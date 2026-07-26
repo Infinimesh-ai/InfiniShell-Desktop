@@ -11,14 +11,19 @@
 ```
 crates/persistence/
 ├── migrations/2026-07-XX-000000_add_ssh_machine_memories/   (NEW — Task 1)
-├── src/schema.rs                                            (修改 — Task 1)
-└── src/model.rs                                             (修改 — Task 1)
+├── migrations/2026-07-XX-000000_add_ssh_machine_memory_tombstones/ (NEW — Task 6)
+├── src/schema.rs                                            (修改 — Task 1/6)
+└── src/model.rs                                             (修改 — Task 1/6)
 
 crates/warp_ssh_manager/src/
 ├── db.rs                           (修改 — Task 2：首次打开失败可降级)
 ├── lib.rs                          (修改 — 导出新模块)
-├── memory.rs                       (NEW — Task 1：类型 + repository + key 归一化)
+├── memory.rs                       (NEW — Task 1；Task 6：tombstone + 同步写入)
 └── sync_provider.rs                (修改 — Task 6：同步新表)
+
+crates/zap_sync/src/
+├── sync_engine.rs                 (修改 — Task 6：等版本归并与 LWW 回传)
+└── types.rs                       (修改 — Task 6：原子版本提交接口)
 
 app/src/ai/machine_memory/          (NEW — Task 2/4)
 ├── mod.rs                          (加载辅助)
@@ -345,9 +350,34 @@ nginx"能直接关联目标机器。
 ### 6.1 同步
 
 `crates/warp_ssh_manager/src/sync_provider.rs`：把 `ssh_machine_memories`
-并入现有 `section_key() = "ssh"` 的 collect/apply（随既有加密通道走）。
-合并策略：按 `machine_key` 对齐，`updated_at` 新者胜（last-write-wins）。
-需处理远端有/本地无、本地有/远端无、双方都有三种情况；不做逐字段 merge。
+并入现有 `section_key() = "ssh"` 的 collect/apply。每条 active memory 的
+`content` 单独调用现有 `zap_sync::crypto` 加密后放入 payload；不得把 Markdown
+明文写入 gist，也不得用带随机 nonce 的密文比较内容。旧 payload 缺 memories
+字段时按空集合兼容。
+
+合并按 `machine_key` 做整行 LWW union，不做逐字段 merge：远端有/本地无、
+本地有/远端无均保留；双方都有时 `updated_at` 新者胜。时间戳相同但内容不同
+时必须确定性决胜：tombstone 优先，其余按包含明文 content 的 canonical tuple
+比较，确保两台设备收敛。应用前先解密并校验全部远端 memory；任一条失败时
+不得修改数据库或 keychain。
+
+物理删除无法跨设备传播，因此 migration 为表新增 nullable `deleted_at`：
+`delete` 清空 content 并写 `deleted_at = updated_at`，暂不 GC tombstone；普通
+`get/list_all` 过滤 tombstone，同步专用查询包含 tombstone；`upsert_content`
+清除 `deleted_at`，表示显式复活。所有本地 memory 写操作与
+`sync_meta.sync_version` 递增在同一事务内完成；同步应用保留获胜行的原始
+`updated_at`，不逐条递增版本。
+
+现有 `SyncEngine` 在本地/远端版本相等时不会调用 provider，且 `apply_data`
+无法回报归并后是否需要把本地胜者传回远端。Task 6 因此同步扩展
+`crates/zap_sync/src/sync_engine.rs`：provider 返回 `local_changed/needs_upload`
+结果，并提供默认 no-op 的等版本 reconcile。SSH provider 的 reconcile 只合并
+machine memories，不能调用会全量替换 SSH tree/keychain 的现有 apply。
+等版本分歧、远端新版 apply 后存在本地胜者、以及 force upload 覆盖前，均先
+归并 memories；需要回传时重新 collect，以 `max(local, remote) + 1` 上传，且
+只有 gist 写入成功后才推进本地版本。版本提交必须原子比较同步开始时的版本；
+若网络请求期间发生本地写入，则保留高于已上传版本的待同步版本，不能覆盖该
+并发增量。版本递增须检查 `i64` 溢出并返回错误。
 
 ### 6.2 UI
 
@@ -357,7 +387,11 @@ nginx"能直接关联目标机器。
 `resolve_machine_key`。i18n 三语言补 key（`warp.ftl`）。
 
 - 验收：面板可见记忆、清空生效；两台设备通过 gist 同步后记忆一致，
-  冲突时新 updated_at 胜出（单元测试覆盖 merge 三种情况）。
+  冲突时新 updated_at 胜出。
+- 单元测试覆盖：legacy payload、逐条密文不泄漏明文、解密失败无副作用；
+  merge 三种来源、双方新旧、等时间确定性；tombstone 防复活与显式复活；
+  等版本分歧自动回传、远端新版 apply 后本地胜者回传、force upload 不丢远端
+  独有记录，以及上传失败不推进本地版本。
 
 ---
 

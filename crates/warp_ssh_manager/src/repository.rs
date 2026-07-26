@@ -30,6 +30,8 @@ pub enum SshRepositoryError {
     NotFound(String),
     #[error("invalid value in db column `{column}`: {value}")]
     InvalidEnum { column: &'static str, value: String },
+    #[error("sync version overflow at {0}")]
+    SyncVersionOverflow(i64),
 }
 
 /// 数据访问层。每个方法都接受 `&mut SqliteConnection`,调用方持有连接,
@@ -489,7 +491,9 @@ impl SyncMetaRepository {
     /// 递增同步版本号并返回新值
     pub fn increment_sync_version(conn: &mut SqliteConnection) -> Result<i64, SshRepositoryError> {
         let current = Self::get_sync_version(conn)?;
-        let new_version = current + 1;
+        let new_version = current
+            .checked_add(1)
+            .ok_or(SshRepositoryError::SyncVersionOverflow(current))?;
         let val = new_version.to_string();
         diesel::replace_into(sync_meta::table)
             .values(NewSyncMeta {
@@ -513,6 +517,27 @@ impl SyncMetaRepository {
             })
             .execute(conn)?;
         Ok(())
+    }
+
+    /// 原子提交已同步版本；若网络请求期间发生本地写入，则保留更高的待同步版本。
+    pub fn commit_sync_version(
+        conn: &mut SqliteConnection,
+        expected_version: i64,
+        synced_version: i64,
+    ) -> Result<i64, SshRepositoryError> {
+        conn.transaction::<_, SshRepositoryError, _>(|conn| {
+            let current_version = Self::get_sync_version(conn)?;
+            let committed_version = if current_version == expected_version {
+                synced_version
+            } else {
+                let newest_version = current_version.max(synced_version);
+                newest_version
+                    .checked_add(1)
+                    .ok_or(SshRepositoryError::SyncVersionOverflow(newest_version))?
+            };
+            Self::set_sync_version(conn, committed_version)?;
+            Ok(committed_version)
+        })
     }
 
     /// 获取上次同步时间
@@ -583,6 +608,9 @@ pub(crate) fn setup_in_memory() -> SqliteConnection {
         ),
         include_str!(
             "../../persistence/migrations/2026-07-26-000000_add_ssh_machine_memories/up.sql"
+        ),
+        include_str!(
+            "../../persistence/migrations/2026-07-26-010000_add_ssh_machine_memory_deleted_at/up.sql"
         ),
     ] {
         conn.batch_execute(up).unwrap();
@@ -877,6 +905,45 @@ mod tests {
         SyncMetaRepository::set_sync_version(&mut conn, 99).unwrap();
         let v = SyncMetaRepository::increment_sync_version(&mut conn).unwrap();
         assert_eq!(v, 100);
+    }
+
+    #[test]
+    fn sync_meta_commit_sets_synced_version_without_concurrent_write() {
+        let mut conn = setup_in_memory();
+        SyncMetaRepository::set_sync_version(&mut conn, 3).unwrap();
+
+        let committed = SyncMetaRepository::commit_sync_version(&mut conn, 3, 4).unwrap();
+
+        assert_eq!(committed, 4);
+        assert_eq!(SyncMetaRepository::get_sync_version(&mut conn).unwrap(), 4);
+    }
+
+    #[test]
+    fn sync_meta_commit_preserves_concurrent_write_as_pending_version() {
+        let mut conn = setup_in_memory();
+        SyncMetaRepository::set_sync_version(&mut conn, 4).unwrap();
+
+        let committed = SyncMetaRepository::commit_sync_version(&mut conn, 3, 4).unwrap();
+
+        assert_eq!(committed, 5);
+        assert_eq!(SyncMetaRepository::get_sync_version(&mut conn).unwrap(), 5);
+    }
+
+    #[test]
+    fn sync_meta_increment_rejects_version_overflow() {
+        let mut conn = setup_in_memory();
+        SyncMetaRepository::set_sync_version(&mut conn, i64::MAX).unwrap();
+
+        let error = SyncMetaRepository::increment_sync_version(&mut conn).unwrap_err();
+
+        assert!(matches!(
+            error,
+            SshRepositoryError::SyncVersionOverflow(i64::MAX)
+        ));
+        assert_eq!(
+            SyncMetaRepository::get_sync_version(&mut conn).unwrap(),
+            i64::MAX
+        );
     }
 
     #[test]

@@ -1547,6 +1547,7 @@ pub struct SshMachineMemoryRow {
     pub last_review_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub deleted_at: Option<String>,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Debug)]
@@ -1559,6 +1560,7 @@ pub struct NewSshMachineMemory<'a> {
     pub last_review_at: Option<&'a str>,
     pub created_at: &'a str,
     pub updated_at: &'a str,
+    pub deleted_at: Option<&'a str>,
 }
 
 // --- Sync Meta ---------------------------------------------------------

@@ -73,6 +73,7 @@ fn memory_at(
         ssh_node_id: None,
         last_review_at: None,
         updated_at: Utc.timestamp_opt(updated_at, 0).single().unwrap(),
+        deleted_at: None,
     }
 }
 

@@ -363,6 +363,7 @@ diesel::table! {
         last_review_at -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        deleted_at -> Nullable<Text>,
     }
 }
 

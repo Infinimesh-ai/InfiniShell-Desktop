@@ -13,14 +13,16 @@ use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
 use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
 use crate::view_components::dropdown::{Dropdown, DropdownItem};
+use markdown_parser::parse_markdown;
 use pathfinder_geometry::vector::vec2f;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{
     Align, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Element, Fill, Flex,
-    Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
-    ParentElement, ParentOffsetBounds, Radius, ScrollbarWidth, Shrinkable, Stack, Text, Wrap,
+    FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
+    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, ScrollbarWidth,
+    Shrinkable, Stack, Text, Wrap,
 };
 use warpui::fonts::Weight;
 use warpui::platform::{Cursor, FilePickerConfiguration};
@@ -32,9 +34,9 @@ use warpui::{
 };
 
 use warp_ssh_manager::{
-    AuthType, ConnectionStatus, KeychainSecretStore, NodeKind, OneKeyCredentialKind, SecretKind,
-    SshNode, SshOneKeyCredential, SshRepository, SshSecretStore, SshSecretStoreError,
-    SshServerInfo,
+    resolve_machine_key, AuthType, ConnectionStatus, KeychainSecretStore, MachineMemory,
+    MachineMemoryRepository, NodeKind, OneKeyCredentialKind, SecretKind, SshNode,
+    SshOneKeyCredential, SshRepository, SshSecretStore, SshSecretStoreError, SshServerInfo,
 };
 use zeroize::Zeroizing;
 
@@ -48,6 +50,8 @@ const AUTH_TOGGLE_PADDING_V: f32 = 6.0;
 const ONEKEY_MANAGER_WIDTH: f32 = 680.0;
 const ONEKEY_MANAGER_HEIGHT: f32 = 500.0;
 const ONEKEY_MANAGER_LIST_WIDTH: f32 = 220.0;
+const MACHINE_MEMORY_CONTENT_HEIGHT: f32 = 220.0;
+const MACHINE_MEMORY_DIALOG_WIDTH: f32 = 450.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SshServerAction {
@@ -71,6 +75,9 @@ pub enum SshServerAction {
     SetManagedOneKeyKey,
     SaveManagedOneKeyCredential,
     DeleteManagedOneKeyCredential,
+    OpenClearMachineMemoryConfirmation,
+    CancelClearMachineMemoryConfirmation,
+    ConfirmClearMachineMemory,
 }
 
 /// 一次性显示在 Save 按钮上方/下方的状态标签。
@@ -95,6 +102,8 @@ pub struct SshServerView {
     node: Option<SshNode>,
     /// 缓存上次从 DB 读到的 server,用于占位文本和初值。folder 节点会是 None。
     server: Option<SshServerInfo>,
+    /// 当前服务器对应的 AI 记忆；读取失败按无记忆降级，不影响服务器表单。
+    machine_memory: Option<MachineMemory>,
     pane_configuration: ModelHandle<PaneConfiguration>,
     focus_handle: Option<PaneFocusHandle>,
 
@@ -130,6 +139,9 @@ pub struct SshServerView {
     onekey_manager_key_btn_state: MouseStateHandle,
     onekey_key_path_picker_btn_state: MouseStateHandle,
     onekey_manager_row_states: Vec<MouseStateHandle>,
+    clear_machine_memory_btn_state: MouseStateHandle,
+    clear_machine_memory_confirm_btn_state: MouseStateHandle,
+    clear_machine_memory_cancel_btn_state: MouseStateHandle,
 
     /// 分组下拉选择器。
     group_dropdown: ViewHandle<Dropdown<SshServerAction>>,
@@ -137,6 +149,7 @@ pub struct SshServerView {
     onekey_credentials: Vec<SshOneKeyCredential>,
     selected_onekey_credential_id: Option<String>,
     show_onekey_manager: bool,
+    show_clear_machine_memory_confirmation: bool,
     managed_onekey_credential_id: Option<String>,
     managed_onekey_kind: OneKeyCredentialKind,
     /// 缓存所有文件夹节点 (id, name),用于重建下拉列表。
@@ -151,6 +164,7 @@ pub struct SshServerView {
     latency_ms: Option<u64>,
     is_testing: bool,
     scroll_state: ClippedScrollStateHandle,
+    machine_memory_scroll_state: ClippedScrollStateHandle,
 }
 
 impl SshServerView {
@@ -201,6 +215,7 @@ impl SshServerView {
             node_id,
             node: None,
             server: None,
+            machine_memory: None,
             pane_configuration,
             focus_handle: None,
             name_editor,
@@ -232,11 +247,15 @@ impl SshServerView {
             onekey_manager_key_btn_state: MouseStateHandle::default(),
             onekey_key_path_picker_btn_state: MouseStateHandle::default(),
             onekey_manager_row_states: Vec::new(),
+            clear_machine_memory_btn_state: MouseStateHandle::default(),
+            clear_machine_memory_confirm_btn_state: MouseStateHandle::default(),
+            clear_machine_memory_cancel_btn_state: MouseStateHandle::default(),
             group_dropdown,
             onekey_credential_dropdown,
             onekey_credentials: Vec::new(),
             selected_onekey_credential_id: None,
             show_onekey_manager: false,
+            show_clear_machine_memory_confirmation: false,
             managed_onekey_credential_id: None,
             managed_onekey_kind: OneKeyCredentialKind::Password,
             folders: Vec::new(),
@@ -247,6 +266,7 @@ impl SshServerView {
             latency_ms: None,
             is_testing: false,
             scroll_state: ClippedScrollStateHandle::default(),
+            machine_memory_scroll_state: ClippedScrollStateHandle::default(),
         };
         me.reload(ctx);
 
@@ -361,6 +381,7 @@ impl SshServerView {
                 self.current_group_id = None;
             }
         }
+        self.reload_machine_memory();
 
         // 把节点名 / server 字段写入 editor buffer
         let name = self
@@ -459,6 +480,23 @@ impl SshServerView {
         self.rebuild_onekey_credential_dropdown(ctx);
         self.sync_onekey_manager_row_states();
         ctx.notify();
+    }
+
+    /// 记忆读取独立于主 reload；数据库异常只隐藏记忆区内容，不影响服务器详情。
+    fn reload_machine_memory(&mut self) {
+        let Some(machine_key) = self.server.as_ref().and_then(machine_key_for_server) else {
+            self.machine_memory = None;
+            return;
+        };
+        match warp_ssh_manager::with_conn(|conn| {
+            Ok(MachineMemoryRepository::get(conn, &machine_key)?)
+        }) {
+            Ok(memory) => self.machine_memory = memory,
+            Err(error) => {
+                log::error!("ssh_server_view: reload machine memory failed: {error:?}");
+                self.machine_memory = None;
+            }
+        }
     }
 
     /// 根据 self.folders 重建下拉列表并设置当前选中项。
@@ -1098,6 +1136,37 @@ impl SshServerView {
         ctx.notify();
     }
 
+    fn on_clear_machine_memory(&mut self, ctx: &mut ViewContext<Self>) {
+        let machine_key = self
+            .machine_memory
+            .as_ref()
+            .map(|memory| memory.machine_key.clone())
+            .or_else(|| self.server.as_ref().and_then(machine_key_for_server));
+        let Some(machine_key) = machine_key else {
+            self.show_clear_machine_memory_confirmation = false;
+            ctx.notify();
+            return;
+        };
+
+        let result = warp_ssh_manager::with_conn(|conn| {
+            MachineMemoryRepository::delete(conn, &machine_key)?;
+            Ok(())
+        });
+        self.show_clear_machine_memory_confirmation = false;
+        if let Err(error) = result {
+            log::error!("ssh_server_view: clear machine memory failed: {error:?}");
+            self.status = Some(StatusBanner::Error(format!("{error}")));
+            ctx.notify();
+            return;
+        }
+
+        self.reload_machine_memory();
+        SshTreeChangedNotifier::handle(ctx).update(ctx, |_, ctx| {
+            ctx.emit(SshTreeChangedEvent::TreeChanged);
+        });
+        ctx.notify();
+    }
+
     // ---------- 渲染 helpers ---------- //
 
     fn render_label(&self, text: &str, appearance: &Appearance) -> Box<dyn Element> {
@@ -1505,6 +1574,195 @@ impl SshServerView {
         )
     }
 
+    fn render_machine_memory_content(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let background = theme.surface_2();
+        let text_color = theme.main_text_color(background).into_solid();
+        let content = self
+            .machine_memory
+            .as_ref()
+            .map(|memory| memory.content.as_str())
+            .filter(|content| !content.trim().is_empty());
+
+        match content {
+            Some(content) => match parse_markdown(content) {
+                Ok(formatted) => FormattedTextElement::new(
+                    formatted,
+                    appearance.ui_font_size(),
+                    appearance.ui_font_family(),
+                    appearance.monospace_font_family(),
+                    text_color,
+                    Default::default(),
+                )
+                .with_heading_to_font_size_multipliers(
+                    appearance.heading_font_size_multipliers().clone(),
+                )
+                .with_hyperlink_font_color(theme.accent().into_solid())
+                .set_selectable(true)
+                .finish(),
+                Err(error) => {
+                    log::warn!("ssh_server_view: parse machine memory markdown failed: {error:?}");
+                    Text::new(
+                        content.to_string(),
+                        appearance.ui_font_family(),
+                        appearance.ui_font_size(),
+                    )
+                    .with_color(text_color)
+                    .with_selectable(true)
+                    .finish()
+                }
+            },
+            None => Text::new(
+                crate::t!("workspace-left-panel-ssh-manager-memory-empty"),
+                appearance.ui_font_family(),
+                appearance.ui_font_size(),
+            )
+            .with_color(theme.sub_text_color(background).into_solid())
+            .with_selectable(true)
+            .finish(),
+        }
+    }
+
+    fn render_machine_memory_section(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let mut header = Flex::row()
+            .with_main_axis_size(MainAxisSize::Max)
+            .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(self.render_label(
+                &crate::t!("workspace-left-panel-ssh-manager-memory"),
+                appearance,
+            ));
+        if self.machine_memory.is_some() {
+            let clear_button = appearance
+                .ui_builder()
+                .button(
+                    ButtonVariant::Warn,
+                    self.clear_machine_memory_btn_state.clone(),
+                )
+                .with_style(UiComponentStyles {
+                    height: Some(SAVE_BUTTON_HEIGHT),
+                    font_size: Some(13.0),
+                    ..Default::default()
+                })
+                .with_centered_text_label(crate::t!(
+                    "workspace-left-panel-ssh-manager-memory-clear"
+                ))
+                .build()
+                .on_click(|ctx, _, _| {
+                    ctx.dispatch_typed_action(SshServerAction::OpenClearMachineMemoryConfirmation)
+                })
+                .finish();
+            header.add_child(clear_button);
+        }
+
+        let mut section = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+        section.add_child(header.finish());
+        if let Some(memory) = self.machine_memory.as_ref() {
+            section.add_child(
+                Container::new(
+                    Text::new_inline(
+                        crate::t!(
+                            "workspace-left-panel-ssh-manager-memory-updated",
+                            updated_at = memory.updated_at.to_rfc3339()
+                        ),
+                        appearance.ui_font_family(),
+                        12.0,
+                    )
+                    .with_color(theme.sub_text_color(theme.background()).into())
+                    .finish(),
+                )
+                .with_margin_bottom(6.0)
+                .finish(),
+            );
+        }
+
+        let memory_content = Container::new(self.render_machine_memory_content(appearance))
+            .with_uniform_padding(12.0)
+            .finish();
+        let scrollable = ConstrainedBox::new(
+            ClippedScrollable::vertical(
+                self.machine_memory_scroll_state.clone(),
+                memory_content,
+                ScrollbarWidth::Auto,
+                theme.disabled_text_color(theme.surface_2()).into(),
+                theme.main_text_color(theme.surface_2()).into(),
+                Fill::None,
+            )
+            .finish(),
+        )
+        .with_height(MACHINE_MEMORY_CONTENT_HEIGHT)
+        .finish();
+        section.add_child(
+            Container::new(scrollable)
+                .with_background(theme.surface_2())
+                .with_border(Border::all(1.0).with_border_fill(internal_colors::neutral_3(theme)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.0)))
+                .finish(),
+        );
+
+        Container::new(section.finish())
+            .with_margin_bottom(FIELD_BLOCK_MARGIN_BOTTOM)
+            .finish()
+    }
+
+    fn render_clear_machine_memory_confirmation(
+        &self,
+        appearance: &Appearance,
+    ) -> Box<dyn Element> {
+        use crate::ui_components::dialog::{dialog_styles, Dialog};
+
+        let cancel_button = appearance
+            .ui_builder()
+            .button(
+                ButtonVariant::Secondary,
+                self.clear_machine_memory_cancel_btn_state.clone(),
+            )
+            .with_text_label(crate::t!("common-cancel"))
+            .build()
+            .on_click(|ctx, _, _| {
+                ctx.dispatch_typed_action(SshServerAction::CancelClearMachineMemoryConfirmation)
+            })
+            .finish();
+        let clear_button = Container::new(
+            appearance
+                .ui_builder()
+                .button(
+                    ButtonVariant::Warn,
+                    self.clear_machine_memory_confirm_btn_state.clone(),
+                )
+                .with_text_label(crate::t!(
+                    "workspace-left-panel-ssh-manager-memory-clear-confirm-button"
+                ))
+                .build()
+                .on_click(|ctx, _, _| {
+                    ctx.dispatch_typed_action(SshServerAction::ConfirmClearMachineMemory)
+                })
+                .finish(),
+        )
+        .with_margin_left(12.0)
+        .finish();
+        let dialog = Dialog::new(
+            crate::t!("workspace-left-panel-ssh-manager-memory-clear-confirm-title"),
+            Some(crate::t!(
+                "workspace-left-panel-ssh-manager-memory-clear-confirm-description"
+            )),
+            dialog_styles(appearance),
+        )
+        .with_bottom_row_child(cancel_button)
+        .with_bottom_row_child(clear_button)
+        .with_width(MACHINE_MEMORY_DIALOG_WIDTH)
+        .build()
+        .finish();
+
+        Dismiss::new(dialog)
+            .prevent_interaction_with_other_elements()
+            .on_dismiss(|ctx, _app| {
+                ctx.dispatch_typed_action(SshServerAction::CancelClearMachineMemoryConfirmation);
+            })
+            .finish()
+    }
+
     /// 分组下拉字段:label + dropdown。
     fn render_group_field(&self, appearance: &Appearance) -> Box<dyn Element> {
         let label = self.render_label(
@@ -1907,6 +2165,11 @@ fn make_editor(
     })
 }
 
+fn machine_key_for_server(server: &SshServerInfo) -> Option<String> {
+    let port = server.port.to_string();
+    resolve_machine_key(Some(&server.host), Some(&port))
+}
+
 fn password_lookup_for_server_form(server: &SshServerInfo) -> (Option<String>, SecretKind) {
     match server.auth_type {
         AuthType::Password => (Some(server.node_id.clone()), SecretKind::Password),
@@ -2016,6 +2279,15 @@ impl TypedActionView for SshServerView {
             SshServerAction::DeleteManagedOneKeyCredential => {
                 self.on_delete_managed_onekey_credential(ctx)
             }
+            SshServerAction::OpenClearMachineMemoryConfirmation => {
+                self.show_clear_machine_memory_confirmation = true;
+                ctx.notify();
+            }
+            SshServerAction::CancelClearMachineMemoryConfirmation => {
+                self.show_clear_machine_memory_confirmation = false;
+                ctx.notify();
+            }
+            SshServerAction::ConfirmClearMachineMemory => self.on_clear_machine_memory(ctx),
             SshServerAction::SelectGroup(index) => {
                 let new_group_id =
                     index.and_then(|i| self.folders.get(i).map(|(id, _)| id.clone()));
@@ -2197,6 +2469,8 @@ impl View for SshServerView {
             &self.notes_editor,
             appearance,
         ));
+        // AI 记忆与人工备注分离，只读展示并单独滚动。
+        col.add_child(self.render_machine_memory_section(appearance));
 
         let theme = appearance.theme();
         let inner = ConstrainedBox::new(
@@ -2221,17 +2495,30 @@ impl View for SshServerView {
         .finish();
 
         let content = Align::new(scrollable).top_center().finish();
-        if self.show_onekey_manager {
+        if self.show_onekey_manager || self.show_clear_machine_memory_confirmation {
             let mut stack = Stack::new().with_child(content);
-            stack.add_positioned_overlay_child(
-                self.render_onekey_manager(appearance),
-                OffsetPositioning::offset_from_parent(
-                    vec2f(0.0, 0.0),
-                    ParentOffsetBounds::WindowByPosition,
-                    ParentAnchor::Center,
-                    ChildAnchor::Center,
-                ),
-            );
+            if self.show_onekey_manager {
+                stack.add_positioned_overlay_child(
+                    self.render_onekey_manager(appearance),
+                    OffsetPositioning::offset_from_parent(
+                        vec2f(0.0, 0.0),
+                        ParentOffsetBounds::WindowByPosition,
+                        ParentAnchor::Center,
+                        ChildAnchor::Center,
+                    ),
+                );
+            }
+            if self.show_clear_machine_memory_confirmation {
+                stack.add_positioned_overlay_child(
+                    self.render_clear_machine_memory_confirmation(appearance),
+                    OffsetPositioning::offset_from_parent(
+                        vec2f(0.0, 0.0),
+                        ParentOffsetBounds::WindowByPosition,
+                        ParentAnchor::Center,
+                        ChildAnchor::Center,
+                    ),
+                );
+            }
             stack.finish()
         } else {
             content

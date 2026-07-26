@@ -26,7 +26,8 @@ pub use ssh_config_parser::{
     load_candidates_from, parse_ssh_config,
 };
 pub use sync_provider::{
-    DbVersionStore, SshSyncData, SshSyncProvider, SyncNode, SyncOneKeyCredential, SyncServer,
+    DbVersionStore, SshSyncData, SshSyncProvider, SyncMachineMemory, SyncNode,
+    SyncOneKeyCredential, SyncServer,
 };
 pub use types::ConnectionStatus;
 pub use types::{
