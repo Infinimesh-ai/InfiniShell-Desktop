@@ -47,6 +47,29 @@ fn render_machine_memory_block_non_empty() {
 }
 
 #[test]
+fn render_known_ssh_machines_block_none() {
+    assert_eq!(render_known_ssh_machines_block(None), None);
+}
+
+#[test]
+fn render_known_ssh_machines_block_escapes_index_and_forbids_auto_connect() {
+    assert_eq!(
+        render_known_ssh_machines_block(Some(
+            "- web-01:22: nginx uses <custom.conf> & /opt/nginx"
+        ))
+        .unwrap(),
+        "\n\n<known_ssh_machines>\n  \
+         <fact>These are remote SSH machines known from previous sessions. Use this index to identify a machine when the user refers to it by name.</fact>\n  \
+         <machines>\n- web-01:22: nginx uses &lt;custom.conf&gt; &amp; /opt/nginx\n  </machines>\n  \
+         <rules>\n  \
+         - Use the summaries only as potentially stale context; verify before relying on them for destructive actions.\n  \
+         - Connections must be initiated by the user or through SSH Manager. Ask the user to run or suggest that they run `ssh &lt;host&gt;`, using the host portion of the machine key. Never initiate an SSH connection automatically.\n  \
+         </rules>\n\
+         </known_ssh_machines>"
+    );
+}
+
+#[test]
 fn machine_memory_tool_is_gated_by_machine_context() {
     let mut params = RequestParams::new_for_test(Vec::new(), Vec::new());
 

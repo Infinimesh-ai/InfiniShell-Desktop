@@ -91,6 +91,7 @@ pub struct RequestParams {
     pub computer_use_model: LLMId,
     pub is_memory_enabled: bool,
     pub machine_memory: Option<MachineMemoryContext>,
+    pub machine_index: Option<String>,
     /// Zap BYOP 专用:用户在 设置 → Agents → Rules 创建的全局 Rules
     /// (`AIFact::Memory`)的快照,在 `new()` 中从 `ObjectStoreModel` 一次性拉取
     /// 后随请求 plumb 到 `chat_stream::build_chat_request` → `prompt_renderer`,
@@ -214,6 +215,7 @@ impl RequestParams {
             computer_use_model: LLMId::from("byop:test"),
             is_memory_enabled: false,
             machine_memory: None,
+            machine_index: None,
             user_rules: Vec::new(),
             warp_drive_context_enabled: false,
             context_window_limit: None,
@@ -252,6 +254,7 @@ impl RequestParams {
         let ai_settings = AISettings::as_ref(app);
         let is_memory_enabled = ai_settings.is_memory_enabled(app);
         let machine_memory = machine_memory::load_for_session(&session_context, app);
+        let machine_index = machine_memory::load_index_for_session(&session_context, app);
         let warp_drive_context_enabled = ai_settings.is_warp_drive_context_enabled(app);
 
         // Zap BYOP 修复 Issue #116:gate 在 `is_memory_enabled`,具体收集逻辑
@@ -417,6 +420,7 @@ impl RequestParams {
             computer_use_model: request_input.computer_use_model_id.clone(),
             is_memory_enabled,
             machine_memory,
+            machine_index,
             user_rules,
             warp_drive_context_enabled,
             mcp_context,

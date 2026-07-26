@@ -216,6 +216,20 @@ fn render_machine_memory_block(
     ))
 }
 
+fn render_known_ssh_machines_block(machine_index: Option<&str>) -> Option<String> {
+    let machine_index = xml_text(machine_index?);
+    Some(format!(
+        "\n\n<known_ssh_machines>\n  \
+         <fact>These are remote SSH machines known from previous sessions. Use this index to identify a machine when the user refers to it by name.</fact>\n  \
+         <machines>\n{machine_index}\n  </machines>\n  \
+         <rules>\n  \
+         - Use the summaries only as potentially stale context; verify before relying on them for destructive actions.\n  \
+         - Connections must be initiated by the user or through SSH Manager. Ask the user to run or suggest that they run `ssh &lt;host&gt;`, using the host portion of the machine key. Never initiate an SSH connection automatically.\n  \
+         </rules>\n\
+         </known_ssh_machines>"
+    ))
+}
+
 /// XML 转义,同时 strip 所有非法/有问题的控制字符,避免 JSON 序列化失败。
 ///
 /// `grid_contents`(从 `formatted_terminal_contents_for_input` 提取的 alt-screen 内容)
@@ -1223,6 +1237,11 @@ fn build_chat_request(
     if let Some(machine_memory_block) = render_machine_memory_block(params.machine_memory.as_ref())
     {
         system_text.push_str(&machine_memory_block);
+    }
+    if let Some(machine_index_block) =
+        render_known_ssh_machines_block(params.machine_index.as_deref())
+    {
+        system_text.push_str(&machine_index_block);
     }
     // 注:LRC / 长命令的工具用法引导(write_to_long_running_shell_command + command_id +
     // 各种 mode 与 raw 字节序列)已经在 `prompts/system/default.j2:69-79` 完整覆盖。
