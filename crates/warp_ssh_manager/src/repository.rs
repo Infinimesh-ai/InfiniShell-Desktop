@@ -581,6 +581,9 @@ pub(crate) fn setup_in_memory() -> SqliteConnection {
         include_str!(
             "../../persistence/migrations/2026-06-09-160000_add_ssh_onekey_key_type/up.sql"
         ),
+        include_str!(
+            "../../persistence/migrations/2026-07-26-000000_add_ssh_machine_memories/up.sql"
+        ),
     ] {
         conn.batch_execute(up).unwrap();
     }
