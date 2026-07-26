@@ -4,15 +4,18 @@
 // date: 2026-05-26
 
 use crate::db::with_conn;
+use crate::memory::{MachineMemory, MachineMemoryRepository, MAX_MEMORY_CHARS};
 use crate::repository::{SshRepository, SyncMetaRepository};
 use crate::secrets::{KeychainSecretStore, SecretKind, SshSecretStore};
 use crate::types::{NodeKind, OneKeyCredentialKind};
+use chrono::{DateTime, Utc};
 use diesel::connection::{Connection, SimpleConnection};
 use diesel::{QueryDsl, RunQueryDsl};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashSet, VecDeque};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use zap_sync::crypto;
-use zap_sync::{SyncDataProvider, SyncEngineError, SyncVersionStore};
+use zap_sync::{ApplyDataOutcome, SyncDataProvider, SyncEngineError, SyncVersionStore};
 use zeroize::Zeroizing;
 
 /// keychain 三种凭据 kind,用于 collect/apply/orphan-cleanup 时统一遍历
@@ -64,6 +67,22 @@ pub struct SyncOneKeyCredential {
     pub password_encrypted: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncMachineMemory {
+    pub machine_key: String,
+    #[serde(default)]
+    pub content_encrypted: Option<String>,
+    #[serde(default)]
+    pub hostname_alias: Option<String>,
+    #[serde(default)]
+    pub ssh_node_id: Option<String>,
+    #[serde(default)]
+    pub last_review_at: Option<String>,
+    pub updated_at: String,
+    #[serde(default)]
+    pub deleted_at: Option<String>,
+}
+
 /// SSH 同步数据
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SshSyncData {
@@ -71,6 +90,8 @@ pub struct SshSyncData {
     pub servers: Vec<SyncServer>,
     #[serde(default)]
     pub onekey_credentials: Vec<SyncOneKeyCredential>,
+    #[serde(default)]
+    pub machine_memories: Vec<SyncMachineMemory>,
 }
 
 /// SSH 数据同步提供者
@@ -99,6 +120,11 @@ impl SyncDataProvider for SshSyncProvider {
         let mut sync_nodes = Vec::new();
         let mut sync_servers = Vec::new();
         let mut sync_onekey_credentials = Vec::new();
+
+        let machine_memories =
+            with_conn(|conn| Ok(MachineMemoryRepository::list_all_for_sync(conn)?))
+                .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
+        let sync_machine_memories = encrypt_machine_memories(token, &machine_memories)?;
 
         let onekey_credentials =
             with_conn(|conn| Ok(SshRepository::list_onekey_credentials(conn)?))
@@ -164,15 +190,28 @@ impl SyncDataProvider for SshSyncProvider {
             nodes: sync_nodes,
             servers: sync_servers,
             onekey_credentials: sync_onekey_credentials,
+            machine_memories: sync_machine_memories,
         };
 
         serde_json::to_value(&data)
             .map_err(|e: serde_json::Error| SyncEngineError::Serialization(e.to_string()))
     }
 
-    fn apply_data(&self, token: &str, data: &serde_json::Value) -> Result<(), SyncEngineError> {
+    fn apply_data(
+        &self,
+        token: &str,
+        data: &serde_json::Value,
+    ) -> Result<ApplyDataOutcome, SyncEngineError> {
         let ssh_data: SshSyncData = serde_json::from_value(data.clone())
             .map_err(|e: serde_json::Error| SyncEngineError::Serialization(e.to_string()))?;
+
+        // 先解密全部 memory，确保坏密文不会触发后续 keychain 或数据库写入。
+        let remote_memories = decrypt_machine_memories(token, &ssh_data.machine_memories)?;
+        let local_memories =
+            with_conn(|conn| Ok(MachineMemoryRepository::list_all_for_sync(conn)?))
+                .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
+        let (merged_memories, memory_outcome) =
+            merge_machine_memories(&local_memories, &remote_memories);
 
         // ---- 阶段 0 ---- 全部解密 + 收集 explicit-clear 列表
         // pending_secrets: 远程明确给了密文 → 需要写入 keychain
@@ -338,6 +377,9 @@ impl SyncDataProvider for SshSyncProvider {
                         })
                         .execute(conn)?;
                 }
+                for memory in &merged_memories {
+                    MachineMemoryRepository::upsert_from_sync(conn, memory)?;
+                }
                 Ok(())
             })
         });
@@ -383,8 +425,188 @@ impl SyncDataProvider for SshSyncProvider {
             }
         }
 
-        Ok(())
+        Ok(memory_outcome)
     }
+
+    fn reconcile_data(
+        &self,
+        token: &str,
+        data: &serde_json::Value,
+    ) -> Result<ApplyDataOutcome, SyncEngineError> {
+        let ssh_data: SshSyncData = serde_json::from_value(data.clone())
+            .map_err(|e: serde_json::Error| SyncEngineError::Serialization(e.to_string()))?;
+        let remote_memories = decrypt_machine_memories(token, &ssh_data.machine_memories)?;
+        let local_memories =
+            with_conn(|conn| Ok(MachineMemoryRepository::list_all_for_sync(conn)?))
+                .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
+        let (merged_memories, outcome) = merge_machine_memories(&local_memories, &remote_memories);
+
+        if outcome.local_changed {
+            with_conn(|conn| {
+                conn.transaction::<(), anyhow::Error, _>(|conn| {
+                    for memory in &merged_memories {
+                        MachineMemoryRepository::upsert_from_sync(conn, memory)?;
+                    }
+                    Ok(())
+                })
+            })
+            .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
+        }
+        Ok(outcome)
+    }
+}
+
+fn encrypt_machine_memories(
+    token: &str,
+    memories: &[MachineMemory],
+) -> Result<Vec<SyncMachineMemory>, SyncEngineError> {
+    let mut encrypted = memories
+        .iter()
+        .map(|memory| {
+            let content_encrypted = if memory.deleted_at.is_some() {
+                None
+            } else {
+                Some(
+                    crypto::encrypt(token, &memory.content)
+                        .map_err(|e| SyncEngineError::Crypto(e.to_string()))?,
+                )
+            };
+            Ok(SyncMachineMemory {
+                machine_key: memory.machine_key.clone(),
+                content_encrypted,
+                hostname_alias: memory.hostname_alias.clone(),
+                ssh_node_id: memory.ssh_node_id.clone(),
+                last_review_at: memory.last_review_at.map(|at| at.to_rfc3339()),
+                updated_at: memory.updated_at.to_rfc3339(),
+                deleted_at: memory.deleted_at.map(|at| at.to_rfc3339()),
+            })
+        })
+        .collect::<Result<Vec<_>, SyncEngineError>>()?;
+    encrypted.sort_by(|a, b| a.machine_key.cmp(&b.machine_key));
+    Ok(encrypted)
+}
+
+fn decrypt_machine_memories(
+    token: &str,
+    memories: &[SyncMachineMemory],
+) -> Result<Vec<MachineMemory>, SyncEngineError> {
+    let mut seen = HashSet::new();
+    let mut decrypted = Vec::with_capacity(memories.len());
+    for memory in memories {
+        if !seen.insert(memory.machine_key.as_str()) {
+            return Err(SyncEngineError::Serialization(format!(
+                "duplicate machine memory key: {}",
+                memory.machine_key
+            )));
+        }
+
+        let last_review_at = memory
+            .last_review_at
+            .as_deref()
+            .map(|value| parse_memory_timestamp("last_review_at", &memory.machine_key, value))
+            .transpose()?;
+        let updated_at =
+            parse_memory_timestamp("updated_at", &memory.machine_key, &memory.updated_at)?;
+        let deleted_at = memory
+            .deleted_at
+            .as_deref()
+            .map(|value| parse_memory_timestamp("deleted_at", &memory.machine_key, value))
+            .transpose()?;
+
+        let mut content = match &memory.content_encrypted {
+            Some(content) => crypto::decrypt(token, content)
+                .map_err(|e| SyncEngineError::Crypto(e.to_string()))?,
+            None if deleted_at.is_some() => String::new(),
+            None => {
+                return Err(SyncEngineError::Serialization(format!(
+                    "active machine memory is missing encrypted content: {}",
+                    memory.machine_key
+                )));
+            }
+        };
+        if deleted_at.is_some() {
+            content.clear();
+        } else if content.chars().count() > MAX_MEMORY_CHARS {
+            return Err(SyncEngineError::Serialization(format!(
+                "machine memory exceeds {MAX_MEMORY_CHARS} characters: {}",
+                memory.machine_key
+            )));
+        }
+
+        decrypted.push(MachineMemory {
+            machine_key: memory.machine_key.clone(),
+            content,
+            hostname_alias: memory.hostname_alias.clone(),
+            ssh_node_id: memory.ssh_node_id.clone(),
+            last_review_at,
+            updated_at,
+            deleted_at,
+        });
+    }
+    decrypted.sort_by(|a, b| a.machine_key.cmp(&b.machine_key));
+    Ok(decrypted)
+}
+
+fn parse_memory_timestamp(
+    column: &'static str,
+    machine_key: &str,
+    value: &str,
+) -> Result<DateTime<Utc>, SyncEngineError> {
+    DateTime::parse_from_rfc3339(value)
+        .map(|timestamp| timestamp.with_timezone(&Utc))
+        .map_err(|_| {
+            SyncEngineError::Serialization(format!(
+                "invalid {column} for machine memory {machine_key}: {value}"
+            ))
+        })
+}
+
+fn merge_machine_memories(
+    local: &[MachineMemory],
+    remote: &[MachineMemory],
+) -> (Vec<MachineMemory>, ApplyDataOutcome) {
+    let local_by_key = local
+        .iter()
+        .cloned()
+        .map(|memory| (memory.machine_key.clone(), memory))
+        .collect::<BTreeMap<_, _>>();
+    let remote_by_key = remote
+        .iter()
+        .cloned()
+        .map(|memory| (memory.machine_key.clone(), memory))
+        .collect::<BTreeMap<_, _>>();
+    let mut merged = local_by_key.clone();
+    for (machine_key, remote_memory) in &remote_by_key {
+        match merged.get(machine_key) {
+            Some(local_memory) => {
+                if compare_machine_memories(remote_memory, local_memory).is_gt() {
+                    merged.insert(machine_key.clone(), remote_memory.clone());
+                }
+            }
+            None => {
+                merged.insert(machine_key.clone(), remote_memory.clone());
+            }
+        }
+    }
+
+    let outcome = ApplyDataOutcome {
+        local_changed: merged != local_by_key,
+        needs_upload: merged != remote_by_key,
+    };
+    (merged.into_values().collect(), outcome)
+}
+
+fn compare_machine_memories(a: &MachineMemory, b: &MachineMemory) -> Ordering {
+    a.updated_at.cmp(&b.updated_at).then_with(|| {
+        a.deleted_at
+            .is_some()
+            .cmp(&b.deleted_at.is_some())
+            .then_with(|| a.deleted_at.cmp(&b.deleted_at))
+            .then_with(|| a.hostname_alias.cmp(&b.hostname_alias))
+            .then_with(|| a.ssh_node_id.cmp(&b.ssh_node_id))
+            .then_with(|| a.last_review_at.cmp(&b.last_review_at))
+            .then_with(|| a.content.cmp(&b.content))
+    })
 }
 
 /// apply_data Phase 1 已写入的 keychain 条目记录,带原值快照用于真正回滚。
@@ -559,6 +781,21 @@ impl SyncVersionStore for DbVersionStore {
             .map_err(|e| SyncEngineError::VersionStore(e.to_string()))
     }
 
+    fn commit_sync_version(
+        &self,
+        expected_version: i64,
+        synced_version: i64,
+    ) -> Result<i64, SyncEngineError> {
+        with_conn(|c| {
+            Ok(SyncMetaRepository::commit_sync_version(
+                c,
+                expected_version,
+                synced_version,
+            )?)
+        })
+        .map_err(|e| SyncEngineError::VersionStore(e.to_string()))
+    }
+
     fn update_sync_meta(&self, time: &str, platform: &str) -> Result<(), SyncEngineError> {
         with_conn(|c| Ok(SyncMetaRepository::update_sync_meta(c, time, platform)?))
             .map_err(|e| SyncEngineError::VersionStore(e.to_string()))
@@ -669,6 +906,7 @@ mod tests {
                 root_password_encrypted: None,
             }],
             onekey_credentials: Vec::new(),
+            machine_memories: Vec::new(),
         };
         let json = serde_json::to_string(&data).unwrap();
         let parsed: SshSyncData = serde_json::from_str(&json).unwrap();
@@ -714,6 +952,7 @@ mod tests {
         let parsed: SshSyncData = serde_json::from_str(json).unwrap();
 
         assert!(parsed.onekey_credentials.is_empty());
+        assert!(parsed.machine_memories.is_empty());
         assert_eq!(parsed.servers[0].credential_id, None);
     }
 
@@ -730,6 +969,7 @@ mod tests {
                 key_path: Some("/home/root/.ssh/id_ed25519".to_string()),
                 password_encrypted: Some("enc".to_string()),
             }],
+            machine_memories: Vec::new(),
         };
 
         let json = serde_json::to_string(&data).unwrap();
@@ -782,6 +1022,7 @@ mod tests {
         let data = SshSyncData::default();
         assert!(data.nodes.is_empty());
         assert!(data.servers.is_empty());
+        assert!(data.machine_memories.is_empty());
     }
 
     #[test]
@@ -801,5 +1042,156 @@ mod tests {
         );
         let parsed: SyncNode = serde_json::from_str(&json).unwrap();
         assert!(parsed.parent_id.is_none());
+    }
+
+    fn memory(machine_key: &str, content: &str, updated_at: i64, deleted: bool) -> MachineMemory {
+        let updated_at = DateTime::<Utc>::from_timestamp(updated_at, 0).unwrap();
+        MachineMemory {
+            machine_key: machine_key.to_string(),
+            content: if deleted {
+                String::new()
+            } else {
+                content.to_string()
+            },
+            hostname_alias: None,
+            ssh_node_id: None,
+            last_review_at: None,
+            updated_at,
+            deleted_at: deleted.then_some(updated_at),
+        }
+    }
+
+    #[test]
+    fn machine_memory_content_is_encrypted_per_row_and_round_trips() {
+        let memories = vec![
+            memory("web-01:22", "plaintext-memory-marker", 10, false),
+            memory("deleted:22", "", 11, true),
+        ];
+
+        let encrypted = encrypt_machine_memories("token", &memories).unwrap();
+        let json = serde_json::to_string(&encrypted).unwrap();
+        assert!(!json.contains("plaintext-memory-marker"));
+        assert!(encrypted[0].content_encrypted.is_none());
+        assert!(encrypted[1].content_encrypted.is_some());
+
+        let mut expected = memories;
+        expected.sort_by(|a, b| a.machine_key.cmp(&b.machine_key));
+        assert_eq!(
+            decrypt_machine_memories("token", &encrypted).unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn invalid_or_missing_active_memory_ciphertext_is_rejected_before_apply() {
+        let mut data = SshSyncData::default();
+        data.machine_memories.push(SyncMachineMemory {
+            machine_key: "web-01:22".to_string(),
+            content_encrypted: Some("not-valid-ciphertext".to_string()),
+            hostname_alias: None,
+            ssh_node_id: None,
+            last_review_at: None,
+            updated_at: "2026-07-26T12:00:00Z".to_string(),
+            deleted_at: None,
+        });
+        let error = SshSyncProvider::new()
+            .apply_data("token", &serde_json::to_value(&data).unwrap())
+            .unwrap_err();
+        assert!(matches!(error, SyncEngineError::Crypto(_)));
+
+        data.machine_memories[0].content_encrypted = None;
+        let error = decrypt_machine_memories("token", &data.machine_memories).unwrap_err();
+        assert!(matches!(error, SyncEngineError::Serialization(_)));
+    }
+
+    #[test]
+    fn duplicate_machine_keys_are_rejected() {
+        let encrypted = crypto::encrypt("token", "memory").unwrap();
+        let memory = SyncMachineMemory {
+            machine_key: "web-01:22".to_string(),
+            content_encrypted: Some(encrypted),
+            hostname_alias: None,
+            ssh_node_id: None,
+            last_review_at: None,
+            updated_at: "2026-07-26T12:00:00Z".to_string(),
+            deleted_at: None,
+        };
+
+        let error = decrypt_machine_memories("token", &[memory.clone(), memory]).unwrap_err();
+        assert!(matches!(error, SyncEngineError::Serialization(_)));
+    }
+
+    #[test]
+    fn memory_merge_unions_both_sides_and_uses_newer_timestamp() {
+        let local = vec![
+            memory("local-only:22", "local", 1, false),
+            memory("shared:22", "old", 2, false),
+        ];
+        let remote = vec![
+            memory("remote-only:22", "remote", 1, false),
+            memory("shared:22", "new", 3, false),
+        ];
+
+        let (merged, outcome) = merge_machine_memories(&local, &remote);
+        assert_eq!(
+            merged
+                .iter()
+                .map(|memory| (memory.machine_key.as_str(), memory.content.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("local-only:22", "local"),
+                ("remote-only:22", "remote"),
+                ("shared:22", "new"),
+            ]
+        );
+        assert_eq!(
+            outcome,
+            ApplyDataOutcome {
+                local_changed: true,
+                needs_upload: true,
+            }
+        );
+    }
+
+    #[test]
+    fn memory_merge_keeps_newer_local_row_for_upload() {
+        let local = vec![memory("shared:22", "new local", 3, false)];
+        let remote = vec![memory("shared:22", "old remote", 2, false)];
+
+        let (merged, outcome) = merge_machine_memories(&local, &remote);
+        assert_eq!(merged, local);
+        assert_eq!(
+            outcome,
+            ApplyDataOutcome {
+                local_changed: false,
+                needs_upload: true,
+            }
+        );
+    }
+
+    #[test]
+    fn equal_timestamp_conflicts_are_deterministic_and_tombstone_wins() {
+        let alpha = memory("shared:22", "alpha", 3, false);
+        let zeta = memory("shared:22", "zeta", 3, false);
+        let tombstone = memory("shared:22", "", 3, true);
+
+        let (first, _) = merge_machine_memories(&[alpha.clone()], &[zeta.clone()]);
+        let (second, _) = merge_machine_memories(&[zeta], &[alpha]);
+        assert_eq!(first, second);
+        assert_eq!(first[0].content, "zeta");
+
+        let (merged, _) = merge_machine_memories(&first, &[tombstone.clone()]);
+        assert_eq!(merged, vec![tombstone]);
+    }
+
+    #[test]
+    fn newer_active_memory_explicitly_revives_older_tombstone() {
+        let tombstone = memory("shared:22", "", 2, true);
+        let active = memory("shared:22", "restored", 3, false);
+
+        let (merged, outcome) = merge_machine_memories(&[tombstone], &[active.clone()]);
+        assert_eq!(merged, vec![active]);
+        assert!(outcome.local_changed);
+        assert!(!outcome.needs_upload);
     }
 }

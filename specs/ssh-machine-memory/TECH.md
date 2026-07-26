@@ -11,20 +11,27 @@
 ```
 crates/persistence/
 ├── migrations/2026-07-XX-000000_add_ssh_machine_memories/   (NEW — Task 1)
-├── src/schema.rs                                            (修改 — Task 1)
-└── src/model.rs                                             (修改 — Task 1)
+├── migrations/2026-07-XX-000000_add_ssh_machine_memory_tombstones/ (NEW — Task 6)
+├── src/schema.rs                                            (修改 — Task 1/6)
+└── src/model.rs                                             (修改 — Task 1/6)
 
 crates/warp_ssh_manager/src/
+├── db.rs                           (修改 — Task 2：首次打开失败可降级)
 ├── lib.rs                          (修改 — 导出新模块)
-├── memory.rs                       (NEW — Task 1：类型 + repository + key 归一化)
+├── memory.rs                       (NEW — Task 1；Task 6：tombstone + 同步写入)
 └── sync_provider.rs                (修改 — Task 6：同步新表)
 
+crates/zap_sync/src/
+├── sync_engine.rs                 (修改 — Task 6：等版本归并与 LWW 回传)
+└── types.rs                       (修改 — Task 6：原子版本提交接口)
+
 app/src/ai/machine_memory/          (NEW — Task 2/4)
-├── mod.rs                          (加载/注入辅助 + 设置项)
+├── mod.rs                          (加载辅助)
 └── review.rs                       (Task 4 — 后台复盘)
 
+app/src/ai/agent/api.rs             (修改 — Task 2/5：RequestParams 增字段)
+app/src/settings/ai.rs               (修改 — Task 2：AI 设置项)
 app/src/ai/agent_providers/
-├── api.rs                          (修改 — Task 2：RequestParams 增字段)
 ├── chat_stream.rs                  (修改 — Task 2 注入；Task 3 工具拦截)
 ├── tools/mod.rs                    (修改 — Task 3：REGISTRY 注册)
 ├── tools/machine_memory.rs         (NEW — Task 3)
@@ -144,16 +151,24 @@ pub struct MachineMemoryContext {
 /// → warp_ssh_manager::with_conn(|c| MachineMemoryRepository::get(...))。
 /// 机器无记忆时也返回 Some（content 空串）——工具可用性（Task 3）依赖 machine_key 存在。
 /// DB 错误：log warn + 返回 None，绝不 panic、不阻塞请求。
-pub fn load_for_session(ctx: &SessionContext) -> Option<MachineMemoryContext>;
+pub fn load_for_session(
+    session_context: &SessionContext,
+    ctx: &AppContext,
+) -> Option<MachineMemoryContext>;
 ```
 
-设置项：在现有 AI 设置处（`AISettings`，`is_memory_enabled` 所在体系）新增
+设置项：在 `app/src/settings/ai.rs` 的现有 AI 设置处（`AISettings`，
+`is_memory_enabled` 所在体系）新增
 `ssh_machine_memory_enabled: bool`，默认 `true`。`load_for_session` 在
 总开关 `is_memory_enabled` 或本开关为 false 时直接返回 None。
 
+`crates/warp_ssh_manager/src/db.rs` 的连接惰性初始化必须传递
+`open()` 错误，不得在 `OnceLock::get_or_init` 内 `expect`；这样未初始化、
+数据库打开失败或表缺失都能在 app 侧统一 warn 后降级。
+
 ### 2.2 RequestParams 增字段
 
-`app/src/ai/agent_providers/api.rs` 的 `RequestParams` 新增
+`app/src/ai/agent/api.rs` 的 `RequestParams` 新增
 `pub machine_memory: Option<MachineMemoryContext>`，在 `RequestParams::new`
 中调用 `load_for_session`（已持有 `session_context`）。
 
@@ -232,6 +247,15 @@ executor，chat_stream 在 `parse_incoming_tool_call` 之前按 name 拦截本�
 4. 成功返回 `{"status":"ok","stored_chars":N}`。
 5. **本轮请求内**后续注入内容不需要刷新（下一轮 `RequestParams::new` 自然读到新值）。
 
+成功、参数错误、机器 key 缺失和数据库错误的结果 JSON 都必须包含
+`"_byop_intercepted": true`。该 sentinel 与现有 todowrite/web 工具一致，由
+controller 触发自动续轮，避免本地拦截工具没有 `AIAgentAction` 入队时对话停住。
+
+carrier `ToolCall` 的 `tool` 为 None，现有转换层默认不生成 UI。允许在 app 侧增加
+专用于机器记忆更新的可见 output message：由 `update_machine_memory` carrier 转换，
+复用现有文本渲染显示结果中性的 `Updating machine memory`；不得为此新增 protobuf
+executor variant。
+
 ### 3.4 验收标准
 
 - [ ] SSH 会话中对 Agent 说"记住这台机器 nginx 装在 /opt/nginx"，模型调用工具，
@@ -239,7 +263,10 @@ executor，chat_stream 在 `parse_incoming_tool_call` 之前按 name 拦截本�
 - [ ] 下一次在同一机器新开会话，`<machine_memory>` 块含上述内容。
 - [ ] 本地非 SSH 会话的请求 tools 数组中**无** `update_machine_memory`。
 - [ ] 超长 content 截断不报错；机器 key 缺失时返回错误 JSON 且不崩。
-- [ ] 单元测试：args 解析、截断、gating（对齐 web 工具现有测试）。
+- [ ] 成功与所有错误结果都带 `_byop_intercepted`，controller 能自动续轮；UI
+      能看到机器记忆更新工具调用。
+- [ ] 单元测试：args 解析、截断、gating、缺 key、sentinel 与 app 侧 carrier
+      转换（对齐 web 工具现有测试）。
 
 ---
 
@@ -253,8 +280,10 @@ Agent 对话有过至少一次完整交互（controller 可查询），调用
 `machine_memory::review::spawn_session_review(...)`。
 
 补充触发（防漏）：终端 view 关闭时若存在符合条件的 SSH 会话对话，同样触发一次。
-用 `last_review_at` + 对话内容 hash 或"本会话已复盘"标记去重，避免同一会话
-ExitShell 与 view 关闭双触发写两次。
+关闭补触发放在 `TerminalPane::detach(DetachType::Closed)`，并且必须在
+`clear_conversations_in_terminal_view` 之前执行；`ExitShell` 仍是主触发。
+用"本会话已复盘"标记去重，避免同一会话 ExitShell 与 view 关闭双触发写两次。
+所有同步前置条件准备完成后、异步请求 spawn 前原子插入去重标记。
 
 ### 4.2 复盘实现
 
@@ -272,13 +301,18 @@ ExitShell 与 view 关闭双触发写两次。
    - 角色：合并旧记忆与本次会话事实，输出该机器的修订版记忆。
    - 输出 JSON：`{"changed": bool, "memory": "<markdown>"}`；无新知识时
      `changed=false`（此时不写库）。
-   - 结构引导（不强制）：`## 系统画像` `## 服务与部署` `## 操作惯例` `## 踩坑记录`。
+   - 结构引导（不强制）：`## System Profile` `## Services and Deployment`
+     `## Operational Conventions` `## Gotchas`。
    - 硬性规则：≤16 000 字符；合并去重、旧事实被推翻时更新而非并存；
      **禁止**写入密码/token/私钥/一次性操作流水。
 3. 解析响应：JSON 解析失败或 `changed=false` → 静默放弃（log debug）。
    成功 → `upsert_content` + `set_last_review_at`。
+   当前记忆作为 system prompt 中的非可信参考数据附加，session digest 单独作为
+   user message，避免 oneshot 的 20 000 字符 user 截断吞掉 digest。
 4. 失败策略：任何环节失败均静默放弃，**不重试**（下次会话还有机会）。
    全程不弹 UI。
+   oneshot 响应解析与数据库写入必须在 `ctx.spawn` 的后台 future 内完成；view
+   关闭后框架可能跳过主线程 callback，callback 不得承载必要副作用。
 5. gating：设置项（Task 2）关闭时不触发；`resolve_active_ai_oneshot` 返回
    None（无可用 BYOP 配置）时不触发。
 
@@ -316,9 +350,34 @@ nginx"能直接关联目标机器。
 ### 6.1 同步
 
 `crates/warp_ssh_manager/src/sync_provider.rs`：把 `ssh_machine_memories`
-并入现有 `section_key() = "ssh"` 的 collect/apply（随既有加密通道走）。
-合并策略：按 `machine_key` 对齐，`updated_at` 新者胜（last-write-wins）。
-需处理远端有/本地无、本地有/远端无、双方都有三种情况；不做逐字段 merge。
+并入现有 `section_key() = "ssh"` 的 collect/apply。每条 active memory 的
+`content` 单独调用现有 `zap_sync::crypto` 加密后放入 payload；不得把 Markdown
+明文写入 gist，也不得用带随机 nonce 的密文比较内容。旧 payload 缺 memories
+字段时按空集合兼容。
+
+合并按 `machine_key` 做整行 LWW union，不做逐字段 merge：远端有/本地无、
+本地有/远端无均保留；双方都有时 `updated_at` 新者胜。时间戳相同但内容不同
+时必须确定性决胜：tombstone 优先，其余按包含明文 content 的 canonical tuple
+比较，确保两台设备收敛。应用前先解密并校验全部远端 memory；任一条失败时
+不得修改数据库或 keychain。
+
+物理删除无法跨设备传播，因此 migration 为表新增 nullable `deleted_at`：
+`delete` 清空 content 并写 `deleted_at = updated_at`，暂不 GC tombstone；普通
+`get/list_all` 过滤 tombstone，同步专用查询包含 tombstone；`upsert_content`
+清除 `deleted_at`，表示显式复活。所有本地 memory 写操作与
+`sync_meta.sync_version` 递增在同一事务内完成；同步应用保留获胜行的原始
+`updated_at`，不逐条递增版本。
+
+现有 `SyncEngine` 在本地/远端版本相等时不会调用 provider，且 `apply_data`
+无法回报归并后是否需要把本地胜者传回远端。Task 6 因此同步扩展
+`crates/zap_sync/src/sync_engine.rs`：provider 返回 `local_changed/needs_upload`
+结果，并提供默认 no-op 的等版本 reconcile。SSH provider 的 reconcile 只合并
+machine memories，不能调用会全量替换 SSH tree/keychain 的现有 apply。
+等版本分歧、远端新版 apply 后存在本地胜者、以及 force upload 覆盖前，均先
+归并 memories；需要回传时重新 collect，以 `max(local, remote) + 1` 上传，且
+只有 gist 写入成功后才推进本地版本。版本提交必须原子比较同步开始时的版本；
+若网络请求期间发生本地写入，则保留高于已上传版本的待同步版本，不能覆盖该
+并发增量。版本递增须检查 `i64` 溢出并返回错误。
 
 ### 6.2 UI
 
@@ -328,7 +387,11 @@ nginx"能直接关联目标机器。
 `resolve_machine_key`。i18n 三语言补 key（`warp.ftl`）。
 
 - 验收：面板可见记忆、清空生效；两台设备通过 gist 同步后记忆一致，
-  冲突时新 updated_at 胜出（单元测试覆盖 merge 三种情况）。
+  冲突时新 updated_at 胜出。
+- 单元测试覆盖：legacy payload、逐条密文不泄漏明文、解密失败无副作用；
+  merge 三种来源、双方新旧、等时间确定性；tombstone 防复活与显式复活；
+  等版本分歧自动回传、远端新版 apply 后本地胜者回传、force upload 不丢远端
+  独有记录，以及上传失败不推进本地版本。
 
 ---
 

@@ -92,6 +92,13 @@ pub trait SyncVersionStore: Send + Sync {
     fn get_sync_version(&self) -> Result<i64, SyncEngineError>;
     /// 设置同步版本号
     fn set_sync_version(&self, version: i64) -> Result<(), SyncEngineError>;
+    /// 在同步成功后提交版本。若当前版本已不等于同步开始时的版本，说明网络请求期间
+    /// 发生了本地写入，必须保留一个高于云端版本的待同步版本。
+    fn commit_sync_version(
+        &self,
+        expected_version: i64,
+        synced_version: i64,
+    ) -> Result<i64, SyncEngineError>;
     /// 更新同步元数据（时间、平台）
     fn update_sync_meta(&self, time: &str, platform: &str) -> Result<(), SyncEngineError>;
 }

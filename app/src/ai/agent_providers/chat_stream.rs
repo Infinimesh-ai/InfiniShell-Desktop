@@ -192,6 +192,44 @@ fn render_ssh_session_block(
     ))
 }
 
+fn render_machine_memory_block(
+    machine_memory: Option<&crate::ai::machine_memory::MachineMemoryContext>,
+) -> Option<String> {
+    let machine_memory = machine_memory?;
+    let machine_key = xml_attr(&machine_memory.machine_key);
+    let content = if machine_memory.content.is_empty() {
+        "(no memory recorded for this machine yet)".to_owned()
+    } else {
+        xml_text(&machine_memory.content)
+    };
+
+    Some(format!(
+        "\n\n<machine_memory machine_key=\"{machine_key}\">\n  \
+         <fact>Accumulated notes from previous sessions on this same remote machine.\n  \
+         They may be stale — verify before relying on them for destructive actions.</fact>\n  \
+         <content>\n{content}\n  </content>\n  \
+         <rules>\n  \
+         - When you learn a durable fact about THIS machine (OS/services layout, deploy conventions, gotchas, non-standard paths), call `update_machine_memory` with the full revised memory document.\n  \
+         - Never store credentials, tokens or private keys in machine memory.\n  \
+         </rules>\n\
+         </machine_memory>"
+    ))
+}
+
+fn render_known_ssh_machines_block(machine_index: Option<&str>) -> Option<String> {
+    let machine_index = xml_text(machine_index?);
+    Some(format!(
+        "\n\n<known_ssh_machines>\n  \
+         <fact>These are remote SSH machines known from previous sessions. Use this index to identify a machine when the user refers to it by name.</fact>\n  \
+         <machines>\n{machine_index}\n  </machines>\n  \
+         <rules>\n  \
+         - Use the summaries only as potentially stale context; verify before relying on them for destructive actions.\n  \
+         - Connections must be initiated by the user or through SSH Manager. Ask the user to run or suggest that they run `ssh &lt;host&gt;`, using the host portion of the machine key. Never initiate an SSH connection automatically.\n  \
+         </rules>\n\
+         </known_ssh_machines>"
+    ))
+}
+
 /// XML 转义,同时 strip 所有非法/有问题的控制字符,避免 JSON 序列化失败。
 ///
 /// `grid_contents`(从 `formatted_terminal_contents_for_input` 提取的 alt-screen 内容)
@@ -1195,6 +1233,15 @@ fn build_chat_request(
     // 追加一段 SSH 状态块矫正 LLM 推断。
     if let Some(ssh_block) = render_ssh_session_block(&params.session_context) {
         system_text.push_str(&ssh_block);
+    }
+    if let Some(machine_memory_block) = render_machine_memory_block(params.machine_memory.as_ref())
+    {
+        system_text.push_str(&machine_memory_block);
+    }
+    if let Some(machine_index_block) =
+        render_known_ssh_machines_block(params.machine_index.as_deref())
+    {
+        system_text.push_str(&machine_index_block);
     }
     // 注:LRC / 长命令的工具用法引导(write_to_long_running_shell_command + command_id +
     // 各种 mode 与 raw 字节序列)已经在 `prompts/system/default.j2:69-79` 完整覆盖。
@@ -2679,6 +2726,9 @@ pub fn available_tool_names(params: &RequestParams) -> Vec<String> {
             {
                 return false;
             }
+            if params.machine_memory.is_none() && t.name == tools::machine_memory::TOOL_NAME {
+                return false;
+            }
             if t.name == "suggest_new_conversation" {
                 return false;
             }
@@ -2736,6 +2786,10 @@ fn build_tools_array(params: &RequestParams) -> Vec<GenaiTool> {
             if !web_enabled
                 && (t.name == tools::webfetch::TOOL_NAME || t.name == tools::websearch::TOOL_NAME)
             {
+                return false;
+            }
+            // Zap:机器记忆工具只属于可定位机器的 legacy SSH 会话。
+            if params.machine_memory.is_none() && t.name == tools::machine_memory::TOOL_NAME {
                 return false;
             }
             // suggest_new_conversation:无 UI 实现,executor 在 Zap 改为
@@ -3922,11 +3976,12 @@ pub async fn generate_byop_output(
                     // 增量刷新 args,长 args 工具(create_or_edit_document、长 grep 等)体感连续。
                     // web 工具(webfetch/websearch)走自己的 loading 帧链路(L2102 区域),
                     // 这里跳过避免双卡。
-                    // todowrite 走 BYOP todo 拦截器,合成 Message::UpdateTodos 触发 chip,
-                    // 这里也跳过占位避免出现一张无意义的"调用 todowrite"卡。
+                    // todowrite / update_machine_memory 走 BYOP 本地拦截器，
+                    // 这里跳过无法转换为 action 的占位卡。
                     if call.fn_name != tools::webfetch::TOOL_NAME
                         && call.fn_name != tools::websearch::TOOL_NAME
                         && call.fn_name != tools::todowrite::TOOL_NAME
+                        && call.fn_name != tools::machine_memory::TOOL_NAME
                     {
                         if let Some(msg_id) = tool_msg_ids.get(&call.call_id).cloned() {
                             // 已 emit 占位 → 节流增量刷新。
@@ -4302,6 +4357,37 @@ pub async fn generate_byop_output(
                         ));
                     }
                 }
+                continue;
+            }
+
+            // Zap BYOP 机器记忆拦截:不映射 protobuf executor,直接写本地数据库，
+            // 再合成 carrier ToolCall + ToolCallResult 给模型继续下一轮。
+            if call.fn_name == tools::machine_memory::TOOL_NAME {
+                let args_str = if call.fn_arguments.is_string() {
+                    call.fn_arguments.as_str().unwrap_or("").to_owned()
+                } else {
+                    call.fn_arguments.to_string()
+                };
+                let result_json = dispatch_byop_machine_memory_tool(
+                    params.machine_memory.as_ref(),
+                    &args_str,
+                );
+                let result_content = serde_json::to_string(&result_json).unwrap_or_else(|_| {
+                    r#"{"_byop_intercepted":true,"status":"error","message":"failed to serialize result"}"#.to_owned()
+                });
+                final_messages.push(make_tool_call_carrier_message(
+                    &current_task_id,
+                    &request_id,
+                    &call.call_id,
+                    &call.fn_name,
+                    &args_str,
+                ));
+                final_messages.push(make_tool_call_result_message(
+                    &current_task_id,
+                    &request_id,
+                    call.call_id.clone(),
+                    result_content,
+                ));
                 continue;
             }
 
@@ -4761,6 +4847,51 @@ fn make_append_event(task_id: &str, message_id: &str, kind: AppendKind) -> api::
                 }],
             },
         )),
+    }
+}
+
+/// Zap BYOP `update_machine_memory` 的本地分发器。
+fn dispatch_byop_machine_memory_tool(
+    memory: Option<&crate::ai::machine_memory::MachineMemoryContext>,
+    args_str: &str,
+) -> Value {
+    dispatch_byop_machine_memory_tool_with(memory, args_str, |machine_key, content| {
+        warp_ssh_manager::with_conn(|conn| {
+            warp_ssh_manager::MachineMemoryRepository::upsert_content(conn, machine_key, content)?;
+            Ok(())
+        })
+    })
+}
+
+fn dispatch_byop_machine_memory_tool_with<E>(
+    memory: Option<&crate::ai::machine_memory::MachineMemoryContext>,
+    args_str: &str,
+    write: impl FnOnce(&str, &str) -> Result<(), E>,
+) -> Value
+where
+    E: std::fmt::Display,
+{
+    let args = match tools::machine_memory::parse_args(args_str) {
+        Ok(args) => args,
+        Err(error) => {
+            log::warn!("[byop][machine-memory] invalid arguments: {error:#}");
+            return tools::machine_memory::invalid_arguments_result_to_json(error.to_string());
+        }
+    };
+    let Some(memory) = memory else {
+        return tools::machine_memory::missing_machine_key_result_to_json();
+    };
+    let content = tools::machine_memory::truncate_content(&args.content);
+    let stored_chars = content.chars().count();
+    match write(&memory.machine_key, &content) {
+        Ok(()) => tools::machine_memory::success_result_to_json(stored_chars),
+        Err(error) => {
+            log::warn!(
+                "[byop][machine-memory] write failed for {}: {error}",
+                memory.machine_key
+            );
+            tools::machine_memory::error_result_to_json("failed to update machine memory")
+        }
     }
 }
 
@@ -7781,3 +7912,7 @@ mod issue_94_task_linearization_tests {
         assert_eq!(message_ids(&out), vec!["m1", "m2", "m3"]);
     }
 }
+
+#[cfg(test)]
+#[path = "chat_stream_machine_memory_tests.rs"]
+mod machine_memory_tests;

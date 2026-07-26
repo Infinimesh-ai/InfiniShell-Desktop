@@ -2708,6 +2708,13 @@ workspace-left-panel-ssh-manager-startup-command = 起動コマンド
 workspace-left-panel-ssh-manager-startup-command-placeholder = 接続成功後に自動実行するコマンド
 workspace-left-panel-ssh-manager-notes = メモ
 workspace-left-panel-ssh-manager-notes-placeholder = メモ情報
+workspace-left-panel-ssh-manager-memory = AI メモリ
+workspace-left-panel-ssh-manager-memory-updated = 更新日時: { $updated_at }
+workspace-left-panel-ssh-manager-memory-empty = このマシンのメモリはまだありません。
+workspace-left-panel-ssh-manager-memory-clear = メモリを消去
+workspace-left-panel-ssh-manager-memory-clear-confirm-title = マシンメモリを消去しますか？
+workspace-left-panel-ssh-manager-memory-clear-confirm-description = このマシンに保存された AI メモリを完全に削除します。
+workspace-left-panel-ssh-manager-memory-clear-confirm-button = メモリを消去
 # TODO: review
 workspace-left-panel-ssh-manager-candidates-header = { $path } から
 # TODO: review

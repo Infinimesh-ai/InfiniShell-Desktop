@@ -1529,6 +1529,16 @@ define_settings_group!(AISettings, settings: [
         toml_path: "agents.knowledge.rules_enabled",
         description: "Whether the agent uses your saved rules during requests.",
     }
+    // legacy SSH 会话是否使用每机器记忆。
+    ssh_machine_memory_enabled: SshMachineMemoryEnabled {
+        type: bool,
+        default: true,
+        supported_platforms: SupportedPlatforms::ALL,
+        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+        private: false,
+        toml_path: "agents.knowledge.ssh_machine_memory_enabled",
+        description: "Whether the agent uses per-machine memory in legacy SSH sessions.",
+    }
     // Whether zap drive context should be included in AI requests
     warp_drive_context_enabled: WarpDriveContextEnabled {
         type: bool,
@@ -2109,6 +2119,10 @@ impl AISettings {
 
     pub fn is_memory_enabled(&self, app: &warpui::AppContext) -> bool {
         self.is_any_ai_enabled(app) && *self.memory_enabled
+    }
+
+    pub fn is_ssh_machine_memory_enabled(&self, app: &warpui::AppContext) -> bool {
+        self.is_memory_enabled(app) && *self.ssh_machine_memory_enabled
     }
 
     pub fn is_warp_drive_context_enabled(&self, app: &warpui::AppContext) -> bool {

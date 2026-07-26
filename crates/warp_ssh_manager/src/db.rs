@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 static DB_PATH: OnceLock<PathBuf> = OnceLock::new();
-static CONN: OnceLock<Mutex<SqliteConnection>> = OnceLock::new();
+static CONN: OnceLock<Mutex<Option<SqliteConnection>>> = OnceLock::new();
 
 /// 由 app 启动时调用一次,传入 sqlite db 文件路径。重复调用会被忽略
 /// (OnceLock 语义)。
@@ -43,9 +43,15 @@ fn open() -> Result<SqliteConnection> {
 
 /// 锁内执行闭包。首次调用时 lazy 打开连接;后续调用复用。
 pub fn with_conn<R>(f: impl FnOnce(&mut SqliteConnection) -> Result<R>) -> Result<R> {
-    let mtx = CONN.get_or_init(|| Mutex::new(open().expect("warp_ssh_manager db open")));
+    let mtx = CONN.get_or_init(|| Mutex::new(None));
     let mut guard = mtx
         .lock()
         .map_err(|_| anyhow!("warp_ssh_manager db mutex poisoned"))?;
-    f(&mut guard)
+    if guard.is_none() {
+        *guard = Some(open()?);
+    }
+    let conn = guard
+        .as_mut()
+        .ok_or_else(|| anyhow!("warp_ssh_manager db connection unavailable"))?;
+    f(conn)
 }

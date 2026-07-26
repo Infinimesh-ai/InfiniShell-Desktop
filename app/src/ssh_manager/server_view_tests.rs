@@ -100,6 +100,27 @@ fn auth_toggle_includes_onekey_option() {
 }
 
 #[test]
+fn machine_memory_key_uses_normalized_server_host_and_port() {
+    let server = SshServerInfo {
+        node_id: "server-1".to_string(),
+        host: " Admin@WEB-01.EXAMPLE.COM ".to_string(),
+        port: 2202,
+        username: "admin".to_string(),
+        auth_type: AuthType::Password,
+        key_path: None,
+        credential_id: None,
+        startup_command: None,
+        notes: None,
+        last_connected_at: None,
+    };
+
+    assert_eq!(
+        machine_key_for_server(&server).as_deref(),
+        Some("web-01.example.com:2202")
+    );
+}
+
+#[test]
 fn onekey_auth_only_renders_credential_field_in_server_form() {
     assert_eq!(
         auth_specific_fields(AuthType::OneKey),
