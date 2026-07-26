@@ -26,6 +26,7 @@ pub mod edit;
 pub mod exa;
 pub mod files;
 pub mod long_shell;
+pub mod machine_memory;
 pub mod markers;
 pub mod mcp;
 pub mod search;
@@ -100,6 +101,9 @@ pub const REGISTRY: &[&OpenAiTool] = &[
     // gating:profile.web_search_enabled=false 时,build_tools_array 会过滤掉。
     &webfetch::WEBFETCH,
     &websearch::WEBSEARCH,
+    // Zap:每台 SSH 机器的 AI 记忆,由 chat_stream 本地写库。
+    // gating:仅有 machine_memory 上下文时加入请求 tools 数组。
+    &machine_memory::UPDATE_MACHINE_MEMORY,
 ];
 
 /// 按 OpenAI function name 反查注册表。

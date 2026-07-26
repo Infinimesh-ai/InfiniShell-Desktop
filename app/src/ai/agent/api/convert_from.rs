@@ -141,6 +141,21 @@ impl ConvertAPIMessageToClientOutputMessage for api::Message {
                     ),
                 ))
             }
+            api::message::Message::ToolCall(tool_call)
+                if is_machine_memory_tool_carrier(&tool_call, &self.server_message_data) =>
+            {
+                Ok(MaybeAIAgentOutputMessage::Message(
+                    AIAgentOutputMessage::text(
+                        MessageId::new(self.id),
+                        AIAgentText {
+                            sections: parse_markdown_into_text_and_code_sections(
+                                "Updating machine memory",
+                            ),
+                        },
+                    )
+                    .with_citations(citations),
+                ))
+            }
             api::message::Message::ToolCall(tool_call) => match tool_call.to_action(params)? {
                 MaybeAIAgentAction::Action(action) => Ok(MaybeAIAgentOutputMessage::Message(
                     AIAgentOutputMessage::action(MessageId::new(self.id), action)
@@ -506,6 +521,16 @@ impl ConvertAPIMessageToClientOutputMessage for api::Message {
     }
 }
 
+fn is_machine_memory_tool_carrier(
+    tool_call: &api::message::ToolCall,
+    server_message_data: &str,
+) -> bool {
+    tool_call.tool.is_none()
+        && server_message_data
+            .split_once('\n')
+            .is_some_and(|(name, _)| name == "update_machine_memory")
+}
+
 impl From<api::message::AgentOutput> for AIAgentText {
     fn from(value: api::message::AgentOutput) -> Self {
         AIAgentText {
@@ -823,3 +848,7 @@ fn convert_api_question(
         },
     })
 }
+
+#[cfg(test)]
+#[path = "convert_from_tests.rs"]
+mod tests;

@@ -45,3 +45,86 @@ fn render_machine_memory_block_non_empty() {
          </machine_memory>"
     );
 }
+
+#[test]
+fn machine_memory_tool_is_gated_by_machine_context() {
+    let mut params = RequestParams::new_for_test(Vec::new(), Vec::new());
+
+    assert!(!available_tool_names(&params)
+        .iter()
+        .any(|name| name == tools::machine_memory::TOOL_NAME));
+    assert!(!build_tools_array(&params)
+        .iter()
+        .any(|tool| tool.name == tools::machine_memory::TOOL_NAME.into()));
+
+    params.machine_memory = Some(MachineMemoryContext {
+        machine_key: "web-01:22".to_owned(),
+        content: String::new(),
+    });
+
+    assert!(available_tool_names(&params)
+        .iter()
+        .any(|name| name == tools::machine_memory::TOOL_NAME));
+    assert!(build_tools_array(&params)
+        .iter()
+        .any(|tool| tool.name == tools::machine_memory::TOOL_NAME.into()));
+}
+
+#[test]
+fn missing_machine_context_returns_intercepted_error_without_writing() {
+    let result = dispatch_byop_machine_memory_tool_with(
+        None,
+        r#"{"content":"remember me"}"#,
+        |_, _| -> Result<(), &'static str> { panic!("missing key must not write") },
+    );
+
+    assert_eq!(result["_byop_intercepted"], true);
+    assert_eq!(result["status"], "error");
+    assert_eq!(
+        result["message"],
+        "not in an ssh session with machine identity"
+    );
+}
+
+#[test]
+fn dispatch_truncates_unicode_and_reports_stored_character_count() {
+    let memory = MachineMemoryContext {
+        machine_key: "web-01:22".to_owned(),
+        content: String::new(),
+    };
+    let args = serde_json::json!({
+        "content": "机".repeat(warp_ssh_manager::MAX_MEMORY_CHARS + 1),
+    })
+    .to_string();
+    let mut written = None;
+
+    let result =
+        dispatch_byop_machine_memory_tool_with(Some(&memory), &args, |machine_key, content| {
+            written = Some((machine_key.to_owned(), content.to_owned()));
+            Ok::<(), &'static str>(())
+        });
+
+    let (machine_key, content) = written.unwrap();
+    assert_eq!(machine_key, "web-01:22");
+    assert_eq!(content.chars().count(), warp_ssh_manager::MAX_MEMORY_CHARS);
+    assert_eq!(result["_byop_intercepted"], true);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["stored_chars"], warp_ssh_manager::MAX_MEMORY_CHARS);
+}
+
+#[test]
+fn dispatch_database_error_keeps_auto_resume_sentinel() {
+    let memory = MachineMemoryContext {
+        machine_key: "web-01:22".to_owned(),
+        content: String::new(),
+    };
+    let result = dispatch_byop_machine_memory_tool_with(
+        Some(&memory),
+        r#"{"content":"remember me"}"#,
+        |_, _| Err("database unavailable"),
+    );
+
+    assert_eq!(result["_byop_intercepted"], true);
+    assert_eq!(result["status"], "error");
+    assert_eq!(result["message"], "failed to update machine memory");
+}

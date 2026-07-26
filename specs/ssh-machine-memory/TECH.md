@@ -242,6 +242,15 @@ executor，chat_stream 在 `parse_incoming_tool_call` 之前按 name 拦截本�
 4. 成功返回 `{"status":"ok","stored_chars":N}`。
 5. **本轮请求内**后续注入内容不需要刷新（下一轮 `RequestParams::new` 自然读到新值）。
 
+成功、参数错误、机器 key 缺失和数据库错误的结果 JSON 都必须包含
+`"_byop_intercepted": true`。该 sentinel 与现有 todowrite/web 工具一致，由
+controller 触发自动续轮，避免本地拦截工具没有 `AIAgentAction` 入队时对话停住。
+
+carrier `ToolCall` 的 `tool` 为 None，现有转换层默认不生成 UI。允许在 app 侧增加
+专用于机器记忆更新的可见 output message：由 `update_machine_memory` carrier 转换，
+复用现有文本渲染显示结果中性的 `Updating machine memory`；不得为此新增 protobuf
+executor variant。
+
 ### 3.4 验收标准
 
 - [ ] SSH 会话中对 Agent 说"记住这台机器 nginx 装在 /opt/nginx"，模型调用工具，
@@ -249,7 +258,10 @@ executor，chat_stream 在 `parse_incoming_tool_call` 之前按 name 拦截本�
 - [ ] 下一次在同一机器新开会话，`<machine_memory>` 块含上述内容。
 - [ ] 本地非 SSH 会话的请求 tools 数组中**无** `update_machine_memory`。
 - [ ] 超长 content 截断不报错；机器 key 缺失时返回错误 JSON 且不崩。
-- [ ] 单元测试：args 解析、截断、gating（对齐 web 工具现有测试）。
+- [ ] 成功与所有错误结果都带 `_byop_intercepted`，controller 能自动续轮；UI
+      能看到机器记忆更新工具调用。
+- [ ] 单元测试：args 解析、截断、gating、缺 key、sentinel 与 app 侧 carrier
+      转换（对齐 web 工具现有测试）。
 
 ---
 

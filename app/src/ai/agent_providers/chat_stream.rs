@@ -2707,6 +2707,9 @@ pub fn available_tool_names(params: &RequestParams) -> Vec<String> {
             {
                 return false;
             }
+            if params.machine_memory.is_none() && t.name == tools::machine_memory::TOOL_NAME {
+                return false;
+            }
             if t.name == "suggest_new_conversation" {
                 return false;
             }
@@ -2764,6 +2767,10 @@ fn build_tools_array(params: &RequestParams) -> Vec<GenaiTool> {
             if !web_enabled
                 && (t.name == tools::webfetch::TOOL_NAME || t.name == tools::websearch::TOOL_NAME)
             {
+                return false;
+            }
+            // Zap:机器记忆工具只属于可定位机器的 legacy SSH 会话。
+            if params.machine_memory.is_none() && t.name == tools::machine_memory::TOOL_NAME {
                 return false;
             }
             // suggest_new_conversation:无 UI 实现,executor 在 Zap 改为
@@ -3950,11 +3957,12 @@ pub async fn generate_byop_output(
                     // 增量刷新 args,长 args 工具(create_or_edit_document、长 grep 等)体感连续。
                     // web 工具(webfetch/websearch)走自己的 loading 帧链路(L2102 区域),
                     // 这里跳过避免双卡。
-                    // todowrite 走 BYOP todo 拦截器,合成 Message::UpdateTodos 触发 chip,
-                    // 这里也跳过占位避免出现一张无意义的"调用 todowrite"卡。
+                    // todowrite / update_machine_memory 走 BYOP 本地拦截器，
+                    // 这里跳过无法转换为 action 的占位卡。
                     if call.fn_name != tools::webfetch::TOOL_NAME
                         && call.fn_name != tools::websearch::TOOL_NAME
                         && call.fn_name != tools::todowrite::TOOL_NAME
+                        && call.fn_name != tools::machine_memory::TOOL_NAME
                     {
                         if let Some(msg_id) = tool_msg_ids.get(&call.call_id).cloned() {
                             // 已 emit 占位 → 节流增量刷新。
@@ -4330,6 +4338,37 @@ pub async fn generate_byop_output(
                         ));
                     }
                 }
+                continue;
+            }
+
+            // Zap BYOP 机器记忆拦截:不映射 protobuf executor,直接写本地数据库，
+            // 再合成 carrier ToolCall + ToolCallResult 给模型继续下一轮。
+            if call.fn_name == tools::machine_memory::TOOL_NAME {
+                let args_str = if call.fn_arguments.is_string() {
+                    call.fn_arguments.as_str().unwrap_or("").to_owned()
+                } else {
+                    call.fn_arguments.to_string()
+                };
+                let result_json = dispatch_byop_machine_memory_tool(
+                    params.machine_memory.as_ref(),
+                    &args_str,
+                );
+                let result_content = serde_json::to_string(&result_json).unwrap_or_else(|_| {
+                    r#"{"_byop_intercepted":true,"status":"error","message":"failed to serialize result"}"#.to_owned()
+                });
+                final_messages.push(make_tool_call_carrier_message(
+                    &current_task_id,
+                    &request_id,
+                    &call.call_id,
+                    &call.fn_name,
+                    &args_str,
+                ));
+                final_messages.push(make_tool_call_result_message(
+                    &current_task_id,
+                    &request_id,
+                    call.call_id.clone(),
+                    result_content,
+                ));
                 continue;
             }
 
@@ -4789,6 +4828,51 @@ fn make_append_event(task_id: &str, message_id: &str, kind: AppendKind) -> api::
                 }],
             },
         )),
+    }
+}
+
+/// Zap BYOP `update_machine_memory` 的本地分发器。
+fn dispatch_byop_machine_memory_tool(
+    memory: Option<&crate::ai::machine_memory::MachineMemoryContext>,
+    args_str: &str,
+) -> Value {
+    dispatch_byop_machine_memory_tool_with(memory, args_str, |machine_key, content| {
+        warp_ssh_manager::with_conn(|conn| {
+            warp_ssh_manager::MachineMemoryRepository::upsert_content(conn, machine_key, content)?;
+            Ok(())
+        })
+    })
+}
+
+fn dispatch_byop_machine_memory_tool_with<E>(
+    memory: Option<&crate::ai::machine_memory::MachineMemoryContext>,
+    args_str: &str,
+    write: impl FnOnce(&str, &str) -> Result<(), E>,
+) -> Value
+where
+    E: std::fmt::Display,
+{
+    let args = match tools::machine_memory::parse_args(args_str) {
+        Ok(args) => args,
+        Err(error) => {
+            log::warn!("[byop][machine-memory] invalid arguments: {error:#}");
+            return tools::machine_memory::invalid_arguments_result_to_json(error.to_string());
+        }
+    };
+    let Some(memory) = memory else {
+        return tools::machine_memory::missing_machine_key_result_to_json();
+    };
+    let content = tools::machine_memory::truncate_content(&args.content);
+    let stored_chars = content.chars().count();
+    match write(&memory.machine_key, &content) {
+        Ok(()) => tools::machine_memory::success_result_to_json(stored_chars),
+        Err(error) => {
+            log::warn!(
+                "[byop][machine-memory] write failed for {}: {error}",
+                memory.machine_key
+            );
+            tools::machine_memory::error_result_to_json("failed to update machine memory")
+        }
     }
 }
 
