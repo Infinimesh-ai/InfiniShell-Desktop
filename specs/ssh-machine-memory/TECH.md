@@ -15,16 +15,18 @@ crates/persistence/
 └── src/model.rs                                             (修改 — Task 1)
 
 crates/warp_ssh_manager/src/
+├── db.rs                           (修改 — Task 2：首次打开失败可降级)
 ├── lib.rs                          (修改 — 导出新模块)
 ├── memory.rs                       (NEW — Task 1：类型 + repository + key 归一化)
 └── sync_provider.rs                (修改 — Task 6：同步新表)
 
 app/src/ai/machine_memory/          (NEW — Task 2/4)
-├── mod.rs                          (加载/注入辅助 + 设置项)
+├── mod.rs                          (加载辅助)
 └── review.rs                       (Task 4 — 后台复盘)
 
+app/src/ai/agent/api.rs             (修改 — Task 2/5：RequestParams 增字段)
+app/src/settings/ai.rs               (修改 — Task 2：AI 设置项)
 app/src/ai/agent_providers/
-├── api.rs                          (修改 — Task 2：RequestParams 增字段)
 ├── chat_stream.rs                  (修改 — Task 2 注入；Task 3 工具拦截)
 ├── tools/mod.rs                    (修改 — Task 3：REGISTRY 注册)
 ├── tools/machine_memory.rs         (NEW — Task 3)
@@ -144,16 +146,24 @@ pub struct MachineMemoryContext {
 /// → warp_ssh_manager::with_conn(|c| MachineMemoryRepository::get(...))。
 /// 机器无记忆时也返回 Some（content 空串）——工具可用性（Task 3）依赖 machine_key 存在。
 /// DB 错误：log warn + 返回 None，绝不 panic、不阻塞请求。
-pub fn load_for_session(ctx: &SessionContext) -> Option<MachineMemoryContext>;
+pub fn load_for_session(
+    session_context: &SessionContext,
+    ctx: &AppContext,
+) -> Option<MachineMemoryContext>;
 ```
 
-设置项：在现有 AI 设置处（`AISettings`，`is_memory_enabled` 所在体系）新增
+设置项：在 `app/src/settings/ai.rs` 的现有 AI 设置处（`AISettings`，
+`is_memory_enabled` 所在体系）新增
 `ssh_machine_memory_enabled: bool`，默认 `true`。`load_for_session` 在
 总开关 `is_memory_enabled` 或本开关为 false 时直接返回 None。
 
+`crates/warp_ssh_manager/src/db.rs` 的连接惰性初始化必须传递
+`open()` 错误，不得在 `OnceLock::get_or_init` 内 `expect`；这样未初始化、
+数据库打开失败或表缺失都能在 app 侧统一 warn 后降级。
+
 ### 2.2 RequestParams 增字段
 
-`app/src/ai/agent_providers/api.rs` 的 `RequestParams` 新增
+`app/src/ai/agent/api.rs` 的 `RequestParams` 新增
 `pub machine_memory: Option<MachineMemoryContext>`，在 `RequestParams::new`
 中调用 `load_for_session`（已持有 `session_context`）。
 

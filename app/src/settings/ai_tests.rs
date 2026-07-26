@@ -382,6 +382,38 @@ fn test_toolbar_command_map_matched_agent() {
 }
 
 #[test]
+fn ssh_machine_memory_setting_respects_memory_master_switch() {
+    App::test((), |mut app| async move {
+        initialize_settings_for_tests(&mut app);
+
+        AISettings::handle(&app).read(&app, |settings, ctx| {
+            assert!(settings.is_ssh_machine_memory_enabled(ctx));
+        });
+
+        AISettings::handle(&app).update(&mut app, |settings, ctx| {
+            settings
+                .ssh_machine_memory_enabled
+                .set_value(false, ctx)
+                .unwrap();
+        });
+        AISettings::handle(&app).read(&app, |settings, ctx| {
+            assert!(!settings.is_ssh_machine_memory_enabled(ctx));
+        });
+
+        AISettings::handle(&app).update(&mut app, |settings, ctx| {
+            settings
+                .ssh_machine_memory_enabled
+                .set_value(true, ctx)
+                .unwrap();
+            settings.memory_enabled.set_value(false, ctx).unwrap();
+        });
+        AISettings::handle(&app).read(&app, |settings, ctx| {
+            assert!(!settings.is_ssh_machine_memory_enabled(ctx));
+        });
+    });
+}
+
+#[test]
 fn test_should_display_quota_reset_banner_with_empty_history() {
     App::test((), |mut app| async move {
         initialize_settings_for_tests(&mut app);

@@ -192,6 +192,30 @@ fn render_ssh_session_block(
     ))
 }
 
+fn render_machine_memory_block(
+    machine_memory: Option<&crate::ai::machine_memory::MachineMemoryContext>,
+) -> Option<String> {
+    let machine_memory = machine_memory?;
+    let machine_key = xml_attr(&machine_memory.machine_key);
+    let content = if machine_memory.content.is_empty() {
+        "(no memory recorded for this machine yet)".to_owned()
+    } else {
+        xml_text(&machine_memory.content)
+    };
+
+    Some(format!(
+        "\n\n<machine_memory machine_key=\"{machine_key}\">\n  \
+         <fact>Accumulated notes from previous sessions on this same remote machine.\n  \
+         They may be stale — verify before relying on them for destructive actions.</fact>\n  \
+         <content>\n{content}\n  </content>\n  \
+         <rules>\n  \
+         - When you learn a durable fact about THIS machine (OS/services layout, deploy conventions, gotchas, non-standard paths), call `update_machine_memory` with the full revised memory document.\n  \
+         - Never store credentials, tokens or private keys in machine memory.\n  \
+         </rules>\n\
+         </machine_memory>"
+    ))
+}
+
 /// XML 转义,同时 strip 所有非法/有问题的控制字符,避免 JSON 序列化失败。
 ///
 /// `grid_contents`(从 `formatted_terminal_contents_for_input` 提取的 alt-screen 内容)
@@ -1195,6 +1219,10 @@ fn build_chat_request(
     // 追加一段 SSH 状态块矫正 LLM 推断。
     if let Some(ssh_block) = render_ssh_session_block(&params.session_context) {
         system_text.push_str(&ssh_block);
+    }
+    if let Some(machine_memory_block) = render_machine_memory_block(params.machine_memory.as_ref())
+    {
+        system_text.push_str(&machine_memory_block);
     }
     // 注:LRC / 长命令的工具用法引导(write_to_long_running_shell_command + command_id +
     // 各种 mode 与 raw 字节序列)已经在 `prompts/system/default.j2:69-79` 完整覆盖。
@@ -7781,3 +7809,7 @@ mod issue_94_task_linearization_tests {
         assert_eq!(message_ids(&out), vec!["m1", "m2", "m3"]);
     }
 }
+
+#[cfg(test)]
+#[path = "chat_stream_machine_memory_tests.rs"]
+mod machine_memory_tests;
