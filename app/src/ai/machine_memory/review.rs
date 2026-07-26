@@ -1,6 +1,8 @@
 //! Legacy SSH 会话结束后的机器记忆复盘。
 
-use chrono::Utc;
+use std::collections::HashSet;
+
+use chrono::{DateTime, Local, Utc};
 use serde::Deserialize;
 use warp_multi_agent_api as api;
 use warp_ssh_manager::MachineMemoryRepository;
@@ -27,9 +29,14 @@ pub(crate) struct PreparedSessionReview {
 }
 
 /// 同步准备一次会话复盘；任一前置条件不满足时静默跳过。
+///
+/// `session_started_at` 是本次 SSH 会话的开始时间:门控与 digest 都限定在
+/// [session_started_at, 退出时刻] 的时间窗内,避免把 SSH 之前的本地 Agent 交互
+/// 记入远端机器记忆(纯手工 SSH 会话也因此不会发起任何 LLM 请求)。
 pub(crate) fn prepare_session_review(
     machine_key: String,
     terminal_view_id: EntityId,
+    session_started_at: DateTime<Local>,
     ctx: &AppContext,
 ) -> Option<PreparedSessionReview> {
     if !AISettings::as_ref(ctx).is_ssh_machine_memory_enabled(ctx) {
@@ -40,15 +47,10 @@ pub(crate) fn prepare_session_review(
     let conversations = history_model
         .all_live_conversations_for_terminal_view(terminal_view_id)
         .collect::<Vec<_>>();
-    if !conversations.iter().any(|conversation| {
-        conversation
-            .root_task_exchanges()
-            .any(|exchange| exchange.output_status.is_finished_and_successful())
-    }) {
-        return None;
-    }
+    let session_message_ids =
+        collect_session_scoped_message_ids(&conversations, session_started_at)?;
 
-    let digest = build_session_digest(conversations.iter().copied());
+    let digest = build_session_digest(conversations.iter().copied(), &session_message_ids);
     if digest.is_empty() {
         return None;
     }
@@ -130,10 +132,39 @@ where
     let _ = ctx.spawn(future, |_owner, (), _ctx| {});
 }
 
-fn build_session_digest<'a>(conversations: impl IntoIterator<Item = &'a AIConversation>) -> String {
+/// 收集 SSH 会话时间窗内(以 exchange 发起时间为准)产生的全部消息 id。
+///
+/// 窗口内不存在完整成功的 Agent 交互时返回 None,对应"纯手工 SSH 会话退出
+/// 不发起任何 LLM 请求"的验收要求。
+fn collect_session_scoped_message_ids<'a>(
+    conversations: &[&'a AIConversation],
+    session_started_at: DateTime<Local>,
+) -> Option<HashSet<&'a str>> {
+    let mut message_ids = HashSet::new();
+    let mut has_finished_exchange = false;
+    for conversation in conversations.iter().copied() {
+        for exchange in conversation.root_task_exchanges() {
+            if exchange.start_time < session_started_at {
+                continue;
+            }
+            has_finished_exchange |= exchange.output_status.is_finished_and_successful();
+            message_ids.extend(exchange.added_message_ids.iter().map(|id| &**id));
+        }
+    }
+    has_finished_exchange.then_some(message_ids)
+}
+
+fn build_session_digest<'a>(
+    conversations: impl IntoIterator<Item = &'a AIConversation>,
+    session_message_ids: &HashSet<&str>,
+) -> String {
     let mut digest = DigestBuilder::default();
     for conversation in conversations {
         for message in conversation.all_linearized_messages() {
+            // 只纳入窗口内 root exchange 记录过的消息;子任务消息不在其中,一并排除。
+            if !session_message_ids.contains(message.id.as_str()) {
+                continue;
+            }
             let Some(message) = message.message.as_ref() else {
                 continue;
             };

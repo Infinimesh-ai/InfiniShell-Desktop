@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use chrono::TimeZone as _;
 use warp_multi_agent_api as api;
 
 use super::*;
@@ -67,6 +68,25 @@ fn command_result(id: &str, request_id: &str, command: &str, output: &str) -> ap
     )
 }
 
+/// 给消息补上 proto 时间戳,restored exchange 的 start_time 由此推导。
+fn at(mut message: api::Message, seconds: i64) -> api::Message {
+    message.timestamp = Some(prost_types::Timestamp { seconds, nanos: 0 });
+    message
+}
+
+fn local_time(seconds: i64) -> DateTime<Local> {
+    Local.timestamp_opt(seconds, 0).unwrap()
+}
+
+/// 不做窗口过滤的全量消息 id 集合,供只关注 digest 格式的测试使用。
+fn all_message_ids(conversation: &AIConversation) -> HashSet<&str> {
+    conversation
+        .all_linearized_messages()
+        .into_iter()
+        .map(|message| message.id.as_str())
+        .collect()
+}
+
 fn conversation(messages: Vec<api::Message>) -> AIConversation {
     AIConversation::new_restored(
         AIConversationId::new(),
@@ -100,7 +120,7 @@ fn digest_joins_multiple_rounds_and_truncates_each_command_output() {
         agent_output("agent-2", "request-2", "Reload completed."),
     ]);
 
-    let digest = build_session_digest([&conversation]);
+    let digest = build_session_digest([&conversation], &all_message_ids(&conversation));
 
     assert!(digest.contains("User:\nInspect nginx"));
     assert!(digest.contains("$ nginx -V"));
@@ -120,10 +140,88 @@ fn digest_total_limit_preserves_unicode_boundaries() {
         &"机".repeat(DIGEST_MAX_CHARS + 1),
     )]);
 
-    let digest = build_session_digest([&conversation]);
+    let digest = build_session_digest([&conversation], &all_message_ids(&conversation));
 
     assert_eq!(digest.chars().count(), DIGEST_MAX_CHARS);
     assert!(digest.starts_with("User:\n机"));
+}
+
+/// 本地交互(t=1000)在前、SSH 会话内交互(t=2000)在后的混合会话。
+fn mixed_window_conversation() -> AIConversation {
+    conversation(vec![
+        at(user_query("user-1", "request-1", "Check local disk"), 1000),
+        at(
+            command_result("result-1", "request-1", "df -h", "local output"),
+            1000,
+        ),
+        at(
+            agent_output("agent-1", "request-1", "Local disk is fine."),
+            1000,
+        ),
+        at(
+            user_query("user-2", "request-2", "Inspect remote nginx"),
+            2000,
+        ),
+        at(
+            command_result("result-2", "request-2", "nginx -V", "remote output"),
+            2000,
+        ),
+        at(
+            agent_output("agent-2", "request-2", "Remote nginx is installed."),
+            2000,
+        ),
+    ])
+}
+
+#[test]
+fn window_gating_and_digest_exclude_exchanges_before_ssh_session() {
+    let conversation = mixed_window_conversation();
+
+    // SSH 会话从 t=1500 开始:只有 request-2 的交互落在窗口内。
+    let session_message_ids =
+        collect_session_scoped_message_ids(&[&conversation], local_time(1500))
+            .expect("窗口内存在完整交互,应放行");
+    let digest = build_session_digest([&conversation], &session_message_ids);
+
+    assert!(digest.contains("User:\nInspect remote nginx"));
+    assert!(digest.contains("$ nginx -V"));
+    assert!(digest.contains("Assistant:\nRemote nginx is installed."));
+    assert!(!digest.contains("Check local disk"));
+    assert!(!digest.contains("df -h"));
+    assert!(!digest.contains("Local disk is fine."));
+}
+
+#[test]
+fn pure_manual_ssh_session_yields_no_review_gate() {
+    let conversation = mixed_window_conversation();
+
+    // SSH 会话从 t=3000 开始:期间没有任何 Agent 交互,不应放行(即不发 LLM 请求)。
+    assert_eq!(
+        collect_session_scoped_message_ids(&[&conversation], local_time(3000)),
+        None
+    );
+}
+
+#[test]
+fn unfinished_exchange_in_window_does_not_open_gate() {
+    // request-1(t=1000)是完整交互但在窗口前;request-2(t=2000)在窗口内,
+    // 但只有用户输入、没有输出,restore 后按取消处理,不构成完整交互。
+    let conversation = conversation(vec![
+        at(user_query("user-1", "request-1", "Check local disk"), 1000),
+        at(
+            agent_output("agent-1", "request-1", "Local disk is fine."),
+            1000,
+        ),
+        at(
+            user_query("user-2", "request-2", "Inspect remote nginx"),
+            2000,
+        ),
+    ]);
+
+    assert_eq!(
+        collect_session_scoped_message_ids(&[&conversation], local_time(1500)),
+        None
+    );
 }
 
 #[test]
