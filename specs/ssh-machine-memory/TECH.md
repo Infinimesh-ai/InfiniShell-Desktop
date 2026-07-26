@@ -275,8 +275,10 @@ Agent 对话有过至少一次完整交互（controller 可查询），调用
 `machine_memory::review::spawn_session_review(...)`。
 
 补充触发（防漏）：终端 view 关闭时若存在符合条件的 SSH 会话对话，同样触发一次。
-用 `last_review_at` + 对话内容 hash 或"本会话已复盘"标记去重，避免同一会话
-ExitShell 与 view 关闭双触发写两次。
+关闭补触发放在 `TerminalPane::detach(DetachType::Closed)`，并且必须在
+`clear_conversations_in_terminal_view` 之前执行；`ExitShell` 仍是主触发。
+用"本会话已复盘"标记去重，避免同一会话 ExitShell 与 view 关闭双触发写两次。
+所有同步前置条件准备完成后、异步请求 spawn 前原子插入去重标记。
 
 ### 4.2 复盘实现
 
@@ -294,13 +296,18 @@ ExitShell 与 view 关闭双触发写两次。
    - 角色：合并旧记忆与本次会话事实，输出该机器的修订版记忆。
    - 输出 JSON：`{"changed": bool, "memory": "<markdown>"}`；无新知识时
      `changed=false`（此时不写库）。
-   - 结构引导（不强制）：`## 系统画像` `## 服务与部署` `## 操作惯例` `## 踩坑记录`。
+   - 结构引导（不强制）：`## System Profile` `## Services and Deployment`
+     `## Operational Conventions` `## Gotchas`。
    - 硬性规则：≤16 000 字符；合并去重、旧事实被推翻时更新而非并存；
      **禁止**写入密码/token/私钥/一次性操作流水。
 3. 解析响应：JSON 解析失败或 `changed=false` → 静默放弃（log debug）。
    成功 → `upsert_content` + `set_last_review_at`。
+   当前记忆作为 system prompt 中的非可信参考数据附加，session digest 单独作为
+   user message，避免 oneshot 的 20 000 字符 user 截断吞掉 digest。
 4. 失败策略：任何环节失败均静默放弃，**不重试**（下次会话还有机会）。
    全程不弹 UI。
+   oneshot 响应解析与数据库写入必须在 `ctx.spawn` 的后台 future 内完成；view
+   关闭后框架可能跳过主线程 callback，callback 不得承载必要副作用。
 5. gating：设置项（Task 2）关闭时不触发；`resolve_active_ai_oneshot` 返回
    None（无可用 BYOP 配置）时不触发。
 

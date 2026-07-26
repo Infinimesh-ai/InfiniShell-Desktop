@@ -2428,6 +2428,8 @@ pub struct TerminalView {
     focus_handle: Option<PaneFocusHandle>,
 
     sessions: ModelHandle<Sessions>,
+    /// Zap:已启动机器记忆复盘的 SSH session，防止退出与关窗重复触发。
+    machine_memory_reviewed_sessions: HashSet<SessionId>,
     active_block_metadata: Option<BlockMetadata>,
 
     block_text_selection_start_position: Option<Vector2F>,
@@ -3900,6 +3902,7 @@ impl TerminalView {
             pane_configuration,
             focus_handle: None,
             sessions,
+            machine_memory_reviewed_sessions: HashSet::new(),
             remote_server_shimmer_handle: ShimmeringTextStateHandle::new(),
             active_block_metadata: None,
             block_text_selection_start_position: None,
@@ -6426,6 +6429,50 @@ impl TerminalView {
         self.active_block_metadata
             .as_ref()
             .and_then(BlockMetadata::session_id)
+    }
+
+    /// 在 legacy SSH 会话结束时准备并启动一次静默机器记忆复盘。
+    pub(crate) fn maybe_spawn_machine_memory_review(
+        &mut self,
+        session_id: SessionId,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if self.machine_memory_reviewed_sessions.contains(&session_id)
+            || !AISettings::as_ref(ctx).is_ssh_machine_memory_enabled(ctx)
+        {
+            return;
+        }
+
+        let Some(session) = self.sessions.as_ref(ctx).get(session_id) else {
+            return;
+        };
+        if !session.is_legacy_ssh_session() {
+            return;
+        }
+        let Some(machine_key) = session
+            .subshell_info()
+            .as_ref()
+            .and_then(|info| info.ssh_connection_info.as_ref())
+            .and_then(|info| {
+                warp_ssh_manager::resolve_machine_key(info.host.as_deref(), info.port.as_deref())
+            })
+        else {
+            return;
+        };
+
+        let Some(request) = crate::ai::machine_memory::review::prepare_session_review(
+            machine_key,
+            self.view_id,
+            ctx,
+        ) else {
+            return;
+        };
+
+        // 所有同步前置条件已满足；先标记，再 spawn，保证两个触发入口原子去重。
+        if !self.machine_memory_reviewed_sessions.insert(session_id) {
+            return;
+        }
+        crate::ai::machine_memory::review::spawn_session_review(request, ctx);
     }
 
     pub fn active_session_shell_type<C: ModelAsRef>(&self, ctx: &C) -> Option<ShellType> {
@@ -10902,6 +10949,8 @@ impl TerminalView {
                 }
             }
             ModelEvent::ExitShell { session_id } => {
+                self.maybe_spawn_machine_memory_review(*session_id, ctx);
+
                 // Drop the remote server client for this session before the
                 // user's outer ssh tunnel starts closing. The last
                 // `Arc<RemoteServerClient>` carries an owned `Child` for the

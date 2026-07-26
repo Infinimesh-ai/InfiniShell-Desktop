@@ -1,5 +1,7 @@
 //! Legacy SSH 会话的每机器 AI 记忆加载。
 
+pub(crate) mod review;
+
 use std::fmt::Display;
 
 use warp_ssh_manager::{resolve_machine_key, MachineMemoryRepository};

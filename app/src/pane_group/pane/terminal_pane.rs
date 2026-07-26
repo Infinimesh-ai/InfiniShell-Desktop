@@ -276,6 +276,13 @@ impl PaneContent for TerminalPane {
         ctx: &mut ViewContext<PaneGroup>,
     ) {
         if matches!(detach_type, DetachType::Closed) {
+            let terminal_view = self.terminal_view(ctx);
+            if let Some(session_id) = terminal_view.as_ref(ctx).active_block_session_id() {
+                terminal_view.update(ctx, |view, ctx| {
+                    view.maybe_spawn_machine_memory_review(session_id, ctx);
+                });
+            }
+
             // Only immediately clear conversations and delete blocks if the session is being
             // permanently closed.
             BlocklistAIHistoryModel::handle(ctx).update(ctx, |history_model, ctx| {
