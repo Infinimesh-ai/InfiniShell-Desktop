@@ -14,9 +14,10 @@ use super::schema::{
     generic_string_objects, ignored_suggestions, mcp_environment_variables,
     mcp_server_installations, mcp_server_panes, notebook_panes, notebooks, object_actions,
     object_metadata, object_permissions, pane_branches, pane_leaves, pane_nodes, panels,
-    project_rules, projects, server_experiments, settings_panes, ssh_nodes, ssh_onekey_credentials,
-    ssh_servers, sync_meta, tabs, team_members, team_settings, teams, terminal_panes,
-    user_profiles, welcome_panes, windows, workflow_panes, workflows, workspace_teams, workspaces,
+    project_rules, projects, server_experiments, settings_panes, ssh_machine_memories, ssh_nodes,
+    ssh_onekey_credentials, ssh_servers, sync_meta, tabs, team_members, team_settings, teams,
+    terminal_panes, user_profiles, welcome_panes, windows, workflow_panes, workflows,
+    workspace_teams, workspaces,
 };
 
 #[derive(Insertable)]
@@ -1533,6 +1534,31 @@ pub struct NewSshServer<'a> {
     pub startup_command: Option<&'a str>,
     pub notes: Option<&'a str>,
     pub credential_id: Option<&'a str>,
+}
+
+#[derive(Identifiable, Queryable, Selectable, Clone, Debug)]
+#[diesel(table_name = ssh_machine_memories)]
+#[diesel(primary_key(machine_key))]
+pub struct SshMachineMemoryRow {
+    pub machine_key: String,
+    pub content: String,
+    pub hostname_alias: Option<String>,
+    pub ssh_node_id: Option<String>,
+    pub last_review_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Insertable, AsChangeset, Clone, Debug)]
+#[diesel(table_name = ssh_machine_memories)]
+pub struct NewSshMachineMemory<'a> {
+    pub machine_key: &'a str,
+    pub content: &'a str,
+    pub hostname_alias: Option<&'a str>,
+    pub ssh_node_id: Option<&'a str>,
+    pub last_review_at: Option<&'a str>,
+    pub created_at: &'a str,
+    pub updated_at: &'a str,
 }
 
 // --- Sync Meta ---------------------------------------------------------

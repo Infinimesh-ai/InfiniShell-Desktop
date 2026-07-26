@@ -355,6 +355,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    ssh_machine_memories (machine_key) {
+        machine_key -> Text,
+        content -> Text,
+        hostname_alias -> Nullable<Text>,
+        ssh_node_id -> Nullable<Text>,
+        last_review_at -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     ssh_nodes (id) {
         id -> Text,
         parent_id -> Nullable<Text>,
@@ -557,5 +569,6 @@ diesel::allow_tables_to_appear_in_same_query!(
 diesel::allow_tables_to_appear_in_same_query!(code_pane_tabs, code_panes,);
 diesel::allow_tables_to_appear_in_same_query!(object_metadata, object_permissions,);
 diesel::allow_tables_to_appear_in_same_query!(team_members, team_settings, teams,);
+diesel::allow_tables_to_appear_in_same_query!(ssh_machine_memories,);
 diesel::allow_tables_to_appear_in_same_query!(sync_meta,);
 diesel::allow_tables_to_appear_in_same_query!(ssh_nodes, ssh_onekey_credentials, ssh_servers,);
