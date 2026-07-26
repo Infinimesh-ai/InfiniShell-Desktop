@@ -96,15 +96,21 @@ pub struct SshSyncData {
 
 /// SSH 数据同步提供者
 pub struct SshSyncProvider {
-    secret_store: KeychainSecretStore,
+    secret_store: Box<dyn SshSecretStore>,
 }
 
 impl SshSyncProvider {
     /// 创建新的 SshSyncProvider 实例
     pub fn new() -> Self {
         Self {
-            secret_store: KeychainSecretStore::default(),
+            secret_store: Box::new(KeychainSecretStore::default()),
         }
+    }
+
+    /// 测试注入自定义凭据存储,绕开 OS keychain。
+    #[cfg(test)]
+    pub(crate) fn with_secret_store(secret_store: Box<dyn SshSecretStore>) -> Self {
+        Self { secret_store }
     }
 }
 
@@ -131,7 +137,7 @@ impl SyncDataProvider for SshSyncProvider {
                 .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
         for credential in onekey_credentials {
             let secret_kind = onekey_secret_kind(credential.kind);
-            let password = read_secret(&self.secret_store, &credential.id, secret_kind)?;
+            let password = read_secret(self.secret_store.as_ref(), &credential.id, secret_kind)?;
             sync_onekey_credentials.push(SyncOneKeyCredential {
                 id: credential.id,
                 label: credential.label,
@@ -162,11 +168,15 @@ impl SyncDataProvider for SshSyncProvider {
                     // - Ok(None) = 用户确实没设,字段写 None
                     // - Err = 中止整次上传,避免把瞬时 keychain 故障序列化为
                     //   "无密码"覆盖其他设备的真实密码(PR #161 review #5)
-                    let password = read_secret(&self.secret_store, &node.id, SecretKind::Password)?;
+                    let password =
+                        read_secret(self.secret_store.as_ref(), &node.id, SecretKind::Password)?;
                     let passphrase =
-                        read_secret(&self.secret_store, &node.id, SecretKind::Passphrase)?;
-                    let root_password =
-                        read_secret(&self.secret_store, &node.id, SecretKind::RootPassword)?;
+                        read_secret(self.secret_store.as_ref(), &node.id, SecretKind::Passphrase)?;
+                    let root_password = read_secret(
+                        self.secret_store.as_ref(),
+                        &node.id,
+                        SecretKind::RootPassword,
+                    )?;
 
                     sync_servers.push(SyncServer {
                         node_id: server.node_id.clone(),
@@ -206,12 +216,10 @@ impl SyncDataProvider for SshSyncProvider {
             .map_err(|e: serde_json::Error| SyncEngineError::Serialization(e.to_string()))?;
 
         // 先解密全部 memory，确保坏密文不会触发后续 keychain 或数据库写入。
+        // 本地快照的读取与归并推迟到阶段 2 的写回事务内(见 merge_and_persist_memories),
+        // 在此处提前读会留下竞态窗口:归并期间 Agent 的 update_machine_memory 写入
+        // 会被旧快照算出的归并结果覆盖。
         let remote_memories = decrypt_machine_memories(token, &ssh_data.machine_memories)?;
-        let local_memories =
-            with_conn(|conn| Ok(MachineMemoryRepository::list_all_for_sync(conn)?))
-                .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
-        let (merged_memories, memory_outcome) =
-            merge_machine_memories(&local_memories, &remote_memories);
 
         // ---- 阶段 0 ---- 全部解密 + 收集 explicit-clear 列表
         // pending_secrets: 远程明确给了密文 → 需要写入 keychain
@@ -301,7 +309,7 @@ impl SyncDataProvider for SshSyncProvider {
                 Ok(opt) => opt,
                 Err(e) => {
                     // 与 read_secret 同等严格:keychain 任何错误都中止,避免无法 rollback
-                    rollback_keychain_writes(&self.secret_store, &written_secrets);
+                    rollback_keychain_writes(self.secret_store.as_ref(), &written_secrets);
                     return Err(SyncEngineError::Provider(format!(
                         "读取 keychain 旧值失败 ({}, {:?}): {e}。已回滚 {} 项,请确认密钥库可用后重试下载",
                         s.node_id,
@@ -311,7 +319,7 @@ impl SyncDataProvider for SshSyncProvider {
                 }
             };
             if let Err(e) = self.secret_store.set(&s.node_id, s.kind, &s.value) {
-                rollback_keychain_writes(&self.secret_store, &written_secrets);
+                rollback_keychain_writes(self.secret_store.as_ref(), &written_secrets);
                 return Err(SyncEngineError::Provider(format!(
                     "写入 keychain 失败 ({}, {:?}): {e},请检查密钥库权限后重试下载",
                     s.node_id, s.kind
@@ -326,7 +334,7 @@ impl SyncDataProvider for SshSyncProvider {
 
         // ---- 阶段 2 ---- DB 事务:DELETE + 按拓扑顺序 INSERT
         let db_result = with_conn(|conn| {
-            conn.transaction::<(), anyhow::Error, _>(|conn| {
+            conn.transaction::<ApplyDataOutcome, anyhow::Error, _>(|conn| {
                 conn.batch_execute(
                     "DELETE FROM ssh_servers; DELETE FROM ssh_nodes; DELETE FROM ssh_onekey_credentials;",
                 )?;
@@ -377,20 +385,22 @@ impl SyncDataProvider for SshSyncProvider {
                         })
                         .execute(conn)?;
                 }
-                for memory in &merged_memories {
-                    MachineMemoryRepository::upsert_from_sync(conn, memory)?;
-                }
-                Ok(())
+                // 快照读取 + LWW 归并 + 写回在同一事务内完成,
+                // 阶段 1(keychain)期间落地的本地 memory 写入也会被归并进来。
+                merge_and_persist_memories(conn, &remote_memories)
             })
         });
-        if let Err(e) = db_result {
-            // DB 失败 → 回滚刚写入的 keychain,避免长期残留指向不存在 node 的密钥
-            let rolled = written_secrets.len();
-            rollback_keychain_writes(&self.secret_store, &written_secrets);
-            return Err(SyncEngineError::Provider(format!(
-                "DB 写入失败 ({e});已回滚 {rolled} 项 keychain 写入"
-            )));
-        }
+        let memory_outcome = match db_result {
+            Ok(outcome) => outcome,
+            Err(e) => {
+                // DB 失败 → 回滚刚写入的 keychain,避免长期残留指向不存在 node 的密钥
+                let rolled = written_secrets.len();
+                rollback_keychain_writes(self.secret_store.as_ref(), &written_secrets);
+                return Err(SyncEngineError::Provider(format!(
+                    "DB 写入失败 ({e});已回滚 {rolled} 项 keychain 写入"
+                )));
+            }
+        };
 
         // ---- 阶段 3a ---- 清理 explicit-clear:节点仍存在但远程把对应 *_encrypted 设为 None
         // 用户在其他设备清空了某项密码 → 必须 delete 本地 keychain,否则 connect 时会继续用旧密码,
@@ -436,24 +446,38 @@ impl SyncDataProvider for SshSyncProvider {
         let ssh_data: SshSyncData = serde_json::from_value(data.clone())
             .map_err(|e: serde_json::Error| SyncEngineError::Serialization(e.to_string()))?;
         let remote_memories = decrypt_machine_memories(token, &ssh_data.machine_memories)?;
-        let local_memories =
-            with_conn(|conn| Ok(MachineMemoryRepository::list_all_for_sync(conn)?))
-                .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
-        let (merged_memories, outcome) = merge_machine_memories(&local_memories, &remote_memories);
-
-        if outcome.local_changed {
-            with_conn(|conn| {
-                conn.transaction::<(), anyhow::Error, _>(|conn| {
-                    for memory in &merged_memories {
-                        MachineMemoryRepository::upsert_from_sync(conn, memory)?;
-                    }
-                    Ok(())
-                })
+        // 快照读取与写回必须在同一次 with_conn(持全局锁)+ 同一事务内,
+        // 否则归并期间的本地写会被旧快照覆盖(见 merge_and_persist_memories)。
+        with_conn(|conn| {
+            conn.transaction::<ApplyDataOutcome, anyhow::Error, _>(|conn| {
+                merge_and_persist_memories(conn, &remote_memories)
             })
-            .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
-        }
-        Ok(outcome)
+        })
+        .map_err(|e| SyncEngineError::Provider(e.to_string()))
     }
+}
+
+/// 在同一事务内完成:读取本地 memory 快照 → LWW 归并 → 写回。
+///
+/// 快照与写回必须原子。若先在单独一次 `with_conn` 里读快照(db.rs 的全局锁
+/// 按调用持有,不跨读写),后台同步归并期间 Agent 的 `update_machine_memory`
+/// 写入(更新 updated_at 并 bump sync_version)会被旧快照算出的归并结果覆盖,
+/// updated_at 更旧的数据反而胜出,造成真实数据丢失;commit_sync_version 的
+/// pending 机制只保住版本号,重新同步时上传的仍是被覆盖后的旧数据
+/// (specs/ssh-machine-memory/TECH.md Task 6)。
+fn merge_and_persist_memories(
+    conn: &mut diesel::sqlite::SqliteConnection,
+    remote_memories: &[MachineMemory],
+) -> Result<ApplyDataOutcome, anyhow::Error> {
+    let local_memories = MachineMemoryRepository::list_all_for_sync(conn)?;
+    let (merged_memories, outcome) = merge_machine_memories(&local_memories, remote_memories);
+    // 归并结果与本地一致时跳过写回,避免无意义的行覆盖。
+    if outcome.local_changed {
+        for memory in &merged_memories {
+            MachineMemoryRepository::upsert_from_sync(conn, memory)?;
+        }
+    }
+    Ok(outcome)
 }
 
 fn encrypt_machine_memories(
@@ -1193,5 +1217,165 @@ mod tests {
         assert_eq!(merged, vec![active]);
         assert!(outcome.local_changed);
         assert!(!outcome.needs_upload);
+    }
+
+    #[test]
+    fn merge_and_persist_keeps_newer_local_write_over_older_remote() {
+        let mut conn = crate::repository::setup_in_memory();
+        // Agent 已写入较新内容(updated_at = now,同时 bump sync_version)
+        MachineMemoryRepository::upsert_content(&mut conn, "web-01:22", "Agent 新内容").unwrap();
+
+        // 远端持有较旧内容;快照在写回事务内读取,归并必须以当前 DB 状态为准
+        let remote = vec![memory("web-01:22", "远端旧内容", 1, false)];
+        let outcome = merge_and_persist_memories(&mut conn, &remote).unwrap();
+
+        let stored = MachineMemoryRepository::get(&mut conn, "web-01:22")
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.content, "Agent 新内容");
+        assert_eq!(
+            outcome,
+            ApplyDataOutcome {
+                local_changed: false,
+                needs_upload: true,
+            }
+        );
+    }
+
+    #[test]
+    fn merge_and_persist_applies_newer_remote_without_bumping_sync_version() {
+        let mut conn = crate::repository::setup_in_memory();
+        let remote = vec![memory("web-01:22", "远端内容", 100, false)];
+
+        let outcome = merge_and_persist_memories(&mut conn, &remote).unwrap();
+
+        let stored = MachineMemoryRepository::get(&mut conn, "web-01:22")
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.content, "远端内容");
+        assert_eq!(
+            outcome,
+            ApplyDataOutcome {
+                local_changed: true,
+                needs_upload: false,
+            }
+        );
+        assert_eq!(SyncMetaRepository::get_sync_version(&mut conn).unwrap(), 0);
+    }
+
+    /// 归并期间注入本地写的 mock 凭据存储:apply_data 阶段 1 首次读取旧值时,
+    /// 通过 with_conn 模拟 Agent 的 update_machine_memory 写入。该时点位于
+    /// 旧实现"读快照 → 写回"的竞态窗口内(旧实现在阶段 0 之前就读了快照),
+    /// 用于回归验证快照与写回的原子性。
+    #[derive(Default)]
+    struct InjectingSecretStore {
+        injected: std::sync::atomic::AtomicBool,
+    }
+
+    impl SshSecretStore for InjectingSecretStore {
+        fn set(
+            &self,
+            _node_id: &str,
+            _kind: SecretKind,
+            _secret: &str,
+        ) -> Result<(), crate::secrets::SshSecretStoreError> {
+            Ok(())
+        }
+
+        fn get(
+            &self,
+            _node_id: &str,
+            _kind: SecretKind,
+        ) -> Result<Option<Zeroizing<String>>, crate::secrets::SshSecretStoreError> {
+            if !self
+                .injected
+                .swap(true, std::sync::atomic::Ordering::SeqCst)
+            {
+                with_conn(|conn| {
+                    MachineMemoryRepository::upsert_content(
+                        conn,
+                        "web-01:22",
+                        "Agent 归并期间写入",
+                    )?;
+                    Ok(())
+                })
+                .unwrap();
+            }
+            Ok(None)
+        }
+
+        fn delete(
+            &self,
+            _node_id: &str,
+            _kind: SecretKind,
+        ) -> Result<(), crate::secrets::SshSecretStoreError> {
+            Ok(())
+        }
+    }
+
+    /// 回归测试:同步归并期间落地的本地写不能被旧快照的归并结果覆盖。
+    /// 使用真实的 db::with_conn 全局连接(nextest 每个测试独立进程,
+    /// OnceLock 路径不会跨测试污染)。
+    #[test]
+    fn apply_data_preserves_local_write_that_lands_during_keychain_phase() {
+        let dir = tempfile::tempdir().unwrap();
+        crate::db::set_database_path(dir.path().join("ssh.sqlite3"));
+        with_conn(|conn| {
+            crate::repository::run_test_migrations(conn);
+            Ok(())
+        })
+        .unwrap();
+
+        let token = "token";
+        let payload = SshSyncData {
+            nodes: vec![SyncNode {
+                id: "srv-1".to_string(),
+                parent_id: None,
+                kind: "server".to_string(),
+                name: "web".to_string(),
+                sort_order: 0,
+                is_collapsed: false,
+            }],
+            // 带密码的服务器,确保阶段 1 会调用 secret_store.get 触发注入
+            servers: vec![SyncServer {
+                node_id: "srv-1".to_string(),
+                host: "web-01".to_string(),
+                port: 22,
+                username: "root".to_string(),
+                auth_type: "password".to_string(),
+                key_path: None,
+                startup_command: None,
+                notes: None,
+                credential_id: None,
+                password_encrypted: Some(crypto::encrypt(token, "pw").unwrap()),
+                passphrase_encrypted: None,
+                root_password_encrypted: None,
+            }],
+            onekey_credentials: Vec::new(),
+            machine_memories: vec![SyncMachineMemory {
+                machine_key: "web-01:22".to_string(),
+                content_encrypted: Some(crypto::encrypt(token, "远端旧内容").unwrap()),
+                hostname_alias: None,
+                ssh_node_id: None,
+                last_review_at: None,
+                updated_at: "2020-01-01T00:00:00Z".to_string(),
+                deleted_at: None,
+            }],
+        };
+
+        let provider =
+            SshSyncProvider::with_secret_store(Box::new(InjectingSecretStore::default()));
+        let outcome = provider
+            .apply_data(token, &serde_json::to_value(&payload).unwrap())
+            .unwrap();
+
+        // Agent 注入的写 updated_at 更新,LWW 归并必须让它胜出并回传远端;
+        // 旧实现会用注入前的空快照归并出远端旧内容并覆盖之。
+        let stored = with_conn(|conn| Ok(MachineMemoryRepository::get(conn, "web-01:22")?))
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.content, "Agent 归并期间写入");
+        assert!(outcome.needs_upload);
+        assert!(!outcome.local_changed);
     }
 }

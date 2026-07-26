@@ -589,6 +589,15 @@ pub(crate) fn setup_in_memory() -> SqliteConnection {
     use diesel::connection::SimpleConnection;
     let mut conn = SqliteConnection::establish(":memory:").unwrap();
     conn.batch_execute("PRAGMA foreign_keys = ON;").unwrap();
+    run_test_migrations(&mut conn);
+    conn
+}
+
+/// 测试用:在任意连接上执行全部 SSH migrations(sync_provider 测试需要在
+/// `db::with_conn` 的全局文件连接上建表)。
+#[cfg(test)]
+pub(crate) fn run_test_migrations(conn: &mut SqliteConnection) {
+    use diesel::connection::SimpleConnection;
     for up in [
         include_str!(
             "../../persistence/migrations/2026-05-04-120000_add_ssh_manager_tables/up.sql"
@@ -615,7 +624,6 @@ pub(crate) fn setup_in_memory() -> SqliteConnection {
     ] {
         conn.batch_execute(up).unwrap();
     }
-    conn
 }
 
 #[cfg(test)]
