@@ -5,6 +5,7 @@ use async_channel::Sender;
 pub use command_executor::*;
 
 use anyhow::Result;
+use chrono::{DateTime, Local};
 use futures::future::{BoxFuture, Shared};
 use futures::FutureExt;
 use instant::Instant;
@@ -873,6 +874,8 @@ impl From<BootstrapSessionType> for SessionType {
 #[derive(Debug)]
 pub struct Session {
     info: SessionInfo,
+    /// 会话完成 bootstrap 被创建的时刻;机器记忆复盘用它界定 SSH 会话时间窗。
+    created_at: DateTime<Local>,
     external_commands: Arc<OnceCell<HashSet<SmolStr>>>,
     /// The command executor for this session. Behind a `RwLock` so it can be
     /// swapped after a remote server reconnect (via `set_command_executor`).
@@ -901,6 +904,7 @@ impl Session {
         let session_type = SessionType::from(session_info.session_type.clone());
         Self {
             info: session_info,
+            created_at: Local::now(),
             external_commands: Arc::new(OnceCell::new()),
             command_executor: RwLock::new(command_executor),
             load_external_commands_future: Default::default(),
@@ -911,6 +915,11 @@ impl Session {
 
     pub fn id(&self) -> SessionId {
         self.info.session_id
+    }
+
+    /// 该会话对象的创建时间(bootstrap 完成时刻)。
+    pub fn created_at(&self) -> DateTime<Local> {
+        self.created_at
     }
 
     pub fn user(&self) -> &str {
@@ -1687,6 +1696,7 @@ pub mod testing {
             let session_type = SessionType::from(info.session_type.clone());
             Self {
                 info,
+                created_at: Local::now(),
                 external_commands: Default::default(),
                 command_executor: RwLock::new(Arc::new(TestCommandExecutor::default())),
                 load_external_commands_future: Default::default(),
@@ -1702,6 +1712,7 @@ pub mod testing {
             let session_type = SessionType::from(info.session_type.clone());
             Self {
                 info,
+                created_at: Local::now(),
                 external_commands: Default::default(),
                 command_executor: RwLock::new(Arc::new(TestCommandExecutor::default())),
                 load_external_commands_future: Default::default(),

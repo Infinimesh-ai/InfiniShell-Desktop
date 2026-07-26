@@ -6459,10 +6459,13 @@ impl TerminalView {
         else {
             return;
         };
+        // 以该 SSH 会话的创建时间为窗口起点，只复盘会话期间发生的 Agent 交互。
+        let session_started_at = session.created_at();
 
         let Some(request) = crate::ai::machine_memory::review::prepare_session_review(
             machine_key,
             self.view_id,
+            session_started_at,
             ctx,
         ) else {
             return;
