@@ -11,8 +11,9 @@ use warpui::{Entity, ModelContext, SingletonEntity};
 /// - AGENTS.md 社区通用(opencode / Cursor / Cline 等都识别)。
 /// - CLAUDE.md Claude Code 原生约定，让从 Claude Code 迁过来的项目一键可用。
 ///
-/// 扩展新名称只需调整本数组(插入位置 = 优先级),`RuleAtPath`
-/// 以 priority-indexed slot 数组实现，不需动 if-else 逻辑。
+/// 扩展新名称时,本数组的插入位置 = 优先级,同时要在 `RuleAtPath` 加一个
+/// 对应槽位,并在 `RuleAtPath::slot_for_file_name()` / `respected_rule()`
+/// 中登记该槽位(增量更新与优先级两条路径都靠这两处)。
 ///
 /// 定义在 `cfg_if` 外部，以便不编译 `local_fs` 的路径(WASM / 测试)也能引用。
 pub(crate) const RULES_FILE_PATTERN: &[&str] = &["WARP.md", "AGENTS.md", "CLAUDE.md"];
@@ -77,11 +78,31 @@ struct RuleAtPath {
     parent_path: PathBuf,
     warp_md: Option<ProjectRule>,
     agents_md: Option<ProjectRule>,
+    claude_md: Option<ProjectRule>,
 }
 
 impl RuleAtPath {
     fn respected_rule(&self) -> Option<&ProjectRule> {
-        self.warp_md.as_ref().or(self.agents_md.as_ref())
+        self.warp_md
+            .as_ref()
+            .or(self.agents_md.as_ref())
+            .or(self.claude_md.as_ref())
+    }
+
+    /// 按文件名(大小写不敏感)定位对应的规则槽位,文件名不在
+    /// `RULES_FILE_PATTERN` 中时返回 None。`upsert_rule` / `remove_rule`
+    /// 共用此处,避免文件名分支在多处各写一遍而漏掉某个名称。
+    fn slot_for_file_name(&mut self, file_name: &str) -> Option<&mut Option<ProjectRule>> {
+        let file_name = file_name.to_lowercase();
+        if file_name == "warp.md" {
+            Some(&mut self.warp_md)
+        } else if file_name == "agents.md" {
+            Some(&mut self.agents_md)
+        } else if file_name == "claude.md" {
+            Some(&mut self.claude_md)
+        } else {
+            None
+        }
     }
 }
 
@@ -156,13 +177,7 @@ impl ProjectRules {
             .iter_mut()
             .find(|rule| rule.parent_path == parent)?;
 
-        if file_name.to_lowercase() == "warp.md" {
-            rule.warp_md.take()
-        } else if file_name.to_lowercase() == "agents.md" {
-            rule.agents_md.take()
-        } else {
-            None
-        }
+        rule.slot_for_file_name(file_name)?.take()
     }
 
     /// Upsert a rule to the set of project rules. This will create a new RuleAtPath entry if none exists and update the existing one
@@ -188,10 +203,8 @@ impl ProjectRules {
 
         match existing_rule {
             Some(rule) => {
-                if file_name.to_lowercase() == "warp.md" {
-                    rule.warp_md = rule_file;
-                } else if file_name.to_lowercase() == "agents.md" {
-                    rule.agents_md = rule_file;
+                if let Some(slot) = rule.slot_for_file_name(file_name) {
+                    *slot = rule_file;
                 }
             }
             None => {
@@ -199,10 +212,8 @@ impl ProjectRules {
                     parent_path: parent.to_path_buf(),
                     ..Default::default()
                 };
-                if file_name.to_lowercase() == "warp.md" {
-                    rule.warp_md = rule_file;
-                } else if file_name.to_lowercase() == "agents.md" {
-                    rule.agents_md = rule_file;
+                if let Some(slot) = rule.slot_for_file_name(file_name) {
+                    *slot = rule_file;
                 }
                 self.rules.push(rule);
             }
@@ -307,6 +318,14 @@ impl ProjectContextModel {
                                 })
                                 .chain(rule_files.rules.iter().filter_map(|rule| {
                                     rule.agents_md.as_ref().map(|rule| ProjectRulePath {
+                                        project_root: root_clone.clone(),
+                                        path: rule.path.clone(),
+                                    })
+                                }))
+                                // 持久化要覆盖全部槽位(优先级在读取时才应用),
+                                // 漏掉 claude_md 会让 CLAUDE.md 重启后丢失。
+                                .chain(rule_files.rules.iter().filter_map(|rule| {
+                                    rule.claude_md.as_ref().map(|rule| ProjectRulePath {
                                         project_root: root_clone.clone(),
                                         path: rule.path.clone(),
                                     })
@@ -492,7 +511,7 @@ impl ProjectContextModel {
     /// 从 `start` 起逐级向上同步 stat + 读取规则文件。对齐 opencode `findUp`,
     /// 但添加 `MAX_WALK_DEPTH` + `FAST_PATH_BUDGET` 双保障让 UI 绝不阻塞。
     ///
-    /// 每层依 `RULES_FILE_PATTERN`(WARP.md > AGENTS.md)取首个命中的,对齐
+    /// 每层依 `RULES_FILE_PATTERN`(WARP.md > AGENTS.md > CLAUDE.md)取首个命中的,对齐
     /// `RuleAtPath::respected_rule()` 语义。
     #[cfg(feature = "local_fs")]
     fn scan_fast_path(start: &Path) -> FastPathEntry {
