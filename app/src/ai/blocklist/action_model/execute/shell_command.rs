@@ -255,26 +255,7 @@ impl ShellCommandExecutor {
     /// 即便上述都失效,`action_result_future` 的 `MAX_UNTIL_COMPLETION_DURATION` 兜底
     /// 会保证 agent 不会**永久**挂起。
     fn turn_off_pager_for_command(&self, command: &String, ctx: &mut ModelContext<Self>) -> String {
-        match self.active_session.as_ref(ctx).shell_type(ctx) {
-            // 子壳里 export,子壳退出码 = 最后一条命令的退出码,从而保留真实 $?。
-            // 先 unset 清理继承自父 shell 的 PAGER/GIT_PAGER/MANPAGER,再 export=cat。
-            Some(ShellType::Zsh) | Some(ShellType::Bash) => format!(
-                "(unset PAGER GIT_PAGER MANPAGER; export PAGER=cat GIT_PAGER=cat MANPAGER=cat GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.pager GIT_CONFIG_VALUE_0=cat; {command})"
-            ),
-            // fish: set -lx 在 begin/end 块内是局部 export, $status 取最后一条命令。
-            // 用 `set -e` 先清掉继承变量,再 `set -lx` 赋 cat。
-            Some(ShellType::Fish) => format!(
-                "begin; set -e PAGER; set -e GIT_PAGER; set -e MANPAGER; set -lx PAGER cat; set -lx GIT_PAGER cat; set -lx MANPAGER cat; set -lx GIT_CONFIG_COUNT 1; set -lx GIT_CONFIG_KEY_0 core.pager; set -lx GIT_CONFIG_VALUE_0 cat; {command}; end"
-            ),
-            // pwsh: script block 局部 $env: 不污染外层会话, $LASTEXITCODE 透出。
-            // Remove-Item Env: 清理继承值,再赋 cat;对不存在变量用 -ErrorAction SilentlyContinue。
-            Some(ShellType::PowerShell) => format!(
-                "& {{ Remove-Item Env:PAGER -ErrorAction SilentlyContinue; Remove-Item Env:GIT_PAGER -ErrorAction SilentlyContinue; Remove-Item Env:MANPAGER -ErrorAction SilentlyContinue; $env:PAGER='cat'; $env:GIT_PAGER='cat'; $env:MANPAGER='cat'; $env:GIT_CONFIG_COUNT='1'; $env:GIT_CONFIG_KEY_0='core.pager'; $env:GIT_CONFIG_VALUE_0='cat'; {command} }}"
-            ),
-            // 未知 shell 无法安全装饰,直接放过 —— 此路径下 pager 抑制完全无效,只能
-            // 依靠 MAX_UNTIL_COMPLETION_DURATION 兜底超时避免永久挂起。
-            None => command.clone(),
-        }
+        wrap_command_without_pager(self.active_session.as_ref(ctx).shell_type(ctx), command)
     }
 
     pub(super) fn execute(
@@ -757,6 +738,69 @@ impl ShellCommandExecutor {
         _ctx: &mut ModelContext<Self>,
     ) -> BoxFuture<'static, ()> {
         futures::future::ready(()).boxed()
+    }
+}
+
+/// bash/zsh 的 pager 抑制前缀。子壳里 export,子壳退出码 = 最后一条命令的退出码,
+/// 从而保留真实 `$?`。先 unset 清理继承自父 shell 的 PAGER/GIT_PAGER/MANPAGER,再 export=cat。
+const POSIX_NO_PAGER_PRELUDE: &str = "unset PAGER GIT_PAGER MANPAGER; export PAGER=cat GIT_PAGER=cat MANPAGER=cat GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.pager GIT_CONFIG_VALUE_0=cat";
+
+/// fish: `set -lx` 在 begin/end 块内是局部 export,`$status` 取最后一条命令。
+/// 用 `set -e` 先清掉继承变量,再 `set -lx` 赋 cat。
+const FISH_NO_PAGER_PRELUDE: &str = "set -e PAGER; set -e GIT_PAGER; set -e MANPAGER; set -lx PAGER cat; set -lx GIT_PAGER cat; set -lx MANPAGER cat; set -lx GIT_CONFIG_COUNT 1; set -lx GIT_CONFIG_KEY_0 core.pager; set -lx GIT_CONFIG_VALUE_0 cat";
+
+/// pwsh: script block 局部 `$env:` 不污染外层会话,`$LASTEXITCODE` 透出。
+/// `Remove-Item Env:` 清理继承值,再赋 cat;对不存在变量用 `-ErrorAction SilentlyContinue`。
+const PWSH_NO_PAGER_PRELUDE: &str = "Remove-Item Env:PAGER -ErrorAction SilentlyContinue; Remove-Item Env:GIT_PAGER -ErrorAction SilentlyContinue; Remove-Item Env:MANPAGER -ErrorAction SilentlyContinue; $env:PAGER='cat'; $env:GIT_PAGER='cat'; $env:MANPAGER='cat'; $env:GIT_CONFIG_COUNT='1'; $env:GIT_CONFIG_KEY_0='core.pager'; $env:GIT_CONFIG_VALUE_0='cat'";
+
+/// 把 `command` 包进"禁用 pager"的作用域里,见 [`ShellCommandExecutor::turn_off_pager_for_command`]。
+///
+/// **不变式:多行命令的闭合 token(`)` / `end` / `}`)必须独占一行。**
+///
+/// 反例:agent 发 `python3 - <<'PY' … PY`,朴素拼接会得到 `…\nPY)`。heredoc 结束符
+/// 要求独占一行,`PY)` 不再匹配,shell 于是永远停在 PS2 续行提示符上等那一行 `PY`
+/// —— 命令永不结束 → precmd 不触发 → `ActionResultDelay::UntilCompletion` 一路挂到
+/// `MAX_UNTIL_COMPLETION_DURATION`(30 分钟),期间 `is_active_and_long_running()` 守卫
+/// 还会把 agent 后续所有命令打成 `CancelledBeforeExecution`,表现为整个 agent 卡死。
+/// 以尾随 `#` 注释结尾的命令是同一类破绽(闭合 token 被注释掉)。
+///
+/// 只在命令**本身已经是多行**时才切到多行包裹形态:单行命令保持原有单行字节形态,
+/// 避免在不支持 bracketed paste 的 shell(如 macOS 自带 bash 3.2)上被
+/// `bytes_to_execute_command` 的 `\n` → `\r` 替换拆成多个 block。多行命令在那些 shell
+/// 上本来就已经被拆分,本函数不会让情况变差。
+fn wrap_command_without_pager(shell_type: Option<ShellType>, command: &str) -> String {
+    // 命令尾部的换行/空白会让闭合 token 前多出空行,无语义影响但污染 blocklist 显示。
+    let command = command.trim_end();
+    let is_multiline = command.contains('\n');
+
+    match shell_type {
+        Some(ShellType::Zsh) | Some(ShellType::Bash) => {
+            let prelude = POSIX_NO_PAGER_PRELUDE;
+            if is_multiline {
+                format!("({prelude}\n{command}\n)")
+            } else {
+                format!("({prelude}; {command})")
+            }
+        }
+        Some(ShellType::Fish) => {
+            let prelude = FISH_NO_PAGER_PRELUDE;
+            if is_multiline {
+                format!("begin; {prelude}\n{command}\nend")
+            } else {
+                format!("begin; {prelude}; {command}; end")
+            }
+        }
+        Some(ShellType::PowerShell) => {
+            let prelude = PWSH_NO_PAGER_PRELUDE;
+            if is_multiline {
+                format!("& {{ {prelude}\n{command}\n}}")
+            } else {
+                format!("& {{ {prelude}; {command} }}")
+            }
+        }
+        // 未知 shell 无法安全装饰,直接放过 —— 此路径下 pager 抑制完全无效,只能
+        // 依靠 MAX_UNTIL_COMPLETION_DURATION 兜底超时避免永久挂起。
+        None => command.to_owned(),
     }
 }
 

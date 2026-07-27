@@ -163,3 +163,61 @@ fn preemption_logic_covers_until_completion_timeout() {
         DurationDelay(Duration::from_secs(1))
     ));
 }
+
+/// 复现挂死案例:heredoc 结束符必须保持独占一行,闭合 `)` 不能被拼到它后面。
+/// 拼成 `PY)` 后 shell 永远等不到结束符,停在 PS2 上,命令永不结束。
+#[test]
+fn multiline_heredoc_keeps_delimiter_and_closer_on_their_own_lines() {
+    let command = "python3 - <<'PY'\nprint('ok')\nPY";
+
+    for shell in [ShellType::Bash, ShellType::Zsh] {
+        let wrapped = wrap_command_without_pager(Some(shell), command);
+        let lines: Vec<&str> = wrapped.lines().collect();
+
+        assert_eq!(
+            lines[lines.len() - 2],
+            "PY",
+            "heredoc 结束符被污染: {wrapped}"
+        );
+        assert_eq!(lines[lines.len() - 1], ")", "闭合括号未独占一行: {wrapped}");
+        assert!(wrapped.contains("PAGER=cat"), "pager 抑制丢失: {wrapped}");
+    }
+}
+
+/// 同一类破绽:命令以尾随 `#` 注释结尾时,闭合 token 会被注释掉。
+#[test]
+fn multiline_trailing_comment_does_not_swallow_closer() {
+    let command = "echo start\necho done # 收尾";
+
+    assert!(wrap_command_without_pager(Some(ShellType::Bash), command).ends_with("\n)"));
+    assert!(wrap_command_without_pager(Some(ShellType::Fish), command).ends_with("\nend"));
+    assert!(wrap_command_without_pager(Some(ShellType::PowerShell), command).ends_with("\n}"));
+}
+
+/// 单行命令必须保持原有的单行形态:`bytes_to_execute_command` 在不支持 bracketed
+/// paste 的 shell 上会把 `\n` 换成 `\r`,多加换行会把一条命令拆成多个 block。
+#[test]
+fn single_line_command_stays_on_one_line() {
+    let command = "cargo check";
+
+    for shell in [
+        ShellType::Bash,
+        ShellType::Zsh,
+        ShellType::Fish,
+        ShellType::PowerShell,
+    ] {
+        let wrapped = wrap_command_without_pager(Some(shell), command);
+        assert!(
+            !wrapped.contains('\n'),
+            "{shell:?} 单行命令被拆行: {wrapped}"
+        );
+        assert!(wrapped.contains(command), "{shell:?} 命令丢失: {wrapped}");
+    }
+}
+
+/// 未知 shell 无法安全装饰,原样放过。
+#[test]
+fn unknown_shell_passes_command_through() {
+    let command = "python3 - <<'PY'\nprint('ok')\nPY";
+    assert_eq!(wrap_command_without_pager(None, command), command);
+}
