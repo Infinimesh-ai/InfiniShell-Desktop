@@ -1,6 +1,6 @@
 # 迁移设置到 InfiniShell
 
-[English](./migrate-from-warp.md) · [日本語](./migrate-from-warp.ja.md)
+[English](./migrate-from-warp.md)
 
 本文给希望把**设置类配置**(自定义快捷键、主题、工作流、MCP 配置等)从历史安装
 带到 InfiniShell 的用户。

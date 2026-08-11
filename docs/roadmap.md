@@ -39,4 +39,4 @@ InfiniShell's agent stack will be built as a standalone open-source service, ind
 
 ---
 
-[简体中文](./roadmap.zh-CN.md) · [日本語](./roadmap.ja.md)
+[简体中文](./roadmap.zh-CN.md)

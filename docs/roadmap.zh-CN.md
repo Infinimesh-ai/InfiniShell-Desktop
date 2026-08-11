@@ -39,4 +39,4 @@ InfiniShell 的 Agent 能力将以独立开源服务的形式实现,不绑定 Wa
 
 ---
 
-[English](./roadmap.md) · [日本語](./roadmap.ja.md)
+[English](./roadmap.md)

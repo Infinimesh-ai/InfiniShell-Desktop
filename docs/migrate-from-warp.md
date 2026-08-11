@@ -1,6 +1,6 @@
 # Migrating settings to InfiniShell
 
-[简体中文](./migrate-from-warp.zh-CN.md) · [日本語](./migrate-from-warp.ja.md)
+[简体中文](./migrate-from-warp.zh-CN.md)
 
 This guide is for people who want to bring **settings-style configuration**
 (custom keybindings, themes, workflows, MCP config, etc.) into InfiniShell from a
