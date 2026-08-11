@@ -78,9 +78,15 @@ fn claude_command_pipes_prompt_path() {
 #[serial_test::serial]
 fn parent_bridge_root_prefers_environment_override() {
     let tmp = TempDir::new().unwrap();
-    std::env::set_var(OZ_MESSAGE_LISTENER_STATE_ROOT_ENV, tmp.path());
+    // edition 2024:`set_var` / `remove_var` 是 unsafe fn(多线程下改环境变量不安全)。
+    // 这里由 `#[serial_test::serial]` 保证测试串行执行,不存在并发读写环境变量的情况。
+    unsafe {
+        std::env::set_var(OZ_MESSAGE_LISTENER_STATE_ROOT_ENV, tmp.path());
+    }
     let root = parent_bridge_root().unwrap();
-    std::env::remove_var(OZ_MESSAGE_LISTENER_STATE_ROOT_ENV);
+    unsafe {
+        std::env::remove_var(OZ_MESSAGE_LISTENER_STATE_ROOT_ENV);
+    }
 
     assert_eq!(root, tmp.path());
 }

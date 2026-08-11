@@ -13,7 +13,7 @@ const REPO_OWNER: &str = "zerx-lab";
 const REPO_NAME: &str = "warp";
 
 // GitHub 强制要求 User-Agent;同时显式声明 API 版本避免未来 default 漂移。
-const USER_AGENT: &str = "Zap-Autoupdate";
+const USER_AGENT: &str = "InfiniShell-Autoupdate";
 const ACCEPT: &str = "application/vnd.github+json";
 const API_VERSION: &str = "2022-11-28";
 

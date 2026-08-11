@@ -1,9 +1,11 @@
-use crate::{
-    banner::BannerState, persistence::ModelEvent, resource_center::TipsCompleted,
-    settings::SettingsFileError,
-};
 use std::sync::mpsc::SyncSender;
+
 use warpui::{Entity, ModelHandle, SingletonEntity};
+
+use crate::banner::BannerState;
+use crate::persistence::ModelEvent;
+use crate::resource_center::TipsCompleted;
+use crate::settings::SettingsFileError;
 
 /// Interfaces that allow us to interact with global resources owned by the main
 /// thread that exist throughout the app including Model handles, channel senders,
@@ -52,7 +54,7 @@ pub struct GlobalResourceHandles {
 }
 
 impl GlobalResourceHandles {
-    #[cfg(any(test, feature = "integration_tests"))]
+    #[cfg(any(test, feature = "integration_tests", feature = "test-util"))]
     pub fn mock(app: &mut warpui::App) -> Self {
         let user_default_shell_unsupported_banner_model_handle =
             app.add_model(|_| BannerState::default());
@@ -75,6 +77,10 @@ pub struct GlobalResourceHandlesProvider {
 impl GlobalResourceHandlesProvider {
     pub fn get(&self) -> &GlobalResourceHandles {
         &self.global_resources
+    }
+    #[cfg(any(test, feature = "test-util"))]
+    pub fn set_model_event_sender_for_test(&mut self, sender: SyncSender<ModelEvent>) {
+        self.global_resources.model_event_sender = Some(sender);
     }
 
     pub(super) fn new(global_resources: GlobalResourceHandles) -> Self {

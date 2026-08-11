@@ -14,6 +14,8 @@ fn message(id: &str, request_id: &str, message: api::message::Message) -> api::M
         timestamp: None,
         server_message_data: String::new(),
         citations: Vec::new(),
+        // proto b0886a95 新增:服务端检索到的记忆列表,本地复盘测试不涉及,留空。
+        fetched_memories: Vec::new(),
         message: Some(message),
     }
 }
@@ -60,6 +62,9 @@ fn command_result(id: &str, request_id: &str, command: &str, output: &str) -> ap
                             command_id: format!("command-{id}"),
                             output: output.to_owned(),
                             exit_code: 0,
+                            // proto b0886a95 新增的起止时间戳,本测试只关心命令文本与输出。
+                            start_ts: None,
+                            finish_ts: None,
                         },
                     )),
                 },

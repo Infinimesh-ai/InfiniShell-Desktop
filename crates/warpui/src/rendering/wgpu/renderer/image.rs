@@ -1,10 +1,7 @@
-use crate::image_cache::StaticImage;
-use crate::rendering::texture_cache::{TextureCache, TextureCacheIndex};
-use crate::rendering::wgpu::{resources, shader_types};
-use crate::scene::Layer;
-use crate::Scene;
 use std::borrow::Cow;
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+
 use wgpu::util::BufferInitDescriptor;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupLayout, ColorTargetState, Device, Extent3d,
@@ -13,9 +10,13 @@ use wgpu::{
 };
 
 use self::shaders::{ColorModifier, ImageInstanceData};
-
-use super::util::create_buffer_init;
 use super::WGPUContext;
+use super::util::create_buffer_init;
+use crate::Scene;
+use crate::image_cache::StaticImage;
+use crate::rendering::texture_cache::{TextureCache, TextureCacheIndex};
+use crate::rendering::wgpu::{resources, shader_types};
+use crate::scene::Layer;
 
 pub(super) struct Pipeline {
     render_pipeline: RenderPipeline,
@@ -88,7 +89,10 @@ impl Pipeline {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[shader_types::Vertex::desc(), ImageInstanceData::desc()],
+                buffers: &[
+                    Some(shader_types::Vertex::desc()),
+                    Some(ImageInstanceData::desc()),
+                ],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -302,10 +306,11 @@ impl TextureInfo {
 }
 
 mod shaders {
-    use crate::rendering::wgpu::shader_types::{vec4f, ColorF, Vector4F};
-    use crate::rendering::CornerRadius;
     use pathfinder_color::ColorU;
     use pathfinder_geometry::rect::RectF;
+
+    use crate::rendering::CornerRadius;
+    use crate::rendering::wgpu::shader_types::{ColorF, Vector4F, vec4f};
 
     /// Icons support overriding the color, whereas images only allow setting the opacity.
     pub(super) enum ColorModifier {

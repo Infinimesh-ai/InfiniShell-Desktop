@@ -156,6 +156,10 @@ pub fn merge_with_precedence(
     AgentConfigSnapshot {
         name,
         environment_id: None,
+        // 以下两个字段只服务于云端 worker 的计算配置覆盖与服务端注入的额外源仓库,
+        // Zap 本地运行不需要,恒为 None。
+        runner_id: None,
+        additional_source_repos: None,
         model_id,
         base_prompt,
         mcp_servers,

@@ -5,10 +5,13 @@ mod local_minidump;
 mod linux;
 
 use std::borrow::Cow;
-
 use lazy_static::lazy_static;
 use warp_core::channel::Channel;
-use warpui::{r#async::block_on, AppContext, SingletonEntity};
+use warpui::r#async::block_on;
+use warpui::rendering::GPUDeviceInfo;
+use warpui::windowing::state::ApplicationStage;
+use warpui::windowing::{self, StateEvent, WindowManager};
+use warpui::{AppContext, SingletonEntity};
 
 use crate::antivirus::{AntivirusInfo, AntivirusInfoEvent};
 use crate::auth::{AuthStateProvider, UserUid};
@@ -18,9 +21,6 @@ use crate::settings::{PrivacySettings, PrivacySettingsChangedEvent};
 use parking_lot::RwLock;
 use regex::Regex;
 use std::collections::HashMap;
-use warpui::rendering::GPUDeviceInfo;
-use warpui::windowing::state::ApplicationStage;
-use warpui::windowing::{self, StateEvent, WindowManager};
 
 #[cfg(linux_or_windows)]
 pub use local_minidump::run_server as run_minidump_server;

@@ -1,6 +1,18 @@
 use std::collections::HashMap;
 use std::io;
 use std::ops::{Range, RangeInclusive};
+use std::sync::Arc;
+
+use itertools::Itertools;
+use num_traits::Float as _;
+use parking_lot::Mutex;
+use pathfinder_color::ColorU;
+use vec1::Vec1;
+use warp_core::semantic_selection::SemanticSelection;
+use warp_errors::report_error;
+use warp_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
+use warpui::text::SelectionType;
+use warpui::units::Lines;
 
 use super::find::RegexDFAs;
 use super::grid::RespectDisplayedOutput;
@@ -26,16 +38,6 @@ use crate::terminal::model::iterm_image::ITermImage;
 use crate::terminal::model::secrets::ObfuscateSecrets;
 use crate::terminal::model::selection::{Selection, SelectionRange};
 use crate::terminal::{SizeInfo, SizeUpdate};
-use itertools::Itertools;
-use num_traits::Float as _;
-use parking_lot::Mutex;
-use pathfinder_color::ColorU;
-use std::sync::Arc;
-use vec1::Vec1;
-use warp_core::semantic_selection::SemanticSelection;
-use warp_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
-use warpui::text::SelectionType;
-use warpui::units::Lines;
 
 pub struct AltScreen {
     grid_handler: GridHandler,
@@ -276,7 +278,10 @@ impl AltScreen {
         })
     }
 
-    pub fn possible_file_paths_at_point(&self, point: Point) -> impl Iterator<Item = PossiblePath> {
+    pub fn possible_file_paths_at_point(
+        &self,
+        point: Point,
+    ) -> impl Iterator<Item = PossiblePath> + use<> {
         self.grid_handler
             .possible_file_paths_at_point(point)
             .into_iter()
@@ -284,6 +289,14 @@ impl AltScreen {
 
     pub fn url_at_point(&self, point: &Point) -> Option<Link> {
         self.grid_handler.url_at_point(*point)
+    }
+
+    /// OSC 8 hyperlink span at `point`, paired with its URI (owned, cloned
+    /// out of the alt-screen's per-screen `HyperlinkRegistry`).
+    pub fn hyperlink_at_point(&self, point: &Point) -> Option<(Link, String)> {
+        let link = self.grid_handler.hyperlink_at_point(*point)?;
+        let uri = self.grid_handler.hyperlink_uri_at_point(*point)?.to_owned();
+        Some((link, uri))
     }
 
     pub fn fragment_boundary_at_point(&self, point: &Point) -> FragmentBoundary {
@@ -347,7 +360,7 @@ impl AltScreen {
         });
     }
 
-    fn ansi_handler(&mut self) -> &mut impl ansi::Handler {
+    fn ansi_handler(&mut self) -> &mut (impl ansi::Handler + use<>) {
         self.grid_handler.ansi_handler()
     }
 
@@ -370,7 +383,9 @@ impl AltScreen {
 
 impl ansi::Handler for AltScreen {
     fn set_title(&mut self, _: Option<String>) {
-        log::error!("Handler method AltScreen::set_title should never be called. This should be handled by TerminalModel.");
+        report_error!(
+            "Handler method AltScreen::set_title should never be called. This should be handled by TerminalModel."
+        );
     }
 
     fn set_cursor_style(&mut self, style: Option<CursorStyle>) {
@@ -383,6 +398,10 @@ impl ansi::Handler for AltScreen {
 
     fn input(&mut self, c: char) {
         self.ansi_handler().input(c);
+    }
+
+    fn set_hyperlink(&mut self, hyperlink: Option<warp_terminal::model::ansi::Hyperlink>) {
+        self.ansi_handler().set_hyperlink(hyperlink);
     }
 
     fn goto(&mut self, row: VisibleRow, col: usize) {
@@ -605,11 +624,15 @@ impl ansi::Handler for AltScreen {
     }
 
     fn push_title(&mut self) {
-        log::error!("Handler method AltScreen::push_title should never be called. This should be handled by TerminalModel.");
+        report_error!(
+            "Handler method AltScreen::push_title should never be called. This should be handled by TerminalModel."
+        );
     }
 
     fn pop_title(&mut self) {
-        log::error!("Handler method AltScreen::pop_title should never be called. This should be handled by TerminalModel.");
+        report_error!(
+            "Handler method AltScreen::pop_title should never be called. This should be handled by TerminalModel."
+        );
     }
 
     fn text_area_size_pixels<W: io::Write>(&mut self, writer: &mut W) {
@@ -622,7 +645,7 @@ impl ansi::Handler for AltScreen {
 
     fn command_finished(&mut self, _: CommandFinishedValue) {}
 
-    fn precmd(&mut self, _: PrecmdValue) {}
+    fn precmd_with_completion_metadata(&mut self, _: PrecmdValue) {}
 
     fn preexec(&mut self, _: PreexecValue) {}
 
@@ -687,5 +710,5 @@ impl Dimensions for AltScreen {
 }
 
 #[cfg(test)]
-#[path = "alt_screen_test.rs"]
+#[path = "alt_screen_tests.rs"]
 mod tests;

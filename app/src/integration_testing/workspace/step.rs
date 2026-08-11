@@ -1,9 +1,9 @@
-use warpui::{async_assert, integration::TestStep, SingletonEntity};
+use warpui::integration::TestStep;
+use warpui::{SingletonEntity, async_assert};
 
-use crate::{
-    integration_testing::view_getters::workspace_view, undo_close::UndoCloseStack,
-    workspace::Workspace,
-};
+use crate::integration_testing::view_getters::workspace_view;
+use crate::undo_close::UndoCloseStack;
+use crate::workspace::Workspace;
 
 /// Mock pressing a button on the Zap-native quit modal. Note that this modal is currently only
 /// used on Linux, not macOS.

@@ -1,11 +1,12 @@
-use warpui::{elements::MouseStateHandle, Element};
-
-use crate::{appearance::Appearance, terminal::view::TerminalAction};
+use warpui::Element;
+use warpui::elements::MouseStateHandle;
 
 use super::{
-    render_inline_block_list_banner, InlineBannerButtonState, InlineBannerCloseButton,
-    InlineBannerContent, InlineBannerStyle, InlineBannerTextButton, InlineBannerTextButtonVariant,
+    InlineBannerButtonState, InlineBannerCloseButton, InlineBannerContent, InlineBannerStyle,
+    InlineBannerTextButton, InlineBannerTextButtonVariant, render_inline_block_list_banner,
 };
+use crate::appearance::Appearance;
+use crate::terminal::view::TerminalAction;
 
 pub struct VimModeBannerState {
     pub id: usize,
@@ -46,7 +47,7 @@ pub fn render_vim_mode_banner(
         InlineBannerStyle::LowPriority,
         appearance,
         InlineBannerContent {
-            title: "Enable Zap's Vim keybindings?".to_string(),
+            title: "Enable InfiniShell's Vim keybindings?".to_string(),
             buttons,
             close_button: Some(close_button),
             ..Default::default()

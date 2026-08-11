@@ -384,8 +384,17 @@ impl OrderedTerminalEventType {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AgentAttachment {
-    BlockReference { block_id: BlockId },
-    PlainText { content: String },
+    BlockReference {
+        block_id: BlockId,
+    },
+    PlainText {
+        content: String,
+    },
+    /// 已上传到会话任务存储的文件附件,由接收端按 id 拉取。
+    FileReference {
+        attachment_id: String,
+        file_name: String,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Copy)]

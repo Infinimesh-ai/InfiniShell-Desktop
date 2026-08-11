@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
+use super::super::blocklist::block::secret_redaction::{
+    SECRET_REDACTION_REPLACEMENT_CHARACTER, find_secrets_in_text,
+};
 use crate::ai::agent::{
     AIAgentActionResultType, AIAgentAttachment, AIAgentContext, AIAgentInput, AnyFileContent,
     AskUserQuestionAnswerItem, AskUserQuestionResult, BlockContext, PassiveSuggestionResultType,
     PassiveSuggestionTrigger, RequestCommandOutputResult, TransferShellCommandControlToUserResult,
-};
-
-use super::super::blocklist::block::secret_redaction::{
-    find_secrets_in_text, SECRET_REDACTION_REPLACEMENT_CHARACTER,
 };
 
 /// Redact all detected secrets in-place within the given string.
@@ -54,12 +53,12 @@ pub(crate) fn redact_inputs(inputs: &mut [AIAgentInput]) {
                 redact_context(Arc::make_mut(context));
             }
             AIAgentInput::SummarizeConversation {
-                prompt,
-                overflow: _,
+                prompt, context, ..
             } => {
                 if let Some(p) = prompt {
                     redact_secrets(p);
                 }
+                redact_context(Arc::make_mut(context));
             }
             AIAgentInput::TriggerPassiveSuggestion {
                 context,
@@ -105,7 +104,8 @@ pub(crate) fn redact_inputs(inputs: &mut [AIAgentInput]) {
             }
             // No user-provided text to redact in inter-agent relay inputs.
             AIAgentInput::MessagesReceivedFromAgents { .. }
-            | AIAgentInput::EventsFromAgents { .. } => {}
+            | AIAgentInput::EventsFromAgents { .. }
+            | AIAgentInput::OrchestrationConfigUpdate { .. } => {}
             AIAgentInput::ActionResult { result, context } => {
                 redact_context(Arc::make_mut(context));
                 match &mut result.result {
@@ -133,13 +133,19 @@ pub(crate) fn redact_inputs(inputs: &mut [AIAgentInput]) {
                         }
                     }
                     AIAgentActionResultType::ReadFiles(read_files_result) => {
-                        if let crate::ai::agent::ReadFilesResult::Success { files } =
-                            read_files_result
+                        if let crate::ai::agent::ReadFilesResult::Success {
+                            files,
+                            failed_files,
+                        } = read_files_result
                         {
                             for file in files {
                                 if let AnyFileContent::StringContent(content) = &mut file.content {
                                     redact_secrets(content);
                                 }
+                            }
+                            for failed_file in failed_files {
+                                redact_secrets(&mut failed_file.path);
+                                redact_secrets(&mut failed_file.message);
                             }
                         }
                     }
@@ -213,11 +219,11 @@ pub(crate) fn redact_inputs(inputs: &mut [AIAgentInput]) {
                     AIAgentActionResultType::AskUserQuestion(result) => {
                         redact_ask_user_question_result(result);
                     }
+                    // Orchestrate results contain agent IDs / canonical error
+                    // strings only; no user-provided text to redact.
+                    AIAgentActionResultType::RunAgents(_)
+                    | AIAgentActionResultType::WaitForEvents(_) => {}
                 }
-            }
-            AIAgentInput::FetchReviewComments { repo_path, context } => {
-                redact_secrets(repo_path);
-                redact_context(Arc::make_mut(context));
             }
             AIAgentInput::InvokeSkill {
                 context,
@@ -297,6 +303,8 @@ fn redact_context(context: &mut [AIAgentContext]) {
             | AIAgentContext::Codebase { .. }
             | AIAgentContext::ProjectRules { .. }
             | AIAgentContext::Git { .. }
+            | AIAgentContext::Repository { .. }
+            | AIAgentContext::PullRequest { .. }
             | AIAgentContext::File(_)
             | AIAgentContext::Skills { .. } => {}
         }

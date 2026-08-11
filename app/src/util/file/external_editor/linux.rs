@@ -1,18 +1,92 @@
-use std::{
-    collections::HashMap,
-    ffi::OsStr,
-    path::{Path, PathBuf},
-    sync::OnceLock,
-};
+use std::collections::HashMap;
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use command::blocking::Command;
 use freedesktop_desktop_entry::DesktopEntry;
+use warp_errors::report_error;
 use warp_util::path::LineAndColumnArg;
 use warpui::AppContext;
 
 use super::Editor;
 
 static INSTALLED_EDITOR_METADATA: OnceLock<HashMap<Editor, EditorMetadata>> = OnceLock::new();
+
+/// Tokenizes a freedesktop Exec string into a list of arguments.
+///
+/// Follows the quoting rules from the [Desktop Entry Specification](
+/// https://specifications.freedesktop.org/desktop-entry-spec/latest/exec-variables.html):
+/// - Arguments are separated by unquoted whitespace.
+/// - Double-quoted strings are treated as a single argument (quotes stripped).
+/// - Within double quotes, the escape sequences `\"`, `` \` ``, `\$`, and
+///   `\\` are recognized and resolved.
+///
+/// Field codes (`%f`, `%u`, etc.) are left as-is in the output tokens; they
+/// are expanded in a separate pass by the caller.
+fn tokenize_exec(exec: &str) -> Result<Vec<String>, DesktopExecError> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut chars = exec.chars().peekable();
+    let mut in_quotes = false;
+    // Tracks whether we have started accumulating a token. This is separate
+    // from `current.is_empty()` because a quoted empty string (`""`) is a
+    // valid zero-length token that should be emitted.
+    let mut in_token = false;
+
+    while let Some(ch) = chars.next() {
+        if in_quotes {
+            match ch {
+                '"' => {
+                    // Closing quote. The quoted content has already been
+                    // accumulated into `current`.
+                    in_quotes = false;
+                }
+                '\\' => {
+                    // Inside double quotes the spec recognizes four escape
+                    // sequences: \", \`, \$, \\.
+                    match chars.peek() {
+                        Some('"' | '`' | '$' | '\\') => {
+                            current.push(chars.next().unwrap());
+                        }
+                        _ => {
+                            // Not a recognized escape; keep the backslash.
+                            current.push('\\');
+                        }
+                    }
+                }
+                other => current.push(other),
+            }
+        } else {
+            match ch {
+                ' ' | '\t' | '\n' => {
+                    if in_token {
+                        tokens.push(std::mem::take(&mut current));
+                        in_token = false;
+                    }
+                }
+                '"' => {
+                    in_quotes = true;
+                    in_token = true;
+                }
+                other => {
+                    current.push(other);
+                    in_token = true;
+                }
+            }
+        }
+    }
+
+    if in_quotes {
+        return Err(DesktopExecError::UnterminatedQuote);
+    }
+
+    if in_token {
+        tokens.push(current);
+    }
+
+    Ok(tokens)
+}
 
 /// A data struct to hold relevant info pulled from a [freedesktop_desktop_entry::DesktopEntry].
 /// Mostly here to get around the lack of an owned version of DesktopEntry.
@@ -66,110 +140,101 @@ impl EditorMetadata {
         })
     }
 
-    /// 构造外部编辑器命令的通用实现。
+    /// Common implementation of building a command from a .desktop Exec key.
     ///
-    /// - 先把 Exec 字段拆成 shell words，再在每个 token 内展开 field code，
-    ///   得到正确的 argv 向量
-    /// - 直接设置 program 和 args，避免经过 shell
+    /// Tokenizes the Exec string (handling quoting per the freedesktop spec),
+    /// expands field codes via `field_code_processor`, and returns a `Command`
+    /// that executes the program directly — without going through a shell.
     ///
-    /// field code 替换由 `field_code_processor` 回调处理。回调收到
-    /// `&mut Vec<String>`：修改最后一个元素表示追加到当前参数，push 新
-    /// `String` 表示新增参数。
+    /// Field code expansion is handled by the `field_code_processor` callback,
+    /// which receives the field code character (the char after `%`) and pushes
+    /// replacement arguments onto the provided `Vec<String>`.
     fn build_command<T>(&self, field_code_processor: T) -> Result<Command, DesktopExecError>
     where
         T: Fn(&Self, &mut Vec<String>, char),
     {
-        let raw_exec = &self.exec;
+        let tokens = tokenize_exec(&self.exec)?;
+        let mut args: Vec<String> = Vec::new();
 
-        // 先按 shell words 拆分 Exec，再在每个 token 内展开 field code。
-        // 这样能保留替换值中的空格(例如文件路径)，同时尊重 .desktop Exec
-        // 原始内容中的引用规则。
-        let tokens =
-            shell_words::split(raw_exec).map_err(|_| DesktopExecError::MalformedFieldCode)?;
-
-        let mut argv: Vec<String> = Vec::with_capacity(tokens.len());
         for token in &tokens {
-            let mut iter = token.chars();
-            let mut parts: Vec<String> = vec![String::new()];
-            while let Some(ch) = iter.next() {
-                if ch != '%' {
-                    parts.last_mut().unwrap().push(ch);
-                    continue;
+            if let Some(field_code) = token.strip_prefix('%') {
+                match field_code.len() {
+                    // A bare `%` with nothing after it is malformed.
+                    0 => return Err(DesktopExecError::MalformedFieldCode),
+                    1 => {
+                        let code_char = field_code.chars().next().unwrap();
+                        if code_char == '%' {
+                            // Literal percent.
+                            args.push("%".to_string());
+                        } else {
+                            field_code_processor(self, &mut args, code_char);
+                        }
+                        continue;
+                    }
+                    // Tokens like `%foo` are not field codes; treat as literal.
+                    _ => {}
                 }
-                let Some(next_char) = iter.next() else {
-                    return Err(DesktopExecError::MalformedFieldCode);
-                };
-                // field code 处理器可以追加额外 argv 项，例如 %i 会把
-                // "--icon" 和 icon 值作为两个独立参数写入。
-                field_code_processor(self, &mut parts, next_char);
             }
-            for p in parts {
-                if !p.is_empty() {
-                    argv.push(p);
-                }
-            }
+            args.push(token.clone());
         }
 
-        let (program, args) = argv
-            .split_first()
-            .ok_or(DesktopExecError::MalformedFieldCode)?;
+        let program = args.first().ok_or(DesktopExecError::NoExec)?;
         let mut command = Command::new(program);
-        command.args(args);
+        command.args(&args[1..]);
 
         Ok(command)
     }
 
-    /// field code 默认替换逻辑。
+    /// The default handler for replacing field codes with argument values.
     ///
-    /// 根据 FreeDesktop 规范处理 `field_code`，把替换值追加到当前 argv 参数
-    /// 或新增 argv 参数：
-    /// https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s07.html
-    /// 依赖文件路径的 %f、%F、%u、%U 使用 `file_path` 参数。
+    /// Takes a `field_code` character (the char after `%`) and pushes the
+    /// corresponding argument(s) onto `args`. Follows the [Desktop Entry
+    /// Specification](https://specifications.freedesktop.org/desktop-entry-spec/latest/exec-variables.html).
     ///
-    /// 信息缺失或处理失败时保持原有行为：静默跳过对应替换值。
-    fn process_field_code(&self, parts: &mut Vec<String>, field_code: char, file_path: &Path) {
+    /// Any errors or missing information (e.g., `%i` with no Icon field,
+    /// `%u` with a non-existent path) will fail silently, resulting in no
+    /// arguments being pushed.
+    fn process_field_code(&self, args: &mut Vec<String>, field_code: char, file_path: &Path) {
         match field_code {
-            // 文件路径
+            // Single file path or file list.
             'f' | 'F' => {
-                parts
-                    .last_mut()
-                    .unwrap()
-                    .push_str(file_path.to_str().unwrap_or_default());
+                if let Some(s) = file_path.to_str() {
+                    args.push(s.to_string());
+                }
             }
-            // URI
+            // Single URI or URI list.
             'u' | 'U' => {
                 // TODO(daprahamian): 这里使用 canonicalize，因此文件不存在时会失败，
                 // 也会额外触发一次文件系统检查。未来可以改用 std::path::absolute。
                 //
-                // 参考 https://github.com/rust-lang/rust/issues/92750
-                if let Ok(absolute) = file_path.canonicalize() {
-                    if let Ok(file_url) = url::Url::from_file_path(absolute) {
-                        parts.last_mut().unwrap().push_str(file_url.as_str());
-                    }
+                // See https://github.com/rust-lang/rust/issues/92750
+                if let Ok(absolute) = file_path.canonicalize()
+                    && let Ok(file_url) = url::Url::from_file_path(absolute)
+                {
+                    args.push(file_url.as_str().to_string());
                 }
             }
-            // 本地化名称
+            // Localized application name.
             'c' => {
                 if let Some(localized_name) = self.localized_name.as_ref() {
-                    parts.last_mut().unwrap().push_str(localized_name);
+                    args.push(localized_name.clone());
                 }
             }
-            // icon 参数需要拆成独立 argv 项
+            // Icon key — expands to two arguments per the spec.
             'i' => {
                 if let Some(icon) = &self.icon {
-                    parts.last_mut().unwrap().push_str("--icon");
-                    parts.push(icon.clone());
+                    args.push("--icon".to_string());
+                    args.push(icon.clone());
                 }
             }
-            // desktop 文件路径
+            // Location of the .desktop file.
             'k' => {
-                parts
-                    .last_mut()
-                    .unwrap()
-                    .push_str(self.desktop_file_path.to_str().unwrap_or_default());
+                if let Some(s) = self.desktop_file_path.to_str() {
+                    args.push(s.to_string());
+                }
             }
-            // 未知 field code 按规范保留该字符
-            other => parts.last_mut().unwrap().push(other),
+            // Unknown or deprecated field codes are silently dropped.
+            _ => {}
         };
     }
 
@@ -187,63 +252,64 @@ impl EditorMetadata {
         self.build_command(|me, parts, c| me.process_field_code(parts, c, file_path))
     }
 
-    /// A variant of [`Self::build_default_command`] for jetbrains IDEs
+    /// A variant of [`Self::build_default_command`] for JetBrains IDEs.
     ///
-    /// Works the same, except that for %f, %F, %u, and %U field codes.
-    /// When adding a file or URL, additional CLI flags are injected to specify
-    /// line and column number if available.
+    /// For `%f`, `%F`, `%u`, and `%U` field codes, injects `--line` and
+    /// optionally `--column` arguments before the file path.
     ///
-    /// NOTE: This is a non-standard behavior according to the .desktop specification.
-    /// Any time we use this, it should be manually tested to verify that it works properly.
+    /// NOTE: This is non-standard behavior according to the .desktop spec.
+    /// Any time we use this, it should be manually tested to verify that it
+    /// works properly.
     fn build_jetbrains_command(
         &self,
         file_path: &Path,
         line_column_number: Option<LineAndColumnArg>,
     ) -> Result<Command, DesktopExecError> {
-        self.build_command(|me, parts, field_code| match field_code {
+        self.build_command(|me, args, field_code| match field_code {
             'f' | 'F' | 'u' | 'U' => {
                 if let Some(file_path) = file_path.to_str() {
                     if let Some(line_column_number) = line_column_number {
-                        parts.last_mut().unwrap().push_str("--line");
-                        parts.push(line_column_number.line_num.to_string());
+                        args.push("--line".to_string());
+                        args.push(line_column_number.line_num.to_string());
                         if let Some(column_num) = line_column_number.column_num {
-                            parts.push("--column".to_string());
-                            parts.push(column_num.to_string());
+                            args.push("--column".to_string());
+                            args.push(column_num.to_string());
                         }
                     }
-                    parts.push(file_path.to_string());
+                    args.push(file_path.to_string());
                 }
             }
-            other => me.process_field_code(parts, other, file_path),
+            other => me.process_field_code(args, other, file_path),
         })
     }
-    /// A variant of [`Self::build_default_command`] for sublime
+
+    /// A variant of [`Self::build_default_command`] for Sublime Text.
     ///
-    /// Works the same, except that for %f, %F, %u, and %U field codes.
-    /// When adding a file or URL, the file name is appended with the line and column number if available.
+    /// For `%f`, `%F`, `%u`, and `%U` field codes, appends `:line:col` to
+    /// the file path as a single argument.
     ///
-    /// NOTE: This is a non-standard behavior according to the .desktop specification.
-    /// Any time we use this, it should be manually tested to verify that it works properly.
+    /// NOTE: This is non-standard behavior according to the .desktop spec.
+    /// Any time we use this, it should be manually tested to verify that it
+    /// works properly.
     fn build_sublime_command(
         &self,
         file_path: &Path,
         line_column_number: Option<LineAndColumnArg>,
     ) -> Result<Command, DesktopExecError> {
-        self.build_command(|me, parts, field_code| match field_code {
+        self.build_command(|me, args, field_code| match field_code {
             'f' | 'F' | 'u' | 'U' => {
                 if let Some(file_path) = file_path.to_str() {
                     let mut arg = file_path.to_string();
                     if let Some(line_column_number) = line_column_number {
-                        let line_num = line_column_number.line_num;
-                        arg += &format!(":{line_num}");
+                        arg += &format!(":{}", line_column_number.line_num);
                         if let Some(column_num) = line_column_number.column_num {
                             arg += &format!(":{column_num}");
                         }
                     }
-                    parts.last_mut().unwrap().push_str(&arg);
+                    args.push(arg);
                 }
             }
-            other => me.process_field_code(parts, other, file_path),
+            other => me.process_field_code(args, other, file_path),
         })
     }
 }
@@ -263,13 +329,16 @@ pub fn open_file_path_with_line_and_col(
 ) {
     if full_path.is_file() {
         let with_editor = with_editor.or_else(|| get_app_for_file_from_mime(full_path));
-        if let Some(editor) = with_editor {
-            if let Some(mut command) = editor.command(full_path, line_column_number) {
-                if let Err(err) = command.spawn() {
-                    log::error!("Error launching {editor:?}: {err:#}");
-                }
-                return;
+        if let Some(editor) = with_editor
+            && let Some(mut command) = editor.command(full_path, line_column_number)
+        {
+            if let Err(err) = command.spawn() {
+                report_error!(
+                    anyhow::Error::new(err).context("Error launching editor"),
+                    extra: { "editor" => ?editor }
+                );
             }
+            return;
         }
     }
 
@@ -549,7 +618,9 @@ impl Editor {
                 Some(metadata) => match metadata.build_default_command(file_path) {
                     Ok(command) => Some(command),
                     Err(err) => {
-                        log::error!("Failed to build editor open command: {err:#}");
+                        report_error!(
+                            anyhow::Error::new(err).context("Failed to build editor open command")
+                        );
                         None
                     }
                 },
@@ -570,7 +641,10 @@ enum DesktopExecError {
     #[error("Attempted to create command for desktop entry with no exec field")]
     NoExec,
 
-    #[error("Malformed exec call: non-terminated field code")]
+    #[error("Unterminated double quote in Exec string")]
+    UnterminatedQuote,
+
+    #[error("Malformed field code in Exec string (bare %)")]
     MalformedFieldCode,
 }
 

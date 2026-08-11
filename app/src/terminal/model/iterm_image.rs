@@ -32,7 +32,7 @@ pub struct ITermImageMetadata {
 impl Default for ITermImageMetadata {
     fn default() -> Self {
         Self {
-            id: rand::thread_rng().gen(),
+            id: rand::thread_rng().r#gen(),
             desired_width: None,
             desired_height: None,
             preserve_aspect_ratio: true,
@@ -123,5 +123,5 @@ pub fn parse_iterm_image_metadata(params: &[&[u8]]) -> ITermImageMetadata {
 }
 
 #[cfg(test)]
-#[path = "iterm_image_test.rs"]
+#[path = "iterm_image_tests.rs"]
 mod tests;

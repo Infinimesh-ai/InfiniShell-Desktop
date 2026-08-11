@@ -1,72 +1,58 @@
-use std::collections::HashSet;
+use std::ops::Not;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
-use vec1::Vec1;
-use warp_core::features::FeatureFlag;
-use warpui::{EntityId, ViewContext};
 
+use ai::document::DEFAULT_PLANNING_DOCUMENT_TITLE;
+use itertools::Itertools;
+use prost::Message;
+use vec1::Vec1;
+use warp_core::channel::ChannelState;
+use warp_core::features::FeatureFlag;
+use warp_errors::report_error;
+use warp_multi_agent_api as api;
+use warpui::units::IntoPixels;
+use warpui::{EntityId, ModelHandle, SingletonEntity, ViewContext};
+
+use super::DEFAULT_AI_BLOCK_HEIGHT;
 use super::blocklist_filter::exchanges_for_blocklist;
+use crate::ai::agent::conversation::{AIConversation, AIConversationId};
+use crate::ai::agent::{
+    AIAgentAction, AIAgentActionResultType, AIAgentActionType, AIAgentExchange, AIAgentExchangeId,
+    AIAgentOutput, AIAgentOutputMessage, AIAgentOutputMessageType, CreateDocumentsRequest,
+    CreateDocumentsResult, EditDocumentsResult,
+};
 use crate::ai::blocklist::agent_view::{
     AgentViewEntryBlockParams, AgentViewEntryOrigin, DismissalStrategy, EphemeralMessage,
 };
 use crate::ai::blocklist::block::cli::CLISubagentViewMode;
 use crate::ai::blocklist::block::cli_controller::CLISubagentController;
-use crate::ai::blocklist::history_model::{CLIAgentConversation, LoadedConversationData};
-use crate::ai::blocklist::{BlocklistAIContextModel, SerializedBlockListItem};
-use crate::terminal::input::message_bar::Message as InputMessage;
-use crate::terminal::input::message_bar::MessageItem;
-use crate::terminal::model::block::SerializedBlock;
-use crate::terminal::model::rich_content::RichContentType;
-use crate::terminal::model_events::ModelEventDispatcher;
-use crate::terminal::TerminalModel;
-use crate::util::bindings::keybinding_name_to_keystroke;
-use chrono::{DateTime, Local};
-use itertools::Itertools;
-use prost::Message;
-use std::ops::Not;
-
-use super::DEFAULT_AI_BLOCK_HEIGHT;
-
-use crate::ai::agent::task::helper::MessageExt;
-use crate::ai::agent::AIAgentActionResultType;
-use crate::ai::agent::CreateDocumentsRequest;
-use crate::ai::agent::MessageId;
-use crate::ai::agent::{
-    AIAgentAction, AIAgentActionType, AIAgentOutputMessage, AIAgentOutputMessageType,
-    CreateDocumentsResult, EditDocumentsResult,
+use crate::ai::blocklist::history_model::{
+    BlocklistAIHistoryModel, CLIAgentConversation, LoadedConversationData,
 };
-use crate::ai::ai_document_view::DEFAULT_PLANNING_DOCUMENT_TITLE;
+use crate::ai::blocklist::model::AIBlockModelImpl;
+use crate::ai::blocklist::{
+    AIBlock, BlocklistAIActionModel, BlocklistAIContextModel, BlocklistAIController,
+    ClientIdentifiers,
+};
 use crate::ai::document::ai_document_model::AIDocumentModel;
-use crate::{
-    ai::{
-        agent::{
-            conversation::{AIConversation, AIConversationId},
-            AIAgentExchange, AIAgentExchangeId, AIAgentOutput,
-        },
-        blocklist::{
-            history_model::BlocklistAIHistoryModel, model::AIBlockModelImpl, AIBlock,
-            BlocklistAIActionModel, BlocklistAIController, ClientIdentifiers,
-        },
-        restored_conversations::RestoredAgentConversations,
-    },
-    persistence::model::AgentConversationData,
-    terminal::{
-        find::TerminalFindModel,
-        model::{
-            blocks::RichContentItem, session::active_session::ActiveSession,
-            terminal_model::BlockIndex,
-        },
-        view::{
-            AIBlockMetadata, Event, RichContent, RichContentInsertionPosition, RichContentMetadata,
-            TerminalView,
-        },
-    },
+use crate::persistence::model::AgentConversationData;
+use crate::terminal::conversation_restoration::{
+    command_block_indices_for_exchanges, prepare_conversation_block_restoration,
 };
-use warp_core::channel::ChannelState;
-use warp_multi_agent_api as api;
-use warpui::units::IntoPixels;
-use warpui::{ModelHandle, SingletonEntity};
+use crate::terminal::find::TerminalFindModel;
+use crate::terminal::input::message_bar::{Message as InputMessage, MessageItem};
+use crate::terminal::model::block::SerializedBlock;
+use crate::terminal::model::blocks::RichContentItem;
+use crate::terminal::model::rich_content::RichContentType;
+use crate::terminal::model::session::active_session::ActiveSession;
+use crate::terminal::model::terminal_model::BlockIndex;
+use crate::terminal::model_events::ModelEventDispatcher;
+use crate::terminal::view::{
+    AIBlockMetadata, Event, RichContent, RichContentInsertionPosition, RichContentMetadata,
+    TerminalView,
+};
+use crate::util::bindings::keybinding_name_to_keystroke;
 
 /// Describes restore-context setup state for directory reconciliation and hinting.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -77,16 +63,18 @@ pub(crate) enum RestorationDirState {
     MissingOriginalDir,
     /// The terminal needs to cd into the conversation's directory.
     NeedsCd { path: String },
+    /// Skipped auto-cd because this conversation wasn't started on this machine.
+    SkippedNonLocalConversation,
 }
 
 /// Specifies how AI conversations should be restored when creating a TerminalView.
 #[derive(Clone, Debug)]
 pub enum ConversationRestorationInNewPaneType {
     /// Restore conversations from persistence during app startup.
-    /// Contains the conversation IDs to load from the database.
-    /// Uses Vec1 to ensure at least one conversation ID is present.
+    /// Contains the conversations to restore, already loaded from the database.
+    /// Uses Vec1 to ensure at least one conversation is present.
     Startup {
-        conversation_ids: Vec1<AIConversationId>,
+        conversations: Vec1<AIConversation>,
         /// If set, the agent view was open in fullscreen mode for this conversation
         /// and should be restored after conversations are loaded.
         active_conversation_id: Option<AIConversationId>,
@@ -104,7 +92,16 @@ pub enum ConversationRestorationInNewPaneType {
 
     /// Fork an existing conversation into this new pane.
     /// This is like Historical but requires special persistence handling.
-    Forked { conversation: AIConversation },
+    Forked {
+        conversation: AIConversation,
+        /// True when the fork is paired with a follow-up prompt or summarize that
+        /// will be sent immediately after restore.
+        /// We skip the `couldn't find original conversation directory` ephemeral
+        /// hint in that case so the warping indicator (gated on
+        /// `ephemeral_message_model.current_message().is_none()` in
+        /// `BlocklistAIStatusBar::render`) isn't suppressed by the hint.
+        has_initial_query: bool,
+    },
 
     /// Load a CLI agent conversation from its downloaded snapshot.
     HistoricalCLIAgent {
@@ -126,7 +123,10 @@ impl ConversationRestorationInNewPaneType {
     pub fn should_show_restore_context_hint(&self) -> bool {
         match self {
             Self::Startup { .. } => false,
-            Self::Historical { .. } | Self::Forked { .. } | Self::HistoricalCLIAgent { .. } => true,
+            Self::Forked {
+                has_initial_query, ..
+            } => !has_initial_query,
+            Self::Historical { .. } | Self::HistoricalCLIAgent { .. } => true,
         }
     }
 
@@ -156,6 +156,26 @@ impl ConversationRestorationInNewPaneType {
                 conversation.metadata.working_directory.clone()
             }
             Self::Startup { .. } => None,
+        }
+    }
+
+    /// Returns the working directory the newly-created pane's shell should start
+    /// in when restoring this conversation.
+    ///
+    /// For a forked conversation we start the shell in the conversation's
+    /// *current* (latest) working directory so the fork continues where the
+    /// source conversation left off, rather than the directory it was originally
+    /// started in (which is what `initial_working_directory` returns). If no
+    /// later exchange recorded a working directory we fall back to the initial
+    /// one. Other restoration modes keep using the initial working directory.
+    pub fn startup_working_directory(&self) -> Option<String> {
+        match self {
+            Self::Forked { conversation, .. } => conversation
+                .current_working_directory()
+                .or_else(|| conversation.initial_working_directory()),
+            Self::Startup { .. } | Self::Historical { .. } | Self::HistoricalCLIAgent { .. } => {
+                self.initial_working_directory()
+            }
         }
     }
 }
@@ -203,13 +223,28 @@ impl RestoredAIConversation {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RestoreConversationEntryBehavior {
+    /// Update the restored conversation as the pending/selected conversation.
+    /// This enters Agent View for the restored conversation.
+    EnterRestoredConversation,
+    /// Restore blocks and history without changing Agent View state. Use this when the caller
+    /// will explicitly enter Agent View after restoration.
+    PreserveAgentViewState,
+}
+
 impl TerminalView {
     /// Determine the directory state for restoring the conversation: whether it's missing, we're
     /// already in the right directory, or we need to cd.
     fn resolve_dir_restoration_state(
         &self,
         cloud_conversation: &LoadedConversationData,
+        is_local_conversation: bool,
     ) -> RestorationDirState {
+        if !is_local_conversation {
+            return RestorationDirState::SkippedNonLocalConversation;
+        }
+
         let target_dir = match cloud_conversation {
             LoadedConversationData::Oz(conversation) => conversation.initial_working_directory(),
             LoadedConversationData::CLIAgent(cli_conversation) => {
@@ -233,16 +268,21 @@ impl TerminalView {
         RestorationDirState::Unchanged
     }
 
+    /// This always restores the conversation. Caller is responsible for
+    /// ensuring the conversation does not already exist in this terminal view.
     pub(crate) fn restore_conversation_and_directory_context<F>(
         &mut self,
         cloud_conversation: LoadedConversationData,
         use_live_appearance: bool,
+        entry_behavior: RestoreConversationEntryBehavior,
+        is_local_conversation: bool,
         on_restored: F,
         ctx: &mut ViewContext<Self>,
     ) where
         F: FnOnce(&mut Self, &mut ViewContext<Self>) + 'static,
     {
-        let restore_context_state = self.resolve_dir_restoration_state(&cloud_conversation);
+        let restore_context_state =
+            self.resolve_dir_restoration_state(&cloud_conversation, is_local_conversation);
 
         let restore_and_continue =
             move |me: &mut TerminalView,
@@ -255,6 +295,7 @@ impl TerminalView {
                         me.restore_conversation_after_view_creation(
                             RestoredAIConversation::new(*conversation),
                             use_live_appearance,
+                            entry_behavior,
                             ctx,
                         );
                     }
@@ -275,8 +316,9 @@ impl TerminalView {
         match restore_context_state {
             RestorationDirState::NeedsCd { path } => {
                 let path_for_hint = path.clone();
+                let escaped = self.shell_family(ctx).shell_escape(&path);
                 let did_execute_cd = self.input.update(ctx, |input, ctx| {
-                    input.try_execute_command(&format!("cd \"{path}\""), ctx)
+                    input.try_execute_command(&format!("cd {escaped}"), ctx)
                 });
                 if did_execute_cd {
                     self.on_next_block_completed(move |me, ctx| {
@@ -292,7 +334,9 @@ impl TerminalView {
                     restore_and_continue(self, RestorationDirState::Unchanged, ctx);
                 }
             }
-            RestorationDirState::Unchanged | RestorationDirState::MissingOriginalDir => {
+            RestorationDirState::Unchanged
+            | RestorationDirState::MissingOriginalDir
+            | RestorationDirState::SkippedNonLocalConversation => {
                 restore_and_continue(self, restore_context_state, ctx);
             }
         }
@@ -308,63 +352,6 @@ impl TerminalView {
             .lock()
             .block_list_mut()
             .insert_restored_block(&block);
-    }
-
-    fn restore_missing_cli_subagent_blocks_for_conversation(
-        &mut self,
-        conversation: &AIConversation,
-    ) {
-        let cli_subagent_block_ids = conversation
-            .all_tasks()
-            .filter(|task| task.is_cli_subagent())
-            .filter_map(|task| task.cli_subagent_block_id())
-            .collect::<HashSet<_>>();
-        if cli_subagent_block_ids.is_empty() {
-            return;
-        }
-
-        // 历史列表进入已有 terminal 时不会预先把 conversation 的 block 快照塞进
-        // TerminalModel；这里只补 CLI subagent 持久化快照，避免普通历史命令重复出现。
-        let serialized_blocks = conversation.to_serialized_blocklist_items();
-        let mut terminal_model = self.model.lock();
-        for item in serialized_blocks {
-            let SerializedBlockListItem::Command { block } = item;
-            if !cli_subagent_block_ids.contains(&block.id)
-                || terminal_model
-                    .block_list()
-                    .block_with_id(&block.id)
-                    .is_some()
-            {
-                continue;
-            }
-
-            terminal_model
-                .block_list_mut()
-                .insert_restored_block(&block);
-        }
-    }
-
-    /// Get AIConversations to restore given conversation IDs.
-    pub(super) fn get_conversations_to_restore(
-        conversation_ids: &[AIConversationId],
-        ctx: &mut ViewContext<Self>,
-    ) -> Vec<AIConversation> {
-        let mut conversations = Vec::new();
-        for &conversation_id in conversation_ids {
-            if let Some(conversation) = RestoredAgentConversations::handle(ctx)
-                .update(ctx, |store, _| store.take_conversation(&conversation_id))
-            {
-                conversations.push(conversation);
-            };
-        }
-
-        // Sort by first exchange start time (oldest first)
-        conversations.sort_by_key(|conversation| {
-            conversation
-                .first_exchange()
-                .map(|exchange| exchange.start_time)
-        });
-        conversations
     }
 
     /// Restore AI documents from exchanges by processing CreateDocuments and EditDocuments actions.
@@ -393,37 +380,33 @@ impl TerminalView {
                                     self.ai_action_model.read(ctx, |action_model, _| {
                                         action_model.get_action_result(&action.id).cloned()
                                     })
-                                {
-                                    if let AIAgentActionResultType::CreateDocuments(
+                                    && let AIAgentActionResultType::CreateDocuments(
                                         CreateDocumentsResult::Success { created_documents },
                                     ) = &result.result
-                                    {
-                                        // Create a mapping from document index to title
-                                        let document_titles: Vec<String> =
-                                            documents.iter().map(|doc| doc.title.clone()).collect();
+                                {
+                                    // Create a mapping from document index to title
+                                    let document_titles: Vec<String> =
+                                        documents.iter().map(|doc| doc.title.clone()).collect();
 
-                                        document_model.update(ctx, |doc_model, doc_ctx| {
-                                            for (index, doc_context) in
-                                                created_documents.iter().enumerate()
-                                            {
-                                                let title = document_titles
-                                                    .get(index)
-                                                    .cloned()
-                                                    .unwrap_or_else(|| {
-                                                        DEFAULT_PLANNING_DOCUMENT_TITLE.to_string()
-                                                    });
-
-                                                doc_model.restore_document(
-                                                    doc_context.document_id,
-                                                    conversation_id,
-                                                    title,
-                                                    doc_context.content.clone(),
-                                                    exchange.start_time,
-                                                    doc_ctx,
+                                    document_model.update(ctx, |doc_model, doc_ctx| {
+                                        for (index, doc_context) in
+                                            created_documents.iter().enumerate()
+                                        {
+                                            let title =
+                                                document_titles.get(index).cloned().unwrap_or_else(
+                                                    || DEFAULT_PLANNING_DOCUMENT_TITLE.to_string(),
                                                 );
-                                            }
-                                        });
-                                    }
+
+                                            doc_model.restore_document(
+                                                doc_context.document_id,
+                                                conversation_id,
+                                                title,
+                                                doc_context.content.clone(),
+                                                exchange.start_time,
+                                                doc_ctx,
+                                            );
+                                        }
+                                    });
                                 }
                             }
                             AIAgentActionType::EditDocuments { .. } => {
@@ -431,22 +414,20 @@ impl TerminalView {
                                     self.ai_action_model.read(ctx, |action_model, _| {
                                         action_model.get_action_result(&action.id).cloned()
                                     })
-                                {
-                                    if let AIAgentActionResultType::EditDocuments(
+                                    && let AIAgentActionResultType::EditDocuments(
                                         EditDocumentsResult::Success { updated_documents },
                                     ) = &result.result
-                                    {
-                                        document_model.update(ctx, |doc_model, doc_ctx| {
-                                            for doc_context in updated_documents {
-                                                doc_model.restore_document_edit(
-                                                    &doc_context.document_id,
-                                                    doc_context.content.clone(),
-                                                    exchange.start_time,
-                                                    doc_ctx,
-                                                );
-                                            }
-                                        });
-                                    }
+                                {
+                                    document_model.update(ctx, |doc_model, doc_ctx| {
+                                        for doc_context in updated_documents {
+                                            doc_model.restore_document_edit(
+                                                &doc_context.document_id,
+                                                doc_context.content.clone(),
+                                                exchange.start_time,
+                                                doc_ctx,
+                                            );
+                                        }
+                                    });
                                 }
                             }
                             _ => {}
@@ -466,6 +447,7 @@ impl TerminalView {
         &mut self,
         ai_block_params: Vec<AIBlockCreationParams>,
         restored_conversations: Vec<RestoredAIConversation>,
+        entry_behavior: RestoreConversationEntryBehavior,
         ctx: &mut ViewContext<Self>,
     ) -> usize {
         let conversations: Vec<AIConversation> = restored_conversations
@@ -505,7 +487,9 @@ impl TerminalView {
         // loading a conversation due to selection from the command palette), then we don't eagerly
         // set the pending query state (which is equivalent to _entering_ the agent view when the
         // FeatureFlag is enabled).
-        if !FeatureFlag::AgentView.is_enabled() || !is_restoring_on_startup {
+        if entry_behavior == RestoreConversationEntryBehavior::EnterRestoredConversation
+            && (!FeatureFlag::AgentView.is_enabled() || !is_restoring_on_startup)
+        {
             // Set agent pending state for follow-up if we have an active conversation
             if let Some(conversation_id) = active_conversation_id {
                 let origin = AgentViewEntryOrigin::RestoreExistingConversation;
@@ -561,6 +545,13 @@ impl TerminalView {
             self.create_and_insert_ai_block(params, ctx);
         }
 
+        // Restored command blocks are inserted into the block list by
+        // `create_and_insert_ai_block` → `process_restored_outputs` without going through the
+        // normal `BlockCompleted` event path that initialises mouse states. Ensure every block
+        // index in the block list has mouse states so the label hover tooltip, bookmark button,
+        // and filter button work for these blocks.
+        self.ensure_mouse_states_for_all_blocks();
+
         blocks_created
     }
 
@@ -610,19 +601,22 @@ impl TerminalView {
     /// Restore a conversation using the stored exchanges for said conversation.
     /// This is used for opening a historical conversation from the agent mode homepage, and
     /// when loading from a debug link.
+    /// Caller is responsible for ensuring the conversation does not already exist in this terminal view.
     pub fn restore_conversation_after_view_creation(
         &mut self,
         restored: RestoredAIConversation,
         use_live_appearance: bool,
+        entry_behavior: RestoreConversationEntryBehavior,
         ctx: &mut ViewContext<Self>,
     ) {
         let conversation_id = restored.ai_conversation.id();
-        log::info!(
-            "Restoring conversation after view creation: {}",
-            conversation_id
-        );
+        log::info!("Restoring conversation after view creation: {conversation_id}",);
         let conversation_for_cli_subagent_restore = restored.ai_conversation.clone();
-        self.restore_missing_cli_subagent_blocks_for_conversation(&restored.ai_conversation);
+
+        let restoration_plan = {
+            let mut model = self.model.lock();
+            prepare_conversation_block_restoration(&restored.ai_conversation, &mut model)
+        };
 
         // Calculate height for AI blocks
         let size_info = *self.size_info;
@@ -630,19 +624,10 @@ impl TerminalView {
             .into_pixels()
             .to_lines(size_info.cell_height_px());
 
-        let exchanges = exchanges_for_blocklist(&restored.ai_conversation);
-        let command_block_indices = {
-            let terminal_model = self.model.lock();
-            command_block_indices_for_exchanges(
-                &terminal_model,
-                exchanges.iter().copied(),
-                exchanges.len(),
-            )
-        };
-
         // Process all exchanges for this conversation
         let mut all_ai_block_params = Vec::new();
-        for (exchange, command_block_index) in exchanges.into_iter().zip(command_block_indices) {
+        for restored_exchange in restoration_plan.into_exchanges() {
+            let exchange = restored_exchange.exchange().clone();
             let params = AIBlockCreationParams {
                 ai_controller: self.ai_controller.clone(),
                 ai_action_model: self.ai_action_model.clone(),
@@ -656,8 +641,8 @@ impl TerminalView {
                 conversation_id,
                 exchange_id: exchange.id,
                 working_directory: exchange.working_directory.clone(),
-                command_block_index,
-                exchange: (*exchange).clone(),
+                command_block_index: restored_exchange.command_block_index(),
+                exchange,
                 use_live_appearance,
                 is_restoring_on_startup: false,
             };
@@ -666,8 +651,12 @@ impl TerminalView {
         }
 
         // Restore action results from all exchanges
-        let blocks_created =
-            self.restore_conversations_from_block_params(all_ai_block_params, vec![restored], ctx);
+        let blocks_created = self.restore_conversations_from_block_params(
+            all_ai_block_params,
+            vec![restored],
+            entry_behavior,
+            ctx,
+        );
         self.restore_cli_subagent_views_for_conversation(
             &conversation_for_cli_subagent_restore,
             ctx,
@@ -697,7 +686,9 @@ impl TerminalView {
             conversation_restoration.should_show_restore_context_hint();
 
         // Save the target working directory so we can detect when the dir doesn't exist on this machine.
-        let target_dir = conversation_restoration.initial_working_directory();
+        // Use the same directory the new pane's shell starts in (the latest one for forks) so the
+        // "couldn't find original conversation directory" hint stays consistent with the spawned shell.
+        let target_dir = conversation_restoration.startup_working_directory();
 
         // Extract the active conversation ID if agent view was open (only for startup restoration)
         let active_conversation_id_to_restore = match &conversation_restoration {
@@ -710,16 +701,14 @@ impl TerminalView {
 
         // Extract restored conversations from restoration type
         let restored_conversations: Vec<RestoredAIConversation> = match conversation_restoration {
-            ConversationRestorationInNewPaneType::Startup {
-                conversation_ids, ..
-            } => Self::get_conversations_to_restore(&conversation_ids, ctx)
+            ConversationRestorationInNewPaneType::Startup { conversations, .. } => conversations
                 .into_iter()
                 .map(RestoredAIConversation::new)
                 .collect(),
             ConversationRestorationInNewPaneType::Historical { conversation, .. } => {
                 vec![RestoredAIConversation::new(conversation)]
             }
-            ConversationRestorationInNewPaneType::Forked { conversation } => {
+            ConversationRestorationInNewPaneType::Forked { conversation, .. } => {
                 vec![RestoredAIConversation::new(conversation)]
             }
             ConversationRestorationInNewPaneType::HistoricalCLIAgent { conversation, .. } => {
@@ -811,6 +800,7 @@ impl TerminalView {
         let blocks_created = self.restore_conversations_from_block_params(
             all_ai_block_params,
             restored_conversations,
+            RestoreConversationEntryBehavior::EnterRestoredConversation,
             ctx,
         );
         for conversation in &conversations_for_cli_subagent_restore {
@@ -841,27 +831,25 @@ impl TerminalView {
         );
 
         // If agent view was open before the session was saved, restore it
-        if FeatureFlag::AgentView.is_enabled() {
-            if let Some(conversation_id) = active_conversation_id_to_restore {
-                // Check if the conversation was successfully restored
-                let conversation_exists = BlocklistAIHistoryModel::handle(ctx)
-                    .as_ref(ctx)
-                    .conversation(&conversation_id)
-                    .is_some();
+        if FeatureFlag::AgentView.is_enabled()
+            && let Some(conversation_id) = active_conversation_id_to_restore
+        {
+            // Check if the conversation was successfully restored
+            let conversation_exists = BlocklistAIHistoryModel::handle(ctx)
+                .as_ref(ctx)
+                .conversation(&conversation_id)
+                .is_some();
 
-                if conversation_exists {
-                    log::info!("Restoring agent view for conversation: {conversation_id}");
-                    self.enter_agent_view_for_conversation(
-                        None,
-                        AgentViewEntryOrigin::RestoreExistingConversation,
-                        conversation_id,
-                        ctx,
-                    );
-                } else {
-                    log::warn!(
-                        "Cannot restore agent view: conversation {conversation_id} not found"
-                    );
-                }
+            if conversation_exists {
+                log::info!("Restoring agent view for conversation: {conversation_id}");
+                self.enter_agent_view_for_conversation(
+                    None,
+                    AgentViewEntryOrigin::RestoreExistingConversation,
+                    conversation_id,
+                    ctx,
+                );
+            } else {
+                log::warn!("Cannot restore agent view: conversation {conversation_id} not found");
             }
         }
     }
@@ -930,7 +918,7 @@ impl TerminalView {
                 items.push(open_repo_hint.clone());
                 items.push(MessageItem::text(" change repos"));
             }
-            RestorationDirState::Unchanged => {}
+            RestorationDirState::Unchanged | RestorationDirState::SkippedNonLocalConversation => {}
         }
 
         if !items.is_empty() {
@@ -944,101 +932,27 @@ impl TerminalView {
         }
     }
 
-    /// Helper function to find a tool call result from a conversation's tasks given a message ID.
-    /// Returns the RunShellCommandResult if found.
-    fn find_run_shell_command_result_for_message(
-        conversation: &AIConversation,
-        message_id: &MessageId,
-    ) -> Option<api::RunShellCommandResult> {
-        // Find the message in any task with the given ID.
-        let tool_call_id = conversation
-            .all_tasks()
-            .filter_map(|task| task.source())
-            .find_map(|api_task| {
-                api_task
-                    .messages
-                    .iter()
-                    .find(|msg| msg.id == **message_id)
-                    .and_then(|message| message.tool_call())
-                    .map(|tool_call| tool_call.tool_call_id.clone())
-            })?;
-
-        // Use the conversation's method to find the result
-        conversation
-            .find_run_shell_command_result(&tool_call_id)
-            .map(|(result, _)| result)
-    }
-
-    /// Process code diffs from AI output messages and apply them to the AI block for rendering
-    /// Also creates shell command blocks for RequestCommandOutput actions that have results
+    /// Process code diffs from AI output messages and apply them to the AI block for rendering.
+    /// Command blocks should already exist in the blocklist (extracted via
+    /// `conversation.to_serialized_blocklist_items`) before AI blocks are created.
     fn process_restored_outputs(
         &mut self,
         ai_block: &mut AIBlock,
         output: &AIAgentOutput,
-        conversation_id: AIConversationId,
-        should_create_requested_command_block: bool,
         ctx: &mut ViewContext<AIBlock>,
     ) {
         for message in &output.messages {
-            match message {
-                AIAgentOutputMessage {
-                    message:
-                        AIAgentOutputMessageType::Action(AIAgentAction {
-                            action: AIAgentActionType::RequestFileEdits { file_edits, .. },
-                            id,
-                            ..
-                        }),
-                    ..
-                } => {
-                    ai_block.set_restored_file_edits(id, file_edits.clone(), ctx);
-                }
-                AIAgentOutputMessage {
-                    message:
-                        AIAgentOutputMessageType::Action(AIAgentAction {
-                            action: AIAgentActionType::RequestCommandOutput { command, .. },
-                            id,
-                            ..
-                        }),
-                    id: msg_id,
-                    ..
-                } if should_create_requested_command_block => {
-                    // Get the tool call result from the conversation's tasks.
-                    let cmd_result =
-                        BlocklistAIHistoryModel::handle(ctx).read(ctx, |history_model, _| {
-                            history_model
-                                .conversation(&conversation_id)
-                                .and_then(|conversation| {
-                                    Self::find_run_shell_command_result_for_message(
-                                        conversation,
-                                        msg_id,
-                                    )
-                                })
-                        });
-                    if let Some(cmd_result) = cmd_result {
-                        // Check if the command finished successfully
-                        if let Some(api::run_shell_command_result::Result::CommandFinished(
-                            api::ShellCommandFinished {
-                                output: command_output,
-                                exit_code,
-                                ..
-                            },
-                        )) = &cmd_result.result
-                        {
-                            // Create a dummy block with the command and its output
-                            let mut model = self.model.lock();
-                            let block_list = model.block_list_mut();
-                            block_list.create_restored_command_block(
-                                command,
-                                command_output,
-                                ai_block.current_working_directory().cloned(),
-                                *exit_code,
-                                Some(id.clone()),
-                                Some(conversation_id),
-                            );
-                        }
-                    }
-                }
-                _ => {}
+            if let AIAgentOutputMessage {
+                message:
+                    AIAgentOutputMessageType::Action(AIAgentAction {
+                        action: AIAgentActionType::RequestFileEdits { file_edits, .. },
+                        id,
+                        ..
+                    }),
+                ..
+            } = message
+            {
+                ai_block.set_restored_file_edits(id, file_edits.clone(), ctx);
             }
         }
     }
@@ -1067,26 +981,36 @@ impl TerminalView {
             artifacts_json: None,
             parent_agent_id: None,
             agent_name: None,
+            orchestration_harness_type: None,
             parent_conversation_id: None,
+            is_remote_child: false,
+            root_task_is_optimistic: None,
             run_id: None,
             autoexecute_override: None,
             last_event_sequence: None,
+            pinned: false,
             compaction_state_json: None,
             byop_repair_state_json: None,
             cli_subagent_block_snapshots_json: None,
         };
 
+        // We already early-return for empty `tasks` above, so the strict
+        // constructor is safe here and matches the other cloud-style entry
+        // points.
         match AIConversation::new_restored(conversation_id, tasks, Some(conversation_data)) {
             Ok(conversation) => {
                 // Use live appearance for the read-only conversation viewer.
                 self.restore_conversation_after_view_creation(
                     RestoredAIConversation::new(conversation),
                     true,
+                    RestoreConversationEntryBehavior::EnterRestoredConversation,
                     ctx,
                 );
             }
             Err(e) => {
-                log::error!("Failed to load conversation from tasks: {e:?}");
+                report_error!(
+                    anyhow::Error::new(e).context("Failed to load conversation from tasks")
+                );
             }
         }
     }
@@ -1135,10 +1059,10 @@ impl TerminalView {
                 params.ai_context_model,
                 params.find_model,
                 params.active_session,
-                self.ambient_agent_view_model.clone(),
                 &params.cli_subagent_controller,
                 &params.model_events_handle,
                 self.agent_view_controller.clone(),
+                self.ambient_agent_view_model.clone(),
                 self.view_handle.clone(),
                 params.terminal_view_id,
                 ctx,
@@ -1152,7 +1076,9 @@ impl TerminalView {
         });
 
         // Insert into block list if command_block_index is provided
-        let item = RichContentItem::new(
+        let is_agent_transcript_user_query =
+            restored_block_view_handle.as_ref(ctx).has_user_input(ctx);
+        let item = RichContentItem::new_with_agent_transcript_user_query(
             Some(RichContentType::AIBlock),
             restored_block_view_handle.id(),
             FeatureFlag::AgentView
@@ -1165,6 +1091,7 @@ impl TerminalView {
                     .agent_view_state()
                     .active_conversation_id()
                     .is_some_and(|id| id == conversation_id),
+            is_agent_transcript_user_query,
         );
         if let Some(cmd_block_index) = command_block_index {
             self.model
@@ -1193,17 +1120,8 @@ impl TerminalView {
         if let Some(output) = exchange.output_status.output() {
             // Process code diffs for the AI block
             let ai_block_handle = restored_block_view_handle.clone();
-            // If we have command_block_index, we already have a real block for the requested command.
-            // So we only create the requested command block if command_block_index is None.
-            let should_create_requested_command_block = command_block_index.is_none();
             ai_block_handle.update(ctx, |ai_block, block_ctx| {
-                self.process_restored_outputs(
-                    ai_block,
-                    &output.get(),
-                    conversation_id,
-                    should_create_requested_command_block,
-                    block_ctx,
-                );
+                self.process_restored_outputs(ai_block, &output.get(), block_ctx);
             });
         }
 
@@ -1234,7 +1152,7 @@ impl TerminalView {
                 .not()
                 .then_some(content.plain_text))
         else {
-            log::error!("Clipboard contents are not a conversation debug link");
+            report_error!("Clipboard contents are not a conversation debug link");
             return;
         };
 
@@ -1255,7 +1173,7 @@ impl TerminalView {
 
             url
         } else {
-            log::error!(
+            report_error!(
                 "Invalid debug link format. Expected format: http://host/debug/maa/conversation-id"
             );
             return;
@@ -1263,10 +1181,14 @@ impl TerminalView {
 
         log::info!("Downloading conversation data from: {proto_url}");
 
+        // Zap:上游从 `ServerApiProvider` 借用共享 HTTP client。云端 server_api 已删除,
+        // 而这里下载的是剪贴板里贴进来的任意 debug 链接(不走 Warp 云端鉴权),
+        // 所以直接新建一个裸 http_client 即可,功能保持不变。
+        let client = Arc::new(http_client::Client::new());
+
         // Download the protobuf data
         ctx.spawn(
             async move {
-                let client = http_client::Client::new();
                 let response = client
                     .get(&proto_url)
                     .header("Accept", "application/protobuf")
@@ -1304,57 +1226,4 @@ impl TerminalView {
             },
         );
     }
-}
-
-/// Returns block indices where `AIBlock`s created for the given `exchanges` should be inserted.
-///
-/// The block indices are based on start timestamp of the exchange, such that the blocks and
-/// `AIBlocks` are ordered chronologically after insertion.
-///
-/// The returned vec is guaranteed to have `exchange_count` len.
-fn command_block_indices_for_exchanges<'a>(
-    terminal_model: &TerminalModel,
-    exchanges: impl Iterator<Item = &'a AIAgentExchange>,
-    exchange_count: usize,
-) -> Vec<Option<BlockIndex>> {
-    let blocks = terminal_model.block_list().blocks();
-
-    // Collect shell command blocks with their timestamps
-    let command_blocks: Vec<(BlockIndex, DateTime<Local>)> = blocks
-        .iter()
-        .enumerate()
-        .filter_map(|(index, block)| {
-            // Only consider shell command blocks (not background/rich content), and only if they have a start timestamp
-            if !block.is_background() {
-                block.start_ts().map(|ts| (BlockIndex::from(index), *ts))
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    // For each exchange timestamp, find the first command block after it
-    let mut result = Vec::with_capacity(exchange_count);
-    let mut command_block_idx = 0;
-
-    for exchange_timestamp in exchanges.map(|exchange| exchange.start_time) {
-        // Advance through command blocks until we find one after the exchange timestamp
-        while command_block_idx < command_blocks.len()
-            && command_blocks[command_block_idx].1 <= exchange_timestamp
-        {
-            command_block_idx += 1;
-        }
-
-        // If we found a command block after this timestamp, use its index
-        // Otherwise, the AI block should be appended (None)
-        let block_index = if command_block_idx < command_blocks.len() {
-            Some(command_blocks[command_block_idx].0)
-        } else {
-            None
-        };
-
-        result.push(block_index);
-    }
-
-    result
 }

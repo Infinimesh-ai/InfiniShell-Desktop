@@ -1,8 +1,7 @@
 use std::future::Future;
 
+use warp_util::sync::Condition;
 use warpui::{Entity, ModelContext, SingletonEntity};
-
-use crate::util::sync::Condition;
 
 /// Represents whether the client is connected to the network.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
@@ -77,7 +76,7 @@ impl NetworkStatus {
 
     /// Returns a future that resolves immediately if online, or waits until the next online
     /// transition if currently offline.
-    pub fn wait_until_online(&self) -> impl Future<Output = ()> {
+    pub fn wait_until_online(&self) -> impl Future<Output = ()> + use<> {
         let condition = self.pending_reconnect.clone();
         async move {
             if let Some(cond) = condition {

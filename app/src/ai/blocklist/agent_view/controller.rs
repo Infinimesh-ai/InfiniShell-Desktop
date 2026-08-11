@@ -399,6 +399,10 @@ impl AgentViewController {
         self.agent_view_state.is_inline()
     }
 
+    pub fn terminal_view_id(&self) -> EntityId {
+        self.terminal_view_id
+    }
+
     pub fn is_fullscreen(&self) -> bool {
         self.agent_view_state.is_fullscreen()
     }
@@ -781,6 +785,9 @@ impl AgentViewController {
                     self.terminal_view_id,
                     false,
                     matches!(origin, AgentViewEntryOrigin::AmbientAgent),
+                    // 上游用 `ThirdPartyCloudAgent` 表示 CLI agent transcript 视图,
+                    // 我方对应的来源是 `ExternalAmbientAgent`。
+                    matches!(origin, AgentViewEntryOrigin::ExternalAmbientAgent),
                     ctx,
                 )
             });
@@ -796,10 +803,18 @@ impl AgentViewController {
             display_mode,
             original_conversation_length: exchange_count,
         };
-        self.terminal_model
-            .lock()
-            .block_list_mut()
-            .set_agent_view_state(self.agent_view_state.clone());
+        // `BlockList` 已把 agent-view 可见性从整体 `AgentViewState` 改为
+        // per-block 的 conversation context(上游纯重构),这里跟随新 API。
+        // `is_cloud` 对应上游的云端 agent 运行,Zap 用 ambient agent 两种来源表达。
+        let is_ambient = matches!(
+            origin,
+            AgentViewEntryOrigin::AmbientAgent | AgentViewEntryOrigin::ExternalAmbientAgent
+        );
+        self.terminal_model.lock().block_list_mut().enter_conversation_context(
+            conversation_id,
+            display_mode.is_inline(),
+            is_ambient,
+        );
 
         if origin == AgentViewEntryOrigin::AmbientAgent {
             self.ambient_agent_view_model.update(ctx, |model, ctx| {
@@ -930,7 +945,7 @@ impl AgentViewController {
         self.terminal_model
             .lock()
             .block_list_mut()
-            .set_agent_view_state(self.agent_view_state.clone());
+            .exit_conversation_context();
 
         // Capture ambient agent status before resetting it
         let was_ambient_agent = self.ambient_agent_view_model.as_ref(ctx).is_ambient_agent();

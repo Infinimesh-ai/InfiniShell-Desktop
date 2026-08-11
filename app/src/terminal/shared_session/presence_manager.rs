@@ -1,34 +1,31 @@
-use std::{
-    collections::{HashMap, HashSet},
-    iter,
-};
+use std::collections::{HashMap, HashSet};
+use std::iter;
 
-use crate::terminal::shared_session::protocol::{
-    InputReplicaId, ParticipantInfo, ParticipantList, ParticipantPresenceUpdate, PresenceUpdate,
-    Role, RoleRequestId, Selection,
-};
+use asset_cache::AssetCacheExt as _;
 use futures::future::BoxFuture;
 use futures_util::future::join_all;
 use itertools::{Either, Itertools};
 use pathfinder_color::ColorU;
 use rand::Rng;
 
-use asset_cache::AssetCacheExt as _;
-use warpui::{
-    assets::asset_cache::{AssetCache, AssetState},
-    image_cache::ImageType,
-    r#async::SpawnedFutureHandle,
-    AppContext, Entity, ModelContext, SingletonEntity,
+// Zap:session-sharing-protocol crate 已剥离,改用本地 protocol 模块
+#[cfg(not(target_arch = "wasm32"))]
+use crate::terminal::shared_session::protocol::Viewer;
+use crate::terminal::shared_session::protocol::{
+    InputReplicaId, ParticipantId, ParticipantInfo, ParticipantList, ParticipantPresenceUpdate,
+    PresenceUpdate, Role, RoleRequestId, Selection,
 };
+use warpui::assets::asset_cache::{AssetCache, AssetState};
+use warpui::r#async::SpawnedFutureHandle;
+use warpui::image_cache::ImageType;
+use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
-use crate::terminal::shared_session::protocol::ParticipantId;
-
-use crate::{
-    auth::UserUid,
-    editor::{CursorColors, PeerSelectionData},
-    terminal::model::{block::BlockId, blocks::BlockList, terminal_model::BlockIndex},
-    util::color::coloru_with_opacity,
-};
+use crate::auth::UserUid;
+use crate::editor::{CursorColors, PeerSelectionData};
+use crate::terminal::model::block::BlockId;
+use crate::terminal::model::blocks::BlockList;
+use crate::terminal::model::terminal_model::BlockIndex;
+use crate::util::color::coloru_with_opacity;
 
 /// Selections have 25% opacity.
 pub fn text_selection_color(participant_color: ColorU) -> ColorU {
@@ -97,7 +94,7 @@ const PRESET_COLORS: &[ColorU] = &[
 ];
 
 /// Helper struct containing participant info and anything else necessary for rendering
-/// for an present participant.
+/// for a present participant.
 #[derive(Clone)]
 pub struct Participant {
     pub info: ParticipantInfo,
@@ -335,11 +332,6 @@ impl PresenceManager {
         self.role_requests.get(participant_id)
     }
 
-    /// Returns the number of present viewers (not including ourselves).
-    pub(crate) fn present_viewer_count(&self) -> usize {
-        self.present_viewers.len()
-    }
-
     /// Returns the present viewers of this shared session, not including ourselves.
     /// There is no guarantee of the ordering of viewers, so callers should sort by ID for a stable ordering.
     pub fn get_present_viewers(&self) -> impl Iterator<Item = &Participant> {
@@ -365,10 +357,10 @@ impl PresenceManager {
     pub fn get_participant(&self, id: &ParticipantId) -> Option<&Participant> {
         if let Some(viewer) = self.present_viewers.get(id) {
             return Some(viewer);
-        } else if let Some(sharer) = self.sharer.as_ref() {
-            if self.sharer_id == *id {
-                return Some(sharer);
-            }
+        } else if let Some(sharer) = self.sharer.as_ref()
+            && self.sharer_id == *id
+        {
+            return Some(sharer);
         }
         None
     }
@@ -551,7 +543,9 @@ impl PresenceManager {
 
         let Some(participant) = participant else {
             if self.id != update.participant_id {
-                log::warn!("Received shared session participant presence update for participant that doesn't exist");
+                log::warn!(
+                    "Received shared session participant presence update for participant that doesn't exist"
+                );
             }
             return;
         };
@@ -572,7 +566,9 @@ impl PresenceManager {
             self.role = Some(role);
         } else {
             let Some(participant) = self.present_viewers.get_mut(participant_id) else {
-                log::warn!("Received shared session participant role update for participant that doesn't exist");
+                log::warn!(
+                    "Received shared session participant role update for participant that doesn't exist"
+                );
                 return;
             };
             participant.role = Some(role);
@@ -600,10 +596,10 @@ impl PresenceManager {
         }
 
         // Ensure viewer doesn't already have requested role
-        if let Some(old_role) = self.viewer_role(&participant_id) {
-            if role == old_role {
-                return;
-            }
+        if let Some(old_role) = self.viewer_role(&participant_id)
+            && role == old_role
+        {
+            return;
         }
 
         self.role_requests
@@ -770,6 +766,33 @@ impl PresenceManager {
     pub fn present_viewer_id_for_uid(&self, viewer_uid: UserUid) -> Option<&ParticipantId> {
         self.present_viewer_ids_for_uid(viewer_uid).next()
     }
+
+    /// Returns the only distinct present viewer UID. Multiple present viewers
+    /// with the same UID count as one user.
+    pub fn single_distinct_present_viewer_uid(&self) -> Option<&str> {
+        Self::single_distinct_uid(
+            self.get_present_viewers()
+                .map(|v| v.info.profile_data.user_uid.as_str()),
+        )
+    }
+
+    /// Like `single_distinct_present_viewer_uid`, but reads directly from a
+    /// participant list before the presence manager finishes processing it.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn single_distinct_present_viewer_uid_from_viewers<'a>(
+        viewers: impl Iterator<Item = &'a Viewer>,
+    ) -> Option<&'a str> {
+        Self::single_distinct_uid(
+            viewers
+                .filter(|v| v.is_present)
+                .map(|v| v.info.profile_data.user_uid.as_str()),
+        )
+    }
+
+    fn single_distinct_uid<'a>(mut uids: impl Iterator<Item = &'a str>) -> Option<&'a str> {
+        let uid = uids.next()?;
+        uids.all(|other_uid| other_uid == uid).then_some(uid)
+    }
 }
 
 pub enum Event {
@@ -781,5 +804,5 @@ impl Entity for PresenceManager {
 }
 
 #[cfg(test)]
-#[path = "presence_manager_test.rs"]
+#[path = "presence_manager_tests.rs"]
 mod tests;

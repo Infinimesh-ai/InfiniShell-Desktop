@@ -56,6 +56,30 @@ impl ThirdPartyHarness for ClaudeHarness {
         Some("https://code.claude.com/docs/en/quickstart")
     }
 
+    fn runtime_error_patterns(&self) -> &'static [&'static str] {
+        &[
+            // Out-of-credits / billing.
+            "Credit balance too low",
+            // Plan/usage limits emitted as `You've hit your <kind> limit`.
+            // We match on the common prefix so the variants (session,
+            // weekly, Opus, etc.) all hit.
+            "You've hit your",
+            // Invalid or malformed API key.
+            "Invalid API key",
+            "This organization has been disabled",
+            "belongs to a disabled organization",
+            // OAuth / login state.
+            "Not logged in",
+            "OAuth token revoked",
+            "OAuth token has expired",
+            // Routines disabled by org policy.
+            "Routines are disabled by your organization's policy",
+            // Generic upstream API failures Claude Code surfaces verbatim.
+            "API Error: Request rejected (429)",
+            "authentication_error",
+        ]
+    }
+
     fn prepare_environment_config(
         &self,
         working_dir: &Path,
@@ -352,7 +376,7 @@ impl HarnessRunner for ClaudeHarnessRunner {
         let claude_version = self.resolve_claude_version(foreground).await;
 
         let _ = (foreground, conversation_id, block_id, claude_version);
-        log::debug!("Skipping Claude transcript and block snapshot export in Zap");
+        log::debug!("Skipping Claude transcript and block snapshot export in InfiniShell");
 
         Ok(())
     }

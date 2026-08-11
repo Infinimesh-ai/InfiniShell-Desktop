@@ -1,25 +1,26 @@
+// The code in this file is adapted from the alacritty_terminal crate under the
+// Apache license; see: crates/warp_terminal/src/model/LICENSE-ALACRITTY.
+
 //! The main event loop which performs I/O on the pseudoterminal.
 
-use std::{
-    borrow::Cow,
-    collections::VecDeque,
-    io::{self, ErrorKind, Read, Write},
-    marker::Send,
-    ops::DerefMut,
-    sync::Arc,
-    thread::{self, JoinHandle},
-};
+use std::borrow::Cow;
+use std::collections::VecDeque;
+use std::io::{self, ErrorKind, Read, Write};
+use std::marker::Send;
+use std::ops::DerefMut;
+use std::sync::Arc;
+use std::thread::{self, JoinHandle};
 
 use log::error;
 use mio::{self, Events, Interest};
 use parking_lot::{FairMutex, FairMutexGuard};
 
-use crate::terminal::{
-    event_listener::ChannelEventListener, local_tty, model::ansi, TerminalModel,
-};
-use crate::terminal::{model::terminal_model::ExitReason, writeable_pty::Message};
-
 use super::mio_channel::Receiver;
+use crate::terminal::event_listener::ChannelEventListener;
+use crate::terminal::model::ansi;
+use crate::terminal::model::terminal_model::ExitReason;
+use crate::terminal::writeable_pty::Message;
+use crate::terminal::{TerminalModel, local_tty};
 
 /// The size of the buffer to read data into from the PTY.
 const READ_BUFFER_SIZE: usize = 0x4_0000;
@@ -165,7 +166,7 @@ where
                 Message::Shutdown => {
                     return ChannelResult::TerminateLoop {
                         child_exited: false,
-                    }
+                    };
                 }
                 Message::Resize(size) => self.pty.on_resize(&size),
                 Message::ChildExited => return ChannelResult::TerminateLoop { child_exited: true },
@@ -245,11 +246,17 @@ where
             };
 
             // Process the bytes read into the buffer.
+            let mut terminal_response_sequences = Vec::new();
             state.parser.parse_bytes(
                 terminal.deref_mut(),
                 &buf[..bytes_in_buffer],
-                &mut self.pty.writer(),
+                &mut terminal_response_sequences,
             );
+            if !terminal_response_sequences.is_empty() {
+                state
+                    .write_list
+                    .push_back(Cow::Owned(terminal_response_sequences));
+            }
 
             bytes_processed += bytes_in_buffer;
             bytes_in_buffer = 0;
@@ -369,10 +376,16 @@ where
 
                     // If there were no events but `poll` returned, that means we hit the timeout.
                     if events.is_empty() {
-                        state
-                            .parser
-                            .finish_sync_output(&mut *self.terminal.lock(), &mut self.pty.writer());
-                        continue;
+                        let mut terminal_response_sequences = Vec::new();
+                        state.parser.finish_sync_output(
+                            &mut *self.terminal.lock(),
+                            &mut terminal_response_sequences,
+                        );
+                        if !terminal_response_sequences.is_empty() {
+                            state
+                                .write_list
+                                .push_back(Cow::Owned(terminal_response_sequences));
+                        }
                     }
 
                     for event in events.iter() {
@@ -452,11 +465,12 @@ where
                             }
                         }
 
-                        if state.needs_write() && can_write {
-                            if let Err(err) = self.pty_write(&mut state, &mut can_write) {
-                                error!("Error writing to PTY in event loop: {err}");
-                                break 'event_loop;
-                            }
+                        if state.needs_write()
+                            && can_write
+                            && let Err(err) = self.pty_write(&mut state, &mut can_write)
+                        {
+                            error!("Error writing to PTY in event loop: {err}");
+                            break 'event_loop;
                         }
                     }
                 }
@@ -469,7 +483,7 @@ where
                 if !child_exited {
                     let res = self.pty.kill();
                     if let Err(err) = res {
-                        log::error!("Failed to kill PTY process {err:?}");
+                        log::warn!("Failed to kill PTY process: {err:#}");
                     }
                 }
                 // Notify the terminal model that the PTY process has exited.

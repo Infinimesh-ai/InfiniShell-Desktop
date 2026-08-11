@@ -15,7 +15,6 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use futures::StreamExt as _;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
@@ -26,7 +25,7 @@ use warpui::ModelSpawner;
 
 use crate::ai::agent_events::{
     run_agent_event_driver, AgentEventConsumer, AgentEventConsumerControlFlow,
-    AgentEventDriverConfig, AgentEventSource, AgentEventSourceItem, AgentEventStreamClient,
+    AgentEventDriverConfig, AgentEventStreamClient, AgentEventStreamClientEventSource,
     AgentRunEvent, MessageHydrator,
 };
 use crate::ai::agent_sdk::driver::{AgentDriver, OZ_MESSAGE_LISTENER_STATE_ROOT_ENV};
@@ -52,64 +51,12 @@ struct MessageBridgeRuntime {
     task: SpawnedFutureHandle,
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(target_family = "wasm")] {
-        type ProviderAgentEventSourceStream =
-            futures::stream::LocalBoxStream<'static, Result<AgentEventSourceItem>>;
-    } else {
-        type ProviderAgentEventSourceStream =
-            futures::stream::BoxStream<'static, Result<AgentEventSourceItem>>;
-    }
-}
-
-struct ProviderAgentEventSource {
-    client: Arc<dyn AgentEventStreamClient>,
-}
-
-impl ProviderAgentEventSource {
-    fn new(client: Arc<dyn AgentEventStreamClient>) -> Self {
-        Self { client }
-    }
-}
-
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(not(target_family = "wasm"), async_trait)]
-impl AgentEventSource for ProviderAgentEventSource {
-    async fn open_stream(
-        &self,
-        run_ids: &[String],
-        since_sequence: i64,
-    ) -> Result<ProviderAgentEventSourceStream> {
-        let stream = self
-            .client
-            .stream_agent_events(run_ids, since_sequence)
-            .await?;
-
-        let stream = stream.filter_map(|event_result| async move {
-            match event_result {
-                Ok(reqwest_eventsource::Event::Open) => Some(Ok(AgentEventSourceItem::Open)),
-                Ok(reqwest_eventsource::Event::Message(message)) => {
-                    match serde_json::from_str::<AgentRunEvent>(&message.data) {
-                        Ok(event) => Some(Ok(AgentEventSourceItem::Event(event))),
-                        Err(err) => {
-                            log::warn!("Skipping malformed agent event from SSE stream: {err}");
-                            None
-                        }
-                    }
-                }
-                Err(err) => Some(Err(anyhow!("SSE stream error: {err:?}"))),
-            }
-        });
-
-        cfg_if::cfg_if! {
-            if #[cfg(target_family = "wasm")] {
-                Ok(stream.boxed_local())
-            } else {
-                Ok(stream.boxed())
-            }
-        }
-    }
-}
+// Zap:上游这里自带一份 `ProviderAgentEventSource`(实现 `AgentEventSource`,
+// 把 `AgentEventStreamClient` 的 SSE 流解析成 `AgentEventSourceItem`)。
+// 我方 `ai::agent_events` 已把这份实现上收为公共的
+// `AgentEventStreamClientEventSource`,而 `AgentEventSource` /
+// `AgentEventSourceItem` 只在 `#[cfg(test)]` 下导出,外部无法再自行实现该 trait。
+// 因此这里删掉本地副本,直接复用公共实现。
 
 struct MessageBridgeEventConsumer {
     run_id: String,
@@ -635,8 +582,8 @@ async fn run_parent_bridge_forever(
     // The shared driver keeps `since_sequence` in memory across its own retry
     // loop, which is all this per-session bridge needs because the state dir is
     // not reused across sessions.
-    let config = AgentEventDriverConfig::retry_forever(vec![run_id.clone()], 0);
-    let source = ProviderAgentEventSource::new(agent_event_stream_client);
+    let config = AgentEventDriverConfig::retry_forever_run_ids(vec![run_id.clone()], 0);
+    let source = AgentEventStreamClientEventSource::new(agent_event_stream_client);
     let mut consumer = MessageBridgeEventConsumer { run_id, state_dir };
     run_agent_event_driver(source, config, &mut consumer).await
 }

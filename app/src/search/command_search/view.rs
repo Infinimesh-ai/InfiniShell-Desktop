@@ -1,60 +1,55 @@
-use itertools::Itertools;
+use std::collections::HashSet;
+use std::ops::Range;
+use std::sync::Arc;
+use std::time::Duration;
 
 use async_channel::Sender;
+use itertools::Itertools;
+use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-
-use crate::search::mixer::AddAsyncSourceOptions;
-use lazy_static::lazy_static;
-use std::{collections::HashSet, ops::Range, sync::Arc, time::Duration};
 use warp_core::features::FeatureFlag;
+use warp_errors::report_error;
+use warpui::accessibility::{AccessibilityContent, WarpA11yRole};
+use warpui::elements::{
+    Align, AnchorPair, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+    Dismiss, Fill, Flex, MouseStateHandle, OffsetPositioning, OffsetType, ParentElement,
+    ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius, Resizable,
+    ResizableStateHandle, SavePosition, ScrollStateHandle, Scrollable, ScrollableElement,
+    Shrinkable, Stack, UniformList, UniformListState, XAxisAnchor, YAxisAnchor,
+    resizable_state_handle,
+};
+use warpui::presenter::ChildView;
+use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{
-    accessibility::{AccessibilityContent, WarpA11yRole},
-    elements::{
-        resizable_state_handle, Align, AnchorPair, Border, ConstrainedBox, Container, CornerRadius,
-        CrossAxisAlignment, Dismiss, Fill, Flex, OffsetPositioning, OffsetType, ParentElement,
-        ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius, Resizable,
-        ResizableStateHandle, SavePosition, ScrollStateHandle, Scrollable, ScrollableElement,
-        Shrinkable, Stack, UniformList, UniformListState, XAxisAnchor, YAxisAnchor,
-    },
-    presenter::ChildView,
-    ui_components::components::{UiComponent, UiComponentStyles},
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
 
-use crate::{
-    ai_assistant::execution_context::WarpAiExecutionContext,
-    appearance::Appearance,
-    auth::{AuthState, AuthStateProvider},
-    completer::SessionContext,
-    drive::settings::WarpDriveSettings,
-    search::{
-        command_search::searcher::{CommandSearchItemAction, CommandSearchMixer},
-        result_renderer::{QueryResultRenderer, QueryResultRendererStyles},
-        search_bar::{SearchBar, SearchBarEvent, SearchBarState, SearchResultOrdering},
-        QueryFilter,
-    },
-    send_telemetry_from_ctx,
-    server::telemetry::TelemetryEvent,
-    settings::AISettings,
-    terminal::{
-        input::MenuPositioning,
-        model::session::SessionId,
-        resizable_data::{ModalType, ResizableData, DEFAULT_UNIVERSAL_SEARCH_WIDTH},
-        History, HistoryEvent,
-    },
-};
-
-use super::{
-    ai_queries::AIQueriesDataSource,
-    env_var_collections::EnvVarCollectionDataSource,
-    history::history_data_source_for_session,
-    notebooks::notebooks_data_source,
-    warp_ai::WarpAIDataSource,
-    workflows::{stored_workflows_data_source, WorkflowsDataSource},
-    zero_state::{CommandSearchZeroStateEvent, CommandSearchZeroStateView},
-};
+use super::ai_queries::AIQueriesDataSource;
+use super::env_var_collections::EnvVarCollectionDataSource;
+use super::history::history_data_source_for_session;
+use super::notebooks::notebooks_data_source;
+use super::warp_ai::WarpAIDataSource;
+use super::workflows::{WorkflowsDataSource, stored_workflows_data_source};
+use super::zero_state::{CommandSearchZeroStateEvent, CommandSearchZeroStateView};
+use crate::ai_assistant::execution_context::WarpAiExecutionContext;
+use crate::appearance::Appearance;
+use crate::auth::{AuthState, AuthStateProvider};
+use crate::completer::SessionContext;
+use crate::drive::settings::WarpDriveSettings;
+use crate::search::QueryFilter;
+use crate::search::command_search::searcher::{CommandSearchItemAction, CommandSearchMixer};
+use crate::search::mixer::AddAsyncSourceOptions;
+use crate::search::result_renderer::{QueryResultRenderer, QueryResultRendererStyles};
+use crate::search::search_bar::{SearchBar, SearchBarEvent, SearchBarState, SearchResultOrdering};
+use crate::send_telemetry_from_ctx;
+use crate::server::telemetry::TelemetryEvent;
+use crate::settings::AISettings;
+use crate::terminal::input::MenuPositioning;
+use crate::terminal::model::session::SessionId;
+use crate::terminal::resizable_data::{DEFAULT_UNIVERSAL_SEARCH_WIDTH, ModalType, ResizableData};
+use crate::terminal::{History, HistoryEvent};
 
 const DEFAULT_PLACEHOLDER_TEXT: &str = "Search your history, workflows, and more";
 const PANEL_POSITION_ID: &str = "CommandSearchViewPanel";
@@ -185,7 +180,7 @@ impl CommandSearchView {
             .as_ref(ctx)
             .get_handle(ctx.window_id(), ModalType::UniversalSearchWidth)
             .unwrap_or_else(|| {
-                log::error!("Couldn't retrieve universal search resizable state handle.");
+                report_error!("Couldn't retrieve universal search resizable state handle.");
                 resizable_state_handle(DEFAULT_UNIVERSAL_SEARCH_WIDTH)
             });
 
@@ -215,6 +210,7 @@ impl CommandSearchView {
         _ai_execution_context: Option<WarpAiExecutionContext>,
         ctx: &mut ViewContext<Self>,
     ) {
+        let window_id = ctx.window_id();
         self.mixer.update(ctx, |mixer, ctx| {
             mixer.reset(ctx);
 
@@ -240,7 +236,7 @@ impl CommandSearchView {
                 }
 
                 mixer.add_async_source(
-                    stored_workflows_data_source(),
+                    stored_workflows_data_source(window_id),
                     workflows_filters,
                     AddAsyncSourceOptions {
                         debounce_interval: Some(Duration::from_millis(50)),
@@ -294,8 +290,9 @@ impl CommandSearchView {
                     ctx,
                 );
             } else {
-                ctx.subscribe_to_model(&History::handle(ctx), move |mixer, history_event, ctx| {
-                    match history_event {
+                ctx.subscribe_to_model(
+                    &History::handle(ctx),
+                    move |mixer, _, history_event, ctx| match history_event {
                         HistoryEvent::Initialized(id) => {
                             if id == &session_id {
                                 let source = history_data_source_for_session(
@@ -313,11 +310,14 @@ impl CommandSearchView {
                                     },
                                     ctx,
                                 );
+                                if let Some(query) = mixer.current_query().cloned() {
+                                    mixer.run_query(query, ctx);
+                                }
                                 ctx.notify();
                             }
                         }
-                    }
-                });
+                    },
+                );
             }
         })
     }
@@ -354,10 +354,10 @@ impl CommandSearchView {
         visible_results_range: Range<usize>,
         ctx: &mut ViewContext<Self>,
     ) {
-        if let Some(current_visible_results_range) = &self.state.visible_results_range {
-            if current_visible_results_range == &visible_results_range {
-                return;
-            }
+        if let Some(current_visible_results_range) = &self.state.visible_results_range
+            && current_visible_results_range == &visible_results_range
+        {
+            return;
         }
         self.state.visible_results_range = Some(visible_results_range);
         ctx.notify();
@@ -379,10 +379,7 @@ impl CommandSearchView {
 
     fn close(&self, ctx: &mut ViewContext<Self>) {
         let query = self.search_bar.as_ref(ctx).query(ctx);
-        let filter = self
-            .search_bar_state
-            .as_ref(ctx)
-            .active_visible_query_filter();
+        let filter = self.search_bar_state.as_ref(ctx).active_query_filter();
         ctx.emit(CommandSearchEvent::Close { query, filter });
     }
 
@@ -434,14 +431,7 @@ impl CommandSearchView {
                 self.state.list_state.scroll_to(*index);
                 ctx.notify();
             }
-            SearchBarEvent::QueryFilterChanged { new_filter } => {
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::CommandSearchFilterChanged {
-                        new_filter: *new_filter
-                    },
-                    ctx
-                );
-            }
+            SearchBarEvent::QueryFilterChanged { .. } => {}
             SearchBarEvent::SelectionUpdateInZeroState { .. } => {}
             SearchBarEvent::EnterInZeroState { .. } => {}
         }
@@ -458,15 +448,13 @@ impl CommandSearchView {
         ctx: &mut ViewContext<Self>,
     ) {
         self.search_bar.update(ctx, |search_bar, ctx| {
-            search_bar.set_visible_query_filter(filter_and_atom_text, ctx);
+            search_bar.set_query_filter(filter_and_atom_text, ctx);
         });
     }
 
     /// Returns the active query filters
     fn active_query_filter(&self, app: &AppContext) -> Option<QueryFilter> {
-        self.search_bar_state
-            .as_ref(app)
-            .active_visible_query_filter()
+        self.search_bar_state.as_ref(app).active_query_filter()
     }
 
     /// Emits the `ItemSelected` event containing the passed `CommandSearchEventPayload` and closes
@@ -519,10 +507,7 @@ impl CommandSearchView {
                 TelemetryEvent::CommandSearchResultAccepted {
                     result_index,
                     result_type: (&result_action).into(),
-                    query_filter: self
-                        .search_bar_state
-                        .as_ref(ctx)
-                        .active_visible_query_filter(),
+                    query_filter: self.search_bar_state.as_ref(ctx).active_query_filter(),
                     buffer_length: self.search_bar.as_ref(ctx).query(ctx).len(),
                     was_immediately_executed,
                 },
@@ -862,7 +847,7 @@ impl View for CommandSearchView {
         let appearance = Appearance::as_ref(app);
         let mixer = self.mixer.as_ref(app);
 
-        let should_show_zero_state = self.search_bar_state.as_ref(app).should_show_zero_state();
+        let should_show_zero_state = self.search_bar.as_ref(app).should_show_zero_state(app);
         let panel_contents_body = if should_show_zero_state {
             ChildView::new(&self.zero_state_handle).finish()
         } else if mixer.is_loading() && mixer.are_results_empty() {
@@ -935,21 +920,20 @@ impl View for CommandSearchView {
             ),
         );
 
-        if !should_show_zero_state {
-            if let (Some(selected_result_renderer), Some(details_panel_positioning)) = (
+        if !should_show_zero_state
+            && let (Some(selected_result_renderer), Some(details_panel_positioning)) = (
                 self.selected_result_renderer(app),
                 self.offset_positioning_for_details_panel(app),
-            ) {
-                if let Some(details) = selected_result_renderer.render_details(app) {
-                    stack.add_positioned_overlay_child(
-                        Container::new(details)
-                            .with_margin_bottom(DETAILS_PANEL_MARGIN)
-                            .with_margin_right(DETAILS_PANEL_MARGIN)
-                            .finish(),
-                        details_panel_positioning,
-                    );
-                }
-            }
+            )
+            && let Some(details) = selected_result_renderer.render_details(app)
+        {
+            stack.add_positioned_overlay_child(
+                Container::new(details)
+                    .with_margin_bottom(DETAILS_PANEL_MARGIN)
+                    .with_margin_right(DETAILS_PANEL_MARGIN)
+                    .finish(),
+                details_panel_positioning,
+            );
         }
 
         Dismiss::new(Container::new(stack.finish()).with_margin_top(36.).finish())
@@ -965,6 +949,13 @@ impl CommandSearchView {
     pub fn search_bar(&self) -> &ViewHandle<SearchBar<CommandSearchItemAction>> {
         &self.search_bar
     }
+
+    pub fn has_search_results(&self, app: &AppContext) -> bool {
+        self.search_bar_state
+            .as_ref(app)
+            .query_result_renderers()
+            .is_some_and(|results| !results.is_empty())
+    }
 }
 
 pub mod styles {
@@ -972,7 +963,8 @@ pub mod styles {
     use pathfinder_color::ColorU;
     use warpui::elements::{Border, DropShadow, ScrollbarWidth};
 
-    use crate::{appearance::Appearance, themes::theme::Fill};
+    use crate::appearance::Appearance;
+    use crate::themes::theme::Fill;
 
     pub const CORNER_RADIUS: f32 = 8.;
     pub const VIEW_WIDTH: f32 = 700.;
@@ -1009,5 +1001,5 @@ pub mod styles {
 }
 
 #[cfg(test)]
-#[path = "view_test.rs"]
+#[path = "view_tests.rs"]
 mod tests;

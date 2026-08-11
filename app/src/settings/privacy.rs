@@ -3,9 +3,14 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use settings::macros::{define_settings_group, maybe_define_setting, register_settings_events};
+use settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
 use warp_core::features::FeatureFlag;
-use warp_core::report_if_error;
+// `private_user_preferences()` 是 `AppContext` 上的扩展 trait 方法(`ModelContext`
+// 通过 deref 拿到),必须显式引入 trait 才能在本文件调用。
 use warp_core::user_preferences::GetUserPreferences as _;
+use warp_errors::{report_error, report_if_error};
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
 
 use crate::ai::blocklist::telemetry_banner::should_collect_ai_ugc_telemetry;
@@ -13,20 +18,12 @@ use crate::auth::AuthState;
 use crate::auth::AuthStateProvider;
 use crate::auth::SyncedUserSettings;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
-use crate::report_error;
 // Zap Wave 3-1:`AuthClient` trait + `MockAuthClient` 随 server_api/auth.rs
 // 整件物理删,`SyncedUserSettings` 迁到 `crate::auth`。
 // Zap Wave 3-1:`ServerApiProvider` 不再被本文件使用 ——
 // `auth_client = ServerApiProvider::as_ref(ctx).get_auth_client()` 的所有调用点
 // 随 AuthClient trait 一同物理删。
 use crate::terminal::safe_mode_settings::SafeModeSettings;
-
-use settings::{
-    macros::{define_settings_group, maybe_define_setting, register_settings_events},
-    RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud,
-};
-
-use serde::{Deserialize, Serialize};
 
 // Zap(本地化,Phase 5):`PreferencesSyncer` 已物理删除。
 use crate::workspaces::workspace::EnterpriseSecretRegex;
@@ -102,6 +99,7 @@ define_settings_group!(WarpDrivePrivacySettings, settings: [
         default: false,
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
+        surface: settings::SettingSurfaces::ALL,
         private: false,
         storage_key: "TelemetryEnabled",
         toml_path: "privacy.telemetry_enabled",
@@ -112,6 +110,7 @@ define_settings_group!(WarpDrivePrivacySettings, settings: [
         default: false,
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
+        surface: settings::SettingSurfaces::ALL,
         private: false,
         storage_key: "CrashReportingEnabled",
         toml_path: "privacy.crash_reporting_enabled",
@@ -124,6 +123,7 @@ maybe_define_setting!(CustomSecretRegexList, group: PrivacySettings, {
     default: Vec::new(),
     supported_platforms: SupportedPlatforms::ALL,
     sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
+    surface: settings::SettingSurfaces::GUI,
     private: false,
     toml_path: "privacy.custom_secret_regex_list",
     description: "Custom regex patterns for detecting and redacting secrets.",
@@ -134,6 +134,7 @@ maybe_define_setting!(HasInitializedDefaultSecretRegexes, group: PrivacySettings
     default: false,
     supported_platforms: SupportedPlatforms::ALL,
     sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
+    surface: settings::SettingSurfaces::GUI,
     private: true,
 });
 
@@ -261,7 +262,7 @@ impl PrivacySettings {
         );
 
         // Listen for changes to the object store and update ourselves when they happen.
-        ctx.subscribe_to_model(&WarpDrivePrivacySettings::handle(ctx), |me, event, ctx| {
+        ctx.subscribe_to_model(&WarpDrivePrivacySettings::handle(ctx), |me, _, event, ctx| {
             let privacy_settings = WarpDrivePrivacySettings::as_ref(ctx);
             match event {
                 WarpDrivePrivacySettingsChangedEvent::IsTelemetryEnabled { .. } => {
@@ -327,16 +328,19 @@ impl PrivacySettings {
             // Convert EnterpriseSecretRegex to CustomSecretRegex for internal use
             let mut enterprise_secrets = Vec::new();
             for enterprise_regex in enterprise_regexes {
-                if let Ok(regex) = Regex::new(&enterprise_regex.pattern) {
-                    enterprise_secrets.push(CustomSecretRegex {
-                        pattern: regex,
-                        name: enterprise_regex.name,
-                    });
-                } else {
-                    log::error!(
-                        "Invalid enterprise secret regex pattern: {}",
-                        enterprise_regex.pattern
-                    );
+                match Regex::new(&enterprise_regex.pattern) {
+                    Ok(regex) => {
+                        enterprise_secrets.push(CustomSecretRegex {
+                            pattern: regex,
+                            name: enterprise_regex.name,
+                        });
+                    }
+                    _ => {
+                        report_error!(
+                            "Invalid enterprise secret regex pattern",
+                            extra: { "pattern" => %enterprise_regex.pattern }
+                        );
+                    }
                 }
             }
             self.enterprise_secret_regex_list = enterprise_secrets;
@@ -426,7 +430,7 @@ impl PrivacySettings {
     }
 
     /// Constructor for tests only.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-util"))]
     pub fn mock(_ctx: &mut ModelContext<Self>) -> Self {
         Self {
             auth_state: Arc::new(AuthState::new_for_test()),
@@ -531,7 +535,7 @@ impl PrivacySettings {
             .set_value(new_user_secret_regex_list, ctx)
             .is_err()
         {
-            log::error!("Custom Secret Regex List failed to serialize")
+            report_error!("Custom Secret Regex List failed to serialize")
         }
     }
 
@@ -544,16 +548,22 @@ impl PrivacySettings {
 
         // Add all the default regexes if they don't already exist
         for default_regex in crate::terminal::model::secrets::regexes::DEFAULT_REGEXES_WITH_NAMES {
-            if let Ok(regex) = Regex::new(default_regex.pattern) {
-                let custom_regex = CustomSecretRegex {
-                    pattern: regex,
-                    name: Some(default_regex.name.to_string()),
-                };
-                if !new_user_secret_regex_list.contains(&custom_regex) {
-                    new_user_secret_regex_list.push(custom_regex);
+            match Regex::new(default_regex.pattern) {
+                Ok(regex) => {
+                    let custom_regex = CustomSecretRegex {
+                        pattern: regex,
+                        name: Some(default_regex.name.to_string()),
+                    };
+                    if !new_user_secret_regex_list.contains(&custom_regex) {
+                        new_user_secret_regex_list.push(custom_regex);
+                    }
                 }
-            } else {
-                log::error!("Failed to compile default regex: {}", default_regex.pattern);
+                _ => {
+                    report_error!(
+                        "Failed to compile default regex",
+                        extra: { "pattern" => %default_regex.pattern }
+                    );
+                }
             }
         }
 
@@ -566,7 +576,7 @@ impl PrivacySettings {
             .set_value(new_user_secret_regex_list, ctx)
             .is_err()
         {
-            log::error!("Failed to serialize default regexes to custom secret regex list")
+            report_error!("Failed to serialize default regexes to custom secret regex list")
         }
 
         ctx.notify();
@@ -579,7 +589,7 @@ impl PrivacySettings {
             .set_value(true, ctx)
             .is_err()
         {
-            log::error!("Failed to disable default regex trigger");
+            report_error!("Failed to disable default regex trigger");
         }
     }
 
@@ -596,7 +606,7 @@ impl PrivacySettings {
                 .set_value(true, ctx)
                 .is_err()
             {
-                log::error!("Failed to set has_initialized_default_secret_regexes flag");
+                report_error!("Failed to set has_initialized_default_secret_regexes flag");
             }
         }
     }
@@ -649,7 +659,7 @@ impl PrivacySettings {
         match (cloud_telemetry_value, cloud_crash_reporting_value) {
             (Some(is_telemetry_enabled), Some(is_crash_reporting_enabled)) => {
                 log::info!(
-                    "Zap Drive privacy preferences are set, using those for telemetry={is_telemetry_enabled}, \
+                    "InfiniShell Drive privacy preferences are set, using those for telemetry={is_telemetry_enabled}, \
                     crash_reporting={is_crash_reporting_enabled}"
                 );
                 self.set_is_telemetry_enabled(is_telemetry_enabled, ctx);
@@ -657,18 +667,22 @@ impl PrivacySettings {
             }
             _ => {
                 log::info!(
-                    "Zap Drive privacy preferences are not set, syncing local PrivacySettings values to \
+                    "InfiniShell Drive privacy preferences are not set, syncing local PrivacySettings values to \
                     WarpDrivePrivacySettings and cloud. telemetry={}, crash_reporting={}",
                     self.is_telemetry_enabled,
                     self.is_crash_reporting_enabled
                 );
                 WarpDrivePrivacySettings::handle(ctx).update(ctx, |settings, ctx| {
-                    report_if_error!(settings
-                        .is_telemetry_enabled
-                        .set_value(self.is_telemetry_enabled, ctx));
-                    report_if_error!(settings
-                        .is_crash_reporting_enabled
-                        .set_value(self.is_crash_reporting_enabled, ctx));
+                    report_if_error!(
+                        settings
+                            .is_telemetry_enabled
+                            .set_value(self.is_telemetry_enabled, ctx)
+                    );
+                    report_if_error!(
+                        settings
+                            .is_crash_reporting_enabled
+                            .set_value(self.is_crash_reporting_enabled, ctx)
+                    );
                 });
                 // Zap(本地化,Phase 5):原 `PreferencesSyncer::maybe_sync_local_prefs_to_cloud`
                 // 同步本地隐私设置到云端,随同步器物理删除。本地设置仅写入 sqlite。
@@ -701,3 +715,7 @@ impl Entity for PrivacySettings {
 }
 
 impl SingletonEntity for PrivacySettings {}
+
+#[cfg(test)]
+#[path = "privacy_tests.rs"]
+mod tests;

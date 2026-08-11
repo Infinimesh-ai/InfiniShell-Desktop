@@ -13,6 +13,7 @@ pub(super) mod ai_fact_pane;
 pub(super) mod code_diff_pane;
 pub(super) mod code_diff_pane_model;
 pub(super) mod code_pane;
+pub(super) mod custom_router_editor_pane;
 pub(super) mod env_var_collection_pane;
 // Zap Wave 7-3:`environment_management_pane` 随 ambient-agent UI 子系统物理删。
 pub(super) mod execution_profile_editor_pane;
@@ -32,51 +33,49 @@ pub(super) mod welcome_pane;
 pub(crate) mod welcome_view;
 pub mod workflow_pane;
 
-use std::{any::Any, fmt::Display};
+use std::any::Any;
+use std::fmt::Display;
 
-use crate::pane_group::focus_state::PaneFocusHandle;
-use crate::pane_group::pane::get_started_view::GetStartedView;
-use crate::ssh_manager::server_view::SshServerView;
-use crate::sftp_manager::browser::SftpBrowserView;
-use crate::view_components::action_button::ActionButton;
-use crate::{
-    ai::execution_profiles::editor::ExecutionProfileEditorView,
-    ai::{
-        ai_document_view::AIDocumentView, blocklist::inline_action::code_diff_view::CodeDiffView,
-        facts::AIFactView,
-    },
-    code::view::CodeView,
-    env_vars::view::env_var_collection::EnvVarCollectionView,
-    menu::MenuItem,
-    notebooks::{file::FileNotebookView, image::ImageViewerView, notebook::NotebookView},
-    settings::PaneSettings,
-    settings_view::SettingsView,
-    terminal::{available_shells::AvailableShell, TerminalView},
-    workflows::workflow_view::WorkflowView,
-};
 use serde::{Deserialize, Serialize};
 use url::Url;
-use warp_core::HostId;
+use warp_util::remote_path::RemotePath;
+use warpui::elements::{DispatchEventResult, EventHandler, MouseInBehavior};
+use warpui::presenter::ChildView;
 use warpui::{
-    elements::{DispatchEventResult, EventHandler, MouseInBehavior},
-    presenter::ChildView,
     Action, AppContext, Element, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity,
     View, ViewContext, ViewHandle, WeakModelHandle,
 };
 
-pub use self::view::PaneHeaderAction;
-pub use self::view::PaneHeaderCustomAction;
-pub use self::view::PaneView;
-pub use self::view::PaneViewEvent;
-
-use welcome_view::WelcomeView;
-
+pub use self::view::{PaneHeaderAction, PaneHeaderCustomAction, PaneView, PaneViewEvent};
 use super::{ActivationReason, LeafContents, PaneGroup, PaneGroupAction};
+use crate::ai::ai_document_view::AIDocumentView;
+use crate::ai::blocklist::inline_action::code_diff_view::CodeDiffView;
+use crate::ai::execution_profiles::editor::ExecutionProfileEditorView;
+use crate::ai::facts::AIFactView;
+#[cfg(feature = "local_fs")]
+use crate::code::buffer_location::LocalOrRemotePath;
+use crate::code::view::CodeView;
+use crate::env_vars::view::env_var_collection::EnvVarCollectionView;
+use crate::menu::MenuItem;
+use crate::notebooks::file::FileNotebookView;
+use crate::notebooks::image::ImageViewerView;
+use crate::notebooks::notebook::NotebookView;
+use crate::pane_group::focus_state::PaneFocusHandle;
+use crate::pane_group::pane::get_started_view::GetStartedView;
+use crate::pane_group::pane::welcome_view::WelcomeView;
+use crate::settings::PaneSettings;
+use crate::settings_view::SettingsView;
+use crate::sftp_manager::browser::SftpBrowserView;
+use crate::ssh_manager::server_view::SshServerView;
+use crate::terminal::TerminalView;
+use crate::terminal::available_shells::AvailableShell;
+use crate::view_components::action_button::ActionButton;
+use crate::workflows::workflow_view::WorkflowView;
 
 pub(super) fn init(app: &mut AppContext) {
     self::view::init(app);
-    welcome_view::init(app);
     get_started_view::init(app);
+    welcome_view::init(app);
 }
 
 /// The opaque identifier for an arbitrary pane. Consumers
@@ -150,6 +149,7 @@ pub(crate) enum IPaneType {
     Settings,
     AIFact,
     AIDocument,
+    CustomRouterEditor,
     ExecutionProfileEditor,
     GetStarted,
     SshServer,
@@ -176,6 +176,7 @@ impl Display for IPaneType {
             IPaneType::Settings => write!(f, "Settings"),
             IPaneType::AIFact => write!(f, "AI Fact"),
             IPaneType::AIDocument => write!(f, "AI Document"),
+            IPaneType::CustomRouterEditor => write!(f, "Custom Router Editor"),
             IPaneType::ExecutionProfileEditor => write!(f, "Execution Profile Editor"),
             IPaneType::GetStarted => write!(f, "GetStarted"),
             IPaneType::SshServer => write!(f, "SSH Server"),
@@ -261,6 +262,13 @@ impl PaneId {
     /// Creates a [`PaneId`] from a [`ViewContext<PaneView<AIDocumentView>>`]
     pub fn from_ai_document_pane_ctx(ctx: &ViewContext<PaneView<AIDocumentView>>) -> Self {
         Self::new_from_ctx(IPaneType::AIDocument, ctx)
+    }
+
+    /// Creates a [`PaneId`] from a [`ViewContext<PaneView<CustomRouterEditorView>>`]
+    pub fn from_custom_router_editor_pane_ctx(
+        ctx: &ViewContext<PaneView<crate::ai::custom_model_router_editor::CustomRouterEditorView>>,
+    ) -> Self {
+        Self::new_from_ctx(IPaneType::CustomRouterEditor, ctx)
     }
 
     /// Creates a [`PaneId`] from a [`ViewContext<PaneView<ExecutionProfileEditorView>>`]
@@ -357,6 +365,13 @@ impl PaneId {
         ai_document_pane_view: &ViewHandle<PaneView<AIDocumentView>>,
     ) -> Self {
         Self::new(IPaneType::AIDocument, ai_document_pane_view)
+    }
+
+    /// Creates a [`PaneId`] from a [`PaneView<CustomRouterEditorView>`] entity ID.
+    pub fn from_custom_router_editor_pane_view(
+        view: &ViewHandle<PaneView<crate::ai::custom_model_router_editor::CustomRouterEditorView>>,
+    ) -> Self {
+        Self::new(IPaneType::CustomRouterEditor, view)
     }
 
     /// Creates a [`PaneId`] from a [`PaneView<ExecutionProfileEditorView>`] entity ID.
@@ -500,6 +515,10 @@ impl PaneId {
             IPaneType::AIDocument => {
                 ChildView::<PaneView<AIDocumentView>>::with_id(self.0.pane_view_id).finish()
             }
+            IPaneType::CustomRouterEditor => ChildView::<
+                PaneView<crate::ai::custom_model_router_editor::CustomRouterEditorView>,
+            >::with_id(self.0.pane_view_id)
+            .finish(),
             IPaneType::ExecutionProfileEditor => {
                 ChildView::<PaneView<ExecutionProfileEditorView>>::with_id(self.0.pane_view_id)
                     .finish()
@@ -870,6 +889,8 @@ pub enum PaneConfigurationEvent {
     ShowAccentBorderUpdated,
     OpenModalUpdated,
     RefreshPaneHeaderOverflowMenuItems,
+    // Zap Phase 2a:`ShareableObjectChanged` / `ToggleSharingDialog` /
+    // `OpenSharingQrCode` 随 pane header 分享 UI 一并移除。
     DimEvenIfFocusedUpdated,
     /// The header content has changed and should be re-rendered.
     /// This is used when the backing view's state changes in a way that
@@ -1108,8 +1129,7 @@ pub enum PaneEvent {
     RepoChanged,
     /// A remote server resolved the repo root for a session in this pane.
     RemoteRepoNavigated {
-        host_id: HostId,
-        indexed_path: String,
+        remote_path: RemotePath,
     },
     /// Split the current pane into two. If `initial_query` is `Some` fill the new pane's input with
     /// its value.
@@ -1119,12 +1139,12 @@ pub enum PaneEvent {
     ClearHoveredTabIndex,
     #[cfg(feature = "local_fs")]
     ReplaceWithCodePane {
-        path: std::path::PathBuf,
+        path: LocalOrRemotePath,
         source: Option<crate::code::editor_management::CodeSource>,
     },
     #[cfg(feature = "local_fs")]
     ReplaceWithFilePane {
-        path: std::path::PathBuf,
+        path: LocalOrRemotePath,
         source: Option<crate::code::editor_management::CodeSource>,
     },
 }

@@ -1,22 +1,20 @@
 /// Common functionality used across different AI Assistant components.
-use markdown_parser::{parse_markdown, CodeBlockText, FormattedText, FormattedTextLine};
+use markdown_parser::{CodeBlockText, FormattedText, FormattedTextLine, parse_markdown};
 use pathfinder_color::ColorU;
-use warpui::{
-    elements::{
-        ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, HighlightedHyperlink,
-        Icon, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
-    },
-    platform::Cursor,
-    ui_components::{
-        button::ButtonVariant,
-        components::{Coords, UiComponent, UiComponentStyles},
-    },
-    AppContext, Element, ModelHandle,
+use warpui::elements::{
+    ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, HighlightedHyperlink, Icon,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
 };
+use warpui::platform::Cursor;
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use warpui::{AppContext, Element, ModelHandle};
 
-use crate::{appearance::Appearance, ui_components::blended_colors};
-
-use super::{panel::AIAssistantAction, requests::Requests, transcript::CodeBlockMouseStateHandles};
+use super::panel::AIAssistantAction;
+use super::requests::Requests;
+use super::transcript::CodeBlockMouseStateHandles;
+use crate::appearance::Appearance;
+use crate::ui_components::blended_colors;
 
 
 const SQUARE_ALERT_SVG_PATH: &str = "bundled/svg/alert-square.svg";

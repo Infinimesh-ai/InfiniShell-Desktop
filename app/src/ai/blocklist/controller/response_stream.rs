@@ -254,6 +254,28 @@ pub struct ResponseStream {
 }
 
 impl ResponseStream {
+    /// Zap:测试支撑构造器,合并时随上游 `#[cfg(test)]` 块一并丢失,按我方字段集取回。
+    /// `controller.rs` 的 `register_mock_stream_for_test` 依赖它。
+    #[cfg(test)]
+    pub fn new_for_test(id: ResponseStreamId) -> Self {
+        let (cancellation_tx, _rx) = oneshot::channel();
+        Self {
+            id,
+            params: api::RequestParams::new_for_test(vec![], vec![]),
+            retry_count: 0,
+            start_time: Local::now(),
+            time_to_latest_event: TimeDelta::seconds(0),
+            cancellation_tx: Some(cancellation_tx),
+            original_error: None,
+            has_received_client_actions: false,
+            ai_identifiers: AIIdentifiers::default(),
+            can_attempt_resume_on_error: false,
+            pending_title_generation: None,
+            should_resume_conversation_after_stream_finished: false,
+            current_request_id: Some(Uuid::new_v4()),
+        }
+    }
+
     pub fn new(
         params: api::RequestParams,
         ai_identifiers: AIIdentifiers,
@@ -649,10 +671,10 @@ impl Entity for ResponseStream {
 async fn byop_required_response_stream(
     cancellation_rx: oneshot::Receiver<()>,
 ) -> Result<api::ResponseStream, ConvertToAPITypeError> {
-    log::debug!("No BYOP provider selected for Zap agent request");
+    log::debug!("No BYOP provider selected for InfiniShell agent request");
     let error_stream = futures::stream::once(async {
         Err(Arc::new(AIApiError::Other(anyhow!(
-            "Zap requires a configured BYOP provider in Settings"
+            "InfiniShell requires a configured BYOP provider in Settings"
         ))))
     })
     .take_until(cancellation_rx);

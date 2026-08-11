@@ -1,17 +1,19 @@
-use crate::rendering::get_best_dash_gap;
-use crate::rendering::wgpu::shader_types::BorderWidth;
-use crate::rendering::wgpu::{resources, shader_types};
-use crate::scene::Layer;
-use crate::Scene;
+use std::borrow::Cow;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::vec2f;
-use std::borrow::Cow;
-use std::sync::{atomic::AtomicBool, Arc};
 use wgpu::util::BufferInitDescriptor;
 use wgpu::{BindGroupLayout, ColorTargetState, Device, RenderPass, RenderPipeline};
 
 use super::util::create_buffer_init;
+use crate::Scene;
+use crate::rendering::get_best_dash_gap;
+use crate::rendering::wgpu::shader_types::BorderWidth;
+use crate::rendering::wgpu::{resources, shader_types};
+use crate::scene::Layer;
 
 pub(super) struct Pipeline {
     render_pipeline: RenderPipeline,
@@ -53,7 +55,10 @@ impl Pipeline {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[shader_types::Vertex::desc(), shader_types::RectData::desc()],
+                buffers: &[
+                    Some(shader_types::Vertex::desc()),
+                    Some(shader_types::RectData::desc()),
+                ],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {

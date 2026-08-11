@@ -26,11 +26,11 @@ impl std::fmt::Display for OnboardingIntention {
 pub use callout::{OnboardingCalloutView, OnboardingKeybindings};
 pub use localization::set_localizer;
 
-/// User-facing names of the AI features enabled when the agent intention is selected.
+/// User-facing descriptions of the AI features enabled when the agent intention is selected.
 /// Shared by the intention slide's agent card checklist and the login slide's
 /// skip-login confirmation dialog so the two always stay in sync.
 pub const AI_FEATURES: &[&str] = &[
-    "Zap agents",
+    "InfiniShell agents",
     "Oz local agents platform",
     "Next command predictions",
     "Prompt suggestions",
@@ -42,7 +42,7 @@ pub const AI_FEATURES: &[&str] = &[
 /// intention is selected with Zap Drive turned on. Shared by the login slide's
 /// skip-login confirmation dialog so the list stays in sync with any future
 /// surfaces that need it.
-pub const WARP_DRIVE_FEATURES: &[&str] = &["Zap Drive", "Session Sharing"];
+pub const WARP_DRIVE_FEATURES: &[&str] = &["InfiniShell Drive", "Session Sharing"];
 
 pub mod components;
 mod visuals;
@@ -66,11 +66,14 @@ impl std::fmt::Display for SessionDefault {
 }
 
 pub use agent_onboarding_view::{AgentOnboardingAction, AgentOnboardingEvent, AgentOnboardingView};
-pub use model::{SelectedSettings, UICustomizationSettings};
-pub use slides::ProjectOnboardingSettings;
+pub use model::{
+    ChooseHowToStartExperimentArm, CreditPackOption, CreditPurchaseState, OnboardingAuthState,
+    SelectedSettings, UICustomizationSettings,
+};
+pub use slides::{OfferVariant, ProjectOnboardingSettings};
 pub use telemetry::OnboardingEvent;
 
-pub fn init(app: &mut warpui::AppContext) {
+pub fn init(app: &mut warpui_core::AppContext) {
     agent_onboarding_view::init(app);
     callout::init(app);
 }

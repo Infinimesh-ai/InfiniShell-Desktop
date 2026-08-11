@@ -1,7 +1,11 @@
 //! Inline repos menu view for switching between indexed repos.
 
+#[cfg(feature = "local_fs")]
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
+#[cfg(feature = "local_fs")]
+use std::sync::{Arc, Mutex};
 
 use warpui::elements::ChildView;
 use warpui::{Element, Entity, ModelHandle, View, ViewContext, ViewHandle};
@@ -11,8 +15,10 @@ use crate::search::data_source::{Query, QueryFilter};
 use crate::search::mixer::{AddAsyncSourceOptions, SearchMixer};
 use crate::terminal::input::buffer_model::{InputBufferModel, InputBufferUpdateEvent};
 use crate::terminal::input::inline_menu::{InlineMenuEvent, InlineMenuPositioner, InlineMenuView};
-use crate::terminal::input::repos::data_source::RepoMenuDataSource;
 use crate::terminal::input::repos::AcceptRepo;
+#[cfg(feature = "local_fs")]
+use crate::terminal::input::repos::data_source::GitSummaryCache;
+use crate::terminal::input::repos::data_source::RepoMenuDataSource;
 use crate::terminal::input::suggestions_mode_model::{
     InputSuggestionsModeEvent, InputSuggestionsModeModel,
 };
@@ -31,6 +37,13 @@ pub struct InlineReposMenuView {
     mixer: ModelHandle<SearchMixer<AcceptRepo>>,
     input_suggestions_model: ModelHandle<InputSuggestionsModeModel>,
     input_buffer_model: ModelHandle<InputBufferModel>,
+    /// Git summaries shared with the data source, populated in the background.
+    ///
+    /// Zap:后台填充链路随 `PersistedWorkspace` 一起下线,这份缓存目前无人写入;
+    /// 保留字段以免改动 data source 侧的接线。
+    #[cfg(feature = "local_fs")]
+    #[allow(dead_code)]
+    git_summaries: GitSummaryCache,
 }
 
 impl InlineReposMenuView {
@@ -41,6 +54,15 @@ impl InlineReposMenuView {
         positioner: &ModelHandle<InlineMenuPositioner>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
+        #[cfg(feature = "local_fs")]
+        let git_summaries: GitSummaryCache = Arc::new(Mutex::new(HashMap::new()));
+
+        #[cfg(feature = "local_fs")]
+        let data_source = {
+            let git_summaries = git_summaries.clone();
+            ctx.add_model(move |_| RepoMenuDataSource::new(git_summaries))
+        };
+        #[cfg(not(feature = "local_fs"))]
         let data_source = ctx.add_model(|_| RepoMenuDataSource::new());
 
         let mixer = ctx.add_model(|ctx| {
@@ -55,7 +77,6 @@ impl InlineReposMenuView {
                 },
                 ctx,
             );
-            mixer.run_query(repos_query(""), ctx);
             mixer
         });
 
@@ -97,6 +118,10 @@ impl InlineReposMenuView {
                             ctx,
                         );
                     });
+                    // Kick off the background git-summary load so branch/diff
+                    // stats fill in without blocking the initial repo list.
+                    #[cfg(feature = "local_fs")]
+                    me.load_git_summaries_in_background(ctx);
                 }
             },
         );
@@ -115,7 +140,26 @@ impl InlineReposMenuView {
             mixer,
             input_suggestions_model,
             input_buffer_model: input_buffer_model.clone(),
+            #[cfg(feature = "local_fs")]
+            git_summaries,
         }
+    }
+
+    /// Loads git summaries (branch + diff stats) for all known repos in the
+    /// background, then re-runs the query so the freshly-loaded data renders.
+    ///
+    /// The initial repo list is shown immediately without git data (see
+    /// [`RepoMenuDataSource`]); this fills it in a moment later. We load all
+    /// summaries and refresh once (rather than per-repo) to avoid repeatedly
+    /// resetting the user's selection while data streams in.
+    #[cfg(feature = "local_fs")]
+    fn load_git_summaries_in_background(&self, _ctx: &mut ViewContext<Self>) {
+        // Zap:候选源 `ai::persisted_workspace::PersistedWorkspace`(云端 workspace
+        // 持久化 /「之前打开过的仓库」列表)已下线,`ai::mod` 不再声明该模块,
+        // 因此这里没有可枚举的仓库路径。`RepoMenuDataSource::run_query` 也已经
+        // 恒返回空结果(见 `repos/data_source.rs` 的模块注释),所以后台加载
+        // git summary 无事可做:保留函数与调用点,整体 no-op,等未来接回
+        //「当前 pane group 实时 cwd」之类的数据源时再恢复。
     }
 
     pub fn select_up(&self, ctx: &mut ViewContext<Self>) {

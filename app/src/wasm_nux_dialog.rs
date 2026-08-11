@@ -1,23 +1,21 @@
+use settings::Setting as _;
+use warp_errors::{report_error, report_if_error};
+use warpui::elements::{
+    Align, CrossAxisAlignment, Flex, MainAxisSize, MouseStateHandle, ParentElement as _,
+};
+use warpui::fonts::Weight;
+use warpui::platform::Cursor;
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+
 use crate::appearance::Appearance;
-use crate::report_if_error;
 use crate::settings::app_installation_detection::{
     UserAppInstallDetectionSettings, UserAppInstallStatus,
 };
 use crate::settings::{NativePreferenceSettings, UserNativePreference};
-use crate::ui_components::dialog::{dialog_styles, Dialog};
+use crate::ui_components::dialog::{Dialog, dialog_styles};
 use crate::uri::web_intent_parser::{self, WebIntent};
-use settings::Setting as _;
-use warpui::elements::{Align, CrossAxisAlignment, Flex};
-use warpui::ui_components::{
-    button::ButtonVariant,
-    components::{Coords, UiComponent, UiComponentStyles},
-};
-use warpui::{
-    elements::{MainAxisSize, MouseStateHandle, ParentElement as _},
-    fonts::Weight,
-    platform::Cursor,
-    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
-};
 
 const CLOSE_BUTTON_DIAMETER: f32 = 20.;
 const DIALOG_WIDTH: f32 = 350.;
@@ -259,7 +257,7 @@ impl TypedActionView for WasmNUXDialog {
                         .user_native_redirect_preference
                         .set_value(UserNativePreference::Web, ctx)
                 }) {
-                    log::error!("Failed to set the open preference to web. {e}");
+                    report_error!(e.context("Failed to set the open preference to web"));
                 };
                 ctx.emit(WasmNUXDialogEvent::Close);
             }
@@ -276,7 +274,7 @@ impl TypedActionView for WasmNUXDialog {
                         },
                     );
                 } else {
-                    log::error!("Failed to open in app. Could not determine current url");
+                    report_error!("Failed to open in app. Could not determine current url");
                 }
             }
             WasmNUXDialogAction::OpenDownloadDesktopAppLink => {

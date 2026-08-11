@@ -1,20 +1,20 @@
-use crate::appearance::Appearance;
-use crate::terminal::general_settings::{GeneralSettings, GeneralSettingsChangedEvent};
-use crate::ui_components::dialog::{dialog_styles, Dialog};
 use settings::Setting as _;
 use warp_core::ui::theme::Fill;
-use warpui::elements::{Align, Container, Empty, Flex, ParentElement};
+use warpui::elements::{Align, Container, Empty, Flex, MouseStateHandle, ParentElement};
+use warpui::fonts::Weight;
 use warpui::keymap::FixedBinding;
 use warpui::modals::{AlertDialogWithCallbacks, AppModalCallback};
-use warpui::ui_components::components::{Coords, UiComponent};
+use warpui::platform::Cursor;
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use warpui::ui_components::text::Span;
 use warpui::{
-    elements::MouseStateHandle,
-    fonts::Weight,
-    platform::Cursor,
-    ui_components::{button::ButtonVariant, components::UiComponentStyles, text::Span},
-    Element, Entity, TypedActionView, View,
+    AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
-use warpui::{AppContext, ModelHandle, SingletonEntity, ViewContext};
+
+use crate::appearance::Appearance;
+use crate::terminal::general_settings::{GeneralSettings, GeneralSettingsChangedEvent};
+use crate::ui_components::dialog::{Dialog, dialog_styles};
 
 pub(super) fn init(app: &mut AppContext) {
     use warpui::keymap::macros::*;
@@ -144,9 +144,11 @@ impl View for NativeModal {
             .on_click(|ctx, _, _| ctx.dispatch_typed_action(NativeModalAction::ToggleDontShowAgain))
             .finish();
 
-        let mut dialog_column_contents = vec![Container::new(dont_show_again_checkbox)
-            .with_padding_bottom(20.)
-            .finish()];
+        let mut dialog_column_contents = vec![
+            Container::new(dont_show_again_checkbox)
+                .with_padding_bottom(20.)
+                .finish(),
+        ];
 
         for (i, modal_button) in alert_dialog.button_data.iter().enumerate() {
             let button = Align::new(

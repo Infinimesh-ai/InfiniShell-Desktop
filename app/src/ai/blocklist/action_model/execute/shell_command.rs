@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
+use chrono::{DateTime, Local};
 use futures::channel::oneshot;
 use futures::future::BoxFuture;
 use futures::{select, FutureExt};
@@ -108,7 +109,11 @@ impl ShellCommandExecutor {
         terminal_view_id: EntityId,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
-        ctx.subscribe_to_model(model_event_dispatcher, Self::handle_terminal_model_event);
+        // Zap:`ModelContext::subscribe_to_model` 的回调现在是 4 参
+        // (`|me, handle, event, ctx|`),不能再直接传 3 参的方法引用。
+        ctx.subscribe_to_model(model_event_dispatcher, |me, _, event, ctx| {
+            me.handle_terminal_model_event(event, ctx)
+        });
 
         Self {
             active_session,
@@ -262,7 +267,7 @@ impl ShellCommandExecutor {
         &mut self,
         input: ExecuteActionInput,
         ctx: &mut ModelContext<Self>,
-    ) -> impl Into<AnyActionExecution> {
+    ) -> impl Into<AnyActionExecution> + use<> {
         let model = self.terminal_model.lock();
 
         // Determine the action we want to take based on the input.
@@ -354,6 +359,8 @@ impl ShellCommandExecutor {
                                 block_id: block.id().clone(),
                                 output,
                                 exit_code,
+                                start_ts: block.start_ts().copied(),
+                                completed_ts: block.completed_ts().copied(),
                             },
                         ),
                     );
@@ -407,6 +414,8 @@ impl ShellCommandExecutor {
                             block_id: block_id.clone(),
                             output,
                             exit_code,
+                            start_ts: block.start_ts().copied(),
+                            completed_ts: block.completed_ts().copied(),
                         },
                     ));
                 }
@@ -500,6 +509,8 @@ impl ShellCommandExecutor {
                                                 block_id: block.id().clone(),
                                                 output: agent_shell_command_block_output(block),
                                                 exit_code: block.exit_code(),
+                                                start_ts: block.start_ts().copied(),
+                                                completed_ts: block.completed_ts().copied(),
                                             }
                                         } else {
                                             let grid_contents = if model.is_alt_screen_active() {
@@ -652,6 +663,8 @@ impl ShellCommandExecutor {
                             block_id: block.id().clone(),
                             output: agent_shell_command_block_output(block),
                             exit_code: block.exit_code(),
+                            start_ts: block.start_ts().copied(),
+                            completed_ts: block.completed_ts().copied(),
                         }
                     } else {
                         let grid_contents = if model.is_alt_screen_active() {
@@ -1055,11 +1068,15 @@ fn action_result_for_requested_command(
             block_id,
             output,
             exit_code,
+            start_ts,
+            completed_ts,
         } => AIAgentActionResultType::RequestCommandOutput(RequestCommandOutputResult::Completed {
             command,
             block_id,
             output,
             exit_code,
+            start_ts,
+            completed_ts,
         }),
         ActionResult::LongRunningCommandSnapshot {
             block_id,
@@ -1093,11 +1110,15 @@ fn action_result_for_write_to_long_running_shell_command(
             block_id,
             output,
             exit_code,
+            start_ts,
+            completed_ts,
         } => AIAgentActionResultType::WriteToLongRunningShellCommand(
             WriteToLongRunningShellCommandResult::CommandFinished {
                 block_id,
                 output,
                 exit_code,
+                start_ts,
+                completed_ts,
             },
         ),
         ActionResult::LongRunningCommandSnapshot {
@@ -1134,12 +1155,16 @@ fn action_result_for_read_shell_command_output(
             output,
             exit_code,
             block_id,
+            start_ts,
+            completed_ts,
         } => AIAgentActionResultType::ReadShellCommandOutput(
             ReadShellCommandOutputResult::CommandFinished {
                 command,
                 block_id,
                 output,
                 exit_code,
+                start_ts,
+                completed_ts,
             },
         ),
         ActionResult::LongRunningCommandSnapshot {
@@ -1176,11 +1201,15 @@ fn action_result_for_transfer_shell_command_control_to_user(
             block_id,
             output,
             exit_code,
+            start_ts,
+            completed_ts,
         } => AIAgentActionResultType::TransferShellCommandControlToUser(
             TransferShellCommandControlToUserResult::CommandFinished {
                 block_id,
                 output,
                 exit_code,
+                start_ts,
+                completed_ts,
             },
         ),
         ActionResult::LongRunningCommandSnapshot {
@@ -1244,6 +1273,10 @@ enum ActionResult {
         block_id: BlockId,
         output: String,
         exit_code: ExitCode,
+        // Zap:上游把 block 的起止时间一路透传到 `*Result::CommandFinished`,
+        // 这里补上同名字段,避免每个 `action_result_for_*` 再去回查 block。
+        start_ts: Option<DateTime<Local>>,
+        completed_ts: Option<DateTime<Local>>,
     },
     LongRunningCommandSnapshot {
         block_id: BlockId,

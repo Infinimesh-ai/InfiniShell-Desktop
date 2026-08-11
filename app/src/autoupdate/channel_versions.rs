@@ -1,4 +1,5 @@
-use std::{env, fs::read_to_string};
+use std::env;
+use std::fs::read_to_string;
 
 use anyhow::{Context as _, Result};
 use channel_versions::{ChannelChangelogs, ChannelVersion, ChannelVersions, VersionInfo};

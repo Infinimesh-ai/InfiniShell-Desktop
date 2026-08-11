@@ -575,6 +575,7 @@ fn user_query(id: &str, task_id: &str, request_id: &str, seconds: i64) -> api::M
         })),
         request_id: request_id.to_string(),
         timestamp: Some(ts(seconds)),
+        fetched_memories: vec![],
     }
 }
 
@@ -591,6 +592,7 @@ fn agent_output(id: &str, task_id: &str, request_id: &str, seconds: i64) -> api:
         )),
         request_id: request_id.to_string(),
         timestamp: Some(ts(seconds)),
+        fetched_memories: vec![],
     }
 }
 

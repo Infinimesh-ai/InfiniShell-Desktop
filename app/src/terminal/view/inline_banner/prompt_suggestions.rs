@@ -1,36 +1,36 @@
-use serde::Serialize;
 use std::rc::Rc;
 
-use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::blocklist::prompt::prompt_alert::{PromptAlertState, PromptAlertView};
-use crate::ai::blocklist::BlocklistAIInputModel;
-use crate::ai::predict::prompt_suggestions::ACCEPT_PROMPT_SUGGESTION_KEYBINDING;
-use crate::server::telemetry::InteractionSource;
-use crate::settings::InputSettings;
-use crate::terminal::view::passive_suggestions::PromptSuggestionResolution;
-use crate::util::bindings::keybinding_name_to_keystroke;
 use pathfinder_geometry::vector::vec2f;
+use serde::Serialize;
+use warp_core::ui::theme::color::internal_colors::{neutral_2, neutral_3};
 use warpui::elements::{
     ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Fill, Flex, HighlightedHyperlink, Hoverable, Icon, MainAxisAlignment, MainAxisSize,
-    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack,
-    Text,
+    MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius,
+    Shrinkable, Stack, Text,
 };
 use warpui::keymap::Keystroke;
 use warpui::platform::Cursor;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{elements::MouseStateHandle, Element};
-use warpui::{AppContext, Entity, EventContext, ModelHandle, ViewContext, ViewHandle};
-use warpui::{SingletonEntity, View};
+use warpui::{
+    AppContext, Element, Entity, EventContext, ModelHandle, SingletonEntity, View, ViewContext,
+    ViewHandle,
+};
 
-use crate::terminal::view::{InputType, PromptSuggestion};
-use crate::ui_components::blended_colors;
-use crate::{appearance::Appearance, terminal::view::TerminalAction};
-use warp_core::ui::theme::color::internal_colors::{neutral_2, neutral_3};
-
-use crate::ui_components::icons::Icon as WarpUIIcon;
-
+use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{PassiveSuggestionTrigger, StaticQueryType};
+use crate::ai::blocklist::BlocklistAIInputModel;
+use crate::ai::blocklist::prompt::prompt_alert::{PromptAlertState, PromptAlertView};
+use crate::ai::predict::prompt_suggestions::ACCEPT_PROMPT_SUGGESTION_KEYBINDING;
+use crate::appearance::Appearance;
+use crate::server::telemetry::InteractionSource;
+use crate::settings::InputSettings;
+use crate::terminal::view::passive_suggestions::PromptSuggestionResolution;
+use crate::terminal::view::{InputType, PromptSuggestion, TerminalAction};
+use crate::ui_components::blended_colors;
+use crate::ui_components::icons::Icon as WarpUIIcon;
+use crate::util::bindings::keybinding_name_to_keystroke;
+
 const INLINE_BANNER_SPACING: f32 = 8.;
 const INLINE_BANNER_BUTTON_PADDING: f32 = 8.;
 
@@ -232,33 +232,34 @@ fn render_button(
         let mut stack = Stack::new();
         stack.add_child(container.finish());
 
-        if is_button_disabled && mouse_state.is_hovered() {
-            if let Some(tooltip_text) = get_tooltip_text_for_alert_state(prompt_alert_state) {
-                let tooltip = appearance
-                    .ui_builder()
-                    .tool_tip(tooltip_text)
-                    .with_style(UiComponentStyles {
-                        font_size: Some(appearance.monospace_font_size() - 4.),
-                        padding: Some(Coords {
-                            top: 4.,
-                            bottom: 4.,
-                            left: 8.,
-                            right: 8.,
-                        }),
-                        background: Some(theme.tooltip_background().into()),
-                        font_color: Some(theme.background().into_solid()),
-                        ..Default::default()
-                    })
-                    .build()
-                    .finish();
-                let tooltip_offset = OffsetPositioning::offset_from_parent(
-                    vec2f(0., 4.),
-                    ParentOffsetBounds::WindowByPosition,
-                    ParentAnchor::BottomMiddle,
-                    ChildAnchor::TopMiddle,
-                );
-                stack.add_positioned_overlay_child(tooltip, tooltip_offset);
-            }
+        if is_button_disabled
+            && mouse_state.is_hovered()
+            && let Some(tooltip_text) = get_tooltip_text_for_alert_state(prompt_alert_state)
+        {
+            let tooltip = appearance
+                .ui_builder()
+                .tool_tip(tooltip_text)
+                .with_style(UiComponentStyles {
+                    font_size: Some(appearance.monospace_font_size() - 4.),
+                    padding: Some(Coords {
+                        top: 4.,
+                        bottom: 4.,
+                        left: 8.,
+                        right: 8.,
+                    }),
+                    background: Some(theme.tooltip_background().into()),
+                    font_color: Some(theme.background().into_solid()),
+                    ..Default::default()
+                })
+                .build()
+                .finish();
+            let tooltip_offset = OffsetPositioning::offset_from_parent(
+                vec2f(0., 4.),
+                ParentOffsetBounds::WindowByPosition,
+                ParentAnchor::BottomMiddle,
+                ChildAnchor::TopMiddle,
+            );
+            stack.add_positioned_overlay_child(tooltip, tooltip_offset);
         }
 
         ConstrainedBox::new(stack.finish())
@@ -345,7 +346,7 @@ impl View for PromptSuggestionsView {
                 1.0,
                 render_button(
                     prompt_suggestion.label().clone(),
-                    WarpUIIcon::Oz,
+                    WarpUIIcon::Agent,
                     0,
                     keybinding_name_to_keystroke(ACCEPT_PROMPT_SUGGESTION_KEYBINDING, app),
                     banner_state.accept_button_mouse_state.clone(),

@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use crate::terminal::event::Event as TerminalEvent;
 use async_channel::Sender;
+
+use crate::terminal::event::Event as TerminalEvent;
 
 /// A wrapper struct that emits events which originate from the PTY event loop.
 /// Instead of passing individual senders, we can pass through this struct
@@ -67,18 +68,17 @@ impl ChannelEventListener {
         // active receivers. This avoids an unnecessary allocation of the bytes vector.
         // Note that we don't simply close the sending side since receivers
         // might come alive at some point in the future.
-        if self.pty_reads_tx.receiver_count() > 0 {
-            if let Err(e) = self.pty_reads_tx.try_broadcast(Arc::new(bytes.to_vec())) {
-                log::warn!("Failed to send pty read event: {e:?}");
-            }
+        if self.pty_reads_tx.receiver_count() > 0
+            && let Err(e) = self.pty_reads_tx.try_broadcast(Arc::new(bytes.to_vec()))
+        {
+            log::warn!("Failed to send pty read event: {e:?}");
         }
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
 mod testing;
+#[cfg(any(test, feature = "test-util"))]
+pub use testing::*;
 
 use crate::terminal::model::terminal_model::HandlerEvent;
-
-#[cfg(test)]
-pub use testing::*;

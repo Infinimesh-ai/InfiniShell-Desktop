@@ -28,70 +28,64 @@ pub mod output;
 pub mod query;
 mod todos;
 
+use std::collections::{HashMap, HashSet};
+
 use common::get_highlight_ranges_for_find_matches;
+use itertools::Itertools;
 use pathfinder_color::ColorU;
 use settings::Setting as _;
-use std::collections::{HashMap, HashSet};
 use warp_core::features::FeatureFlag;
 use warp_core::semantic_selection::SemanticSelection;
-use warpui::elements::{
-    Align, ConstrainedBox, CornerRadius, CrossAxisAlignment, Empty, Expanded, FormattedTextElement,
-    Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, Radius, SavePosition,
-    SelectableArea,
-};
-use warpui::{
-    elements::{Border, Container, Flex, ParentElement},
-    AppContext, Element, SingletonEntity,
-};
-use warpui::{View, ViewContext};
-
-use crate::ai::agent::AIAgentCitation;
-use crate::ai::agent::AIAgentInput;
-use crate::ai::blocklist::block::view_impl::header::{
-    render_overflow_menu_button, OVERFLOW_BUTTON_SIZE,
-};
-use crate::ai::blocklist::inline_action::inline_action_icons::icon_size;
-use crate::ai::blocklist::model::AIBlockModelHelper;
-use crate::appearance::Appearance;
-use crate::settings::{AISettings, InputModeSettings, InputSettings};
-use crate::terminal::model::blocks::{BlockHeightItem, RemovableBlocklistItem, RichContentItem};
-use crate::terminal::model::rich_content::RichContentType;
-use crate::terminal::TerminalView;
-use crate::util::truncation::truncate_from_end;
-
-use super::secret_redaction::SecretRedactionState;
-use super::{
-    attachment_names, AIBlock, AIBlockAction, DISPATCHED_REQUESTED_EDIT_KEYMAP_CONTEXT,
-    HAS_PENDING_ACTION, RICH_CONTENT_SECRET_FIRST_CHAR_POSITION_ID,
-};
-
-use super::TextLocation;
-use crate::ai::blocklist::block::view_impl::comments::address_comment_chips;
-use crate::ai::blocklist::block::{DetectedLinksState, RICH_CONTENT_LINK_FIRST_CHAR_POSITION_ID};
-use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
-use crate::cloud_object::model::persistence::ObjectStoreModel;
-
-use crate::settings_view::SettingsSection;
-use crate::terminal::block_list_element::BlockListMenuSource;
-use crate::terminal::grid_renderer::URL_COLOR;
-use crate::terminal::model::ObfuscateSecrets;
-use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
-use crate::terminal::view::TerminalAction;
-use crate::ui_components::blended_colors;
-use crate::ui_components::icons::Icon;
-use crate::util::link_detection::DetectedLinkType;
-use crate::workspace::WorkspaceAction;
-use itertools::Itertools;
-use warp_core::ui::color::contrast::{
-    foreground_color_with_minimum_contrast, MinimumAllowedContrast,
-};
 use warp_core::ui::color::Rgb;
+use warp_core::ui::color::contrast::{
+    MinimumAllowedContrast, foreground_color_with_minimum_contrast,
+};
 use warp_core::ui::theme::{Fill, WarpTheme};
-use warpui::elements::{Highlight, HighlightedRange, Text};
+use warpui::elements::{
+    Align, Border, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
+    Expanded, Flex, FormattedTextElement, Highlight, HighlightedRange, Hoverable,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, SavePosition,
+    SelectableArea, Text,
+};
 use warpui::fonts::Properties;
 use warpui::platform::Cursor;
 use warpui::text_layout::TextStyle;
 use warpui::ui_components::components::UiComponent;
+use warpui::{AppContext, Element, SingletonEntity, View, ViewContext};
+
+use super::secret_redaction::SecretRedactionState;
+use super::{
+    AIBlock, AIBlockAction, DISPATCHED_REQUESTED_EDIT_KEYMAP_CONTEXT, HAS_PENDING_ACTION,
+    RICH_CONTENT_SECRET_FIRST_CHAR_POSITION_ID, TextLocation, attachment_names,
+};
+use crate::ai::agent::{AIAgentCitation, AIAgentInput};
+use crate::ai::blocklist::block::DetectedLinksState;
+use crate::ai::blocklist::block::view_impl::comments::address_comment_chips;
+use crate::ai::blocklist::block::view_impl::header::{
+    OVERFLOW_BUTTON_SIZE, render_overflow_menu_button,
+};
+use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
+use crate::ai::blocklist::inline_action::inline_action_icons::icon_size;
+use crate::ai::blocklist::model::AIBlockModelHelper;
+use crate::appearance::Appearance;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::settings::{AISettings, InputModeSettings, InputSettings};
+use crate::settings_view::SettingsSection;
+use crate::terminal::TerminalView;
+use crate::terminal::block_list_element::BlockListMenuSource;
+use crate::terminal::grid_renderer::URL_COLOR;
+use crate::terminal::model::ObfuscateSecrets;
+use crate::terminal::model::blocks::{BlockHeightItem, RemovableBlocklistItem, RichContentItem};
+use crate::terminal::model::rich_content::RichContentType;
+use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
+use crate::terminal::view::TerminalAction;
+use crate::terminal::view::ambient_agent::is_cloud_agent_pre_first_exchange;
+use crate::ui_components::blended_colors;
+use crate::ui_components::icons::Icon;
+use crate::util::link_detection::DetectedLinkType;
+use crate::util::truncation::truncate_from_end;
+use crate::view_components::dropdown::DropdownItemAction;
+use crate::workspace::WorkspaceAction;
 
 /// Helper function to create gray strikethrough highlight for secrets
 fn create_secret_gray_highlight() -> Highlight {
@@ -175,72 +169,71 @@ fn add_highlights_to_text(
         Highlight::new().with_text_style(TextStyle::new().with_foreground_color(*URL_COLOR));
     let mut highlighted_ranges = vec![];
 
-    if let Some(open_secret_tooltip) = &secret_redaction_state.open_tooltip_location() {
-        if open_secret_tooltip.location == location {
-            text_element = text_element.with_saved_char_position(
-                open_secret_tooltip.secret_range.char_range.start,
-                RICH_CONTENT_SECRET_FIRST_CHAR_POSITION_ID.to_owned(),
-            );
-        }
+    if let Some(open_secret_tooltip) = &secret_redaction_state.open_tooltip_location()
+        && open_secret_tooltip.location == location
+    {
+        text_element = text_element.with_saved_char_position(
+            open_secret_tooltip.secret_range.char_range.start,
+            RICH_CONTENT_SECRET_FIRST_CHAR_POSITION_ID.to_owned(),
+        );
     }
 
     // Add gray + strikethrough styling for all detected secrets when in strikethrough mode
-    if let Some(detected_secrets) = secret_redaction_state.secrets_for_location(&location) {
-        if matches!(
+    if let Some(detected_secrets) = secret_redaction_state.secrets_for_location(&location)
+        && matches!(
             get_secret_obfuscation_mode(app),
             ObfuscateSecrets::Strikethrough
-        ) {
-            for secret_range in detected_secrets.detected_secrets.keys() {
-                // Skip gray styling if this secret is currently hovered or has tooltip open
-                if !secret_redaction_state.is_hovered(&location, secret_range)
-                    && !secret_redaction_state.has_open_tooltip(&location, secret_range)
-                {
-                    let highlight_indices = secret_range.char_range.clone().collect_vec();
-                    if highlight_indices.is_empty() {
-                        continue;
-                    }
-                    highlighted_ranges.push(HighlightedRange {
-                        highlight: create_secret_gray_highlight(),
-                        highlight_indices,
-                    });
+        )
+    {
+        for secret_range in detected_secrets.detected_secrets.keys() {
+            // Skip gray styling if this secret is currently hovered or has tooltip open
+            if !secret_redaction_state.is_hovered(&location, secret_range)
+                && !secret_redaction_state.has_open_tooltip(&location, secret_range)
+            {
+                let highlight_indices = secret_range.char_range.clone().collect_vec();
+                if highlight_indices.is_empty() {
+                    continue;
                 }
+                highlighted_ranges.push(HighlightedRange {
+                    highlight: create_secret_gray_highlight(),
+                    highlight_indices,
+                });
             }
         }
     }
 
     // If we have an open tooltip, that secret should be highlighted.
-    if let Some(open_secret_tooltip) = &secret_redaction_state.open_tooltip_location() {
-        if open_secret_tooltip.location == location {
-            let highlight_indices = open_secret_tooltip
-                .secret_range
-                .char_range
-                .clone()
-                .collect_vec();
-            if !highlight_indices.is_empty() {
-                highlighted_ranges.push(HighlightedRange {
-                    highlight: secret_hover_click_highlight,
-                    highlight_indices,
-                });
-            }
+    if let Some(open_secret_tooltip) = &secret_redaction_state.open_tooltip_location()
+        && open_secret_tooltip.location == location
+    {
+        let highlight_indices = open_secret_tooltip
+            .secret_range
+            .char_range
+            .clone()
+            .collect_vec();
+        if !highlight_indices.is_empty() {
+            highlighted_ranges.push(HighlightedRange {
+                highlight: secret_hover_click_highlight,
+                highlight_indices,
+            });
         }
     }
     // Also highlight any currently hovered secret if it's different.
-    if let Some(currently_hovered_secret) = &secret_redaction_state.hovered_location() {
-        if currently_hovered_secret.location == location
-            && secret_redaction_state.hovered_location()
-                != secret_redaction_state.open_tooltip_location()
-        {
-            let highlight_indices = currently_hovered_secret
-                .secret_range
-                .char_range
-                .clone()
-                .collect_vec();
-            if !highlight_indices.is_empty() {
-                highlighted_ranges.push(HighlightedRange {
-                    highlight: secret_hover_click_highlight,
-                    highlight_indices,
-                });
-            }
+    if let Some(currently_hovered_secret) = &secret_redaction_state.hovered_location()
+        && currently_hovered_secret.location == location
+        && secret_redaction_state.hovered_location()
+            != secret_redaction_state.open_tooltip_location()
+    {
+        let highlight_indices = currently_hovered_secret
+            .secret_range
+            .char_range
+            .clone()
+            .collect_vec();
+        if !highlight_indices.is_empty() {
+            highlighted_ranges.push(HighlightedRange {
+                highlight: secret_hover_click_highlight,
+                highlight_indices,
+            });
         }
     }
 
@@ -251,35 +244,33 @@ fn add_highlights_to_text(
 
         // Link highlighting.
         // If we have an open tooltip, that link should be highlighted.
-        if let Some(open_link_tooltip) = &detected_links_state.link_location_open_tooltip {
-            if open_link_tooltip.location == location {
-                let highlight_indices = open_link_tooltip.link_range.clone().collect_vec();
-                if !highlight_indices.is_empty() {
-                    highlighted_ranges.push(HighlightedRange {
-                        highlight: link_highlight,
-                        highlight_indices,
-                    });
-                }
-                text_element = text_element.with_saved_char_position(
-                    open_link_tooltip.link_range.start,
-                    RICH_CONTENT_LINK_FIRST_CHAR_POSITION_ID.to_owned(),
-                );
+        if let Some(open_link_tooltip) = &detected_links_state.link_location_open_tooltip
+            && open_link_tooltip.location == location
+        {
+            let highlight_indices = open_link_tooltip.link_range.clone().collect_vec();
+            if !highlight_indices.is_empty() {
+                highlighted_ranges.push(HighlightedRange {
+                    highlight: link_highlight,
+                    highlight_indices,
+                });
             }
+            text_element = text_element.with_saved_char_position(
+                open_link_tooltip.link_range.start,
+                detected_links_state.resolved_tooltip_position_id(),
+            );
         }
         // Also highlight any currently hovered link if it's different.
         if let Some(currently_hovered_link) = &detected_links_state.currently_hovered_link_location
+            && currently_hovered_link.location == location
+            && detected_links_state.currently_hovered_link_location
+                != detected_links_state.link_location_open_tooltip
         {
-            if currently_hovered_link.location == location
-                && detected_links_state.currently_hovered_link_location
-                    != detected_links_state.link_location_open_tooltip
-            {
-                let highlight_indices = currently_hovered_link.link_range.clone().collect_vec();
-                if !highlight_indices.is_empty() {
-                    highlighted_ranges.push(HighlightedRange {
-                        highlight: link_highlight,
-                        highlight_indices,
-                    });
-                }
+            let highlight_indices = currently_hovered_link.link_range.clone().collect_vec();
+            if !highlight_indices.is_empty() {
+                highlighted_ranges.push(HighlightedRange {
+                    highlight: link_highlight,
+                    highlight_indices,
+                });
             }
         }
 
@@ -481,21 +472,19 @@ pub(crate) fn add_highlights_to_rich_text(
                             link_highlight_location = None;
                         }
 
-                        if let Some(link_location) = link_highlight_location {
-                            if link_location.location == location
-                                && link_location.link_range == *range
-                            {
-                                let hover_highlight =
-                                    if matches!(link.link, DetectedLinkType::Url(_)) {
-                                        url_hover_click_highlight
-                                    } else {
-                                        file_hover_click_highlight
-                                    };
-                                return Some(HighlightedRange {
-                                    highlight_indices,
-                                    highlight: hover_highlight,
-                                });
-                            }
+                        if let Some(link_location) = link_highlight_location
+                            && link_location.location == location
+                            && link_location.link_range == *range
+                        {
+                            let hover_highlight = if matches!(link.link, DetectedLinkType::Url(_)) {
+                                url_hover_click_highlight
+                            } else {
+                                file_hover_click_highlight
+                            };
+                            return Some(HighlightedRange {
+                                highlight_indices,
+                                highlight: hover_highlight,
+                            });
                         }
 
                         if matches!(link.link, DetectedLinkType::Url(_)) {
@@ -510,47 +499,27 @@ pub(crate) fn add_highlights_to_rich_text(
                     .collect_vec();
             }
 
-            if let Some(open_link_tooltip) = &detected_links_state.link_location_open_tooltip {
-                if open_link_tooltip.location == location {
-                    formatted_text_element = formatted_text_element.with_saved_glyph_position(
-                        open_link_tooltip.link_range.start,
-                        i,
-                        RICH_CONTENT_LINK_FIRST_CHAR_POSITION_ID.to_owned(),
-                    );
-                }
-            }
-        }
-
-        if let Some(open_secret_tooltip) = &secret_redaction_state.open_tooltip_location() {
-            if open_secret_tooltip.location == location {
-                formatted_text_element = formatted_text_element.with_saved_glyph_position(
-                    open_secret_tooltip.secret_range.char_range.start,
-                    i,
-                    RICH_CONTENT_SECRET_FIRST_CHAR_POSITION_ID.to_owned(),
-                );
-                if !is_selecting {
-                    let highlight_indices = open_secret_tooltip
-                        .secret_range
-                        .char_range
-                        .clone()
-                        .collect_vec();
-                    if !highlight_indices.is_empty() {
-                        style_ranges.push(HighlightedRange {
-                            highlight_indices,
-                            highlight: secret_hover_click_highlight,
-                        });
-                    }
-                }
-            }
-        }
-
-        // Also highlight any currently hovered secret if it's different.
-        if let Some(currently_hovered_secret) = &secret_redaction_state.hovered_location() {
-            if currently_hovered_secret.location == location
-                && secret_redaction_state.hovered_location()
-                    != secret_redaction_state.open_tooltip_location()
+            if let Some(open_link_tooltip) = &detected_links_state.link_location_open_tooltip
+                && open_link_tooltip.location == location
             {
-                let highlight_indices = currently_hovered_secret
+                formatted_text_element = formatted_text_element.with_saved_glyph_position(
+                    open_link_tooltip.link_range.start,
+                    i,
+                    detected_links_state.resolved_tooltip_position_id(),
+                );
+            }
+        }
+
+        if let Some(open_secret_tooltip) = &secret_redaction_state.open_tooltip_location()
+            && open_secret_tooltip.location == location
+        {
+            formatted_text_element = formatted_text_element.with_saved_glyph_position(
+                open_secret_tooltip.secret_range.char_range.start,
+                i,
+                RICH_CONTENT_SECRET_FIRST_CHAR_POSITION_ID.to_owned(),
+            );
+            if !is_selecting {
+                let highlight_indices = open_secret_tooltip
                     .secret_range
                     .char_range
                     .clone()
@@ -564,26 +533,44 @@ pub(crate) fn add_highlights_to_rich_text(
             }
         }
 
+        // Also highlight any currently hovered secret if it's different.
+        if let Some(currently_hovered_secret) = &secret_redaction_state.hovered_location()
+            && currently_hovered_secret.location == location
+            && secret_redaction_state.hovered_location()
+                != secret_redaction_state.open_tooltip_location()
+        {
+            let highlight_indices = currently_hovered_secret
+                .secret_range
+                .char_range
+                .clone()
+                .collect_vec();
+            if !highlight_indices.is_empty() {
+                style_ranges.push(HighlightedRange {
+                    highlight_indices,
+                    highlight: secret_hover_click_highlight,
+                });
+            }
+        }
+
         // Add gray + strikethrough styling for all detected secrets in rich text
         if matches!(
             get_secret_obfuscation_mode(app),
             ObfuscateSecrets::Strikethrough
-        ) {
-            if let Some(detected_secrets) = secret_redaction_state.secrets_for_location(&location) {
-                for secret_range in detected_secrets.detected_secrets.keys() {
-                    // Skip gray styling if this secret is currently hovered or has tooltip open
-                    if !secret_redaction_state.is_hovered(&location, secret_range)
-                        && !secret_redaction_state.has_open_tooltip(&location, secret_range)
-                    {
-                        let highlight_indices = secret_range.char_range.clone().collect_vec();
-                        if highlight_indices.is_empty() {
-                            continue;
-                        }
-                        style_ranges.push(HighlightedRange {
-                            highlight: create_secret_gray_highlight(),
-                            highlight_indices,
-                        });
+        ) && let Some(detected_secrets) = secret_redaction_state.secrets_for_location(&location)
+        {
+            for secret_range in detected_secrets.detected_secrets.keys() {
+                // Skip gray styling if this secret is currently hovered or has tooltip open
+                if !secret_redaction_state.is_hovered(&location, secret_range)
+                    && !secret_redaction_state.has_open_tooltip(&location, secret_range)
+                {
+                    let highlight_indices = secret_range.char_range.clone().collect_vec();
+                    if highlight_indices.is_empty() {
+                        continue;
                     }
+                    style_ranges.push(HighlightedRange {
+                        highlight: create_secret_gray_highlight(),
+                        highlight_indices,
+                    });
                 }
             }
         }
@@ -672,7 +659,7 @@ pub fn render_citation(
         }
         AIAgentCitation::WarpDocumentation { .. } => {
             let icon = Icon::Zap.to_warpui_icon(theme.foreground()).finish();
-            let name = String::from("Zap Docs");
+            let name = String::from("InfiniShell Docs");
             (Some(icon), name)
         }
         AIAgentCitation::WebPage { url } => {
@@ -680,6 +667,15 @@ pub fn render_citation(
                 .to_warpui_icon(theme.foreground())
                 .finish();
             let name = url.clone();
+            (Some(icon), name)
+        }
+        AIAgentCitation::AgentMemory { content, .. } => {
+            let icon = Icon::Cognition.to_warpui_icon(theme.foreground()).finish();
+            let name = if content.is_empty() {
+                String::from("Memory")
+            } else {
+                content.clone()
+            };
             (Some(icon), name)
         }
     };
@@ -723,6 +719,76 @@ pub fn render_citation(
             .with_cursor(Cursor::PointingHand)
             .finish(),
     )
+}
+
+/// Renders the Ask-User-Question speedbump footer: a short description label, a
+/// dropdown for the `ask_user_question` permission, and a right-aligned
+/// "Manage AI Autonomy permissions" link. Matches the visual rhythm of
+/// [`render_autonomy_checkbox_setting_speedbump_footer`].
+pub fn render_autonomy_dropdown_setting_speedbump_footer<A>(
+    description: &'static str,
+    dropdown: &warpui::ViewHandle<crate::view_components::dropdown::Dropdown<A>>,
+    settings_link_handle: MouseStateHandle,
+    app: &AppContext,
+) -> Box<dyn Element>
+where
+    A: DropdownItemAction,
+{
+    let appearance = Appearance::as_ref(app);
+    let theme = appearance.theme();
+    Clipped::new(
+        Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_main_axis_size(MainAxisSize::Max)
+            .with_child(
+                Container::new(
+                    Text::new(
+                        description,
+                        appearance.ui_font_family(),
+                        appearance.monospace_font_size() - 1.,
+                    )
+                    .with_color(blended_colors::text_sub(theme, theme.surface_1()))
+                    .with_selectable(false)
+                    .finish(),
+                )
+                .with_margin_right(8.)
+                .finish(),
+            )
+            .with_child(
+                Container::new(warpui::elements::ChildView::new(dropdown).finish())
+                    .with_margin_right(8.)
+                    .finish(),
+            )
+            .with_child(
+                Expanded::new(
+                    1.,
+                    Align::new(
+                        appearance
+                            .ui_builder()
+                            .link(
+                                "Manage AI Autonomy permissions".into(),
+                                None,
+                                Some(Box::new(move |ctx| {
+                                    ctx.dispatch_typed_action(
+                                        WorkspaceAction::ShowSettingsPageWithSearch {
+                                            search_query: "Autonomy".to_string(),
+                                            section: Some(SettingsSection::AI),
+                                        },
+                                    );
+                                })),
+                                settings_link_handle,
+                            )
+                            .build()
+                            .finish(),
+                    )
+                    .right()
+                    .finish(),
+                )
+                .finish(),
+            )
+            .finish(),
+    )
+    .finish()
 }
 
 /// TODO: All AIBlock footer-related rendering logic should probably be put into its own View.
@@ -975,6 +1041,8 @@ impl View for AIBlock {
                                 state: &self.find_state,
                             },
                         ),
+                        is_agent_transcript_navigation_target: self
+                            .is_agent_transcript_navigation_target(),
                     },
                     app,
                 ) {
@@ -1016,7 +1084,21 @@ impl View for AIBlock {
         let terminal_model = self.terminal_model.lock();
         let shared_session_status = terminal_model.shared_session_status().clone();
         let is_conversation_transcript_viewer = terminal_model.is_conversation_transcript_viewer();
+
+        let is_cloud_agent_pre_first_exchange = is_cloud_agent_pre_first_exchange(
+            self.ambient_agent_view_model.as_ref(),
+            &self.agent_view_controller,
+            &terminal_model,
+            app,
+        );
         drop(terminal_model);
+
+        #[cfg(not(target_family = "wasm"))]
+        let is_cloud_agent_context = FeatureFlag::CloudMode.is_enabled()
+            && self
+                .ambient_agent_view_model
+                .as_ref()
+                .is_some_and(|model| model.as_ref(app).is_ambient_agent());
 
         contents.add_child(output::render(
             output::Props {
@@ -1024,6 +1106,7 @@ impl View for AIBlock {
                 state_handles: &self.state_handles,
                 action_buttons: &self.action_buttons,
                 action_model: &self.action_model,
+                active_session: &self.active_session,
                 editor_views: &self.code_editor_views,
                 current_working_directory: self.current_working_directory.as_ref(),
                 shell_launch_data: self.shell_launch_data.as_ref(),
@@ -1067,10 +1150,16 @@ impl View for AIBlock {
                 shared_session_status: &shared_session_status,
                 terminal_view_id: self.terminal_view_id,
                 is_conversation_transcript_viewer,
+                #[cfg(not(target_family = "wasm"))]
+                is_cloud_agent_context,
                 aws_bedrock_credentials_error_view: self
                     .aws_bedrock_credentials_error_view
                     .as_ref(),
+                gemini_enterprise_credentials_error_view: self
+                    .gemini_enterprise_credentials_error_view
+                    .as_ref(),
                 imported_comments: &self.imported_comments,
+                run_agents_card_views: &self.run_agents_card_views,
                 #[cfg(feature = "local_fs")]
                 resolved_code_block_paths: &self.resolved_code_block_paths,
                 #[cfg(feature = "local_fs")]
@@ -1078,9 +1167,10 @@ impl View for AIBlock {
                 thinking_display_mode: AISettings::as_ref(app).thinking_display_mode,
                 conversation_has_imported_comments: self
                     .model
-                    .is_latest_non_passive_exchange_in_root_task(app)
+                    .is_latest_visible_exchange_in_root_task(app)
                     && self.has_imported_comments_in_current_thread(app),
                 ask_user_question_view: self.ask_user_question_view.as_ref(),
+                is_cloud_agent_pre_first_exchange,
             },
             app,
         ));
@@ -1158,10 +1248,9 @@ impl View for AIBlock {
                     false
                 }
             });
-        let should_add_top_padding = !should_hide_first_block_query_and_header
-            && (contains_user_query_and_is_not_pin_to_top
-                || renders_below_requested_command_view
-                || (!is_previous_blocklist_item_ai_block && !self.is_passive_conversation(app)));
+        let should_add_top_padding = contains_user_query_and_is_not_pin_to_top
+            || renders_below_requested_command_view
+            || (!is_previous_blocklist_item_ai_block && !self.is_passive_conversation(app));
 
         if should_add_top_padding {
             content = content.with_padding_top(CONTENT_VERTICAL_PADDING);
@@ -1174,13 +1263,14 @@ impl View for AIBlock {
         let mut selectable = SelectableArea::new(
             self.state_handles.selection_handle.clone(),
             move |selection_args, ctx, _| {
-                let selection = selection_args.selection;
-                if let Some(selection) =
-                    selection.as_ref().filter(|selection| !selection.is_empty())
-                {
+                let selection = selection_args
+                    .selection
+                    .filter(|selection| !selection.is_empty());
+                if let Some(selection) = selection.as_ref() {
                     ctx.dispatch_typed_action(AIBlockAction::CopyOnSelect(selection.clone()));
                 }
                 *selected_text.write() = selection;
+                ctx.dispatch_typed_action(AIBlockAction::SelectText);
             },
             SavePosition::new(content.finish(), self.saved_position_id().as_str()).finish(),
         )
@@ -1317,14 +1407,14 @@ impl AIAgentInput {
             | AIAgentInput::TriggerPassiveSuggestion { .. }
             | AIAgentInput::CreateNewProject { .. }
             | AIAgentInput::CloneRepository { .. }
-            | AIAgentInput::FetchReviewComments { .. }
             | AIAgentInput::SummarizeConversation { .. }
             | AIAgentInput::InvokeSkill { .. }
             | AIAgentInput::StartFromAmbientRunPrompt { .. }
             | AIAgentInput::ActionResult { .. }
             | AIAgentInput::MessagesReceivedFromAgents { .. }
             | AIAgentInput::EventsFromAgents { .. }
-            | AIAgentInput::PassiveSuggestionResult { .. } => None,
+            | AIAgentInput::PassiveSuggestionResult { .. }
+            | AIAgentInput::OrchestrationConfigUpdate { .. } => None,
         }
     }
 }

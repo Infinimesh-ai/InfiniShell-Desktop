@@ -32,6 +32,16 @@ impl From<DateTime<Utc>> for ServerTimestamp {
     }
 }
 
+// Zap:`Revision` 已统一到 `cloud_objects::cloud_object::Revision`,它内部持有的是
+// `cloud_objects::server_time::ServerTimestamp`(与本类型结构一致的另一份实现)。
+// 原先 `impl From<Revision> for ServerTimestamp` 挂在被删掉的本地 `Revision` 上,
+// 这里在 app 侧补回,保证 `revision.into()` / `.map(Into::into)` 的调用点继续可用。
+impl From<cloud_objects::cloud_object::Revision> for ServerTimestamp {
+    fn from(revision: cloud_objects::cloud_object::Revision) -> Self {
+        ServerTimestamp::new(revision.utc())
+    }
+}
+
 /// 本地估算的服务端时间。
 ///
 /// Zap 不再请求云端 `/current_time`;启动路径用本地当前时间初始化,调用方仍可

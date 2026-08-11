@@ -13,10 +13,8 @@ pub(crate) mod prompt_suggestions;
 mod session_state;
 mod shared_sessions;
 mod shell_process_terminated;
-mod ssh;
 mod vim_mode;
 
-pub use self::prompt_suggestions::*;
 pub use agent_mode_setup::*;
 pub use alias_expansion::*;
 pub use aws_bedrock_login::*;
@@ -25,38 +23,28 @@ pub use notifications_discovery::*;
 pub use notifications_error::*;
 pub use open_in_warp::*;
 pub use passive_code_diff::*;
+use pathfinder_color::ColorU;
 pub use session_state::*;
 pub use shared_sessions::*;
 pub use shell_process_terminated::*;
-pub use ssh::*;
 pub use vim_mode::*;
-
-use pathfinder_color::ColorU;
-use warpui::elements::Clipped;
-use warpui::{
-    elements::{
-        Align, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Icon,
-        MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, SavePosition,
-        Shrinkable, Text,
-    },
-    fonts::{FamilyId, Properties, Weight},
-    ui_components::{
-        button::ButtonVariant,
-        components::{Coords, UiComponent, UiComponentStyles},
-    },
-    Element,
+use warpui::Element;
+use warpui::elements::{
+    Align, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Icon,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, SavePosition,
+    Shrinkable, Text,
 };
+use warpui::fonts::{FamilyId, Properties, Weight};
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
+pub use self::prompt_suggestions::*;
+use crate::appearance::Appearance;
+use crate::terminal::view::TerminalAction;
+use crate::themes::theme::Blend;
 use crate::ui_components::buttons::icon_button;
 use crate::ui_components::icons::Icon as UiIcon;
-
-use crate::util::color::{MinimumAllowedContrast, Opacity};
-use crate::{
-    appearance::Appearance,
-    terminal::view::TerminalAction,
-    themes::theme::Blend,
-    util::color::{coloru_with_opacity, ContrastingColor},
-};
+use crate::util::color::{ContrastingColor, MinimumAllowedContrast, Opacity, coloru_with_opacity};
 
 pub const INLINE_BANNER_BUTTON_PADDING: f32 = 4.0;
 const INLINE_BANNER_MARGIN: f32 = 20.0;

@@ -20,9 +20,9 @@ APP_DIR="$DIST_DIR/AppDir"
 if [ "$RELEASE_CHANNEL" = "oss" ]; then
   CHANNEL_SUFFIX=""
   if [ "$ARTIFACT" = "app" ]; then
-    PACKAGE_NAME="zap"
+    PACKAGE_NAME="infinishell"
   else
-    PACKAGE_NAME="zap-cli"
+    PACKAGE_NAME="infinishell-cli"
   fi
   OPT_DIR="/opt/$PACKAGE_NAME"
 elif [ "$ARTIFACT" = "cli" ]; then

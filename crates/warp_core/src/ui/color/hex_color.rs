@@ -1,6 +1,8 @@
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{borrow::Cow, fmt};
-use warpui::color::ColorU;
+use std::borrow::Cow;
+use std::fmt;
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
+use warpui_core::color::ColorU;
 
 use super::OPAQUE;
 

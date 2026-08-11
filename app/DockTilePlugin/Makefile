@@ -1,5 +1,5 @@
-BUNDLE_NAME = ZapDockTilePlugin.docktileplugin
-OBJC_FILES = ZapDockTilePlugin.m
+BUNDLE_NAME = InfiniShellDockTilePlugin.docktileplugin
+OBJC_FILES = InfiniShellDockTilePlugin.m
 FRAMEWORKS = -framework Cocoa -framework AppKit -framework Foundation
 # Compile a universal binary for both arm64 and x86_64.
 CFLAGS = -fobjc-arc -bundle -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET) -arch arm64 -arch x86_64
@@ -11,7 +11,7 @@ all: $(BUNDLE_NAME)
 
 $(BUNDLE_NAME): $(OBJC_FILES)
 	mkdir -p $(BUNDLE_NAME)/Contents/MacOS
-	clang $(CFLAGS) $(LDFLAGS) $(FRAMEWORKS) $(OBJC_FILES) -o $(BUNDLE_NAME)/Contents/MacOS/ZapDockTilePlugin
+	clang $(CFLAGS) $(LDFLAGS) $(FRAMEWORKS) $(OBJC_FILES) -o $(BUNDLE_NAME)/Contents/MacOS/InfiniShellDockTilePlugin
 	cp Info.plist $(BUNDLE_NAME)/Contents/
 	mkdir -p $(BUNDLE_NAME)/Contents/Resources
 	cp Resources/* $(BUNDLE_NAME)/Contents/Resources/

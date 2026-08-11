@@ -1,4 +1,4 @@
-﻿use std::sync::Arc;
+use std::sync::Arc;
 
 use remote_server::auth::RemoteServerAuthContext;
 use warpui::r#async::BoxFuture;

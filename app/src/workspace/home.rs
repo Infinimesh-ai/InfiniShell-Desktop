@@ -8,9 +8,9 @@ use warpui::ViewContext;
 use super::view::Workspace;
 use crate::pane_group::{AnyPaneContent, FilePane};
 
-const WARP_HOME_TITLE: &str = "Welcome to Zap";
+const WARP_HOME_TITLE: &str = "Welcome to InfiniShell";
 const WARP_HOME_CONTENT: &str = r#"
-Welcome to Zap.
+Welcome to InfiniShell.
 
 Use this local workspace to:
 * Create, view, and edit Zap Drive objects

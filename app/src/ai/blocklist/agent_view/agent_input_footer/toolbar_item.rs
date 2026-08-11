@@ -130,7 +130,9 @@ impl AgentToolbarItemKind {
             Self::NLDToggle => Some(Icon::NLD),
             Self::VoiceInput => Some(Icon::Microphone),
             Self::FileAttach => Some(Icon::Plus),
-            Self::ContextWindowUsage => Some(Icon::ConversationContext0),
+            // 上游把 `ConversationContext{N}`(已用百分比)改名为 `ContextRemaining{N}`
+            // (剩余百分比),语义取反:旧的 `ConversationContext0` 等价于 `ContextRemaining100`。
+            Self::ContextWindowUsage => Some(Icon::ContextRemaining100),
             Self::FileExplorer => Some(Icon::FileCopy),
             Self::RichInput => Some(Icon::TextInput),
             Self::ShareSession => Some(Icon::Phone01),

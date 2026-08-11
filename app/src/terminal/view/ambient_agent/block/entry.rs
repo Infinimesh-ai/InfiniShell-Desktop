@@ -48,8 +48,10 @@ impl AmbientAgentEntryBlock {
         pane_stack: WeakModelHandle<PaneStack<TerminalView>>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
-        let view_model = terminal_view.as_ref(ctx).ambient_agent_view_model().clone();
-        ctx.subscribe_to_model(&view_model, Self::handle_ambient_agent_view_model_event);
+        // `ambient_agent_view_model` 现在是 `Option`,pane 未承载 ambient agent 时不订阅。
+        if let Some(view_model) = terminal_view.as_ref(ctx).ambient_agent_view_model().cloned() {
+            ctx.subscribe_to_model(&view_model, Self::handle_ambient_agent_view_model_event);
+        }
 
         let pane_configuration = terminal_view.as_ref(ctx).pane_configuration().clone();
         ctx.subscribe_to_model(&pane_configuration, Self::handle_pane_configuration_event);
@@ -106,16 +108,21 @@ impl AmbientAgentEntryBlock {
             .unwrap_or_else(|| "New agent".to_owned())
     }
 
-    fn ambient_agent_view_model<'a>(&self, app: &'a AppContext) -> &'a AmbientAgentViewModel {
-        self.terminal_view
-            .as_ref(app)
-            .ambient_agent_view_model()
-            .as_ref(app)
+    fn ambient_agent_view_model<'a>(
+        &self,
+        app: &'a AppContext,
+    ) -> Option<&'a AmbientAgentViewModel> {
+        Some(
+            self.terminal_view
+                .as_ref(app)
+                .ambient_agent_view_model()?
+                .as_ref(app),
+        )
     }
 
     /// Gets the detail text to display based on the ambient agent status.
     fn detail_text(&self, app: &AppContext) -> Option<&'static str> {
-        match self.ambient_agent_view_model(app).status() {
+        match self.ambient_agent_view_model(app)?.status() {
             Status::NotAmbientAgent | Status::Setup | Status::Composing => None,
             Status::WaitingForSession { .. } => Some("Starting environment..."),
             Status::AgentRunning => Some("Agent is working on task"),
@@ -134,16 +141,16 @@ impl AmbientAgentEntryBlock {
         let theme = appearance.theme();
 
         let view_model = self.ambient_agent_view_model(app);
-        let (icon, color) = if view_model.is_failed() {
+        let (icon, color) = if view_model.is_some_and(|vm| vm.is_failed()) {
             (Icon::AlertTriangle, theme.ui_error_color())
-        } else if view_model.is_needs_github_auth() {
+        } else if view_model.is_some_and(|vm| vm.is_needs_github_auth()) {
             (Icon::Info, blended_colors::accent(theme).into_solid())
-        } else if view_model.is_cancelled() {
+        } else if view_model.is_some_and(|vm| vm.is_cancelled()) {
             (
                 Icon::Cancelled,
                 theme.disabled_text_color(theme.background()).into_solid(),
             )
-        } else if view_model.is_waiting_for_session() {
+        } else if view_model.is_some_and(|vm| vm.is_waiting_for_session()) {
             (Icon::ClockLoader, theme.ansi_fg_magenta())
         } else {
             (

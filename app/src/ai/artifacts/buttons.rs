@@ -6,9 +6,8 @@ use warp_core::ui::theme::AnsiColorIdentifier;
 use warpui::elements::{ChildView, Element, Empty, ParentElement, Wrap};
 use warpui::{AppContext, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
-use crate::terminal::input::MenuPositioning;
-
 use super::Artifact;
+use crate::terminal::input::MenuPositioning;
 use crate::view_components::action_button::{
     ActionButton, ActionButtonTheme, ButtonSize, SecondaryTheme, TooltipAlignment,
 };
@@ -181,6 +180,9 @@ fn collect_buttons(
                 // artifacts cannot be fetched. Keep deserialization for legacy history,
                 // but do not render buttons that can only fail.
             }
+            // External references are reported for reverse-lookup and have no
+            // actionable button in the artifact row.
+            Artifact::ExternalReference { .. } => {}
         }
     }
 

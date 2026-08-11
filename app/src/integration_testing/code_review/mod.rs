@@ -1,10 +1,5 @@
-use std::path::{Path, PathBuf};
-
-use warpui::{
-    async_assert,
-    integration::{AssertionCallback, AssertionOutcome, TestStep},
-    App, ViewHandle, WindowId,
-};
+use warpui::integration::{AssertionCallback, AssertionOutcome, TestStep};
+use warpui::{App, ViewHandle, WindowId, async_assert};
 
 use crate::code_review::code_review_view::{CodeReviewView, CodeReviewVisibleAnchorForTest};
 
@@ -52,7 +47,7 @@ pub fn assert_code_review_loaded() -> AssertionCallback {
 }
 
 pub fn assert_code_review_anchor(
-    expected_file_path: impl Into<PathBuf>,
+    expected_file_path: impl Into<String>,
     expected_text: impl Into<String>,
     expected_line_number: Option<usize>,
 ) -> AssertionCallback {
@@ -74,7 +69,7 @@ pub fn assert_code_review_anchor(
 
             assert_anchor(
                 &anchor,
-                expected_file_path.as_path(),
+                &expected_file_path,
                 &expected_text,
                 expected_line_number,
             )
@@ -82,7 +77,7 @@ pub fn assert_code_review_anchor(
     })
 }
 
-pub fn scroll_code_review_to_line(file_path: impl Into<PathBuf>, line_number: usize) -> TestStep {
+pub fn scroll_code_review_to_line(file_path: impl Into<String>, line_number: usize) -> TestStep {
     let file_path = file_path.into();
 
     TestStep::new("Scroll code review to a file line").with_action(move |app, window_id, _| {
@@ -94,7 +89,7 @@ pub fn scroll_code_review_to_line(file_path: impl Into<PathBuf>, line_number: us
 }
 
 pub fn assert_code_review_line_text(
-    expected_file_path: impl Into<PathBuf>,
+    expected_file_path: impl Into<String>,
     line_number: usize,
     expected_text: impl Into<String>,
 ) -> AssertionCallback {
@@ -109,18 +104,16 @@ pub fn assert_code_review_line_text(
         };
         code_review_view.read(app, |code_review_view, ctx| {
             let Some(line_text) =
-                code_review_view.line_text_for_test(expected_file_path.as_path(), line_number, ctx)
+                code_review_view.line_text_for_test(&expected_file_path, line_number, ctx)
             else {
                 return AssertionOutcome::failure(format!(
-                    "expected code review line {line_number} for {:?} to be available",
-                    expected_file_path
+                    "expected code review line {line_number} for {expected_file_path:?} to be available",
                 ));
             };
 
             if line_text != expected_text {
                 return AssertionOutcome::failure(format!(
-                    "expected line {line_number} in {:?} to be {expected_text:?}, got {line_text:?}",
-                    expected_file_path
+                    "expected line {line_number} in {expected_file_path:?} to be {expected_text:?}, got {line_text:?}",
                 ));
             }
 
@@ -131,14 +124,14 @@ pub fn assert_code_review_line_text(
 
 fn assert_anchor(
     anchor: &CodeReviewVisibleAnchorForTest,
-    expected_file_path: &Path,
+    expected_file_path: &str,
     expected_text: &str,
     expected_line_number: Option<usize>,
 ) -> AssertionOutcome {
     if anchor.file_path != expected_file_path {
         return AssertionOutcome::failure(format!(
-            "expected anchor file to be {:?}, got {:?}",
-            expected_file_path, anchor.file_path
+            "expected anchor file to be {expected_file_path:?}, got {:?}",
+            anchor.file_path
         ));
     }
     if anchor.line_text != expected_text {
@@ -147,19 +140,19 @@ fn assert_anchor(
             anchor.line_text
         ));
     }
-    if let Some(expected_line_number) = expected_line_number {
-        if anchor.line_number != expected_line_number {
-            return AssertionOutcome::failure(format!(
-                "expected anchor line number to be {expected_line_number}, got {}",
-                anchor.line_number
-            ));
-        }
+    if let Some(expected_line_number) = expected_line_number
+        && anchor.line_number != expected_line_number
+    {
+        return AssertionOutcome::failure(format!(
+            "expected anchor line number to be {expected_line_number}, got {}",
+            anchor.line_number
+        ));
     }
 
     AssertionOutcome::Success
 }
 
-pub fn scroll_code_review_to_header(file_path: impl Into<PathBuf>) -> TestStep {
+pub fn scroll_code_review_to_header(file_path: impl Into<String>) -> TestStep {
     let file_path = file_path.into();
 
     TestStep::new("Scroll code review to header region").with_action(move |app, window_id, _| {
@@ -170,7 +163,7 @@ pub fn scroll_code_review_to_header(file_path: impl Into<PathBuf>) -> TestStep {
     })
 }
 
-pub fn scroll_code_review_to_footer(file_path: impl Into<PathBuf>) -> TestStep {
+pub fn scroll_code_review_to_footer(file_path: impl Into<String>) -> TestStep {
     let file_path = file_path.into();
 
     TestStep::new("Scroll code review to footer region").with_action(move |app, window_id, _| {
@@ -182,7 +175,7 @@ pub fn scroll_code_review_to_footer(file_path: impl Into<PathBuf>) -> TestStep {
 }
 
 pub fn scroll_code_review_to_deleted_range(
-    file_path: impl Into<PathBuf>,
+    file_path: impl Into<String>,
     near_line: usize,
 ) -> TestStep {
     let file_path = file_path.into();
@@ -218,5 +211,79 @@ pub fn assert_code_review_scroll_region(expected_region: ScrollRegion) -> Assert
             }
             AssertionOutcome::Success
         })
+    })
+}
+
+/// Polls until the given file's diff editor has at least `min` collapsed hidden
+/// sections. Use this to wait for the diff to lay out before interacting.
+pub fn assert_min_hidden_sections(
+    expected_file_path: impl Into<String>,
+    min: usize,
+) -> AssertionCallback {
+    let expected_file_path = expected_file_path.into();
+
+    Box::new(move |app, window_id| {
+        let Some(code_review_view) = try_single_code_review_view(app, window_id) else {
+            return AssertionOutcome::failure(
+                "code review view not yet available in the window".to_string(),
+            );
+        };
+        code_review_view.read(app, |code_review_view, ctx| {
+            let Some(actual) =
+                code_review_view.hidden_section_count_for_test(&expected_file_path, ctx)
+            else {
+                return AssertionOutcome::failure(format!(
+                    "expected hidden-section count for {expected_file_path:?} to be available"
+                ));
+            };
+            async_assert!(
+                actual >= min,
+                "expected at least {min} hidden sections in {expected_file_path:?}, got {actual}"
+            )
+        })
+    })
+}
+
+/// Fully expand the first hidden section (the action a bar double-click
+/// performs) and assert it removed exactly one hidden section. A chunked
+/// reveal would only shrink a range, leaving the count unchanged, so the
+/// decrement is what distinguishes a full expansion.
+pub fn expand_first_hidden_section_and_assert_full_reveal(
+    file_path: impl Into<String>,
+) -> TestStep {
+    let file_path = file_path.into();
+
+    TestStep::new("Fully expand the first hidden section").with_action(move |app, window_id, _| {
+        let code_review_view = single_code_review_view(app, window_id);
+
+        let before = code_review_view
+            .read(app, |code_review_view, ctx| {
+                code_review_view.hidden_section_count_for_test(&file_path, ctx)
+            })
+            .expect("hidden-section count should be available before expanding");
+        assert!(
+            before > 0,
+            "expected at least one hidden section before expanding {file_path:?}, got {before}"
+        );
+
+        let expanded = code_review_view.update(app, |code_review_view, ctx| {
+            code_review_view.fully_expand_first_hidden_section_for_test(&file_path, ctx)
+        });
+        assert!(
+            expanded,
+            "expected a hidden section to expand for {file_path:?}"
+        );
+
+        let after = code_review_view
+            .read(app, |code_review_view, ctx| {
+                code_review_view.hidden_section_count_for_test(&file_path, ctx)
+            })
+            .expect("hidden-section count should be available after expanding");
+        assert_eq!(
+            after,
+            before - 1,
+            "expected a full expansion to remove exactly one hidden section in {file_path:?} \
+             (a chunked reveal would leave the count unchanged)"
+        );
     })
 }

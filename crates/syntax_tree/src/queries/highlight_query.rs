@@ -1,14 +1,16 @@
-use std::{cell::RefCell, collections::HashMap, iter, ops::Range, sync::Arc};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::iter;
+use std::ops::Range;
+use std::sync::Arc;
 
 use arborium::tree_sitter::{Node, Parser, Query, QueryCursor, TextProvider, Tree};
 use rangemap::RangeMap;
 use streaming_iterator::StreamingIterator;
 use string_offset::{ByteOffset, CharOffset};
-use warp_editor::content::{
-    buffer::{Buffer, ToBufferByteOffset, ToBufferCharOffset},
-    text::Bytes,
-};
-use warpui::color::ColorU;
+use warp_editor::content::buffer::{Buffer, ToBufferByteOffset, ToBufferCharOffset};
+use warp_editor::content::text::Bytes;
+use warpui_core::color::ColorU;
 
 thread_local! {
     static INJECTION_PARSER: RefCell<Parser> = RefCell::new(Parser::new());
@@ -263,6 +265,13 @@ fn collect_buffer_bytes(buffer: &Buffer, start: ByteOffset, end: ByteOffset) -> 
 }
 
 fn convert_capture_name_to_color(name: &str, color_map: &ColorMap) -> Option<ColorU> {
+    match name {
+        "text.title" => return Some(color_map.keyword_color),
+        "text.literal" => return Some(color_map.string_color),
+        "text.uri" => return Some(color_map.function_color),
+        "text.reference" => return Some(color_map.property_color),
+        _ => {}
+    }
     match name.split('.').next() {
         Some("keyword") => Some(color_map.keyword_color),
         Some("function") => Some(color_map.function_color),
@@ -272,6 +281,7 @@ fn convert_capture_name_to_color(name: &str, color_map: &ColorMap) -> Option<Col
         Some("comment") => Some(color_map.comment_color),
         Some("property") => Some(color_map.property_color),
         Some("tag") => Some(color_map.tag_color),
+        Some("punctuation") => Some(color_map.comment_color),
         _ => None,
     }
 }

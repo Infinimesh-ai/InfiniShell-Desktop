@@ -1,7 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use super::*;
-use crate::ai::agent::{task::TaskId, AIAgentActionResultType};
+use crate::ai::agent::AIAgentActionResultType;
+use crate::ai::agent::task::TaskId;
 
 fn make_action_result(id: &str) -> Arc<AIAgentActionResult> {
     Arc::new(AIAgentActionResult {
@@ -16,10 +18,10 @@ fn count_startable_actions_for_pass(phases: &[(RunningActionPhase, bool)]) -> us
     let mut count = 0;
 
     for (phase, can_autoexecute) in phases {
-        if let Some(current_phase) = current_phase {
-            if !can_start_action_with_current_phase(current_phase, *phase, *can_autoexecute) {
-                break;
-            }
+        if let Some(current_phase) = current_phase
+            && !can_start_action_with_current_phase(current_phase, *phase, *can_autoexecute)
+        {
+            break;
         }
 
         count += 1;

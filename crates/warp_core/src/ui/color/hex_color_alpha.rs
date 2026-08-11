@@ -2,7 +2,7 @@
 //! 同时兼容 RRGGBB (6 位) 格式，此时 alpha 默认为 255 (不透明)。
 
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use warpui::color::ColorU;
+use warpui_core::color::ColorU;
 
 use super::OPAQUE;
 

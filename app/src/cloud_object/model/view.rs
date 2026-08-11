@@ -316,6 +316,7 @@ impl ObjectStoreViewModel {
 
     fn handle_object_store_event(
         &mut self,
+        _: warpui::ModelHandle<ObjectStoreModel>,
         event: &ObjectStoreEvent,
         ctx: &mut ModelContext<Self>,
     ) {
@@ -381,6 +382,7 @@ impl ObjectStoreViewModel {
 
     fn handle_update_manager_event(
         &mut self,
+        _: warpui::ModelHandle<UpdateManager>,
         event: &UpdateManagerEvent,
         ctx: &mut ModelContext<Self>,
     ) {

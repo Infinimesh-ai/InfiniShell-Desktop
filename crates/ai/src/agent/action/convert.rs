@@ -1,24 +1,22 @@
-use std::{path::PathBuf, time::Duration};
+use std::path::PathBuf;
+use std::time::Duration;
 
 use uuid::Uuid;
 use warp_core::features::FeatureFlag;
 use warp_multi_agent_api as api;
 
-use crate::{
-    agent::{
-        action::{
-            AIAgentActionType, AIAgentPtyWriteMode, CommentSide, FileEdit, InsertReviewComment,
-            InsertedCommentLine, InsertedCommentLocation, ReadFilesRequest, ReadSkillRequest,
-            ShellCommandDelay, SuggestPromptRequest,
-        },
-        action_result::{AnyFileContent, FileContext},
-        convert::ToolToAIAgentActionError,
-        FileLocations,
-    },
-    diff_validation::{ParsedDiff, V4AHunk},
-    document::AIDocumentId,
-    skills::SkillReference,
+use crate::agent::FileLocations;
+use crate::agent::action::{
+    AIAgentActionType, AIAgentPtyWriteMode, CommentSide, CreateDocumentsRequest, DocumentDiff,
+    DocumentToCreate, EditDocumentsRequest, FileEdit, InsertReviewComment, InsertedCommentLine,
+    InsertedCommentLocation, ReadDocumentsRequest, ReadFilesRequest, ReadSkillRequest,
+    ShellCommandDelay, SuggestPromptRequest,
 };
+use crate::agent::action_result::{AnyFileContent, FileContext};
+use crate::agent::convert::ToolToAIAgentActionError;
+use crate::diff_validation::{ParsedDiff, V4AHunk};
+use crate::document::{AIDocumentId, DEFAULT_PLANNING_DOCUMENT_TITLE};
+use crate::skills::SkillReference;
 
 impl From<api::message::tool_call::RunShellCommand> for AIAgentActionType {
     fn from(value: api::message::tool_call::RunShellCommand) -> Self {
@@ -302,7 +300,6 @@ impl From<warp_multi_agent_api::AnyFileContent> for FileContext {
 
 impl From<api::message::tool_call::ReadDocuments> for AIAgentActionType {
     fn from(value: api::message::tool_call::ReadDocuments) -> Self {
-        use crate::agent::action::ReadDocumentsRequest;
         AIAgentActionType::ReadDocuments(ReadDocumentsRequest {
             document_ids: value
                 .documents
@@ -315,7 +312,6 @@ impl From<api::message::tool_call::ReadDocuments> for AIAgentActionType {
 
 impl From<api::message::tool_call::EditDocuments> for AIAgentActionType {
     fn from(value: api::message::tool_call::EditDocuments) -> Self {
-        use crate::agent::action::{DocumentDiff, EditDocumentsRequest};
         AIAgentActionType::EditDocuments(EditDocumentsRequest {
             diffs: value
                 .diffs
@@ -336,7 +332,6 @@ impl From<api::message::tool_call::EditDocuments> for AIAgentActionType {
 
 impl From<api::message::tool_call::CreateDocuments> for AIAgentActionType {
     fn from(value: api::message::tool_call::CreateDocuments) -> Self {
-        use crate::agent::action::{CreateDocumentsRequest, DocumentToCreate};
         AIAgentActionType::CreateDocuments(CreateDocumentsRequest {
             documents: value
                 .new_documents
@@ -344,9 +339,7 @@ impl From<api::message::tool_call::CreateDocuments> for AIAgentActionType {
                 .map(|doc| DocumentToCreate {
                     content: doc.content,
                     title: if doc.title.is_empty() {
-                        // DO NOT SUBMIT
-                        // crate::ai::ai_document_view::DEFAULT_PLANNING_DOCUMENT_TITLE.to_string()
-                        "".to_string()
+                        DEFAULT_PLANNING_DOCUMENT_TITLE.to_owned()
                     } else {
                         doc.title
                     },
@@ -401,9 +394,11 @@ impl From<api::message::tool_call::read_skill::SkillReference> for SkillReferenc
     fn from(value: api::message::tool_call::read_skill::SkillReference) -> Self {
         use warp_multi_agent_api::message::tool_call::read_skill::SkillReference as ApiSkillReference;
         match value {
-            ApiSkillReference::SkillPath(skill_path) => {
-                SkillReference::Path(PathBuf::from(skill_path))
-            }
+            ApiSkillReference::SkillPath(skill_path) => SkillReference::Path(
+                warp_util::local_or_remote_path::LocalOrRemotePath::Local(PathBuf::from(
+                    skill_path,
+                )),
+            ),
             ApiSkillReference::BundledSkillId(id) => SkillReference::BundledSkillId(id),
         }
     }

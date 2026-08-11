@@ -8,11 +8,12 @@
 #[cfg(feature = "local_fs")]
 use super::features::external_editor::ExternalEditorView;
 use super::{
+    flags,
     settings_page::{
         render_body_item, MatchData, PageType, SettingsPageMeta, SettingsPageViewHandle,
         SettingsWidget,
     },
-    LocalOnlyIconState, SettingsAction, SettingsSection, ToggleState,
+    LocalOnlyIconState, SettingsAction, SettingsSection, ToggleSettingActionPair, ToggleState,
 };
 use crate::{
     appearance::Appearance, send_telemetry_from_ctx, settings::CodeSettings,
@@ -22,7 +23,9 @@ use crate::{
 use ai::project_context::model::{ProjectContextModel, ProjectContextModelEvent};
 
 use std::path::PathBuf;
-use warp_core::{features::FeatureFlag, report_if_error, settings::ToggleableSetting as _};
+use warp_core::{features::FeatureFlag, settings::ToggleableSetting as _};
+// Zap:错误上报入口已从 warp_core 迁移到 warp_errors crate。
+use warp_errors::report_if_error;
 use warpui::{
     elements::{ChildView, Element, Empty},
     keymap::ContextPredicate,
@@ -71,6 +74,8 @@ impl CodeSettingsPageView {
                 Box::new(CodeReviewDiffStatsToggleWidget::default()),
                 Box::new(ProjectExplorerToggleWidget::default()),
                 Box::new(GlobalSearchToggleWidget::default()),
+                Box::new(ShowHiddenFilesToggleWidget::default()),
+                Box::new(AutoSaveToggleWidget::default()),
             ];
             (widgets, Some(editor_view))
         } else {
@@ -84,7 +89,7 @@ impl CodeSettingsPageView {
         )
     }
 
-    /// wasm 构建下没有 ExternalEditorView,只渲染 4 个非外部编辑器开关。
+    /// wasm 构建下没有 ExternalEditorView,只渲染非外部编辑器的开关。
     #[cfg(not(feature = "local_fs"))]
     fn build_page(
         _ctx: &mut ViewContext<Self>,
@@ -97,6 +102,8 @@ impl CodeSettingsPageView {
                     Box::new(CodeReviewDiffStatsToggleWidget::default()),
                     Box::new(ProjectExplorerToggleWidget::default()),
                     Box::new(GlobalSearchToggleWidget::default()),
+                    Box::new(ShowHiddenFilesToggleWidget::default()),
+                    Box::new(AutoSaveToggleWidget::default()),
                 ]
             } else {
                 vec![]
@@ -132,6 +139,8 @@ pub enum CodeSettingsPageAction {
     ToggleAutoOpenCodeReviewPane,
     ToggleProjectExplorer,
     ToggleGlobalSearch,
+    ToggleShowHiddenFiles,
+    ToggleAutoSave,
 }
 
 impl TypedActionView for CodeSettingsPageView {
@@ -170,6 +179,18 @@ impl TypedActionView for CodeSettingsPageView {
                 });
                 ctx.notify();
             }
+            CodeSettingsPageAction::ToggleShowHiddenFiles => {
+                CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
+                    report_if_error!(settings.show_hidden_files.toggle_and_save_value(ctx));
+                });
+                ctx.notify();
+            }
+            CodeSettingsPageAction::ToggleAutoSave => {
+                CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
+                    report_if_error!(settings.auto_save.toggle_and_save_value(ctx));
+                });
+                ctx.notify();
+            }
             CodeSettingsPageAction::ToggleAutoOpenCodeReviewPane => {
                 GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
                     report_if_error!(settings
@@ -194,10 +215,66 @@ impl TypedActionView for CodeSettingsPageView {
 }
 
 pub fn init_actions_from_parent_view<T: Action + Clone>(
-    _app: &mut AppContext,
-    _context: &ContextPredicate,
-    _builder: fn(SettingsAction) -> T,
+    app: &mut AppContext,
+    context: &ContextPredicate,
+    builder: fn(SettingsAction) -> T,
 ) {
+    // Zap 没有 codebase indexing / LSP,只注册编辑器与代码评审相关的开关命令。
+    if FeatureFlag::ZapNewSettingsModes.is_enabled() {
+        ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
+            vec![
+                ToggleSettingActionPair::new(
+                    "auto open code review panel",
+                    builder(SettingsAction::Code(
+                        CodeSettingsPageAction::ToggleAutoOpenCodeReviewPane,
+                    )),
+                    context,
+                    flags::AUTO_OPEN_CODE_REVIEW_PANE_FLAG,
+                ),
+                ToggleSettingActionPair::new(
+                    "code review button",
+                    builder(SettingsAction::Code(
+                        CodeSettingsPageAction::ToggleCodeReviewPanel,
+                    )),
+                    context,
+                    flags::SHOW_CODE_REVIEW_BUTTON_FLAG,
+                ),
+                ToggleSettingActionPair::new(
+                    "diff stats on code review button",
+                    builder(SettingsAction::Code(
+                        CodeSettingsPageAction::ToggleShowCodeReviewDiffStats,
+                    )),
+                    context,
+                    flags::SHOW_CODE_REVIEW_DIFF_STATS_FLAG,
+                ),
+                ToggleSettingActionPair::new(
+                    "project explorer",
+                    builder(SettingsAction::Code(
+                        CodeSettingsPageAction::ToggleProjectExplorer,
+                    )),
+                    context,
+                    flags::SHOW_PROJECT_EXPLORER,
+                ),
+                ToggleSettingActionPair::new(
+                    "global file search",
+                    builder(SettingsAction::Code(
+                        CodeSettingsPageAction::ToggleGlobalSearch,
+                    )),
+                    context,
+                    flags::SHOW_GLOBAL_SEARCH,
+                ),
+                ToggleSettingActionPair::new(
+                    "show hidden files in project explorer",
+                    builder(SettingsAction::Code(
+                        CodeSettingsPageAction::ToggleShowHiddenFiles,
+                    )),
+                    context,
+                    flags::SHOW_HIDDEN_FILES,
+                ),
+            ],
+            app,
+        );
+    }
 }
 
 #[cfg(feature = "local_fs")]
@@ -452,6 +529,91 @@ impl SettingsWidget for GlobalSearchToggleWidget {
                 })
                 .finish(),
             Some(crate::t!("settings-code-global-search-desc")),
+        )
+    }
+}
+
+#[derive(Default)]
+struct ShowHiddenFilesToggleWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for ShowHiddenFilesToggleWidget {
+    type View = CodeSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "show hidden files dotfiles project explorer file tree"
+    }
+
+    fn render(
+        &self,
+        _view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let code_settings = CodeSettings::as_ref(app);
+
+        render_body_item::<CodeSettingsPageAction>(
+            "Show hidden files in project explorer".into(),
+            None,
+            LocalOnlyIconState::Hidden,
+            ToggleState::Enabled,
+            appearance,
+            appearance
+                .ui_builder()
+                .switch(self.switch_state.clone())
+                .check(*code_settings.show_hidden_files)
+                .build()
+                .on_click(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(CodeSettingsPageAction::ToggleShowHiddenFiles);
+                })
+                .finish(),
+            Some(
+                "Show dotfiles and hidden files (starting with .) in the project explorer.".into(),
+            ),
+        )
+    }
+}
+
+#[derive(Default)]
+struct AutoSaveToggleWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for AutoSaveToggleWidget {
+    type View = CodeSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "auto save autosave automatically save editor files on type focus"
+    }
+
+    fn render(
+        &self,
+        _view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let code_settings = CodeSettings::as_ref(app);
+
+        render_body_item::<CodeSettingsPageAction>(
+            "Auto save".into(),
+            None,
+            LocalOnlyIconState::Hidden,
+            ToggleState::Enabled,
+            appearance,
+            appearance
+                .ui_builder()
+                .switch(self.switch_state.clone())
+                .check(*code_settings.auto_save)
+                .build()
+                .on_click(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(CodeSettingsPageAction::ToggleAutoSave);
+                })
+                .finish(),
+            Some(
+                "Automatically saves changes in the InfiniShell text editor as you type and when the editor loses focus."
+                    .into(),
+            ),
         )
     }
 }

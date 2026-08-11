@@ -1,22 +1,23 @@
-use crate::server::telemetry::TelemetryEvent;
-use anyhow::anyhow;
-use anyhow::{bail, Result};
+use std::fs::File;
+use std::io::Write as _;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
+use std::{fs, io};
+
+use anyhow::{Result, anyhow, bail};
 use channel_versions::VersionInfo;
 use command::blocking::Command;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
-use std::fs::File;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::{fs, io};
-use std::{io::Write as _, time::Duration};
 use tempfile::TempPath;
 use warp_core::channel::{Channel, ChannelState};
 use warpui::AppContext;
 
 use super::{
-    github, release_assets_directory_url, DownloadProgress, DownloadReady, ProgressCallback,
+    DownloadProgress, DownloadReady, ProgressCallback, github, release_assets_directory_url,
 };
+use crate::server::telemetry::TelemetryEvent;
 use crate::util::windows::install_dir;
 
 lazy_static! {
@@ -38,8 +39,8 @@ pub(super) async fn download_update_and_cleanup(
 
     let channel = ChannelState::channel();
     let installer_file_name = installer_file_name()?;
-    // openWarp:从 GitHub Release 缓存里取真实下载 URL(资产名为 ZapSetup.exe /
-    // ZapSetup-arm64.exe,见 installer_file_name())。其他 channel 走官方 base url。
+    // openWarp:从 GitHub Release 缓存里取真实下载 URL(资产名为 InfiniShellSetup.exe /
+    // InfiniShellSetup-arm64.exe,见 installer_file_name())。其他 channel 走官方 base url。
     let url = if matches!(channel, Channel::Oss) {
         if let Some(release) = github::cached_release() {
             if let Some(found) = release.find_asset(&installer_file_name) {
@@ -74,7 +75,9 @@ pub(super) async fn download_update_and_cleanup(
         .rand_bytes(0)
         .suffix(&format!("{}-{}", version_info.version, installer_file_name))
         .make(|path| {
-            already_exists = path.is_file();
+            // Treat a 0-byte file as missing.
+            let non_empty = path.metadata().map(|m| m.len() > 0).unwrap_or(false);
+            already_exists = non_empty;
             if already_exists {
                 File::open(path)
             } else {
@@ -164,6 +167,47 @@ fn autoupdate_log_file() -> Result<PathBuf> {
     warp_logging::log_directory().map(|dir| dir.join(UPDATE_LOG_FILENAME))
 }
 
+fn parse_exit_code_after_marker(contents_lowercase: &[u8], failed_marker: &[u8]) -> Option<i32> {
+    const EXIT_CODE_MARKER: &[u8] = b"exit code: ";
+
+    let failed_pos = memchr::memmem::find(contents_lowercase, failed_marker)?;
+    let after_failed = &contents_lowercase[failed_pos..];
+    let marker_pos = memchr::memmem::find(after_failed, EXIT_CODE_MARKER)?;
+    let after_marker = &after_failed[marker_pos + EXIT_CODE_MARKER.len()..];
+    let sign_len = if after_marker.first() == Some(&b'-') {
+        1
+    } else {
+        0
+    };
+    let digit_len = after_marker[sign_len..]
+        .iter()
+        .take_while(|b| b.is_ascii_digit())
+        .count();
+    if digit_len == 0 {
+        return None;
+    }
+    std::str::from_utf8(&after_marker[..sign_len + digit_len])
+        .ok()?
+        .parse()
+        .ok()
+}
+
+/// Parses the taskkill exit code from an Inno Setup log containing a
+/// "force-kill failed for" line. Returns `None` if no such line is found or
+/// the exit code cannot be parsed.
+fn parse_forcekill_exit_code(contents_lowercase: &[u8]) -> Option<i32> {
+    const FAILED_MARKER: &[u8] = b"force-kill failed for";
+    parse_exit_code_after_marker(contents_lowercase, FAILED_MARKER)
+}
+
+/// Parses the PowerShell exit code from an Inno Setup log containing a
+/// "minidump-server cleanup failed" line. Returns `None` if no such line is
+/// found or the exit code cannot be parsed.
+fn parse_minidump_cleanup_exit_code(contents_lowercase: &[u8]) -> Option<i32> {
+    const FAILED_MARKER: &[u8] = b"minidump-server cleanup failed";
+    parse_exit_code_after_marker(contents_lowercase, FAILED_MARKER)
+}
+
 /// Checks the autoupdate log file from a previous update attempt.
 /// 记录上一次更新尝试中发现的已知问题。
 /// The log file is renamed after processing to avoid duplicate reports on subsequent launches.
@@ -221,10 +265,24 @@ pub(super) fn check_and_report_update_errors(ctx: &mut AppContext) {
     }
 
     // Fired when taskkill returned non-zero after the mutex timeout.
-    let has_forcekill_failed =
-        memchr::memmem::find(&contents_lowercase, b"force-kill failed for").is_some();
-    if has_forcekill_failed {
-        crate::send_telemetry_sync_from_app_ctx!(TelemetryEvent::AutoupdateForcekillFailed, ctx);
+    // Exit code 128 means "no matching process found" — the process was already
+    // gone when taskkill ran — so suppress that harmless race condition.
+    if let Some(exit_code) = parse_forcekill_exit_code(&contents_lowercase)
+        && exit_code != 128
+    {
+        crate::send_telemetry_sync_from_app_ctx!(
+            TelemetryEvent::AutoupdateForcekillFailed { exit_code },
+            ctx
+        );
+    }
+
+    // Fired when the PowerShell cleanup of the orphaned minidump server process
+    // returned a non-zero exit code.
+    if let Some(exit_code) = parse_minidump_cleanup_exit_code(&contents_lowercase) {
+        crate::send_telemetry_sync_from_app_ctx!(
+            TelemetryEvent::AutoupdateMinidumpCleanupFailed { exit_code },
+            ctx
+        );
     }
 
     // openWarp 不上传 autoupdate 失败日志,仅在本地记录错误计数;完整日志文件会被下方
@@ -267,7 +325,11 @@ pub(super) fn relaunch() -> Result<()> {
     let channel = ChannelState::channel();
 
     let install_dir = install_dir()?;
-    let Some(installer_path) = INSTALLER_PATH.lock().take() else {
+    let Some(installer_path) = INSTALLER_PATH
+        .lock()
+        .as_ref()
+        .map(|path| path.to_path_buf())
+    else {
         bail!("No installer path");
     };
 
@@ -335,8 +397,8 @@ pub(super) fn relaunch() -> Result<()> {
 fn installer_file_name() -> Result<String> {
     let app_name_prefix = app_name_prefix(ChannelState::channel());
 
-    // For example, on arm64 this is WarpSetup-arm64.exe and on x64 this is
-    // WarpSetup.exe.
+    // For example, on arm64 this is InfiniShellSetup-arm64.exe and on x64 this is
+    // InfiniShellSetup.exe.
     if cfg!(target_arch = "aarch64") {
         Ok(format!("{app_name_prefix}Setup-arm64.exe"))
     } else if cfg!(target_arch = "x86_64") {
@@ -350,13 +412,17 @@ fn installer_file_name() -> Result<String> {
 
 fn app_name_prefix(channel: Channel) -> &'static str {
     match channel {
-        Channel::Stable => "Zap",
+        Channel::Stable => "InfiniShell",
         Channel::Preview => "WarpPreview",
         Channel::Local => "warp",
         Channel::Integration => "integration",
         Channel::Dev => "WarpDev",
-        // 与 script/windows/bundle.ps1 OSS 分支 INSTALLER_NAME=Zap+Setup 对齐,
-        // 这样 GitHub Release 资产名 ZapSetup.exe 能被 installer_file_name() 正确生成。
-        Channel::Oss => "Zap",
+        // 与 script/windows/bundle.ps1 OSS 分支 INSTALLER_NAME=InfiniShell+Setup 对齐,
+        // 这样 GitHub Release 资产名 InfiniShellSetup.exe 能被 installer_file_name() 正确生成。
+        Channel::Oss => "InfiniShell",
     }
 }
+
+#[cfg(test)]
+#[path = "windows_tests.rs"]
+mod tests;

@@ -1,55 +1,49 @@
 use pathfinder_color::ColorU;
 use settings::Setting as _;
 use warp_editor::editor::NavigationKey;
+use warp_errors::report_if_error;
+use warpui::accessibility::{AccessibilityContent, WarpA11yRole};
+use warpui::elements::{
+    Align, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+    DispatchEventResult, Element, Empty, EventHandler, Fill, Flex, Hoverable, Icon,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    ParentElement, ParentOffsetBounds, Radius, Rect, SavePosition, ScrollStateHandle, Scrollable,
+    ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text, UniformList, UniformListState,
+};
+use warpui::fonts::{FamilyId, Weight};
+use warpui::geometry::vector::vec2f;
+use warpui::keymap::FixedBinding;
+use warpui::platform::{Cursor, SystemTheme};
+use warpui::ui_components::components::{UiComponent, UiComponentStyles};
+use warpui::windowing::{StateEvent, WindowManager};
 use warpui::{
-    accessibility::{AccessibilityContent, WarpA11yRole},
-    elements::{
-        Align, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-        DispatchEventResult, Element, Empty, EventHandler, Fill, Flex, Hoverable, Icon,
-        MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
-        ParentElement, ParentOffsetBounds, Radius, Rect, SavePosition, ScrollStateHandle,
-        Scrollable, ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text, UniformList,
-        UniformListState,
-    },
-    fonts::{FamilyId, Weight},
-    geometry::vector::vec2f,
-    keymap::FixedBinding,
-    platform::{Cursor, SystemTheme},
-    ui_components::components::{UiComponent, UiComponentStyles},
-    windowing::{StateEvent, WindowManager},
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, Tracked, TypedActionView,
     UpdateModel, View, ViewContext, ViewHandle,
 };
 
-use crate::resource_center::{mark_feature_used_and_write_to_user_defaults, Tip, TipAction};
-use crate::ui_components::tab_selector::{render_tab_selector, SettingsTab};
-use crate::themes::theme::{RespectSystemTheme, ThemeKind, WarpTheme};
-use crate::util::traffic_lights::traffic_light_data;
-use crate::workspace::PANEL_HEADER_HEIGHT;
-use crate::{
-    appearance::Appearance,
-    editor::{
-        Event as EditorEvent, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions, TextOptions,
-    },
-    report_if_error,
-    settings::{respect_system_theme, ThemeSettings},
-    themes::theme::SelectedSystemThemes,
-    user_config::{load_theme_configs, themes_dir, WarpConfig, WarpConfigUpdateEvent},
-    util::traffic_lights::{TrafficLightData, TrafficLightSide},
-    window_settings::WindowSettings,
-};
-use crate::{appearance::AppearanceManager, send_telemetry_from_ctx};
-use crate::{editor::EditorView, resource_center::TipsCompleted};
-use crate::{
-    server::telemetry::TelemetryEvent, ui_components::window_focus_dimming::WindowFocusDimming,
-};
-use crate::{
-    themes::theme::WarpThemeConfig,
-    ui_components::buttons::{close_button, icon_button},
-    ui_components::icons,
-};
-
 use super::theme;
+use crate::appearance::{Appearance, AppearanceManager};
+use crate::editor::{
+    EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
+    TextOptions,
+};
+use crate::resource_center::{
+    Tip, TipAction, TipsCompleted, mark_feature_used_and_write_to_user_defaults,
+};
+use crate::send_telemetry_from_ctx;
+use crate::server::telemetry::TelemetryEvent;
+use crate::settings::{ThemeSettings, respect_system_theme};
+use crate::themes::theme::{
+    RespectSystemTheme, SelectedSystemThemes, ThemeKind, WarpTheme, WarpThemeConfig,
+};
+use crate::ui_components::buttons::{close_button, icon_button};
+use crate::ui_components::icons;
+use crate::ui_components::tab_selector::{SettingsTab, render_tab_selector};
+use crate::ui_components::window_focus_dimming::WindowFocusDimming;
+use crate::user_config::{WarpConfig, WarpConfigUpdateEvent, load_theme_configs, themes_dir};
+use crate::util::traffic_lights::{TrafficLightData, TrafficLightSide, traffic_light_data};
+use crate::window_settings::WindowSettings;
+use crate::workspace::PANEL_HEADER_HEIGHT;
 
 // All units in px
 const THEME_CHOOSER_TITLE: &str = "Themes";
@@ -463,9 +457,11 @@ impl ThemeChooser {
         match self.mode {
             ThemeChooserMode::SystemAgnostic => {
                 theme_settings.update(ctx, |theme_settings, ctx| {
-                    report_if_error!(theme_settings
-                        .theme_kind
-                        .set_value(selected_kind.clone(), ctx,));
+                    report_if_error!(
+                        theme_settings
+                            .theme_kind
+                            .set_value(selected_kind.clone(), ctx,)
+                    );
                 });
             }
             ThemeChooserMode::SystemLight => {
@@ -940,9 +936,9 @@ impl View for ThemeChooser {
 
     fn accessibility_contents(&self, _: &AppContext) -> Option<AccessibilityContent> {
         Some(AccessibilityContent::new(
-                "Theme chooser. Unfortunately, theme chooser window isn't compatible with screen readers yet.",
-                "Press escape to close.",
-                WarpA11yRole::WindowRole,
+            "Theme chooser. Unfortunately, theme chooser window isn't compatible with screen readers yet.",
+            "Press escape to close.",
+            WarpA11yRole::WindowRole,
         ))
     }
 

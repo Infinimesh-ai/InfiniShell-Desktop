@@ -1,24 +1,23 @@
 use pathfinder_geometry::vector::Vector2F;
 use warp_core::context_flag::ContextFlag;
-use warpui::{keymap::Trigger, SingletonEntity, ViewContext, ViewHandle};
-
-use crate::{
-    cloud_object::update_manager::UpdateManager,
-    cloud_object::{GenericStringObjectFormat, Space, StoredObject},
-    drive::{
-        drive_helpers::has_feature_gated_anonymous_user_reached_env_var_limit,
-        export::ExportManager, ObjectTypeAndId,
-    },
-    env_vars::active_env_var_collection_data::TrashStatus,
-    external_secrets::SecretManager,
-    menu::{Event as MenuEvent, Menu, MenuItem, MenuItemFields},
-    pane_group::PaneEvent,
-    ui_components::icons::Icon,
-    util::bindings::{keybinding_name_to_display_string, trigger_to_keystroke, CustomAction},
-    AppContext, FeatureFlag, ObjectStoreModel,
-};
+use warpui::keymap::Trigger;
+use warpui::{SingletonEntity, ViewContext, ViewHandle};
 
 use super::env_var_collection::{EnvVarCollectionAction, EnvVarCollectionView, VariableRowIndex};
+use crate::cloud_object::update_manager::UpdateManager;
+use crate::cloud_object::{GenericStringObjectFormat, Space, StoredObject};
+use crate::drive::ObjectTypeAndId;
+use crate::drive::drive_helpers::has_feature_gated_anonymous_user_reached_env_var_limit;
+use crate::drive::export::ExportManager;
+use crate::env_vars::active_env_var_collection_data::TrashStatus;
+use crate::external_secrets::SecretManager;
+use crate::menu::{Event as MenuEvent, Menu, MenuItem, MenuItemFields};
+use crate::pane_group::PaneEvent;
+use crate::ui_components::icons::Icon;
+use crate::util::bindings::{
+    CustomAction, keybinding_name_to_display_string, trigger_to_keystroke,
+};
+use crate::{AppContext, FeatureFlag, ObjectStoreModel};
 
 const PANE_MENU_WIDTH: f32 = 200.;
 

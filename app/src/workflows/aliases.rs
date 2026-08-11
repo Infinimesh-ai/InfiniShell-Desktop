@@ -3,10 +3,9 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use settings_value::SettingsValue;
-use warp_core::{
-    define_settings_group,
-    settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud},
-};
+use warp_core::define_settings_group;
+use warp_core::settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
+use warp_errors::report_error;
 use warpui::{AppContext, ModelContext, SingletonEntity};
 
 use crate::{
@@ -24,13 +23,14 @@ define_settings_group!(WorkflowAliases, settings: [
         default: vec![],
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+        surface: settings::SettingSurfaces::GUI,
         private: true,
         storage_key: "WorkflowAliases",
     }
 ]);
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, schemars::JsonSchema, SettingsValue)]
-#[schemars(description = "A shortcut alias for a Zap Drive workflow.")]
+#[schemars(description = "A shortcut alias for a InfiniShell Drive workflow.")]
 pub struct WorkflowAlias {
     #[schemars(description = "The alias text that triggers this workflow.")]
     pub alias: String,
@@ -45,7 +45,7 @@ pub struct WorkflowAlias {
 impl WorkflowAliases {
     /// Call once to subscribe to UpdateManager notifications that a workflow has been deleted.
     pub fn connect(&self, ctx: &mut ModelContext<Self>) {
-        ctx.subscribe_to_model(&ObjectStoreModel::handle(ctx), |me, event, ctx| {
+        ctx.subscribe_to_model(&ObjectStoreModel::handle(ctx), |me, _, event, ctx| {
             let result = match event {
                 ObjectStoreEvent::ObjectTrashed {
                     type_and_id: ObjectTypeAndId::Workflow(server_id),
@@ -55,7 +55,7 @@ impl WorkflowAliases {
             };
 
             if let Err(e) = result {
-                log::error!("Error removing aliases for workflow: {e:?}");
+                report_error!(e.context("Error removing aliases for workflow"));
             }
         });
     }
@@ -151,5 +151,5 @@ impl WorkflowAliases {
 }
 
 #[cfg(test)]
-#[path = "aliases_test.rs"]
+#[path = "aliases_tests.rs"]
 mod tests;

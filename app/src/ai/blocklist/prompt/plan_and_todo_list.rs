@@ -1,40 +1,35 @@
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::{appearance::Appearance, theme::color::internal_colors, Icon};
+use warp_core::features::FeatureFlag;
+use warp_core::ui::Icon;
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::theme::color::internal_colors;
+use warpui::elements::{
+    Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+    DEFAULT_UI_LINE_HEIGHT_RATIO, Empty, Fill, Flex, Hoverable, MouseStateHandle,
+    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, SavePosition,
+    Stack, Text,
+};
+use warpui::fonts::{Properties, Weight};
+use warpui::platform::Cursor;
+use warpui::ui_components::components::UiComponent;
 use warpui::{
-    elements::{
-        Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
-        CrossAxisAlignment, Empty, Fill, Flex, Hoverable, MouseStateHandle, OffsetPositioning,
-        ParentAnchor, Radius, SavePosition, Stack, Text, DEFAULT_UI_LINE_HEIGHT_RATIO,
-    },
-    platform::Cursor,
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity as _, TypedActionView,
     View, ViewContext, ViewHandle,
 };
-use warpui::{
-    elements::{ParentElement, ParentOffsetBounds},
-    ui_components::components::UiComponent,
-};
 
-use warp_core::features::FeatureFlag;
-
-use crate::{
-    ai::{
-        agent::{
-            icons::todo_list_icon,
-            todos::popup::{AgentTodosPopupEvent, AgentTodosPopupView},
-        },
-        blocklist::{BlocklistAIContextEvent, BlocklistAIContextModel, BlocklistAIHistoryEvent},
-        document::ai_document_model::{
-            AIDocumentId, AIDocumentModel, AIDocumentModelEvent, AIDocumentVersion,
-        },
-    },
-    terminal::input::{MenuPositioning, MenuPositioningProvider},
-    ui_components::blended_colors,
-    AIAgentTodoList, BlocklistAIHistoryModel,
+use crate::ai::agent::icons::todo_list_icon;
+use crate::ai::agent::todos::popup::{AgentTodosPopupEvent, AgentTodosPopupView};
+use crate::ai::blocklist::{
+    BlocklistAIContextEvent, BlocklistAIContextModel, BlocklistAIHistoryEvent,
 };
-use warpui::fonts::{Properties, Weight};
+use crate::ai::document::ai_document_model::{
+    AIDocumentId, AIDocumentModel, AIDocumentModelEvent, AIDocumentVersion,
+};
+use crate::terminal::input::{MenuPositioning, MenuPositioningProvider};
+use crate::ui_components::blended_colors;
+use crate::{AIAgentTodoList, BlocklistAIHistoryModel};
 
 const TODO_BUTTON_SAVE_POSITION_ID: &str = "plan_and_todo_list::todo_button";
 
@@ -92,10 +87,10 @@ impl PlanAndTodoListView {
                         ctx.notify();
                     }
                 }
-                AIDocumentModelEvent::DocumentSaveStatusUpdated { .. } => {}
-                AIDocumentModelEvent::DocumentUpdated { .. } => {}
-                AIDocumentModelEvent::StreamingDocumentsCleared(..) => {}
-                AIDocumentModelEvent::DocumentVisibilityChanged(_) => {}
+                AIDocumentModelEvent::DocumentSaveStatusUpdated { .. }
+                | AIDocumentModelEvent::DocumentUpdated { .. }
+                | AIDocumentModelEvent::StreamingDocumentsCleared(..)
+                | AIDocumentModelEvent::DocumentVisibilityChanged(_) => {}
             },
         );
 
@@ -103,7 +98,7 @@ impl PlanAndTodoListView {
             &BlocklistAIHistoryModel::handle(ctx),
             |me, _, event, ctx| {
                 if event
-                    .terminal_view_id()
+                    .terminal_surface_id()
                     .is_some_and(|id| id != me.terminal_view_id)
                 {
                     return;
@@ -114,7 +109,7 @@ impl PlanAndTodoListView {
                 match event.clone() {
                     BlocklistAIHistoryEvent::StartedNewConversation { .. }
                     | BlocklistAIHistoryEvent::SetActiveConversation { .. }
-                    | BlocklistAIHistoryEvent::ClearedConversationsInTerminalView { .. }
+                    | BlocklistAIHistoryEvent::ClearedConversationsForTerminalSurface { .. }
                     | BlocklistAIHistoryEvent::AppendedExchange { .. }
                     | BlocklistAIHistoryEvent::UpdatedTodoList { .. } => {
                         ctx.notify();
@@ -326,10 +321,10 @@ impl PlanAndTodoListView {
             return None;
         }
 
-        if let Some(todo_list) = todo_list {
-            if !todo_list.is_empty() {
-                return Some(todo_list.clone());
-            }
+        if let Some(todo_list) = todo_list
+            && !todo_list.is_empty()
+        {
+            return Some(todo_list.clone());
         }
 
         None
@@ -489,16 +484,16 @@ impl View for PlanAndTodoListView {
 
         let mut row = Flex::row();
         // Only show plan chip when AgentView is not enabled
-        if !FeatureFlag::AgentView.is_enabled() {
-            if let Some(ai_document_id) = ai_document_id {
-                row.add_child(self.render_plan_button(
-                    ai_document_id,
-                    todo_list.is_some(),
-                    icon_size,
-                    appearance,
-                    app,
-                ));
-            }
+        if !FeatureFlag::AgentView.is_enabled()
+            && let Some(ai_document_id) = ai_document_id
+        {
+            row.add_child(self.render_plan_button(
+                ai_document_id,
+                todo_list.is_some(),
+                icon_size,
+                appearance,
+                app,
+            ));
         }
         if let Some(todo_list) = todo_list {
             row.add_child(self.render_todo_button(

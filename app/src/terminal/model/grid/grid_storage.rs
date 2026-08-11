@@ -1,3 +1,6 @@
+// The code in this file is adapted from the alacritty_terminal crate under the
+// Apache license; see: crates/warp_terminal/src/model/LICENSE-ALACRITTY.
+
 //! A specialized 2D grid implementation optimized for use in a terminal.
 
 mod resize;
@@ -6,6 +9,7 @@ use std::cmp::min;
 use std::ops::{Index, IndexMut, Range};
 
 use serde::{Deserialize, Serialize};
+use warp_errors::report_error;
 pub use warp_terminal::model::grid::Dimensions;
 
 use crate::features::FeatureFlag;
@@ -547,8 +551,9 @@ impl GridStorage {
         let mut point = self.cursor_point();
 
         if point.row >= self.total_rows() || point.col >= self.columns() {
-            log::error!(
-                "Error retrieving cursor cell, cursor point was outside the bounds of the grid: {point:?}"
+            report_error!(
+                "Error retrieving cursor cell, cursor point was outside the bounds of the grid",
+                extra: { "point" => ?point }
             );
             point = Point {
                 row: self.total_rows().saturating_sub(1),
@@ -593,5 +598,5 @@ impl Dimensions for GridStorage {
 }
 
 #[cfg(test)]
-#[path = "grid_test.rs"]
+#[path = "grid_tests.rs"]
 mod tests;

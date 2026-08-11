@@ -1,8 +1,7 @@
 use chrono::{Local, TimeZone as _};
 
+use super::{MenuEntry, MenuItem, interleave_conversations};
 use crate::input_suggestions::HistoryOrder;
-
-use super::{interleave_conversations, MenuEntry, MenuItem};
 
 #[test]
 fn interleave_conversations_only_inserts_into_current_session_segment() {

@@ -1,25 +1,21 @@
 use std::marker::PhantomData;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{Local, TimeDelta};
 use history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
-use warpui::{AppContext, SingletonEntity, View, ViewContext};
-
-use crate::terminal::shared_session::ParticipantId;
-
-use crate::ai::{
-    agent::{
-        conversation::AIConversationId, AIAgentExchange, AIAgentExchangeId, AIAgentInput,
-        AIAgentOutputStatus, FinishedAIAgentOutput, ServerOutputId, Shared,
-    },
-    blocklist::{
-        history_model,
-        model::{AIRequestType, PassiveRequestType},
-    },
-    llms::LLMId,
-};
+use warp_errors::report_error;
+use warpui::{AppContext, Entity, SingletonEntity, ViewContext};
 
 use super::{AIBlockModel, AIBlockOutputStatus, OutputStatusUpdateCallback};
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::{
+    AIAgentExchange, AIAgentExchangeId, AIAgentInput, AIAgentOutputStatus, FinishedAIAgentOutput,
+    ServerOutputId, Shared,
+};
+use crate::ai::blocklist::history_model;
+use crate::ai::blocklist::model::{AIRequestType, PassiveRequestType};
+use crate::ai::llms::LLMId;
+use crate::terminal::shared_session::ParticipantId;
 
 /// Standard [`AIBlock`] impl for live outputs corresponding to an `OutputStream`.
 pub struct AIBlockModelImpl<V> {
@@ -32,7 +28,7 @@ pub struct AIBlockModelImpl<V> {
 
 impl<V> AIBlockModelImpl<V>
 where
-    V: View,
+    V: Entity,
 {
     pub fn new(
         exchange_id: AIAgentExchangeId,
@@ -86,7 +82,7 @@ where
 
 impl<V> AIBlockModel for AIBlockModelImpl<V>
 where
-    V: View,
+    V: Entity,
 {
     type View = V;
 
@@ -145,7 +141,7 @@ where
         match exchange {
             Ok(exchange) => Some(Local::now().signed_duration_since(exchange.start_time)),
             Err(err) => {
-                log::error!("Failed to get time since request start. {err}");
+                report_error!(err.context("Failed to get time since request start"));
                 None
             }
         }
@@ -156,7 +152,7 @@ where
         match exchange {
             Ok(exchange) => Some(&exchange.model_id),
             Err(err) => {
-                log::error!("Failed to get base model. {err}");
+                report_error!(err.context("Failed to get base model"));
                 None
             }
         }
@@ -205,18 +201,32 @@ where
         let conversation_id = self.conversation_id;
         let history_model = BlocklistAIHistoryModel::handle(ctx);
         ctx.subscribe_to_model(&history_model, move |me, _, event, ctx| {
-            let BlocklistAIHistoryEvent::UpdatedStreamingExchange {
-                exchange_id: event_exchange_id,
-                conversation_id: event_conversation_id,
-                ..
-            } = event
-            else {
-                return;
-            };
-            if *event_exchange_id == exchange_id {
-                callback(me, ctx);
-            } else if *event_conversation_id == conversation_id {
-                ctx.notify();
+            match event {
+                BlocklistAIHistoryEvent::UpdatedStreamingExchange {
+                    exchange_id: event_exchange_id,
+                    conversation_id: event_conversation_id,
+                    ..
+                } => {
+                    if *event_exchange_id == exchange_id {
+                        callback(me, ctx);
+                    } else if *event_conversation_id == conversation_id {
+                        ctx.notify();
+                    }
+                }
+                BlocklistAIHistoryEvent::ConversationUsageMetadataUpdated { .. } => {
+                    // Cross-pane orchestration credit rollup: the collapsed
+                    // footer pill on an orchestrator's AIBlock derives its
+                    // headline number from descendant credits, which the
+                    // existing exchange-scoped notify path above doesn't
+                    // cover. Trigger a re-render on any usage metadata
+                    // change so the pill stays live. Filtering to only
+                    // descendants of this block's conversation would
+                    // require an O(depth) walk per event for every AI
+                    // block in the app; an unconditional notify is cheap
+                    // and tracks live status accurately.
+                    ctx.notify();
+                }
+                _ => {}
             }
         });
     }

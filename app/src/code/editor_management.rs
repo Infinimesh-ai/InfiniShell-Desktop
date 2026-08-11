@@ -1,23 +1,19 @@
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    path::PathBuf,
-};
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+use std::path::{Path, PathBuf};
 
-use crate::ai::skills::SkillOpenOrigin;
 use ai::skills::SkillReference;
 use serde::{Deserialize, Serialize};
 use warp_util::path::LineAndColumnArg;
 use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity, ViewHandle, WindowId};
 
-use crate::{
-    ai::agent::AIAgentActionId,
-    code_review::code_review_view::CodeReviewView,
-    pane_group::{PaneGroup, PaneId},
-    workspace::PaneViewLocator,
-};
-
-use super::buffer_location::BufferLocation;
+use super::buffer_location::LocalOrRemotePath;
 use super::view::CodeView;
+use crate::ai::agent::AIAgentActionId;
+use crate::ai::skills::SkillOpenOrigin;
+use crate::code_review::code_review_view::CodeReviewView;
+use crate::pane_group::{PaneGroup, PaneId};
+use crate::workspace::PaneViewLocator;
 
 pub struct CodeEditorSummary<'a> {
     pub unsaved_changes: Vec<&'a CodeEditorStatus>,
@@ -69,7 +65,7 @@ impl CodeEditorStatus {
     pub fn editors_in_tab<'a>(
         tab: &ViewHandle<PaneGroup>,
         app: &'a AppContext,
-    ) -> impl Iterator<Item = Self> + 'a {
+    ) -> impl Iterator<Item = Self> + 'a + use<'a> {
         tab.as_ref(app)
             .code_panes(app)
             .map(move |(_, editor)| Self::editor_status(&editor, app))
@@ -118,21 +114,19 @@ pub enum CodeSource {
     /// Opened from an active AI agent conversation.
     AIAction { id: AIAgentActionId },
     /// Opened from project rules (WARP.md) file.
-    ProjectRules { path: PathBuf },
-    /// Opened from file tree.
-    FileTree { path: PathBuf },
-    /// 从远端文件树点击打开的远端文件(openWarp 独有)。通过 buffer-sync 协议
-    /// 与 SSH daemon 同步内容,本地没有对应路径,因此 tab 身份用 [`RemotePath`]
-    /// 标识。pane 不持久化 —— 远端 buffer 依赖活跃 SSH 连接。
-    RemoteFileTree {
-        remote_path: super::buffer_location::RemotePath,
-    },
+    ProjectRules { location: LocalOrRemotePath },
+    /// Opened from file tree (local or remote).
+    /// 远端文件通过 buffer-sync 协议与 SSH daemon 同步内容,本地没有对应路径,
+    /// pane 不持久化 —— 远端 buffer 依赖活跃 SSH 连接(见 [`Self::is_restorable`])。
+    FileTree { location: LocalOrRemotePath },
+    /// Opened from command palette file search (local or remote).
+    CommandPalette { location: LocalOrRemotePath },
     /// Opened from macOS Finder via "Open With".
     Finder { path: PathBuf },
     /// Opened from a skill.
     Skill {
         reference: SkillReference,
-        path: PathBuf,
+        location: LocalOrRemotePath,
         origin: SkillOpenOrigin,
     },
 }
@@ -147,7 +141,7 @@ impl CodeSource {
             | Self::AIAction { .. }
             | Self::ProjectRules { .. }
             | Self::FileTree { .. }
-            | Self::RemoteFileTree { .. }
+            | Self::CommandPalette { .. }
             | Self::Finder { .. }
             | Self::Skill { .. } => None,
         }
@@ -157,30 +151,45 @@ impl CodeSource {
     /// [`Self::location`] 取统一身份。
     pub fn path(&self) -> Option<PathBuf> {
         match self {
-            Self::New { .. } | Self::AIAction { .. } | Self::RemoteFileTree { .. } => None,
-            Self::Link { path, .. }
-            | Self::ProjectRules { path }
-            | Self::FileTree { path }
-            | Self::Finder { path }
-            | Self::Skill { path, .. } => Some(path.clone()),
+            Self::New { .. } | Self::AIAction { .. } => None,
+            Self::FileTree { location, .. } | Self::CommandPalette { location, .. } => {
+                match location {
+                    LocalOrRemotePath::Local(path) => Some(path.clone()),
+                    LocalOrRemotePath::Remote(_) => None,
+                }
+            }
+            Self::Link { path, .. } | Self::Finder { path } => Some(path.clone()),
+            Self::ProjectRules { location } | Self::Skill { location, .. } => {
+                location.to_local_path().map(Path::to_path_buf)
+            }
         }
     }
 
-    /// 该 source 对应文件的统一身份(本地路径或远端 `RemotePath`)。
+    /// Returns the `LocalOrRemotePath` for file tree sources.
+    pub fn file_location(&self) -> Option<&LocalOrRemotePath> {
+        match self {
+            Self::FileTree { location } | Self::CommandPalette { location } => Some(location),
+            _ => None,
+        }
+    }
+
+    /// Returns the `LocalOrRemotePath` for any source that has a backing file.
     ///
-    /// 本地文件与远端文件统一走 `CodeView` 的多文件分组逻辑,tab 去重 / 聚焦
-    /// 都用 [`BufferLocation`] 作为 key。
-    pub fn location(&self) -> Option<BufferLocation> {
+    /// Unlike `path()` (which only returns local paths) and `file_location()`
+    /// (which only covers `FileTree`), this covers every variant that maps to
+    /// a file — local or remote.
+    pub fn location(&self) -> Option<LocalOrRemotePath> {
         match self {
             Self::New { .. } | Self::AIAction { .. } => None,
-            Self::RemoteFileTree { remote_path } => {
-                Some(BufferLocation::Remote(remote_path.clone()))
+            Self::FileTree { location } | Self::CommandPalette { location } => {
+                Some(location.clone())
             }
-            Self::Link { path, .. }
-            | Self::ProjectRules { path }
-            | Self::FileTree { path }
-            | Self::Finder { path }
-            | Self::Skill { path, .. } => Some(BufferLocation::Local(path.clone())),
+            Self::Link { path, .. } | Self::Finder { path } => {
+                Some(LocalOrRemotePath::Local(path.clone()))
+            }
+            Self::ProjectRules { location } | Self::Skill { location, .. } => {
+                Some(location.clone())
+            }
         }
     }
 
@@ -214,8 +223,14 @@ impl CodeSource {
             Self::Link { .. } => "link",
             Self::AIAction { .. } => "ai_action",
             Self::ProjectRules { .. } => "project_rules",
+            Self::FileTree {
+                location: LocalOrRemotePath::Remote(_),
+            } => "remote_file_tree",
             Self::FileTree { .. } => "file_tree",
-            Self::RemoteFileTree { .. } => "remote_file_tree",
+            Self::CommandPalette {
+                location: LocalOrRemotePath::Remote(_),
+            } => "remote_command_palette",
+            Self::CommandPalette { .. } => "command_palette",
             Self::Finder { .. } => "finder",
             Self::Skill { .. } => "skill",
         }
@@ -224,9 +239,25 @@ impl CodeSource {
     /// Returns `true` if this source should be restored across app restarts.
     ///
     /// `AIAction` is ephemeral (tied to a live conversation) and should not
-    /// be restored. `RemoteFileTree` 依赖活跃 SSH 连接,同样不恢复。
+    /// be restored. 远端文件依赖活跃 SSH 连接,同样不恢复。
     pub fn is_restorable(&self) -> bool {
-        !matches!(self, Self::AIAction { .. } | Self::RemoteFileTree { .. })
+        !matches!(
+            self,
+            Self::AIAction { .. }
+                | Self::FileTree {
+                    location: LocalOrRemotePath::Remote(_),
+                }
+                | Self::CommandPalette {
+                    location: LocalOrRemotePath::Remote(_),
+                }
+                | Self::ProjectRules {
+                    location: LocalOrRemotePath::Remote(_),
+                }
+                | Self::Skill {
+                    location: LocalOrRemotePath::Remote(_),
+                    ..
+                }
+        )
     }
 }
 
@@ -278,12 +309,14 @@ impl CodeManager {
     pub fn deregister_pane(&mut self, source: &CodeSource) {
         self.source_to_pane_data.remove(&source.omit_line_col());
     }
-    /// Returns the locator for a code pane that already has `location` open in
-    /// the given pane group. `location` 统一覆盖本地与远端文件。
+
+    /// Returns the locator for a code pane that already has the given `LocalOrRemotePath`
+    /// open in the given pane group. Works for both local and remote files.
+    /// `location` 统一覆盖本地与远端文件。
     pub fn get_locator_for_location_in_tab(
         &self,
         pane_group_id: EntityId,
-        location: &BufferLocation,
+        location: &LocalOrRemotePath,
     ) -> Option<PaneViewLocator> {
         self.source_to_pane_data
             .iter()

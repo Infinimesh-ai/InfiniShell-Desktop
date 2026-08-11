@@ -1,8 +1,12 @@
+mod cloud_mode_v2_view;
 mod data_source;
+mod mixer;
 mod search_item;
 mod view;
 
+pub use cloud_mode_v2_view::{CloudModeV2SlashCommandView, Section as CloudModeV2Section};
 pub use data_source::*;
+pub use mixer::{SlashCommandMixer, build_slash_command_mixer, slash_command_query};
 pub use view::*;
 
 #[cfg(feature = "local_fs")]
@@ -17,15 +21,18 @@ use warp_util::path::{CleanPathResult, LineAndColumnArg};
 use warpui::clipboard::ClipboardContent;
 use warpui::{SingletonEntity, ViewContext};
 
+use crate::TelemetryEvent;
 use crate::ai::blocklist::agent_view::{
-    AgentViewEntryOrigin, DismissalStrategy, EphemeralMessage, ENTER_OR_EXIT_CONFIRMATION_WINDOW,
+    AgentViewEntryOrigin, DismissalStrategy, ENTER_OR_EXIT_CONFIRMATION_WINDOW, EphemeralMessage,
 };
 use crate::ai::blocklist::drive_object_attachment_for_reference;
-use crate::ai::blocklist::{BlocklistAIHistoryModel, SlashCommandRequest};
-use crate::cloud_object::{model::persistence::ObjectStoreModel, ObjectType};
+use crate::ai::blocklist::{
+    BlocklistAIHistoryModel, InputTypeAutoDetectionSource, PendingAttachment, SlashCommandRequest,
+};
+use crate::cloud_object::{ObjectType, model::persistence::ObjectStoreModel};
 use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
-use crate::search::slash_command_menu::static_commands::commands::{self, COMMAND_REGISTRY};
 use crate::search::slash_command_menu::static_commands::Availability;
+use crate::search::slash_command_menu::static_commands::commands::{self, COMMAND_REGISTRY};
 use crate::search::slash_command_menu::{SlashCommandId, StaticCommand};
 use crate::server::ids::SyncId;
 use crate::server::telemetry::SlashCommandAcceptedDetails;
@@ -33,6 +40,7 @@ use crate::settings::AISettings;
 use crate::terminal::input::decorations::InputBackgroundJobOptions;
 use crate::terminal::input::inline_menu::{InlineMenuAction, InlineMenuType};
 use crate::terminal::input::message_bar::Message;
+use crate::terminal::input::models::InlineModelSelectorTab;
 use crate::terminal::input::slash_command_model::{
     SlashCommandEntryState, UpdatedSlashCommandModel,
 };
@@ -44,7 +52,6 @@ use crate::terminal::model::session::Session;
 use crate::terminal::view::TerminalAction;
 use crate::view_components::DismissibleToast;
 use crate::workspace::{ForkedConversationDestination, ToastStack, WorkspaceAction};
-use crate::TelemetryEvent;
 
 #[derive(Debug, Clone)]
 pub enum AcceptSlashCommandOrSavedPrompt {
@@ -129,6 +136,23 @@ fn open_file_command_path(
 }
 
 impl Input {
+    /// Drains the input's staged attachments so they travel with a fork's initial prompt.
+    ///
+    /// Only drains when a non-empty prompt will actually be sent: `ForkAIConversation` drops
+    /// attachments when there is no initial prompt, which would silently discard them.
+    fn take_pending_attachments_for_fork(
+        &mut self,
+        argument: Option<&String>,
+        ctx: &mut ViewContext<Self>,
+    ) -> Vec<PendingAttachment> {
+        if !argument.is_some_and(|argument| !argument.trim().is_empty()) {
+            return Vec::new();
+        }
+        self.ai_context_model.update(ctx, |context_model, ctx| {
+            context_model.take_pending_attachments(ctx)
+        })
+    }
+
     pub(super) fn select_slash_command(
         &mut self,
         command: &StaticCommand,
@@ -188,7 +212,7 @@ impl Input {
         }
 
         match self.slash_command_model.as_ref(ctx).state().clone() {
-            SlashCommandEntryState::None | SlashCommandEntryState::DisabledUntilEmptyBuffer => {
+            SlashCommandEntryState::None => {
                 if self.suggestions_mode_model.as_ref(ctx).is_slash_commands() {
                     self.close_slash_commands_menu(ctx);
                 }
@@ -220,7 +244,7 @@ impl Input {
                 if detected_command.command.auto_enter_ai_mode
                     || !FeatureFlag::AgentView.is_enabled()
                 {
-                    self.enter_ai_mode(ctx);
+                    self.enter_ai_mode(Some(InputTypeAutoDetectionSource::SlashCommand), ctx);
                 }
 
                 if detected_command.command.name == commands::EDIT.name
@@ -247,7 +271,7 @@ impl Input {
                 }
 
                 // Skill commands always require AI mode
-                self.enter_ai_mode(ctx);
+                self.enter_ai_mode(Some(InputTypeAutoDetectionSource::SlashCommand), ctx);
             }
         }
     }
@@ -636,7 +660,23 @@ impl Input {
                 self.open_invoke_skill_selector(ctx);
             }
             models if command.name == commands::MODEL.name => {
-                self.open_model_selector(ctx);
+                if trigger.is_keybinding() {
+                    // A keybinding may carry a pre-existing prompt in the buffer; open
+                    // like the model chip so the prompt is parked for search and
+                    // restored when a model is selected (or the selector is dismissed).
+                    self.open_model_selector_and_snapshot_prompt(
+                        InlineModelSelectorTab::BaseAgent,
+                        ctx,
+                    );
+                } else {
+                    // Typed `/model`: the buffer holds the consumable command text.
+                    // Just switch into the model selector; `set_mode` snapshots the
+                    // buffer so it's restored on dismiss but cleared on selection.
+                    self.suggestions_mode_model.update(ctx, |model, ctx| {
+                        model.set_mode(InputSuggestionsMode::ModelSelector, ctx);
+                    });
+                    ctx.notify();
+                }
             }
             profiles if command.name == commands::PROFILE.name => {
                 if !FeatureFlag::InlineProfileSelector.is_enabled() {
@@ -665,7 +705,9 @@ impl Input {
                     .map(|path| path.to_path_buf())
                     .map(|path| path.to_string_lossy().to_string())
                 else {
-                    log::error!("Expected a valid working directory since /pr-comments is only available from the terminal");
+                    log::error!(
+                        "Expected a valid working directory since /pr-comments is only available from the terminal"
+                    );
                     return false;
                 };
 
@@ -692,12 +734,19 @@ impl Input {
                     ForkedConversationDestination::SplitPane
                 };
 
+                // Move any pending attachments out of the source input so they travel with the
+                // initial prompt into the forked pane and no longer linger on the original input.
+                // Only drain them when a non-empty prompt will actually be sent; the fork drops
+                // attachments when there is no initial prompt, which would silently discard them.
+                let initial_attachments = self.take_pending_attachments_for_fork(argument, ctx);
+
                 ctx.dispatch_typed_action(&WorkspaceAction::ForkAIConversation {
                     conversation_id,
                     fork_from_exchange: None,
                     summarize_after_fork: false,
                     summarization_prompt: None,
                     initial_prompt: argument.cloned(),
+                    initial_attachments,
                     destination,
                 });
             }
@@ -724,12 +773,15 @@ impl Input {
                     ForkedConversationDestination::CurrentPane
                 };
 
+                let initial_attachments = self.take_pending_attachments_for_fork(argument, ctx);
+
                 ctx.dispatch_typed_action(&WorkspaceAction::ForkAIConversation {
                     conversation_id,
                     fork_from_exchange: None,
                     summarize_after_fork: true,
                     summarization_prompt: None,
                     initial_prompt: argument.cloned(),
+                    initial_attachments,
                     destination,
                 });
             }
@@ -781,7 +833,9 @@ impl Input {
                         prompt,
                     });
                 } else {
-                    self.submit_queued_prompt(prompt, ctx);
+                    // Not in progress: submit immediately as a regular (non-queued) user query so
+                    // the live staging is sent and reset, rather than treated as a queued-row fire.
+                    self.submit_user_query_now(prompt, ctx);
                 }
             }
             open_repo if command.name == commands::OPEN_REPO.name => {
@@ -909,12 +963,11 @@ impl Input {
                 let reference = detected_skill.reference.clone();
                 let user_query = detected_skill.argument.clone();
                 self.execute_skill_command(
-                    reference, user_query, /*is_queued_prompt*/ false, ctx,
+                    reference, user_query, /*queued_query_id*/ None,
+                    /*conversation_id_override*/ None, ctx,
                 )
             }
-            SlashCommandEntryState::None
-            | SlashCommandEntryState::Composing { .. }
-            | SlashCommandEntryState::DisabledUntilEmptyBuffer => false,
+            SlashCommandEntryState::None | SlashCommandEntryState::Composing { .. } => false,
         }
     }
 
@@ -959,13 +1012,58 @@ impl Input {
                 let reference = detected_skill.reference.clone();
                 let user_query = detected_skill.argument.clone();
                 self.execute_skill_command(
-                    reference, user_query, /*is_queued_prompt*/ false, ctx,
+                    reference, user_query, /*queued_query_id*/ None,
+                    /*conversation_id_override*/ None, ctx,
                 )
             }
-            SlashCommandEntryState::None
-            | SlashCommandEntryState::Composing { .. }
-            | SlashCommandEntryState::DisabledUntilEmptyBuffer => false,
+            SlashCommandEntryState::None | SlashCommandEntryState::Composing { .. } => false,
         }
+    }
+}
+
+/// Whether executing the static slash `command` submits its text to the conversation as an AI
+/// prompt (handled downstream like a normal user query) rather than performing an immediate
+/// local action.
+///
+/// This is the single source of truth for the "reiterated as a prompt vs handled immediately"
+/// distinction, mirroring the `command_that_just_sends_ai_request_with_prefix` arm in
+/// [`Input::execute_slash_command`]. Every other slash command emits an immediate action
+/// (forking, switching model, opening a menu, etc.), so callers gating prompt queuing or
+/// shared-session forwarding should treat those as "run now".
+///
+/// Zap:上游按 `SlashCommandKind::{Compact, Plan, Orchestrate}` 判定。我方 `StaticCommand`
+/// 没有随上游拆出 `kind` 字段,这里按命令名判定;并且两处语义差异:
+/// * `/orchestrate` 与编排模式一起已从本地优先分支删除;
+/// * `/compact` 在我方是**立即处理**的(dispatch `SummarizeAIConversation` 走本地摘要链路),
+///   不再作为带前缀的 AI 请求下发,故不计入;
+/// * `/init` 在我方走"带前缀发 AI 请求"这条路径,故计入。
+pub fn slash_command_is_submitted_as_prompt(command: &StaticCommand) -> bool {
+    command.name == commands::INIT.name || command.name == commands::PLAN.name
+}
+
+/// Tooltip and slash command name for the fork button, returned as a unit so
+/// callers rendering the button and callers inserting the command always agree.
+#[cfg(not(target_family = "wasm"))]
+pub(crate) struct ForkButtonAction {
+    pub tooltip: &'static str,
+    pub command_name: &'static str,
+}
+
+/// Returns the tooltip and slash command for the fork button.
+///
+/// Zap:上游会在「云端 Oz 会话」上下文里把该按钮改写成 `/continue-locally`
+/// (`conversation_is_cloud_oz_for_slash_command` 判定 harness)。本地优先分支删除了
+/// cloud→local 交接链路,没有云端会话可以「继续到本地」,因此这里恒定返回 `/fork`。
+/// 保留上游的函数签名与返回结构,以免调用点(fork 按钮渲染 / 命令插入)分叉。
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn fork_button_action(
+    _conversation_id: Option<crate::ai::agent::conversation::AIConversationId>,
+    _is_cloud_agent_context: bool,
+    _ctx: &warpui::AppContext,
+) -> ForkButtonAction {
+    ForkButtonAction {
+        tooltip: "Fork conversation",
+        command_name: commands::FORK.name,
     }
 }
 
@@ -974,10 +1072,10 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    use crate::terminal::model::session::command_executor::testing::TestCommandExecutor;
-    use crate::terminal::model::session::SessionInfo;
-    use crate::terminal::shell::ShellType;
     use crate::terminal::ShellLaunchData;
+    use crate::terminal::model::session::SessionInfo;
+    use crate::terminal::model::session::command_executor::testing::TestCommandExecutor;
+    use crate::terminal::shell::ShellType;
 
     fn wsl_session() -> Session {
         Session::new(

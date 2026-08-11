@@ -1,42 +1,55 @@
 //! This module contains the implementation of `BackingView` for `TerminalView`, as well as
 //! business logic for integrating the terminal view with the pane infra (`crate::pane_group`).
+use warpui::elements::{
+    ConstrainedBox, CrossAxisAlignment, Empty, Flex, MainAxisAlignment, MainAxisSize,
+    ParentElement, Shrinkable,
+};
+use warpui::prelude::{ChildView, Container};
+use warpui::text_layout::ClipConfig;
+use warpui::ui_components::components::UiComponent;
+use warpui::{
+    AppContext, Element, ModelHandle, SingletonEntity, TypedActionView, ViewContext,
+    WeakModelHandle,
+};
+
+use super::ambient_agent::is_cloud_agent_pre_first_exchange;
 use super::shared_session::adapter::Kind as SharedSessionKind;
 use super::{Event, PaneConfiguration, TerminalAction, TerminalViewState, Viewer};
-use crate::ai::agent::conversation::{AIConversation, ConversationStatus};
-use crate::ai::blocklist::agent_view::agent_view_bg_fill;
+use crate::ai::agent::conversation::{
+    AIConversation, ConversationStatus, ServerAIConversationMetadata,
+};
 use crate::ai::blocklist::BlocklistAIHistoryModel;
-use crate::ai::conversation_status_ui::{render_status_element, STATUS_ELEMENT_PADDING};
+use crate::ai::blocklist::agent_view::orchestration_conversation_links::parent_conversation_navigation_card;
+use crate::ai::blocklist::orchestration_topology::orchestration_aware_conversation_status;
 use crate::appearance::Appearance;
 use crate::features::FeatureFlag;
 use crate::menu::{MenuItem, MenuItemFields};
 use crate::pane_group::focus_state::{PaneFocusHandle, PaneGroupFocusEvent, PaneGroupFocusState};
+use crate::pane_group::pane::view::PaneHeaderAction;
 use crate::pane_group::pane::view::header::components::{
-    header_edge_min_width, render_pane_header_buttons, render_pane_header_title_text,
-    render_three_column_header, CenteredHeaderEdgeWidth,
+    CenteredHeaderEdgeWidth, header_edge_min_width, render_pane_header_buttons,
+    render_pane_header_title_text, render_three_column_header,
 };
-use crate::pane_group::pane::PaneStack;
-use crate::pane_group::{pane::view, pane::view::PaneHeaderAction, BackingView, SplitPaneState};
+use crate::pane_group::pane::view::header::{PANE_HEADER_HEIGHT, render_pane_header_draggable};
+use crate::pane_group::pane::{PaneStack, view};
+use crate::pane_group::{BackingView, SplitPaneState, TOGGLE_MAXIMIZE_PANE_BINDING_NAME};
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
-use crate::terminal::model::terminal_model::ConversationTranscriptViewerStatus;
+use crate::terminal::shared_session::SharedSessionActionSource;
 use crate::terminal::shared_session::participant_avatar_view::render_participants_and_role_elements;
 use crate::terminal::shared_session::render_util::shared_session_indicator_color;
-use crate::terminal::shared_session::SharedSessionActionSource;
-use crate::terminal::TerminalManager;
-use crate::terminal::TerminalView;
-use crate::ui_components::blended_colors;
+use crate::terminal::{TerminalManager, TerminalView};
+use crate::ui_components::agent_icon::terminal_view_agent_icon_variant;
 use crate::ui_components::buttons::icon_button_with_color;
-use crate::ui_components::icons;
+use crate::ui_components::icon_with_status::render_icon_with_status;
+use crate::ui_components::{blended_colors, icons};
+use crate::util::bindings::keybinding_name_to_display_string;
 use crate::workspace::tab_settings::TabSettings;
-use warp_core::ui::Icon as WarpIcon;
-use warpui::elements::{
-    ChildAnchor, ConstrainedBox, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
-    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Shrinkable, Stack,
-};
-use warpui::prelude::{vec2f, ChildView, Container, Hoverable};
-use warpui::text_layout::ClipConfig;
-use warpui::ui_components::components::UiComponent;
-use warpui::WeakModelHandle;
-use warpui::{AppContext, Element, ModelHandle, SingletonEntity, TypedActionView, ViewContext};
+
+/// Total size of the agent icon-with-status component rendered in the pane header.
+/// Sub-components (circle, badge, cloud) are derived inside `render_icon_with_status`.
+/// Sized so the component fits comfortably within `PANE_HEADER_HEIGHT` (34px) with a
+/// few pixels of vertical buffer.
+const PANE_HEADER_AGENT_SIZE: f32 = 26.;
 
 impl TerminalView {
     /// Returns a reference to the focus handle if one has been set.
@@ -139,6 +152,7 @@ impl TerminalView {
             return;
         }
 
+        // Zap:分享对话框 / ShareableObject 链路已剥离,这里只刷新头部内容与溢出菜单。
         self.pane_configuration.update(ctx, |pane_config, ctx| {
             pane_config.notify_header_content_changed(ctx);
             pane_config.refresh_pane_header_overflow_menu_items(ctx);
@@ -174,18 +188,15 @@ impl TerminalView {
             .and_then(|h| h.upgrade(app))
             .is_some_and(|stack| stack.as_ref(app).depth() > 1);
 
-        let ambient_agent_view = self.ambient_agent_view_model.as_ref(app);
         let is_transcript_viewer = self.model.lock().is_conversation_transcript_viewer();
-        let has_parent_terminal = (ambient_agent_view.is_ambient_agent()
-            && ambient_agent_view.has_parent_terminal())
-            || (!ambient_agent_view.is_ambient_agent() && !is_transcript_viewer);
+        let is_ambient_agent = self.is_ambient_agent_session(app);
+        let has_parent_terminal = (is_ambient_agent && self.is_nested_cloud_mode(app))
+            || (!is_ambient_agent && !is_transcript_viewer);
         let is_fullscreen_agent_view = self.agent_view_controller.as_ref(app).is_fullscreen();
 
         if in_nav_stack || (is_fullscreen_agent_view && has_parent_terminal) {
-            Flex::column()
-                .with_main_axis_alignment(MainAxisAlignment::Center)
-                .with_cross_axis_alignment(CrossAxisAlignment::Start)
-                .with_main_axis_size(MainAxisSize::Max)
+            Flex::row()
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_child(ChildView::new(&self.agent_view_back_button).finish())
                 .finish()
         } else {
@@ -199,6 +210,15 @@ impl TerminalView {
         header_ctx: &view::HeaderRenderContext,
         app: &AppContext,
     ) -> Box<dyn Element> {
+        // V2 swap-panes semantics: every conversation in the orchestration
+        // tree (orchestrator + each child) gets the orchestration pill bar
+        // rendered above the agent view header, so the pane title here
+        // falls back to the regular conversation title. Breadcrumbs used
+        // to render here for split-off child views, but the swap-panes
+        // refactor removed the split-off code path — the pill bar is now
+        // shown on every view, so a breadcrumb row alongside it would
+        // double-render the same navigation affordance.
+
         let appearance = Appearance::as_ref(app);
         let pane_config = self.pane_configuration.as_ref(app);
         let title = pane_config.title().to_owned();
@@ -208,16 +228,21 @@ impl TerminalView {
             ClipConfig::start()
         };
 
-        let should_render_ambient_agent_indicator = {
-            let model = self.model.lock();
-            model.is_shared_ambient_agent_session()
-                || matches!(
-                    model.conversation_transcript_viewer_status(),
-                    Some(ConversationTranscriptViewerStatus::ViewingAmbientConversation(_))
-                )
+        let should_render_ambient_agent_indicator = self.is_cloud_agent_session(app);
+        let theme = appearance.theme();
+        let render_agent_circle = |variant| {
+            render_icon_with_status(
+                variant,
+                PANE_HEADER_AGENT_SIZE,
+                0.,
+                theme,
+                theme.background(),
+            )
         };
         let pane_indicator = if should_render_ambient_agent_indicator {
-            Some(self.render_ambient_agent_indicator(app))
+            // Shared/viewed ambient session: route through the shared helper so the pane header
+            // renders the same brand-color circle + cloud lobe + status as the vertical tab.
+            terminal_view_agent_icon_variant(self, app).map(render_agent_circle)
         } else if let Some(shared_session) = self.shared_session.as_ref() {
             if let Some(Viewer {
                 sharer: Some(sharer),
@@ -249,17 +274,9 @@ impl TerminalView {
                     .selected_conversation(app)
                     .is_some())
         {
-            self.ai_context_model
-                .as_ref(app)
-                .selected_conversation(app)
-                .map(|conversation| {
-                    self.render_agent_indicator(
-                        conversation.id(),
-                        conversation.status().clone(),
-                        self.is_long_running(),
-                        app,
-                    )
-                })
+            // Conversation-bound terminal: same shared helper — produces an OzAgent variant for
+            // local conversations and a CLIAgent variant for the (rare) CLI-backed terminal.
+            terminal_view_agent_icon_variant(self, app).map(render_agent_circle)
         } else {
             self.render_terminal_mode_indicator(app)
         };
@@ -317,7 +334,28 @@ impl TerminalView {
             None
         };
 
-        let left_of_overflow = self.render_shared_session_header_content(app);
+        // Zap:会话详情面板(conversation_details_panel)与云端 ambient agent 链路已剥离,
+        // 这里只保留 shared session 头部内容。
+        let mut left_of_overflow = self.render_shared_session_header_content(app);
+
+        let mut icon_button_count: u32 = 0;
+
+        // 云端 ambient agent 仍在等待会话就绪时展示取消按钮。
+        let is_waiting_for_session = FeatureFlag::CloudMode.is_enabled()
+            && self
+                .ambient_agent_view_model
+                .as_ref()
+                .is_some_and(|model| model.as_ref(app).is_waiting_for_session());
+        if is_waiting_for_session {
+            let button = self.render_ambient_agent_cancel_button(app);
+            icon_button_count += 1;
+            if let Some(existing) = left_of_overflow {
+                left_of_overflow =
+                    Some(Flex::row().with_child(existing).with_child(button).finish());
+            } else {
+                left_of_overflow = Some(button);
+            }
+        }
 
         let mut right_row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
@@ -343,12 +381,97 @@ impl TerminalView {
                 button_size,
             ),
         );
-        let icon_button_count = show_close_button as u32
+        icon_button_count += show_close_button as u32
             + header_ctx.has_overflow_items as u32
             + has_sharing_element as u32;
 
         let min_width = header_edge_min_width(icon_button_count);
         (right_row.finish(), min_width)
+    }
+
+    fn render_parent_conversation_header_card(&self, app: &AppContext) -> Option<Box<dyn Element>> {
+        if !(FeatureFlag::AgentView.is_enabled()
+            && self.agent_view_controller.as_ref(app).is_fullscreen())
+        {
+            return None;
+        }
+
+        let active_conversation_id = self
+            .agent_view_controller
+            .as_ref(app)
+            .agent_view_state()
+            .active_conversation_id()?;
+        let active_conversation =
+            BlocklistAIHistoryModel::as_ref(app).conversation(&active_conversation_id)?;
+        parent_conversation_navigation_card(
+            active_conversation,
+            self.mouse_states.parent_conversation_header_link.clone(),
+            app,
+        )
+    }
+
+    fn maybe_add_parent_navigation_card(
+        &self,
+        header: Box<dyn Element>,
+        parent_conversation_header_card: Option<Box<dyn Element>>,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        // The pill bar is shown for the orchestrator and swap-target child panes.
+        // Split-off panes ("Open in new pane" / "Open in new tab") render a
+        // breadcrumb row instead. When no children have arrived yet,
+        // `OrchestrationPillBar::pill_specs` returns `None` and the pill
+        // bar's `render` short-circuits to `Empty`.
+        if FeatureFlag::AgentView.is_enabled()
+            && self.agent_view_controller.as_ref(app).is_fullscreen()
+        {
+            // The wrapping `Flex::column` would otherwise pass an infinite
+            // vertical max constraint down to its non-flex children. That
+            // breaks the title's vertical centering: with infinite max.y,
+            // the centered `Align` inside `render_three_column_header`
+            // collapses to the title's own (small) line-box height, and
+            // the outer row's `CrossAxisAlignment::Stretch` then pins the
+            // title to the top of the row. Pinning the header to its
+            // standard `PANE_HEADER_HEIGHT` here restores the finite
+            // vertical constraint the centering logic relies on, while
+            // letting the pill bar / breadcrumb row sit immediately below
+            // at its own height.
+            let pinned_header = ConstrainedBox::new(header)
+                .with_height(PANE_HEADER_HEIGHT)
+                .finish();
+            let secondary_row: Box<dyn Element> = if self.is_orchestration_split_off() {
+                crate::ai::blocklist::agent_view::render_orchestration_breadcrumbs(
+                    self.agent_view_controller.as_ref(app),
+                    self.mouse_states.parent_conversation_header_link.clone(),
+                    self.mouse_states.breadcrumbs_horizontal_scroll.clone(),
+                    app,
+                )
+                .unwrap_or_else(|| Empty::new().finish())
+            } else {
+                ChildView::new(&self.orchestration_pill_bar).finish()
+            };
+            return Flex::column()
+                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+                .with_child(pinned_header)
+                .with_child(secondary_row)
+                .finish();
+        }
+
+        if let Some(parent_card) = parent_conversation_header_card {
+            Flex::column()
+                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+                .with_child(
+                    Container::new(parent_card)
+                        .with_padding_left(4.)
+                        .with_padding_right(4.)
+                        .with_padding_top(4.)
+                        .with_padding_bottom(2.)
+                        .finish(),
+                )
+                .with_child(header)
+                .finish()
+        } else {
+            header
+        }
     }
 
     fn render_terminal_pane_header(
@@ -358,6 +481,7 @@ impl TerminalView {
     ) -> Box<dyn Element> {
         let is_fullscreen_agent_view = FeatureFlag::AgentView.is_enabled()
             && self.agent_view_controller.as_ref(app).is_fullscreen();
+        let parent_conversation_header_card = self.render_parent_conversation_header_card(app);
 
         let left = self.maybe_render_header_back_button(app);
         let center = self.render_header_title(is_fullscreen_agent_view, header_ctx, app);
@@ -374,14 +498,21 @@ impl TerminalView {
             header_ctx.header_left_inset,
             header_ctx.draggable_state.is_dragging(),
         );
-
-        if is_fullscreen_agent_view {
-            Container::new(header)
-                .with_background(agent_view_bg_fill(app))
-                .finish()
-        } else {
-            header
-        }
+        // Make only the title row draggable; the secondary row (pill
+        // bar / breadcrumbs / navigation card) sits outside the drag
+        // region so its own mouse-driven widgets (notably the pill
+        // bar's scrollbar thumb) keep their hit-targets.
+        let draggable_header = render_pane_header_draggable::<TerminalView>(
+            self.pane_configuration.clone(),
+            header,
+            header_ctx.draggable_state.clone(),
+            app,
+        );
+        self.maybe_add_parent_navigation_card(
+            draggable_header,
+            parent_conversation_header_card,
+            app,
+        )
     }
 }
 
@@ -439,7 +570,8 @@ impl BackingView for TerminalView {
                     .into_item(),
             );
         }
-        // Zap:删除 Pane 头部 "Share session" 入口(云端 shared session)
+        // Zap:删除 Pane 头部 "Share session" / "Copy link" / "Open on Desktop" 入口
+        //(云端 shared session 链路已剥离,shared_session::manager 不存在)
 
         // Split-pane related items.
         if self.split_pane_state(ctx).is_in_split_pane() {
@@ -451,6 +583,10 @@ impl BackingView for TerminalView {
             items.push(
                 MenuItemFields::toggle_pane_action(is_maximized)
                     .with_on_select_action(TerminalAction::ToggleMaximizePane)
+                    .with_key_shortcut_label(keybinding_name_to_display_string(
+                        TOGGLE_MAXIMIZE_PANE_BINDING_NAME,
+                        ctx,
+                    ))
                     .into_item(),
             );
         }
@@ -479,7 +615,9 @@ impl BackingView for TerminalView {
     ) -> view::HeaderContent {
         view::HeaderContent::Custom {
             element: self.render_terminal_pane_header(header_ctx, app),
-            has_custom_draggable_behavior: false,
+            // We wrap only the title row in the drag handler ourselves;
+            // the secondary row stays interactive.
+            has_custom_draggable_behavior: true,
         }
     }
 
@@ -527,54 +665,6 @@ impl TerminalView {
         .finish()
     }
 
-    /// Render the agent indicator icon for when a conversation is selected.
-    fn render_agent_indicator(
-        &self,
-        conversation_id: crate::ai::agent::conversation::AIConversationId,
-        status: ConversationStatus,
-        is_long_running: bool,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let Some(conversation) =
-            BlocklistAIHistoryModel::as_ref(app).conversation(&conversation_id)
-        else {
-            return warpui::elements::Empty::new().finish();
-        };
-
-        let appearance = Appearance::as_ref(app);
-        let theme = appearance.theme();
-
-        // When a long-running command is active, show InProgress
-        // instead of the conversation's actual status.
-        let status = if is_long_running {
-            ConversationStatus::InProgress
-        } else {
-            status
-        };
-
-        if FeatureFlag::AgentView.is_enabled()
-            && conversation.exchange_count() == 0
-            && !is_long_running
-        {
-            ConstrainedBox::new(
-                WarpIcon::Oz
-                    .to_warpui_icon(blended_colors::text_sub(theme, theme.background()).into())
-                    .finish(),
-            )
-            .with_height(appearance.ui_font_size())
-            .with_width(appearance.ui_font_size())
-            .finish()
-        } else if FeatureFlag::NewTabStyling.is_enabled() {
-            let icon_size = appearance.ui_font_size() + 2.0 - STATUS_ELEMENT_PADDING * 2.;
-            render_status_element(&status, icon_size, appearance)
-        } else {
-            ConstrainedBox::new(status.render_icon(appearance).finish())
-                .with_height(appearance.ui_font_size())
-                .with_width(appearance.ui_font_size())
-                .finish()
-        }
-    }
-
     /// Render the indicator for terminal mode (no conversation selected).
     /// Shows error indicator if terminal is in error state, otherwise shell indicator on Windows.
     fn render_terminal_mode_indicator(&self, app: &AppContext) -> Option<Box<dyn Element>> {
@@ -615,51 +705,6 @@ impl TerminalView {
         None
     }
 
-    fn render_ambient_agent_indicator(&self, app: &AppContext) -> Box<dyn Element> {
-        let appearance = Appearance::as_ref(app);
-        let icon_color = appearance
-            .theme()
-            .main_text_color(appearance.theme().background());
-        let font_size = appearance.ui_font_size();
-        let ui_builder = appearance.ui_builder().clone();
-
-        Hoverable::new(
-            self.mouse_states
-                .ambient_agent_indicator_mouse_handle
-                .clone(),
-            move |state| {
-                let mut stack = Stack::new().with_child(
-                    ConstrainedBox::new(
-                        icons::Icon::AmbientAgentMode
-                            .to_warpui_icon(icon_color)
-                            .finish(),
-                    )
-                    .with_height(font_size * 1.5)
-                    .with_width(font_size * 1.5)
-                    .finish(),
-                );
-                if state.is_hovered() {
-                    let tooltip = ui_builder
-                        .tool_tip(crate::t!("terminal-cloud-agent-run"))
-                        .build()
-                        .finish();
-                    stack.add_positioned_overlay_child(
-                        tooltip,
-                        OffsetPositioning::offset_from_parent(
-                            vec2f(0., 3.),
-                            ParentOffsetBounds::WindowByPosition,
-                            ParentAnchor::BottomMiddle,
-                            ChildAnchor::TopMiddle,
-                        ),
-                    );
-                }
-
-                stack.finish()
-            },
-        )
-        .finish()
-    }
-
     /// Render shared session header content (participant avatars and role controls).
     fn render_shared_session_header_content(&self, app: &AppContext) -> Option<Box<dyn Element>> {
         let Some(shared_session) = &self.shared_session else {
@@ -697,8 +742,33 @@ impl TerminalView {
         ))
     }
 
-    pub fn is_ambient_agent_session(&self, _ctx: &AppContext) -> bool {
-        false
+    pub fn is_ambient_agent_session(&self, ctx: &AppContext) -> bool {
+        FeatureFlag::CloudMode.is_enabled()
+            && self
+                .ambient_agent_view_model
+                .as_ref()
+                .is_some_and(|model| model.as_ref(ctx).is_ambient_agent())
+    }
+
+    /// Whether this pane should be treated as an ambient agent conversation for display
+    /// purposes (e.g. the ambient agent icon in the pane header and vertical tab). This is the
+    /// single source of truth for that check; surfaces should call it rather than re-deriving
+    /// the condition, so they can't drift apart.
+    ///
+    /// Two signals are combined because they live in different places and neither subsumes the
+    /// other:
+    /// - [`Self::is_ambient_agent_session`] reads the pane's [`AmbientAgentViewModel`], which is
+    ///   how a cloud/ambient run composed or spawned *in this view* is recognized before it has
+    ///   any shared-session source.
+    /// - [`TerminalModel::is_cloud_agent_conversation`] reads model state — a shared *ambient*
+    ///   session or viewing an ambient conversation transcript — which the view model doesn't
+    ///   carry (e.g. a viewer that joined someone else's ambient session).
+    ///
+    /// It deliberately does NOT treat a manually shared *local* (`User`) session as a cloud
+    /// agent session even though it now carries an orchestrator task id on its `source_task_id`
+    /// sidecar (see QUALITY-726).
+    pub fn is_cloud_agent_session(&self, ctx: &AppContext) -> bool {
+        self.is_ambient_agent_session(ctx) || self.model.lock().is_cloud_agent_conversation()
     }
 
     fn selected_conversation_for_user_facing_chrome<'a>(
@@ -731,21 +801,48 @@ impl TerminalView {
         }
     }
 
+    /// Returns `true` while a cloud-mode ambient agent run is still spinning up. This covers
+    /// both the `WaitingForSession` phase (env being provisioned, "Connecting to Host") and
+    /// the post-session pre-first-exchange phase (session ready, harness not started, no
+    /// exchange yet). In either case the run is committed and we want the UI to read as busy.
+    fn is_in_cloud_agent_setup_phase(&self, ctx: &AppContext) -> bool {
+        if self
+            .ambient_agent_view_model
+            .as_ref()
+            .is_some_and(|model| model.as_ref(ctx).is_waiting_for_session())
+        {
+            return true;
+        }
+
+        let model = self.model.lock();
+        is_cloud_agent_pre_first_exchange(
+            self.ambient_agent_view_model.as_ref(),
+            &self.agent_view_controller,
+            &model,
+            ctx,
+        )
+    }
+
     /// Selected conversation status for chrome, or [`ConversationStatus::InProgress`] while the
-    /// active block is long-running (terminal-derived; not mirrored in history events).
+    /// active block is long-running (terminal-derived; not mirrored in history events) or while
+    /// a cloud-mode ambient agent is still in its environment-setup phase. For orchestrator
+    /// conversations, returns the aggregated child status so tab/header badges keep reflecting
+    /// active descendants after its turn finishes.
     pub fn selected_conversation_status(&self, ctx: &AppContext) -> Option<ConversationStatus> {
         let long_running = self.is_long_running();
+        let cloud_setup = self.is_in_cloud_agent_setup_phase(ctx);
 
         let Some(conversation) = self.selected_conversation_for_user_facing_chrome(ctx) else {
             // Ambient agent tabs can show Oz chrome without a filtered "chrome" conversation;
-            // still surface busy while a long-running shell command is active.
-            if long_running && self.is_ambient_agent_session(ctx) {
+            // still surface busy while a long-running shell command is active or the cloud
+            // environment is spinning up.
+            if (long_running || cloud_setup) && self.is_ambient_agent_session(ctx) {
                 return Some(ConversationStatus::InProgress);
             }
             return None;
         };
 
-        if long_running {
+        if long_running || cloud_setup {
             return Some(ConversationStatus::InProgress);
         }
 
@@ -753,7 +850,10 @@ impl TerminalView {
             return None;
         }
 
-        Some(conversation.status().clone())
+        Some(orchestration_aware_conversation_status(
+            BlocklistAIHistoryModel::as_ref(ctx),
+            conversation,
+        ))
     }
 
     pub fn selected_conversation_is_empty(&self, ctx: &AppContext) -> bool {
@@ -762,23 +862,47 @@ impl TerminalView {
     }
 
     /// Returns the conversation status for display purposes, suppressing the status when the
-    /// conversation is empty (no exchanges yet). This avoids showing a misleading "In progress"
-    /// indicator when a new conversation hasn't started streaming, except when a shell command
-    /// is actively long-running — that InProgress is real and should always surface.
+    /// conversation is empty (no exchanges yet) AND nothing else makes the run "busy". This
+    /// avoids showing a misleading "In progress" indicator on a brand-new conversation; real
+    /// InProgress states (long-running shell commands, cloud-environment setup) come through
+    /// because [`Self::selected_conversation_status`] surfaces them as `InProgress`.
     pub fn selected_conversation_status_for_display(
         &self,
         ctx: &AppContext,
     ) -> Option<ConversationStatus> {
-        if self.selected_conversation_is_empty(ctx) && !self.is_long_running() {
-            None
+        let status = self.selected_conversation_status(ctx)?;
+        if matches!(status, ConversationStatus::InProgress)
+            || !self.selected_conversation_is_empty(ctx)
+        {
+            Some(status)
         } else {
-            self.selected_conversation_status(ctx)
+            None
         }
     }
 
     pub fn selected_conversation_display_title(&self, ctx: &AppContext) -> Option<String> {
         self.selected_conversation_for_user_facing_chrome(ctx)
             .map(|conversation| self.selected_conversation_display_title_for_chrome(conversation))
+    }
+
+    /// Whether the selected conversation is a local orchestration child: it was spawned by a
+    /// parent orchestrator and is not executing on a remote worker. These runs are backed by a
+    /// server task (so they carry an ambient task id) but execute locally, so their agent icon
+    /// must use the local treatment rather than the cloud/ambient one.
+    pub(crate) fn selected_conversation_is_local_child(&self, ctx: &AppContext) -> bool {
+        self.selected_conversation_for_user_facing_chrome(ctx)
+            .is_some_and(|conversation| {
+                conversation.is_child_agent_conversation() && !conversation.is_remote_child()
+            })
+    }
+
+    /// Server metadata for the selected conversation, if any.
+    pub fn selected_conversation_server_metadata<'a>(
+        &'a self,
+        ctx: &'a AppContext,
+    ) -> Option<&'a ServerAIConversationMetadata> {
+        self.selected_conversation_for_user_facing_chrome(ctx)
+            .and_then(AIConversation::server_metadata)
     }
 
     pub fn selected_conversation_latest_user_prompt_for_tab_name(

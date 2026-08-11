@@ -23,7 +23,7 @@ pub fn validate_agent_mode_base_model_id(
 
     let llm_id: LLMId = model_id.into();
     let valid_ids = llm_prefs
-        .get_base_llm_choices_for_agent_mode()
+        .get_base_llm_choices_for_agent_mode(ctx)
         .map(|info| info.id.clone())
         .collect::<Vec<_>>();
 
@@ -91,7 +91,7 @@ pub fn refresh_warp_drive(
     ObjectStoreModel::as_ref(ctx)
         .initial_load_complete()
         .with_timeout(WARP_DRIVE_SYNC_TIMEOUT)
-        .map_err(|_| anyhow::anyhow!("Timed out waiting for Zap Drive to sync"))
+        .map_err(|_| anyhow::anyhow!("Timed out waiting for InfiniShell Drive to sync"))
 }
 
 /// Format an object owner for display in the CLI.

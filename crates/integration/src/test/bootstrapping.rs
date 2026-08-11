@@ -2,35 +2,32 @@
 
 use settings::Setting as _;
 use version_compare::Cmp;
-use warp::{
-    cmd_or_ctrl_shift,
-    integration_testing::{
-        input::{
-            input_contains_string, input_editor_is_focused, input_editor_is_not_focused,
-            input_is_empty,
-        },
-        step::new_step_with_default_assertions,
-        tab::tab_title_step,
-        terminal::{
-            assert_active_block_command_for_single_terminal_in_tab,
-            assert_long_running_block_executing_for_single_terminal_in_tab,
-            execute_command_for_single_terminal_in_tab,
-            util::{current_shell_starter_and_version, ExpectedExitStatus},
-            wait_until_bootstrapped_single_pane_for_tab,
-        },
-        view_getters::{single_input_view_for_tab, single_terminal_view_for_tab},
-    },
-    terminal::session_settings::HonorPS1,
-    terminal::shell::{self, ShellType},
-    workspace::Workspace,
+use warp::cmd_or_ctrl_shift;
+use warp::integration_testing::input::{
+    input_contains_string, input_editor_is_focused, input_editor_is_not_focused, input_is_empty,
 };
-use warpui::{
-    async_assert, async_assert_eq, clipboard::ClipboardContent, integration::TestStep, ViewHandle,
+use warp::integration_testing::step::new_step_with_default_assertions;
+use warp::integration_testing::tab::tab_title_step;
+use warp::integration_testing::terminal::util::{
+    ExpectedExitStatus, current_shell_starter_and_version,
 };
+use warp::integration_testing::terminal::{
+    assert_active_block_command_for_single_terminal_in_tab,
+    assert_long_running_block_executing_for_single_terminal_in_tab,
+    execute_command_for_single_terminal_in_tab, wait_until_bootstrapped_single_pane_for_tab,
+};
+use warp::integration_testing::view_getters::{
+    single_input_view_for_tab, single_terminal_view_for_tab,
+};
+use warp::terminal::session_settings::HonorPS1;
+use warp::terminal::shell::{self, ShellType};
+use warp::workspace::Workspace;
+use warpui_core::clipboard::ClipboardContent;
+use warpui_core::integration::TestStep;
+use warpui_core::{ViewHandle, async_assert, async_assert_eq};
 
-use crate::util::{write_all_rc_files_for_test, write_rc_files_for_test, ShellRcType};
-
-use super::{new_builder, Builder};
+use super::{Builder, new_builder};
+use crate::util::{ShellRcType, write_all_rc_files_for_test, write_rc_files_for_test};
 
 /// Ensures that config files are only sourced once when bootstrapping a new session.
 pub fn test_rc_files_only_sourced_once_during_bootstrapping() -> Builder {
@@ -104,7 +101,7 @@ pub fn test_paste_and_type_characters_before_bootstrap() -> Builder {
                 .add_named_assertion("Validate block contents", assert_active_block_command_for_single_terminal_in_tab("Enter some user input: ", 0))
         )
         .with_step(
-            TestStep::new("Zap input should not start focused, since .rc file is reading user input")
+            TestStep::new("InfiniShell input should not start focused, since .rc file is reading user input")
                 .add_assertion(input_editor_is_not_focused(0))
         )
         .with_step(
@@ -200,7 +197,7 @@ pub fn test_paste_and_type_characters_before_bootstrap() -> Builder {
         )
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
         .with_step(
-            new_step_with_default_assertions("Zap input should be focused and keep buffered text")
+            new_step_with_default_assertions("InfiniShell input should be focused and keep buffered text")
                 .add_assertion(input_editor_is_focused(0))
                 .add_assertion(input_contains_string(0, "this is the pasted textthese are some typed characters".to_owned()))
         )

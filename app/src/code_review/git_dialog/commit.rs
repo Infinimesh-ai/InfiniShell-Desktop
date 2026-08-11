@@ -4,58 +4,38 @@
 
 use std::path::Path;
 
+use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::appearance::Appearance;
-use warpui::{
-    elements::{
-        ChildView, ClippedScrollStateHandle, Container, CornerRadius, CrossAxisAlignment, Element,
-        Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
-    },
-    ui_components::{
-        components::{UiComponent, UiComponentStyles},
-        switch::SwitchStateHandle,
-    },
-    AppContext, SingletonEntity, ViewContext, ViewHandle,
+use warp_errors::report_error;
+use warpui::elements::{
+    ChildView, ClippedScrollStateHandle, Container, CornerRadius, CrossAxisAlignment, Element,
+    Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
 };
+use warpui::ui_components::components::{UiComponent, UiComponentStyles};
+use warpui::ui_components::switch::SwitchStateHandle;
+use warpui::{AppContext, SingletonEntity, ViewContext, ViewHandle};
 
-use crate::{
-    code_review::git_dialog::{
-        interactive_path_future, pr::show_pr_created_toast, render_branch_section,
-        render_file_changes_box, show_toast, user_facing_git_error, GitDialog, GitDialogAction,
-        GitDialogEvent, GitDialogMode,
-    },
-    editor::{
-        EditorOptions, EditorView, Event as EditorEvent, InteractionState,
-        PropagateAndNoOpNavigationKeys, TextOptions,
-    },
-    ui_components::icons::Icon,
-    util::git::{
-        create_pr, get_file_change_entries, run_commit, run_push, FileChangeEntry, PrInfo,
-    },
-    view_components::action_button::{ActionButton, ButtonSize, SecondaryTheme},
+use crate::code_review::diff_state::CommitChainMode;
+use crate::code_review::git_dialog::pr::show_pr_created_toast;
+use crate::code_review::git_dialog::{
+    GitDialog, GitDialogAction, GitDialogEvent, GitDialogMode, render_branch_section,
+    render_file_changes_box, should_send_git_ops_ai_request, show_toast, user_facing_git_error,
 };
-
-/// What should happen after a successful commit.
-#[allow(clippy::enum_variant_names)] // `Commit` prefix is intentional: describes the always-present first stage.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CommitIntent {
-    CommitOnly,
-    CommitAndPush,
-    CommitAndCreatePr,
-}
-
-/// What actually happened when a commit confirm ran to completion. Keeps
-/// the "which stages ran" information separate from the user's selected
-/// intent so the callback can't drift out of sync with the async body.
-enum CommitOutcome {
-    Committed,
-    Pushed,
-    PrCreated(PrInfo),
-}
+use crate::code_review::telemetry_event::{
+    CodeReviewTelemetryEvent, GitDialogStatus, GitOperationKind,
+};
+use crate::editor::{
+    EditorOptions, EditorView, Event as EditorEvent, InteractionState,
+    PropagateAndNoOpNavigationKeys, TextOptions,
+};
+use crate::ui_components::icons::Icon;
+use crate::util::git::{FileChangeEntry, PrInfo, get_file_change_entries};
+use crate::view_components::action_button::{ActionButton, ButtonSize, SecondaryTheme};
 
 /// Commit-specific sub-actions, dispatched wrapped in `GitDialogAction::Commit`.
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommitSubAction {
-    SetIntent(CommitIntent),
+    SetIntent(CommitChainMode),
     ToggleIncludeUnstaged,
     ToggleChangesExpanded,
 }
@@ -65,7 +45,7 @@ const EDITOR_MIN_HEIGHT: f32 = 72.;
 /// button API currently stores borrowed labels.
 const LOADING_LABEL: &str = "Committing\u{2026}";
 pub struct CommitState {
-    intent: CommitIntent,
+    pub(super) intent: CommitChainMode,
     include_unstaged: bool,
     file_changes: Vec<FileChangeEntry>,
     changes_expanded: bool,
@@ -83,14 +63,14 @@ pub struct CommitState {
 }
 
 pub(super) fn new_state(
-    repo_path: &Path,
+    local_repo_path: Option<&Path>,
     allow_create_pr: bool,
     has_upstream: bool,
     ctx: &mut ViewContext<GitDialog>,
 ) -> CommitState {
     // Dialog always opens with the plain commit intent; the user picks
     // something else via the segmented intent selector inside the dialog.
-    let intent = CommitIntent::CommitOnly;
+    let intent = CommitChainMode::CommitOnly;
     // `CommitAndPush` always runs `git push --set-upstream`, so it works
     // whether or not the branch already has an upstream — but the label
     // and icon flip to communicate the user-visible difference.
@@ -135,7 +115,7 @@ pub(super) fn new_state(
             .with_icon(Icon::GitCommit)
             .on_click(|ctx| {
                 ctx.dispatch_typed_action(GitDialogAction::Commit(CommitSubAction::SetIntent(
-                    CommitIntent::CommitOnly,
+                    CommitChainMode::CommitOnly,
                 )))
             })
     });
@@ -146,7 +126,7 @@ pub(super) fn new_state(
             .with_icon(push_icon)
             .on_click(|ctx| {
                 ctx.dispatch_typed_action(GitDialogAction::Commit(CommitSubAction::SetIntent(
-                    CommitIntent::CommitAndPush,
+                    CommitChainMode::CommitAndPush,
                 )))
             })
     });
@@ -162,7 +142,7 @@ pub(super) fn new_state(
             .with_icon(Icon::Github)
             .on_click(|ctx| {
                 ctx.dispatch_typed_action(GitDialogAction::Commit(CommitSubAction::SetIntent(
-                    CommitIntent::CommitAndCreatePr,
+                    CommitChainMode::CommitAndCreatePr,
                 )))
             })
         }))
@@ -171,25 +151,25 @@ pub(super) fn new_state(
     };
 
     let include_unstaged = true;
-    let repo_path_for_load = repo_path.to_path_buf();
-    ctx.spawn(
-        async move { get_file_change_entries(&repo_path_for_load, include_unstaged).await },
-        move |me, result, ctx| {
-            let GitDialogMode::Commit(state) = &mut me.mode else {
-                return;
-            };
-            match result {
-                Ok(entries) => {
-                    state.file_changes = entries;
+    // Local repos load the changes list from the working tree here; remote
+    // repos source the Changes box from synced metadata.
+    if let Some(repo_path) = local_repo_path {
+        let repo_path_for_load = repo_path.to_path_buf();
+        ctx.spawn(
+            async move { get_file_change_entries(&repo_path_for_load, include_unstaged).await },
+            move |me, result, ctx| {
+                let GitDialogMode::Commit(state) = &mut me.mode else {
+                    return;
+                };
+                match result {
+                    Ok(entries) => state.file_changes = entries,
+                    Err(err) => log::warn!("Failed to load file changes: {err}"),
                 }
-                Err(err) => {
-                    log::warn!("Failed to load file changes: {err}");
-                }
-            };
-            me.refresh_confirm_enabled(ctx);
-            ctx.notify();
-        },
-    );
+                me.refresh_confirm_enabled(ctx);
+                ctx.notify();
+            },
+        );
+    }
 
     let state = CommitState {
         intent,
@@ -213,21 +193,118 @@ pub(super) fn on_focus(state: &CommitState, ctx: &mut ViewContext<GitDialog>) {
 }
 
 pub(super) fn is_ready_to_confirm(state: &CommitState, app: &AppContext) -> bool {
-    // Confirm requires at least one file change and a non-empty commit
-    // message. While open-time autogen is in flight the editor is still
-    // empty, so this keeps the button disabled until the draft lands (or the
-    // user types something).
-    !state.file_changes.is_empty() && commit_message(state, app).is_some()
+    // Confirm requires committable changes and a non-empty commit message.
+    // While open-time autogen is in flight the editor is still empty, so this
+    // keeps the button disabled until the draft lands (or the user types
+    // something).
+    has_committable_changes(state) && commit_message(state, app).is_some()
+}
+
+/// Whether there's at least one change to commit — the guard that keeps
+/// Confirm disabled when there's nothing to commit.
+///
+/// Gates on `file_changes`, which already reflects the active "include
+/// unstaged" scope: local re-reads the working tree on toggle, while remote
+/// shows the full synced set (it can't re-scope client-side). The daemon-side
+/// `run_commit` is the authoritative backstop that rejects an empty commit —
+/// e.g. "exclude unstaged" with nothing staged — surfacing it as an error
+/// toast rather than a phantom success.
+fn has_committable_changes(state: &CommitState) -> bool {
+    !state.file_changes.is_empty()
 }
 
 /// Returns a tooltip to show on the disabled Confirm button when the
 /// user needs to take action, or `None` when no tooltip is needed.
 pub(super) fn confirm_tooltip(state: &CommitState, app: &AppContext) -> Option<&'static str> {
-    if !state.file_changes.is_empty() && commit_message(state, app).is_none() {
-        Some("Enter a commit message")
-    } else {
-        None
+    // Only nudge for a missing message; an empty Changes box is self-evident,
+    // and gating a tooltip on it would also flash during the open-time load.
+    if has_committable_changes(state) && commit_message(state, app).is_none() {
+        return Some("Enter a commit message");
     }
+    None
+}
+
+/// Populates the commit message editor from an AI-generated message. Shared
+/// by both backends, whose open-time autogen arrives via the
+/// `CommitMessageGenerated` model event, so both behave identically: on
+/// success, fill the editor unless the user already typed; on failure, swap
+/// to the manual-type placeholder (no toast — the empty editor tells the
+/// story and the failure isn't retryable).
+pub(super) fn apply_generated_commit_message(
+    me: &mut GitDialog,
+    result: Result<String, String>,
+    ctx: &mut ViewContext<GitDialog>,
+) {
+    let editor_handle = match me.mode() {
+        GitDialogMode::Commit(state) => state.message_editor.clone(),
+        _ => return,
+    };
+    match result {
+        Ok(generated) => {
+            let user_typed = !editor_handle.as_ref(ctx).buffer_text(ctx).trim().is_empty();
+            editor_handle.update(ctx, |editor, ctx| {
+                // Swap "Generating\u{2026}" for the manual-type prompt so it
+                // shows if the user later clears the generated draft.
+                editor.set_placeholder_text(crate::t!("code-review-type-commit-message-placeholder"), ctx);
+                // User input wins — don't clobber their text.
+                if !user_typed {
+                    editor.system_reset_buffer_text(generated.trim(), ctx);
+                }
+            });
+            me.refresh_confirm_enabled(ctx);
+            ctx.notify();
+        }
+        Err(err) => {
+            log::warn!("Failed to autogenerate commit message: {err}");
+            editor_handle.update(ctx, |editor, ctx| {
+                editor.set_placeholder_text(crate::t!("code-review-type-commit-message-placeholder"), ctx);
+            });
+            me.refresh_confirm_enabled(ctx);
+            ctx.notify();
+        }
+    }
+}
+
+/// Kicks off AI commit-message autogen request.
+/// The model runs the generation (local in-process, remote on the daemon) and  
+/// the result returns via `DiffStateModelEvent::CommitMessageGenerated`, applied by `apply_generated_commit_message`.
+pub(super) fn maybe_start_commit_message_autogen(me: &GitDialog, ctx: &mut ViewContext<GitDialog>) {
+    if !should_send_git_ops_ai_request(ctx) {
+        return;
+    }
+    // Generate from the same scope that will be committed (the "include
+    // unstaged" toggle), so the message describes what `run_commit` stages
+    // rather than always assuming the full working set.
+    let include_unstaged = match me.mode() {
+        GitDialogMode::Commit(state) => state.include_unstaged,
+        _ => return,
+    };
+    let branch_name = me.branch_name().to_string();
+    me.diff_state_model().update(ctx, |m, ctx| {
+        m.generate_commit_message(include_unstaged, branch_name, ctx);
+    });
+}
+
+/// Sources the commit Changes box from synced metadata (`against_head.files`).
+/// Remote repos can't read the working tree, so the list comes from metadata
+/// instead of `get_file_change_entries`. No-op for local repos, which load it
+/// from the working tree in `new_state` (and re-scope it on the unstaged
+/// toggle). Safe to call on open and on every metadata refresh.
+pub(super) fn refresh_remote_file_changes(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>) {
+    if !me.repo_location().is_remote() {
+        return;
+    }
+    let entries = me.diff_state_model().read(ctx, |model, ctx| {
+        model.uncommitted_file_entries(ctx).to_vec()
+    });
+    {
+        let GitDialogMode::Commit(state) = me.mode_mut() else {
+            return;
+        };
+        state.file_changes = entries;
+    }
+    me.refresh_confirm_enabled(ctx);
+    ctx.notify();
 }
 
 pub(super) fn handle_sub_action(
@@ -253,7 +330,13 @@ pub(super) fn handle_sub_action(
             if let GitDialogMode::Commit(state) = me.mode_mut() {
                 state.include_unstaged = !state.include_unstaged;
             }
+            // Local re-reads the working tree scoped to the new toggle (its
+            // spawn callback re-evaluates Confirm when it lands). Remote can't
+            // re-scope its synced list, so it keeps showing the full set; the
+            // daemon-side commit is the backstop that rejects an empty staged
+            // set when unstaged is excluded.
             reload_file_changes(me, ctx);
+            me.refresh_confirm_enabled(ctx);
             ctx.notify();
         }
         CommitSubAction::ToggleChangesExpanded => {
@@ -278,8 +361,10 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
     let intent = state.intent;
     let include_unstaged = state.include_unstaged;
     let message_editor = state.message_editor.clone();
-    let repo_path = me.repo_path().clone();
     let branch_name = me.branch_name().to_string();
+    // When the chain includes create-PR, AI-generate the PR title/body when the
+    // user has it enabled (ignored for commit-only / commit-and-push).
+    let autogenerate_pr_content = should_send_git_ops_ai_request(ctx);
 
     me.set_loading(LOADING_LABEL, ctx);
 
@@ -288,48 +373,60 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
         editor.set_interaction_state(InteractionState::Disabled, ctx);
     });
 
-    let path_future = interactive_path_future(ctx);
+    me.diff_state_model().update(ctx, |m, ctx| {
+        m.git_commit_chain(
+            intent,
+            message,
+            include_unstaged,
+            branch_name,
+            autogenerate_pr_content,
+            ctx,
+        );
+    });
+}
 
-    ctx.spawn(
-        async move {
-            let path_env = path_future.await;
-            let path_env_ref = path_env.as_deref();
-            run_commit(&repo_path, &message, include_unstaged, path_env_ref).await?;
-            let outcome = match intent {
-                CommitIntent::CommitOnly => CommitOutcome::Committed,
-                CommitIntent::CommitAndPush => {
-                    run_push(&repo_path, &branch_name, path_env_ref).await?;
-                    CommitOutcome::Pushed
-                }
-                CommitIntent::CommitAndCreatePr => {
-                    run_push(&repo_path, &branch_name, path_env_ref).await?;
-                    let pr = create_pr(&repo_path, None, None, path_env_ref).await?;
-                    CommitOutcome::PrCreated(pr)
-                }
+/// Shared commit-chain completion for both backends: toast + telemetry + close.
+/// `Ok(Some)` means create-PR ran; `Ok(None)` is a plain commit / commit-and-push.
+pub(super) fn finish_commit_chain(
+    me: &GitDialog,
+    intent: CommitChainMode,
+    result: Result<Option<PrInfo>, String>,
+    ctx: &mut ViewContext<GitDialog>,
+) {
+    let operation = match intent {
+        CommitChainMode::CommitOnly => GitOperationKind::CommitOnly,
+        CommitChainMode::CommitAndPush => GitOperationKind::CommitAndPush,
+        CommitChainMode::CommitAndCreatePr => GitOperationKind::CommitAndCreatePr,
+    };
+    let (status, error) = match &result {
+        Ok(_) => (GitDialogStatus::Succeeded, None),
+        Err(err) => (GitDialogStatus::Failed, Some(err.clone())),
+    };
+    match &result {
+        Ok(Some(pr)) => show_pr_created_toast(pr, ctx),
+        Ok(None) => {
+            let msg = if matches!(intent, CommitChainMode::CommitOnly) {
+                "Changes successfully committed."
+            } else {
+                "Changes committed and pushed."
             };
-            anyhow::Ok(outcome)
+            show_toast(msg, ctx);
+        }
+        Err(err) => {
+            report_error!("Commit failed", extra: { "error" => %err });
+            show_toast(user_facing_git_error(err), ctx);
+        }
+    }
+    send_telemetry_from_ctx!(
+        CodeReviewTelemetryEvent::GitDialogCompleted {
+            is_local: Some(!me.repo_location().is_remote()),
+            operation,
+            status,
+            error,
         },
-        move |_me, result, ctx| {
-            match result {
-                Ok(CommitOutcome::Committed) => {
-                    show_toast("Changes successfully committed.", ctx);
-                }
-                Ok(CommitOutcome::Pushed) => {
-                    show_toast("Changes committed and pushed.", ctx);
-                }
-                Ok(CommitOutcome::PrCreated(pr)) => {
-                    show_pr_created_toast(&pr, ctx);
-                }
-                Err(err) => {
-                    log::error!("Commit failed: {err}");
-                    show_toast(user_facing_git_error(&err.to_string()), ctx);
-                }
-            }
-            // Success or failure, the dialog is done and the parent should
-            // close it and refresh.
-            ctx.emit(GitDialogEvent::Completed);
-        },
+        ctx
     );
+    ctx.emit(GitDialogEvent::Completed);
 }
 
 fn handle_editor_event(me: &mut GitDialog, event: &EditorEvent, ctx: &mut ViewContext<GitDialog>) {
@@ -349,20 +446,22 @@ fn handle_editor_event(me: &mut GitDialog, event: &EditorEvent, ctx: &mut ViewCo
 
 fn apply_intent_selector(state: &CommitState, ctx: &mut ViewContext<GitDialog>) {
     state.commit_button.update(ctx, |b, ctx| {
-        b.set_active(state.intent == CommitIntent::CommitOnly, ctx);
+        b.set_active(state.intent == CommitChainMode::CommitOnly, ctx);
     });
     state.commit_and_push_button.update(ctx, |b, ctx| {
-        b.set_active(state.intent == CommitIntent::CommitAndPush, ctx);
+        b.set_active(state.intent == CommitChainMode::CommitAndPush, ctx);
     });
     if let Some(button) = &state.commit_and_create_pr_button {
         button.update(ctx, |b, ctx| {
-            b.set_active(state.intent == CommitIntent::CommitAndCreatePr, ctx);
+            b.set_active(state.intent == CommitChainMode::CommitAndCreatePr, ctx);
         });
     }
 }
 
 fn reload_file_changes(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>) {
-    let repo_path = me.repo_path().clone();
+    let Some(repo_path) = me.repo_location().to_local_path().map(Path::to_path_buf) else {
+        return;
+    };
     let include_unstaged = match me.mode() {
         GitDialogMode::Commit(state) => state.include_unstaged,
         _ => return,

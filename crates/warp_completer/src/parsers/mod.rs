@@ -1,10 +1,9 @@
 #[cfg_attr(feature = "v2", path = "v2.rs")]
 #[cfg_attr(not(feature = "v2"), path = "legacy.rs")]
 mod imp;
-use imp::*;
-
 #[cfg(not(feature = "v2"))]
 pub use imp::SignatureAtTokenIndex;
+use imp::*;
 
 mod errors;
 pub use errors::{ArgumentError, ParseError, ParseErrorReason};
@@ -12,18 +11,15 @@ pub mod hir;
 pub mod simple;
 
 use derive_new::new;
+use hir::{ArgType, Command, Expression, ExternalCommand};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
 use warp_command_signatures::Argument;
 
+use crate::completer::TopLevelCommandCaseSensitivity;
+use crate::meta::{HasSpan, Span, Spanned, SpannedItem};
 use crate::signatures::CommandRegistry;
-use crate::{
-    completer::TopLevelCommandCaseSensitivity,
-    meta::{HasSpan, Span, Spanned, SpannedItem},
-};
-
-use hir::{ArgType, Command, Expression, ExternalCommand};
 
 lazy_static! {
     // Regex to test for a valid environment variable name, Environment variable names used by the
@@ -163,17 +159,17 @@ fn parse_arg(
     }
     let arg_types_to_validate =
         arg_signature.map(ArgType::get_arg_types_to_validate_from_arg_signature);
-    if let Some(arg_types_to_validate) = arg_types_to_validate {
-        if !arg_types_to_validate.is_empty() {
-            return (
-                ParsedExpression::new(
-                    Expression::ValidatableArgument(arg_types_to_validate),
-                    ParsedToken(lite_arg.item.clone()),
-                )
-                .spanned(lite_arg.span),
-                None,
-            );
-        }
+    if let Some(arg_types_to_validate) = arg_types_to_validate
+        && !arg_types_to_validate.is_empty()
+    {
+        return (
+            ParsedExpression::new(
+                Expression::ValidatableArgument(arg_types_to_validate),
+                ParsedToken(lite_arg.item.clone()),
+            )
+            .spanned(lite_arg.span),
+            None,
+        );
     }
     (
         ParsedExpression::new(Expression::Literal, ParsedToken(lite_arg.item.clone()))

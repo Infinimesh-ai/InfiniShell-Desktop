@@ -1,6 +1,8 @@
 use super::{display_working_directory, format_session_location};
 use crate::ai::blocklist::agent_view::zero_state_block::current_working_directory_for_zero_state;
-use crate::terminal::model::ansi::{Handler, InitShellValue, PrecmdValue, SSHValue};
+use crate::terminal::model::ansi::{
+    Handler, InitShellValue, PromptMetadata, SSHValue,
+};
 use crate::terminal::model::test_utils::block_size;
 use crate::terminal::model::{session::Session, TerminalModel};
 use crate::terminal::{
@@ -76,11 +78,20 @@ fn display_working_directory_abbreviates_subdirectory_under_home() {
 #[test]
 fn cwd_for_recent_conversations_prefers_active_block_pwd() {
     let mut terminal = prebootstrap_terminal_with_startup_path("/startup/path");
-    terminal.precmd(PrecmdValue {
-        pwd: Some("/active/path".to_owned()),
-        session_id: Some(0),
-        ..Default::default()
-    });
+    // 上游把 `Handler::precmd` 拆成了 `precmd_with_completion_metadata` /
+    // `prompt_only_precmd`,并给 `TerminalModel` 层的 precmd 加了生命周期状态机
+    // 门控(`FeatureFlag::TerminalLifecycleRecovery`),从 `Unknown` 相位收到
+    // precmd 会被忽略。本用例的被测对象是 `current_working_directory_for_zero_state`
+    // 而非生命周期状态机,所以直接把 prompt 元数据应用到活动 block 上,等价于旧
+    // `TerminalModel::precmd` 里 `apply_precmd_to_fresh_block` 的效果。
+    terminal
+        .block_list_mut()
+        .active_block_mut()
+        .prompt_only_precmd(PromptMetadata {
+            pwd: Some("/active/path".to_owned()),
+            session_id: Some(0),
+            ..Default::default()
+        });
 
     let cwd = current_working_directory_for_zero_state(&terminal);
     assert_eq!(cwd, Some("/active/path".to_owned()));
@@ -96,7 +107,12 @@ fn cwd_for_recent_conversations_uses_startup_path_before_bootstrap_for_local_ses
 #[test]
 fn cwd_for_recent_conversations_does_not_use_startup_path_for_pending_ssh_bootstrap() {
     let mut terminal = prebootstrap_terminal_with_startup_path("/startup/path");
-    terminal.ssh(SSHValue::default());
+    // 上游给 SSH hook 加了 `remote_session_id` 必填校验(缺失时整条 hook 被丢弃),
+    // 所以这里必须带上,否则挂起的 SSH 会话根本不会被登记。
+    terminal.ssh(SSHValue {
+        remote_session_id: Some(123),
+        ..Default::default()
+    });
     let cwd = current_working_directory_for_zero_state(&terminal);
     assert_eq!(cwd, None);
 }

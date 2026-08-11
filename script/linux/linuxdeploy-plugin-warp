@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# linuxdeploy input plugin for restructuring the AppDir to match Zap's
+# linuxdeploy input plugin for restructuring the AppDir to match InfiniShell's
 # standard Linux install layout.
 #
 # By default, linuxdeploy places the executable at usr/bin/ inside the AppDir.
@@ -13,10 +13,10 @@
 # as installing a .deb or .rpm package.
 #
 # Required environment variables:
-#   WARP_BINARY_NAME:           Name of the binary (e.g. "zap-oss").
+#   WARP_BINARY_NAME:           Name of the binary (e.g. "infinishell").
 #   WARP_OPT_DIR:               Absolute /opt-rooted directory for the
 #                               install layout inside the AppDir (e.g.
-#                               "/opt/zap" for the Zap OSS channel, or
+#                               "/opt/infinishell" for the InfiniShell OSS channel, or
 #                               "/opt/warpdotdev/warp-terminal-dev" for
 #                               upstream-style internal channels).
 #   WARP_BUNDLED_RESOURCES_DIR: Path to the staged resources directory to copy.
@@ -63,7 +63,7 @@ if [ ! -f "$SRC_BIN" ]; then
 fi
 
 # Create the /opt install directory inside the AppDir. WARP_OPT_DIR is an
-# absolute path on the target machine (e.g. "/opt/zap"); prepend the AppDir
+# absolute path on the target machine (e.g. "/opt/infinishell"); prepend the AppDir
 # to nest it inside the AppImage.
 OPT_DIR="$APPDIR$WARP_OPT_DIR"
 mkdir -p "$OPT_DIR"
@@ -84,4 +84,4 @@ echo "Copying bundled resources to $DEST_RESOURCES"
 mkdir -p "$DEST_RESOURCES"
 cp -R "$WARP_BUNDLED_RESOURCES_DIR/." "$DEST_RESOURCES/"
 
-echo "Successfully restructured AppDir for Zap"
+echo "Successfully restructured AppDir for InfiniShell"

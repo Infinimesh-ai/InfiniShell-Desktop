@@ -1,37 +1,31 @@
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::{self, appearance::Appearance, color::blend::Blend as _};
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::color::blend::Blend as _;
+use warp_core::ui::{self};
+use warpui::elements::{
+    Align, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Icon,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement as _, Radius,
+};
+use warpui::keymap::EditableBinding;
+use warpui::platform::Cursor;
+use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{
-    elements::{
-        Align, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Icon,
-        MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement as _, Radius,
-    },
-    keymap::EditableBinding,
-    platform::Cursor,
-    ui_components::{
-        button::{ButtonVariant, TextAndIcon, TextAndIconAlignment},
-        components::{Coords, UiComponent, UiComponentStyles},
-    },
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext, ViewHandle,
 };
 
-use crate::{
-    coding_entrypoints::{
-        clone_repo_view::{CloneRepoEvent, CloneRepoView},
-        create_project_view::{CreateProjectEvent, CreateProjectView},
-        project_buttons::{ProjectButtons, ProjectButtonsEvent},
-    },
-    pane_group::{
-        focus_state::PaneFocusHandle, pane::view, BackingView, PaneConfiguration, PaneEvent,
-    },
-    send_telemetry_from_ctx,
-    terminal::TerminalView,
-    util::bindings::{keybinding_name_to_display_string, BindingGroup, CustomAction},
-    view_components::DismissibleToast,
-    workspace::ToastStack,
-    workspace::{Workspace, WorkspaceAction},
-    TelemetryEvent,
-};
+use crate::coding_entrypoints::clone_repo_view::{CloneRepoEvent, CloneRepoView};
+use crate::coding_entrypoints::create_project_view::{CreateProjectEvent, CreateProjectView};
+use crate::coding_entrypoints::project_buttons::{ProjectButtons, ProjectButtonsEvent};
+use crate::pane_group::focus_state::PaneFocusHandle;
+use crate::pane_group::pane::view;
+use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
+use crate::terminal::TerminalView;
+use crate::util::bindings::{BindingGroup, CustomAction, keybinding_name_to_display_string};
+use crate::view_components::DismissibleToast;
+use crate::workspace::{ToastStack, Workspace, WorkspaceAction};
+use crate::{TelemetryEvent, send_telemetry_from_ctx};
 
 pub fn init(app: &mut AppContext) {
     use warpui::keymap::macros::*;
@@ -381,16 +375,16 @@ where
     F: FnOnce(&mut TerminalView, &mut ViewContext<TerminalView>) -> S,
 {
     let window_id = ctx.window_id();
-    if let Some(workspaces) = ctx.views_of_type::<Workspace>(window_id) {
-        if let Some(workspace) = workspaces.into_iter().next() {
-            workspace.update(ctx, |workspace, ctx| {
-                let pane_group = workspace.active_tab_pane_group();
-                pane_group.update(ctx, |pane_group, ctx| {
-                    if let Some(active_terminal) = pane_group.active_session_view(ctx) {
-                        active_terminal.update(ctx, func);
-                    }
-                });
+    if let Some(workspaces) = ctx.views_of_type::<Workspace>(window_id)
+        && let Some(workspace) = workspaces.into_iter().next()
+    {
+        workspace.update(ctx, |workspace, ctx| {
+            let pane_group = workspace.active_tab_pane_group();
+            pane_group.update(ctx, |pane_group, ctx| {
+                if let Some(active_terminal) = pane_group.active_session_view(ctx) {
+                    active_terminal.update(ctx, func);
+                }
             });
-        }
+        });
     }
 }

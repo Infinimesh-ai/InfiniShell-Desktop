@@ -1,6 +1,10 @@
+use std::future::Future;
 use std::time::Duration;
+
+use anyhow::{Result, anyhow};
 use thiserror::Error;
-use warpui::RetryOption;
+use warpui::r#async::Timer;
+use warpui::{RetryOption, duration_with_jitter};
 
 /// Common duration for a periodic poll. In our app, we generally have the following to update the same data:
 /// - RTC messages
@@ -58,8 +62,91 @@ pub(crate) fn is_transient_http_error(e: &anyhow::Error) -> bool {
     // the top-level error object — walk the chain.
     for cause in e.chain() {
         if let Some(http_err) = cause.downcast_ref::<HttpStatusError>() {
-            return matches!(http_err.status, 408 | 429 | 500..=599);
+            return is_transient_status(http_err.status);
         }
     }
     true
+}
+
+/// Classify public-API status errors as transient or permanent.
+///
+/// Unlike [`is_transient_http_error`], errors without a typed HTTP transport cause are
+/// treated as permanent: callers using this classifier convert user-facing API errors
+/// into plain `anyhow` errors at the operation layer, and those should not be retried
+/// or placed into transient cooldowns.
+///
+/// Zap 注:上游此函数还会识别 `GraphQLError`,但 GraphQL 传输层已从本 fork 剥离,
+/// 因此只保留 HTTP 状态码分类。
+pub(crate) fn is_transient_graphql_or_http_error(e: &anyhow::Error) -> bool {
+    for cause in e.chain() {
+        if let Some(http_err) = cause.downcast_ref::<HttpStatusError>() {
+            return is_transient_status(http_err.status);
+        }
+    }
+
+    false
+}
+
+fn is_transient_status(status: u16) -> bool {
+    matches!(status, 408 | 429 | 500..=599)
+}
+
+/// Returns `true` if the error chain carries an [`HttpStatusError`] with an
+/// authentication/authorization status (401 or 403).
+///
+/// Used by long-lived listeners to distinguish "credentials are permanently
+/// invalid" (for example, a cloud-agent task whose token stops working once the
+/// task ends) from generic permanent errors, so they can stop retrying instead
+/// of reconnecting forever.
+pub(crate) fn is_auth_error(e: &anyhow::Error) -> bool {
+    for cause in e.chain() {
+        if let Some(http_err) = cause.downcast_ref::<HttpStatusError>() {
+            return matches!(http_err.status, 401 | 403);
+        }
+    }
+    false
+}
+
+/// Maximum total attempts per operation (initial attempt plus retries on transient errors).
+pub(crate) const MAX_ATTEMPTS: usize = 3;
+
+/// Base backoff between retry attempts; each subsequent attempt multiplies by [`BACKOFF_FACTOR`].
+const INITIAL_BACKOFF: Duration = Duration::from_millis(500);
+
+/// Exponential growth factor for retry backoff.
+const BACKOFF_FACTOR: f32 = 2.0;
+
+/// Maximum jitter as a fraction of the backoff interval.
+const BACKOFF_JITTER: f32 = 0.3;
+
+/// Run `attempt_fn` with bounded exponential-backoff retries on transient failures.
+///
+/// `operation` is included in retry logs so concurrent callers can be distinguished.
+///
+/// `attempt_fn` is called repeatedly with a fresh `Future` per attempt, so callers that need
+/// per-attempt state (e.g. cloning a request body) own that inside their closure.
+///
+/// Transient errors are retried up to [`MAX_ATTEMPTS`] total. Permanent errors return
+/// immediately. A warning is logged between attempts so retries are visible in logs.
+pub(crate) async fn with_bounded_retry<T, F, Fut>(operation: &str, mut attempt_fn: F) -> Result<T>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T>>,
+{
+    let mut delay = INITIAL_BACKOFF;
+    for attempt in 1..=MAX_ATTEMPTS {
+        match attempt_fn().await {
+            Ok(value) => return Ok(value),
+            Err(e) if attempt >= MAX_ATTEMPTS || !is_transient_http_error(&e) => return Err(e),
+            Err(e) => {
+                log::warn!("{operation}: attempt {attempt}/{MAX_ATTEMPTS} failed, retrying: {e:#}");
+                Timer::after(duration_with_jitter(delay, BACKOFF_JITTER)).await;
+                delay = delay.mul_f32(BACKOFF_FACTOR);
+            }
+        }
+    }
+    // Unreachable when MAX_ATTEMPTS >= 1.
+    Err(anyhow!(
+        "retry loop exhausted without attempting operation (MAX_ATTEMPTS={MAX_ATTEMPTS})"
+    ))
 }

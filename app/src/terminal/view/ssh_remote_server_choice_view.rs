@@ -8,7 +8,7 @@
 //!
 //! The view owns:
 //! - a child [`KeyboardNavigableButtons`] handle for the two selectable
-//!   cards ("Install Zap's SSH extension" / "Continue without installing"),
+//!   cards ("Install InfiniShell's SSH extension" / "Continue without installing"),
 //! - the [`SessionId`] this prompt is scoped to (used for event forwarding),
 //! - the current "Don't ask me this again" checked state (purely local to
 //!   this prompt instance; persisted to `ssh_extension_install_mode` only
@@ -18,29 +18,29 @@
 //! deregistered) is the parent's responsibility.
 use settings::Setting;
 use warp_core::ui::theme::color::internal_colors;
+use warp_errors::report_error;
+use warpui::elements::{
+    Border, ChildView, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
+};
+use warpui::platform::Cursor;
+use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{
-    elements::{
-        Border, ChildView, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable,
-        MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
-    },
-    platform::Cursor,
-    ui_components::components::{UiComponent, UiComponentStyles},
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
 
-use crate::{
-    ai::blocklist::{
-        block::keyboard_navigable_buttons::{rich_navigation_button, KeyboardNavigableButtons},
-        inline_action::inline_action_header::{HeaderConfig, INLINE_ACTION_HORIZONTAL_PADDING},
-    },
-    send_telemetry_from_ctx,
-    server::telemetry::TelemetryEvent,
-    terminal::model::session::SessionId,
-    terminal::warpify::settings::{SshExtensionInstallMode, WarpifySettings},
-    ui_components::blended_colors,
-    Appearance,
+use crate::ai::blocklist::block::keyboard_navigable_buttons::{
+    KeyboardNavigableButtons, rich_navigation_button,
 };
+use crate::ai::blocklist::inline_action::inline_action_header::{
+    HeaderConfig, INLINE_ACTION_HORIZONTAL_PADDING,
+};
+use crate::server::telemetry::TelemetryEvent;
+use crate::terminal::model::session::SessionId;
+use crate::terminal::warpify::settings::{SshExtensionInstallMode, WarpifySettings};
+use crate::ui_components::blended_colors;
+use crate::{Appearance, send_telemetry_from_ctx};
 
 const PROMPT_BORDER_RADIUS: f32 = 8.;
 
@@ -265,7 +265,9 @@ impl TypedActionView for SshRemoteServerChoiceView {
                     let mode = SshExtensionInstallMode::AlwaysInstall;
                     WarpifySettings::handle(ctx).update(ctx, |settings, ctx| {
                         if let Err(e) = settings.ssh_extension_install_mode.set_value(mode, ctx) {
-                            log::error!("Failed to persist ssh_extension_install_mode: {e}");
+                            report_error!(
+                                e.context("Failed to persist ssh_extension_install_mode")
+                            );
                         }
                     });
                     send_telemetry_from_ctx!(
@@ -282,7 +284,9 @@ impl TypedActionView for SshRemoteServerChoiceView {
                     let mode = SshExtensionInstallMode::NeverInstall;
                     WarpifySettings::handle(ctx).update(ctx, |settings, ctx| {
                         if let Err(e) = settings.ssh_extension_install_mode.set_value(mode, ctx) {
-                            log::error!("Failed to persist ssh_extension_install_mode: {e}");
+                            report_error!(
+                                e.context("Failed to persist ssh_extension_install_mode")
+                            );
                         }
                     });
                     send_telemetry_from_ctx!(

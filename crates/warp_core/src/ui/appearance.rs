@@ -1,13 +1,11 @@
 use std::collections::HashMap;
 
-use warpui::{
-    current_render_window,
-    elements::HeadingFontSizeMultipliers,
-    fonts::{FamilyId, Weight},
-    Entity, ModelContext, SingletonEntity, WindowId,
-};
+use warpui_core::elements::HeadingFontSizeMultipliers;
+use warpui_core::fonts::{FamilyId, Weight};
+use warpui_core::{Entity, ModelContext, SingletonEntity, WindowId, current_render_window};
 
-use super::{builder::UiBuilder, theme::WarpTheme};
+use super::builder::UiBuilder;
+use super::theme::WarpTheme;
 
 /// The standard font size to use for headers (e.g.: in dialogs).
 const HEADER_FONT_SIZE: f32 = 18.;
@@ -139,9 +137,9 @@ impl Appearance {
 
     #[cfg(feature = "test-util")]
     pub fn mock() -> Self {
-        use warpui::color::ColorU;
+        use warpui_core::color::ColorU;
 
-        use crate::ui::theme::{mock_terminal_colors, Details, Fill};
+        use crate::ui::theme::{Details, Fill, mock_terminal_colors};
 
         let mock_theme = WarpTheme::new(
             Fill::Solid(ColorU::from_u32(0x000000ff)),

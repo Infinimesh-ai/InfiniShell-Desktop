@@ -12,14 +12,11 @@ use settings::Setting as _;
 use warpui::{AppContext, ModelContext};
 use warpui::{Entity, SingletonEntity};
 
+use super::ShellLaunchData;
+use super::session_settings::{NewSessionShell, StartupShell};
+use super::shell::ShellType;
 #[cfg(feature = "local_tty")]
 use crate::util::path::file_exists_and_is_executable;
-
-use super::{
-    session_settings::{NewSessionShell, StartupShell},
-    shell::ShellType,
-    ShellLaunchData,
-};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct LocalConfig {
@@ -605,8 +602,9 @@ impl AvailableShells {
         value: AvailableShell,
         ctx: &mut ModelContext<Self>,
     ) -> anyhow::Result<()> {
-        use super::session_settings::SessionSettings;
         use warp_core::features::FeatureFlag;
+
+        use super::session_settings::SessionSettings;
         SessionSettings::handle(ctx).update(ctx, |settings, ctx| {
             if FeatureFlag::ShellSelector.is_enabled() {
                 settings
@@ -850,10 +848,10 @@ impl AvailableShells {
                 let Ok(path) = dunce::canonicalize(line) else {
                     continue;
                 };
-                if let Some(file_name) = path.file_name().and_then(|name| name.to_str()) {
-                    if let Some(set) = shells.get_mut(file_name) {
-                        set.insert(path);
-                    }
+                if let Some(file_name) = path.file_name().and_then(|name| name.to_str())
+                    && let Some(set) = shells.get_mut(file_name)
+                {
+                    set.insert(path);
                 }
             }
         }
@@ -895,12 +893,11 @@ impl AvailableShells {
                             executable_path,
                             ..
                         }) = shell.state.as_ref()
+                            && shell_command == command
                         {
-                            if shell_command == command {
-                                return Some(NewSessionShell::Executable(
-                                    executable_path.display().to_string(),
-                                ));
-                            }
+                            return Some(NewSessionShell::Executable(
+                                executable_path.display().to_string(),
+                            ));
                         }
                     }
                     None
@@ -990,5 +987,5 @@ pub fn register(app: &mut impl warpui::AddSingletonModel) {
 
 #[cfg(test)]
 #[cfg(not(windows))]
-#[path = "available_shells_test.rs"]
+#[path = "available_shells_tests.rs"]
 mod tests;

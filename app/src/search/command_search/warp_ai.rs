@@ -1,28 +1,22 @@
-use crate::{
-    ai_assistant::AI_ASSISTANT_LOGO_COLOR,
-    appearance::Appearance,
-    features::FeatureFlag,
-    search::{
-        command_search::searcher::CommandSearchItemAction,
-        data_source::{Query, QueryResult},
-        item::SearchItem,
-        mixer::{DataSourceRunErrorWrapper, SyncDataSource},
-        result_renderer::ItemHighlightState,
-    },
-    themes::theme::Blend,
-    ui_components::icons::Icon as UIIcon,
-    util::color::{ContrastingColor, MinimumAllowedContrast},
-};
-
 use ordered_float::OrderedFloat;
 use warp_core::ui::builder;
-use warpui::{
-    elements::{ConstrainedBox, Container, Text},
-    AppContext, Element, SingletonEntity,
-};
+use warpui::elements::{ConstrainedBox, Container, Text};
+use warpui::{AppContext, Element, SingletonEntity};
 
-const OPEN_WARP_AI_ITEM_BODY_TEXT: &str = "Ask Zap AI for command suggestions";
-const TRANSLATE_WITH_WARP_AI_ITEM_BODY_TEXT: &str = "Translate into shell command using Zap AI";
+use crate::ai_assistant::AI_ASSISTANT_LOGO_COLOR;
+use crate::appearance::Appearance;
+use crate::features::FeatureFlag;
+use crate::search::command_search::searcher::CommandSearchItemAction;
+use crate::search::data_source::{Query, QueryResult};
+use crate::search::item::SearchItem;
+use crate::search::mixer::{DataSourceRunErrorWrapper, SyncDataSource};
+use crate::search::result_renderer::ItemHighlightState;
+use crate::themes::theme::Blend;
+use crate::ui_components::icons::Icon as UIIcon;
+use crate::util::color::{ContrastingColor, MinimumAllowedContrast};
+
+const OPEN_WARP_AI_ITEM_BODY_TEXT: &str = "Ask InfiniShell AI for command suggestions";
+const TRANSLATE_WITH_WARP_AI_ITEM_BODY_TEXT: &str = "Translate into shell command using InfiniShell AI";
 
 #[derive(Clone, Debug)]
 pub enum WarpAISearchItem {
@@ -59,7 +53,7 @@ impl SearchItem for WarpAISearchItem {
         };
 
         let icon = if FeatureFlag::AgentMode.is_enabled() {
-            UIIcon::Oz
+            UIIcon::Agent
                 .to_warpui_icon(
                     appearance
                         .theme()
@@ -125,7 +119,7 @@ impl SearchItem for WarpAISearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Zap AI: {}", self.item_body_text())
+        format!("InfiniShell AI: {}", self.item_body_text())
     }
 }
 

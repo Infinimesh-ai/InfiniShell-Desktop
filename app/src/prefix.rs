@@ -19,13 +19,9 @@ pub fn longest_common_prefix<'a>(strings: impl IntoIterator<Item = &'a str>) -> 
         );
     }
 
-    if len == 0 {
-        None
-    } else {
-        Some(&first[0..len])
-    }
+    if len == 0 { None } else { Some(&first[0..len]) }
 }
 
 #[cfg(test)]
-#[path = "prefix_test.rs"]
+#[path = "prefix_tests.rs"]
 mod tests;

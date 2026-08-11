@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use futures_util::FutureExt as _;
 use itertools::Itertools as _;
-use warpui::{r#async::executor::BackgroundTask, AppContext, SingletonEntity};
+use warp_errors::report_if_error;
+use warpui::r#async::executor::BackgroundTask;
+use warpui::{AppContext, SingletonEntity};
 use zbus::{interface, proxy, zvariant};
 
 use crate::channel::ChannelState;
-use crate::report_if_error;
 
 /// Initializes application services.
 pub fn init(ctx: &mut AppContext) {
@@ -155,11 +156,11 @@ impl ApplicationService {
 // `default_service` / `default_path` 在调用处 (`pass_startup_args_to_existing_instance`) 通过
 // `.destination(well_known_name())` / `.path(application_service_path())` 在 builder 上覆盖,
 // 所以这里的常量不会被实际使用;但为避免误导未来通过 `Proxy::new` 直接使用 default 的调用方,
-// 这里仍指向 OSS 默认的 `dev.zap.Zap`。
+// 这里仍指向 OSS 默认的 `dev.infinishell.InfiniShell`。
 #[proxy(
     interface = "org.freedesktop.Application",
-    default_service = "dev.zap.Zap",
-    default_path = "/dev/zap/Zap",
+    default_service = "dev.infinishell.InfiniShell",
+    default_path = "/dev/infinishell/InfiniShell",
     gen_blocking = false
 )]
 trait ExistingApplication {

@@ -33,14 +33,16 @@ pub mod text {
             | AIAgentInput::CreateNewProject { .. }
             | AIAgentInput::CloneRepository { .. }
             | AIAgentInput::InitProjectRules { .. }
+            // Zap: FetchReviewComments(云端拉取 code review 评论)已剥离,不再有该变体。
             | AIAgentInput::CodeReview { .. }
-            | AIAgentInput::FetchReviewComments { .. }
             | AIAgentInput::SummarizeConversation { .. }
             | AIAgentInput::InvokeSkill { .. }
             | AIAgentInput::StartFromAmbientRunPrompt { .. }
             | AIAgentInput::MessagesReceivedFromAgents { .. }
             | AIAgentInput::PassiveSuggestionResult { .. }
-            | AIAgentInput::EventsFromAgents { .. } => {
+            | AIAgentInput::EventsFromAgents { .. }
+            // 编排配置更新是搭车发送的控制面消息,对用户无可见输出。
+            | AIAgentInput::OrchestrationConfigUpdate { .. } => {
                 // Do not include the user query, since it's already provided as input to the agent.
                 Ok(())
             }
@@ -251,6 +253,9 @@ pub mod text {
                 AIAgentActionResultType::ReadShellCommandOutput { .. } => Ok(()),
                 AIAgentActionResultType::TransferShellCommandControlToUser { .. } => Ok(()),
                 AIAgentActionResultType::AskUserQuestion(_) => Ok(()),
+                // 子 agent 编排的结果由 orchestration 侧自行呈现,SDK 输出不重复展开。
+                AIAgentActionResultType::RunAgents(_)
+                | AIAgentActionResultType::WaitForEvents(_) => Ok(()),
             },
         }
     }
@@ -342,6 +347,9 @@ pub mod text {
                         writeln!(w, "Reading skill: {}", request.skill)?;
                     }
                     AIAgentActionType::AskUserQuestion { .. } => (),
+                    // 多智能体编排动作在无头 SDK 输出流里不做人类可读呈现。
+                    AIAgentActionType::RunAgents(_)
+                    | AIAgentActionType::WaitForEvents { .. } => (),
                 },
                 AIAgentOutputMessageType::TodoOperation(operation) => match operation {
                     TodoOperation::UpdateTodos { todos } => {
@@ -633,7 +641,9 @@ pub mod json {
     #[derive(Serialize)]
     struct JsonComment<'a> {
         comment_text: &'a str,
-        file_path: Option<&'a Path>,
+        /// Zap: 上游把评论路径统一成 `LocalOrRemotePath`,远端路径没有本地 `Path`,
+        /// 这里改成序列化后的展示路径字符串。
+        file_path: Option<String>,
         line_number: Option<usize>,
         head_title: Option<&'a str>,
     }
@@ -674,14 +684,16 @@ pub mod json {
                 | AIAgentInput::CreateNewProject { .. }
                 | AIAgentInput::CloneRepository { .. }
                 | AIAgentInput::InitProjectRules { .. }
+                // Zap: FetchReviewComments(云端拉取 code review 评论)已剥离,不再有该变体。
                 | AIAgentInput::CodeReview { .. }
-                | AIAgentInput::FetchReviewComments { .. }
                 | AIAgentInput::SummarizeConversation { .. }
                 | AIAgentInput::InvokeSkill { .. }
                 | AIAgentInput::StartFromAmbientRunPrompt { .. }
                 | AIAgentInput::MessagesReceivedFromAgents { .. }
                 | AIAgentInput::EventsFromAgents { .. }
-                | AIAgentInput::PassiveSuggestionResult { .. } => None,
+                | AIAgentInput::PassiveSuggestionResult { .. }
+                // 编排配置更新是搭车发送的控制面消息,对用户无可见输出。
+                | AIAgentInput::OrchestrationConfigUpdate { .. } => None,
                 // These input types should not occur in a SDK-run agent.
                 AIAgentInput::ResumeConversation { .. }
                 | AIAgentInput::TriggerPassiveSuggestion { .. } => None,
@@ -753,7 +765,7 @@ pub mod json {
                     RequestFileEditsResult::Cancelled => Some(JsonMessage::ToolCanceled),
                 },
                 AIAgentActionResultType::ReadFiles(result) => match result {
-                    ReadFilesResult::Success { files } => Some(JsonMessage::ToolResult(
+                    ReadFilesResult::Success { files, .. } => Some(JsonMessage::ToolResult(
                         JsonToolResult::ReadFiles(JsonFileCollectionResult {
                             files: JsonFile::from_file_contexts(files),
                         }),
@@ -946,6 +958,9 @@ pub mod json {
                     | AIAgentActionType::ReadSkill(_)
                     | AIAgentActionType::TransferShellCommandControlToUser { .. } => None,
                     AIAgentActionType::AskUserQuestion { .. } => None,
+                    // 多智能体编排动作不映射为 SDK JSON 工具调用。
+                    AIAgentActionType::RunAgents(_)
+                    | AIAgentActionType::WaitForEvents { .. } => None,
                 },
                 AIAgentOutputMessageType::TodoOperation(operation) => match operation {
                     TodoOperation::UpdateTodos { todos } => Some(JsonMessage::UpdateTodos {
@@ -1007,7 +1022,11 @@ pub mod json {
         fn from(review_comment: &'a ReviewComment) -> Self {
             Self {
                 comment_text: review_comment.content.as_str(),
-                file_path: review_comment.diff.file_path.as_deref(),
+                file_path: review_comment
+                    .diff
+                    .file_path
+                    .as_ref()
+                    .map(|path| path.display_path()),
                 line_number: review_comment.diff.line_number,
                 head_title: review_comment.head_title.as_deref(),
             }
@@ -1157,8 +1176,8 @@ fn format_agent_text<W: Write>(text: &AIAgentText, w: &mut W) -> io::Result<()> 
                 }
 
                 match source {
-                    Some(CodeSource::ProjectRules { path }) => {
-                        writeln!(w, " rules_path={}", path.display())?;
+                    Some(CodeSource::ProjectRules { location }) => {
+                        writeln!(w, " rules_path={}", location.display_path())?;
                     }
                     Some(CodeSource::Link {
                         path,
@@ -1177,13 +1196,14 @@ fn format_agent_text<W: Write>(text: &AIAgentText, w: &mut W) -> io::Result<()> 
 
                         writeln!(w)?;
                     }
-                    Some(CodeSource::Skill { path, .. }) => {
-                        writeln!(w, " skill_path={}", path.display())?;
+                    Some(CodeSource::Skill { location, .. }) => {
+                        writeln!(w, " skill_path={}", location.display_path())?;
                     }
+                    // Zap: 没有 `RemoteFileTree` 变体,远端文件由 `FileTree { location }` 统一承载。
                     Some(CodeSource::AIAction { .. })
                     | Some(CodeSource::New { .. })
                     | Some(CodeSource::FileTree { .. })
-                    | Some(CodeSource::RemoteFileTree { .. })
+                    | Some(CodeSource::CommandPalette { .. })
                     | Some(CodeSource::Finder { .. })
                     | None => {}
                 }

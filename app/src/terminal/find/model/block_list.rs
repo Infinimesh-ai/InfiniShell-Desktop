@@ -1,28 +1,23 @@
 //! This module implements terminal find functionality for the blocklist.
-use std::{collections::HashMap, iter, ops::RangeInclusive};
+use std::collections::HashMap;
+use std::iter;
+use std::ops::RangeInclusive;
 
 use itertools::Itertools;
-use warpui::{units::Lines, AppContext, EntityId};
+use warpui::units::Lines;
+use warpui::{AppContext, EntityId};
 
-use crate::terminal::{
-    model::{
-        block::Block,
-        blocks::{
-            BlockHeight, BlockHeightItem, BlockHeightSummary, BlockList, RichContentItem,
-            TotalIndex,
-        },
-        find::{FindConfig, RegexDFAs},
-        index::Point,
-        terminal_model::{BlockIndex, BlockSortDirection},
-    },
-    GridType,
+use super::FindOptions;
+use super::rich_content::{FindableRichContentHandle, RichContentMatchId};
+use crate::terminal::GridType;
+use crate::terminal::model::block::Block;
+use crate::terminal::model::blocks::{
+    BlockHeight, BlockHeightItem, BlockHeightSummary, BlockList, RichContentItem, TotalIndex,
 };
+use crate::terminal::model::find::{FindConfig, RegexDFAs};
+use crate::terminal::model::index::Point;
+use crate::terminal::model::terminal_model::{BlockIndex, BlockSortDirection};
 use crate::view_components::find::FindDirection;
-
-use super::{
-    rich_content::{FindableRichContentHandle, RichContentMatchId},
-    FindOptions,
-};
 
 /// Runs a find operation on the blocklist using the given `options` and returns a
 /// `BlockListFindRun` with the results.
@@ -72,12 +67,12 @@ pub(super) fn run_find_on_block_list(
         // In both cases we want the most recent block updated last, which means the sort direction
         // here should always be MostRecentLast
         for block_index in blocks_to_include_in_results {
-            let agent_view_state = block_list.agent_view_state();
+            let transcript_scope = block_list.transcript_scope();
             if let Some(block) = block_list
                 .block_at(*block_index)
-                .filter(|block| !block.is_empty(agent_view_state))
+                .filter(|block| !block.is_empty(transcript_scope))
             {
-                if block.height(agent_view_state) == Lines::zero() {
+                if block.height(transcript_scope) == Lines::zero() {
                     // This should not happen in practice, because `blocks_to_include_in_results`
                     // is set by selecting blocks, which are presumably visible.
                     continue;
@@ -243,6 +238,18 @@ pub struct BlockGridMatch {
 }
 
 /// Represents a single find match in the blocklist.
+///
+/// Match values are snapshots of the find run that produced them. The grid
+/// `range` on `CommandBlock` and the `index` on `RichContent` are captured at
+/// scan time and can be invalidated by subsequent block list mutations (new
+/// blocks, removals, rich content rescans, etc.). Callers should consume
+/// cloned values inline; long-lived storage outside a `BlockListFindRun` is
+/// not supported.
+///
+/// TODO(vkodithala): The `RichContent` variant mirrors `AsyncFocusedAiMatch` in the async
+/// path. Both derive `Clone` even though their contents are short-lived;
+/// explore removing `Clone` from both in a future PR to enforce the snapshot
+/// contract in the type system.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockListMatch {
     CommandBlock(BlockGridMatch),
@@ -634,11 +641,7 @@ fn update_matches_for_filtered_block<'a>(
 ) {
     let Some(displayed_rows) = block.displayed_output_row_ranges() else {
         matches.for_each(|find_match| {
-            if let BlockListMatch::CommandBlock(BlockGridMatch {
-                ref mut is_filtered,
-                ..
-            }) = find_match
-            {
+            if let BlockListMatch::CommandBlock(BlockGridMatch { is_filtered, .. }) = find_match {
                 *is_filtered = false;
             }
         });
@@ -742,5 +745,5 @@ fn update_matches_for_filtered_block<'a>(
 }
 
 #[cfg(test)]
-#[path = "block_list_test.rs"]
+#[path = "block_list_tests.rs"]
 mod tests;

@@ -9,7 +9,7 @@ use std::{
 
 use warpui::{
     accessibility::{AccessibilityContent, WarpA11yRole},
-    assets::asset_cache::{AssetCache, AssetSource},
+    assets::asset_cache::{AssetCache, AssetSource, LocalFileContentVersion},
     elements::{Align, CacheOption, DispatchEventResult, Empty, EventHandler, Image, Text},
     image_cache::ImageType,
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
@@ -85,6 +85,9 @@ impl ImageViewerView {
         });
         self.source = Some(AssetSource::LocalFile {
             path: local_path.to_string_lossy().into_owned(),
+            // 打开图片是低频操作(非渲染热路径),顺带读一次文件元数据,
+            // 这样磁盘上的图片被改写后缓存会失效并重新读取。
+            content_version: LocalFileContentVersion::for_path(&local_path),
         });
         self.path = Some(local_path);
 
@@ -97,7 +100,7 @@ impl ImageViewerView {
     /// being fetched, so the pane shows its filename and a spinner up front.
     #[cfg_attr(not(feature = "local_tty"), allow(dead_code))]
     pub fn set_loading_remote(&mut self, remote_path: &RemotePath, ctx: &mut ViewContext<Self>) {
-        let name = remote_path.file_name().to_string();
+        let name = remote_path.path.file_name().unwrap_or_default().to_string();
         self.pane_configuration.update(ctx, |pane_config, ctx| {
             pane_config.set_title(name.clone(), ctx);
         });
@@ -115,7 +118,7 @@ impl ImageViewerView {
         bytes: &[u8],
         ctx: &mut ViewContext<Self>,
     ) {
-        let name = remote_path.file_name().to_string();
+        let name = remote_path.path.file_name().unwrap_or_default().to_string();
         self.pane_configuration.update(ctx, |pane_config, ctx| {
             pane_config.set_title(name.clone(), ctx);
         });

@@ -1,48 +1,47 @@
-use std::{borrow::Cow, mem, ops::Range, sync::Arc};
+use std::borrow::Cow;
+use std::mem;
+use std::ops::Range;
+use std::sync::Arc;
 
 use string_offset::{ByteOffset, CharOffset};
 use warp_completer::signatures::CommandRegistry;
-use warp_editor::{
-    content::{anchor::Anchor, buffer::Buffer, selection_model::BufferSelectionModel},
-    editor::EmbeddedItemModel,
-};
+use warp_editor::content::anchor::Anchor;
+use warp_editor::content::buffer::Buffer;
+use warp_editor::content::selection_model::BufferSelectionModel;
+use warp_editor::editor::EmbeddedItemModel;
 use warp_util::user_input::UserInput;
-use warpui::{
-    elements::{
-        Align, Border, Container, CrossAxisAlignment, Empty, Flex, MainAxisAlignment,
-        MouseStateHandle, ParentElement, Shrinkable,
-    },
-    platform::Cursor,
-    ui_components::{button::ButtonVariant, components::UiComponent},
-    AppContext, Element, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity,
+use warpui::elements::{
+    Align, Border, Container, CrossAxisAlignment, Empty, Flex, MainAxisAlignment, MouseStateHandle,
+    ParentElement, Shrinkable,
 };
+use warpui::platform::Cursor;
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::UiComponent;
+use warpui::{AppContext, Element, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity};
 
-use crate::{
-    appearance::Appearance,
-    cloud_object::{model::persistence::ObjectStoreModel, StoredObject},
-    completer::SessionAgnosticContext,
-    notebooks::{
-        styles::block_footer_action_button,
-        telemetry::{ActionEntrypoint, BlockInfo},
-    },
-    server::ids::{HashableId, ToServerId},
-    settings::FontSettings,
-    terminal::input::decorations::{parse_current_commands_and_tokens, ParsedTokensSnapshot},
-    themes::theme::AnsiColorIdentifier,
-    ui_components::icons::Icon,
-    util::bindings::CustomAction,
-    workflows::{WorkflowId, WorkflowObject},
+use super::embedded_item::EmbeddedWorkflow;
+use super::keys::{NotebookKeybindings, custom_action_to_display};
+use super::model::ChildModelHandle;
+use super::notebook_command::{
+    parsed_token_to_color_style_ranges, transform_ansi_color_to_solid_color,
 };
-
-use super::{
-    embedded_item::EmbeddedWorkflow,
-    keys::{custom_action_to_display, NotebookKeybindings},
-    model::ChildModelHandle,
-    notebook_command::{parsed_token_to_color_style_ranges, transform_ansi_color_to_solid_color},
-    rich_text_styles,
-    view::EditorViewAction,
-    NotebookWorkflow,
+use super::view::EditorViewAction;
+use super::{NotebookWorkflow, rich_text_styles};
+use crate::appearance::Appearance;
+use crate::cloud_object::StoredObject;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::completer::SessionAgnosticContext;
+use crate::notebooks::styles::block_footer_action_button;
+use crate::notebooks::telemetry::{ActionEntrypoint, BlockInfo};
+use crate::server::ids::{HashableId, ToServerId};
+use crate::settings::FontSettings;
+use crate::terminal::input::decorations::{
+    ParsedTokensSnapshot, parse_current_commands_and_tokens,
 };
+use crate::themes::theme::AnsiColorIdentifier;
+use crate::ui_components::icons::Icon;
+use crate::util::bindings::CustomAction;
+use crate::workflows::{WorkflowId, WorkflowObject};
 
 #[derive(Default)]
 struct MouseStateHandles {

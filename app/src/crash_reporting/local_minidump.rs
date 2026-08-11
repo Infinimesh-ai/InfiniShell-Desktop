@@ -2,18 +2,14 @@
 //! This captures application crashes due to Unix signals like SIGSEGV (segfault) or Windows
 //! exceptions without uploading them to a remote crash service.
 
-use std::{
-    collections::HashMap,
-    fs::File,
-    io,
-    path::{Path, PathBuf},
-    process,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::process;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use anyhow::Context as _;
 use command::blocking::Command;
@@ -22,6 +18,7 @@ use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use warp_errors::report_error;
 
 use super::ToCrashReportTags;
 
@@ -133,7 +130,7 @@ pub fn run_server(socket_path: &Path) -> anyhow::Result<()> {
             &self,
             result: Result<minidumper::MinidumpBinary, minidumper::Error>,
         ) -> minidumper::LoopAction {
-            if let Err(ref err) = &result {
+            if let Err(err) = &result {
                 log::warn!("Unable to create minidump file: {err:#}");
             }
 
@@ -143,6 +140,15 @@ pub fn run_server(socket_path: &Path) -> anyhow::Result<()> {
             send_crash_report(crash_details, result.as_ref().ok(), dump_path, tags);
 
             minidumper::LoopAction::Exit
+        }
+
+        fn on_client_disconnected(&self, num_clients: usize) -> minidumper::LoopAction {
+            if num_clients == 0 {
+                log::info!("All clients disconnected, shutting down minidump server");
+                minidumper::LoopAction::Exit
+            } else {
+                minidumper::LoopAction::Continue
+            }
         }
 
         fn on_message(&self, _kind: u32, buffer: Vec<u8>) {
@@ -180,7 +186,7 @@ pub fn run_server(socket_path: &Path) -> anyhow::Result<()> {
         .run(handler, &shutdown, Some(2 * PING_INTERVAL))
         .context("Error running minidump server");
     if let Err(ref err) = result {
-        log::error!("Error running minidump server: {err:#}");
+        report_error!(err);
     }
 
     result
@@ -323,13 +329,15 @@ fn wait_for_server(socket_path: &Path) -> anyhow::Result<minidumper::Client> {
 fn spawn_keepalive_thread(client: Arc<minidumper::Client>) {
     let _ = std::thread::Builder::new()
         .name("minidump-keepalive".to_string())
-        .spawn(move || loop {
-            // Assume that if a ping fails, the server was shut down - the only purpose of this thread
-            // is to prevent an idle timeout.
-            if client.ping().is_err() {
-                return;
+        .spawn(move || {
+            loop {
+                // Assume that if a ping fails, the server was shut down - the only purpose of this thread
+                // is to prevent an idle timeout.
+                if client.ping().is_err() {
+                    return;
+                }
+                std::thread::sleep(PING_INTERVAL);
             }
-            std::thread::sleep(PING_INTERVAL);
         });
 }
 

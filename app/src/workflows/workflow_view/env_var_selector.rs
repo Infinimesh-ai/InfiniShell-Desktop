@@ -1,7 +1,8 @@
 use itertools::Itertools as _;
+use warpui::elements::ChildView;
 use warpui::{
-    elements::ChildView, Element as _, Entity, SingletonEntity as _, TypedActionView, View,
-    ViewAsRef, ViewContext, ViewHandle,
+    Element as _, Entity, SingletonEntity as _, TypedActionView, View, ViewAsRef, ViewContext,
+    ViewHandle,
 };
 
 use crate::{

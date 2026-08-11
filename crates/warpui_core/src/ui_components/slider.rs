@@ -1,22 +1,22 @@
-use std::{ops::Range, sync::Arc};
+use std::ops::Range;
+use std::sync::Arc;
 
-use crate::platform::Cursor;
-use crate::{
-    elements::{
-        AnchorPair, ConstrainedBox, Container, CornerRadius, DragAxis, Draggable, DraggableState,
-        DropShadow, Fill, Hoverable, MouseStateHandle, OffsetPositioning, OffsetType,
-        ParentElement, ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius,
-        Rect, SavePosition, Stack, XAxisAnchor, YAxisAnchor,
-    },
-    ui_components::components::UiComponentStyles,
-    AppContext, Element, EventContext,
-};
 use lazy_static::lazy_static;
 use parking_lot::{Mutex, RwLock};
 use pathfinder_color::ColorU;
-use pathfinder_geometry::{rect::RectF, vector::vec2f};
+use pathfinder_geometry::rect::RectF;
+use pathfinder_geometry::vector::vec2f;
 
 use super::components::UiComponent;
+use crate::elements::{
+    AnchorPair, ConstrainedBox, Container, CornerRadius, DragAxis, Draggable, DraggableState,
+    DropShadow, Fill, Hoverable, MouseStateHandle, OffsetPositioning, OffsetType, ParentElement,
+    ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius, Rect, SavePosition,
+    Stack, XAxisAnchor, YAxisAnchor,
+};
+use crate::platform::Cursor;
+use crate::ui_components::components::UiComponentStyles;
+use crate::{AppContext, Element, EventContext};
 
 const DEFAULT_THUMB_SIZE: f32 = 18.;
 const DEFAULT_TRACK_HEIGHT: f32 = 4.;
@@ -391,19 +391,19 @@ fn snap_offset_and_value(
     let canonical = (raw_offset_x / draggable_width).clamp(0., 1.);
     let raw_value = canonical * (value_range.end - value_range.start) + value_range.start;
 
-    if let Some(values) = snap_values {
-        if !values.is_empty() {
-            // Snap to nearest value by absolute distance.
-            let snapped_value = values.iter().copied().fold(values[0], |best, v| {
-                if (v - raw_value).abs() < (best - raw_value).abs() {
-                    v
-                } else {
-                    best
-                }
-            });
-            let snapped_canonical = value_to_canonical_linear(snapped_value, value_range);
-            return (snapped_canonical * draggable_width, snapped_value);
-        }
+    if let Some(values) = snap_values
+        && !values.is_empty()
+    {
+        // Snap to nearest value by absolute distance.
+        let snapped_value = values.iter().copied().fold(values[0], |best, v| {
+            if (v - raw_value).abs() < (best - raw_value).abs() {
+                v
+            } else {
+                best
+            }
+        });
+        let snapped_canonical = value_to_canonical_linear(snapped_value, value_range);
+        return (snapped_canonical * draggable_width, snapped_value);
     }
 
     let Some(step) = step.filter(|s| *s > 0.) else {

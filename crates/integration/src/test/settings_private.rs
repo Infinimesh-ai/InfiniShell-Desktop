@@ -6,17 +6,14 @@
 use std::collections::HashMap;
 
 use settings::Setting as _;
-use warp::{
-    features::FeatureFlag,
-    integration_testing::{
-        step::new_step_with_default_assertions,
-        terminal::wait_until_bootstrapped_single_pane_for_tab,
-    },
-    settings::{CodeSettings, DebugSettings, FontSettings},
-};
-use warpui::{async_assert, async_assert_eq, integration::TestStep, SingletonEntity};
+use warp::features::FeatureFlag;
+use warp::integration_testing::step::new_step_with_default_assertions;
+use warp::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use warp::settings::{CodeSettings, DebugSettings, FontSettings};
+use warpui_core::integration::TestStep;
+use warpui_core::{SingletonEntity, async_assert, async_assert_eq};
 
-use super::{new_builder, Builder};
+use super::{Builder, new_builder};
 
 /// Helper: read the TOML settings file from disk and return its contents.
 /// Returns an empty string if the file does not exist.

@@ -4,19 +4,17 @@
 //! filesystem watcher and pushed into the in-memory setting models, on every
 //! platform where Zap watches `config_local_dir()`.
 
-use settings::Setting as _;
 use std::time::Duration;
-use warp::{
-    features::FeatureFlag,
-    integration_testing::{
-        step::new_step_with_default_assertions,
-        terminal::wait_until_bootstrapped_single_pane_for_tab,
-    },
-    settings::FontSettings,
-};
-use warpui::{async_assert_eq, integration::TestStep, SingletonEntity};
 
-use super::{new_builder, Builder};
+use settings::Setting as _;
+use warp::features::FeatureFlag;
+use warp::integration_testing::step::new_step_with_default_assertions;
+use warp::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use warp::settings::FontSettings;
+use warpui_core::integration::TestStep;
+use warpui_core::{SingletonEntity, async_assert_eq};
+
+use super::{Builder, new_builder};
 
 /// Helper: returns the path to the TOML settings file.
 fn toml_file_path() -> std::path::PathBuf {

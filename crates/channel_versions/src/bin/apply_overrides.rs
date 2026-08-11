@@ -1,7 +1,8 @@
-use std::{fs, path::PathBuf};
+use std::fs;
+use std::path::PathBuf;
 
 use anyhow::Result;
-use channel_versions::{overrides, ChannelVersion, ChannelVersions};
+use channel_versions::{ChannelVersion, ChannelVersions, overrides};
 use clap::Parser;
 
 #[derive(Parser, Debug)]

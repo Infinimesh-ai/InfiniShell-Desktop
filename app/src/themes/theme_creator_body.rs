@@ -1,17 +1,10 @@
-use crate::appearance::{Appearance, AppearanceManager};
-use crate::editor::{EditorView, Event as EditorEvent};
-use crate::themes::theme::{InMemoryThemeOptions, ThemeKind};
-use crate::user_config;
-#[cfg(feature = "local_fs")]
-use crate::{
-    send_telemetry_from_ctx, server::telemetry::TelemetryEvent, themes::theme::CustomTheme,
-};
-use pathfinder_color::ColorU;
-use pathfinder_geometry::vector::vec2f;
 use std::default::Default;
 use std::path::PathBuf;
 #[cfg(feature = "local_fs")]
 use std::{fs::copy, io::Write};
+
+use pathfinder_color::ColorU;
+use pathfinder_geometry::vector::vec2f;
 #[cfg(feature = "local_fs")]
 use warp_core::ui::theme::WarpTheme;
 use warpui::elements::{
@@ -20,13 +13,21 @@ use warpui::elements::{
     ParentElement, Radius, Rect, SavePosition, Shrinkable, Text,
 };
 use warpui::fonts::Weight;
+use warpui::platform::Cursor;
 use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::text_input::TextInput;
-use warpui::ViewHandle;
 use warpui::{
-    platform::Cursor, AppContext, Element, Entity, SingletonEntity, TypedActionView, View,
-    ViewContext,
+    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
+
+use crate::appearance::{Appearance, AppearanceManager};
+use crate::editor::{EditorView, Event as EditorEvent};
+use crate::themes::theme::{InMemoryThemeOptions, ThemeKind};
+use crate::user_config;
+#[cfg(feature = "local_fs")]
+use crate::{
+    send_telemetry_from_ctx, server::telemetry::TelemetryEvent, themes::theme::CustomTheme,
 };
 
 const BUTTON_PADDING: f32 = 12.;
@@ -103,17 +104,17 @@ impl ThemeCreatorBody {
     }
 
     pub fn handle_editor_event(&mut self, event: &EditorEvent, ctx: &mut ViewContext<Self>) {
-        if let EditorEvent::Edited(_) = event {
-            if let Some(theme_options) = &mut self.theme_options {
-                self.editor.update(ctx, |editor, ctx| {
-                    theme_options.set_name(editor.buffer_text(ctx));
+        if let EditorEvent::Edited(_) = event
+            && let Some(theme_options) = &mut self.theme_options
+        {
+            self.editor.update(ctx, |editor, ctx| {
+                theme_options.set_name(editor.buffer_text(ctx));
 
-                    let theme_kind = ThemeKind::InMemory(theme_options.clone());
-                    AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-                        appearance_manager.set_transient_theme(theme_kind, ctx);
-                    });
+                let theme_kind = ThemeKind::InMemory(theme_options.clone());
+                AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
+                    appearance_manager.set_transient_theme(theme_kind, ctx);
                 });
-            }
+            });
         }
         ctx.notify();
     }
@@ -210,21 +211,21 @@ impl ThemeCreatorBody {
     ) -> Option<T> {
         if let Ok(theme_yaml) = serde_yaml::to_string(theme) {
             let path = dir.join(theme_yaml_file_name);
-            if let Ok(mut file) = crate::util::file::create_file(&path) {
-                if write!(file, "{theme_yaml}").is_ok() {
-                    match image_option {
-                        Some((image_path, theme_name, image_extension)) => {
-                            if copy(
-                                image_path.clone(),
-                                dir.join(format!("{theme_name}.{image_extension}")),
-                            )
-                            .is_ok()
-                            {
-                                return Some((success_callback)(path));
-                            }
+            if let Ok(mut file) = crate::util::file::create_file(&path)
+                && write!(file, "{theme_yaml}").is_ok()
+            {
+                match image_option {
+                    Some((image_path, theme_name, image_extension)) => {
+                        if copy(
+                            image_path.clone(),
+                            dir.join(format!("{theme_name}.{image_extension}")),
+                        )
+                        .is_ok()
+                        {
+                            return Some((success_callback)(path));
                         }
-                        None => return Some((success_callback)(path)),
                     }
+                    None => return Some((success_callback)(path)),
                 }
             }
         }

@@ -1,13 +1,10 @@
 // Specific slide implementations
 pub mod cta_button;
 
-use crate::ui_components::blended_colors;
-use crate::ui_components::icons::Icon;
-use crate::view_components::action_button::{ActionButton, PrimaryTheme, SecondaryTheme};
-use crate::workspace::view::launch_modal::cta_button::{CTAButton, CTAButtonAction};
-use markdown_parser::{parse_markdown, FormattedText, FormattedTextLine};
-use pathfinder_color::ColorU;
 use std::collections::HashMap;
+
+use markdown_parser::{FormattedText, FormattedTextLine, parse_markdown};
+use pathfinder_color::ColorU;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::Fill;
 use warpui::assets::asset_cache::AssetSource;
@@ -26,6 +23,11 @@ use warpui::ui_components::components::UiComponent;
 use warpui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
+
+use crate::ui_components::blended_colors;
+use crate::ui_components::icons::Icon;
+use crate::view_components::action_button::{ActionButton, PrimaryTheme, SecondaryTheme};
+use crate::workspace::view::launch_modal::cta_button::{CTAButton, CTAButtonAction};
 
 pub fn init<S: Slide>(app: &mut AppContext) {
     use warpui::keymap::macros::*;

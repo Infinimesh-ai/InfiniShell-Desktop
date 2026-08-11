@@ -1,4 +1,6 @@
 use registry::register_uri_handler;
+#[cfg(feature = "release_bundle")]
+use warp_errors::report_error;
 use warpui::AppContext;
 #[cfg(feature = "release_bundle")]
 use {
@@ -18,7 +20,7 @@ mod single_instance_manager;
 pub enum StartupArgsForwardingError {
     #[error("should not forward arguments after an auto-update")]
     IgnoredAfterAutoUpdate,
-    #[error("there is no other instance of Zap")]
+    #[error("there is no other instance of InfiniShell")]
     NoExistingInstance,
     #[error("failed to construct url")]
     CouldNotCreateUrl(#[from] url::ParseError),
@@ -48,7 +50,10 @@ pub fn pass_startup_args_to_existing_instance(
                 match current_dir.into_os_string().into_string() {
                     Ok(current_dir) => open_new_url.push_str(&format!("?path={}", current_dir)),
                     Err(os_string) => {
-                        log::error!("Failed to convert OsString {os_string:?} to ");
+                        report_error!(
+                            "Failed to convert OsString to String",
+                            extra: { "os_string" => ?os_string }
+                        );
                     }
                 }
             }

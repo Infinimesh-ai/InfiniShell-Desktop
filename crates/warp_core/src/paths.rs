@@ -19,18 +19,19 @@ use std::path::{Path, PathBuf};
 use cfg_if::cfg_if;
 use directories::BaseDirs;
 
-use crate::{
-    channel::{Channel, ChannelState},
-    AppId,
-};
+use crate::AppId;
+use crate::channel::{Channel, ChannelState};
 
-/// The name of the directory in which to put non-global Zap-specific files.
+/// The name of the directory in which to put non-global InfiniShell-specific files.
 ///
 /// This should be used, for example, as the base directory under which
 /// repository workflows would be stored (in "./.warp/workflows").
 pub const WARP_CONFIG_DIR: &str = ".warp";
 
-/// The name of the folder that stores Zap execution logs and network logs.
+/// The home-relative config directory name used by the OSS (InfiniShell) channel.
+pub const OSS_CONFIG_DIR: &str = ".infinishell";
+
+/// The name of the folder that stores InfiniShell execution logs and network logs.
 /// This is currently only used on Windows to maintain backwards compatibility.
 pub const WARP_LOGS_DIR: &str = "logs";
 
@@ -39,13 +40,14 @@ fn base_warp_config_dir_name() -> String {
         // Preview shares the same directory as Stable for backward
         // compatibility — existing users already have config in `.warp`.
         Channel::Stable | Channel::Preview => WARP_CONFIG_DIR.to_owned(),
-        Channel::Oss => ".zap".to_owned(),
+        Channel::Oss => OSS_CONFIG_DIR.to_owned(),
         Channel::Dev => format!("{WARP_CONFIG_DIR}-dev"),
         Channel::Integration => format!("{WARP_CONFIG_DIR}-integration"),
         Channel::Local => format!("{WARP_CONFIG_DIR}-local"),
     }
 }
-/// Returns the home-relative Zap config directory name for the current channel and data profile.
+
+/// Returns the home-relative InfiniShell config directory name for the current channel and data profile.
 ///
 /// This preserves the historical `.warp*` directory shape while still isolating dev, local,
 /// integration, oss, and optional development profiles.
@@ -59,11 +61,11 @@ pub fn warp_home_config_dir_name() -> String {
     }
 }
 
-/// Returns the home-relative Zap config directory for the current channel and data profile.
+/// Returns the home-relative InfiniShell config directory for the current channel and data profile.
 ///
 /// Unlike [`data_dir`] and [`config_local_dir`] on non-macOS platforms, this intentionally keeps
-/// Zap-authored, user-facing config under a `.warp*` directory in the home directory instead of
-/// using the platform XDG/AppData project directories.
+/// InfiniShell-authored, user-facing config under a `.warp*`/`.infinishell*` directory in the home
+/// directory instead of using the platform XDG/AppData project directories.
 pub fn warp_home_config_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|home_dir| home_dir.join(warp_home_config_dir_name()))
 }
@@ -76,22 +78,40 @@ pub fn warp_home_mcp_config_file_path() -> Option<PathBuf> {
     warp_home_config_dir().map(|warp_config_dir| warp_config_dir.join(".mcp.json"))
 }
 
-/// Returns the macOS config directory name for the current channel.
+/// Returns the macOS config directory name for the current channel and data
+/// profile.
 ///
 /// Stable uses `.warp`, while other channels include a channel suffix
 /// (e.g., `.warp-dev`, `.warp-local`).
+///
+/// Development data profiles append a further `-{profile}` suffix. Without it,
+/// every profile of a channel would share this directory — and with it the
+/// public settings in `settings.toml` — defeating the isolation that profiles
+/// already provide for UserDefaults, Application Support, and the keychain.
 ///
 /// These suffixes are persisted on disk as directory names and must not be
 /// changed once established, or existing user data will be orphaned.
 #[cfg(target_os = "macos")]
 fn macos_config_dir_name() -> String {
-    match ChannelState::channel() {
+    macos_config_dir_name_for(
+        ChannelState::channel(),
+        ChannelState::data_profile().as_deref(),
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn macos_config_dir_name_for(channel: Channel, data_profile: Option<&str>) -> String {
+    let base_dir_name = match channel {
         Channel::Stable => WARP_CONFIG_DIR.to_owned(),
         Channel::Preview => format!("{WARP_CONFIG_DIR}-preview"),
-        Channel::Oss => ".zap".to_owned(),
+        Channel::Oss => OSS_CONFIG_DIR.to_owned(),
         Channel::Dev => format!("{WARP_CONFIG_DIR}-dev"),
         Channel::Integration => format!("{WARP_CONFIG_DIR}-integration"),
         Channel::Local => format!("{WARP_CONFIG_DIR}-local"),
+    };
+    match data_profile {
+        Some(profile) => format!("{base_dir_name}-{profile}"),
+        None => base_dir_name,
     }
 }
 
@@ -111,6 +131,28 @@ pub fn data_dir() -> PathBuf {
     }
 }
 
+/// Returns the GUI application ID for the current channel.
+///
+/// Most TUI channel binaries use the same application ID as the GUI. The OSS
+/// TUI is the exception: it uses `WarpTui`, while the corresponding GUI uses
+/// the InfiniShell application ID registered by `bin/infinishell.rs`.
+#[cfg(any(not(target_os = "macos"), test))]
+fn gui_app_id_for_channel(channel: Channel, current_app_id: AppId) -> AppId {
+    match channel {
+        Channel::Oss => AppId::new("dev", "infinishell", "InfiniShell"),
+        Channel::Stable
+        | Channel::Preview
+        | Channel::Dev
+        | Channel::Integration
+        | Channel::Local => current_app_id,
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn gui_app_id() -> AppId {
+    gui_app_id_for_channel(ChannelState::channel(), ChannelState::app_id())
+}
+
 /// Returns the path to the directory where non-portable configuration files
 /// should be stored.
 pub fn config_local_dir() -> PathBuf {
@@ -127,6 +169,83 @@ pub fn config_local_dir() -> PathBuf {
     }
 }
 
+/// Resolves the GUI's non-portable configuration directory from any frontend.
+///
+/// This differs from [`config_local_dir`] when the active process uses a
+/// frontend-specific application ID, as the OSS TUI does on Linux and Windows.
+/// On macOS, development data profiles do not have an unambiguous corresponding
+/// GUI `.warp*` directory, so this fails closed instead of selecting a source
+/// profile implicitly.
+pub fn gui_config_local_dir() -> Option<PathBuf> {
+    cfg_if! {
+        if #[cfg(target_os = "macos")] {
+            if ChannelState::data_profile().is_some() {
+                return None;
+            }
+            dirs::home_dir().map(|home_dir| home_dir.join(macos_config_dir_name()))
+        } else {
+            project_dirs_for_app_id(
+                gui_app_id(),
+                ChannelState::data_profile().as_deref(),
+            )
+            .map(|dirs| dirs.config_local_dir().to_owned())
+        }
+    }
+}
+
+/// Resolves the GUI's global file-based MCP configuration from any frontend.
+///
+/// As with [`gui_config_local_dir`], macOS development data profiles fail
+/// closed because the matching GUI source profile is ambiguous.
+pub fn gui_mcp_config_file_path() -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    if ChannelState::data_profile().is_some() {
+        return None;
+    }
+
+    warp_home_mcp_config_file_path()
+}
+
+/// Returns the macOS config directory name for the TUI front-end (`warp-tui`)
+/// for the current channel.
+///
+/// This mirrors [`macos_config_dir_name`] but under a `.warp_cli*` directory so
+/// the TUI keeps its settings separate from the GUI's `.warp*` directory. Like
+/// the GUI names, these are persisted on disk as directory names and must not be
+/// changed once established.
+#[cfg(target_os = "macos")]
+fn macos_tui_config_dir_name() -> String {
+    macos_config_dir_name().replacen(WARP_CONFIG_DIR, ".warp_cli", 1)
+}
+
+/// Returns the path to the directory where non-portable configuration files for
+/// the TUI front-end (`warp-tui`) should be stored.
+///
+/// This is intentionally distinct from [`config_local_dir`] so the GUI and the
+/// TUI never share (and clobber) a settings file. On macOS it is a sibling
+/// `.warp_cli*` directory (mirroring the GUI's `.warp*`); on other platforms —
+/// whose config dirs are already app-id based — it nests under a `cli`
+/// subdirectory of the standard config dir.
+pub fn tui_config_local_dir() -> PathBuf {
+    cfg_if! {
+        if #[cfg(target_os = "macos")] {
+            dirs::home_dir()
+                .unwrap_or_default()
+                .join(macos_tui_config_dir_name())
+        } else {
+            config_local_dir().join("cli")
+        }
+    }
+}
+
+/// Returns the path to the TUI front-end's global MCP configuration file.
+///
+/// This is intentionally distinct from [`warp_home_mcp_config_file_path`] so
+/// the GUI and TUI can run different MCP configurations and versions without
+/// reading or modifying each other's files.
+pub fn tui_mcp_config_file_path() -> PathBuf {
+    tui_config_local_dir().join(".mcp.json")
+}
 /// Returns the base directory for general config files. Useful for accessing the config files for
 /// other programs.
 pub fn base_config_dir() -> PathBuf {
@@ -140,7 +259,7 @@ pub fn base_config_dir() -> PathBuf {
 ///
 /// This is the appropriate home for files like our sqlite database, which
 /// contains durable but non-critical and non-portable data like what windows
-/// the user had open and cached state of known Zap Drive objects.
+/// the user had open and cached state of known InfiniShell Drive objects.
 pub fn state_dir() -> PathBuf {
     let Some(project_dirs) = project_dirs() else {
         return PathBuf::new();
@@ -178,6 +297,19 @@ pub fn secure_state_dir() -> Option<PathBuf> {
     None
 }
 
+/// Returns the path to the directory where non-portable application state
+/// data for the TUI front-end (`warp-tui`) should be stored.
+///
+/// This is intentionally distinct from the GUI's state directory (see
+/// [`state_dir`] / [`secure_state_dir`]) so the two front-ends never share a
+/// SQLite database: they can be on different versions with different
+/// persistence schemas, and whichever binary is newer would otherwise migrate
+/// the shared database out from under the older one. Like other on-disk
+/// names, the `tui` directory name must not be changed once established.
+pub fn tui_state_dir() -> PathBuf {
+    secure_state_dir().unwrap_or_else(state_dir).join("tui")
+}
+
 /// Returns the path to the directory containing the user's custom themes.
 pub fn themes_dir() -> PathBuf {
     data_dir().join("themes")
@@ -208,10 +340,10 @@ pub fn cache_dir() -> PathBuf {
 /// home-dir-relative manner, if appropriate.
 pub fn home_relative_path(path: &Path) -> String {
     #[cfg(unix)]
-    if let Some(base_dirs) = directories::BaseDirs::new() {
-        if let Ok(relative_path) = path.strip_prefix(base_dirs.home_dir()) {
-            return format!("~/{}", relative_path.display());
-        }
+    if let Some(base_dirs) = directories::BaseDirs::new()
+        && let Ok(relative_path) = path.strip_prefix(base_dirs.home_dir())
+    {
+        return format!("~/{}", relative_path.display());
     };
 
     path.display().to_string()
@@ -239,10 +371,10 @@ fn project_dirs_for_app_id(
     cfg_if::cfg_if! {
         if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             // Adjust the base application name so that we end up with
-            // a directory like "zap" matching our Linux package name.
+            // a directory like "infinishell" matching our Linux package name.
             let base_app_name = match app_id.application_name() {
-                "Zap" => "zap".to_owned(),
-                other if other.starts_with("Zap") => other.replace("Zap", "zap-"),
+                "InfiniShell" => "infinishell".to_owned(),
+                other if other.starts_with("InfiniShell") => other.replace("InfiniShell", "infinishell-"),
                 _ => app_id.application_name().to_owned(),
             };
         } else {
@@ -279,12 +411,12 @@ pub fn app_group_container_path() -> Option<PathBuf> {
         // We have to double-check that the path points to a directory we can actually use. In addition to
         // macOS returning a path that may not exist, processes may list the container directory without
         // having permissions to read to or write from it.
-        if let Some(url) = fm.containerURLForSecurityApplicationGroupIdentifier(&group_id) {
-            if let Some(ns_path) = url.path() {
-                let path = PathBuf::from(ns_path.to_string());
-                if tempfile::tempfile_in(&path).is_ok() {
-                    return Some(path);
-                }
+        if let Some(url) = fm.containerURLForSecurityApplicationGroupIdentifier(&group_id)
+            && let Some(ns_path) = url.path()
+        {
+            let path = PathBuf::from(ns_path.to_string());
+            if tempfile::tempfile_in(&path).is_ok() {
+                return Some(path);
             }
         }
 
@@ -293,13 +425,17 @@ pub fn app_group_container_path() -> Option<PathBuf> {
     LazyLock::force(&CONTAINER_PATH).clone()
 }
 
-/// Returns the path to resources included in the Zap distribution.
+/// Returns the path to resources included in the InfiniShell distribution.
 ///
-/// Unlike [`warpui::AssetProvider`] assets, which are generally embedded in the binary, these are
-/// stored on the filesystem alongside the rest of Zap.
+/// Unlike [`warpui_core::AssetProvider`] assets, which are generally embedded in the binary, these
+/// are stored on the filesystem alongside the rest of InfiniShell.
 ///
 /// ## macOS
-/// The resources directory is `$APP_DIR/Contents/Resources` (e.g. `/Applications/Zap.app/Contents/Resources`).
+/// For the `.app` bundle, the resources directory is `$APP_DIR/Contents/Resources`
+/// (e.g. `/Applications/InfiniShell.app/Contents/Resources`). For the standalone CLI build
+/// (compiled with the `standalone` feature) the binary is not inside a `.app` bundle,
+/// and its resources live in a sibling `resources` directory next to the binary
+/// (e.g. `$INSTALL_DIR/resources`), matching the Linux/Windows layout.
 ///
 /// ## Linux
 /// The resources directory is `$INSTALL_DIR/resources`, where `$INSTALL_DIR` depends on the
@@ -307,16 +443,24 @@ pub fn app_group_container_path() -> Option<PathBuf> {
 ///
 /// ## Windows
 /// The resources directory is `$INSTALL_DIR/resources`, where `$INSTALL_DIR` is the directory
-/// containing the Zap executable (e.g. `C:\Program Files\WarpDev\resources`).
+/// containing the InfiniShell executable (e.g. `C:\Program Files\WarpDev\resources`).
 pub fn bundled_resources_dir() -> Option<PathBuf> {
     cfg_if::cfg_if! {
         if #[cfg(target_os = "macos")] {
-            crate::macos::get_bundle_path().ok()
-                .map(|bundle_path| {
-                    PathBuf::from(bundle_path)
-                        .join("Contents")
-                        .join("Resources")
-                })
+            if cfg!(feature = "standalone") {
+                // Standalone CLI build: the binary is not inside a `.app` bundle, so
+                // its resources live in a sibling `resources` directory next to the
+                // binary (matching the Linux/Windows layout).
+                std::env::current_exe()
+                    .ok()
+                    .and_then(|executable| std::fs::canonicalize(executable).ok())
+                    .and_then(|executable| executable.parent().map(|parent| parent.join("resources")))
+            } else {
+                // Regular `.app` bundle: resources live in `Contents/Resources`.
+                crate::macos::get_bundle_path()
+                    .ok()
+                    .map(|bundle_path| PathBuf::from(bundle_path).join("Contents").join("Resources"))
+            }
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             std::env::current_exe()
                 .ok()

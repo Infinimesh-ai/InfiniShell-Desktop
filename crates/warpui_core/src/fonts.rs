@@ -3,26 +3,22 @@ mod external_fallback;
 mod metrics;
 mod text_layout_system;
 
-pub use text_layout_system::TextLayoutSystem;
-
 use std::hash::Hash;
 
-use crate::{platform, rendering, scene::GlyphKey, SingletonEntity};
 use anyhow::{Error, Result};
-use dashmap::{
-    mapref::{entry::Entry, one::Ref},
-    DashMap,
-};
-
+use dashmap::DashMap;
+use dashmap::mapref::entry::Entry;
+use dashmap::mapref::one::Ref;
 use enum_iterator::Sequence;
 use markdown_parser::weight::CustomWeight;
 use ordered_float::OrderedFloat;
-use pathfinder_geometry::vector::Vector2I;
-use pathfinder_geometry::{
-    rect::{RectF, RectI},
-    vector::{vec2f, Vector2F},
-};
+use pathfinder_geometry::rect::{RectF, RectI};
+use pathfinder_geometry::vector::{Vector2F, Vector2I, vec2f};
 use serde::{Deserialize, Serialize};
+pub use text_layout_system::TextLayoutSystem;
+
+use crate::scene::GlyphKey;
+use crate::{SingletonEntity, platform, rendering};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Sequence, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema_gen", derive(schemars::JsonSchema))]
@@ -127,13 +123,11 @@ impl CustomWeightConversion for CustomWeight {
     }
 }
 
-#[cfg(not(target_family = "wasm"))]
-use {futures_util::future::BoxFuture, futures_util::FutureExt};
-
-pub(crate) use external_fallback::{FontBytes, RequestedFallbackFontSource};
-
 pub use external_fallback::{ExternalFontFamily, FallbackFontEvent, FallbackFontModel};
+pub(crate) use external_fallback::{FontBytes, RequestedFallbackFontSource};
 pub use metrics::Metrics;
+#[cfg(not(target_family = "wasm"))]
+use {futures_util::FutureExt, futures_util::future::BoxFuture};
 
 pub type GlyphId = u32;
 
@@ -337,14 +331,13 @@ impl Cache {
     pub fn get_or_load_system_font(&mut self, font_family: &str) -> Result<FamilyId> {
         match self.family_id_for_name(font_family) {
             Some(id) => {
-                if let Some(available_system_fonts) = self.available_system_fonts.as_mut() {
-                    if let Some(entry) =
+                if let Some(available_system_fonts) = self.available_system_fonts.as_mut()
+                    && let Some(entry) =
                         available_system_fonts.iter_mut().find(|(family_id, data)| {
                             data.family_name == font_family && family_id.is_none()
                         })
-                    {
-                        entry.0 = Some(id);
-                    }
+                {
+                    entry.0 = Some(id);
                 }
                 Ok(id)
             }
@@ -569,5 +562,5 @@ impl MetricsExt for Metrics {
 }
 
 #[cfg(test)]
-#[path = "fonts_test.rs"]
+#[path = "fonts_tests.rs"]
 mod tests;

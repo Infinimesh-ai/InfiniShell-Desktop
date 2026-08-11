@@ -1,90 +1,24 @@
-use super::directory_color_add_picker::{DirectoryColorAddPicker, DirectoryColorAddPickerEvent};
-use super::settings_page::{
-    AdditionalInfo, Category, LocalOnlyIconState, MatchData, PageType, SettingsWidget,
-};
-use super::{flags, SettingsSection};
-use super::{
-    settings_page::{
-        build_reset_button, render_body_item, render_body_item_label, render_dropdown_item,
-        SettingsPageEvent, SettingsPageMeta, SettingsPageViewHandle, ToggleState, HEADER_PADDING,
-    },
-    SettingsAction,
-};
-use super::{SettingActionPairContexts, SettingActionPairDescriptions, ToggleSettingActionPair};
-use crate::appearance::{Appearance, AppearanceEvent};
-use crate::channel::{Channel, ChannelState};
-use crate::context_chips::prompt::PromptEvent;
-use crate::context_chips::renderer::ChipDragState;
-use crate::context_chips::{
-    prompt::Prompt, renderer::Renderer as ContextChipRenderer, ChipAvailability,
-};
-use crate::editor::{
-    EditOrigin, Event as EditorEvent, InteractionState, SingleLineEditorOptions, TextOptions,
-};
-use crate::gpu_state::{GPUState, GPUStateEvent};
-use crate::prompt::editor_modal::OpenSource as PromptEditorOpenSource;
-use crate::server::telemetry::InputUXChangeOrigin;
-use crate::settings::{
-    active_theme_kind,
-    app_icon::{AppIcon, AppIconSettings},
-    language::{Language, LanguageSettings},
-    respect_system_theme, AIFontName, AppEditorSettings, CursorBlink, CursorBlinkEnabled,
-    EnforceMinimumContrast, FocusPaneOnHover, FontSettings, FontSettingsChangedEvent, InputBoxType,
-    InputModeSettings, InputModeState, MarkdownHeadingH1Scale, MarkdownHeadingH2Scale,
-    MarkdownHeadingH3Scale, MarkdownHeadingH4Scale, MarkdownHeadingH5Scale, MarkdownHeadingH6Scale,
-    MonospaceFallbackFontName, MonospaceFontName, PaneSettings, ShouldDimInactivePanes,
-    ThemeSettings, UiFontName, UseSystemTheme, DEFAULT_MONOSPACE_FONT_NAME,
-    MARKDOWN_HEADING_SCALE_MAX, MARKDOWN_HEADING_SCALE_MIN, UI_FONT_SIZE_MAX, UI_FONT_SIZE_MIN,
-};
-use crate::settings::{CursorDisplayType, GPUSettings, InputSettings, InputSettingsChangedEvent};
-use crate::terminal::block_list_viewport::InputMode;
-use crate::terminal::blockgrid_element::BlockGridElement;
-use crate::terminal::ligature_settings::{LigatureRenderingEnabled, LigatureSettings};
-use crate::terminal::model::blockgrid::BlockGrid;
-use crate::terminal::model::ObfuscateSecrets;
-use crate::terminal::session_settings::SessionSettings;
-use crate::terminal::settings::{
-    AltScreenPadding, AltScreenPaddingMode, Spacing, SpacingMode, TerminalSettings,
-};
-use crate::terminal::{BlockListSettings, ShowBlockDividers};
-use crate::terminal::{ShowJumpToBottomOfBlockButton, SizeInfo};
-use crate::themes::theme::{self, RespectSystemTheme, SelectedSystemThemes, ThemeKind, WarpTheme};
-use crate::user_config::WarpConfig;
-use crate::util::bindings;
-use crate::window_settings::{
-    BackgroundBlurRadius, BackgroundBlurTexture, BackgroundOpacity, LeftPanelVisibilityAcrossTabs,
-    OpenWindowsAtCustomSize, WindowSettings, WindowSettingsChangedEvent, ZoomLevel,
-};
-use crate::workspace::header_toolbar_editor::HeaderToolbarInlineEditor;
-use crate::workspace::tab_settings::{
-    DirectoryTabColor, PreserveActiveTabColor, ShowCodeReviewButton, ShowIndicatorsButton,
-    ShowTitleBarSearchBar, ShowVerticalTabPanelInRestoredWindows, TabCloseButtonPosition,
-    TabSettings, TabSettingsChangedEvent, UseLatestUserPromptAsConversationTitleInTabNames,
-    UseVerticalTabs, WorkspaceDecorationVisibility,
-};
-use crate::workspace::WorkspaceAction;
-use crate::{editor::EditorView, themes::theme_chooser::ThemeChooserMode};
-use crate::{
-    features::FeatureFlag,
-    view_components::{Dropdown, DropdownItem, FilterableDropdown},
-};
-use crate::{report_error, report_if_error, themes};
-use crate::{send_telemetry_from_ctx, server::telemetry::TelemetryEvent};
-use ::settings::{Setting, SettingSection, ToggleableSetting};
-use enum_iterator::all;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
+
+use ::settings::{Setting, SettingSection, ToggleableSetting};
+use enum_iterator::all;
 use warp_core::ui::theme::color::internal_colors;
+use warp_errors::{report_error, report_if_error};
 use warp_util::path::user_friendly_path;
 use warpui::elements::{
-    Clipped, Empty, FormattedTextElement, MainAxisAlignment, MainAxisSize, Text, Wrap,
+    Align, Border, ChildView, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+    DEFAULT_UI_LINE_HEIGHT_RATIO, Dismiss, Element, Empty, Fill, Flex, FormattedTextElement,
+    Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius,
+    Shrinkable, Text, Wrap,
 };
 use warpui::fonts::{FamilyId, FontInfo, Weight};
 use warpui::keymap::{ContextPredicate, FixedBinding};
-use warpui::platform::{Cursor, FilePickerConfiguration, GraphicsBackend};
+use warpui::platform::{Cursor, FilePickerConfiguration, GraphicsBackend, SystemTheme};
+use warpui::rendering::ThinStrokes;
 use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::radio_buttons::{
@@ -93,26 +27,82 @@ use warpui::ui_components::radio_buttons::{
 use warpui::ui_components::slider::SliderStateHandle;
 use warpui::ui_components::switch::SwitchStateHandle;
 use warpui::units::IntoPixels;
-
-use warpui::id;
 use warpui::{
-    elements::{
-        Align, Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-        Dismiss, Element, Fill, Flex, Hoverable, MouseStateHandle, ParentElement, Radius,
-        Shrinkable, DEFAULT_UI_LINE_HEIGHT_RATIO,
-    },
-    rendering::ThinStrokes,
-};
-use warpui::{platform::SystemTheme, Action};
-use warpui::{
-    AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, UpdateModel, View,
-    ViewContext, ViewHandle, WindowId,
+    Action, AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, UpdateModel, View,
+    ViewContext, ViewHandle, WindowId, id,
 };
 
-use crate::settings::UseThinStrokes;
-use crate::ui_components::color_dot::{render_color_dot, TAB_COLOR_OPTIONS};
+use super::directory_color_add_picker::{DirectoryColorAddPicker, DirectoryColorAddPickerEvent};
+use super::settings_page::{
+    AdditionalInfo, Category, HEADER_PADDING, LocalOnlyIconState, MatchData, PageType,
+    SettingsPageEvent, SettingsPageMeta, SettingsPageViewHandle, SettingsWidget, ToggleState,
+    build_reset_button, render_body_item, render_body_item_label, render_dropdown_item,
+};
+use super::{
+    SettingActionPairContexts, SettingActionPairDescriptions, SettingsAction, SettingsSection,
+    ToggleSettingActionPair, flags,
+};
+use crate::appearance::{Appearance, AppearanceEvent};
+use crate::channel::{Channel, ChannelState};
+use crate::context_chips::ChipAvailability;
+use crate::context_chips::prompt::{Prompt, PromptEvent};
+use crate::context_chips::renderer::{ChipDragState, Renderer as ContextChipRenderer};
+use crate::drive::settings::WarpDriveSettings;
+use crate::editor::{
+    EditOrigin, EditorView, Event as EditorEvent, InteractionState, SingleLineEditorOptions,
+    TextOptions,
+};
+use crate::features::FeatureFlag;
+use crate::gpu_state::{GPUState, GPUStateEvent};
+use crate::prompt::editor_modal::OpenSource as PromptEditorOpenSource;
+use crate::server::telemetry::{InputUXChangeOrigin, TelemetryEvent};
+use crate::settings::app_icon::{AppIcon, AppIconSettings, ShowDockIconState};
+use crate::settings::language::{Language, LanguageSettings};
+use crate::settings::{
+    AIFontName, AISettings, AppEditorSettings, CodeSettings, CursorBlink, CursorBlinkEnabled,
+    CursorDisplayType, DEFAULT_MONOSPACE_FONT_NAME, EnforceMinimumContrast, FocusPaneOnHover,
+    FontSettings, FontSettingsChangedEvent, GPUSettings, InputBoxType, InputModeSettings,
+    InputModeState, InputSettings, InputSettingsChangedEvent, MARKDOWN_HEADING_SCALE_MAX,
+    MARKDOWN_HEADING_SCALE_MIN, MarkdownHeadingH1Scale, MarkdownHeadingH2Scale,
+    MarkdownHeadingH3Scale, MarkdownHeadingH4Scale, MarkdownHeadingH5Scale, MarkdownHeadingH6Scale,
+    MonospaceFallbackFontName, MonospaceFontName, PaneSettings, ShouldDimInactivePanes,
+    ThemeSettings, UI_FONT_SIZE_MAX, UI_FONT_SIZE_MIN, UiFontName, UseSystemTheme, UseThinStrokes,
+    active_theme_kind, respect_system_theme,
+};
+use crate::terminal::block_list_viewport::InputMode;
+use crate::terminal::blockgrid_element::BlockGridElement;
+use crate::terminal::ligature_settings::{LigatureRenderingEnabled, LigatureSettings};
+use crate::terminal::model::ObfuscateSecrets;
+use crate::terminal::model::blockgrid::BlockGrid;
+use crate::terminal::session_settings::SessionSettings;
+use crate::terminal::settings::{
+    AltScreenPadding, AltScreenPaddingMode, Spacing, SpacingMode, TerminalSettings,
+};
+use crate::terminal::{
+    BlockListSettings, ShowBlockDividers, ShowJumpToBottomOfBlockButton, SizeInfo,
+};
+use crate::themes::theme::{self, RespectSystemTheme, SelectedSystemThemes, ThemeKind, WarpTheme};
+use crate::themes::theme_chooser::ThemeChooserMode;
+use crate::ui_components::color_dot::{TAB_COLOR_OPTIONS, render_color_dot};
 use crate::ui_components::icons::Icon;
+use crate::user_config::WarpConfig;
+use crate::util::bindings;
 use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme};
+use crate::view_components::{Dropdown, DropdownItem, FilterableDropdown};
+use crate::window_settings::{
+    BackgroundBlurRadius, BackgroundBlurTexture, BackgroundOpacity, LeftPanelVisibilityAcrossTabs,
+    OpenWindowsAtCustomSize, WindowSettings, WindowSettingsChangedEvent, ZoomLevel,
+};
+use crate::workspace::WorkspaceAction;
+use crate::workspace::header_toolbar_editor::HeaderToolbarInlineEditor;
+use crate::workspace::tab_settings::{
+    DirectoryTabColor, HideTitleBarSearchBarInVerticalTabs, PreserveActiveTabColor,
+    ShowCodeReviewButton, ShowIndicatorsButton, ShowVerticalTabPanelInRestoredWindows,
+    TabCloseButtonPosition, TabSettings, TabSettingsChangedEvent,
+    UseLatestUserPromptAsConversationTitleInTabNames, UseVerticalTabs,
+    WorkspaceDecorationVisibility, canonical_directory_key,
+};
+use crate::{send_telemetry_from_ctx, themes};
 
 const FONT_SIZE_INPUT_BOX_WIDTH: f32 = 80.;
 const NOTEBOOK_FONT_SIZE_INPUT_BOX_WIDTH: f32 = 50.;
@@ -232,29 +222,33 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         flags::DIM_INACTIVE_PANES_FLAG,
     ));
 
-    app.register_fixed_bindings(vec![FixedBinding::empty(
-        "Start Input at the Top".to_string(),
-        builder(SettingsAction::AppearancePageToggle(
-            AppearancePageAction::SetInputMode {
-                new_mode: InputMode::Waterfall,
-                from_binding: true,
-            },
-        )),
-        context.to_owned(),
-    )
-    .with_group(bindings::BindingGroup::Settings.as_str())]);
+    app.register_fixed_bindings(vec![
+        FixedBinding::empty(
+            "Start Input at the Top".to_string(),
+            builder(SettingsAction::AppearancePageToggle(
+                AppearancePageAction::SetInputMode {
+                    new_mode: InputMode::Waterfall,
+                    from_binding: true,
+                },
+            )),
+            context.to_owned(),
+        )
+        .with_group(bindings::BindingGroup::Settings.as_str()),
+    ]);
 
-    app.register_fixed_bindings(vec![FixedBinding::empty(
-        "Pin Input to the Top".to_string(),
-        builder(SettingsAction::AppearancePageToggle(
-            AppearancePageAction::SetInputMode {
-                new_mode: InputMode::PinnedToTop,
-                from_binding: true,
-            },
-        )),
-        context.to_owned(),
-    )
-    .with_group(bindings::BindingGroup::Settings.as_str())]);
+    app.register_fixed_bindings(vec![
+        FixedBinding::empty(
+            "Pin Input to the Top".to_string(),
+            builder(SettingsAction::AppearancePageToggle(
+                AppearancePageAction::SetInputMode {
+                    new_mode: InputMode::PinnedToTop,
+                    from_binding: true,
+                },
+            )),
+            context.to_owned(),
+        )
+        .with_group(bindings::BindingGroup::Settings.as_str()),
+    ]);
 
     app.register_fixed_bindings(vec![FixedBinding::empty(
         "Pin Input to the Bottom".to_string(),
@@ -268,14 +262,60 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     )]);
 
     // Add command palette entry for toggling between Zap and Classic input modes
-    app.register_fixed_bindings(vec![FixedBinding::empty(
-        "Toggle Input Mode (Zap/Classic)".to_string(),
+    app.register_fixed_bindings(vec![
+        FixedBinding::empty(
+            "Toggle Input Mode (InfiniShell/Classic)".to_string(),
+            builder(SettingsAction::AppearancePageToggle(
+                AppearancePageAction::ToggleInputMode,
+            )),
+            context.to_owned(),
+        )
+        .with_group(bindings::BindingGroup::Settings.as_str()),
+    ]);
+    toggle_binding_pairs.push(ToggleSettingActionPair::new(
+        "open new windows with custom size",
         builder(SettingsAction::AppearancePageToggle(
-            AppearancePageAction::ToggleInputMode,
+            AppearancePageAction::ToggleOpenWindowsAtCustomSize,
         )),
-        context.to_owned(),
-    )
-    .with_group(bindings::BindingGroup::Settings.as_str())]);
+        context,
+        flags::OPEN_WINDOWS_AT_CUSTOM_SIZE_FLAG,
+    ));
+
+    toggle_binding_pairs.push(ToggleSettingActionPair::new(
+        "window blur acrylic texture",
+        builder(SettingsAction::AppearancePageToggle(
+            AppearancePageAction::ToggleBlurTexture,
+        )),
+        context,
+        flags::WINDOW_BLUR_TEXTURE_FLAG,
+    ));
+
+    toggle_binding_pairs.push(ToggleSettingActionPair::new(
+        "tools panel visibility across tabs",
+        builder(SettingsAction::AppearancePageToggle(
+            AppearancePageAction::ToggleLeftPanelVisibility,
+        )),
+        context,
+        flags::LEFT_PANEL_VISIBILITY_ACROSS_TABS_FLAG,
+    ));
+
+    toggle_binding_pairs.push(ToggleSettingActionPair::new(
+        "agent font matching terminal font",
+        builder(SettingsAction::AppearancePageToggle(
+            AppearancePageAction::ToggleMatchAIToTerminalFontFamily,
+        )),
+        context,
+        flags::MATCH_AI_FONT_TO_TERMINAL_FONT_FLAG,
+    ));
+
+    toggle_binding_pairs.push(ToggleSettingActionPair::new(
+        "notebook font size matching terminal font size",
+        builder(SettingsAction::AppearancePageToggle(
+            AppearancePageAction::ToggleMatchNotebookToMonospaceFontSize,
+        )),
+        context,
+        flags::MATCH_NOTEBOOK_FONT_SIZE_TO_TERMINAL_FONT_SIZE_FLAG,
+    ));
 
     toggle_binding_pairs.push(
         ToggleSettingActionPair::new(
@@ -401,7 +441,15 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 AppearancePageAction::ToggleShowVerticalTabPanelInRestoredWindows,
             )),
             context,
-            flags::USE_VERTICAL_TABS_FLAG,
+            flags::SHOW_VERTICAL_TAB_PANEL_IN_RESTORED_WINDOWS_FLAG,
+        ));
+        toggle_binding_pairs.push(ToggleSettingActionPair::new(
+            "latest user prompt as conversation title in tab names",
+            builder(SettingsAction::AppearancePageToggle(
+                AppearancePageAction::ToggleUseLatestUserPromptAsConversationTitleInTabNames,
+            )),
+            context,
+            flags::USE_LATEST_USER_PROMPT_AS_CONVERSATION_TITLE_IN_TAB_NAMES_FLAG,
         ));
     }
 
@@ -415,6 +463,24 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             flags::LIGATURE_RENDERING_CONTEXT_FLAG,
         ));
     }
+
+    toggle_binding_pairs.push(ToggleSettingActionPair::new(
+        "preserve active tab color for new tabs",
+        builder(SettingsAction::AppearancePageToggle(
+            AppearancePageAction::TogglePreserveActiveTabColor,
+        )),
+        context,
+        flags::PRESERVE_ACTIVE_TAB_COLOR_FLAG,
+    ));
+
+    toggle_binding_pairs.push(ToggleSettingActionPair::new(
+        "custom padding in alt-screen",
+        builder(SettingsAction::AppearancePageToggle(
+            AppearancePageAction::ToggleAltScreenPadding,
+        )),
+        context,
+        flags::ALT_SCREEN_PADDING_FLAG,
+    ));
 
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(toggle_binding_pairs, app);
 }
@@ -463,6 +529,7 @@ pub enum AppearancePageAction {
     SetInputType(InputBoxType),
     SetAppIcon(AppIcon),
     SetLanguage(Language),
+    ToggleShowDockIcon,
     SetCursorType(CursorDisplayType),
     SetWorkspaceDecorationVisibility(WorkspaceDecorationVisibility),
     ToggleWorkspaceDecorationVisibility,
@@ -481,15 +548,20 @@ pub enum AppearancePageAction {
     TogglePreserveActiveTabColor,
     ToggleVerticalTabs,
     ToggleShowVerticalTabPanelInRestoredWindows,
-    ToggleShowTitleBarSearchBar,
+    ToggleHideTitleBarSearchBarInVerticalTabs,
     ToggleUseLatestUserPromptAsConversationTitleInTabNames,
     ToggleLigatureRendering,
     ToggleBlurTexture,
     ToggleLeftPanelVisibility,
+    ToggleToolsPanelProjectExplorer,
+    ToggleToolsPanelGlobalSearch,
+    ToggleToolsPanelWarpDrive,
+    ToggleToolsPanelConversationHistory,
     SetEnforceMinimumContrast(EnforceMinimumContrast),
     OpenUrl(String),
     ToggleFocusPaneOnHover,
     ToggleInputMode,
+    ToggleAltScreenPadding,
     UpdateAltScreenPaddingMode(AltScreenPaddingMode),
     SetTabCloseButtonPosition(TabCloseButtonPosition),
     SetZoomLevel(u16),
@@ -573,9 +645,11 @@ impl TypedActionView for AppearanceSettingsPageView {
             SetFontWeight(value) => self.set_font_weight(*value, ctx),
             ToggleMatchNotebookToMonospaceFontSize => {
                 FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
-                    report_if_error!(font_settings
-                        .match_notebook_to_monospace_font_size
-                        .toggle_and_save_value(ctx));
+                    report_if_error!(
+                        font_settings
+                            .match_notebook_to_monospace_font_size
+                            .toggle_and_save_value(ctx)
+                    );
                 });
             }
             ToggleMatchAIToTerminalFontFamily => self.toggle_match_ai_font_to_terminal_font(ctx),
@@ -592,9 +666,11 @@ impl TypedActionView for AppearanceSettingsPageView {
             SetAIFontFamily(name) => {
                 self.set_ai_font_family(name, ctx);
                 FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
-                    report_if_error!(font_settings
-                        .match_ai_font_to_terminal_font
-                        .set_value(false, ctx));
+                    report_if_error!(
+                        font_settings
+                            .match_ai_font_to_terminal_font
+                            .set_value(false, ctx)
+                    );
                 });
             }
             SetUIFontFamily(name) => {
@@ -604,9 +680,11 @@ impl TypedActionView for AppearanceSettingsPageView {
             SetThinStrokes(value) => self.set_thin_strokes(value, ctx),
             SetEnforceMinimumContrast(value) => {
                 FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
-                    report_if_error!(font_settings
-                        .enforce_minimum_contrast
-                        .set_value(*value, ctx,));
+                    report_if_error!(
+                        font_settings
+                            .enforce_minimum_contrast
+                            .set_value(*value, ctx,)
+                    );
                 });
             }
             SetWorkspaceDecorationVisibility(value) => {
@@ -623,6 +701,36 @@ impl TypedActionView for AppearanceSettingsPageView {
             ToggleDimInactivePanes => self.toggle_dim_inactive_panes(ctx),
             ToggleBlurTexture => self.toggle_blur_texture(ctx),
             ToggleLeftPanelVisibility => self.toggle_left_panel_visibility(ctx),
+            ToggleToolsPanelProjectExplorer => {
+                CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
+                    report_if_error!(settings.show_project_explorer.toggle_and_save_value(ctx));
+                });
+                // The Appearance page does not subscribe to these settings
+                // groups, so notify explicitly to refresh the switch state.
+                ctx.notify();
+            }
+            ToggleToolsPanelGlobalSearch => {
+                CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
+                    report_if_error!(settings.show_global_search.toggle_and_save_value(ctx));
+                });
+                ctx.notify();
+            }
+            ToggleToolsPanelWarpDrive => {
+                WarpDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
+                    report_if_error!(settings.enable_warp_drive.toggle_and_save_value(ctx));
+                });
+                ctx.notify();
+            }
+            ToggleToolsPanelConversationHistory => {
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    report_if_error!(
+                        settings
+                            .show_conversation_history
+                            .toggle_and_save_value(ctx)
+                    );
+                });
+                ctx.notify();
+            }
             SetInputMode {
                 new_mode,
                 from_binding,
@@ -630,6 +738,7 @@ impl TypedActionView for AppearanceSettingsPageView {
             SetInputType(input_type) => self.set_input_type(*input_type, ctx),
             SetAppIcon(new_icon) => self.set_app_icon(*new_icon, ctx),
             SetLanguage(new_lang) => self.set_language(*new_lang, ctx),
+            ToggleShowDockIcon => self.toggle_show_dock_icon(ctx),
             SetCursorType(cursor_display_type) => self.set_cursor_type(*cursor_display_type, ctx),
             OpacitySliderDragged(val) => self.set_opacity(*val, false, ctx),
             BlurSliderDragged(val) => self.set_blur(*val, false, ctx),
@@ -643,7 +752,9 @@ impl TypedActionView for AppearanceSettingsPageView {
             ToggleShowVerticalTabPanelInRestoredWindows => {
                 self.toggle_show_vertical_tab_panel_in_restored_windows(ctx)
             }
-            ToggleShowTitleBarSearchBar => self.toggle_show_title_bar_search_bar(ctx),
+            ToggleHideTitleBarSearchBarInVerticalTabs => {
+                self.toggle_hide_title_bar_search_bar_in_vertical_tabs(ctx)
+            }
             ToggleUseLatestUserPromptAsConversationTitleInTabNames => {
                 self.toggle_use_latest_user_prompt_as_conversation_title_in_tab_names(ctx)
             }
@@ -670,11 +781,28 @@ impl TypedActionView for AppearanceSettingsPageView {
             ToggleInputMode => {
                 self.toggle_input_mode(ctx);
             }
+            ToggleAltScreenPadding => {
+                let new_mode = TerminalSettings::as_ref(ctx).alt_screen_padding.toggled();
+                TerminalSettings::handle(ctx).update(ctx, |terminal_settings, ctx| {
+                    report_if_error!(
+                        terminal_settings
+                            .alt_screen_padding
+                            .set_value(new_mode, ctx)
+                    );
+                });
+                self.set_alt_screen_padding_editor_text(ctx);
+                send_telemetry_from_ctx!(
+                    TelemetryEvent::UpdateAltScreenPaddingMode { new_mode },
+                    ctx
+                );
+            }
             UpdateAltScreenPaddingMode(new_mode) => {
                 TerminalSettings::handle(ctx).update(ctx, |terminal_settings, ctx| {
-                    report_if_error!(terminal_settings
-                        .alt_screen_padding
-                        .set_value(*new_mode, ctx));
+                    report_if_error!(
+                        terminal_settings
+                            .alt_screen_padding
+                            .set_value(*new_mode, ctx)
+                    );
                 });
                 self.set_alt_screen_padding_editor_text(ctx);
                 send_telemetry_from_ctx!(
@@ -1187,7 +1315,9 @@ impl AppearanceSettingsPageView {
                 .iter()
                 .position(|val| *val == current_value)
                 .unwrap_or_else(|| {
-                    log::error!("Could not find current ThinStrokes value in dropdown option list");
+                    report_error!(
+                        "Could not find current ThinStrokes value in dropdown option list"
+                    );
                     0
                 });
 
@@ -1223,7 +1353,7 @@ impl AppearanceSettingsPageView {
                 .iter()
                 .position(|val| *val == current_value)
                 .unwrap_or_else(|| {
-                    log::error!("Could not find current InputMode value in dropdown option list");
+                    report_error!("Could not find current InputMode value in dropdown option list");
                     0
                 });
 
@@ -1286,7 +1416,7 @@ impl AppearanceSettingsPageView {
                 .iter()
                 .position(|val| *val == current_value)
                 .unwrap_or_else(|| {
-                    log::error!("Could not find current AppIcon value in dropdown option list");
+                    report_error!("Could not find current AppIcon value in dropdown option list");
                     0
                 });
 
@@ -1318,7 +1448,7 @@ impl AppearanceSettingsPageView {
             let current_value = *FontSettings::as_ref(ctx)
                 .enforce_minimum_contrast;
             let selected_index = values.iter().position(|val| *val == current_value).unwrap_or_else(|| {
-                log::error!("Could not find current EnforceMinimumContrast value in dropdown option list");
+                report_error!("Could not find current EnforceMinimumContrast value in dropdown option list");
                 0
             });
 
@@ -1486,6 +1616,30 @@ impl AppearanceSettingsPageView {
             ));
         }
 
+        // Tools panel tab visibility toggles. These control which of the four
+        // tabs appear in the tools panel and mirror the onboarding "Customize
+        // your UI" tools-panel selection (see `crates/onboarding`); each toggle
+        // points at the same backing setting as onboarding so the two surfaces
+        // stay in sync, and the tools panel already recomputes its available
+        // views live when these settings change (see `Workspace::new`).
+        // Each toggle is gated only on compile-time / feature-flag availability
+        // of the corresponding tab (not on transient login/AI state), so the
+        // section stays stable regardless of when the page is built.
+        let mut tools_panel_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![];
+        if cfg!(feature = "local_fs") {
+            tools_panel_widgets.push(Box::new(ToolsPanelProjectExplorerWidget::default()));
+        }
+        if FeatureFlag::AgentViewConversationListView.is_enabled() {
+            tools_panel_widgets.push(Box::new(ToolsPanelConversationHistoryWidget::default()));
+        }
+        if cfg!(feature = "local_fs") && FeatureFlag::GlobalSearch.is_enabled() {
+            tools_panel_widgets.push(Box::new(ToolsPanelGlobalSearchWidget::default()));
+        }
+        tools_panel_widgets.push(Box::new(ToolsPanelWarpDriveWidget::default()));
+        if !tools_panel_widgets.is_empty() {
+            categories.push(Category::new("Tools panel", tools_panel_widgets));
+        }
+
         // Create the Input category with all widgets
         // The PromptWidget and InputModeWidget will handle their own visibility
 
@@ -1585,7 +1739,9 @@ impl AppearanceSettingsPageView {
             tab_settings_widgets.push(Box::new(
                 ShowVerticalTabPanelInRestoredWindowsWidget::default(),
             ));
-            tab_settings_widgets.push(Box::new(ShowTitleBarSearchBarWidget::default()));
+            tab_settings_widgets.push(Box::new(
+                HideTitleBarSearchBarInVerticalTabsWidget::default(),
+            ));
             tab_settings_widgets.push(Box::new(
                 UseLatestUserPromptAsConversationTitleInTabNamesWidget::default(),
             ));
@@ -1671,6 +1827,11 @@ impl AppearanceSettingsPageView {
             AppearanceEvent::UiFontFamilyChanged { .. } => {
                 self.update_font_dropdown(ctx);
             }
+            AppearanceEvent::ThemeChanged => {
+                // Context-chip colors are theme-derived, so rebuild the Input
+                // preview chips when the theme changes to keep them in sync.
+                self.context_chips = Self::get_context_chip_renderers(ctx);
+            }
             _ => {}
         }
 
@@ -1722,10 +1883,10 @@ impl AppearanceSettingsPageView {
         // If we're on a non-Linux platform, render the dropdown item in the
         // actual font.  We currently don't do this on Linux because
         // pre-loading all of the fonts is too expensive.
-        if cfg!(not(any(target_os = "linux", target_os = "freebsd"))) {
-            if let Some(family_id) = ctx.font_cache().family_id_for_name(&font_name) {
-                initial_dropdown_item = initial_dropdown_item.with_font_override(family_id);
-            }
+        if cfg!(not(any(target_os = "linux", target_os = "freebsd")))
+            && let Some(family_id) = ctx.font_cache().family_id_for_name(&font_name)
+        {
+            initial_dropdown_item = initial_dropdown_item.with_font_override(family_id);
         }
 
         initial_dropdown_item
@@ -1792,7 +1953,7 @@ impl AppearanceSettingsPageView {
             AppIcon::Original => "Original",
             AppIcon::Starburst => "Starburst",
             AppIcon::Sticker => "Sticker",
-            AppIcon::WarpOne => "Zap 1",
+            AppIcon::WarpOne => "InfiniShell 1",
         }
     }
 
@@ -1859,21 +2020,23 @@ impl AppearanceSettingsPageView {
             EditorEvent::Edited(EditOrigin::UserTyped | EditOrigin::UserInitiated) => {
                 let buffer_text = self.alt_screen_padding_editor.as_ref(ctx).buffer_text(ctx);
 
-                if let Ok(padding) = buffer_text.parse::<f32>() {
-                    if padding >= 0. {
-                        TerminalSettings::handle(ctx).update(ctx, |terminal_settings, ctx| {
-                            let new_mode = AltScreenPaddingMode::Custom {
-                                uniform_padding: padding.into_pixels(),
-                            };
-                            report_if_error!(terminal_settings
+                if let Ok(padding) = buffer_text.parse::<f32>()
+                    && padding >= 0.
+                {
+                    TerminalSettings::handle(ctx).update(ctx, |terminal_settings, ctx| {
+                        let new_mode = AltScreenPaddingMode::Custom {
+                            uniform_padding: padding.into_pixels(),
+                        };
+                        report_if_error!(
+                            terminal_settings
                                 .alt_screen_padding
-                                .set_value(new_mode, ctx));
-                            send_telemetry_from_ctx!(
-                                TelemetryEvent::UpdateAltScreenPaddingMode { new_mode },
-                                ctx
-                            );
-                        });
-                    }
+                                .set_value(new_mode, ctx)
+                        );
+                        send_telemetry_from_ctx!(
+                            TelemetryEvent::UpdateAltScreenPaddingMode { new_mode },
+                            ctx
+                        );
+                    });
                 }
 
                 ctx.notify();
@@ -2017,14 +2180,16 @@ impl AppearanceSettingsPageView {
 
     fn set_font_size(&mut self, ctx: &mut ViewContext<Self>) {
         let user_input = self.font_size_editor.as_ref(ctx).buffer_text(ctx);
-        if let Ok(num) = user_input.parse::<usize>() {
-            if (MIN_FONT_SIZE..=MAX_FONT_SIZE).contains(&num) {
-                FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
-                    report_if_error!(font_settings
+        if let Ok(num) = user_input.parse::<usize>()
+            && (MIN_FONT_SIZE..=MAX_FONT_SIZE).contains(&num)
+        {
+            FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
+                report_if_error!(
+                    font_settings
                         .monospace_font_size
-                        .set_value(num as f32, ctx,));
-                });
-            }
+                        .set_value(num as f32, ctx,)
+                );
+            });
         }
     }
 
@@ -2036,12 +2201,12 @@ impl AppearanceSettingsPageView {
 
     fn set_notebook_font_size(&mut self, ctx: &mut ViewContext<Self>) {
         let user_input = self.notebook_font_size_editor.as_ref(ctx).buffer_text(ctx);
-        if let Ok(num) = user_input.parse::<usize>() {
-            if (MIN_FONT_SIZE..=MAX_FONT_SIZE).contains(&num) {
-                FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
-                    report_if_error!(font_settings.notebook_font_size.set_value(num as f32, ctx,));
-                });
-            }
+        if let Ok(num) = user_input.parse::<usize>()
+            && (MIN_FONT_SIZE..=MAX_FONT_SIZE).contains(&num)
+        {
+            FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
+                report_if_error!(font_settings.notebook_font_size.set_value(num as f32, ctx,));
+            });
         }
     }
 
@@ -2142,9 +2307,11 @@ impl AppearanceSettingsPageView {
             );
         }
         WindowSettings::handle(ctx).update(ctx, |window_settings, ctx| {
-            report_if_error!(window_settings
-                .background_opacity
-                .set_value(opacity_value as u8, ctx));
+            report_if_error!(
+                window_settings
+                    .background_opacity
+                    .set_value(opacity_value as u8, ctx)
+            );
         });
         ctx.notify();
     }
@@ -2168,9 +2335,11 @@ impl AppearanceSettingsPageView {
             .set_all_windows_background_blur_radius(blur_value as u8);
 
         WindowSettings::handle(ctx).update(ctx, |window_settings, ctx| {
-            report_if_error!(window_settings
-                .background_blur_radius
-                .set_value(blur_value as u8, ctx));
+            report_if_error!(
+                window_settings
+                    .background_blur_radius
+                    .set_value(blur_value as u8, ctx)
+            );
         });
         ctx.notify()
     }
@@ -2188,9 +2357,11 @@ impl AppearanceSettingsPageView {
         );
 
         FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
-            report_if_error!(font_settings
-                .line_height_ratio
-                .set_value(DEFAULT_UI_LINE_HEIGHT_RATIO, ctx));
+            report_if_error!(
+                font_settings
+                    .line_height_ratio
+                    .set_value(DEFAULT_UI_LINE_HEIGHT_RATIO, ctx)
+            );
         });
     }
 
@@ -2213,9 +2384,11 @@ impl AppearanceSettingsPageView {
 
             if (MIN_LINE_SPACING..=MAX_LINE_SPACING).contains(&new_line_height) {
                 FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
-                    report_if_error!(font_settings
-                        .line_height_ratio
-                        .set_value(new_line_height, ctx));
+                    report_if_error!(
+                        font_settings
+                            .line_height_ratio
+                            .set_value(new_line_height, ctx)
+                    );
                 });
             }
         }
@@ -2229,9 +2402,11 @@ impl AppearanceSettingsPageView {
                 TelemetryEvent::ToggleNewWindowsAtCustomSize { enabled: new_val },
                 ctx
             );
-            report_if_error!(window_settings
-                .open_windows_at_custom_size
-                .set_value(new_val, ctx));
+            report_if_error!(
+                window_settings
+                    .open_windows_at_custom_size
+                    .set_value(new_val, ctx)
+            );
         });
         ctx.notify();
     }
@@ -2239,9 +2414,11 @@ impl AppearanceSettingsPageView {
     fn set_new_windows_num_columns(&mut self, columns: u16, ctx: &mut ViewContext<Self>) {
         WindowSettings::handle(ctx).update(ctx, |window_settings, ctx| {
             send_telemetry_from_ctx!(TelemetryEvent::SetNewWindowsAtCustomSize, ctx);
-            report_if_error!(window_settings
-                .new_windows_num_columns
-                .set_value(columns, ctx));
+            report_if_error!(
+                window_settings
+                    .new_windows_num_columns
+                    .set_value(columns, ctx)
+            );
         });
     }
 
@@ -2297,10 +2474,10 @@ impl AppearanceSettingsPageView {
                         // If we're on a non-Linux platform, render the dropdown item in the
                         // actual font.  We currently don't do this on Linux because
                         // pre-loading all of the fonts is too expensive.
-                        if cfg!(not(any(target_os = "linux", target_os = "freebsd"))) {
-                            if let Some(family_id) = family {
-                                dropdown = dropdown.with_font_override(*family_id)
-                            }
+                        if cfg!(not(any(target_os = "linux", target_os = "freebsd")))
+                            && let Some(family_id) = family
+                        {
+                            dropdown = dropdown.with_font_override(*family_id)
                         }
 
                         Some(dropdown)
@@ -2421,10 +2598,10 @@ impl AppearanceSettingsPageView {
                     // If we're on a non-Linux platform, render the dropdown item in the
                     // actual font.  We currently don't do this on Linux because
                     // pre-loading all of the fonts is too expensive.
-                    if cfg!(not(any(target_os = "linux", target_os = "freebsd"))) {
-                        if let Some(family_id) = family {
-                            dropdown = dropdown.with_font_override(*family_id)
-                        }
+                    if cfg!(not(any(target_os = "linux", target_os = "freebsd")))
+                        && let Some(family_id) = family
+                    {
+                        dropdown = dropdown.with_font_override(*family_id)
                     }
 
                     Some(dropdown)
@@ -2531,9 +2708,11 @@ impl AppearanceSettingsPageView {
 
     pub fn set_font_family(&mut self, name: &str, ctx: &mut ViewContext<Self>) {
         FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
-            report_if_error!(font_settings
-                .monospace_font_name
-                .set_value(name.to_string(), ctx));
+            report_if_error!(
+                font_settings
+                    .monospace_font_name
+                    .set_value(name.to_string(), ctx)
+            );
             if *font_settings.match_ai_font_to_terminal_font.value() {
                 report_if_error!(font_settings.ai_font_name.set_value(name.to_string(), ctx))
             }
@@ -2550,9 +2729,11 @@ impl AppearanceSettingsPageView {
 
     pub fn toggle_match_ai_font_to_terminal_font(&mut self, ctx: &mut ViewContext<Self>) {
         FontSettings::handle(ctx).update(ctx, |font_settings, ctx| {
-            report_if_error!(font_settings
-                .match_ai_font_to_terminal_font
-                .toggle_and_save_value(ctx));
+            report_if_error!(
+                font_settings
+                    .match_ai_font_to_terminal_font
+                    .toggle_and_save_value(ctx)
+            );
             if *font_settings.match_ai_font_to_terminal_font.value() {
                 let font_name = font_settings.monospace_font_name.value().clone();
                 self.ai_font_family_dropdown.update(ctx, |dropdown, ctx| {
@@ -2614,9 +2795,11 @@ impl AppearanceSettingsPageView {
             ctx
         );
         ctx.update_model(&block_list_settings, move |block_list_settings, ctx| {
-            report_if_error!(block_list_settings
-                .show_jump_to_bottom_of_block_button
-                .set_value(new_value, ctx));
+            report_if_error!(
+                block_list_settings
+                    .show_jump_to_bottom_of_block_button
+                    .set_value(new_value, ctx)
+            );
         });
     }
 
@@ -2628,18 +2811,22 @@ impl AppearanceSettingsPageView {
             ctx
         );
         ctx.update_model(&block_list_settings, move |block_list_settings, ctx| {
-            report_if_error!(block_list_settings
-                .show_block_dividers
-                .set_value(new_value, ctx));
+            report_if_error!(
+                block_list_settings
+                    .show_block_dividers
+                    .set_value(new_value, ctx)
+            );
         });
     }
 
     pub fn toggle_compact_mode(&mut self, ctx: &mut ViewContext<Self>) {
         TerminalSettings::handle(ctx).update(ctx, |terminal_settings, ctx| {
             let current_value = *terminal_settings.spacing_mode.value();
-            report_if_error!(terminal_settings
-                .spacing_mode
-                .set_value(current_value.other_mode(), ctx));
+            report_if_error!(
+                terminal_settings
+                    .spacing_mode
+                    .set_value(current_value.other_mode(), ctx)
+            );
         });
     }
 
@@ -2682,18 +2869,22 @@ impl AppearanceSettingsPageView {
         ctx.windows()
             .set_all_windows_background_blur_texture(!blur_enabled);
         WindowSettings::handle(ctx).update(ctx, |window_settings, ctx| {
-            report_if_error!(window_settings
-                .background_blur_texture
-                .toggle_and_save_value(ctx));
+            report_if_error!(
+                window_settings
+                    .background_blur_texture
+                    .toggle_and_save_value(ctx)
+            );
         });
         ctx.notify();
     }
 
     pub fn toggle_left_panel_visibility(&mut self, ctx: &mut ViewContext<Self>) {
         WindowSettings::handle(ctx).update(ctx, |window_settings, ctx| {
-            report_if_error!(window_settings
-                .left_panel_visibility_across_tabs
-                .toggle_and_save_value(ctx));
+            report_if_error!(
+                window_settings
+                    .left_panel_visibility_across_tabs
+                    .toggle_and_save_value(ctx)
+            );
         });
         ctx.notify();
     }
@@ -2745,9 +2936,11 @@ impl AppearanceSettingsPageView {
             // Selecting classic mode must also enable honor_ps1 so the mode takes
             // effect immediately (input_type() requires honor_ps1 to return classic).
             SessionSettings::handle(ctx).update(ctx, |session_settings, ctx| {
-                report_if_error!(session_settings
-                    .honor_ps1
-                    .set_value(new_type == InputBoxType::Classic, ctx));
+                report_if_error!(
+                    session_settings
+                        .honor_ps1
+                        .set_value(new_type == InputBoxType::Classic, ctx)
+                );
             });
 
             ctx.notify();
@@ -2802,11 +2995,19 @@ impl AppearanceSettingsPageView {
         });
     }
 
+    fn toggle_show_dock_icon(&mut self, ctx: &mut ViewContext<Self>) {
+        AppIconSettings::handle(ctx).update(ctx, |app_icon_settings, ctx| {
+            report_if_error!(app_icon_settings.show_dock_icon.toggle_and_save_value(ctx));
+        });
+    }
+
     fn set_cursor_type(&mut self, new_cursor_type: CursorDisplayType, ctx: &mut ViewContext<Self>) {
         AppEditorSettings::handle(ctx).update(ctx, |app_editor_settings, ctx| {
-            report_if_error!(app_editor_settings
-                .cursor_display_type
-                .set_value(new_cursor_type, ctx));
+            report_if_error!(
+                app_editor_settings
+                    .cursor_display_type
+                    .set_value(new_cursor_type, ctx)
+            );
             send_telemetry_from_ctx!(
                 TelemetryEvent::CursorDisplayType {
                     cursor: new_cursor_type.to_string(),
@@ -2840,9 +3041,11 @@ impl AppearanceSettingsPageView {
         let new_value = !*tab_settings.as_ref(ctx).show_code_review_button.value();
 
         ctx.update_model(&tab_settings, move |tab_settings, ctx| {
-            report_if_error!(tab_settings
-                .show_code_review_button
-                .set_value(new_value, ctx));
+            report_if_error!(
+                tab_settings
+                    .show_code_review_button
+                    .set_value(new_value, ctx)
+            );
         });
     }
 
@@ -2851,9 +3054,11 @@ impl AppearanceSettingsPageView {
         let new_value = !*tab_settings.as_ref(ctx).preserve_active_tab_color.value();
 
         ctx.update_model(&tab_settings, move |tab_settings, ctx| {
-            report_if_error!(tab_settings
-                .preserve_active_tab_color
-                .set_value(new_value, ctx));
+            report_if_error!(
+                tab_settings
+                    .preserve_active_tab_color
+                    .set_value(new_value, ctx)
+            );
         });
 
         send_telemetry_from_ctx!(
@@ -2873,17 +3078,21 @@ impl AppearanceSettingsPageView {
 
     fn toggle_show_vertical_tab_panel_in_restored_windows(&mut self, ctx: &mut ViewContext<Self>) {
         TabSettings::handle(ctx).update(ctx, |settings, ctx| {
-            report_if_error!(settings
-                .show_vertical_tab_panel_in_restored_windows
-                .toggle_and_save_value(ctx));
+            report_if_error!(
+                settings
+                    .show_vertical_tab_panel_in_restored_windows
+                    .toggle_and_save_value(ctx)
+            );
         });
     }
 
-    fn toggle_show_title_bar_search_bar(&mut self, ctx: &mut ViewContext<Self>) {
+    fn toggle_hide_title_bar_search_bar_in_vertical_tabs(&mut self, ctx: &mut ViewContext<Self>) {
         TabSettings::handle(ctx).update(ctx, |settings, ctx| {
-            report_if_error!(settings
-                .show_title_bar_search_bar
-                .toggle_and_save_value(ctx));
+            report_if_error!(
+                settings
+                    .hide_title_bar_search_bar_in_vertical_tabs
+                    .toggle_and_save_value(ctx)
+            );
         });
     }
 
@@ -2892,9 +3101,11 @@ impl AppearanceSettingsPageView {
         ctx: &mut ViewContext<Self>,
     ) {
         TabSettings::handle(ctx).update(ctx, |settings, ctx| {
-            report_if_error!(settings
-                .use_latest_user_prompt_as_conversation_title_in_tab_names
-                .toggle_and_save_value(ctx));
+            report_if_error!(
+                settings
+                    .use_latest_user_prompt_as_conversation_title_in_tab_names
+                    .toggle_and_save_value(ctx)
+            );
         });
     }
 
@@ -2906,9 +3117,11 @@ impl AppearanceSettingsPageView {
     ) {
         let previous_value = TabSettings::handle(ctx).update(ctx, |tab_settings, ctx| {
             let prev_value = *tab_settings.workspace_decoration_visibility.value();
-            report_if_error!(tab_settings
-                .workspace_decoration_visibility
-                .set_value(new_value, ctx));
+            report_if_error!(
+                tab_settings
+                    .workspace_decoration_visibility
+                    .set_value(new_value, ctx)
+            );
             prev_value
         });
         send_telemetry_from_ctx!(
@@ -2926,9 +3139,11 @@ impl AppearanceSettingsPageView {
             TabSettings::handle(ctx).update(ctx, |tab_settings, ctx| {
                 let previous_value = *tab_settings.workspace_decoration_visibility.value();
                 let new_value = previous_value.toggled();
-                report_if_error!(tab_settings
-                    .workspace_decoration_visibility
-                    .set_value(new_value, ctx));
+                report_if_error!(
+                    tab_settings
+                        .workspace_decoration_visibility
+                        .set_value(new_value, ctx)
+                );
                 (new_value, previous_value)
             });
         send_telemetry_from_ctx!(
@@ -2954,7 +3169,7 @@ impl AppearanceSettingsPageView {
 
             let current_value = TabSettings::as_ref(ctx).workspace_decoration_visibility;
             let selected_index = values.iter().position(|val| *val == current_value).unwrap_or_else(|| {
-                log::error!("Could not find current WorkspaceDecorationVisibility value in dropdown option list");
+                report_error!("Could not find current WorkspaceDecorationVisibility value in dropdown option list");
                 0
             });
 
@@ -2980,7 +3195,7 @@ impl AppearanceSettingsPageView {
 
             let current_value = TabSettings::as_ref(ctx).close_button_position;
             let selected_index = values.iter().position(|val| *val == current_value).unwrap_or_else(|| {
-                log::error!("Could not find current TabCloseButtonPosition value in dropdown option list");
+                report_error!("Could not find current TabCloseButtonPosition value in dropdown option list");
                 0
             });
 
@@ -3068,9 +3283,11 @@ impl AppearanceSettingsPageView {
                 .value();
 
             ligature_settings.update(ctx, |settings, ctx| {
-                report_if_error!(settings
-                    .ligature_rendering_enabled
-                    .set_value(new_value, ctx));
+                report_if_error!(
+                    settings
+                        .ligature_rendering_enabled
+                        .set_value(new_value, ctx)
+                );
             });
 
             send_telemetry_from_ctx!(
@@ -3392,34 +3609,31 @@ impl SettingsWidget for LanguageWidget {
 }
 
 #[derive(Default)]
-struct CustomAppIconWidget {}
+struct CustomAppIconWidget {
+    show_dock_icon_switch_state: SwitchStateHandle,
+}
 
 impl SettingsWidget for CustomAppIconWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "customize custom app icon icons"
+        "customize custom app icon icons dock cmd tab app switcher"
     }
 
     fn render(
         &self,
         view: &Self::View,
         appearance: &Appearance,
-        _app: &AppContext,
+        app: &AppContext,
     ) -> Box<dyn Element> {
         #[allow(unused_mut)]
         let show_bundle_warning = {
             #[cfg(target_os = "macos")]
-            #[allow(deprecated)]
             {
-                use cocoa::base::id;
-                use objc::{class, msg_send, sel, sel_impl};
-                unsafe {
-                    let running_app: id =
-                        msg_send![class!(NSRunningApplication), currentApplication];
-                    let bundle_id: id = msg_send![running_app, bundleIdentifier];
-                    bundle_id.is_null()
-                }
+                use objc2_app_kit::NSRunningApplication;
+                NSRunningApplication::currentApplication()
+                    .bundleIdentifier()
+                    .is_none()
             }
             #[cfg(not(target_os = "macos"))]
             {
@@ -3439,41 +3653,74 @@ impl SettingsWidget for CustomAppIconWidget {
             &view.app_icon_dropdown,
         );
 
+        let show_dock_icon_toggle = render_body_item::<AppearancePageAction>(
+            "Show Warp in Dock".into(),
+            None,
+            LocalOnlyIconState::for_setting(
+                ShowDockIconState::storage_key(),
+                ShowDockIconState::sync_to_cloud(),
+                &mut view.local_only_icon_tooltip_states.borrow_mut(),
+                app,
+            ),
+            ToggleState::Enabled,
+            appearance,
+            appearance
+                .ui_builder()
+                .switch(self.show_dock_icon_switch_state.clone())
+                .check(*AppIconSettings::as_ref(app).show_dock_icon)
+                .build()
+                .on_click(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(AppearancePageAction::ToggleShowDockIcon);
+                })
+                .finish(),
+            None,
+        );
+        let show_dock_icon_is_supported = AppIconSettings::as_ref(app)
+            .show_dock_icon
+            .is_supported_on_current_platform();
+
         #[cfg(target_os = "macos")]
         {
             use crate::appearance::AppearanceManager;
 
-            let app_icon_at_startup = AppearanceManager::as_ref(_app).app_icon_at_startup();
-            let current_icon = *AppIconSettings::as_ref(_app).app_icon;
+            let app_icon_at_startup = AppearanceManager::as_ref(app).app_icon_at_startup();
+            let current_icon = *AppIconSettings::as_ref(app).app_icon;
             if current_icon == AppIcon::Default
                 && ChannelState::channel() != Channel::Local
                 && app_icon_at_startup != AppIcon::Default
             {
                 let theme = appearance.theme();
-                return Flex::column()
-                    .with_child(dropdown)
-                    .with_child(
-                        appearance
-                            .ui_builder()
-                            .wrappable_text(
-                                crate::t!("settings-appearance-custom-icon-restart-warning"),
-                                true,
-                            )
-                            .with_style(UiComponentStyles {
-                                font_color: Some(
-                                    theme.sub_text_color(theme.background()).into_solid(),
-                                ),
-                                margin: Some(Coords::default().bottom(8.)),
-                                ..Default::default()
-                            })
-                            .build()
-                            .finish(),
-                    )
-                    .finish();
+                let column = Flex::column().with_child(dropdown).with_child(
+                    appearance
+                        .ui_builder()
+                        .wrappable_text(
+                            crate::t!("settings-appearance-custom-icon-restart-warning"),
+                            true,
+                        )
+                        .with_style(UiComponentStyles {
+                            font_color: Some(theme.sub_text_color(theme.background()).into_solid()),
+                            margin: Some(Coords::default().bottom(8.)),
+                            ..Default::default()
+                        })
+                        .build()
+                        .finish(),
+                );
+                let column = if show_dock_icon_is_supported {
+                    column.with_child(show_dock_icon_toggle)
+                } else {
+                    column
+                };
+                return column.finish();
             }
         }
 
-        dropdown
+        let column = Flex::column().with_child(dropdown);
+        let column = if show_dock_icon_is_supported {
+            column.with_child(show_dock_icon_toggle)
+        } else {
+            column
+        };
+        column.finish()
     }
 }
 
@@ -3842,22 +4089,23 @@ impl SettingsWidget for WindowBlurTextureWidget {
                 .finish(),
             None,
         ));
-        if let Some(window) = app.windows().platform_window(view.window_id) {
-            if !window.supports_transparency() && window.graphics_backend() != GraphicsBackend::Gl {
-                col.add_child(
-                    Container::new(
-                        FormattedTextElement::from_str(
-                            crate::t!("settings-appearance-window-blur-texture-not-supported"),
-                            appearance.ui_font_family(),
-                            appearance.ui_font_size(),
-                        )
-                        .with_color(appearance.theme().disabled_ui_text_color().into_solid())
-                        .finish(),
+        if let Some(window) = app.windows().platform_window(view.window_id)
+            && !window.supports_transparency()
+            && window.graphics_backend() != GraphicsBackend::Gl
+        {
+            col.add_child(
+                Container::new(
+                    FormattedTextElement::from_str(
+                        crate::t!("settings-appearance-window-blur-texture-not-supported"),
+                        appearance.ui_font_family(),
+                        appearance.ui_font_size(),
                     )
-                    .with_margin_bottom(8.0)
+                    .with_color(appearance.theme().disabled_ui_text_color().into_solid())
                     .finish(),
-                );
-            }
+                )
+                .with_margin_bottom(8.0)
+                .finish(),
+            );
         }
         col.finish()
     }
@@ -3905,6 +4153,167 @@ impl SettingsWidget for ToolsPanelStateScopeWidget {
                 })
                 .finish(),
             None,
+        )
+    }
+}
+
+/// Tools panel tab-visibility toggles. Each mirrors an onboarding tools-panel
+/// chip and points at the same backing setting so Settings and onboarding stay
+/// in sync; toggling live-updates the tools panel via `Workspace`'s settings
+/// subscriptions.
+#[derive(Default)]
+struct ToolsPanelProjectExplorerWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for ToolsPanelProjectExplorerWidget {
+    type View = AppearanceSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "tools panel tabs file explorer project explorer file tree left panel visibility"
+    }
+
+    fn render(
+        &self,
+        _view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        render_body_item::<AppearancePageAction>(
+            "Project explorer".to_string(),
+            None,
+            LocalOnlyIconState::Hidden,
+            ToggleState::Enabled,
+            appearance,
+            appearance
+                .ui_builder()
+                .switch(self.switch_state.clone())
+                .check(*CodeSettings::as_ref(app).show_project_explorer)
+                .build()
+                .on_click(|evt_ctx, _app, _v2f| {
+                    evt_ctx.dispatch_typed_action(
+                        AppearancePageAction::ToggleToolsPanelProjectExplorer,
+                    );
+                })
+                .finish(),
+            Some("Show the project explorer / file tree tab in the tools panel.".to_string()),
+        )
+    }
+}
+
+#[derive(Default)]
+struct ToolsPanelConversationHistoryWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for ToolsPanelConversationHistoryWidget {
+    type View = AppearanceSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "tools panel tabs conversation history agent conversations left panel visibility"
+    }
+
+    fn render(
+        &self,
+        _view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        render_body_item::<AppearancePageAction>(
+            "Agent conversations".to_string(),
+            None,
+            LocalOnlyIconState::Hidden,
+            ToggleState::Enabled,
+            appearance,
+            appearance
+                .ui_builder()
+                .switch(self.switch_state.clone())
+                .check(*AISettings::as_ref(app).show_conversation_history)
+                .build()
+                .on_click(|evt_ctx, _app, _v2f| {
+                    evt_ctx.dispatch_typed_action(
+                        AppearancePageAction::ToggleToolsPanelConversationHistory,
+                    );
+                })
+                .finish(),
+            Some("Show the agent conversation history tab in the tools panel.".to_string()),
+        )
+    }
+}
+
+#[derive(Default)]
+struct ToolsPanelGlobalSearchWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for ToolsPanelGlobalSearchWidget {
+    type View = AppearanceSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "tools panel tabs global file search left panel visibility"
+    }
+
+    fn render(
+        &self,
+        _view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        render_body_item::<AppearancePageAction>(
+            "Global search".to_string(),
+            None,
+            LocalOnlyIconState::Hidden,
+            ToggleState::Enabled,
+            appearance,
+            appearance
+                .ui_builder()
+                .switch(self.switch_state.clone())
+                .check(*CodeSettings::as_ref(app).show_global_search)
+                .build()
+                .on_click(|evt_ctx, _app, _v2f| {
+                    evt_ctx
+                        .dispatch_typed_action(AppearancePageAction::ToggleToolsPanelGlobalSearch);
+                })
+                .finish(),
+            Some("Show the global file search tab in the tools panel.".to_string()),
+        )
+    }
+}
+
+#[derive(Default)]
+struct ToolsPanelWarpDriveWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for ToolsPanelWarpDriveWidget {
+    type View = AppearanceSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "tools panel tabs warp drive left panel visibility"
+    }
+
+    fn render(
+        &self,
+        _view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        render_body_item::<AppearancePageAction>(
+            "Warp Drive".to_string(),
+            None,
+            LocalOnlyIconState::Hidden,
+            ToggleState::Enabled,
+            appearance,
+            appearance
+                .ui_builder()
+                .switch(self.switch_state.clone())
+                .check(*WarpDriveSettings::as_ref(app).enable_warp_drive)
+                .build()
+                .on_click(|evt_ctx, _app, _v2f| {
+                    evt_ctx.dispatch_typed_action(AppearancePageAction::ToggleToolsPanelWarpDrive);
+                })
+                .finish(),
+            Some("Show the Warp Drive tab in the tools panel.".to_string()),
         )
     }
 }
@@ -5538,15 +5947,15 @@ impl SettingsWidget for ShowVerticalTabPanelInRestoredWindowsWidget {
 }
 
 #[derive(Default)]
-struct ShowTitleBarSearchBarWidget {
+struct HideTitleBarSearchBarInVerticalTabsWidget {
     switch_state: SwitchStateHandle,
 }
 
-impl SettingsWidget for ShowTitleBarSearchBarWidget {
+impl SettingsWidget for HideTitleBarSearchBarInVerticalTabsWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "title bar search bar palette session agent vertical tabs"
+        "hide title bar search bar vertical tabs chrome minimal"
     }
 
     fn render(
@@ -5558,11 +5967,11 @@ impl SettingsWidget for ShowTitleBarSearchBarWidget {
         let tab_settings = TabSettings::as_ref(app);
 
         render_body_item::<AppearancePageAction>(
-            crate::t!("settings-appearance-tab-show-title-bar-search-bar-label"),
+            "Hide search bar in vertical tab layout".into(),
             None,
             LocalOnlyIconState::for_setting(
-                ShowTitleBarSearchBar::storage_key(),
-                ShowTitleBarSearchBar::sync_to_cloud(),
+                HideTitleBarSearchBarInVerticalTabs::storage_key(),
+                HideTitleBarSearchBarInVerticalTabs::sync_to_cloud(),
                 &mut view.local_only_icon_tooltip_states.borrow_mut(),
                 app,
             ),
@@ -5571,15 +5980,18 @@ impl SettingsWidget for ShowTitleBarSearchBarWidget {
             appearance
                 .ui_builder()
                 .switch(self.switch_state.clone())
-                .check(*tab_settings.show_title_bar_search_bar)
+                .check(*tab_settings.hide_title_bar_search_bar_in_vertical_tabs)
                 .build()
                 .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleShowTitleBarSearchBar);
+                    ctx.dispatch_typed_action(
+                        AppearancePageAction::ToggleHideTitleBarSearchBarInVerticalTabs,
+                    );
                 })
                 .finish(),
-            Some(crate::t!(
-                "settings-appearance-tab-show-title-bar-search-bar-description"
-            )),
+            Some(
+                "When using the vertical tab layout, hide the search bar in the title bar. Search stays available via the command palette and keyboard shortcuts."
+                    .to_string(),
+            ),
         )
     }
 }
@@ -5698,8 +6110,7 @@ fn build_directory_delete_buttons(
 fn add_directory_tab_color_path(path: PathBuf, ctx: &mut ViewContext<AppearanceSettingsPageView>) {
     TabSettings::handle(ctx).update(ctx, |settings, ctx| {
         let current = settings.directory_tab_colors.value();
-        let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
-        let key = canonical.to_string_lossy().to_string();
+        let key = canonical_directory_key(&path);
         let dominated_by_existing = current
             .0
             .get(&key)
@@ -5715,10 +6126,10 @@ fn open_directory_tab_color_folder_picker(ctx: &mut ViewContext<AppearanceSettin
     let file_picker_config = FilePickerConfiguration::new().folders_only();
     ctx.open_file_picker(
         move |result, ctx| {
-            if let Ok(paths) = result {
-                if let Some(directory_path) = paths.first() {
-                    add_directory_tab_color_path(PathBuf::from(directory_path), ctx);
-                }
+            if let Ok(paths) = result
+                && let Some(directory_path) = paths.first()
+            {
+                add_directory_tab_color_path(PathBuf::from(directory_path), ctx);
             }
         },
         file_picker_config,
@@ -5792,7 +6203,10 @@ impl SettingsWidget for DirectoryTabColorsWidget {
             dirs::home_dir().and_then(|home_dir| home_dir.to_str().map(|s| s.to_owned()));
         for (idx, (dir_path, current_color)) in directory_tab_colors(app).into_iter().enumerate() {
             let Some(dot_mouse_states) = view.color_picker_dot_states.get(idx).cloned() else {
-                log::error!("Missing color picker dot states for directory index {idx}");
+                report_error!(
+                    "Missing color picker dot states for directory",
+                    extra: { "index" => %idx }
+                );
                 continue;
             };
 

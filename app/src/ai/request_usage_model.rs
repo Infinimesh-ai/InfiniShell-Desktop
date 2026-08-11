@@ -39,7 +39,17 @@ pub const AMBIENT_AGENT_TRIAL_CREDIT_THRESHOLD: i32 = 20;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BonusGrantScope {
     User,
+    Team(WorkspaceUid),
     Workspace(WorkspaceUid),
+}
+
+impl BonusGrantScope {
+    pub fn workspace_uid(&self) -> Option<WorkspaceUid> {
+        match self {
+            BonusGrantScope::User => None,
+            BonusGrantScope::Team(uid) | BonusGrantScope::Workspace(uid) => Some(*uid),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -143,6 +153,9 @@ impl Entity for AIRequestUsageModel {
 /// `AIRequestUsageModel` 本地化后不再 emit 任何变体 → 所有订阅回调成为静默 no-op。
 pub enum AIRequestUsageModelEvent {
     RequestUsageUpdated,
+    /// The server-authoritative credit availability decision was updated.
+    CreditAvailabilityUpdated,
+    AmbientCreditsBannerDismissed,
     RequestBonusRefunded {
         requests_refunded: i32,
         server_conversation_id: String,

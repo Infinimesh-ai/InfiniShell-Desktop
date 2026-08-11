@@ -52,6 +52,47 @@ lazy_static! {
         Regex::new(r" \((\d+)\)$").expect("regex should not fail to compile");
 }
 
+// 上游把 workflow 模型迁到了 `cloud_object_models`,该 crate 用的是
+// `cloud_objects::ids::SyncId`;而 app 侧的对象存储走 `crate::server::ids::SyncId`。
+// 两者结构一致(ClientId / ServerId),但只要 `crate::server::ids` 不是
+// `cloud_objects::ids` 的重导出,它们就是两个不同的类型。这里按 uid 字符串做显式转换,
+// 两种情形下都成立(重导出时退化为恒等转换)。
+pub(crate) fn model_sync_id_to_app(id: &cloud_objects::ids::SyncId) -> SyncId {
+    match id {
+        cloud_objects::ids::SyncId::ClientId(client_id) => {
+            SyncId::ClientId(ClientId::from(client_id.to_string()))
+        }
+        cloud_objects::ids::SyncId::ServerId(server_id) => {
+            SyncId::ServerId(ServerId::from_string_lossy(server_id.uid()))
+        }
+    }
+}
+
+/// `crate::server::ids::ServerId::sqlite_type_and_uid_hash` 现在收的是
+/// `cloud_objects` 侧的 `ObjectIdType`,而 app 的对象模型给出的是
+/// `crate::cloud_object::ObjectIdType`。两者变体一一对应,这里做一次显式映射。
+fn object_id_type_to_cloud(id_type: ObjectIdType) -> cloud_objects::cloud_object::ObjectIdType {
+    match id_type {
+        ObjectIdType::Notebook => cloud_objects::cloud_object::ObjectIdType::Notebook,
+        ObjectIdType::Workflow => cloud_objects::cloud_object::ObjectIdType::Workflow,
+        ObjectIdType::Folder => cloud_objects::cloud_object::ObjectIdType::Folder,
+        ObjectIdType::GenericStringObject => {
+            cloud_objects::cloud_object::ObjectIdType::GenericStringObject
+        }
+    }
+}
+
+pub(crate) fn app_sync_id_to_model(id: SyncId) -> cloud_objects::ids::SyncId {
+    match id {
+        SyncId::ClientId(client_id) => cloud_objects::ids::SyncId::ClientId(
+            cloud_objects::ids::ClientId::from(client_id.to_string()),
+        ),
+        SyncId::ServerId(server_id) => cloud_objects::ids::SyncId::ServerId(
+            cloud_objects::ids::ServerId::from_string_lossy(server_id.uid()),
+        ),
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum OperationSuccessType {
     Success,
@@ -259,7 +300,7 @@ impl UpdateManager {
         let _ = fetch_single_object_option;
         let _ = ctx;
         let (fetch_cloud_object_tx, fetch_cloud_object_rx) = oneshot::channel::<()>();
-        log::debug!("Zap 跳过云端单对象拉取: {server_id:?}");
+        log::debug!("InfiniShell 跳过云端单对象拉取: {server_id:?}");
         let _ = fetch_cloud_object_tx.send(());
         fetch_cloud_object_rx
     }
@@ -511,7 +552,7 @@ impl UpdateManager {
             for enum_id in enums.iter() {
                 let object_store_model = ObjectStoreModel::as_ref(ctx);
                 let object: Option<&WorkflowEnumObject> =
-                    object_store_model.get_object_of_type(enum_id);
+                    object_store_model.get_object_of_type(&model_sync_id_to_app(enum_id));
                 let Some(object) = object else {
                     log::error!("Could not find referenced workflow enum to copy over to the new space, skipping");
                     continue;
@@ -533,7 +574,8 @@ impl UpdateManager {
                     ctx,
                 );
 
-                workflow_model.replace_object_id(*enum_id, SyncId::ClientId(client_id));
+                workflow_model
+                    .replace_object_id(*enum_id, app_sync_id_to_model(SyncId::ClientId(client_id)));
             }
 
             // Update the workflow with the new enum IDs, if there are any
@@ -1332,7 +1374,8 @@ impl UpdateManager {
                     .has_pending_metadata_change = false;
             }
 
-            let hashed_sqlite_id = server_id.sqlite_type_and_uid_hash(id.object_id_type());
+            let hashed_sqlite_id =
+                server_id.sqlite_type_and_uid_hash(object_id_type_to_cloud(id.object_id_type()));
             self.save_in_memory_object_metadata_to_sqlite(
                 object_store_model,
                 &hashed_id,

@@ -1,9 +1,10 @@
+use fuzzy_match::FuzzyMatchResult;
+use repo_metadata::RepoMetadataModel;
+use repo_metadata::repositories::DetectedRepositories;
+use warpui::{App, SingletonEntity};
+
 use super::super::search_item::{FileSearchItem, FileSearchResult};
 use super::FileSearchModel;
-use fuzzy_match::FuzzyMatchResult;
-use repo_metadata::repositories::DetectedRepositories;
-use repo_metadata::RepoMetadataModel;
-use warpui::{App, SingletonEntity};
 
 #[cfg(test)]
 mod file_search_model_tests {
@@ -151,6 +152,28 @@ mod file_search_model_tests {
         assert!(!FileSearchModel::should_skip_overly_broad_query("a*b"));
     }
 
+    #[cfg(feature = "local_fs")]
+    #[test]
+    fn test_contents_args_keeps_folders_by_default() {
+        // The default (directory-inclusive) path is used by callers like the
+        // AI context menu and must keep folders in the traversal.
+        let args = FileSearchModel::contents_args("src", true, |_| Some("src/main.rs".into()));
+        assert!(args.include_folders);
+
+        let empty = FileSearchModel::contents_args("", true, |_| Some("src/main.rs".into()));
+        assert!(empty.include_folders);
+    }
+
+    #[cfg(feature = "local_fs")]
+    #[test]
+    fn test_contents_args_excludes_folders_for_file_only_search() {
+        let args = FileSearchModel::contents_args("src", false, |_| Some("src/main.rs".into()));
+        assert!(!args.include_folders);
+
+        let empty = FileSearchModel::contents_args("", false, |_| Some("src/main.rs".into()));
+        assert!(!empty.include_folders);
+    }
+
     #[test]
     fn test_filename_prioritization() {
         // Filename matches should score higher than path matches
@@ -252,8 +275,9 @@ mod file_search_item_tests {
 
 #[cfg(test)]
 mod strip_absolute_path_prefix_tests {
-    use super::*;
     use std::path::{Path, PathBuf};
+
+    use super::*;
 
     /// Builds an absolute path from the given components, using the platform's
     /// root (`/` on Unix, `C:\` on Windows).  This ensures the constructed
@@ -398,7 +422,7 @@ mod integration_tests {
             "src/lib.rs",
             "src/components/button.tsx",
             "src/components/input.tsx",
-            "tests/integration_test.rs",
+            "tests/integration_tests.rs",
             "README.md",
         ];
 
@@ -434,7 +458,7 @@ mod integration_tests {
             "src/components/button.tsx",
             "src/components/input.tsx",
             "src/utils/button_helper.rs",
-            "tests/button_test.rs",
+            "tests/button_tests.rs",
         ];
 
         let query = "comp button";

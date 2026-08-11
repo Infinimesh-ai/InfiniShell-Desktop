@@ -1,11 +1,12 @@
-#[cfg(target_family = "wasm")]
-use crate::uri::browser_url_handler::parse_current_url;
-use crate::ChannelState;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use url::Url;
 
 #[cfg(target_family = "wasm")]
 use warp_core::context_flag::ContextFlag;
+
+use crate::ChannelState;
+#[cfg(target_family = "wasm")]
+use crate::uri::browser_url_handler::parse_current_url;
 
 #[derive(Debug)]
 /// Represents an intent parsed from a web url
@@ -14,6 +15,7 @@ pub enum WebIntent {
     DriveObject(Url),
     SettingsView(Url),
     Home(Url),
+    CloudAgentHome(Url),
     Action(Url),
 }
 
@@ -117,6 +119,7 @@ impl WebIntent {
             WebIntent::DriveObject(url) => url,
             WebIntent::SettingsView(url) => url,
             WebIntent::Home(url) => url,
+            WebIntent::CloudAgentHome(url) => url,
             WebIntent::Action(url) => url,
         }
     }
@@ -154,6 +157,7 @@ fn set_context_flags_from_url(url: Url) {
         Ok(WebIntent::DriveObject(_)) => ContextFlag::set_warp_drive_link_only(),
         Ok(WebIntent::SettingsView(_)) => ContextFlag::set_settings_link_only(),
         Ok(WebIntent::Home(_)) => ContextFlag::set_warp_home_link_only(),
+        Ok(WebIntent::CloudAgentHome(_)) => {}
         Ok(WebIntent::Action(_)) => {} // No special context flag for actions
         _ => {}
     }

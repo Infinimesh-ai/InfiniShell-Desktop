@@ -141,3 +141,24 @@ fn test_oss_version_newer_date_wins() {
     let newer: ParsedVersion = "v2026.05.27.0".try_into().unwrap();
     assert!(newer > older);
 }
+
+#[test]
+fn changelog_tui_updates_are_backward_compatible() {
+    let old_payload = r#"{
+        "date": "2026-07-30T12:00:00+00:00",
+        "sections": [],
+        "oz_updates": []
+    }"#;
+    let changelog: Changelog =
+        serde_json::from_str(old_payload).expect("old changelog payload should deserialize");
+    assert!(changelog.tui_updates.is_empty());
+
+    let new_payload = r#"{
+        "date": "2026-07-30T12:00:00+00:00",
+        "sections": [],
+        "tui_updates": ["Added inline TUI menus"]
+    }"#;
+    let changelog: Changelog =
+        serde_json::from_str(new_payload).expect("new changelog payload should deserialize");
+    assert_eq!(changelog.tui_updates, ["Added inline TUI menus"]);
+}

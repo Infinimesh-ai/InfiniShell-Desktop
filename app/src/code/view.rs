@@ -1,83 +1,76 @@
-use crate::code::editor::scroll::ScrollPosition;
-use crate::code::editor::view::CodeEditorRenderOptions;
-use crate::code::editor_management::CodeEditorStatus;
-use crate::code::global_buffer_model::GlobalBufferModel;
-use crate::code::{ImmediateSaveError, SaveOutcome, SaveStatus};
-use crate::editor::InteractionState;
-use crate::input::Vector2F;
-use crate::pane_group::focus_state::PaneFocusHandle;
-use crate::pane_group::pane::view::header::components::{
-    render_pane_header_buttons, render_pane_header_title_text, render_three_column_header,
-    CenteredHeaderEdgeWidth,
-};
-use crate::pane_group::pane::view::header::render_pane_header_draggable;
-use crate::pane_group::{CodePane, PaneConfigurationEvent, PaneDragDropLocation};
-use crate::quit_warning::UnsavedStateSummary;
-use crate::server::telemetry::CodeContextDestination;
-use crate::terminal::cli_agent::{
-    build_selection_line_range_prompt, build_selection_substring_prompt,
-};
-use crate::terminal::view::CliAgentRouting;
-use crate::workspace::util::get_context_target_terminal_view;
-use crate::workspace::TabBarDropTargetData;
-use crate::{code::EditorTabBarDropTargetData, pane_group::pane::ActionOrigin};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::vec2f;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use warp_core::channel::{Channel, ChannelState};
 use warp_core::features::FeatureFlag;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::icons::ICON_DIMENSIONS;
 use warp_editor::render::element::VerticalExpansionBehavior;
 use warp_util::path::LineAndColumnArg;
-use warpui::elements::Rect;
-use warpui::fonts::Style;
-use warpui::text_layout::ClipConfig;
-
 #[cfg(feature = "local_fs")]
 use warpui::clipboard::ClipboardContent;
+use warpui::elements::{
+    AcceptedByDropTarget, Align, Border, ChildAnchor, ChildView, Clipped, ConstrainedBox,
+    Container, CornerRadius, CrossAxisAlignment, Draggable, DraggableState, DropTarget, Empty,
+    Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
+    OffsetPositioning, Padding, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Rect,
+    SavePosition, Shrinkable, Stack, Text,
+};
+use warpui::fonts::{Properties, Style, Weight};
+use warpui::keymap::EditableBinding;
+use warpui::text_layout::ClipConfig;
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::UiComponent;
 use warpui::{
-    elements::{
-        AcceptedByDropTarget, Align, Border, ChildAnchor, ChildView, Clipped, ConstrainedBox,
-        Container, CornerRadius, CrossAxisAlignment, Draggable, DraggableState, DropTarget, Empty,
-        Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
-        OffsetPositioning, Padding, ParentAnchor, ParentElement, ParentOffsetBounds, Radius,
-        SavePosition, Shrinkable, Stack, Text,
-    },
-    fonts::{Properties, Weight},
-    id,
-    keymap::EditableBinding,
-    ui_components::{button::ButtonVariant, components::UiComponent},
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
-    ViewContext, ViewHandle, WindowId,
+    ViewContext, ViewHandle, WindowId, id,
 };
 
-use crate::{
-    menu::{MenuItem, MenuItemFields},
-    notebooks::file::{is_markdown_file, MarkdownDisplayMode},
-    search::{files::icon::icon_from_file_path, ItemHighlightState},
-    tab::TAB_BAR_BORDER_HEIGHT,
-    ui_components::{blended_colors, buttons::icon_button},
-    view_components::{DismissibleToast, MarkdownToggleEvent, MarkdownToggleView},
-    workspace::{ActiveSession, ToastStack, WorkspaceAction},
+use super::buffer_location::LocalOrRemotePath;
+use super::diff_viewer::DiffViewer;
+use super::editor::view::{CodeEditorEvent, CodeEditorView};
+use super::editor_management::{CodeManager, CodeSource};
+use super::local_code_editor::{LocalCodeEditorEvent, LocalCodeEditorView};
+use crate::code::editor::scroll::ScrollPosition;
+use crate::code::editor::view::CodeEditorRenderOptions;
+use crate::code::editor_management::CodeEditorStatus;
+use crate::code::global_buffer_model::GlobalBufferModel;
+use crate::code::{EditorTabBarDropTargetData, ImmediateSaveError, SaveOutcome, SaveStatus};
+use crate::editor::InteractionState;
+use crate::input::Vector2F;
+use crate::menu::{MenuItem, MenuItemFields};
+use crate::notebooks::file::{MarkdownDisplayMode, renders_in_warp_notebook_viewer};
+use crate::pane_group::focus_state::PaneFocusHandle;
+use crate::pane_group::pane::view::header::components::{
+    CenteredHeaderEdgeWidth, render_pane_header_buttons, render_pane_header_title_text,
+    render_three_column_header,
 };
-
+use crate::pane_group::pane::view::header::render_pane_header_draggable;
+use crate::pane_group::pane::{ActionOrigin, PaneHeaderAction, view};
 use crate::pane_group::{
-    pane::{view, PaneHeaderAction},
-    BackingView, PaneConfiguration, PaneEvent,
+    BackingView, CodePane, PaneConfiguration, PaneConfigurationEvent, PaneDragDropLocation,
+    PaneEvent, TabBarAxis,
 };
-
-use super::{
-    buffer_location::BufferLocation,
-    diff_viewer::DiffViewer,
-    editor::view::{CodeEditorEvent, CodeEditorView},
-    editor_management::{CodeManager, CodeSource},
-    local_code_editor::{LocalCodeEditorEvent, LocalCodeEditorView},
+use crate::quit_warning::UnsavedStateSummary;
+use crate::search::ItemHighlightState;
+use crate::search::files::icon::icon_from_file_path;
+use crate::server::telemetry::CodeContextDestination;
+use crate::settings::CodeSettings;
+use crate::tab::TAB_BAR_BORDER_HEIGHT;
+use crate::terminal::cli_agent::{
+    build_selection_line_range_prompt, build_selection_substring_prompt,
 };
-
-use crate::{send_telemetry_from_ctx, TelemetryEvent};
+use crate::terminal::view::CliAgentRouting;
+use crate::ui_components::blended_colors;
+use crate::ui_components::buttons::icon_button;
+use crate::util::path::{display_name_with_host, display_path_with_host};
+use crate::view_components::{DismissibleToast, MarkdownToggleEvent, MarkdownToggleView};
+use crate::workspace::util::get_context_target_terminal_view;
+use crate::workspace::{ActiveSession, TabBarDropTargetData, ToastStack, WorkspaceAction};
+use crate::{TelemetryEvent, send_telemetry_from_ctx};
 
 // Read-only rendered Markdown preview for remote files reuses the notebook rich-text
 // machinery. `RichTextEditorView` is referenced by the always-present `TabData` field, so
@@ -172,6 +165,11 @@ pub enum CodeViewAction {
     ToggleMaximized,
     #[cfg(feature = "local_fs")]
     CopyFilePath,
+    /// Open the active code tab's file in the platform's file manager
+    /// (Finder on macOS, Explorer on Windows). No-op when the active tab has
+    /// no resolvable local path.
+    #[cfg(feature = "local_fs")]
+    RevealInFinder,
     #[cfg(feature = "local_fs")]
     RenderMarkdown,
     DragOverIndex {
@@ -191,11 +189,11 @@ pub enum CodeViewAction {
 pub enum CodeViewEvent {
     Pane(PaneEvent),
     TabChanged {
-        file_path: Option<PathBuf>,
+        location: Option<LocalOrRemotePath>,
         tab_index: usize,
     },
     FileOpened {
-        file_path: PathBuf,
+        location: LocalOrRemotePath,
         tab_index: usize,
     },
     RunTabConfigSkill {
@@ -214,12 +212,9 @@ struct TabDataMouseStateHandles {
 
 #[derive(Clone)]
 pub struct TabData {
-    /// 本地文件路径。**仅本地文件**有值 —— 远端文件没有本地路径。
-    /// 仅用于显示 / repo 检测 / rename 等本地专属逻辑。
-    path: Option<PathBuf>,
     /// tab 的统一身份(本地路径或远端 `RemotePath`),用于 tab 去重 / 聚焦。
     /// 新建文件(无 backing)为 `None`。
-    location: Option<BufferLocation>,
+    location: Option<LocalOrRemotePath>,
     editor_view: ViewHandle<LocalCodeEditorView>,
     mouse_state_handles: TabDataMouseStateHandles,
     preview: bool,
@@ -237,21 +232,17 @@ pub enum PendingSaveIntent {
 }
 
 impl TabData {
-    pub fn path(&self) -> Option<PathBuf> {
-        self.path.clone()
-    }
-
-    /// tab 的统一身份(本地路径或远端 `RemotePath`)。
-    pub fn location(&self) -> Option<&BufferLocation> {
+    /// Returns the file location (local or remote), if any.
+    pub fn location(&self) -> Option<&LocalOrRemotePath> {
         self.location.as_ref()
     }
 
-    /// tab / header 显示用的文件名。
-    fn display_name(&self) -> String {
+    /// Returns the local filesystem path, if this tab is backed by a local file.
+    /// Returns `None` for remote files and untitled tabs.
+    pub fn local_path(&self) -> Option<PathBuf> {
         self.location
             .as_ref()
-            .map(|loc| loc.display_name())
-            .unwrap_or_else(|| "Untitled".to_string())
+            .and_then(|loc| loc.to_local_path().map(Path::to_path_buf))
     }
 }
 
@@ -307,24 +298,15 @@ impl CodeView {
 
     #[cfg(feature = "local_fs")]
     fn update_markdown_mode_segmented_control(&mut self, ctx: &mut ViewContext<Self>) {
-        // 本地文件优先用 `local_path()` / `tab.path` / `source.path()`;远端文件这些都是
-        // `None`,改用 `location.language_path()`(只取后缀,不做文件系统访问)识别 Markdown。
-        let path = self
-            .local_path(ctx)
-            .or_else(|| {
-                self.tab_at(self.active_tab_index)
-                    .and_then(|t| t.path.clone())
-            })
-            .or_else(|| self.source.path())
-            .or_else(|| {
-                self.tab_at(self.active_tab_index)
-                    .and_then(|t| t.location.as_ref())
-                    .map(|loc| loc.language_path())
-            });
+        // 只看 `location` 的路径后缀(不做文件系统访问),本地与远端文件一致处理 ——
+        // 远端文件没有本地路径,用 `display_path()` 取远端路径字符串即可。
+        let renders_in_notebook_viewer = self
+            .tab_at(self.active_tab_index)
+            .and_then(|t| t.location.as_ref())
+            .map(|loc| renders_in_warp_notebook_viewer(std::path::Path::new(&loc.display_path())))
+            .unwrap_or(false);
 
-        let is_markdown = path.as_ref().map(is_markdown_file).unwrap_or(false);
-
-        if !is_markdown {
+        if !renders_in_notebook_viewer {
             self.markdown_mode_segmented_control = None;
             ctx.notify();
             return;
@@ -342,7 +324,7 @@ impl CodeView {
                 let is_remote = view
                     .tab_at(view.active_tab_index)
                     .and_then(|t| t.location.as_ref())
-                    .is_some_and(|loc| matches!(loc, BufferLocation::Remote(_)));
+                    .is_some_and(|loc| matches!(loc, LocalOrRemotePath::Remote(_)));
                 match (mode, is_remote) {
                     (MarkdownDisplayMode::Rendered, false) => {
                         view.handle_action(&CodeViewAction::RenderMarkdown, ctx);
@@ -450,7 +432,7 @@ impl CodeView {
         let mut view = Self::new_internal(source, ctx);
         for tab_snapshot in tabs {
             // 持久化恢复只可能是本地文件 —— 远端 pane 不持久化。
-            let location = tab_snapshot.path.clone().map(BufferLocation::Local);
+            let location = tab_snapshot.path.clone().map(LocalOrRemotePath::Local);
             let tab_data = view.build_tab_data(location, false, ctx);
             view.tab_group.push(tab_data);
         }
@@ -483,26 +465,34 @@ impl CodeView {
 
     /// If a tab is a preview, promote it and emit "FileOpened"
     fn promote_if_preview(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(tab) = self.tab_group.get_mut(self.active_tab_index) {
-            if tab.preview {
-                tab.preview = false;
-                self.set_title_after_content_update(ctx);
-                self.update_tab_bar_state(ctx);
-                self.focus_contents(ctx);
-                send_telemetry_from_ctx!(TelemetryEvent::PreviewPanePromoted, ctx);
-                ctx.notify();
-            }
+        if let Some(tab) = self.tab_group.get_mut(self.active_tab_index)
+            && tab.preview
+        {
+            tab.preview = false;
+            self.set_title_after_content_update(ctx);
+            self.update_tab_bar_state(ctx);
+            self.focus_contents(ctx);
+            send_telemetry_from_ctx!(TelemetryEvent::PreviewPanePromoted, ctx);
+            ctx.notify();
         }
     }
 
-    fn construct_shared_buffer_editor_from_path(
+    /// Construct an editor backed by the global shared buffer for the given location.
+    ///
+    /// 本地与远端统一走 `GlobalBufferModel`,远端 buffer 的内容由 buffer-sync 协议
+    /// 异步填充。远端 buffer 创建时内容为空,加载窗口内若可编辑,用户输入会被
+    /// `OpenBufferResponse` 的 `replace_all()` 覆盖丢失 —— 先锁为 `Selectable`
+    /// (可滚动/选择但不可编辑),待 `LocalCodeEditorEvent::FileLoaded` 到达后再恢复
+    /// `Editable`。footer(保存冲突 UI)本地与远端一致挂载。
+    fn construct_editor_for_location(
         &mut self,
-        path: &Path,
+        location: LocalOrRemotePath,
         ctx: &mut ViewContext<Self>,
     ) -> ViewHandle<LocalCodeEditorView> {
+        let is_local = matches!(location, LocalOrRemotePath::Local(_));
         ctx.add_typed_action_view(|ctx| {
             let mut editor = LocalCodeEditorView::new_with_global_buffer(
-                path,
+                location,
                 |buffer_state, ctx| {
                     ctx.add_typed_action_view(|ctx| {
                         CodeEditorView::new(
@@ -528,59 +518,13 @@ impl CodeView {
                     editor.with_selection_as_context(Box::new(get_context_target_terminal_view));
             }
 
-            editor.add_footer(ctx);
-            editor
-        })
-    }
-
-    /// 构造一个绑定到远端 buffer 的编辑器视图。结构与
-    /// [`Self::construct_shared_buffer_editor_from_path`] 一致,但 buffer 经
-    /// `GlobalBufferModel` 的 `BufferLocation::Remote` 路径打开,内容由
-    /// buffer-sync 协议异步填充。
-    #[cfg(feature = "local_tty")]
-    fn construct_shared_buffer_editor_from_remote(
-        &mut self,
-        remote_path: &super::buffer_location::RemotePath,
-        ctx: &mut ViewContext<Self>,
-    ) -> ViewHandle<LocalCodeEditorView> {
-        let remote_path = remote_path.clone();
-        ctx.add_typed_action_view(|ctx| {
-            let mut editor = LocalCodeEditorView::new_with_remote_buffer(
-                remote_path,
-                |buffer_state, ctx| {
-                    ctx.add_typed_action_view(|ctx| {
-                        CodeEditorView::new(
-                            None,
-                            Some(buffer_state.buffer),
-                            CodeEditorRenderOptions::new(VerticalExpansionBehavior::FillMaxHeight),
-                            ctx,
-                        )
-                        .with_horizontal_scrollbar_appearance(
-                            warpui::elements::new_scrollable::ScrollableAppearance::new(
-                                warpui::elements::ScrollbarWidth::Auto,
-                                true,
-                            ),
-                        )
-                    })
-                },
-                false,
-                None,
-                ctx,
-            );
-            if FeatureFlag::HoaCodeReview.is_enabled() {
-                editor =
-                    editor.with_selection_as_context(Box::new(get_context_target_terminal_view));
+            if !is_local {
+                // 远端 buffer 加载期间先锁只读,`FileLoaded` 到达后恢复 Editable。
+                editor.editor().update(ctx, |code_editor, ctx| {
+                    code_editor.set_interaction_state(InteractionState::Selectable, ctx);
+                });
             }
 
-            // 远端 buffer 创建时内容为空,初始内容经 buffer-sync 协议异步到达。
-            // 加载窗口内若可编辑,用户输入会被 OpenBufferResponse 的 replace_all()
-            // 覆盖丢失 —— 先锁为 Selectable(可滚动/选择但不可编辑),待
-            // `FileLoaded` 到达后再恢复 Editable。
-            editor.editor().update(ctx, |code_editor, ctx| {
-                code_editor.set_interaction_state(InteractionState::Selectable, ctx);
-            });
-
-            // 与本地 shared-buffer 编辑器一致:补上 footer / 保存冲突 UI。
             editor.add_footer(ctx);
             editor
         })
@@ -618,32 +562,18 @@ impl CodeView {
 
     fn build_tab_data(
         &mut self,
-        location: Option<BufferLocation>,
+        location: Option<LocalOrRemotePath>,
         preview: bool,
         ctx: &mut ViewContext<Self>,
     ) -> TabData {
-        // 本地路径(仅 `Local` 变体有),用于显示 / repo 检测 / rename。
-        let path = location.as_ref().and_then(|loc| match loc {
-            BufferLocation::Local(p) => Some(p.clone()),
-            BufferLocation::Remote(_) => None,
-        });
-
         // Opt out of shared buffer if we are creating a new file.
         // TODO(kevin): Once the file is saved, we should convert that into a shared buffer.
-        let code_editor = match location.as_ref() {
-            Some(BufferLocation::Local(path)) => {
-                self.construct_shared_buffer_editor_from_path(path, ctx)
+        let (code_editor, tab_location) = match location {
+            Some(loc) => {
+                let editor = self.construct_editor_for_location(loc.clone(), ctx);
+                (editor, Some(loc))
             }
-            #[cfg(feature = "local_tty")]
-            Some(BufferLocation::Remote(remote_path)) => {
-                self.construct_shared_buffer_editor_from_remote(remote_path, ctx)
-            }
-            #[cfg(not(feature = "local_tty"))]
-            Some(BufferLocation::Remote(_)) => {
-                log::error!("Remote files require the local_tty feature");
-                self.construct_new_file_editor(ctx)
-            }
-            None => self.construct_new_file_editor(ctx),
+            None => (self.construct_new_file_editor(ctx), None),
         };
 
         let editor = code_editor.as_ref(ctx).editor().clone();
@@ -660,7 +590,7 @@ impl CodeView {
         });
 
         // For new files (CodeSource::New), mark the editor as a new file and set default directory
-        if path.is_none() && matches!(self.source, CodeSource::New { .. }) {
+        if tab_location.is_none() && matches!(self.source, CodeSource::New { .. }) {
             let default_directory = self.source.default_directory().cloned();
             code_editor.update(ctx, |local_editor, _ctx| {
                 local_editor.set_new_file(true);
@@ -679,7 +609,7 @@ impl CodeView {
                 // 远端 buffer 初始内容到达后,解除加载期施加的编辑锁。
                 // 本地文件创建时即可编辑,从不被锁,这里也就是 no-op。
                 if let Some(tab) = me.tab_group.iter().find(|tab| tab.editor_view == emitter) {
-                    if matches!(tab.location, Some(BufferLocation::Remote(_))) {
+                    if matches!(tab.location, Some(LocalOrRemotePath::Remote(_))) {
                         emitter.update(ctx, |local_editor, ctx| {
                             local_editor.editor().update(ctx, |code_editor, ctx| {
                                 code_editor.set_interaction_state(InteractionState::Editable, ctx);
@@ -730,10 +660,14 @@ impl CodeView {
                     ctx,
                 );
             }
-            LocalCodeEditorEvent::FileSaved => {
-                me.sync_active_tab_path(ctx);
+            LocalCodeEditorEvent::FileSaved { auto_saved } => {
+                me.sync_active_tab_location(ctx);
                 me.set_title_after_content_update(ctx);
-                CodeView::display_save_success(ctx.window_id(), ctx);
+                // Only surface the success toast for manual (cmd-s) saves;
+                // auto-saves persist silently.
+                if !*auto_saved {
+                    CodeView::display_save_success(ctx.window_id(), ctx);
+                }
                 ctx.notify();
                 // 远端异步 Save 完成:触发暂存的 close-tab callback。
                 if let Some(cb) = me.pending_remote_save_callbacks.remove(&emitter.id()) {
@@ -783,8 +717,7 @@ impl CodeView {
         });
 
         TabData {
-            path,
-            location,
+            location: tab_location,
             editor_view: code_editor,
             mouse_state_handles: Default::default(),
             preview,
@@ -844,12 +777,15 @@ impl CodeView {
     }
 
     /// Open a file as a "preview" or if it's already being previewed, promote it to "open", making it
-    /// active and editable. `location` 统一覆盖本地与远端文件。
+    /// active and editable. `location` 统一覆盖本地与远端文件 —— 远端文件同样支持预览,
+    /// 因此参数取 `impl Into<LocalOrRemotePath>`(裸 `PathBuf` 调用点也能直接传入)。
     pub fn open_in_preview_or_promote(
         &mut self,
-        location: BufferLocation,
+        location: impl Into<LocalOrRemotePath>,
         ctx: &mut ViewContext<Self>,
     ) {
+        let location = location.into();
+
         // If the file already is open, set the active tab to the existing tab and return.
         if let Some(existing_index) = self
             .tab_group
@@ -881,18 +817,15 @@ impl CodeView {
         let active_tab_index = self.tab_group.len() - 1;
         self.set_active_tab_index(active_tab_index, ctx);
 
-        // `FileOpened` 仅对本地文件有意义(repo 检测 / OpenedFilesModel)。
-        if let BufferLocation::Local(file_path) = location {
-            ctx.emit(CodeViewEvent::FileOpened {
-                file_path,
-                tab_index: self.active_tab_index,
-            });
-        }
+        ctx.emit(CodeViewEvent::FileOpened {
+            location,
+            tab_index: self.active_tab_index,
+        });
     }
 
     pub fn open_in_preview_or_promote_and_jump(
         &mut self,
-        location: BufferLocation,
+        location: impl Into<LocalOrRemotePath>,
         line_col: Option<LineAndColumnArg>,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -904,12 +837,12 @@ impl CodeView {
 
     pub fn open_or_focus_existing(
         &mut self,
-        location: Option<BufferLocation>,
+        location: Option<LocalOrRemotePath>,
         line_col: Option<LineAndColumnArg>,
         ctx: &mut ViewContext<Self>,
     ) {
         // If the tab already exists, focus it (and optionally jump) without re-opening from disk.
-        if let Some(existing_index) = self.focus_existing_tab_if_present(&location, ctx) {
+        if let Some(existing_index) = self.focus_existing_tab_if_present(location.as_ref(), ctx) {
             self.promote_if_preview(ctx);
             if let Some(line_col) = line_col {
                 self.jump_to_line_col_in_tab(existing_index, line_col, ctx);
@@ -917,16 +850,16 @@ impl CodeView {
             return;
         }
 
-        self.open_new_tab_for_location(location, line_col, ctx);
+        self.open_new_tab(location, line_col, ctx);
     }
 
     fn focus_existing_tab_if_present(
         &mut self,
-        location: &Option<BufferLocation>,
+        location: Option<&LocalOrRemotePath>,
         ctx: &mut ViewContext<Self>,
     ) -> Option<usize> {
         // `None` location(新建文件)永不与已有 tab 去重。
-        let location = location.as_ref()?;
+        let location = location?;
         let existing_index = self
             .tab_group
             .iter()
@@ -959,9 +892,9 @@ impl CodeView {
         });
     }
 
-    fn open_new_tab_for_location(
+    fn open_new_tab(
         &mut self,
-        location: Option<BufferLocation>,
+        location: Option<LocalOrRemotePath>,
         line_col: Option<LineAndColumnArg>,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -969,14 +902,11 @@ impl CodeView {
         self.tab_group.push(new_tab);
         let active_tab_index = self.tab_group.len() - 1;
 
-        if let (Some(location), Some(tab)) = (location, self.tab_group.get(active_tab_index)) {
-            // `FileOpened` 仅对本地文件有意义(repo 检测 / OpenedFilesModel)。
-            if let BufferLocation::Local(file_path) = &location {
-                ctx.emit(CodeViewEvent::FileOpened {
-                    file_path: file_path.clone(),
-                    tab_index: active_tab_index,
-                });
-            }
+        if let (Some(loc), Some(tab)) = (&location, self.tab_group.get(active_tab_index)) {
+            ctx.emit(CodeViewEvent::FileOpened {
+                location: loc.clone(),
+                tab_index: active_tab_index,
+            });
 
             let scroll_position = match line_col {
                 Some(line_col) => ScrollPosition::LineAndColumn(line_col),
@@ -999,17 +929,17 @@ impl CodeView {
 
     /// Set the title of the pane, which is the file path.
     fn set_title(&self, _unsaved_changes: bool, ctx: &mut ViewContext<Self>) {
-        let active_tab = self.tab_at(self.active_tab_index);
-        let is_new = active_tab.is_some_and(|t| t.editor_view.as_ref(ctx).is_new_file());
+        // 标题用编辑器的 `file_location`,远端文件带上 host 前缀,避免显示成 "Untitled"。
+        let file_location = self
+            .tab_at(self.active_tab_index)
+            .and_then(|t| t.editor_view.as_ref(ctx).file_location().cloned());
+        let is_new = self
+            .tab_at(self.active_tab_index)
+            .is_some_and(|t| t.editor_view.as_ref(ctx).is_new_file());
 
-        // 标题优先用本地路径(完整路径),远端文件无本地路径时回退到
-        // `location` 派生的显示名,避免远端 tab 显示成 "Untitled"。
-        let title = if let Some(file) = self.local_path(ctx) {
-            file.display().to_string()
-        } else if let Some(name) = active_tab.map(|t| t.display_name()) {
-            name
-        } else {
-            "Untitled".to_string()
+        let title = match &file_location {
+            Some(location) => display_path_with_host(location, false, ctx),
+            None => "Untitled".to_string(),
         };
 
         self.pane_configuration.update(ctx, |pane_config, ctx| {
@@ -1023,6 +953,7 @@ impl CodeView {
             pane_config.set_title(title, ctx);
             pane_config.set_title_secondary(secondary, ctx);
             ctx.emit(PaneConfigurationEvent::TitleUpdated);
+            ctx.emit(PaneConfigurationEvent::HeaderContentChanged);
         });
     }
 
@@ -1038,7 +969,10 @@ impl CodeView {
         let remote_save_target = self.tab_at(index).and_then(|tab| {
             let editor = tab.editor_view.as_ref(ctx);
             let file_id = editor.file_id()?;
-            let is_remote = GlobalBufferModel::as_ref(ctx).is_remote(file_id);
+            // `GlobalBufferModel` 不再暴露 buffer source,这里用 `file_path` 间接判定:
+            // 它只对 `LocalOrRemotePath::Local`(本地 / ServerLocal buffer)返回 `Some`,
+            // 远端 buffer 恒为 `None`。
+            let is_remote = GlobalBufferModel::as_ref(ctx).file_path(file_id).is_none();
             is_remote.then(|| tab.editor_view.id())
         });
 
@@ -1058,6 +992,14 @@ impl CodeView {
             Err(ImmediateSaveError::NoFileId) => {
                 // If there's no file ID, this is a new file - trigger Save As
                 self.save_as(index, callback, ctx)
+            }
+            Err(ImmediateSaveError::RemoteDisconnected) => {
+                log::warn!("Cannot save: remote session disconnected");
+                CodeView::display_remote_disconnected_save_failure(ctx.window_id(), ctx);
+                if let Some(callback) = callback {
+                    callback(SaveOutcome::Failed, self, ctx);
+                }
+                SaveStatus::Failed(ImmediateSaveError::RemoteDisconnected)
             }
             Err(err) => {
                 log::warn!("Failed to save file. {err:?}");
@@ -1129,6 +1071,15 @@ impl CodeView {
         });
     }
 
+    fn display_remote_disconnected_save_failure(window_id: WindowId, ctx: &mut ViewContext<Self>) {
+        ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
+            let toast =
+                DismissibleToast::error(String::from("Cannot save — remote session disconnected."))
+                    .with_object_id("failed_to_save_file_remote_disconnected".to_string());
+            toast_stack.add_ephemeral_toast(toast, window_id, ctx);
+        });
+    }
+
     fn display_save_success(window_id: WindowId, ctx: &mut ViewContext<Self>) {
         ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
             let toast = DismissibleToast::success(crate::t!("code-file-saved-toast"))
@@ -1165,9 +1116,59 @@ impl CodeView {
         Self::has_unsaved_changes(tab, ctx)
     }
 
+    /// Whether the active tab should render the unsaved-changes indicator.
+    /// Auto-save-aware: see [`Self::show_unsaved_indicator`].
+    pub fn active_tab_shows_unsaved_indicator(&self, ctx: &AppContext) -> bool {
+        self.tab_at(self.active_tab_index)
+            .is_some_and(|tab| Self::show_unsaved_indicator(tab, ctx))
+    }
+
     fn has_unsaved_changes(tab: &TabData, ctx: &AppContext) -> bool {
         let local_editor = tab.editor_view.as_ref(ctx);
         local_editor.has_unsaved_changes(ctx)
+    }
+
+    /// Whether to render the transient "unsaved changes" indicator for a tab.
+    ///
+    /// When auto-save is enabled, edits are persisted automatically (debounced
+    /// while typing and on focus loss), so showing the dot would just make it
+    /// flicker on and off as the user types. It is only hidden for changes
+    /// auto-save can actually persist, though: untitled buffers and
+    /// disconnected remotes keep the indicator so unsaveable changes stay
+    /// visible.
+    fn show_unsaved_indicator(tab: &TabData, app: &AppContext) -> bool {
+        if !Self::has_unsaved_changes(tab, app) {
+            return false;
+        }
+        !*CodeSettings::as_ref(app).auto_save || !tab.editor_view.as_ref(app).can_auto_save(app)
+    }
+
+    /// Flush-saves every unsaved tab that has a backing file, marking each save
+    /// as an auto-save so it stays silent (no "File saved." toast). Returns
+    /// `true` if any unsaved tab could NOT be auto-saved (e.g. an untitled
+    /// buffer with no path), so callers can still warn before discarding those.
+    pub fn auto_save_all_unsaved_tabs(&mut self, ctx: &mut ViewContext<Self>) -> bool {
+        let mut unsaveable_changes_remain = false;
+        for index in self.unsaved_indices(ctx) {
+            // A tab can only be auto-saved if it has a backing file *and*, for
+            // remote files, its host is still connected. A disconnected remote
+            // buffer has a `file_id` but `save_local` would fail silently, so
+            // treat it as unsaveable and let the caller warn before discarding
+            // the edits.
+            let can_auto_save = self
+                .tab_at(index)
+                .is_some_and(|tab| tab.editor_view.as_ref(ctx).can_auto_save(ctx));
+            if can_auto_save {
+                if let Some(tab) = self.tab_at(index) {
+                    tab.editor_view
+                        .update(ctx, |editor, _| editor.mark_next_save_as_auto_save());
+                }
+                self.save_local(index, None, ctx);
+            } else {
+                unsaveable_changes_remain = true;
+            }
+        }
+        unsaveable_changes_remain
     }
 
     /// Check whether there are unsaved changes and reset the pane title accordingly.
@@ -1175,17 +1176,11 @@ impl CodeView {
         self.set_title(self.contains_unsaved_changes(ctx), ctx);
     }
 
-    /// Update the TabData path for the active tab to match the LocalCodeEditor metadata.
-    /// This is needed after save_as operations to keep the paths in sync.
-    fn sync_active_tab_path(&mut self, ctx: &mut ViewContext<Self>) {
+    /// Update the TabData location for the active tab to match the LocalCodeEditor metadata.
+    /// This is needed after save operations to keep local and remote locations in sync.
+    fn sync_active_tab_location(&mut self, ctx: &mut ViewContext<Self>) {
         if let Some(tab) = self.tab_group.get_mut(self.active_tab_index) {
-            let new_path = tab
-                .editor_view
-                .as_ref(ctx)
-                .file_path()
-                .map(|p| p.to_path_buf());
-            tab.location = new_path.clone().map(BufferLocation::Local);
-            tab.path = new_path;
+            tab.location = tab.editor_view.as_ref(ctx).file_location().cloned();
         }
     }
 
@@ -1341,8 +1336,12 @@ impl CodeView {
         ctx: &mut ViewContext<Self>,
     ) {
         if let Some(tab) = self.tab_at(index) {
-            // 用 `location` 派生文件名:远端文件没有本地 `path`,否则会丢失文件名。
-            let file_name = tab.location().map(|loc| loc.display_name());
+            // 用 `location` 派生文件名:远端文件没有本地 path,否则会丢失文件名。
+            let file_name = tab
+                .location
+                .as_ref()
+                .map(|loc| display_name_with_host(loc, ctx))
+                .filter(|n| !n.is_empty());
             let summary = UnsavedStateSummary::for_editor_tab(
                 file_name,
                 vec![CodeEditorStatus::new(Self::has_unsaved_changes(tab, ctx))],
@@ -1353,6 +1352,43 @@ impl CodeView {
             if summary.should_display_warning(ctx)
                 && ChannelState::channel() != Channel::Integration
             {
+                // With auto-save enabled, closing a file that has a backing path
+                // shouldn't block on the "unsaved changes" dialog just because
+                // the debounce hasn't fired yet — the edits will be persisted
+                // anyway. Flush them and close (mirroring the dialog's "Save
+                // changes" action), marking the saves as auto-saves so they stay
+                // silent. Untitled files (no path) still prompt, since auto-save
+                // can't persist them without a Save As.
+                let tab_has_backing_file = self
+                    .tab_at(index)
+                    .is_some_and(|tab| tab.editor_view.as_ref(ctx).file_id().is_some());
+                if *CodeSettings::as_ref(ctx).auto_save && tab_has_backing_file {
+                    if is_clearing_group {
+                        let unsaved_indices = self.unsaved_indices(ctx);
+                        for &unsaved_index in &unsaved_indices {
+                            if let Some(tab) = self.tab_group.get(unsaved_index)
+                                && tab.editor_view.as_ref(ctx).file_id().is_some()
+                            {
+                                tab.editor_view
+                                    .update(ctx, |editor, _| editor.mark_next_save_as_auto_save());
+                            }
+                        }
+                        self.clear_tab_group_with_intent(
+                            unsaved_indices,
+                            0,
+                            Some(PendingSaveIntent::Save),
+                            ctx,
+                        );
+                    } else {
+                        if let Some(tab) = self.tab_at(index) {
+                            tab.editor_view
+                                .update(ctx, |editor, _| editor.mark_next_save_as_auto_save());
+                        }
+                        self.remove_tab_with_intent(index, Some(PendingSaveIntent::Save), ctx);
+                    }
+                    return;
+                }
+
                 let handle_save_intent = |intent: PendingSaveIntent| {
                     let handle = ctx.handle().clone();
                     move |ctx: &mut AppContext| {
@@ -1431,19 +1467,21 @@ impl CodeView {
         index: usize,
         ctx: &mut ViewContext<Self>,
     ) -> Option<CodePane> {
+        // 远端 tab 也要能在 pane 之间移动 —— 用 `location` 而非本地 path 还原 source。
         self.tab_at(index)
-            .and_then(|t| t.location().cloned())
+            .and_then(|t| t.location.clone())
             .map(|location| {
                 let source = match location {
-                    BufferLocation::Local(path) => CodeSource::Link {
+                    LocalOrRemotePath::Local(path) => CodeSource::Link {
                         path,
                         range_start: None,
                         range_end: None,
                     },
-                    BufferLocation::Remote(remote_path) => {
-                        CodeSource::RemoteFileTree { remote_path }
+                    remote @ LocalOrRemotePath::Remote(_) => {
+                        CodeSource::FileTree { location: remote }
                     }
                 };
+                // 移动 tab 不能关掉 buffer(目标 pane 还要接着用)。
                 self.remove_tab_data_index_for_move(index, ctx);
                 CodePane::new(source, None, ctx)
             })
@@ -1549,9 +1587,9 @@ impl CodeView {
         self.active_tab_index = index;
         self.update_tab_bar_state(ctx);
 
-        let file_path = self.tab_at(index).and_then(|tab| tab.path());
+        let location = self.tab_at(index).and_then(|tab| tab.location.clone());
         ctx.emit(CodeViewEvent::TabChanged {
-            file_path,
+            location,
             tab_index: index,
         });
 
@@ -1568,7 +1606,7 @@ impl CodeView {
     pub fn close_tabs_with_path(&mut self, file_path: &Path, ctx: &mut ViewContext<Self>) {
         let mut indices_to_remove = Vec::new();
         for (tab_idx, tab) in self.tab_group.iter().enumerate() {
-            if tab.path.as_ref().is_some_and(|path| path == file_path) {
+            if tab.local_path().is_some_and(|path| path == file_path) {
                 indices_to_remove.push(tab_idx);
             }
         }
@@ -1587,9 +1625,8 @@ impl CodeView {
         ctx: &mut ViewContext<Self>,
     ) {
         for tab in self.tab_group.iter_mut() {
-            if tab.path.as_ref().is_some_and(|path| path == old_path) {
-                tab.path = Some(new_path.to_path_buf());
-                tab.location = Some(BufferLocation::Local(new_path.to_path_buf()));
+            if tab.local_path().is_some_and(|path| path == old_path) {
+                tab.location = Some(LocalOrRemotePath::Local(new_path.to_path_buf()));
                 tab.editor_view.update(ctx, |editor, ctx| {
                     let was_unsaved = editor.has_unsaved_changes(ctx);
 
@@ -1747,6 +1784,7 @@ impl CodeView {
         is_hovered: bool,
         has_unsaved_changes: bool,
         appearance: &Appearance,
+        app: &AppContext,
     ) -> Box<dyn Element> {
         let theme = appearance.theme();
         let text_color = if is_active {
@@ -1759,7 +1797,12 @@ impl CodeView {
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween);
 
-        let file_name = tab_data.display_name();
+        let file_name = tab_data
+            .location
+            .as_ref()
+            .map(|loc| display_name_with_host(loc, app))
+            .filter(|n| !n.is_empty())
+            .unwrap_or_else(|| "Untitled".to_string());
         let language_icon =
             icon_from_file_path(&file_name, appearance, ItemHighlightState::Default);
         row.add_child(
@@ -1793,6 +1836,7 @@ impl CodeView {
         )
         .with_color(text_color)
         .with_style(style)
+        .with_clip(ClipConfig::start())
         .finish();
         row.add_child(
             Shrinkable::new(
@@ -1868,7 +1912,7 @@ impl CodeView {
                         origin: ActionOrigin::EditorTab(index),
                         drag_location: PaneDragDropLocation::TabBar(data.tab_bar_location),
                         drag_position,
-                        precomputed_tab_hover_index: None,
+                        tab_bar_axis: Some(TabBarAxis::Horizontal),
                     },
                 );
             } else {
@@ -1971,8 +2015,9 @@ impl CodeView {
                             index,
                             is_active,
                             tab_handle.is_hovered(),
-                            Self::has_unsaved_changes(tab_data, app),
+                            Self::show_unsaved_indicator(tab_data, app),
                             appearance,
+                            app,
                         ))
                         .with_horizontal_margin(TAB_HORIZONTAL_MARGIN)
                         .with_padding(Padding::uniform(TAB_PADDING))
@@ -2014,23 +2059,22 @@ impl CodeView {
                             .mouse_state_handles
                             .tab_draggable_state
                             .is_dragging()
+                        && let Some(path) = tab_data.local_path()
                     {
-                        if let Some(path) = tab_data.path.clone() {
-                            let tooltip = appearance
-                                .ui_builder()
-                                .tool_tip(Self::relative_path(path, self.window_id, app))
-                                .build()
-                                .finish();
-                            stack.add_positioned_overlay_child(
-                                tooltip,
-                                OffsetPositioning::offset_from_parent(
-                                    vec2f(10., -1.),
-                                    ParentOffsetBounds::Unbounded,
-                                    ParentAnchor::BottomLeft,
-                                    ChildAnchor::TopLeft,
-                                ),
-                            );
-                        }
+                        let tooltip = appearance
+                            .ui_builder()
+                            .tool_tip(Self::relative_path(path, self.window_id, app))
+                            .build()
+                            .finish();
+                        stack.add_positioned_overlay_child(
+                            tooltip,
+                            OffsetPositioning::offset_from_parent(
+                                vec2f(10., -1.),
+                                ParentOffsetBounds::Unbounded,
+                                ParentAnchor::BottomLeft,
+                                ChildAnchor::TopLeft,
+                            ),
+                        );
                     }
 
                     stack.finish()
@@ -2142,7 +2186,12 @@ impl CodeView {
         let title = self
             .tab_group
             .first()
-            .map(|tab| tab.display_name())
+            .and_then(|tab| {
+                tab.location
+                    .as_ref()
+                    .map(|loc| display_name_with_host(loc, app))
+                    .filter(|n| !n.is_empty())
+            })
             .unwrap_or_else(|| "Untitled".to_string());
 
         let appearance = Appearance::as_ref(app);
@@ -2183,18 +2232,37 @@ impl CodeView {
         let tab = self.tab_group.first();
         let tab_handle = tab.map(|tab| tab.mouse_state_handles.tab_handle.clone());
 
+        // Check unsaved changes for the active tab.
+        let has_unsaved = tab.is_some_and(|tab| Self::show_unsaved_indicator(tab, app));
+
         // Build the center title element, with a hover tooltip showing the full path.
         let title_element: Box<dyn Element> = match tab_handle {
             Some(handle) => Hoverable::new(handle, |hover_state| {
                 let title_text =
                     render_pane_header_title_text(title.clone(), appearance, ClipConfig::start());
+
+                let mut title_row = Flex::row()
+                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                    .with_main_axis_size(MainAxisSize::Min);
+                if has_unsaved {
+                    let dot_color = appearance
+                        .theme()
+                        .sub_text_color(appearance.theme().background());
+                    title_row.add_child(
+                        Container::new(render_unsaved_changes_icon(dot_color.into()))
+                            .with_margin_right(4.)
+                            .finish(),
+                    );
+                }
+                title_row.add_child(title_text);
+
                 let mut stack = Stack::new();
-                stack.add_child(title_text);
+                stack.add_child(title_row.finish());
                 if hover_state.is_hovered() {
-                    let tooltip_relative_path = tab
-                        .and_then(|tab| tab.path.clone())
-                        .map(|p| Self::relative_path(p, self.window_id, app));
-                    if let Some(ref path) = tooltip_relative_path {
+                    let tooltip_path = tab
+                        .and_then(|tab| tab.location())
+                        .map(|loc| loc.display_path());
+                    if let Some(ref path) = tooltip_path {
                         let tooltip = appearance
                             .ui_builder()
                             .tool_tip(path.clone())
@@ -2214,7 +2282,27 @@ impl CodeView {
                 stack.finish()
             })
             .finish(),
-            None => render_pane_header_title_text(title, appearance, ClipConfig::start()),
+            None => {
+                let title_text =
+                    render_pane_header_title_text(title, appearance, ClipConfig::start());
+                if has_unsaved {
+                    let dot_color = appearance
+                        .theme()
+                        .sub_text_color(appearance.theme().background());
+                    let mut row = Flex::row()
+                        .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                        .with_main_axis_size(MainAxisSize::Min);
+                    row.add_child(
+                        Container::new(render_unsaved_changes_icon(dot_color.into()))
+                            .with_margin_right(4.)
+                            .finish(),
+                    );
+                    row.add_child(title_text);
+                    row.finish()
+                } else {
+                    title_text
+                }
+            }
         };
 
         render_three_column_header(
@@ -2251,15 +2339,49 @@ impl CodeView {
         ];
 
         #[cfg(feature = "local_fs")]
-        if let Some(path) = self.local_path(ctx) {
-            items.extend([
-                MenuItem::Separator,
-                MenuItemFields::new(crate::t!("code-copy-file-path"))
-                    .with_on_select_action(CodeViewAction::CopyFilePath)
-                    .into_item(),
-            ]);
+        {
+            let active_location = self
+                .tab_at(self.active_tab_index)
+                .and_then(|t| t.location.as_ref());
+            let local_path = self.local_path(ctx);
 
-            if is_markdown_file(&path) {
+            if active_location.is_some() {
+                items.push(MenuItem::Separator);
+                items.push(
+                    MenuItemFields::new(crate::t!("code-copy-file-path"))
+                        .with_on_select_action(CodeViewAction::CopyFilePath)
+                        .into_item(),
+                );
+            }
+
+            if local_path.is_some() {
+                let reveal_label = if cfg!(target_os = "macos") {
+                    "Reveal in Finder"
+                } else if cfg!(target_os = "windows") {
+                    "Reveal in Explorer"
+                } else {
+                    "Reveal in file manager"
+                };
+                items.push(
+                    MenuItemFields::new(reveal_label)
+                        .with_on_select_action(CodeViewAction::RevealInFinder)
+                        .into_item(),
+                );
+            }
+
+            let renders_in_notebook_viewer = local_path
+                .as_ref()
+                .map(renders_in_warp_notebook_viewer)
+                .unwrap_or_else(|| {
+                    active_location
+                        .map(|loc| {
+                            renders_in_warp_notebook_viewer(std::path::Path::new(
+                                &loc.display_path(),
+                            ))
+                        })
+                        .unwrap_or(false)
+                });
+            if renders_in_notebook_viewer {
                 items.push(
                     MenuItemFields::new(crate::t!("code-view-markdown-preview"))
                         .with_on_select_action(CodeViewAction::RenderMarkdown)
@@ -2273,18 +2395,18 @@ impl CodeView {
 
     /// Merges tabs from another `CodeView`, avoiding duplicates and updating the active tab index.
     pub fn merge_tabs(&mut self, source_code_view: &CodeView, ctx: &mut ViewContext<Self>) {
-        let existing_locations_to_idx: HashMap<BufferLocation, usize> = self
+        let existing_locations_to_idx: HashMap<&LocalOrRemotePath, usize> = self
             .tab_group
             .iter()
             .enumerate()
-            .filter_map(|(idx, tab)| tab.location().cloned().map(|loc| (loc, idx)))
+            .filter_map(|(idx, tab)| tab.location.as_ref().map(|loc| (loc, idx)))
             .collect();
         let mut active_tab_index = self.active_tab_index();
         let mut to_extend: Vec<TabData> = Vec::new();
 
         for (i, tab_data) in source_code_view.tab_group.iter().enumerate() {
-            if let Some(location) = tab_data.location() {
-                if let Some(&index) = existing_locations_to_idx.get(location) {
+            if let Some(loc) = tab_data.location.as_ref() {
+                if let Some(&index) = existing_locations_to_idx.get(loc) {
                     // If the tab already exists in the tab group and is the active tab in the source CodeView,
                     // update the active tab index to point to it.
                     if i == source_code_view.active_tab_index() {
@@ -2418,19 +2540,31 @@ impl TypedActionView for CodeView {
 
             #[cfg(feature = "local_fs")]
             CodeViewAction::CopyFilePath => {
-                if let Some(path) = self.local_path(ctx) {
+                if let Some(location) = self
+                    .tab_at(self.active_tab_index)
+                    .and_then(|t| t.location.as_ref())
+                {
                     ctx.clipboard()
-                        .write(ClipboardContent::plain_text(path.display().to_string()));
+                        .write(ClipboardContent::plain_text(location.display_path()));
+                }
+            }
+            #[cfg(feature = "local_fs")]
+            CodeViewAction::RevealInFinder => {
+                if let Some(path) = self.local_path(ctx) {
+                    ctx.open_file_path_in_explorer(&path);
+                } else {
+                    log::warn!(
+                        "Reveal in Finder requested, but the active code tab has no local file path"
+                    );
                 }
             }
             #[cfg(feature = "local_fs")]
             CodeViewAction::RenderMarkdown => {
-                let path = self.local_path(ctx).or_else(|| {
-                    self.tab_at(self.active_tab_index)
-                        .and_then(|t| t.path.clone())
-                });
+                let lor_path = self
+                    .tab_at(self.active_tab_index)
+                    .and_then(|t| t.location.clone());
 
-                if let Some(path) = path {
+                if let Some(lor_path) = lor_path {
                     let source = self.source.clone();
                     if self.active_tab_has_unsaved_changes(ctx) {
                         self.save_local(
@@ -2438,7 +2572,7 @@ impl TypedActionView for CodeView {
                             Some(Box::new(move |outcome, _me, ctx| {
                                 if outcome != SaveOutcome::Canceled {
                                     ctx.emit(CodeViewEvent::Pane(PaneEvent::ReplaceWithFilePane {
-                                        path: path.clone(),
+                                        path: lor_path.clone(),
                                         source: Some(source.clone()),
                                     }));
                                 }
@@ -2447,7 +2581,7 @@ impl TypedActionView for CodeView {
                         );
                     } else {
                         ctx.emit(CodeViewEvent::Pane(PaneEvent::ReplaceWithFilePane {
-                            path,
+                            path: lor_path,
                             source: Some(source),
                         }));
                     }

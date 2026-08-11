@@ -1,15 +1,16 @@
-use crate::{
-    cloud_object::{
-        model::persistence::ObjectStoreModel, update_manager::UpdateManager, Space,
-        StoredObjectEventEntrypoint, StoredObjectLocation,
-    },
-    network::{NetworkStatus, NetworkStatusKind},
-    server::ids::ClientId,
-    util::bindings::keybinding_name_to_display_string,
-    workflows::workflow::Workflow,
-    workspaces::{team::Team, user_workspaces::UserWorkspaces, workspace::Workspace},
-};
-use warpui::{async_assert, async_assert_eq, integration::TestStep, SingletonEntity};
+use warpui::integration::TestStep;
+use warpui::{SingletonEntity, async_assert, async_assert_eq};
+
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::update_manager::UpdateManager;
+use crate::cloud_object::{Space, StoredObjectEventEntrypoint, StoredObjectLocation};
+use crate::network::{NetworkStatus, NetworkStatusKind};
+use crate::server::ids::ClientId;
+use crate::util::bindings::keybinding_name_to_display_string;
+use crate::workflows::workflow::Workflow;
+use crate::workspaces::team::Team;
+use crate::workspaces::user_workspaces::UserWorkspaces;
+use crate::workspaces::workspace::Workspace;
 
 fn set_and_assert_network_status(status: NetworkStatusKind) -> TestStep {
     TestStep::new("Set and assert network status")
@@ -41,20 +42,21 @@ pub fn go_online() -> TestStep {
 }
 
 pub fn join_a_workspace() -> TestStep {
-    TestStep::new("Join a Zap Drive workspace")
+    TestStep::new("Join a InfiniShell Drive workspace")
         .with_action(move |app, _, _| {
             UserWorkspaces::handle(app).update(app, |user_workspaces, ctx| {
                 let workspace_uid = "workspace_uid123456789".to_string().into();
                 let teams: Vec<Team> = vec![Team {
                     uid: "team_uid12345678912345".try_into().expect("ID is valid"),
                     name: "My Team".to_string(),
+                    color: None,
                     invite_code: Default::default(),
                     members: Default::default(),
                     pending_email_invites: Default::default(),
                     invite_link_domain_restrictions: Default::default(),
                     billing_metadata: Default::default(),
                     stripe_customer_id: None,
-                    organization_settings: Default::default(),
+                    settings: Default::default(),
                     is_eligible_for_discovery: false,
                     has_billing_history: false,
                 }];
@@ -65,6 +67,7 @@ pub fn join_a_workspace() -> TestStep {
                     teams: teams.clone(),
                     billing_metadata: Default::default(),
                     bonus_grants_purchased_this_month: Default::default(),
+                    billing_cycle_usage: None,
                     has_billing_history: false,
                     settings: Default::default(),
                     invite_code: Default::default(),

@@ -9,7 +9,7 @@ use warpui::{Entity, EntityId, ModelContext, SingletonEntity};
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_conversations_model::AgentConversationsModel;
 use crate::ai::ambient_agents::spawn::{spawn_task, AmbientAgentEvent};
-use crate::ai::ambient_agents::task::HarnessConfig;
+use crate::ai::ambient_agents::task::{HarnessAuthSecretsConfig, HarnessConfig};
 use crate::ai::ambient_agents::{
     AgentConfigSnapshot, AmbientAgentTaskId, AmbientAgentTaskState, AttachmentInput,
     SpawnAgentRequest, OUT_OF_CREDITS_TASK_FAILURE_MESSAGE, SERVER_OVERLOADED_TASK_FAILURE_MESSAGE,
@@ -32,6 +32,21 @@ pub struct AgentProgress {
     pub harness_started_at: Option<Instant>,
     /// When the agent stopped.
     pub stopped_at: Option<Instant>,
+}
+
+impl AgentProgress {
+    /// Human-readable step label for the ambient-agent setup progress indicator.
+    /// Mirrors the inline logic in `view_impl.rs`'s loading screen so the status
+    /// bar and the full-pane loading screen stay in sync.
+    pub fn setup_status_text(&self) -> &'static str {
+        if self.harness_started_at.is_some() {
+            "Starting Environment (Step 3/3)"
+        } else if self.claimed_at.is_some() {
+            "Creating Environment (Step 2/3)"
+        } else {
+            "Connecting to Host (Step 1/3)"
+        }
+    }
 }
 
 /// Status of the ambient agent run.
@@ -94,6 +109,9 @@ pub struct AmbientAgentViewModel {
     /// Selected execution harness for the ambient-agent run.
     /// Defaults to `Harness::Oz`. Used to populate `AgentConfigSnapshot.harness` on spawn.
     harness: Harness,
+    /// Name of the selected auth secret for the current non-Oz harness.
+    /// Driven by `AuthSecretSelector` / `AuthSecretFtuxView` and read back on spawn.
+    harness_auth_secret_name: Option<String>,
     /// Whether the optimistic InitialUserQuery block has been inserted for the current run.
     has_inserted_ambient_agent_user_query_block: bool,
     /// Whether the harness CLI (e.g. `claude`, `gemini`) has started running for a non-oz run.
@@ -120,6 +138,7 @@ impl AmbientAgentViewModel {
             task_id: None,
             conversation_id: None,
             harness: Harness::default(),
+            harness_auth_secret_name: None,
             has_inserted_ambient_agent_user_query_block: false,
             harness_command_started: false,
         }
@@ -150,12 +169,32 @@ impl AmbientAgentViewModel {
             return;
         }
         self.harness = harness;
+        // 切换 harness 后旧的 auth secret 不再适用,清空以便选择器从设置里重新恢复。
+        self.harness_auth_secret_name = None;
         ctx.emit(AmbientAgentViewModelEvent::HarnessSelected);
+    }
+
+    /// Name of the auth secret selected for the current non-Oz harness, if any.
+    pub fn selected_harness_auth_secret_name(&self) -> Option<&str> {
+        self.harness_auth_secret_name.as_deref()
+    }
+
+    /// Sets the auth secret name for the current harness and emits `AuthSecretSelected`.
+    pub fn set_harness_auth_secret_name(
+        &mut self,
+        name: Option<String>,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if self.harness_auth_secret_name == name {
+            return;
+        }
+        self.harness_auth_secret_name = name;
+        ctx.emit(AmbientAgentViewModelEvent::AuthSecretSelected);
     }
 
     /// True when the run is configured to use a non-Oz execution harness and the
     /// required feature flags are enabled.
-    pub(super) fn is_third_party_harness(&self) -> bool {
+    pub fn is_third_party_harness(&self) -> bool {
         FeatureFlag::AgentHarness.is_enabled() && self.harness != Harness::Oz
     }
 
@@ -347,11 +386,27 @@ impl AmbientAgentViewModel {
         let harness_override =
             (self.harness != Harness::Oz).then(|| HarnessConfig::from_harness_type(self.harness));
 
+        let harness_auth_secrets =
+            self.harness_auth_secret_name
+                .as_ref()
+                .and_then(|name| match self.harness {
+                    Harness::Claude => Some(HarnessAuthSecretsConfig {
+                        claude_auth_secret_name: Some(name.clone()),
+                        codex_auth_secret_name: None,
+                    }),
+                    Harness::Codex => Some(HarnessAuthSecretsConfig {
+                        claude_auth_secret_name: None,
+                        codex_auth_secret_name: Some(name.clone()),
+                    }),
+                    _ => None,
+                });
+
         let config = Some(AgentConfigSnapshot {
             environment_id: None,
             model_id: Some(model_id),
             computer_use_enabled,
             harness: harness_override,
+            harness_auth_secrets,
             ..Default::default()
         });
 
@@ -734,6 +789,8 @@ pub enum AmbientAgentViewModelEvent {
     Cancelled,
     /// The selected execution harness (Oz / Claude Code) changed.
     HarnessSelected,
+    /// The selected harness auth secret changed.
+    AuthSecretSelected,
     /// The harness CLI (for non-oz runs) has started executing in the shared session.
     /// Fires once per run and signals the transition out of the pre-first-exchange phase
     /// for claude / gemini / other third-party harnesses.

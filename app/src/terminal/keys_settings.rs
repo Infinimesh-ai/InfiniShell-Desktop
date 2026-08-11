@@ -1,15 +1,13 @@
-use settings::{
-    macros::define_settings_group, RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud,
-};
-use warpui::{keymap::Keystroke, AppContext, DisplayIdx, ModelContext};
+use settings::macros::define_settings_group;
+use settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
+use warp_errors::{report_error, report_if_error};
+use warpui::keymap::Keystroke;
+use warpui::{AppContext, DisplayIdx, ModelContext};
 
-use crate::{
-    report_if_error,
-    root_view::{update_quake_window_bounds, QuakeModePinPosition},
-    settings::{
-        CtrlTabBehavior, ExtraMetaKeys as ExtraMetaKeysEnum, GlobalHotkeyMode, SizePercentages,
-        DEFAULT_QUAKE_MODE_SIZE_PERCENTAGES,
-    },
+use crate::root_view::{QuakeModePinPosition, update_quake_window_bounds};
+use crate::settings::{
+    CtrlTabBehavior, DEFAULT_QUAKE_MODE_SIZE_PERCENTAGES, ExtraMetaKeys as ExtraMetaKeysEnum,
+    GlobalHotkeyMode, SizePercentages,
 };
 
 define_settings_group!(KeysSettings, settings: [
@@ -18,6 +16,7 @@ define_settings_group!(KeysSettings, settings: [
         default: crate::settings::QuakeModeSettings::default(),
         supported_platforms: SupportedPlatforms::DESKTOP,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+        surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "global_hotkey.dedicated_window.settings",
         max_table_depth: 2,
@@ -28,6 +27,7 @@ define_settings_group!(KeysSettings, settings: [
         default: false,
         supported_platforms: SupportedPlatforms::DESKTOP,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+        surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "global_hotkey.dedicated_window.enabled",
         description: "Whether the dedicated hotkey window is enabled. Mutually exclusive with `global_hotkey.toggle_all_windows.enabled`; only one should be true at a time.",
@@ -37,6 +37,7 @@ define_settings_group!(KeysSettings, settings: [
         default: false,
         supported_platforms: SupportedPlatforms::DESKTOP,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+        surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "global_hotkey.toggle_all_windows.enabled",
         description: "Whether the hotkey that toggles visibility of all windows is enabled. Mutually exclusive with `global_hotkey.dedicated_window.enabled`; only one should be true at a time.",
@@ -46,6 +47,7 @@ define_settings_group!(KeysSettings, settings: [
         default: None,
         supported_platforms: SupportedPlatforms::DESKTOP,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+        surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "global_hotkey.toggle_all_windows.keybinding",
         description: "The keybinding used for the global activation hotkey. Format: modifiers (cmd, ctrl, alt, shift, meta) and a key joined by '-', e.g. \"cmd-shift-a\" or \"alt-enter\". Bindings are case-sensitive: when shift is present, the key must be its shifted form (e.g., \"ctrl-shift-E\", not \"ctrl-shift-e\").",
@@ -55,6 +57,7 @@ define_settings_group!(KeysSettings, settings: [
         default: ExtraMetaKeysEnum::default(),
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+        surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "terminal.input.extra_meta_keys",
         description: "Controls which additional keys are treated as meta keys.",
@@ -64,6 +67,7 @@ define_settings_group!(KeysSettings, settings: [
         default: CtrlTabBehavior::default(),
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+        surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "keys.ctrl_tab_behavior_setting",
         description: "Controls the behavior of Ctrl+Tab.",
@@ -85,9 +89,10 @@ impl KeysSettings {
         };
 
         report_if_error!(self.quake_mode_enabled.set_value(enable_quake_mode, ctx));
-        report_if_error!(self
-            .activation_hotkey_enabled
-            .set_value(enable_activation_hotkey, ctx));
+        report_if_error!(
+            self.activation_hotkey_enabled
+                .set_value(enable_activation_hotkey, ctx)
+        );
     }
 
     // Note that registering an empty keybinding when enabling quake mode will be a no-op.
@@ -197,7 +202,9 @@ impl KeysSettings {
         }
 
         if *self.quake_mode_enabled && *self.activation_hotkey_enabled {
-            log::error!("Both quake mode AND activation hotkey enabled. Either one or the other should be active.");
+            report_error!(
+                "Both quake mode AND activation hotkey enabled. Either one or the other should be active."
+            );
             // Quake mode takes precedence
             selected = GlobalHotkeyMode::QuakeMode;
         } else if *self.quake_mode_enabled {

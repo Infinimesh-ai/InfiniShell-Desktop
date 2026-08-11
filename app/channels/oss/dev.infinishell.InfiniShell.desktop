@@ -1,0 +1,27 @@
+[Desktop Entry]
+# The version of the desktop entry spec this conforms to.
+Version=1.0
+
+Type=Application
+
+Name=InfiniShell
+GenericName=TerminalEmulator
+
+# `infinishell` 在 deb/rpm 包里是 /opt/infinishell/infinishell 的 symlink,
+# 在 arch 包里是 /usr/bin/infinishell wrapper script —— 三者都在 PATH 上能直接调用。
+# AppImage 打包时 bundle_appimage 会用 sed 把这一行替换为 `Exec=infinishell %U`,
+# 直接指向 AppImage 内部的二进制。
+Exec=infinishell %U
+StartupWMClass=dev.infinishell.InfiniShell
+
+Keywords=shell;prompt;command;commandline;cmd;
+
+Icon=dev.infinishell.InfiniShell
+
+Categories=System;TerminalEmulator;
+
+# Don't run this application within a terminal.
+Terminal=false
+
+# Register ourselves as the handler for infinishell:// URLs.
+MimeType=x-scheme-handler/infinishell;

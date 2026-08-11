@@ -4,26 +4,26 @@
 //! finalized when the button is released. The selection should be cleared
 //! when text is added/removed/scrolled on the screen. The selection should
 //! also be cleared if the user clicks off of the selection.
-use std::fmt::Debug;
-use vec1::Vec1;
-use warp_terminal::model::grid::cell;
-
-use crate::terminal::model::ansi::CursorShape;
-use crate::terminal::model::cell::Flags;
-use crate::terminal::model::grid::grid_handler::GridHandler;
-use crate::terminal::model::grid::Dimensions;
-use crate::terminal::model::index::{Point, Side};
-use crate::terminal::model::GridStorage;
-use crate::terminal::Vector2F;
 use std::cmp::{max, min};
+use std::fmt::Debug;
 use std::mem;
 use std::ops::RangeInclusive;
 pub use std::ops::{Range, RangeBounds};
+
+use vec1::Vec1;
 use warp_core::semantic_selection::SemanticSelection;
+use warp_terminal::model::grid::cell;
 use warpui::text::SelectionType;
 use warpui::units::Lines;
 
 use super::index::{Direction, VisibleRow};
+use crate::terminal::Vector2F;
+use crate::terminal::model::GridStorage;
+use crate::terminal::model::ansi::CursorShape;
+use crate::terminal::model::cell::Flags;
+use crate::terminal::model::grid::Dimensions;
+use crate::terminal::model::grid::grid_handler::GridHandler;
+use crate::terminal::model::index::{Point, Side};
 
 /// A Point and side within that point.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -484,22 +484,21 @@ impl Selection {
         selection: &SemanticSelection,
         is_reversed: bool,
     ) -> SelectionRange {
-        if start == end {
-            if let Some(matching) = grid_handler.bracket_search(start) {
-                if (matching.row == start.row && matching.col < start.col)
-                    || (matching.row > start.row)
-                {
-                    start = matching;
-                } else {
-                    end = matching;
-                }
-
-                return SelectionRange {
-                    start,
-                    end,
-                    is_reversed,
-                };
+        if start == end
+            && let Some(matching) = grid_handler.bracket_search(start)
+        {
+            if (matching.row == start.row && matching.col < start.col) || (matching.row > start.row)
+            {
+                start = matching;
+            } else {
+                end = matching;
             }
+
+            return SelectionRange {
+                start,
+                end,
+                is_reversed,
+            };
         }
 
         // first, get the bounds for normal, non-smart-selection
@@ -624,5 +623,5 @@ fn is_word_boundary_char(selection: &SemanticSelection, c: char) -> bool {
 /// and [EX] (at the start), or [BE] for a single cell. Partially selected cells
 /// look like [ B] and [E ].
 #[cfg(test)]
-#[path = "selection_test.rs"]
+#[path = "selection_tests.rs"]
 mod tests;

@@ -1,4 +1,5 @@
-use std::{fs, path::Path};
+use std::fs;
+use std::path::Path;
 
 use anyhow::{Context as _, Result};
 use warp_cli::skill::SkillSpec;
@@ -28,7 +29,7 @@ fn resolve_from_skill_dirs_by_directory_scan_resolves_home_skill_dir() -> Result
         &skill_path,
         "my-skill",
         "desc",
-        "# Global Zap skill\n\nUse this one.",
+        "# Global InfiniShell skill\n\nUse this one.",
     )?;
 
     let spec = SkillSpec::without_repo("my-skill".to_string());
@@ -36,7 +37,7 @@ fn resolve_from_skill_dirs_by_directory_scan_resolves_home_skill_dir() -> Result
         .context("Expected to resolve skill from explicit home skill dir")?;
 
     assert_eq!(resolved.skill_path, skill_path);
-    assert!(resolved.instructions.contains("Global Zap skill"));
+    assert!(resolved.instructions.contains("Global InfiniShell skill"));
 
     Ok(())
 }
@@ -63,7 +64,7 @@ fn resolve_from_root_path_by_directory_scan_respects_directory_precedence() -> R
         &warp_skill,
         "my-skill",
         "desc",
-        "# Zap version\n\nDo not pick this when .agents exists.",
+        "# InfiniShell version\n\nDo not pick this when .agents exists.",
     )?;
     write_skill_file(
         &claude_skill,
@@ -83,7 +84,7 @@ fn resolve_from_root_path_by_directory_scan_respects_directory_precedence() -> R
 
     assert_eq!(resolved.skill_path, agents_skill);
     assert!(resolved.instructions.contains("Agents version"));
-    assert!(!resolved.instructions.contains("Zap version"));
+    assert!(!resolved.instructions.contains("InfiniShell version"));
     assert!(!resolved.instructions.contains("Claude version"));
     assert!(!resolved.instructions.contains("Codex version"));
     assert!(!resolved.instructions.contains("name:"));
@@ -201,7 +202,7 @@ fn resolve_simple_name_uses_directory_precedence() -> Result<()> {
         &warp_skill,
         "my-skill",
         "desc",
-        "# Zap version\n\nThis should lose to .agents but beat .claude.",
+        "# InfiniShell version\n\nThis should lose to .agents but beat .claude.",
     )?;
 
     let claude_skill = root.join(".claude/skills/my-skill/SKILL.md");
@@ -218,7 +219,7 @@ fn resolve_simple_name_uses_directory_precedence() -> Result<()> {
         .context("Expected to resolve skill by name")?;
     assert_eq!(resolved.skill_path, agents_skill);
     assert!(resolved.instructions.contains("Agents version"));
-    assert!(!resolved.instructions.contains("Zap version"));
+    assert!(!resolved.instructions.contains("InfiniShell version"));
     assert!(!resolved.instructions.contains("Claude version"));
 
     Ok(())

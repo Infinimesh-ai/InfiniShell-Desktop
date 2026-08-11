@@ -1,25 +1,22 @@
 use warp_core::ui::appearance::Appearance;
 use warp_editor::render::element::VerticalExpansionBehavior;
-use warpui::{
-    elements::{new_scrollable::ScrollableAppearance, ScrollbarWidth},
-    platform::WindowStyle,
-    App, TypedActionView, ViewHandle, WindowId,
-};
-
-use crate::{
-    cloud_object::model::persistence::ObjectStoreModel,
-    editor::InteractionState,
-    notebooks::editor::keys::NotebookKeybindings,
-    settings_view::keybindings::KeybindingChangedNotifier,
-    test_util::settings::initialize_settings_for_tests,
-    vim_registers::VimRegisters,
-    workspace::{sync_inputs::SyncedInputState, ActiveSession},
-    workspaces::user_workspaces::UserWorkspaces,
-    AuthStateProvider,
-};
+use warp_util::user_input::UserInput;
+use warpui::elements::ScrollbarWidth;
+use warpui::elements::new_scrollable::ScrollableAppearance;
+use warpui::platform::WindowStyle;
+use warpui::{App, TypedActionView, ViewHandle, WindowId};
 
 use super::{CodeEditorRenderOptions, CodeEditorView, CodeEditorViewAction};
-use warp_util::user_input::UserInput;
+use crate::AuthStateProvider;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::editor::InteractionState;
+use crate::notebooks::editor::keys::NotebookKeybindings;
+use crate::settings_view::keybindings::KeybindingChangedNotifier;
+use crate::test_util::settings::initialize_settings_for_tests;
+use crate::vim_registers::VimRegisters;
+use crate::workspace::ActiveSession;
+use crate::workspace::sync_inputs::SyncedInputState;
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 fn initialize_editor(app: &mut App) -> (WindowId, ViewHandle<CodeEditorView>) {
     initialize_settings_for_tests(app);

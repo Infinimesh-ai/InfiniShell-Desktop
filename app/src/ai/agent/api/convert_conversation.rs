@@ -4,9 +4,19 @@
 //! If some UI state is stored in the client, it needs to also be represented in the proto tasks somehow so it can be restored.
 //! Some conversions may be lossy if it's not important to recover that UI state.
 
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+
+use ai::agent::action_result::{AskUserQuestionAnswerItem, AskUserQuestionResult, ReadSkillResult};
+use ai::skills::{ParsedSkill, SkillPathOrigin};
+use chrono::{DateTime, Local, TimeZone};
+use warp_core::command::ExitCode;
+use warp_multi_agent_api as api;
+use warp_multi_agent_api::ask_user_question_result::answer_item::Answer as AskUserQuestionAnswer;
+
 use crate::ai::agent::api::convert_from::{
-    convert_user_query_mode, ConversionParams, ConvertAPIMessageToClientOutputMessage,
-    MaybeAIAgentOutputMessage,
+    ConversionParams, ConvertAPIMessageToClientOutputMessage, MaybeAIAgentOutputMessage,
+    convert_user_query_mode,
 };
 use crate::ai::agent::conversation::update_todo_list_from_todo_op;
 use crate::ai::agent::task::TaskId;
@@ -18,12 +28,12 @@ use crate::ai::agent::{
     DocumentContext, EditDocumentsResult, FileContext, FileGlobResult, FileGlobV2Match,
     FileGlobV2Result, FinishedAIAgentOutput, GrepFileMatch, GrepLineMatch, GrepResult,
     ImageContext, InsertReviewCommentsResult, OutputModelInfo, PassiveCodeDiffEntry,
-    PassiveSuggestionResultType, PassiveSuggestionTrigger, ReadDocumentsResult, ReadFilesResult,
-    ReadMCPResourceResult, ReadShellCommandOutputResult, RequestCommandOutputResult,
-    RequestFileEditsResult, ServerOutputId, Shared, ShellCommandCompletedTrigger,
-    ShellCommandError, SuggestNewConversationResult, SuggestPromptResult,
-    TransferShellCommandControlToUserResult, UpdatedFileContext,
-    WriteToLongRunningShellCommandResult,
+    PassiveSuggestionResultType, PassiveSuggestionTrigger, ReadDocumentsResult,
+    ReadFilesFailedFile, ReadFilesResult, ReadMCPResourceResult, ReadShellCommandOutputResult,
+    RequestCommandOutputResult, RequestFileEditsResult, ServerOutputId, Shared,
+    ShellCommandCompletedTrigger, ShellCommandError, SuggestNewConversationResult,
+    SuggestPromptResult, TransferShellCommandControlToUserResult, UpdatedFileContext,
+    UserQueryMode, WriteToLongRunningShellCommandResult,
 };
 use crate::ai::block_context::BlockContext;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentVersion};
@@ -31,16 +41,6 @@ use crate::ai::llms::LLMId;
 use crate::ai_assistant::execution_context::{WarpAiExecutionContext, WarpAiOsContext};
 use crate::terminal::model::block::BlockId;
 use crate::terminal::model::terminal_model::BlockIndex;
-use ai::agent::action_result::{AskUserQuestionAnswerItem, AskUserQuestionResult, ReadSkillResult};
-use ai::skills::ParsedSkill;
-use chrono::{DateTime, Local, TimeZone};
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-use warp_core::command::ExitCode;
-use warp_multi_agent_api as api;
-use warp_multi_agent_api::ask_user_question_result::answer_item::Answer as AskUserQuestionAnswer;
-
-use crate::ai::agent::UserQueryMode;
 
 /// Converts InputContext from the API to the application type `Arc<[AIAgentContext]>`
 #[allow(clippy::single_range_in_vec_init)]
@@ -149,7 +149,8 @@ pub(crate) fn convert_input_context(context: Option<&api::InputContext>) -> Arc<
             };
 
             // Convert binary data to base64
-            use base64::{engine::general_purpose, Engine};
+            use base64::Engine;
+            use base64::engine::general_purpose;
             let data = general_purpose::STANDARD.encode(&image.data);
 
             result.push(AIAgentContext::Image(ImageContext {
@@ -334,19 +335,18 @@ impl ConvertToExchanges for &api::Task {
                             });
                             true
                         }
-                        api::message::system_query::Type::FetchReviewComments(fetch) => {
-                            current_inputs.push(AIAgentInput::FetchReviewComments {
-                                repo_path: fetch.repo_path.clone(),
-                                context: convert_input_context(query.context.as_ref()),
-                            });
-                            true
-                        }
                         // TriggerSuggestPrompt is not rendered as user input, so we don't want to include it as an input in the exchange.
                         // ResumeConversation is actually added to the task's messages as a plain UserQuery, so we don't expect to encounter it in the task's messages.
+                        // FetchReviewComments backed the removed /pr-comments slash command; the
+                        // proto variant is retained for back-compat but is no longer rendered.
                         api::message::system_query::Type::ResumeConversation(_)
+                        | api::message::system_query::Type::FetchReviewComments(_)
                         | api::message::system_query::Type::GeneratePassiveSuggestions(_)
                         // TODO: Implement this for real. ZB adding this to bump proto version for unrelated API changes.
-                        | api::message::system_query::Type::SummarizeConversation(_)=> false,
+                        | api::message::system_query::Type::SummarizeConversation(_)
+                        // HandoffRehydration is injected by the server for agent-only
+                        // context; the client must never render it as user input.
+                        | api::message::system_query::Type::HandoffRehydration(_) => false,
                     }
                 }
                 api::message::Message::ToolCallResult(tool_call_result) => {
@@ -371,8 +371,11 @@ impl ConvertToExchanges for &api::Task {
                     false
                 }
                 api::message::Message::InvokeSkill(invoke_skill) => {
-                    if let Some(api_skill) = invoke_skill.skill.clone() {
-                        if let Ok(parsed_skill) = ParsedSkill::try_from(api_skill) {
+                    if let Some(api_skill) = invoke_skill.skill.clone()
+                        && let Ok(parsed_skill) = ParsedSkill::try_from_api_with_origin(
+                            api_skill,
+                            &SkillPathOrigin::RestoredDisplayOnly,
+                        ) {
                             let user_query = invoke_skill
                                 .user_query
                                 .clone()
@@ -390,7 +393,6 @@ impl ConvertToExchanges for &api::Task {
                             };
                             current_inputs.push(input);
                         };
-                    };
 
                     true
                 }
@@ -423,21 +425,22 @@ impl ConvertToExchanges for &api::Task {
                 | api::message::Message::DebugOutput(_)
                 | api::message::Message::ArtifactEvent(_)
                 | api::message::Message::MessagesReceivedFromAgents(_)
-                | api::message::Message::ModelUsed(_) => false,
+                | api::message::Message::ModelUsed(_)
+                | api::message::Message::OrchestrationConfigSnapshot(_) => false,
             };
 
-            if !added_message_as_exchange_input {
-                if let Ok(MaybeAIAgentOutputMessage::Message(output_msg)) = (*api_message)
+            if !added_message_as_exchange_input
+                && let Ok(MaybeAIAgentOutputMessage::Message(output_msg)) = (*api_message)
                     .clone()
                     .to_client_output_message(ConversionParams {
                         current_todo_list: todo_lists.last(),
                         // TODO(alokedesai): Support persistence for the code review state.
                         active_code_review: None,
                         task_id: &TaskId::new(api_message.task_id.clone()),
+                        skill_path_origin: &SkillPathOrigin::Unavailable,
                     })
-                {
-                    current_outputs.push(output_msg);
-                }
+            {
+                current_outputs.push(output_msg);
             }
         }
 
@@ -491,6 +494,14 @@ pub(crate) fn convert_tool_call_result_to_input(
                         command: result.command.clone(),
                         output: finished.output.clone(),
                         exit_code: ExitCode::from(finished.exit_code),
+                        start_ts: finished
+                            .start_ts
+                            .as_ref()
+                            .map(|ts| proto_timestamp_to_local_datetime(ts.seconds, ts.nanos)),
+                        completed_ts: finished
+                            .finish_ts
+                            .as_ref()
+                            .map(|ts| proto_timestamp_to_local_datetime(ts.seconds, ts.nanos)),
                     }
                 }
                 Some(api::run_shell_command_result::Result::LongRunningCommandSnapshot(
@@ -537,6 +548,8 @@ pub(crate) fn convert_tool_call_result_to_input(
                         block_id: finished.command_id.clone().into(),
                         output: finished.output.clone(),
                         exit_code: ExitCode::from(finished.exit_code),
+                        start_ts: finished.start_ts.as_ref().map(|ts| proto_timestamp_to_local_datetime(ts.seconds, ts.nanos)),
+                        completed_ts: finished.finish_ts.as_ref().map(|ts| proto_timestamp_to_local_datetime(ts.seconds, ts.nanos)),
                     },
                     Some(api::write_to_long_running_shell_command_result::Result::Error(api::ShellCommandError{
                         r#type: Some(api::shell_command_error::Type::CommandNotFound(()))
@@ -561,8 +574,19 @@ pub(crate) fn convert_tool_call_result_to_input(
                         .iter()
                         .map(|file| FileContext::from(file.clone()))
                         .collect();
+                    let failed_files = success
+                        .failed_reads
+                        .iter()
+                        .map(|failed_file| ReadFilesFailedFile {
+                            path: failed_file.path.clone(),
+                            message: failed_file.message.clone(),
+                        })
+                        .collect();
 
-                    ReadFilesResult::Success { files }
+                    ReadFilesResult::Success {
+                        files,
+                        failed_files,
+                    }
                 }
                 Some(api::read_files_result::Result::TextFilesSuccess(success)) => {
                     let files = success
@@ -570,7 +594,18 @@ pub(crate) fn convert_tool_call_result_to_input(
                         .iter()
                         .map(|file| FileContext::from(file.clone()))
                         .collect();
-                    ReadFilesResult::Success { files }
+                    let failed_files = success
+                        .failed_reads
+                        .iter()
+                        .map(|failed_file| ReadFilesFailedFile {
+                            path: failed_file.path.clone(),
+                            message: failed_file.message.clone(),
+                        })
+                        .collect();
+                    ReadFilesResult::Success {
+                        files,
+                        failed_files,
+                    }
                 }
                 Some(api::read_files_result::Result::Error(error)) => {
                     ReadFilesResult::Error(error.message.clone())
@@ -1077,6 +1112,14 @@ pub(crate) fn convert_tool_call_result_to_input(
                         block_id: finished.command_id.clone().into(),
                         output: finished.output.clone(),
                         exit_code: ExitCode::from(finished.exit_code),
+                        start_ts: finished
+                            .start_ts
+                            .as_ref()
+                            .map(|ts| proto_timestamp_to_local_datetime(ts.seconds, ts.nanos)),
+                        completed_ts: finished
+                            .finish_ts
+                            .as_ref()
+                            .map(|ts| proto_timestamp_to_local_datetime(ts.seconds, ts.nanos)),
                     }
                 }
                 Some(
@@ -1127,6 +1170,8 @@ pub(crate) fn convert_tool_call_result_to_input(
                     block_id: finished.command_id.clone().into(),
                     output: finished.output.clone(),
                     exit_code: ExitCode::from(finished.exit_code),
+                    start_ts: finished.start_ts.as_ref().map(|ts| proto_timestamp_to_local_datetime(ts.seconds, ts.nanos)),
+                    completed_ts: finished.finish_ts.as_ref().map(|ts| proto_timestamp_to_local_datetime(ts.seconds, ts.nanos)),
                 },
                 Some(api::transfer_shell_command_control_to_user_result::Result::Error(
                     api::ShellCommandError {
@@ -1193,10 +1238,6 @@ pub(crate) fn convert_tool_call_result_to_input(
             create_cancelled_result_for_tool_call(task_id, &tool_call_id, tool_call_map, context)
         }
         Some(ToolCallResultType::Subagent(_)) => None,
-        Some(ToolCallResultType::StartAgent(_)) | Some(ToolCallResultType::StartAgentV2(_)) => {
-            // 云端工具已物理切除
-            None
-        }
         Some(ToolCallResultType::AskUserQuestion(result)) => {
             let ask_result = match &result.result {
                 Some(warp_multi_agent_api::ask_user_question_result::Result::Success(success)) => {
@@ -1240,6 +1281,86 @@ pub(crate) fn convert_tool_call_result_to_input(
             // 云端工具已物理切除
             None
         }
+        Some(ToolCallResultType::RunAgentsResult(result)) => {
+            use ai::agent::action_result::{
+                RunAgentsAgentOutcome, RunAgentsAgentOutcomeKind, RunAgentsLaunchedExecutionMode,
+                RunAgentsResult,
+            };
+            let run_agents_result = match &result.outcome {
+                Some(api::run_agents_result::Outcome::Launched(launched)) => {
+                    #[allow(deprecated)]
+                    let execution_mode = match &launched.resolved_execution_mode {
+                        Some(api::run_agents_result::launched::ResolvedExecutionMode::Remote(
+                            remote,
+                        )) => RunAgentsLaunchedExecutionMode::Remote {
+                            environment_id: remote.environment_id.clone(),
+                            worker_host: remote.worker_host.clone(),
+                            computer_use_enabled: remote.computer_use_enabled,
+                            runner_id: remote.runner_id.clone(),
+                        },
+                        Some(api::run_agents_result::launched::ResolvedExecutionMode::Local(_))
+                        | None => RunAgentsLaunchedExecutionMode::Local,
+                    };
+                    let agents = launched
+                        .agents
+                        .iter()
+                        .map(|outcome| RunAgentsAgentOutcome {
+                            name: outcome.name.clone(),
+                            resolved_model_id: outcome.model_id.clone(),
+                            kind: match &outcome.result {
+                                Some(api::run_agents_result::agent_outcome::Result::Launched(
+                                    launched_agent,
+                                )) => RunAgentsAgentOutcomeKind::Launched {
+                                    agent_id: launched_agent.agent_id.clone(),
+                                },
+                                Some(api::run_agents_result::agent_outcome::Result::Failed(
+                                    failed,
+                                )) => RunAgentsAgentOutcomeKind::Failed {
+                                    error: failed.error.clone(),
+                                },
+                                None => RunAgentsAgentOutcomeKind::Failed {
+                                    error: String::new(),
+                                },
+                            },
+                        })
+                        .collect();
+                    #[allow(deprecated)]
+                    let model_id = launched.resolved_model_id.clone();
+                    RunAgentsResult::Launched {
+                        model_id,
+                        // 我方出站转换(`TryFrom<RunAgentsResult>`)只写 `agents`,
+                        // 不序列化 harness,所以还原时也没有可恢复的 harness 名。
+                        harness_type: String::new(),
+                        execution_mode,
+                        agents,
+                    }
+                }
+                Some(api::run_agents_result::Outcome::Denied(denied)) => RunAgentsResult::Denied {
+                    reason: denied.reason.clone(),
+                },
+                Some(api::run_agents_result::Outcome::Failure(failure)) => {
+                    RunAgentsResult::Failure {
+                        error: failure.error.clone(),
+                    }
+                }
+                None => RunAgentsResult::Cancelled,
+            };
+            Some(AIAgentInput::ActionResult {
+                result: AIAgentActionResult {
+                    id: tool_call_id.into(),
+                    task_id: task_id.clone(),
+                    result: AIAgentActionResultType::RunAgents(run_agents_result),
+                },
+                context,
+            })
+        }
+        // WaitForEvents 没有可还原的展示状态,转录里直接跳过。
+        Some(ToolCallResultType::WaitForEvents(_)) => None,
+        // codebase 向量索引在 Zap 里整条链路下线,历史转录里的结果直接跳过。
+        Some(ToolCallResultType::SearchCodebase(_)) => None,
+        // Computer Use / 屏幕录制已物理删除。
+        Some(ToolCallResultType::StartRecording(_))
+        | Some(ToolCallResultType::StopRecording(_)) => None,
         // Deprecated/unused result types.
         Some(ToolCallResultType::SuggestCreatePlan(..))
         | Some(ToolCallResultType::SuggestPlan(..)) => None,
@@ -1328,13 +1449,22 @@ fn create_cancelled_result_for_tool_call(
         ToolType::FetchConversation(_) => return None,
         ToolType::Server(_) => return None,
         ToolType::Subagent(_) => return None,
-        ToolType::StartAgent(_) | ToolType::StartAgentV2(_) => return None,
         ToolType::AskUserQuestion(_) => {
             AIAgentActionResultType::AskUserQuestion(AskUserQuestionResult::Cancelled)
         }
         ToolType::SendMessageToAgent(_) => return None,
         // These tools are deprecated.
         ToolType::SuggestCreatePlan(_) | ToolType::SuggestPlan(_) => return None,
+        ToolType::WaitForEvents(_) => {
+            return None;
+        }
+        ToolType::RunAgents(_) => {
+            AIAgentActionResultType::RunAgents(ai::agent::action_result::RunAgentsResult::Cancelled)
+        }
+        // codebase 向量索引已下线。
+        ToolType::SearchCodebase(_) => return None,
+        // 屏幕录制已物理删除。
+        ToolType::StartRecording(_) | ToolType::StopRecording(_) => return None,
     };
 
     Some(AIAgentInput::ActionResult {
@@ -1432,6 +1562,10 @@ fn create_exchange_from_messages(
             model_id: model.model_id.clone().into(),
             display_name: model.model_display_name.clone(),
             is_fallback: model.is_fallback,
+            prompt_cache_expires_at: model
+                .prompt_cache_expires_at
+                .as_ref()
+                .map(|ts| proto_timestamp_to_local_datetime(ts.seconds, ts.nanos)),
         }),
         request_cost: None,
     };
@@ -1534,7 +1668,8 @@ where
                 | api::message::Message::DebugOutput(_)
                 | api::message::Message::ArtifactEvent(_)
                 | api::message::Message::InvokeSkill(_)
-                | api::message::Message::ModelUsed(_) => {
+                | api::message::Message::ModelUsed(_)
+                | api::message::Message::OrchestrationConfigSnapshot(_) => {
                     message.timestamp.as_ref().map(|timestamp| {
                         proto_timestamp_to_local_datetime(timestamp.seconds, timestamp.nanos)
                     })
@@ -1640,7 +1775,7 @@ fn convert_passive_suggestion_result_to_input(
         context,
     })
 }
-fn proto_timestamp_to_local_datetime(seconds: i64, nanos: i32) -> DateTime<Local> {
+pub(crate) fn proto_timestamp_to_local_datetime(seconds: i64, nanos: i32) -> DateTime<Local> {
     let nanos = if nanos < 0 { 0 } else { nanos as u32 };
 
     Local

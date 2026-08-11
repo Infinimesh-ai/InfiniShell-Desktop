@@ -1,95 +1,94 @@
-use crate::ai::ambient_agents::AmbientAgentTaskId;
-use crate::ai::blocklist::SerializedBlockListItem;
-use crate::terminal::available_shells::AvailableShell;
-use crate::terminal::block_list_element::GridType;
-use crate::terminal::event::{
-    BootstrappedEvent, Event, ExecutedExecutorCommandEvent, InitSshEvent, InitSubshellEvent,
-    SourcedRcFileInSubshellEvent, SshLoginStatus, TerminalMode,
-};
-use crate::terminal::event_listener::ChannelEventListener;
-use crate::terminal::model::ansi;
-use crate::terminal::model::bootstrap::BootstrapStage;
-use crate::terminal::model::completions::{
-    ShellCompletion, ShellCompletionUpdate, ShellData as CompletionsShellData,
-};
-use crate::terminal::model::escape_sequences::ModeProvider;
-use crate::terminal::model::index::VisibleRow;
-use crate::terminal::model::iterm_image::{ITermImage, ITermImageMetadata};
-use crate::terminal::shared_session::{ai_agent::encode_agent_response_event, SharedSessionStatus};
-use crate::terminal::ssh::util::{InteractiveSshCommand, SshLoginState};
-use crate::terminal::{block_filter::BlockFilterQuery, model::ansi::Handler};
-use crate::terminal::{color, ssh, BlockPadding, ShellHost, SizeUpdate, SizeUpdateReason};
-use crate::terminal::{ShellLaunchData, ShellLaunchState};
-use crate::util::AsciiDebug;
+use std::cmp::{max, min};
+use std::collections::{HashMap, HashSet};
+use std::num::ParseIntError;
+use std::ops::{Range, RangeInclusive};
+use std::path::PathBuf;
+use std::sync::Arc;
 
-pub use crate::terminal::history::HistoryEntry;
+use async_channel::Sender;
+use base64::Engine;
+use hex::FromHexError;
+use itertools::{Either, Itertools};
+use serde::Serialize;
+use string_offset::CharOffset;
+use warp_core::command::ExitCode;
+use warp_core::features::FeatureFlag;
+use warp_core::semantic_selection::SemanticSelection;
+use warp_errors::report_error;
+pub use warp_terminal::model::BlockIndex;
+use warp_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
+use warpui::AppContext;
+use warpui::assets::asset_cache::Asset;
+use warpui::r#async::executor::Background;
+use warpui::image_cache::ImageType;
 
-use super::ansi::{
-    FinishUpdateValue, InputBufferValue, Mode, PendingHook, TmuxInstallFailedInfo,
-    WarpificationUnavailableReason,
-};
+use super::super::{AltScreen, BlockList};
+use super::ansi::{BootstrappedValue, FinishUpdateValue, InputBufferValue, Mode, PendingHook};
 use super::block::{
-    AgentInteractionMetadata, Block, BlockId, BlockMetadata, BlockSize, BlocklistEnvVarMetadata,
-    SerializedBlock,
+    AgentInteractionMetadata, Block, BlockId, BlockMetadata, BlockSize, BlockState,
+    BlocklistEnvVarMetadata, SerializedBlock,
 };
 use super::blockgrid::BlockGrid;
+use super::blocks::{ActiveBlockCompletion, BlockFilter};
 use super::grid::grid_handler::{
     ContainsPoint, FragmentBoundary, GridHandler, Link, PossiblePath, TermMode,
 };
 use super::image_map::StoredImageMetadata;
 use super::index::Point;
 use super::kitty::{
-    create_kitty_error_reply, create_kitty_ok_reply, DeletionType, KittyAction, KittyChunk,
-    KittyMessage, KittyResponse, PendingKittyMessage,
+    DeletionType, KittyAction, KittyChunk, KittyMessage, KittyResponse, PendingKittyMessage,
+    create_kitty_error_reply, create_kitty_ok_reply,
+};
+use super::lifecycle::{
+    BlockLifecycleCoordinator, CommandStartKind, IgnoreReason, LifecycleAction, LifecycleInput,
+    LifecycleSnapshot, LifecycleTransition, PreexecObservation, StartCommandOutcome,
 };
 use super::secrets::{RespectObfuscatedSecrets, SecretAndHandle};
 use super::selection::ScrollDelta;
 use super::session::{BootstrapSessionType, InBandCommandOutputReceiver, SessionId};
-use super::tmux::commands::TmuxCommand;
-use super::{
-    super::{AltScreen, BlockList},
-    ansi::BootstrappedValue,
+use super::{Secret, SecretHandle};
+use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::ai::blocklist::SerializedBlockListItem;
+use crate::terminal::available_shells::AvailableShell;
+use crate::terminal::block_filter::BlockFilterQuery;
+use crate::terminal::block_list_element::GridType;
+use crate::terminal::event::{
+    BootstrappedEvent, Event, ExecutedExecutorCommandEvent, InitSubshellEvent,
+    SourcedRcFileInSubshellEvent, SshLoginStatus, TerminalMode,
 };
-use super::{tmux, Secret, SecretHandle};
+use crate::terminal::event_listener::ChannelEventListener;
+pub use crate::terminal::history::HistoryEntry;
+use crate::terminal::model::ansi;
 use crate::terminal::model::ansi::{
-    ClearValue, CommandFinishedValue, ExitShellValue, InitShellValue, InitSshValue,
-    InitSubshellValue, PreInteractiveSSHSessionValue, PrecmdValue, PreexecValue, SSHValue,
-    SourcedRcFileForWarpValue,
+    ClearValue, CommandFinishedValue, CompletionMetadata, ExitShellValue, Handler, InitShellValue,
+    InitSubshellValue, PreInteractiveSSHSessionValue, PrecmdValue, PreexecValue, PromptMetadata,
+    SSHValue, SourcedRcFileForWarpValue,
 };
+use crate::terminal::model::bootstrap::BootstrapStage;
+use crate::terminal::model::completions::{
+    ShellCompletion, ShellCompletionUpdate, ShellData as CompletionsShellData,
+};
+use crate::terminal::model::escape_sequences::ModeProvider;
 use crate::terminal::model::grid::IndexRegion;
-use crate::terminal::model::session::SessionInfo;
-use crate::terminal::shell::{ShellName, ShellType};
-
+use crate::terminal::model::index::VisibleRow;
+use crate::terminal::model::iterm_image::{ITermImage, ITermImageMetadata};
 use crate::terminal::model::secrets::ObfuscateSecrets;
-use crate::terminal::shared_session::protocol::SessionSourceType;
-use warp_core::report_error;
-#[cfg(not(target_family = "wasm"))]
-use warpui::util::save_as_file;
-
-use crate::terminal::shared_session::protocol::{
-    AICommandMetadata, OrderedTerminalEventType, ParticipantId,
-};
-use async_channel::Sender;
-use base64::Engine;
-use hex::FromHexError;
 use instant::Instant;
-use itertools::{Either, Itertools};
-use serde::Serialize;
-use std::cmp::{max, min};
-use std::collections::HashMap;
-use std::num::ParseIntError;
-use std::ops::{Range, RangeInclusive};
-use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
-use warp_core::features::FeatureFlag;
-use warp_core::semantic_selection::SemanticSelection;
-pub use warp_terminal::model::BlockIndex;
-use warp_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
-use warpui::assets::asset_cache::Asset;
-use warpui::image_cache::ImageType;
-use warpui::r#async::executor::Background;
-use warpui::AppContext;
+
+// Zap:session-sharing-protocol crate 已剥离,改用本地 shared_session::protocol
+use crate::terminal::model::session::SessionInfo;
+use crate::terminal::shared_session::ai_agent::encode_agent_response_event;
+use crate::terminal::shared_session::protocol::{
+    AICommandMetadata, OrderedTerminalEventType, ParticipantId, SessionSourceType,
+};
+use crate::terminal::shared_session::{SharedSessionSource, SharedSessionStatus};
+use crate::terminal::shell::{ShellName, ShellType};
+use crate::terminal::ssh::util::{InteractiveSshCommand, SshLoginState};
+use crate::terminal::{
+    BlockPadding, ShellHost, ShellLaunchData, ShellLaunchState, SizeUpdate, SizeUpdateReason,
+    color, ssh,
+};
 
 /// Max size of the window title stack.
 const TITLE_STACK_MAX_DEPTH: usize = 4096;
@@ -379,6 +378,7 @@ pub struct SubshellSuccessBlockInfo {
     pub session_type: BootstrapSessionType,
 }
 
+// Zap:保留 TMUX warpify 流程(上游 #12478 已删除,我方保留)
 #[derive(Debug, Default, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TmuxInstallationState {
@@ -460,6 +460,7 @@ pub struct TerminalModel {
     /// List of blocks. All blocks are immutable except for the current block.
     /// Always non-empty (includes an invisible block).
     block_list: BlockList,
+    lifecycle_coordinator: BlockLifecycleCoordinator,
     /// Whether the blocklist has been cleared in the lifetime of this terminal model.
     pub blocklist_has_been_cleared: bool,
 
@@ -486,15 +487,7 @@ pub struct TerminalModel {
     /// The pending `SSHValue`, if any, of the active session. This is a temporary value that's
     /// stored between when an SSH connection is initiated (the `SSH` hook executed on the local
     /// machine) and when the remote shell sends the `InitShell` DCS.
-    pending_legacy_ssh_session: Option<SSHValue>,
-
-    /// This variable allows us to differentiate between warp-initiated and user-initiated invocations of
-    /// control mode. Whenever we attempt to warpify an ssh session, we track the context of when warp initiated
-    /// control mode, indicating that we expect the shell to enter control mode. We reset to None whenever
-    /// the active block finishes. If we enter control mode and option is None, then we know it's user-initiated.
-    pending_warp_initiated_control_mode: Option<WarpInitiatedTmuxControlMode>,
-
-    tmux_control_mode_context: Option<TmuxControlModeContext>,
+    pending_ssh_wrapper_session: Option<SSHValue>,
 
     /// The path of the shell binary used for the pending shell session, if any. This is
     /// temporarily stored between the spawning of the child shell process and bootstrap completion.
@@ -565,9 +558,9 @@ pub struct TerminalModel {
 
     shared_session_status: SharedSessionStatus,
 
-    /// The source type of the shared session (if this is a shared session).
-    /// If it is not a shared session, this will be `None`.
-    shared_session_source_type: Option<SessionSourceType>,
+    /// `SessionSourceType` paired with `source_task_id`, or `None` when
+    /// this is not a shared session.
+    shared_session_source: Option<SharedSessionSource>,
 
     /// Whether this terminal model was created as a ambient-agent dummy session
     /// (no local shell process, deferred shared-session viewer backing).
@@ -597,8 +590,6 @@ pub struct TerminalModel {
     /// until the replay is complete.
     is_receiving_agent_conversation_replay: bool,
 
-    tmux_background_outputs: HashMap<u32, Vec<u8>>,
-
     /// When some, the TerminalModel emits the event [Event::DetectedEndOfSshLogin]. This
     /// event is emitted either as the initial check or the confirmation check.
     notify_on_end_of_ssh_login: Option<SshLogin>,
@@ -608,6 +599,11 @@ pub struct TerminalModel {
     /// Next ID to use for images where the ID is not explicitly specified
     /// by the Kitty protocol
     pub next_kitty_image_id: u32,
+
+    /// Set of session IDs that were generated client-side and injected into
+    /// bootstrap init scripts. Used to validate DCS hook integrity: hooks
+    /// carrying an unrecognized session_id are rejected.
+    registered_session_ids: HashSet<SessionId>,
 }
 
 #[derive(Clone, Debug)]
@@ -670,7 +666,7 @@ impl SelectedBlockRange {
     pub fn range(
         &self,
         sort_direction: Option<BlockSortDirection>,
-    ) -> impl Iterator<Item = BlockIndex> {
+    ) -> impl Iterator<Item = BlockIndex> + use<> {
         let range = self.start().0..=self.end().0;
         // Note we need the heap allocation through the box because we
         // can't return .rev() and not .rev() iterators without it.
@@ -694,7 +690,7 @@ impl SelectedBlockRange {
     pub fn intersection(
         &self,
         other: &RangeInclusive<BlockIndex>,
-    ) -> impl Iterator<Item = BlockIndex> {
+    ) -> impl Iterator<Item = BlockIndex> + use<> {
         (max(self.start().0, other.start().0)..=min(self.end().0, other.end().0))
             .map(BlockIndex::from)
     }
@@ -1027,12 +1023,12 @@ impl TerminalModel {
     pub fn set_is_input_dirty(&mut self, value: bool) {
         self.is_input_dirty = value;
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-util"))]
     #[allow(clippy::too_many_arguments)]
     /// Returns a bootstrapped `TerminalModel` with no restored blocks
     /// and just one default block to avoid any side effects of being
     /// in the middle of the bootstrap sequence.
-    pub fn new_for_test(
+    pub(crate) fn new_for_test(
         sizes: BlockSize,
         colors: color::List,
         event_proxy: ChannelEventListener,
@@ -1066,23 +1062,37 @@ impl TerminalModel {
             },
         );
 
+        let session_id = 123.into();
+        terminal_model.register_session_id(session_id);
+
         // We need to set the hostname to the local hostname to ensure that we
         // treat the session as a local one, not a remote one.  (See the
         // implementation of `SessionInfo::determine_session_type()` for more
         // details.)
         let hostname = get_local_hostname().unwrap_or_else(|_| "localhost".to_string());
         terminal_model.init_shell(InitShellValue {
-            session_id: 123.into(),
+            session_id,
             shell: "zsh".to_owned(),
             hostname,
             ..Default::default()
         });
         terminal_model.bootstrapped(BootstrappedValue {
+            session_id: Some(session_id.as_u64()),
             shell: "zsh".to_string(),
             ..Default::default()
         });
-        terminal_model.command_finished(Default::default());
-        terminal_model.precmd(Default::default());
+        let completion_metadata = ansi::CompletionMetadata::default();
+        terminal_model.command_finished(CommandFinishedValue {
+            completion_metadata: completion_metadata.clone(),
+            session_id: Some(session_id.as_u64()),
+        });
+        terminal_model.precmd_with_completion_metadata(PrecmdValue {
+            completion_metadata,
+            prompt_metadata: PromptMetadata {
+                session_id: Some(session_id.as_u64()),
+                ..Default::default()
+            },
+        });
         terminal_model
     }
 
@@ -1129,6 +1139,7 @@ impl TerminalModel {
             alt_screen,
             is_input_dirty: false,
             block_list,
+            lifecycle_coordinator: BlockLifecycleCoordinator::default(),
             blocklist_has_been_cleared: false,
             alt_screen_active: false,
             title_stack: Vec::new(),
@@ -1137,7 +1148,7 @@ impl TerminalModel {
             colors,
             override_colors: color::OverrideList::empty(),
             event_proxy,
-            pending_legacy_ssh_session: None,
+            pending_ssh_wrapper_session: None,
             pending_shell_launch_data: None,
             active_shell_launch_data: None,
             pending_session_info: None,
@@ -1155,20 +1166,18 @@ impl TerminalModel {
             shell_launch_state: shell_state,
             obfuscate_secrets,
             shared_session_status,
-            shared_session_source_type: None,
+            shared_session_source: None,
             is_dummy_ambient_agent_session,
             conversation_transcript_viewer_status: None,
             ordered_terminal_events_for_shared_session_tx: None,
             write_to_pty_events_for_shared_session_tx: None,
             is_receiving_agent_conversation_replay: false,
-            tmux_background_outputs: HashMap::new(),
-            tmux_control_mode_context: None,
-            pending_warp_initiated_control_mode: None,
             notify_on_end_of_ssh_login: None,
             is_receiving_hook: IsReceivingHook::No,
             image_id_to_metadata: HashMap::new(),
             // Start mid-way through the u32 range to avoid collisions
             next_kitty_image_id: 2147483647,
+            registered_session_ids: HashSet::new(),
         }
     }
 
@@ -1222,22 +1231,29 @@ impl TerminalModel {
         is_inverted: bool,
         obfuscate_secrets: ObfuscateSecrets,
     ) -> Self {
-        let mut me = Self::new_for_shared_session_viewer_internal(
+        Self::new_internal(
+            None,
             sizes,
             colors,
             event_proxy,
             background_executor,
+            false,
+            false,
             show_memory_stats,
             honor_ps1,
             is_inverted,
             obfuscate_secrets,
+            false,
+            None,
+            // TODO: use the same shell type as the sharer
+            ShellLaunchState::ShellSpawned {
+                available_shell: None,
+                display_name: ShellName::blank(),
+                shell_type: ShellType::Zsh,
+            },
+            SharedSessionStatus::ViewPending,
             true,
-        );
-        if false {
-            me.block_list_mut()
-                .set_is_executing_oz_environment_startup_commands(true);
-        }
-        me
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1298,6 +1314,7 @@ impl TerminalModel {
             honor_ps1,
             is_inverted,
             obfuscate_secrets,
+            // 普通共享会话观看端不是 ambient agent 的占位会话。
             false,
         )
     }
@@ -1333,10 +1350,10 @@ impl TerminalModel {
             return;
         }
 
-        if let Some(tx) = &self.write_to_pty_events_for_shared_session_tx {
-            if let Err(e) = tx.try_send(bytes) {
-                log::warn!("Failed to send write to pty events: {e}");
-            }
+        if let Some(tx) = &self.write_to_pty_events_for_shared_session_tx
+            && let Err(e) = tx.try_send(bytes)
+        {
+            log::warn!("Failed to send write to pty events: {e}");
         }
     }
 
@@ -1380,31 +1397,30 @@ impl TerminalModel {
     }
 
     pub fn send_agent_conversation_replay_started_for_shared_session(&mut self) {
-        if self.shared_session_status().is_sharer() {
-            if let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx {
-                if let Err(e) =
-                    tx.try_send(OrderedTerminalEventType::AgentConversationReplayStarted)
-                {
-                    log::warn!(
-                        "Failed to send OrderedTerminalEventType::AgentConversationReplayStarted: {e}"
-                    );
-                }
-            }
+        if self.shared_session_status().is_sharer()
+            && let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx
+            && let Err(e) = tx.try_send(OrderedTerminalEventType::AgentConversationReplayStarted)
+        {
+            log::warn!(
+                "Failed to send OrderedTerminalEventType::AgentConversationReplayStarted: {e}"
+            );
         }
     }
 
     pub fn send_agent_conversation_replay_ended_for_shared_session(&mut self) {
-        if self.shared_session_status().is_sharer() {
-            if let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx {
-                if let Err(e) = tx.try_send(OrderedTerminalEventType::AgentConversationReplayEnded)
-                {
-                    log::warn!(
-                        "Failed to send OrderedTerminalEventType::AgentConversationReplayEnded: {e}"
-                    );
-                }
-            }
+        if self.shared_session_status().is_sharer()
+            && let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx
+            && let Err(e) = tx.try_send(OrderedTerminalEventType::AgentConversationReplayEnded)
+        {
+            log::warn!(
+                "Failed to send OrderedTerminalEventType::AgentConversationReplayEnded: {e}"
+            );
         }
     }
+
+    // Zap 已下线 Cloud Mode Setup V2:`OrderedTerminalEventType` 不再有
+    // `CloudModeSetupPhaseEnded` 变体,观看端也没有对应的消费逻辑,
+    // 因此上游的 `send_cloud_mode_setup_phase_ended_for_shared_session` 整体移除。
 
     /// Whether the session sharing server is currently replaying
     /// conversation events (for conversation reconstruction).
@@ -1416,43 +1432,71 @@ impl TerminalModel {
         self.is_receiving_agent_conversation_replay = value;
     }
 
-    pub fn set_shared_session_source_type(
-        &mut self,
-        set_shared_session_source_type: SessionSourceType,
-    ) {
-        self.shared_session_source_type = Some(set_shared_session_source_type);
+    pub fn set_shared_session_source(&mut self, source: SharedSessionSource) {
+        self.shared_session_source = Some(source);
+    }
+
+    pub fn shared_session_source(&self) -> Option<&SharedSessionSource> {
+        self.shared_session_source.as_ref()
     }
 
     pub fn shared_session_source_type(&self) -> Option<SessionSourceType> {
-        self.shared_session_source_type.clone()
+        self.shared_session_source
+            .as_ref()
+            .map(|s| s.source_type.clone())
+    }
+
+    pub fn set_shared_session_source_task_id(&mut self, task_id: Option<String>) {
+        if let Some(source) = self.shared_session_source.as_mut() {
+            source.source_task_id = task_id;
+        }
     }
 
     pub fn is_dummy_ambient_agent_session(&self) -> bool {
         self.is_dummy_ambient_agent_session
     }
 
+    #[cfg(test)]
+    pub fn set_is_dummy_cloud_mode_session(&mut self, value: bool) {
+        // Zap:字段沿用我方命名 is_dummy_ambient_agent_session
+        self.is_dummy_ambient_agent_session = value;
+    }
+
     pub fn is_shared_ambient_agent_session(&self) -> bool {
         matches!(
-            self.shared_session_source_type,
+            self.shared_session_source.as_ref().map(|s| &s.source_type),
             Some(SessionSourceType::AmbientAgent { .. })
         )
     }
 
     pub fn ambient_agent_task_id(&self) -> Option<AmbientAgentTaskId> {
-        // Check if we're viewing an ambient agent conversation transcript
         if let Some(ConversationTranscriptViewerStatus::ViewingAmbientConversation(task_id)) =
             &self.conversation_transcript_viewer_status
         {
             return Some(*task_id);
         }
+        self.shared_session_source
+            .as_ref()
+            .and_then(|s| s.orchestrator_task_id())
+            .and_then(|s| s.parse().ok())
+    }
 
-        // Otherwise, check if we're in a shared ambient agent session
-        if let Some(SessionSourceType::AmbientAgent { task_id }) = &self.shared_session_source_type
-        {
-            task_id.as_deref().and_then(|s| s.parse().ok())
-        } else {
-            None
-        }
+    /// Model-only portion of the "is this a cloud agent conversation?" check used for display
+    /// purposes (e.g. the cloud agent icon). Callers holding a [`TerminalView`] should use
+    /// [`TerminalView::is_cloud_agent_session`], which also accounts for the ambient agent view
+    /// model.
+    ///
+    /// This intentionally keys off cloud-execution (ambient agent) semantics — a shared
+    /// *ambient* session or viewing an ambient conversation — NOT the mere presence of an
+    /// orchestrator task id. A manually shared *local* (`User`) session carries a
+    /// `source_task_id` sidecar but is not a cloud agent conversation, so it must fall through
+    /// here (see QUALITY-726).
+    pub fn is_cloud_agent_conversation(&self) -> bool {
+        self.is_shared_ambient_agent_session()
+            || matches!(
+                self.conversation_transcript_viewer_status.as_ref(),
+                Some(ConversationTranscriptViewerStatus::ViewingAmbientConversation(_))
+            )
     }
 
     /// Loads the provided scrollback into the model.
@@ -1464,6 +1508,7 @@ impl TerminalModel {
 
         self.block_list_mut()
             .load_shared_session_scrollback(scrollback);
+        self.lifecycle_coordinator.reset_unknown();
 
         // The scrollback contains the prompt for the active block, and the terminal view needs to be notified to render it.
         self.event_proxy.send_wakeup_event();
@@ -1474,6 +1519,7 @@ impl TerminalModel {
 
         self.block_list_mut()
             .append_followup_shared_session_scrollback(scrollback);
+        self.lifecycle_coordinator.reset_unknown();
 
         self.event_proxy.send_wakeup_event();
     }
@@ -1505,6 +1551,8 @@ impl TerminalModel {
         if self.handled_exit {
             return;
         }
+        log::debug!("Terminal model exiting: reason={reason:?}");
+        let transition = self.plan_lifecycle_transition(LifecycleInput::Exit, None, None, None);
 
         self.handled_exit = true;
         // Forcibly exit the alt screen so that we can show the user the
@@ -1514,6 +1562,7 @@ impl TerminalModel {
         // possibly receive more output from the shell.
         self.block_list.active_block_mut().finish(0);
         self.event_proxy.send_terminal_event(Event::Exit { reason });
+        self.commit_lifecycle_transition(&transition);
     }
 
     pub fn is_read_only(&self) -> bool {
@@ -1623,7 +1672,7 @@ impl TerminalModel {
     }
 
     pub fn has_pending_ssh_session(&self) -> bool {
-        self.pending_legacy_ssh_session.is_some()
+        self.pending_ssh_wrapper_session.is_some()
     }
 
     pub fn pending_shell_type(&self) -> Option<ShellType> {
@@ -1675,6 +1724,11 @@ impl TerminalModel {
         &mut self.block_list
     }
 
+    /// Clears all completed blocks and resets the active block's screen.
+    pub fn clear_blocks(&mut self) {
+        self.block_list.clear_screen(ansi::ClearMode::ResetAndClear);
+    }
+
     pub fn remove_image_id_to_metadata_entry(&mut self, image_id: u32) {
         self.image_id_to_metadata.remove(&image_id);
     }
@@ -1683,18 +1737,21 @@ impl TerminalModel {
     /// from the input editor when it sends user bytes to the pty (usually the
     /// next command to run, but also ctrl-d). Once we've written to the pty on
     /// the user's behalf, we consider the active block started.
-    pub fn start_command_execution(&mut self) {
-        self.block_list.start_active_block();
+    pub fn start_command_execution(&mut self) -> StartCommandOutcome {
+        self.start_command_execution_for_kind(CommandStartKind::UserOrQueued)
     }
 
     pub fn start_command_execution_from_env_var_collection(
         &mut self,
         env_var_metadata: BlocklistEnvVarMetadata,
-    ) {
-        self.start_command_execution();
-        self.block_list
-            .active_block_mut()
-            .set_env_var_metadata(env_var_metadata);
+    ) -> StartCommandOutcome {
+        let outcome = self.start_command_execution_for_kind(CommandStartKind::UserOrQueued);
+        if outcome.is_accepted() {
+            self.block_list
+                .active_block_mut()
+                .set_env_var_metadata(env_var_metadata);
+        }
+        outcome
     }
 
     /// Starts the execution for a command in a shared session (sharer or viewer).
@@ -1702,8 +1759,11 @@ impl TerminalModel {
         &mut self,
         participant_id: ParticipantId,
         agent_metadata: Option<AgentInteractionMetadata>,
-    ) {
-        self.start_command_execution();
+    ) -> StartCommandOutcome {
+        let outcome = self.start_command_execution_for_kind(CommandStartKind::SharedSession);
+        if !outcome.is_accepted() {
+            return outcome;
+        }
 
         // If this command has AI metadata, attach it to the active block.
         if let Some(ai_metadata) = &agent_metadata {
@@ -1716,14 +1776,15 @@ impl TerminalModel {
 
         // If this is a sharer, send an event to indicate the start of the command execution
         // along with the identity of the participant that ran the command.
-        if let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx {
-            if let Err(e) = tx.try_send(OrderedTerminalEventType::CommandExecutionStarted {
+        if let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx
+            && let Err(e) = tx.try_send(OrderedTerminalEventType::CommandExecutionStarted {
                 participant_id,
                 ai_metadata: agent_metadata.as_ref().map(Self::ai_metadata_to_protocol),
-            }) {
-                log::warn!("Failed to send OrderedTerminalEventType::CommandExecutionStarted: {e}");
-            }
+            })
+        {
+            log::warn!("Failed to send OrderedTerminalEventType::CommandExecutionStarted: {e}");
         }
+        outcome
     }
 
     /// Starts the command execution (per `Self::start_command_execution`) and additionally sets
@@ -1731,11 +1792,98 @@ impl TerminalModel {
     pub fn start_command_execution_with_ai_metadata(
         &mut self,
         agent_metadata: AgentInteractionMetadata,
-    ) {
-        self.start_command_execution();
-        self.block_list
-            .active_block_mut()
-            .set_agent_interaction_mode(agent_metadata);
+    ) -> StartCommandOutcome {
+        let outcome = self.start_command_execution_for_kind(CommandStartKind::UserOrQueued);
+        if outcome.is_accepted() {
+            self.block_list
+                .active_block_mut()
+                .set_agent_interaction_mode(agent_metadata);
+        }
+        outcome
+    }
+
+    pub(in crate::terminal) fn start_in_band_command_execution(&mut self) -> StartCommandOutcome {
+        self.start_command_execution_for_kind(CommandStartKind::InBand)
+    }
+
+    fn start_command_execution_for_kind(&mut self, kind: CommandStartKind) -> StartCommandOutcome {
+        let transition =
+            self.plan_lifecycle_transition(LifecycleInput::StartCommand(kind), None, None, None);
+        let outcome = match transition.action {
+            LifecycleAction::StartActiveBlock => {
+                match kind {
+                    CommandStartKind::UserOrQueued | CommandStartKind::SharedSession => {
+                        self.block_list.start_active_block()
+                    }
+                    CommandStartKind::InBand => {
+                        self.block_list.start_active_block_for_in_band_command()
+                    }
+                }
+                StartCommandOutcome::Accepted
+            }
+            LifecycleAction::Ignore(IgnoreReason::CoalescedStart) => StartCommandOutcome::Coalesced,
+            LifecycleAction::Ignore(IgnoreReason::RejectedExecuting) => {
+                StartCommandOutcome::RejectedExecuting
+            }
+            LifecycleAction::Ignore(IgnoreReason::IgnoredTerminated) => {
+                StartCommandOutcome::IgnoredTerminated
+            }
+            action => {
+                log::error!("Unexpected lifecycle action for command start: {action:?}");
+                StartCommandOutcome::RejectedExecuting
+            }
+        };
+        self.commit_lifecycle_transition(&transition);
+        outcome
+    }
+
+    fn lifecycle_snapshot(
+        &self,
+        supplied_next_block_id: Option<&BlockId>,
+        supplied_exit_code: Option<ExitCode>,
+        hook_session_id: Option<u64>,
+    ) -> LifecycleSnapshot {
+        let active_block = self.block_list.active_block();
+        let completion_mismatch = supplied_next_block_id == Some(active_block.id())
+            && supplied_exit_code
+                .zip(self.block_list.previous_command_exit_code())
+                .is_some_and(|(supplied, recorded)| supplied != recorded);
+        LifecycleSnapshot {
+            active_block_id: active_block.id().to_string(),
+            active_session_id: active_block.session_id().map(|id| id.as_u64()),
+            supplied_next_block_id: supplied_next_block_id.map(ToString::to_string),
+            hook_session_id,
+            block_state: active_block.state(),
+            started: active_block.started(),
+            finished: active_block.finished(),
+            received_precmd: active_block.has_received_precmd(),
+            is_in_band: active_block.is_in_band_command_block(),
+            is_bootstrapped: active_block.is_bootstrapped(),
+            is_bootstrap_done: self.block_list.is_bootstrapping_precmd_done(),
+            is_alt_screen_active: self.alt_screen_active,
+            completion_mismatch,
+        }
+    }
+
+    fn plan_lifecycle_transition(
+        &mut self,
+        input: LifecycleInput,
+        supplied_next_block_id: Option<&BlockId>,
+        supplied_exit_code: Option<ExitCode>,
+        hook_session_id: Option<u64>,
+    ) -> LifecycleTransition {
+        let snapshot =
+            self.lifecycle_snapshot(supplied_next_block_id, supplied_exit_code, hook_session_id);
+        self.lifecycle_coordinator.plan(&snapshot, input)
+    }
+
+    fn commit_lifecycle_transition(&mut self, transition: &LifecycleTransition) {
+        if let Some(record) = transition.recovery_record.clone() {
+            log::debug!("Terminal lifecycle transition diagnostic: {record:?}");
+            self.event_proxy
+                .send_terminal_event(Event::LifecycleRecovery(record));
+        }
+        self.lifecycle_coordinator.commit(transition);
     }
 
     // Starts active block as a background block. Used in Alacritty integration tests to
@@ -1824,7 +1972,7 @@ impl TerminalModel {
     pub fn possible_file_paths_at_point(
         &self,
         point: WithinModel<Point>,
-    ) -> impl Iterator<Item = WithinModel<PossiblePath>> {
+    ) -> impl Iterator<Item = WithinModel<PossiblePath>> + use<> {
         match point {
             WithinModel::AltScreen(inner_point) => Either::Left(
                 self.alt_screen
@@ -1849,6 +1997,24 @@ impl TerminalModel {
                 .block_list
                 .url_at_point(inner_point)
                 .map(WithinModel::BlockList),
+        }
+    }
+
+    /// OSC 8 hyperlink span at `point`, paired with its URI. Routes to alt
+    /// screen or block list depending on which surface the point lives on.
+    pub fn hyperlink_at_point(
+        &self,
+        point: &WithinModel<Point>,
+    ) -> Option<(WithinModel<Link>, String)> {
+        match point {
+            WithinModel::AltScreen(inner_point) => {
+                let (link, uri) = self.alt_screen.hyperlink_at_point(inner_point)?;
+                Some((WithinModel::AltScreen(link), uri))
+            }
+            WithinModel::BlockList(inner_point) => {
+                let (link, uri) = self.block_list.hyperlink_at_point(inner_point)?;
+                Some((WithinModel::BlockList(link), uri))
+            }
         }
     }
 
@@ -1983,21 +2149,15 @@ impl TerminalModel {
         if size_update.rows_or_columns_changed() {
             let num_rows = size_update.new_size.rows();
             let num_cols = size_update.new_size.columns();
-            if let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx {
-                if let Err(e) = tx.try_send(OrderedTerminalEventType::Resize {
+            if let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx
+                && let Err(e) = tx.try_send(OrderedTerminalEventType::Resize {
                     window_size: crate::terminal::shared_session::protocol::WindowSize {
                         num_rows,
                         num_cols,
                     },
-                }) {
-                    log::warn!("Failed to send OrderedTerminalEventType::Resize: {e}");
-                }
-            }
-
-            if self.tmux_control_mode_context.is_some() {
-                self.emit_handler_event(HandlerEvent::RunTmuxCommand(
-                    TmuxCommand::UpdateClientSize { num_rows, num_cols },
-                ));
+                })
+            {
+                log::warn!("Failed to send OrderedTerminalEventType::Resize: {e}");
             }
         }
     }
@@ -2141,7 +2301,10 @@ impl TerminalModel {
     fn restored_block_commands(&self) -> Vec<HistoryEntry> {
         let mut commands = Vec::new();
         for block in self.block_list.blocks() {
-            if block.is_restored() && !block.is_background() {
+            if block.is_restored()
+                && !block.is_background()
+                && block.state() != BlockState::DoneWithNoExecution
+            {
                 let entry = HistoryEntry::for_restored_block(block.command_to_string(), block);
                 commands.push(entry);
             }
@@ -2200,33 +2363,102 @@ impl TerminalModel {
         }
     }
 
+    /// Takes accumulated typeahead that should be inserted into a front-end input editor.
+    pub fn take_typeahead_for_input(&mut self) -> Option<(String, CharOffset)> {
+        let completed_block_index = self.block_list.prev_matching_block_from_index(
+            BlockFilter {
+                include_hidden: true,
+                include_background: false,
+            },
+            self.block_list.active_block_index(),
+        );
+        let was_entered_during_agent_requested_command =
+            completed_block_index.is_some_and(|index| {
+                self.block_list
+                    .block_at(index)
+                    .is_some_and(|block| block.agent_interaction_metadata().is_some())
+            });
+        if was_entered_during_agent_requested_command {
+            return None;
+        }
+
+        let (typeahead, previously_inserted) =
+            self.block_list.early_output_mut().advance_typeahead()?;
+        Some((typeahead.to_owned(), previously_inserted))
+    }
+
     fn emit_handler_event(&mut self, event: HandlerEvent) {
         self.event_proxy.send_handler_event(event);
     }
 
+    /// Applies the normal command-completion pipeline and its once-per-command side effects.
+    fn complete_command(&mut self, data: CompletionMetadata) {
+        // If we ssh from a doesn't-understand-bracketed-paste shell into one
+        // that enables it, then get disconnected, we'll be stuck in a state
+        // of bracketed paste being enabled, but the local shell doesn't know
+        // how to turn it off (and will never do so).  We forcibly unset the
+        // mode to avoid getting stuck in this state.
+        self.unset_mode(Mode::BracketedPaste);
+
+        // Similar to bracketed paste, above, make sure we quit out of the
+        // alt screen if we're currently in it.  This prevents issues where we
+        // remain in the alt screen after disconnect when we should return to
+        // the blocklist (for the local shell).
+        self.exit_alt_screen(true);
+
+        let block_id = data.next_block_id.to_string();
+        self.block_list
+            .ensure_active_block_executing_for_completion();
+        let is_for_in_band_command = self.block_list().active_block().is_in_band_command_block();
+        let finished_block_bootstrap_stage = self.block_list().active_block().bootstrap_stage();
+        let active_block_completion = self.block_list.complete_active_block_and_advance(data);
+
+        if active_block_completion == ActiveBlockCompletion::NewlyFinished {
+            if let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx
+                && let Err(e) = tx.try_send(OrderedTerminalEventType::CommandExecutionFinished {
+                    next_block_id: block_id.into(),
+                })
+            {
+                log::warn!("Failed to send OrderedTerminalEventType::CommandFinished: {e}");
+            }
+
+            self.emit_handler_event(HandlerEvent::CommandFinished {
+                command_type: if is_for_in_band_command {
+                    CommandType::InBandCommand
+                } else if finished_block_bootstrap_stage == BootstrapStage::PostBootstrapPrecmd {
+                    CommandType::User
+                } else {
+                    CommandType::Bootstrap
+                },
+            });
+        }
+    }
+
+    /// Applies prompt metadata through the normal once-per-block path.
+    fn apply_precmd_to_fresh_block(&mut self, data: PromptMetadata) {
+        self.ignore_bootstrapping_messages = false;
+        let session_id = data.session_id;
+        let mut env_vars = HashMap::new();
+        if let Some(kube_config) = data.kube_config.clone() {
+            env_vars.insert("KUBECONFIG".to_string(), kube_config);
+        }
+        let handled_after_inband = data.was_sent_after_in_band_command();
+        self.block_list.apply_precmd_to_active(data);
+
+        self.emit_handler_event(HandlerEvent::Precmd {
+            session_id: session_id.map(|id| id.into()),
+            handled_after_inband,
+            env_vars,
+        });
+    }
+
+    fn apply_preexec(&mut self, data: PreexecValue) {
+        self.block_list.apply_preexec_to_active(data);
+        self.emit_handler_event(HandlerEvent::Preexec);
+    }
+
     pub fn set_env_var_collection_name(&mut self, value: Option<String>) {
         self.env_var_collection_name = value;
-    }
-
-    pub fn set_pending_warp_initiated_control_mode(&mut self) {
-        let tmux_installation = self
-            .tmux_control_mode_context
-            .and_then(|context| context.tmux_installation());
-        self.pending_warp_initiated_control_mode =
-            Some(WarpInitiatedTmuxControlMode::new(tmux_installation));
-    }
-
-    pub fn set_pending_warp_initiated_control_mode_with_install_tmux(&mut self, with_root: bool) {
-        self.pending_warp_initiated_control_mode =
-            Some(WarpInitiatedTmuxControlMode::new(Some(if with_root {
-                TmuxInstallationState::InstalledByWarpRootInThisSession
-            } else {
-                TmuxInstallationState::InstalledByWarpInThisSession
-            })));
-    }
-
-    pub fn clear_pending_warp_initiated_control_mode(&mut self) {
-        self.pending_warp_initiated_control_mode = None;
     }
 
     /// Informs the terminal model to start watching for ssh output that indicates the session
@@ -2322,28 +2554,13 @@ impl TerminalModel {
     pub fn is_ssh_block(&self) -> bool {
         self.notify_on_end_of_ssh_login.is_some()
     }
-
-    pub fn tmux_control_mode_active(&self) -> bool {
-        self.tmux_control_mode_context.is_some()
-    }
-
-    pub fn is_pending_warp_initiated_control_mode(&self) -> bool {
-        self.pending_warp_initiated_control_mode.is_some()
-    }
-
-    pub fn is_warpified_ssh(&self) -> bool {
-        matches!(
-            self.tmux_control_mode_context,
-            Some(TmuxControlModeContext::WarpInitiatedForSsh { .. })
-        )
-    }
 }
 
 /// Used in the ansi::Handler implementation for TerminalModel below. Performs
 /// the provided method call on the active handler, either the block_list or the
 /// alt_screen if it is active.
 macro_rules! delegate {
-    ($self:ident.$method:ident( $( $arg:expr ),* )) => {
+    ($self:ident.$method:ident( $( $arg:expr_2021 ),* )) => {
         if $self.alt_screen_active {
             $self.alt_screen.$method($( $arg ),*)
         } else {
@@ -2353,6 +2570,12 @@ macro_rules! delegate {
 }
 
 impl TerminalModel {
+    /// Registers a client-generated session ID so that DCS hooks carrying
+    /// this ID will be accepted by the integrity check.
+    pub fn register_session_id(&mut self, session_id: SessionId) {
+        self.registered_session_ids.insert(session_id);
+    }
+
     pub fn needs_bracketed_paste(&mut self) -> bool {
         delegate!(self.needs_bracketed_paste())
     }
@@ -2403,16 +2626,17 @@ pub enum HandlerEvent {
     UnsetMode {
         mode: Mode,
     },
-    StartTmuxControlMode,
-    TmuxControlModeReady {
-        primary_pane: u32,
-        context: Option<TmuxControlModeContext>,
-    },
-    EndTmuxControlMode,
-    RunTmuxCommand(TmuxCommand),
 }
 
 impl ansi::Handler for TerminalModel {
+    fn is_registered_session(&self, session_id: SessionId) -> bool {
+        self.registered_session_ids.contains(&session_id)
+    }
+
+    fn should_validate_dcs_hook_session_id(&self) -> bool {
+        !self.shared_session_status().is_viewer()
+    }
+
     fn set_title(&mut self, title: Option<String>) {
         // Don't set the tab title if the title event is for a running in-band command.
         if self.block_list().is_writing_or_executing_in_band_command() {
@@ -2436,6 +2660,10 @@ impl ansi::Handler for TerminalModel {
 
     fn set_cursor_shape(&mut self, shape: ansi::CursorShape) {
         delegate!(self.set_cursor_shape(shape));
+    }
+
+    fn set_hyperlink(&mut self, hyperlink: Option<warp_terminal::model::ansi::Hyperlink>) {
+        delegate!(self.set_hyperlink(hyperlink));
     }
 
     fn input(&mut self, c: char) {
@@ -2773,63 +3001,100 @@ impl ansi::Handler for TerminalModel {
     }
 
     fn command_finished(&mut self, data: CommandFinishedValue) {
-        // If we ssh from a doesn't-understand-bracketed-paste shell into one
-        // that enables it, then get disconnected, we'll be stuck in a state
-        // of bracketed paste being enabled, but the local shell doesn't know
-        // how to turn it off (and will never do so).  We forcibly unset the
-        // mode to avoid getting stuck in this state.
-        self.unset_mode(Mode::BracketedPaste);
-
-        // Similar to bracketed paste, above, make sure we quit out of the
-        // alt screen if we're currently in it.  This prevents issues where we
-        // remain in the alt screen after disconnect when we should return to
-        // the blocklist (for the local shell).
-        self.exit_alt_screen(true);
-
-        let block_id = data.next_block_id.to_string();
-        let is_for_in_band_command = self.block_list().active_block().is_in_band_command_block();
-        let finished_block_bootstrap_stage = self.block_list().active_block().bootstrap_stage();
-        delegate!(self.command_finished(data));
-
-        if let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx {
-            if let Err(e) = tx.try_send(OrderedTerminalEventType::CommandExecutionFinished {
-                next_block_id: block_id.into(),
-            }) {
-                log::warn!("Failed to send OrderedTerminalEventType::CommandFinished: {e}");
-            }
+        let disposition = self
+            .block_list
+            .classify_next_block_id(&data.completion_metadata.next_block_id);
+        let transition = self.plan_lifecycle_transition(
+            LifecycleInput::CommandFinished(disposition),
+            Some(&data.completion_metadata.next_block_id),
+            Some(data.completion_metadata.exit_code),
+            data.session_id,
+        );
+        if matches!(transition.action, LifecycleAction::AcceptCommandFinished) {
+            self.complete_command(data.completion_metadata);
         }
-
-        self.emit_handler_event(HandlerEvent::CommandFinished {
-            command_type: if is_for_in_band_command {
-                CommandType::InBandCommand
-            } else if finished_block_bootstrap_stage == BootstrapStage::PostBootstrapPrecmd {
-                CommandType::User
-            } else {
-                CommandType::Bootstrap
-            },
-        });
+        self.commit_lifecycle_transition(&transition);
     }
 
-    fn precmd(&mut self, data: PrecmdValue) {
-        self.ignore_bootstrapping_messages = false;
-        let session_id = data.session_id;
-        let mut env_vars = HashMap::new();
-        if let Some(kube_config) = data.kube_config.clone() {
-            env_vars.insert("KUBECONFIG".to_string(), kube_config);
+    fn set_current_working_directory(&mut self, path: String) {
+        // OSC 7 is honor-system: the parser only accepts payloads whose host
+        // matches our local hostname, but a wrapper SSH session streams the
+        // remote shell's bytes through this same Performer, so a remote box
+        // with a coincident hostname could still slip through. Drop the
+        // update entirely while we know we're inside an SSH-launching block.
+        if self.is_ssh_block() {
+            log::debug!("Ignoring OSC 7 CWD update inside SSH session: {path:?}");
+            return;
         }
-        let handled_after_inband = data.was_sent_after_in_band_command();
-        delegate!(self.precmd(data));
+        // Always route OSC 7 to the block list, not through `delegate!` —
+        // the alt-screen handler has no `set_current_working_directory`
+        // override, so a TUI program running on the alt screen (vim, htop,
+        // etc.) would silently swallow updates emitted by tools it
+        // launches. The shell's CWD belongs on the block list regardless
+        // of what's currently rendered on screen.
+        self.block_list.set_current_working_directory(path);
+    }
 
-        self.emit_handler_event(HandlerEvent::Precmd {
-            session_id: session_id.map(|id| id.into()),
-            handled_after_inband,
-            env_vars,
-        });
+    fn precmd_with_completion_metadata(&mut self, data: PrecmdValue) {
+        let disposition = self
+            .block_list
+            .classify_next_block_id(&data.completion_metadata.next_block_id);
+        let transition = self.plan_lifecycle_transition(
+            LifecycleInput::PrecmdWithCompletionMetadata(disposition),
+            Some(&data.completion_metadata.next_block_id),
+            Some(data.completion_metadata.exit_code),
+            data.prompt_metadata.session_id,
+        );
+        match transition.action {
+            LifecycleAction::ApplyPrecmd => self.apply_precmd_to_fresh_block(data.prompt_metadata),
+            LifecycleAction::ReconcileCompletionThenApplyPrecmd => {
+                self.complete_command(data.completion_metadata);
+                self.apply_precmd_to_fresh_block(data.prompt_metadata);
+            }
+            LifecycleAction::StartActiveBlock
+            | LifecycleAction::ApplyPreexec
+            | LifecycleAction::AcceptCommandFinished
+            | LifecycleAction::BeginEpoch
+            | LifecycleAction::Terminate
+            | LifecycleAction::Ignore(_) => {}
+        }
+        self.commit_lifecycle_transition(&transition);
+    }
+
+    fn prompt_only_precmd(&mut self, data: PromptMetadata) {
+        let transition = self.plan_lifecycle_transition(
+            LifecycleInput::PromptOnlyPrecmd,
+            None,
+            None,
+            data.session_id,
+        );
+        if matches!(transition.action, LifecycleAction::ApplyPrecmd) {
+            self.apply_precmd_to_fresh_block(data);
+        }
+        self.commit_lifecycle_transition(&transition);
     }
 
     fn preexec(&mut self, data: PreexecValue) {
-        delegate!(self.preexec(data));
-        self.emit_handler_event(HandlerEvent::Preexec);
+        let active_block = self.block_list.active_block();
+        let observation = if active_block.state() == BlockState::Executing {
+            if active_block.command_to_string() == data.command.as_str() {
+                PreexecObservation::RepeatedSameCommand
+            } else {
+                PreexecObservation::RepeatedDifferentCommand
+            }
+        } else {
+            PreexecObservation::First
+        };
+        let transition = self.plan_lifecycle_transition(
+            LifecycleInput::Preexec(observation),
+            None,
+            None,
+            data.session_id,
+        );
+        if matches!(transition.action, LifecycleAction::ApplyPreexec) {
+            self.apply_preexec(data);
+        }
+        self.commit_lifecycle_transition(&transition);
     }
 
     fn bootstrapped(&mut self, value: BootstrappedValue) {
@@ -2841,7 +3106,7 @@ impl ansi::Handler for TerminalModel {
                 // Not being able to read the value should not cause a full-app crash. Instead,
                 // bootstrapping should fail in the same way that it would if the DCS message
                 // were otherwise corrupted.
-                log::error!("Received bootstrap message with no pending session info.");
+                report_error!("Received bootstrap message with no pending session info.");
                 return;
             }
         };
@@ -2851,8 +3116,8 @@ impl ansi::Handler for TerminalModel {
             _ => None,
         };
 
-        let fully_populated_session_info = pending_session_info
-            .merge_from_bootstrapped_value(value, self.tmux_control_mode_context.is_some());
+        let fully_populated_session_info =
+            pending_session_info.merge_from_bootstrapped_value(value);
 
         self.block_list
             .early_output_mut()
@@ -2880,7 +3145,25 @@ impl ansi::Handler for TerminalModel {
     fn ssh(&mut self, value: SSHValue) {
         if !self.ignore_bootstrapping_messages {
             let remote_shell = value.remote_shell.clone();
-            self.pending_legacy_ssh_session = Some(value);
+            let Some(remote_session_id) = value.remote_session_id.map(SessionId::from) else {
+                log::warn!("Rejected SSH hook without remote_session_id");
+                return;
+            };
+            // The value `0` is the legacy/default session ID, not a client-generated
+            // integrity token.
+            if remote_session_id.as_u64() == 0 {
+                log::warn!("Rejected SSH hook with zero remote_session_id");
+                return;
+            }
+            self.register_session_id(remote_session_id);
+            if value.external_control_master {
+                log::info!(
+                    "SSH wrapper attached to an external ControlMaster at {}; \
+                     Warp will not tear it down on session exit",
+                    value.socket_path.display()
+                );
+            }
+            self.pending_ssh_wrapper_session = Some(value);
             self.event_proxy
                 .send_terminal_event(Event::SSH(remote_shell));
         }
@@ -2898,6 +3181,17 @@ impl ansi::Handler for TerminalModel {
 
     fn init_shell(&mut self, data: InitShellValue) {
         if !self.ignore_bootstrapping_messages {
+            let hook_session_id = Some(data.session_id.as_u64());
+            let transition = self.plan_lifecycle_transition(
+                LifecycleInput::InitShell,
+                None,
+                None,
+                hook_session_id,
+            );
+            if !matches!(transition.action, LifecycleAction::BeginEpoch) {
+                self.commit_lifecycle_transition(&transition);
+                return;
+            }
             let subshell_info = if data.is_subshell {
                 let was_triggered_by_rc_file_snippet =
                     self.did_receive_rc_file_dcs.take().unwrap_or(false);
@@ -2925,11 +3219,7 @@ impl ansi::Handler for TerminalModel {
                 data,
                 subshell_info,
                 self.pending_shell_launch_data.take(),
-                self.pending_legacy_ssh_session.take(),
-                matches!(
-                    self.tmux_control_mode_context,
-                    Some(TmuxControlModeContext::WarpInitiatedForSsh { .. })
-                ),
+                self.pending_ssh_wrapper_session.take(),
                 self.block_list().active_block().session_id(),
             );
             self.pending_session_info = Some(pending_session_info.clone());
@@ -2941,6 +3231,7 @@ impl ansi::Handler for TerminalModel {
             self.emit_handler_event(HandlerEvent::InitShell {
                 pending_session_info: Box::new(pending_session_info),
             });
+            self.commit_lifecycle_transition(&transition);
         }
     }
 
@@ -2953,28 +3244,18 @@ impl ansi::Handler for TerminalModel {
     }
 
     fn init_subshell(&mut self, data: InitSubshellValue) {
-        let is_tmux_ssh = self.pending_warp_initiated_control_mode.is_some();
-        let shell_type = ShellType::from_name(data.shell.as_str());
-        if let Some(shell_type) = shell_type {
-            self.event_proxy
-                .send_terminal_event(Event::InitSubshell(InitSubshellEvent {
-                    shell_type,
-                    uname: data.uname,
-                }));
-        } else {
-            log::error!(
-                "Received invalid shell name in init_subshell: {} | is_tmux_ssh: {}",
-                data.shell,
-                is_tmux_ssh
-            );
-            if is_tmux_ssh {
+        match ShellType::from_name(data.shell.as_str()) {
+            Some(shell_type) => {
                 self.event_proxy
-                    .send_terminal_event(Event::RemoteWarpificationIsUnavailable(
-                        WarpificationUnavailableReason::UnsupportedShell {
-                            shell_name: data.shell,
-                        },
-                    ))
+                    .send_terminal_event(Event::InitSubshell(InitSubshellEvent {
+                        shell_type,
+                        uname: data.uname,
+                    }))
             }
+            None => report_error!(
+                "Received invalid shell name in init_subshell",
+                extra: { "shell" => %data.shell }
+            ),
         }
     }
 
@@ -2991,63 +3272,22 @@ impl ansi::Handler for TerminalModel {
                             SourcedRcFileInSubshellEvent {
                                 shell_type,
                                 uname: data.uname,
-                                tmux: data.tmux,
                             },
                         ))
                 }
                 None => {
-                    log::error!(
-                        "Received invalid shell name in SourcedRCFileForWarpValue: {}",
-                        data.shell
+                    report_error!(
+                        "Received invalid shell name in SourcedRCFileForWarpValue",
+                        extra: { "shell" => %data.shell }
                     );
                 }
             }
         }
     }
 
-    fn init_ssh(&mut self, data: InitSshValue) {
-        let shell_type = ShellType::from_name(data.shell.as_str());
-        match shell_type {
-            Some(shell_type @ (ShellType::Bash | ShellType::Zsh | ShellType::Fish)) => self
-                .event_proxy
-                .send_terminal_event(Event::InitSsh(InitSshEvent {
-                    shell_type,
-                    uname: data.uname,
-                })),
-            _ => self
-                .event_proxy
-                .send_terminal_event(Event::RemoteWarpificationIsUnavailable(
-                    WarpificationUnavailableReason::UnsupportedShell {
-                        shell_name: data.shell,
-                    },
-                )),
-        }
-    }
-
     fn finish_update(&mut self, data: FinishUpdateValue) {
         self.event_proxy
             .send_terminal_event(Event::FinishUpdate(data));
-    }
-
-    fn remote_warpification_is_unavailable(&mut self, data: WarpificationUnavailableReason) {
-        self.event_proxy
-            .send_terminal_event(Event::RemoteWarpificationIsUnavailable(data));
-    }
-
-    fn notify_ssh_tmux_is_installed(&mut self, tmux_installation: TmuxInstallationState) {
-        if let Some(ref mut warp_initiated_for_ssh) = self.pending_warp_initiated_control_mode {
-            warp_initiated_for_ssh.tmux_installation = Some(tmux_installation);
-        }
-        self.event_proxy
-            .send_terminal_event(Event::SshTmuxInstaller(tmux_installation));
-    }
-
-    fn tmux_install_failed(&mut self, data: TmuxInstallFailedInfo) {
-        self.event_proxy
-            .send_terminal_event(Event::TmuxInstallFailed {
-                line: data.line,
-                command: data.command,
-            });
     }
 
     fn start_in_band_command_output(&mut self) {
@@ -3091,7 +3331,9 @@ impl ansi::Handler for TerminalModel {
                 self.is_receiving_in_band_command_output = IsReceivingInBandCommandOutput::No;
             }
             IsReceivingInBandCommandOutput::No => {
-                log::warn!("Received 'end_in_band_command_output' while not expecting to read in-band command output.");
+                log::warn!(
+                    "Received 'end_in_band_command_output' while not expecting to read in-band command output."
+                );
             }
         }
 
@@ -3105,14 +3347,13 @@ impl ansi::Handler for TerminalModel {
         if let Some(SshLogin {
             notification_state, ..
         }) = &self.notify_on_end_of_ssh_login
-        {
-            if matches!(
+            && matches!(
                 notification_state,
                 SshLoginNotificationState::Monitoring
                     | SshLoginNotificationState::SentInitialNotification
-            ) {
-                self.check_for_end_of_ssh_login(false);
-            }
+            )
+        {
+            self.check_for_end_of_ssh_login(false);
         }
 
         let bytes = input.bytes();
@@ -3125,14 +3366,14 @@ impl ansi::Handler for TerminalModel {
         // both when the frame is flushed and when we initially process the raw bytes (the ordering of the two
         // depends on whether we receive the start and end markers in the same batch of bytes). We only want to send
         // the raw bytes to viewers, not the flushed frame - they'll handle the synchronized output framing themselves.
-        if !input.is_synchronized_output_frame() && self.shared_session_status().is_sharer() {
-            if let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx {
-                if let Err(e) = tx.try_send(OrderedTerminalEventType::PtyBytesRead {
-                    bytes: bytes.to_owned(),
-                }) {
-                    log::warn!("Failed to send OrderedTerminalEventType::PtyBytesRead: {e}");
-                }
-            }
+        if !input.is_synchronized_output_frame()
+            && self.shared_session_status().is_sharer()
+            && let Some(tx) = &self.ordered_terminal_events_for_shared_session_tx
+            && let Err(e) = tx.try_send(OrderedTerminalEventType::PtyBytesRead {
+                bytes: bytes.to_owned(),
+            })
+        {
+            log::warn!("Failed to send OrderedTerminalEventType::PtyBytesRead: {e}");
         }
 
         delegate!(self.on_finish_byte_processing(input))
@@ -3145,76 +3386,6 @@ impl ansi::Handler for TerminalModel {
             return;
         }
         delegate!(self.on_reset_grid());
-    }
-
-    fn tmux_control_mode_event(&mut self, event: tmux::ControlModeEvent) {
-        match event {
-            tmux::ControlModeEvent::BackgroundPaneOutput { pane, byte } => {
-                let output = self.tmux_background_outputs.entry(pane).or_default();
-                output.push(byte);
-                if byte == b'\n' && output.ends_with(b"$$$\r\n") {
-                    match tmux::parse_generator_output(output) {
-                        Some(command_event) => {
-                            self.event_proxy
-                                .send_terminal_event(Event::ExecutedInBandCommand(command_event));
-                        }
-                        None => {
-                            log::warn!(
-                                "Could not parse tmux generator output: {:?}",
-                                AsciiDebug(output)
-                            );
-                        }
-                    }
-                    self.tmux_background_outputs.remove(&pane);
-                }
-            }
-            tmux::ControlModeEvent::Starting => {
-                if let Some(warp_initiated_for_ssh) = self.pending_warp_initiated_control_mode {
-                    self.tmux_control_mode_context = Some(
-                        TmuxControlModeContext::WarpInitiatedForSsh(warp_initiated_for_ssh),
-                    );
-                } else {
-                    self.tmux_control_mode_context = Some(TmuxControlModeContext::UserInitiated);
-                }
-                self.emit_handler_event(HandlerEvent::StartTmuxControlMode);
-
-                self.emit_handler_event(HandlerEvent::RunTmuxCommand(
-                    TmuxCommand::GetPrimaryWindowPane,
-                ));
-
-                let size = self.block_list.size();
-                let num_rows = size.rows();
-                let num_cols = size.columns();
-
-                if self.tmux_control_mode_context != Some(TmuxControlModeContext::UserInitiated) {
-                    // We don't want to intentionally disable persistence when the user runs tmux control
-                    // mode on their own.
-                    self.emit_handler_event(HandlerEvent::RunTmuxCommand(
-                        TmuxCommand::SetDestroyUnattached,
-                    ));
-
-                    self.emit_handler_event(HandlerEvent::RunTmuxCommand(
-                        TmuxCommand::SetWindowSizeToSmallest,
-                    ));
-                }
-
-                self.emit_handler_event(HandlerEvent::RunTmuxCommand(
-                    TmuxCommand::UpdateClientSize { num_cols, num_rows },
-                ));
-            }
-            tmux::ControlModeEvent::Exited => {
-                self.tmux_control_mode_context = None;
-                self.emit_handler_event(HandlerEvent::EndTmuxControlMode);
-            }
-            tmux::ControlModeEvent::ControlModeReady { primary_pane, .. } => {
-                self.emit_handler_event(HandlerEvent::TmuxControlModeReady {
-                    primary_pane,
-                    context: self.tmux_control_mode_context,
-                });
-                self.event_proxy
-                    .send_terminal_event(Event::TmuxControlModeReady { primary_pane });
-            }
-        }
     }
 
     fn start_completions_output(&mut self, data: CompletionsShellData) {
@@ -3264,7 +3435,9 @@ impl ansi::Handler for TerminalModel {
                 if let Some(last_item) = output.last_mut() {
                     last_item.update(completion_update);
                 } else {
-                    log::warn!("Received update last completion result OSC before any completion results have been received");
+                    log::warn!(
+                        "Received update last completion result OSC before any completion results have been received"
+                    );
                 }
             }
             IsReceivingCompletionsOutput::Yes {
@@ -3308,16 +3481,9 @@ impl ansi::Handler for TerminalModel {
                 pending.data = decoded_bytes;
 
                 if !pending.metadata.inline {
-                    #[cfg(not(target_family = "wasm"))]
-                    if let Some(cwd) = self
-                        .active_block_metadata()
-                        .current_working_directory()
-                        .map(|cwd| cwd.to_string())
-                    {
-                        let mut path = PathBuf::from(cwd);
-                        path.push(pending.metadata.name);
-                        let _ = save_as_file(&pending.data[..], path);
-                    }
+                    log::warn!(
+                        "Ignoring non-inline iTerm file payload; automatic local file writes are disabled."
+                    );
                     return;
                 }
 
@@ -3333,7 +3499,9 @@ impl ansi::Handler for TerminalModel {
                 self.handle_completed_iterm_image(pending);
             }
             IsReceivingITermImageData::No => {
-                log::warn!("Received 'end_iterm_image_receiving' while not expecting to read iTerm image chunks.")
+                log::warn!(
+                    "Received 'end_iterm_image_receiving' while not expecting to read iTerm image chunks."
+                )
             }
         }
     }
@@ -3400,7 +3568,9 @@ impl ansi::Handler for TerminalModel {
         );
 
         let IsReceivingKittyActionData::Yes { mut pending } = is_receiving_kitty_image_data else {
-            log::warn!("Received 'end_kitty_action_receiving' while not expecting to read kitty image chunks.");
+            log::warn!(
+                "Received 'end_kitty_action_receiving' while not expecting to read kitty image chunks."
+            );
             return;
         };
 
@@ -3420,10 +3590,10 @@ impl ansi::Handler for TerminalModel {
             Ok(message) => message,
             Err(err) => {
                 log::warn!("{err:?}");
-                if let Some(message_id) = message_id {
-                    if verbosity.send_error() {
-                        let _ = writer.write_all(&create_kitty_error_reply(message_id, err.into()));
-                    }
+                if let Some(message_id) = message_id
+                    && verbosity.send_error()
+                {
+                    let _ = writer.write_all(&create_kitty_error_reply(message_id, err.into()));
                 }
                 return;
             }
@@ -3495,19 +3665,18 @@ impl ansi::Handler for TerminalModel {
 
                 match self.handle_completed_kitty_action(action.clone(), &mut HashMap::new()) {
                     Some(Ok(_)) => {
-                        if let Some(message_id) = message_id {
-                            if verbosity.send_ok() {
-                                let _ = writer.write_all(&create_kitty_ok_reply(message_id));
-                            }
+                        if let Some(message_id) = message_id
+                            && verbosity.send_ok()
+                        {
+                            let _ = writer.write_all(&create_kitty_ok_reply(message_id));
                         }
                     }
                     Some(Err(err)) => {
                         log::warn!("{err:?}");
-                        if let Some(message_id) = message_id {
-                            if verbosity.send_error() {
-                                let _ =
-                                    writer.write_all(&create_kitty_error_reply(message_id, err));
-                            }
+                        if let Some(message_id) = message_id
+                            && verbosity.send_error()
+                        {
+                            let _ = writer.write_all(&create_kitty_error_reply(message_id, err));
                         }
                     }
                     None => {}
@@ -3515,10 +3684,10 @@ impl ansi::Handler for TerminalModel {
             }
             Err(err) => {
                 log::warn!("{err:?}");
-                if let Some(message_id) = message_id {
-                    if verbosity.send_error() {
-                        let _ = writer.write_all(&create_kitty_error_reply(message_id, err));
-                    }
+                if let Some(message_id) = message_id
+                    && verbosity.send_error()
+                {
+                    let _ = writer.write_all(&create_kitty_error_reply(message_id, err));
                 }
             }
         };
@@ -3620,7 +3789,9 @@ enum InBandCommandOutputDecodingError {
     NoContentLengthHeader,
     #[error("DCS content length header is corrupted: {0:?}")]
     ContentLengthHeaderCorrupted(ParseIntError),
-    #[error("Content length header does not match length of received content. Actual: {actual_length}, expected: {expected_length}")]
+    #[error(
+        "Content length header does not match length of received content. Actual: {actual_length}, expected: {expected_length}"
+    )]
     ContentLengthMismatch {
         actual_length: usize,
         expected_length: usize,
@@ -3644,5 +3815,5 @@ pub enum ExitReason {
 }
 
 #[cfg(test)]
-#[path = "terminal_model_test.rs"]
+#[path = "terminal_model_tests.rs"]
 pub(crate) mod tests;

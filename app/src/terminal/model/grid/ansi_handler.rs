@@ -1,3 +1,6 @@
+// The code in this file is adapted from the alacritty_terminal crate under the
+// Apache license; see: crates/warp_terminal/src/model/LICENSE-ALACRITTY.
+
 // path attribute needed due to current non-fs-based nesting of ansi_handler
 // under grid_handler.
 #[path = "ansi_handler/tab_stops.rs"]
@@ -13,24 +16,28 @@ use base64::Engine as _;
 use bounded_vec_deque::BoundedVecDeque;
 use pathfinder_geometry::vector::Vector2F;
 use rand::Rng;
+use tab_stops::TabStops;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
+use warp_errors::report_error;
 use warp_terminal::model::ansi::CharsetIndex;
 use warp_terminal::model::grid::cell;
 use warp_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
-use warpui::image_cache::{resize_dimensions, FitType};
+use warpui::image_cache::{FitType, resize_dimensions};
 
+use super::{AbsolutePoint, FullGridClearBehavior, GridHandler, PerformResetGridChecks, TermMode};
 use crate::server::telemetry::ImageProtocol;
 use crate::terminal::event::Event;
 use crate::terminal::event_listener::ChannelEventListener;
+use crate::terminal::model::ObfuscateSecrets;
 use crate::terminal::model::ansi::{
     self, Attr, Color, CursorStyle, Handler as _, NamedColor, PrecmdValue, PreexecValue,
 };
 use crate::terminal::model::cell::{Cell, Flags};
 use crate::terminal::model::char_or_str::CharOrStr;
 use crate::terminal::model::grid::indexing::IndexRegion as _;
-use crate::terminal::model::grid::{grapheme_cursor, Dimensions as _};
+use crate::terminal::model::grid::{Dimensions as _, grapheme_cursor};
 use crate::terminal::model::image_map::{ImagePlacementData, ImageType, StoredImageMetadata};
 use crate::terminal::model::index::{Point, VisibleRow};
 use crate::terminal::model::iterm_image::{ITermImage, ITermImageDimensionUnit};
@@ -38,12 +45,7 @@ use crate::terminal::model::kitty::{
     CursorMovementPolicy, KittyAction, KittyError, KittyResponse, StorageError,
 };
 use crate::terminal::model::selection::ScrollDelta;
-use crate::terminal::model::ObfuscateSecrets;
 use crate::terminal::{ClipboardType, SizeInfo};
-
-use super::{AbsolutePoint, GridHandler, PerformResetGridChecks, TermMode};
-
-use tab_stops::TabStops;
 
 const MAX_IMAGE_CELL_HEIGHT: u32 = 255;
 
@@ -155,7 +157,13 @@ enum ResetGridChecks {
 
 impl ansi::Handler for GridHandler {
     fn set_title(&mut self, _: Option<String>) {
-        log::error!("Handler method GridHandler::set_title should never be called. This should be handled by TerminalModel.");
+        report_error!(
+            "Handler method GridHandler::set_title should never be called. This should be handled by TerminalModel."
+        );
+    }
+
+    fn set_hyperlink(&mut self, hyperlink: Option<warp_terminal::model::ansi::Hyperlink>) {
+        self.active_hyperlink_id = hyperlink.and_then(|h| self.hyperlink_registry.intern(h));
     }
 
     fn set_cursor_style(&mut self, style: Option<ansi::CursorStyle>) {
@@ -174,9 +182,11 @@ impl ansi::Handler for GridHandler {
     }
 
     fn input(&mut self, c: char) {
-        // We disable Reset Grid checks in unit tests, as they are not designed to test
-        // PTY integration. `#[cfg(test)]` only applies to unit tests, not integration tests.
-        #[cfg(all(windows, not(test)))]
+        // We disable Reset Grid checks in tests, as they are not designed to test
+        // PTY integration. `not(test)` covers this crate's own unit tests, and
+        // `not(feature = "test-util")` covers other crates (e.g. `warp_tui`) that
+        // build real terminal models against `warp`'s test helpers.
+        #[cfg(all(windows, not(test), not(feature = "test-util")))]
         if let ResetGridChecks::Enabled { received_osc } = self.ansi_handler_state.reset_grid_checks
         {
             debug_assert!(
@@ -428,7 +438,7 @@ impl ansi::Handler for GridHandler {
     fn report_xtversion<W: std::io::Write>(&mut self, writer: &mut W) {
         log::trace!("Reporting xtversion");
         let version = ChannelState::app_version().unwrap_or("");
-        let _ = writer.write_all(format!("\x1bP>|Zap({version})\x1b\\").as_bytes());
+        let _ = writer.write_all(format!("\x1bP>|InfiniShell({version})\x1b\\").as_bytes());
     }
 
     fn device_status<W: std::io::Write>(&mut self, writer: &mut W, arg: usize) {
@@ -846,7 +856,12 @@ impl ansi::Handler for GridHandler {
                 if self.ansi_handler_state.is_alt_screen {
                     self.grid.region_mut(..).each(|cell| *cell = bg.into());
                 } else {
-                    self.clear_viewport();
+                    if self.full_grid_clear_behavior == FullGridClearBehavior::Clear {
+                        self.clear_visible_rows_in_place(bg);
+                    } else {
+                        self.clear_viewport();
+                    }
+                    self.active_hyperlink_id = None;
                 }
             }
             ansi::ClearMode::Saved if self.history_size() > 0 => {
@@ -863,6 +878,7 @@ impl ansi::Handler for GridHandler {
                 // grid has been cleared.
                 self.clear_secrets();
                 self.clear_displayed_rows_and_filter_matches();
+                self.active_hyperlink_id = None;
 
                 // The row with the cursor still exists, though, so mark it as
                 // dirty and re-compute state accordingly.
@@ -893,6 +909,8 @@ impl ansi::Handler for GridHandler {
         self.flat_storage.clear();
 
         self.clear_secrets();
+
+        self.active_hyperlink_id = None;
 
         self.ansi_handler_state.active_charset = Default::default();
         self.ansi_handler_state.cursor_style = CursorStyle::default();
@@ -1134,15 +1152,21 @@ impl ansi::Handler for GridHandler {
     }
 
     fn set_color(&mut self, _: usize, _: warpui::color::ColorU) {
-        log::error!("Handler method GridHandler::set_color should never be called. This should be handled by TerminalModel.");
+        report_error!(
+            "Handler method GridHandler::set_color should never be called. This should be handled by TerminalModel."
+        );
     }
 
     fn dynamic_color_sequence<W: std::io::Write>(&mut self, _: &mut W, _: u8, _: usize, _: &str) {
-        log::error!("Handler method GridHandler::dynamic_color_sequence should never be called. This should be handled by TerminalModel.");
+        report_error!(
+            "Handler method GridHandler::dynamic_color_sequence should never be called. This should be handled by TerminalModel."
+        );
     }
 
     fn reset_color(&mut self, _: usize) {
-        log::error!("Handler method GridHandler::reset_color should never be called. This should be handled by TerminalModel.");
+        report_error!(
+            "Handler method GridHandler::reset_color should never be called. This should be handled by TerminalModel."
+        );
     }
 
     fn clipboard_store(&mut self, clipboard: u8, base64: &[u8]) {
@@ -1152,12 +1176,12 @@ impl ansi::Handler for GridHandler {
             _ => return,
         };
 
-        if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(base64) {
-            if let Ok(text) = String::from_utf8(bytes) {
-                self.ansi_handler_state
-                    .event_proxy
-                    .send_terminal_event(Event::ClipboardStore(clipboard_type, text));
-            }
+        if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(base64)
+            && let Ok(text) = String::from_utf8(bytes)
+        {
+            self.ansi_handler_state
+                .event_proxy
+                .send_terminal_event(Event::ClipboardStore(clipboard_type, text));
         }
     }
 
@@ -1191,11 +1215,15 @@ impl ansi::Handler for GridHandler {
     }
 
     fn push_title(&mut self) {
-        log::error!("Handler method GridHandler::push_title should never be called. This should be handled by TerminalModel.");
+        report_error!(
+            "Handler method GridHandler::push_title should never be called. This should be handled by TerminalModel."
+        );
     }
 
     fn pop_title(&mut self) {
-        log::error!("Handler method GridHandler::pop_title should never be called. This should be handled by TerminalModel.");
+        report_error!(
+            "Handler method GridHandler::pop_title should never be called. This should be handled by TerminalModel."
+        );
     }
 
     fn text_area_size_pixels<W: std::io::Write>(&mut self, writer: &mut W) {
@@ -1208,7 +1236,7 @@ impl ansi::Handler for GridHandler {
         let _ = write!(writer, "\x1b[8;{};{}t", self.visible_rows(), self.columns());
     }
 
-    fn precmd(&mut self, _: PrecmdValue) {
+    fn precmd_with_completion_metadata(&mut self, _: PrecmdValue) {
         unreachable!("Precmd hook is handled at block layer")
     }
 
@@ -1269,16 +1297,16 @@ impl ansi::Handler for GridHandler {
             return;
         }
 
-        if let Some((width, _)) = image.metadata.desired_width {
-            if width == 0 {
-                return;
-            }
+        if let Some((width, _)) = image.metadata.desired_width
+            && width == 0
+        {
+            return;
         }
 
-        if let Some((height, _)) = image.metadata.desired_height {
-            if height == 0 {
-                return;
-            }
+        if let Some((height, _)) = image.metadata.desired_height
+            && height == 0
+        {
+            return;
         }
 
         let mut desired_width_px = image.metadata.image_size.x();
@@ -1361,7 +1389,7 @@ impl ansi::Handler for GridHandler {
             (scroll_right_px / (self.ansi_handler_state.cell_width as f32)).ceil() as usize;
 
         let image_id = image.metadata.id;
-        let placement_id = rand::thread_rng().gen();
+        let placement_id = rand::thread_rng().r#gen();
 
         self.ansi_handler_state
             .event_proxy
@@ -1583,6 +1611,7 @@ impl GridHandler {
         let fg = self.grid.cursor().template.fg;
         let bg = self.grid.cursor().template.bg;
         let flags = self.grid.cursor().template.flags;
+        let hyperlink_id = self.active_hyperlink_id;
 
         let cursor_cell = self.grid.cursor_cell();
 
@@ -1592,6 +1621,7 @@ impl GridHandler {
         cursor_cell.fg = fg;
         cursor_cell.bg = bg;
         cursor_cell.flags = flags;
+        cursor_cell.set_hyperlink_id(hyperlink_id);
 
         cursor_cell
     }
@@ -1698,6 +1728,31 @@ impl GridHandler {
         }
     }
 
+    fn clear_visible_rows_in_place(&mut self, bg: Color) {
+        self.grid.region_mut(..).each(|cell| *cell = bg.into());
+        let visible_start_row = self.history_size();
+        let visible_end_row = visible_start_row + self.visible_rows();
+        if visible_start_row < visible_end_row {
+            self.images.evict_image_ids_between_points_with_type(
+                AbsolutePoint::from_point(Point::new(visible_start_row, 0), self),
+                AbsolutePoint::from_point(Point::new(visible_end_row - 1, usize::MAX), self),
+                vec![ImageType::ITerm, ImageType::Kitty],
+            );
+            if self.columns() > 0 {
+                self.clear_secrets_in_range(
+                    Point::new(visible_start_row, 0)
+                        ..=Point::new(visible_end_row - 1, self.columns() - 1),
+                );
+            }
+        }
+        self.clear_displayed_rows_and_filter_matches();
+        if self.track_content_length {
+            self.bottommost_visible_content_row = self.bottommost_visible_content_row_backward();
+        }
+        self.ansi_handler_state.dirty_cells_range =
+            Point::new(visible_start_row, 0)..Point::new(visible_end_row, 0);
+    }
+
     pub(in crate::terminal::model) fn disable_reset_grid_checks(&mut self) {
         self.ansi_handler_state.reset_grid_checks = ResetGridChecks::Disabled;
     }
@@ -1729,7 +1784,7 @@ impl GridHandler {
                         return Err(StorageError::UnknownId {
                             id: action.image_id,
                         }
-                        .into())
+                        .into());
                     }
                 };
 
@@ -1752,7 +1807,7 @@ impl GridHandler {
                         return Err(StorageError::UnknownId {
                             id: action.image_id,
                         }
-                        .into())
+                        .into());
                     }
                 };
 
@@ -1854,7 +1909,7 @@ impl GridHandler {
                         return Err(StorageError::UnknownId {
                             id: action.image_id,
                         }
-                        .into())
+                        .into());
                     }
                 };
 

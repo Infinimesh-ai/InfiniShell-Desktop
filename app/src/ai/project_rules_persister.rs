@@ -19,6 +19,7 @@ use ai::project_context::model::{ProjectContextModel, ProjectContextModelEvent};
 use repo_metadata::repositories::{DetectedRepositories, DetectedRepositoriesEvent};
 use warpui::{Entity, ModelContext, SingletonEntity};
 
+use crate::ai::metadata_project_rules::read_project_rule_contents;
 use crate::persistence::ModelEvent;
 
 /// 详见模块级文档。
@@ -41,7 +42,7 @@ impl ProjectRulesPersister {
         persistence_tx: Option<SyncSender<ModelEvent>>,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
-        ctx.subscribe_to_model(&ProjectContextModel::handle(ctx), |me, event, _ctx| {
+        ctx.subscribe_to_model(&ProjectContextModel::handle(ctx), |me, _handle, event, _ctx| {
             let ProjectContextModelEvent::KnownRulesChanged(delta) = event else {
                 return;
             };
@@ -75,12 +76,15 @@ impl ProjectRulesPersister {
             }
         });
 
-        ctx.subscribe_to_model(&DetectedRepositories::handle(ctx), |_me, event, ctx| {
+        ctx.subscribe_to_model(&DetectedRepositories::handle(ctx), |_me, _handle, event, ctx| {
             let DetectedRepositoriesEvent::DetectedGitRepo { repository, .. } = event;
             let repo_path = repository.as_ref(ctx).root_dir().to_local_path_lossy();
 
             ProjectContextModel::handle(ctx).update(ctx, |model, ctx| {
-                let _ = model.index_and_store_rules(repo_path, ctx);
+                // 上游把规则文件的读取抽成注入的 `ProjectRuleContentReader`
+                // (远端文件读取实现在 app crate),这里传与 `lib.rs`
+                // `new_from_persisted` 相同的实现。
+                let _ = model.index_and_store_rules(repo_path, read_project_rule_contents, ctx);
             });
         });
 

@@ -1,6 +1,6 @@
 {% if user_rules %}
 # User rules
-The user has configured the following global rules in Zap (Settings → Agents → Rules). Treat them as authoritative and follow them in all responses.
+The user has configured the following global rules in InfiniShell (Settings → Agents → Rules). Treat them as authoritative and follow them in all responses.
 {% for rule in user_rules %}
 {% if rule.name %}## {{ rule.name }}
 {% endif %}{{ rule.content }}

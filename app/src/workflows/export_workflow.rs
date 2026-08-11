@@ -1,24 +1,20 @@
-use serde::{
-    de::{self, MapAccess, Visitor},
-    ser::SerializeStruct,
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use std::collections::HashMap;
+use std::fmt;
+use std::result::Result;
+use std::str::FromStr;
+
+use serde::de::{self, MapAccess, Visitor};
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_yaml::Value;
 use strum::VariantNames as _;
 use strum_macros::{Display, EnumString, VariantNames};
 use warpui::{AppContext, SingletonEntity};
 
-use std::{collections::HashMap, fmt, result::Result, str::FromStr};
-
-use crate::{
-    cloud_object::model::persistence::ObjectStoreModel,
-    server::ids::{ClientId, SyncId},
-};
-
-use super::{
-    workflow::{Argument, ArgumentType, Workflow},
-    workflow_enum::{EnumVariants, WorkflowEnum},
-};
+use super::workflow::{Argument, ArgumentType, Workflow};
+use super::workflow_enum::{EnumVariants, WorkflowEnum};
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::server::ids::{ClientId, SyncId};
 
 /// Separate structure for exporting arguments. This new structure holds explicit enum information,
 /// unlike the `Argument` struct which just holds the enum_id. It is also flatter than the normal `Argument`
@@ -113,7 +109,10 @@ impl ExportArgument {
                     }
                     // If we are missing some enum info, use the default type instead
                     Err(_) => {
-                        log::warn!("Tried to deserialize an enum argument without any static variants or dynamic command provided, defaulting to {:?} argument", ArgumentType::default());
+                        log::warn!(
+                            "Tried to deserialize an enum argument without any static variants or dynamic command provided, defaulting to {:?} argument",
+                            ArgumentType::default()
+                        );
                         ArgumentType::default()
                     }
                 }
@@ -218,7 +217,7 @@ where
 /// Macro for deserializing workflow fields, given an associated variant on Field, a string name, a variable name, an expected type, a
 /// and an optional flag, which is true when the field is optional as we deserialize.
 macro_rules! extract_fields {
-    ($map:expr; $(($field:ident, $name:literal, $var:ident, $type:ty, $optional:expr)),* $(,)?) => {{
+    ($map:expr_2021; $(($field:ident, $name:literal, $var:ident, $type:ty, $optional:expr_2021)),* $(,)?) => {{
         $(let mut $var = None;)*
 
         while let Some(key) = $map.next_key()? {

@@ -1,41 +1,35 @@
+pub mod manager;
+pub mod templatable_manager;
+
 #[cfg(not(target_family = "wasm"))]
-use crate::server::datetime_ext::DateTimeExt;
-#[cfg(not(target_family = "wasm"))]
-use chrono::DateTime;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 #[cfg(not(target_family = "wasm"))]
-use crate::persistence::model::MCPEnvironmentVariables;
-use crate::{
-    cloud_object::{
-        model::{
-            generic_string_model::{GenericStringModel, GenericStringObjectId, StringModel},
-            json_model::{JsonModel, JsonSerializer},
-            persistence::ObjectStoreModel,
-        },
-        GenericStoredObject, GenericStringObjectFormat, GenericStringObjectUniqueKey,
-        JsonObjectType,
-    },
-    drive::{
-        items::{mcp_server::WarpDriveMCPServer, WarpDriveItem},
-        ObjectTypeAndId,
-    },
-    server::ids::SyncId,
-};
-#[cfg(not(target_family = "wasm"))]
 use diesel::{QueryDsl, RunQueryDsl, SqliteConnection};
-use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::Icon;
-
-pub mod manager;
-pub mod templatable_manager;
 #[cfg(not(target_family = "wasm"))]
 pub use templatable_manager::McpIntegration;
 pub use templatable_manager::TemplatableMCPServerManager;
+use warp_core::ui::Icon;
+use warp_core::ui::appearance::Appearance;
+use warpui::{AppContext, SingletonEntity as _};
+
+use crate::cloud_object::model::generic_string_model::{
+    GenericStringModel, GenericStringObjectId, StringModel,
+};
+use crate::cloud_object::model::json_model::{JsonModel, JsonSerializer};
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::{
+    GenericStoredObject, GenericStringObjectFormat, GenericStringObjectUniqueKey, JsonObjectType,
+};
+use crate::drive::ObjectTypeAndId;
+use crate::drive::items::WarpDriveItem;
+use crate::drive::items::mcp_server::WarpDriveMCPServer;
+#[cfg(not(target_family = "wasm"))]
+use crate::persistence::model::MCPEnvironmentVariables;
+use crate::server::ids::SyncId;
 
 cfg_if::cfg_if! {
     if #[cfg(not(feature = "local_fs"))] {
@@ -43,13 +37,6 @@ cfg_if::cfg_if! {
         pub use dummy_file_based_manager::FileBasedMCPManager;
         mod dummy_file_mcp_watcher;
         pub use dummy_file_mcp_watcher::FileMCPWatcher;
-    }
-}
-
-pub(crate) fn home_config_file_path(provider: MCPProvider) -> Option<PathBuf> {
-    match provider {
-        MCPProvider::Zap => warp_core::paths::warp_home_mcp_config_file_path(),
-        _ => dirs::home_dir().map(|home_dir| home_dir.join(provider.home_config_path())),
     }
 }
 
@@ -62,206 +49,31 @@ cfg_if::cfg_if! {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
-pub enum MCPProvider {
-    Zap,
-    Claude,
-    Codex,
-    Agents,
-}
-
-impl MCPProvider {
-    pub fn display_name(&self) -> &str {
-        match self {
-            MCPProvider::Zap => "Zap",
-            MCPProvider::Claude => "Claude",
-            MCPProvider::Codex => "Codex",
-            MCPProvider::Agents => "Other Agents",
-        }
-    }
-
-    pub fn icon(&self) -> Icon {
-        match self {
-            MCPProvider::Zap => Icon::Zap,
-            MCPProvider::Claude => Icon::ClaudeLogo,
-            MCPProvider::Codex => Icon::OpenAILogo,
-            MCPProvider::Agents => Icon::Zap,
-        }
-    }
-
-    /// Returns the path of the provider's config file relative to the home directory.
-    pub fn home_config_path(&self) -> &'static Path {
-        match self {
-            MCPProvider::Zap => Path::new(".warp/.mcp.json"),
-            MCPProvider::Claude => Path::new(".claude.json"),
-            MCPProvider::Codex => Path::new(".codex/config.toml"),
-            MCPProvider::Agents => Path::new(".agents/.mcp.json"),
-        }
-    }
-
-    /// Returns the path of the provider's config file relative to a project root.
-    pub fn project_config_path(&self) -> &'static Path {
-        match self {
-            MCPProvider::Zap => Path::new(".warp/.mcp.json"),
-            MCPProvider::Claude => Path::new(".mcp.json"),
-            MCPProvider::Codex => Path::new(".codex/config.toml"),
-            MCPProvider::Agents => Path::new(".agents/.mcp.json"),
-        }
-    }
-}
-
-/// Returns the [`MCPProvider`] that owns `file_path` as a config file, if any.
-///
-/// Matches against both home-level configs (e.g. `~/.claude.json`) and
-/// project-level configs (e.g. `.mcp.json` anywhere in the path).
-pub fn mcp_provider_from_file_path(file_path: &Path) -> Option<MCPProvider> {
-    // Try exact home-config match first (unambiguous).
-    for provider in MCPProvider::iter() {
-        if home_config_file_path(provider)
-            .as_ref()
-            .is_some_and(|home_config_path| file_path == home_config_path)
-        {
-            return Some(provider);
-        }
-    }
-    // Fall back to project-config suffix match, preferring the longest
-    // (most-specific) suffix.
-    // This avoids `.mcp.json` shadowing `.warp/.mcp.json`, for example.
-    let mut best: Option<(MCPProvider, usize)> = None;
-    for provider in MCPProvider::iter() {
-        let cfg = provider.project_config_path();
-        if file_path.ends_with(cfg) {
-            let len = cfg.as_os_str().len();
-            if best.is_none_or(|(_, best_len)| len > best_len) {
-                best = Some((provider, len));
-            }
-        }
-    }
-    best.map(|(p, _)| p)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{mcp_provider_from_file_path, MCPProvider};
-
-    #[test]
-    fn mcp_provider_from_file_path_recognizes_warp_home_path() {
-        if let Some(warp_home_mcp_config_file_path) =
-            warp_core::paths::warp_home_mcp_config_file_path()
-        {
-            assert_eq!(
-                mcp_provider_from_file_path(&warp_home_mcp_config_file_path),
-                Some(MCPProvider::Zap)
-            );
-        }
-    }
-}
-
 pub mod gallery;
 pub use gallery::MCPGalleryManager;
-use warpui::{AppContext, SingletonEntity as _};
+#[cfg(not(target_family = "wasm"))]
+pub mod builtin;
 pub mod templatable;
-pub use templatable::JsonTemplate;
-pub use templatable::{TemplatableMCPServer, TemplateVariable};
+#[cfg(not(target_family = "wasm"))]
+pub use cloud_object_models::{
+    CLIServer, JSONMCPServer, JSONTransportType, ServerSentEvents, StaticEnvVar, StaticHeader,
+};
+pub use cloud_object_models::{
+    CloudMCPServer, CloudMCPServerModel, MCPServer, MCPServerState, TransportType,
+};
+pub use templatable::{JsonTemplate, TemplatableMCPServer, TemplateVariable};
 pub mod logs;
 pub mod templatable_installation;
 pub use templatable_installation::TemplatableMCPServerInstallation;
 #[cfg(not(target_family = "wasm"))]
 pub use templatable_installation::{VariableType, VariableValue};
 pub mod parsing;
+#[cfg(not(target_family = "wasm"))]
 pub use parsing::ParsedTemplatableMCPServerResult;
 #[cfg(not(target_family = "wasm"))]
-pub mod http_client;
+use warp_errors::report_error;
 #[cfg(not(target_family = "wasm"))]
 pub mod reconnecting_peer;
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(target_family = "wasm", expect(dead_code))]
-pub struct JSONMCPServer {
-    #[serde(flatten)]
-    pub transport_type: JSONTransportType,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum JSONTransportType {
-    CLIServer {
-        command: String,
-        #[serde(default)]
-        args: Vec<String>,
-        #[serde(default)]
-        env: HashMap<String, String>,
-        #[serde(default)]
-        working_directory: Option<String>,
-    },
-    SSEServer {
-        #[serde(alias = "serverUrl")]
-        url: String,
-        #[serde(default)]
-        headers: HashMap<String, String>,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MCPServer {
-    pub transport_type: TransportType,
-    pub name: String,
-    #[serde(default)]
-    pub uuid: uuid::Uuid,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[cfg_attr(target_family = "wasm", allow(dead_code))]
-pub enum MCPServerState {
-    NotRunning,
-    Starting,
-    Authenticating,
-    Running,
-    ShuttingDown,
-    FailedToStart,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TransportType {
-    CLIServer(CLIServer),
-    ServerSentEvents(ServerSentEvents),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CLIServer {
-    pub command: String,
-    #[serde(default)]
-    pub args: Vec<String>,
-    pub cwd_parameter: Option<String>,
-    /// Static env vars added via editor inputs.
-    pub static_env_vars: Vec<StaticEnvVar>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StaticEnvVar {
-    pub name: String,
-    /// To avoid leaking environment variables, we ensure that values are not
-    /// serialized before being sent to our servers
-    #[serde(skip_serializing, default)]
-    pub value: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StaticHeader {
-    pub name: String,
-    /// To avoid leaking header values (which may contain secrets), we ensure that values are not
-    /// serialized before being sent to our servers
-    #[serde(skip_serializing, default)]
-    pub value: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ServerSentEvents {
-    pub url: String,
-    /// Static headers added via editor inputs.
-    #[serde(default)]
-    pub headers: Vec<StaticHeader>,
-}
 
 pub type MCPServerObject = GenericStoredObject<GenericStringObjectId, MCPServerObjectModel>;
 pub type MCPServerObjectModel = GenericStringModel<MCPServer, JsonSerializer>;
@@ -288,6 +100,11 @@ impl MCPServerObject {
             .find(|server| server.model().string_model.uuid == *uuid)
     }
 }
+
+// Zap:上游在这里为 `MCPServer` 实现 `CloudObjectUuid`(配合
+// `CloudObjectUuidLookup` 做云端对象的 uuid 反查)。我方 `crate::cloud_object`
+// 走的是 `StoredObject*` 体系,没有这两个 trait,uuid 反查由上面的
+// `MCPServerObject::get_by_uuid` 直接完成,故不再实现。
 
 impl StringModel for MCPServer {
     type StoredObjectType = MCPServerObject;
@@ -400,6 +217,7 @@ fn items_from_hashmap<T: NameValuePair>(map: &HashMap<String, String>) -> Vec<T>
 
 /// Converts a slice of name/value pair items to a HashMap.
 #[cfg(not(target_family = "wasm"))]
+#[allow(dead_code)]
 fn items_to_hashmap<T: NameValuePair>(items: &[T]) -> HashMap<String, String> {
     items
         .iter()
@@ -455,53 +273,63 @@ fn apply_values<T: NameValuePair>(items: &mut [T], values: &HashMap<String, Stri
 }
 
 #[cfg(not(target_family = "wasm"))]
-impl MCPServer {
-    fn find_server_map(
-        config: serde_json::Value,
-    ) -> serde_json::Result<HashMap<String, JSONMCPServer>> {
-        // We want to be quite permissive in parsing user input. They may specify more than one
-        // server. They might paste things in Claude Desktop style or VSCode style. All are
-        // accepted here.
-        //
-        // VSCode:
-        // {
-        //   "mcp": {
-        //     "servers": {
-        //          [map of mcp servers]
-        //     }
-        //   }
-        // }
-        //   ---  OR  ---
-        // {
-        //   "servers": {
-        //     [map of mcp servers]
-        //   }
-        // }
-        //
-        // Claude Desktop:
-        // {
-        //   "mcpServers": {
-        //     [map of mcp servers]
-        //   }
-        // }
-        // Also allowed:
-        // {
-        //   [map of mcp servers]
-        // }
+fn find_server_map(
+    config: serde_json::Value,
+) -> serde_json::Result<HashMap<String, JSONMCPServer>> {
+    // We want to be quite permissive in parsing user input. They may specify more than one
+    // server. They might paste things in Claude Desktop style or VSCode style. All are
+    // accepted here.
+    //
+    // VSCode:
+    // {
+    //   "mcp": {
+    //     "servers": {
+    //          [map of mcp servers]
+    //     }
+    //   }
+    // }
+    //   ---  OR  ---
+    // {
+    //   "servers": {
+    //     [map of mcp servers]
+    //   }
+    // }
+    //
+    // Claude Desktop:
+    // {
+    //   "mcpServers": {
+    //     [map of mcp servers]
+    //   }
+    // }
+    // Also allowed:
+    // {
+    //   [map of mcp servers]
+    // }
 
-        let pointers = ["/mcp/servers", "/servers", "/mcpServers"];
-        for pointer in pointers.into_iter() {
-            if let Some(value) = config.pointer(pointer) {
-                if let Ok(servers) =
-                    serde_json::from_value::<HashMap<String, JSONMCPServer>>(value.clone())
-                {
-                    return Ok(servers);
-                }
-            }
+    let pointers = ["/mcp/servers", "/servers", "/mcpServers"];
+    for pointer in pointers.into_iter() {
+        if let Some(value) = config.pointer(pointer)
+            && let Ok(servers) =
+                serde_json::from_value::<HashMap<String, JSONMCPServer>>(value.clone())
+        {
+            return Ok(servers);
         }
-        serde_json::from_value::<HashMap<String, JSONMCPServer>>(config)
     }
-    pub fn from_user_json(json: &str) -> serde_json::Result<Vec<MCPServer>> {
+    serde_json::from_value::<HashMap<String, JSONMCPServer>>(config)
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub trait MCPServerExt {
+    fn from_user_json(json: &str) -> serde_json::Result<Vec<MCPServer>>;
+    #[cfg(test)]
+    fn to_user_json(&self) -> String;
+    fn to_parsed_templatable_mcp_server_result(&self) -> ParsedTemplatableMCPServerResult;
+    fn fill_environment_variables(&mut self, conn: &mut SqliteConnection);
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl MCPServerExt for MCPServer {
+    fn from_user_json(json: &str) -> serde_json::Result<Vec<MCPServer>> {
         // Some docs don't show curly braces around the json object, so add them if necessary.
         let json = json.trim();
         let json = if json.starts_with("{") {
@@ -512,7 +340,7 @@ impl MCPServer {
 
         let config: serde_json::Value = serde_json::from_str(&json)?;
 
-        let servers = Self::find_server_map(config)?;
+        let servers = find_server_map(config)?;
         Ok(servers
             .iter()
             .map(|(name, server)| {
@@ -546,7 +374,8 @@ impl MCPServer {
 
     /// Includes the environment variable values, should only be shown to users,
     /// not sent to our servers.
-    pub fn to_user_json(&self) -> String {
+    #[cfg(test)]
+    fn to_user_json(&self) -> String {
         let transport_type = match &self.transport_type {
             TransportType::CLIServer(cli_server) => JSONTransportType::CLIServer {
                 command: cli_server.command.clone(),
@@ -566,12 +395,14 @@ impl MCPServer {
         // serde_json::to_string_pretty should never fail on our JSONMCPServer type, but better to
         // not crash the app if it does.
         .unwrap_or_else(|err| {
-            log::error!("Could not serialize MCP server to user json: {err:?}");
+            report_error!(
+                anyhow::Error::new(err).context("Could not serialize MCP server to user json")
+            );
             Default::default()
         })
     }
 
-    pub fn to_parsed_templatable_mcp_server_result(&self) -> ParsedTemplatableMCPServerResult {
+    fn to_parsed_templatable_mcp_server_result(&self) -> ParsedTemplatableMCPServerResult {
         let (transport_type, variables, variable_values) = match &self.transport_type {
             TransportType::CLIServer(cli_server) => {
                 let (env, vars, vals) = extract_template_variables(&cli_server.static_env_vars);
@@ -606,7 +437,9 @@ impl MCPServer {
         // serde_json::to_string_pretty should never fail on our JSONMCPServer type, but better to
         // not crash the app if it does.
         .unwrap_or_else(|err| {
-            log::error!("Could not serialize MCP server to user json: {err:?}");
+            report_error!(
+                anyhow::Error::new(err).context("Could not serialize MCP server to user json")
+            );
             Default::default()
         });
 
@@ -615,23 +448,24 @@ impl MCPServer {
             name: self.name.clone(),
             description: None,
             template: JsonTemplate { json, variables },
-            version: DateTime::now().timestamp(),
+            version: chrono::Local::now().timestamp(),
             gallery_data: None,
         };
         let templatable_mcp_server_installation: Option<TemplatableMCPServerInstallation> =
             Some(TemplatableMCPServerInstallation::new(
                 uuid::Uuid::new_v4(),
                 templatable_mcp_server.clone(),
-                variable_values,
+                variable_values.clone(),
             ));
 
         ParsedTemplatableMCPServerResult {
             templatable_mcp_server,
             templatable_mcp_server_installation,
+            variable_values,
         }
     }
 
-    pub fn fill_environment_variables(&mut self, conn: &mut SqliteConnection) {
+    fn fill_environment_variables(&mut self, conn: &mut SqliteConnection) {
         if let TransportType::CLIServer(ref mut cli_server) = self.transport_type {
             let uuid = self.uuid.as_bytes().to_vec();
             match crate::persistence::schema::mcp_environment_variables::dsl::mcp_environment_variables
@@ -644,27 +478,10 @@ impl MCPServer {
                     apply_values(&mut cli_server.static_env_vars, &env_vars);
                 }
                 Err(error) => {
-                    log::error!("Could not read MCP server environment variables from sqlite: {error:?}");
+                    report_error!(anyhow::Error::new(error)
+                        .context("Could not read MCP server environment variables from sqlite"));
                 }
             }
-        }
-    }
-}
-
-#[cfg(target_family = "wasm")]
-impl MCPServer {
-    pub fn from_user_json(_json: &str) -> serde_json::Result<Vec<MCPServer>> {
-        Ok(Vec::new())
-    }
-
-    pub fn to_user_json(&self) -> String {
-        Default::default()
-    }
-
-    pub fn to_parsed_templatable_mcp_server_result(&self) -> ParsedTemplatableMCPServerResult {
-        ParsedTemplatableMCPServerResult {
-            templatable_mcp_server: TemplatableMCPServer::default(),
-            templatable_mcp_server_installation: None,
         }
     }
 }
@@ -690,5 +507,96 @@ pub enum MCPServerUpdate {
     },
 }
 
+pub(crate) fn home_config_file_path(provider: MCPProvider) -> Option<PathBuf> {
+    match provider {
+        MCPProvider::Zap => warp_core::paths::warp_home_mcp_config_file_path(),
+        _ => dirs::home_dir().map(|home_dir| home_dir.join(provider.home_config_path())),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
+pub enum MCPProvider {
+    Zap,
+    Claude,
+    Codex,
+    Agents,
+}
+
+impl MCPProvider {
+    pub fn display_name(&self) -> &str {
+        match self {
+            MCPProvider::Zap => "InfiniShell",
+            MCPProvider::Claude => "Claude",
+            MCPProvider::Codex => "Codex",
+            MCPProvider::Agents => "Other Agents",
+        }
+    }
+
+    pub fn icon(&self) -> Icon {
+        match self {
+            // Zap's own agent MCP config — use the Zap brand mark.
+            MCPProvider::Zap => Icon::Zap,
+            MCPProvider::Claude => Icon::ClaudeLogo,
+            MCPProvider::Codex => Icon::OpenAILogo,
+            // "Other Agents" is the cross-tool .agents/.mcp.json convention for
+            // third-party agent tooling (not Zap-branded). Use a neutral AI
+            // icon so this row never carries the Zap brand mark, and the two
+            // rows remain visually distinct.
+            MCPProvider::Agents => Icon::AiAssistant,
+        }
+    }
+
+    /// Returns the path of the provider's config file relative to the home directory.
+    pub fn home_config_path(&self) -> &'static Path {
+        match self {
+            MCPProvider::Zap => Path::new(".warp/.mcp.json"),
+            MCPProvider::Claude => Path::new(".claude.json"),
+            MCPProvider::Codex => Path::new(".codex/config.toml"),
+            MCPProvider::Agents => Path::new(".agents/.mcp.json"),
+        }
+    }
+
+    /// Returns the path of the provider's config file relative to a project root.
+    pub fn project_config_path(&self) -> &'static Path {
+        match self {
+            MCPProvider::Zap => Path::new(".warp/.mcp.json"),
+            MCPProvider::Claude => Path::new(".mcp.json"),
+            MCPProvider::Codex => Path::new(".codex/config.toml"),
+            MCPProvider::Agents => Path::new(".agents/.mcp.json"),
+        }
+    }
+}
+
+/// Returns the [`MCPProvider`] that owns `file_path` as a config file, if any.
+///
+/// Matches against both home-level configs (e.g. `~/.claude.json`) and
+/// project-level configs (e.g. `.mcp.json` anywhere in the path).
+pub fn mcp_provider_from_file_path(file_path: &Path) -> Option<MCPProvider> {
+    // Try exact home-config match first (unambiguous).
+    for provider in MCPProvider::iter() {
+        if home_config_file_path(provider)
+            .as_ref()
+            .is_some_and(|home_config_path| file_path == home_config_path)
+        {
+            return Some(provider);
+        }
+    }
+    // Fall back to project-config suffix match, preferring the longest
+    // (most-specific) suffix.
+    // This avoids `.mcp.json` shadowing `.warp/.mcp.json`, for example.
+    let mut best: Option<(MCPProvider, usize)> = None;
+    for provider in MCPProvider::iter() {
+        let cfg = provider.project_config_path();
+        if file_path.ends_with(cfg) {
+            let len = cfg.as_os_str().len();
+            if best.is_none_or(|(_, best_len)| len > best_len) {
+                best = Some((provider, len));
+            }
+        }
+    }
+    best.map(|(p, _)| p)
+}
+
 #[cfg(test)]
-mod mod_test;
+#[path = "mod_tests.rs"]
+mod tests;

@@ -1,18 +1,14 @@
-use crate::{
-    cloud_object::{
-        breadcrumbs::ContainingObject,
-        model::{persistence::ObjectStoreEvent, view::ObjectStoreViewModel},
-        Owner, Revision, Space, StoredObject,
-    },
-    drive::sharing::{ContentEditability, SharingAccessLevel},
-    env_vars::EnvVarCollectionObject,
-    server::ids::{ClientId, SyncId},
-    AppContext, ObjectStoreModel,
-};
-
 use warpui::{Entity, ModelContext, SingletonEntity};
 
 use super::EnvVarCollectionObjectModel;
+use crate::cloud_object::breadcrumbs::ContainingObject;
+use crate::cloud_object::model::persistence::ObjectStoreEvent;
+use crate::cloud_object::model::view::ObjectStoreViewModel;
+use crate::cloud_object::{Owner, Revision, Space, StoredObject};
+use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
+use crate::env_vars::EnvVarCollectionObject;
+use crate::server::ids::{ClientId, SyncId};
+use crate::{AppContext, ObjectStoreModel};
 
 #[derive(Default, Clone)]
 pub enum ActiveEnvVarCollection {
@@ -49,7 +45,7 @@ impl ActiveEnvVarCollectionData {
         // `ObjectStoreModel` 订阅保留(本地对象变更仍需 breadcrumbs 刷新)。
         let object_store_model = ObjectStoreModel::handle(ctx);
 
-        ctx.subscribe_to_model(&object_store_model, |me, event, ctx| {
+        ctx.subscribe_to_model(&object_store_model, |me, _, event, ctx| {
             me.handle_object_store_event(event, ctx);
         });
 
@@ -63,12 +59,11 @@ impl ActiveEnvVarCollectionData {
         event: &ObjectStoreEvent,
         ctx: &mut ModelContext<Self>,
     ) {
-        if let ObjectStoreEvent::ObjectMoved { type_and_id, .. } = event {
-            if let Some(env_var_collection_id) = type_and_id.as_generic_string_object_id() {
-                if self.is_active_env_var_collection(env_var_collection_id) {
-                    ctx.emit(ActiveEnvVarCollectionDataEvent::BreadcrumbsChanged)
-                }
-            }
+        if let ObjectStoreEvent::ObjectMoved { type_and_id, .. } = event
+            && let Some(env_var_collection_id) = type_and_id.as_generic_string_object_id()
+            && self.is_active_env_var_collection(env_var_collection_id)
+        {
+            ctx.emit(ActiveEnvVarCollectionDataEvent::BreadcrumbsChanged)
         }
     }
 

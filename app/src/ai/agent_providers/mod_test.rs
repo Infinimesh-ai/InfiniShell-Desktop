@@ -31,6 +31,18 @@ fn init_byop_test_app(app: &mut warpui::App) {
     app.add_singleton_model(|_| AuthStateProvider::new_for_test());
     app.add_singleton_model(AuthManager::new_for_test);
     app.add_singleton_model(UserWorkspaces::default_mock);
+    app.add_singleton_model(crate::cloud_object::model::persistence::ObjectStoreModel::mock);
+    app.add_singleton_model(crate::cloud_object::update_manager::UpdateManager::mock);
+    app.add_singleton_model(|_| {
+        crate::ai::mcp::templatable_manager::TemplatableMCPServerManager::default()
+    });
+    // BYOP 选择器会读取执行档案(`AIExecutionProfilesModel`)来过滤可用模型。
+    app.add_singleton_model(|ctx| {
+        crate::ai::execution_profiles::profiles::AIExecutionProfilesModel::new(
+            &crate::LaunchMode::new_for_unit_test(),
+            ctx,
+        )
+    });
     app.add_singleton_model(LLMPreferences::new);
 }
 
@@ -50,7 +62,7 @@ fn smoke_build_byop_models_by_feature_exposes_configured_models() {
 
         app.read(|ctx| {
             let choices: Vec<_> = LLMPreferences::as_ref(ctx)
-                .get_base_llm_choices_for_agent_mode()
+                .get_base_llm_choices_for_agent_mode(ctx)
                 .collect();
             assert_eq!(choices.len(), 1, "expected one BYOP model in picker");
             assert!(
@@ -71,7 +83,7 @@ fn smoke_build_byop_models_by_feature_uses_placeholder_when_misconfigured() {
         init_byop_test_app(&mut app);
 
         app.read(|ctx| {
-            let default = LLMPreferences::as_ref(ctx).get_default_base_model();
+            let default = LLMPreferences::as_ref(ctx).get_default_base_model(ctx);
             assert_eq!(
                 default.disable_reason,
                 Some(DisableReason::Unavailable),
@@ -95,7 +107,7 @@ fn smoke_build_byop_models_by_feature_skips_empty_base_url() {
         });
 
         app.read(|ctx| {
-            let default = LLMPreferences::as_ref(ctx).get_default_base_model();
+            let default = LLMPreferences::as_ref(ctx).get_default_base_model(ctx);
             assert_eq!(
                 default.disable_reason,
                 Some(DisableReason::Unavailable),

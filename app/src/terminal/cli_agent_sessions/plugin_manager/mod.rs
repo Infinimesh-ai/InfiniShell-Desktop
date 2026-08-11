@@ -6,21 +6,20 @@ pub(crate) mod opencode;
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::fmt;
-use std::io;
 use std::path::PathBuf;
+use std::{fmt, io};
 
 use async_trait::async_trait;
-
-use crate::features::FeatureFlag;
-use crate::terminal::model::session::LocalCommandExecutor;
-use crate::terminal::shell::ShellType;
-use crate::terminal::CLIAgent;
 use claude::ClaudeCodePluginManager;
 use codex::CodexPluginManager;
 use deepseek::DeepSeekPluginManager;
 use gemini::GeminiPluginManager;
 use opencode::OpenCodePluginManager;
+
+use crate::features::FeatureFlag;
+use crate::terminal::CLIAgent;
+use crate::terminal::model::session::LocalCommandExecutor;
+use crate::terminal::shell::ShellType;
 
 /// Distinguishes whether the plugin instructions modal should show install or update steps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,6 +53,7 @@ pub(crate) struct PluginInstructions {
 /// Error returned when plugin installation fails.
 /// Carries both a short user-facing message (for the toast) and a detailed
 /// command log (for the log file the user can inspect).
+#[derive(Debug)]
 pub(crate) struct PluginInstallError {
     /// Short description shown in the toast notification.
     pub message: String,
@@ -66,6 +66,8 @@ impl fmt::Display for PluginInstallError {
         f.write_str(&self.message)
     }
 }
+
+impl std::error::Error for PluginInstallError {}
 
 impl From<io::Error> for PluginInstallError {
     fn from(err: io::Error) -> Self {
@@ -162,6 +164,24 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
         false
     }
 
+    /// Whether this agent's Oz platform plugin is already installed.
+    /// Default returns `true` because most agents do not have a platform plugin.
+    fn is_platform_plugin_installed(&self) -> bool {
+        true
+    }
+    /// Whether this agent's Oz platform plugin is below the minimum required version.
+    /// Default returns `false` because most agents do not have a platform plugin.
+    fn platform_plugin_needs_update(&self) -> bool {
+        false
+    }
+
+    /// Whether the agent's plugin marketplace is currently overridden to a
+    /// local filesystem path. This is used by local test flows to avoid
+    /// clobbering a developer's marketplace override while still preserving
+    /// normal install/update behavior in staging and production.
+    fn has_local_marketplace_override(&self) -> bool {
+        false
+    }
     /// Install the Zap notification plugin.
     /// Default returns an error — only agents with `can_auto_install() == true` should override.
     async fn install(&self) -> Result<(), PluginInstallError> {
@@ -182,12 +202,12 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
 
     /// Toast message shown after a successful auto-install.
     fn install_success_message(&self) -> &'static str {
-        "Zap plugin installed. Please restart the session to activate."
+        "InfiniShell plugin installed. Please restart the session to activate."
     }
 
     /// Toast message shown after a successful auto-update.
     fn update_success_message(&self) -> &'static str {
-        "Zap plugin updated. Please restart the session to activate."
+        "InfiniShell plugin updated. Please restart the session to activate."
     }
 
     /// Manual installation instructions for the modal UI.
@@ -201,6 +221,21 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
 
     /// Manual update instructions for the modal UI.
     fn update_instructions(&self) -> &'static PluginInstructions;
+
+    /// Install the Oz platform plugin for this CLI agent, if one exists,
+    /// which provides skills that third-party harnesses can use to interact with
+    /// the Oz platform.
+    /// Default is a no-op — only agents with a platform plugin should override.
+    async fn install_platform_plugin(&self) -> Result<(), PluginInstallError> {
+        Ok(())
+    }
+
+    /// Update the Oz platform plugin for this CLI agent, if one exists.
+    /// Default reuses the install path because most agents do not have a
+    /// platform plugin or need distinct update behavior.
+    async fn update_platform_plugin(&self) -> Result<(), PluginInstallError> {
+        self.install_platform_plugin().await
+    }
 }
 
 /// Returns a plugin manager for the given CLI agent, or `None` if the agent
@@ -236,7 +271,11 @@ pub(crate) fn plugin_manager_for_with_shell(
             if FeatureFlag::CodexNotifications.is_enabled()
                 && FeatureFlag::HOANotifications.is_enabled() =>
         {
-            Some(Box::new(CodexPluginManager))
+            Some(Box::new(CodexPluginManager::new(
+                shell_path,
+                shell_type,
+                path_env_var,
+            )))
         }
         CLIAgent::Gemini
             if FeatureFlag::GeminiNotifications.is_enabled()
@@ -259,11 +298,15 @@ pub(crate) fn plugin_manager_for_with_shell(
         | CLIAgent::Droid
         | CLIAgent::Copilot
         | CLIAgent::Pi
+        | CLIAgent::OhMyPi
         | CLIAgent::Auggie
         | CLIAgent::CursorCli
+        | CLIAgent::Hermes
         | CLIAgent::Goose
+        | CLIAgent::Vibe
         | CLIAgent::Antigravity
         | CLIAgent::Omp
+        | CLIAgent::WarpTui
         | CLIAgent::Unknown => None,
     }
 }

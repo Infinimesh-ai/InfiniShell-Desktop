@@ -1,21 +1,25 @@
-use crate::localization::localized;
-use crate::model::OnboardingStateModel;
-
-use super::OnboardingSlide;
 use pathfinder_color::ColorU;
-use ui_components::{button, Component as _, Options as _};
-use warp_core::ui::{appearance::Appearance, theme::color::internal_colors, Icon};
-use warpui::{
-    elements::{
-        shimmering_text::{ShimmerConfig, ShimmeringTextElement, ShimmeringTextStateHandle},
-        Align, ConstrainedBox, Container, CrossAxisAlignment, Flex, FormattedTextElement,
-        MainAxisAlignment, MainAxisSize, ParentElement,
-    },
-    keymap::Keystroke,
-    text_layout::TextAlignment,
+use ui_components::{Component as _, Options as _, button};
+use warp_core::ui::Icon;
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::theme::color::internal_colors;
+use warpui_core::elements::shimmering_text::{
+    ShimmerConfig, ShimmeringTextElement, ShimmeringTextStateHandle,
+};
+use warpui_core::elements::{
+    Align, ConstrainedBox, Container, CrossAxisAlignment, Flex, FormattedTextElement,
+    MainAxisAlignment, MainAxisSize, ParentElement,
+};
+use warpui_core::keymap::Keystroke;
+use warpui_core::text_layout::TextAlignment;
+use warpui_core::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext,
 };
+
+use super::OnboardingSlide;
+use crate::localization::localized;
+use crate::model::OnboardingStateModel;
 
 #[derive(Clone, Debug)]
 pub enum IntroSlideAction {
@@ -83,7 +87,7 @@ impl IntroSlide {
         let base_color: ColorU = internal_colors::fg_overlay_4(theme).into();
         let shimmer_color: ColorU = theme.foreground().into();
         let title = ShimmeringTextElement::new(
-            localized("onboarding-intention-title", "Welcome to Zap"),
+            localized("onboarding-intention-title", "Welcome to InfiniShell"),
             appearance.ui_font_family(),
             32.,
             base_color,

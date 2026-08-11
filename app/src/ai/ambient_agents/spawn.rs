@@ -69,6 +69,6 @@ pub fn spawn_task(
     _timeout: Option<Duration>,
 ) -> impl Stream<Item = Result<AmbientAgentEvent, anyhow::Error>> {
     async_stream::stream! {
-        yield Err(anyhow::anyhow!("Agent spawning is disabled in Zap"));
+        yield Err(anyhow::anyhow!("Agent spawning is disabled in InfiniShell"));
     }
 }

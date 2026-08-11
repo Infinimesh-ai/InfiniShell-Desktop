@@ -1,29 +1,26 @@
-use crate::network::NetworkStatus;
-use crate::persistence::ModelEvent;
-// Zap Wave 3-1:`AuthClient` trait 与 `workspace:debug_create_anonymous_user`
-// debug action 随 auth 子系统下线一同物理删。
-use crate::app_state::get_app_state;
-use crate::terminal::alt_screen_reporting::AltScreenReporting;
-use crate::terminal::general_settings::GeneralSettings;
-use crate::workspace::cross_window_tab_drag::CrossWindowTabDrag;
-// Zap Wave 3-1:`ServerApiProvider` 不再被本文件使用,`debug_create_anonymous_user`
-// debug action 随 AuthClient 一同物理删。
-use ::settings::ToggleableSetting;
-use warp_core::execution_mode::AppExecutionMode;
-
-use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::agent::AIAgentExchangeId;
-use crate::root_view::OpenPath;
-use crate::undo_close::UndoCloseStack;
-use crate::workspace::{Workspace, WorkspaceAction};
-use crate::GlobalResourceHandlesProvider;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use ::settings::ToggleableSetting;
 use futures::stream::AbortHandle;
+use warp_core::execution_mode::AppExecutionMode;
+use warp_errors::report_error;
 use warpui::r#async::Timer;
 use warpui::windowing::WindowManager;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, TypedActionView};
+
+use crate::ai::agent::AIAgentExchangeId;
+use crate::ai::agent::conversation::AIConversationId;
+use crate::app_state::get_app_state;
+use crate::network::NetworkStatus;
+use crate::persistence::ModelEvent;
+use crate::root_view::OpenPath;
+use crate::terminal::alt_screen_reporting::AltScreenReporting;
+use crate::terminal::general_settings::GeneralSettings;
+use crate::undo_close::UndoCloseStack;
+use crate::workspace::cross_window_tab_drag::CrossWindowTabDrag;
+use crate::workspace::{Workspace, WorkspaceAction};
+use crate::GlobalResourceHandlesProvider;
 
 /// Specifies where a forked conversation should be opened.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -38,6 +35,16 @@ pub enum ForkedConversationDestination {
 }
 
 impl ForkedConversationDestination {
+    /// Fork destination from an Enter (`false`) / Cmd-or-Ctrl+Enter (`true`) trigger: Enter
+    /// opens a new split pane, Cmd/Ctrl+Enter opens a new tab. Shared by all fork-style commands.
+    pub fn for_fork_trigger(cmd_or_ctrl_enter: bool) -> Self {
+        if cmd_or_ctrl_enter {
+            Self::NewTab
+        } else {
+            Self::SplitPane
+        }
+    }
+
     pub fn is_new_tab(&self) -> bool {
         matches!(self, Self::NewTab)
     }
@@ -198,7 +205,7 @@ fn save_app_snapshot_now(ctx: &mut AppContext) {
     let event = ModelEvent::Snapshot(app_state);
 
     if let Err(err) = model_event_sender.send(event) {
-        log::error!("Error trying to send model event {err:?}");
+        report_error!(anyhow::Error::new(err).context("Error trying to send model event"));
     }
 }
 
@@ -227,14 +234,13 @@ fn undo_close(_: &(), ctx: &mut AppContext) {
 
 /// Dispatches an action to the active workspace, if one exists.
 fn dispatch_to_active_workspace(ctx: &mut AppContext, action: WorkspaceAction) {
-    if let Some(window_id) = WindowManager::as_ref(ctx).active_window() {
-        if let Some(workspaces) = ctx.views_of_type::<Workspace>(window_id) {
-            if let Some(workspace) = workspaces.into_iter().next() {
-                workspace.update(ctx, |workspace, ctx| {
-                    workspace.handle_action(&action, ctx);
-                });
-            }
-        }
+    if let Some(window_id) = WindowManager::as_ref(ctx).active_window()
+        && let Some(workspaces) = ctx.views_of_type::<Workspace>(window_id)
+        && let Some(workspace) = workspaces.into_iter().next()
+    {
+        workspace.update(ctx, |workspace, ctx| {
+            workspace.handle_action(&action, ctx);
+        });
     }
 }
 
@@ -263,6 +269,7 @@ fn fork_ai_conversation(params: &ForkAIConversationParams, ctx: &mut AppContext)
             summarize_after_fork: params.summarize_after_fork,
             summarization_prompt: params.summarization_prompt.clone(),
             initial_prompt: params.initial_prompt.clone(),
+            initial_attachments: vec![],
             destination: params.destination,
         },
     );

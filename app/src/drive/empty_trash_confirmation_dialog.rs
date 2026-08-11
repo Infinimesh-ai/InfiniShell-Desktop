@@ -1,18 +1,12 @@
-use warpui::{
-    elements::MouseStateHandle,
-    fonts::Weight,
-    platform::Cursor,
-    ui_components::{
-        button::ButtonVariant,
-        components::{Coords, UiComponent, UiComponentStyles},
-    },
-    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
-};
+use warpui::elements::MouseStateHandle;
+use warpui::fonts::Weight;
+use warpui::platform::Cursor;
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
-use crate::{
-    appearance::Appearance,
-    ui_components::dialog::{dialog_styles, Dialog},
-};
+use crate::appearance::Appearance;
+use crate::ui_components::dialog::{Dialog, dialog_styles};
 
 // This follows our new design standard for confirmation dialogs (e.g. used in the session sharing dialog)
 // Design team has discouraged us from continuing to use ActionConfirmationDialog's current design

@@ -1,17 +1,16 @@
+use std::borrow::Cow;
+use std::collections::HashSet;
+
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
-use std::{borrow::Cow, collections::HashSet};
 use url::{Origin, Url};
 
+use super::Channel;
+use crate::AppId;
 #[cfg(not(feature = "test-util"))]
 use crate::channel::config::DISABLED_HTTP_SENTINEL;
-use crate::AppId;
-use crate::{
-    channel::config::{ChannelConfig, McpOAuthProviderConfig},
-    features::FeatureFlag,
-};
-
-use super::Channel;
+use crate::channel::config::{ChannelConfig, McpOAuthProviderConfig};
+use crate::features::FeatureFlag;
 
 lazy_static! {
     static ref CHANNEL_STATE: Mutex<ChannelState> = Mutex::new(ChannelState::init());
@@ -19,8 +18,8 @@ lazy_static! {
 
 #[cfg(feature = "test-util")]
 lazy_static! {
-    static ref MOCK_SERVER: mockito::ServerGuard = mockito::Server::new();
-    static ref MOCK_SERVER_URL: String = MOCK_SERVER.url();
+    static ref MOCK_SERVER: Mutex<mockito::ServerGuard> = Mutex::new(mockito::Server::new());
+    static ref MOCK_SERVER_URL: String = MOCK_SERVER.lock().url();
     static ref APP_VERSION: Mutex<Option<&'static str>> = Mutex::new(None);
 }
 
@@ -37,7 +36,7 @@ pub struct ChannelState {
 impl ChannelState {
     pub fn init() -> Self {
         let channel = Channel::Oss;
-        let app_id = AppId::new("dev", "zap", "Zap");
+        let app_id = AppId::new("dev", "infinishell", "InfiniShell");
         Self {
             channel,
             additional_features: Default::default(),
@@ -48,6 +47,13 @@ impl ChannelState {
                 mcp_static_config: None,
             },
         }
+    }
+
+    /// Returns the server used by test-only URL routing so downstream tests can install mocks.
+    #[cfg(feature = "test-util")]
+    pub fn mock_server() -> parking_lot::MutexGuard<'static, mockito::ServerGuard> {
+        lazy_static::initialize(&MOCK_SERVER_URL);
+        MOCK_SERVER.lock()
     }
 
     pub fn new(channel: Channel, mut config: ChannelConfig) -> Self {
@@ -245,7 +251,7 @@ impl ChannelState {
             // Dummy value--integration tests shouldn't support URL schemes.
             Channel::Integration => "warpintegration",
             Channel::Local => "warplocal",
-            Channel::Oss => "zap",
+            Channel::Oss => "infinishell",
         }
     }
 }
@@ -264,28 +270,17 @@ fn app_id_from_bundle() -> Option<AppId> {
     // We skip this for tests, as the call to `mainBundle` can take 30+ms,
     // which is a significant portion of the total test runtime.
     #[cfg(all(target_os = "macos", not(feature = "test-util")))]
-    #[allow(deprecated)]
-    unsafe {
-        use cocoa::{
-            base::{id, nil},
-            foundation::NSBundle,
-        };
-        use objc::{msg_send, sel, sel_impl};
-        use warpui::platform::mac::utils::nsstring_as_str;
+    {
+        use objc2_foundation::NSBundle;
 
-        let bundle = id::mainBundle();
-        if bundle != nil {
-            let nsstring: id = msg_send![bundle, bundleIdentifier];
-            if nsstring != nil {
-                let app_id = nsstring_as_str(nsstring)
-                    .expect("bundle IDs should always be valid UTF-8 strings");
-
-                if !app_id.is_empty() {
-                    return Some(
-                        AppId::parse(app_id)
-                            .expect("macOS bundle identifier has an unexpected format"),
-                    );
-                }
+        let bundle = NSBundle::mainBundle();
+        if let Some(bundle_identifier) = bundle.bundleIdentifier() {
+            let app_id = bundle_identifier.to_string();
+            if !app_id.is_empty() {
+                return Some(
+                    AppId::parse(&app_id)
+                        .expect("macOS bundle identifier has an unexpected format"),
+                );
             }
         }
     }

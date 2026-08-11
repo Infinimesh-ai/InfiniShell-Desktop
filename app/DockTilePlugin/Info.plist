@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>dev.zap.ZapDockTilePlugin</string>
+    <string>dev.infinishell.InfiniShellDockTilePlugin</string>
     <key>CFBundleExecutable</key>
-    <string>ZapDockTilePlugin</string>
+    <string>InfiniShellDockTilePlugin</string>
     <key>CFBundleName</key>
-    <string>ZapDockTilePlugin</string>
+    <string>InfiniShellDockTilePlugin</string>
     <key>CFBundlePackageType</key>
     <string>BNDL</string>
     <key>CFBundleShortVersionString</key>
@@ -15,7 +15,7 @@
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>NSPrincipalClass</key>
-    <string>ZapDockTilePlugin</string>
+    <string>InfiniShellDockTilePlugin</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
 </dict>

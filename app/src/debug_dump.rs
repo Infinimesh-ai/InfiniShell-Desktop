@@ -9,7 +9,7 @@ use warp_core::channel::ChannelState;
 use warpui::windowing;
 
 pub(crate) fn run() -> anyhow::Result<()> {
-    println!("Zap version: {:?}", ChannelState::app_version());
+    println!("InfiniShell version: {:?}", ChannelState::app_version());
 
     #[cfg(not(windows))]
     {
@@ -40,11 +40,11 @@ pub(crate) fn run() -> anyhow::Result<()> {
             {
                 use winit::raw_window_handle::HasDisplayHandle as _;
 
-                if let Ok(display_handle) = event_loop.display_handle() {
-                    if let Ok(system) = windowing::System::try_from(display_handle.as_raw()) {
-                        println!("Windowing system: {system:?}");
-                        windowing_system = Some(system);
-                    }
+                if let Ok(display_handle) = event_loop.display_handle()
+                    && let Ok(system) = windowing::System::try_from(display_handle.as_raw())
+                {
+                    println!("Windowing system: {system:?}");
+                    windowing_system = Some(system);
                 }
 
                 if let Some(name) = windowing::winit::get_os_window_manager_name() {
@@ -58,11 +58,12 @@ pub(crate) fn run() -> anyhow::Result<()> {
     {
         use std::ops::Deref as _;
 
-        use crate::settings::{
-            init_private_user_preferences, PreferLowPowerGPU, PreferredGraphicsBackend,
-        };
         use settings::Setting as _;
         use warpui::rendering::GPUPowerPreference;
+
+        use crate::settings::{
+            PreferLowPowerGPU, PreferredGraphicsBackend, init_private_user_preferences,
+        };
 
         let user_preferences = init_private_user_preferences();
 

@@ -1,18 +1,15 @@
-use pathfinder_geometry::rect::RectF;
-use std::{
-    collections::VecDeque,
-    fmt::{Display, Formatter},
-};
+use std::collections::VecDeque;
+use std::fmt::{Display, Formatter};
 
-use crate::{
-    geometry,
-    platform::{self, FullscreenState, TerminationMode, WindowFocusBehavior},
-    scene::{CornerRadius, Radius},
-    windowing, DisplayId, DisplayIdx, Entity, ModelContext, OptionalPlatformWindow,
-    SingletonEntity, WindowId,
-};
+use pathfinder_geometry::rect::RectF;
 
 use super::WindowCallbacks;
+use crate::platform::{self, FullscreenState, TerminationMode, WindowFocusBehavior};
+use crate::scene::{CornerRadius, Radius};
+use crate::{
+    DisplayId, DisplayIdx, Entity, ModelContext, OptionalPlatformWindow, SingletonEntity, WindowId,
+    geometry, windowing,
+};
 
 /// Description of the current stage in the lifecycle of the app.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -199,6 +196,21 @@ impl WindowManager {
             8.
         };
         CornerRadius::with_all(Radius::Pixels(radius))
+    }
+
+    /// Like [`Self::window_corner_radius`], but square when the given window is fullscreen: a
+    /// fullscreen window occupies the entire screen, and rounding its corners leaves transparent
+    /// notches at the screen corners that square content behind can poke through.
+    pub fn window_corner_radius_for_window(&self, window_id: WindowId) -> CornerRadius {
+        let is_fullscreen = self
+            .platform_window(window_id)
+            .map(|window| window.fullscreen_state() == FullscreenState::Fullscreen)
+            .unwrap_or(false);
+        if is_fullscreen {
+            CornerRadius::with_all(Radius::Pixels(0.))
+        } else {
+            self.window_corner_radius()
+        }
     }
 
     pub(crate) fn open_window(

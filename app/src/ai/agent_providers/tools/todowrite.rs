@@ -212,6 +212,8 @@ fn make_update_todos_message(
         )),
         request_id: request_id.to_owned(),
         timestamp: None,
+        // Zap:本地 todo 更新消息不携带记忆检索结果。
+        fetched_memories: vec![],
     }
 }
 

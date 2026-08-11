@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/zap-logo.svg" alt="Zap" width="128" />
+<img src="assets/zap-logo.svg" alt="InfiniShell" width="128" />
 
-# Zap
+# InfiniShell
 
 [English](./README.md) · [日本語](./README.ja.md)
 
@@ -10,7 +10,7 @@
 
 </div>
 
-Zap 是一个开放、本地优先的终端,带一等公民的 AI 与 Agent 体验。接入任意 AI 提供商、接入任意 CLI Agent、在终端内管理 SSH 主机 —— 密钥、历史与 Agent 状态默认留在本地。
+InfiniShell 是一个开放、本地优先的终端,带一等公民的 AI 与 Agent 体验。接入任意 AI 提供商、接入任意 CLI Agent、在终端内管理 SSH 主机 —— 密钥、历史与 Agent 状态默认留在本地。
 
 ## 相比官方 Warp 多出的功能
 
@@ -23,11 +23,14 @@ Zap 是一个开放、本地优先的终端,带一等公民的 AI 与 Agent 体�
 - **多语言界面** —— 原生英文 / 简体中文 / 日语,社区可扩展。
 - **隐私默认值** —— Cloud Agent / Computer Use / Referral / 遥测默认关闭。
 
-## 从 OpenWarp 或 Warp 迁移过来
+## 从 Zap / OpenWarp / Warp 迁移过来
 
-如果你在项目改名 Zap 之前就一直在用(那时还叫 **OpenWarp**),
-或者你是从上游 **Warp** 切过来的,参见
-[docs/migrate-from-warp.zh-CN.md](docs/migrate-from-warp.zh-CN.md) 把设置带过来。
+从 **Zap**(上一个名字)升上来的用户不需要做任何事 —— InfiniShell 首次启动时会
+自动把旧的 `.zap` 目录搬过来。
+
+如果你在项目还叫 **OpenWarp** 的年代就在用,或者你是从上游 **Warp** 切过来的,
+参见 [docs/migrate-from-warp.zh-CN.md](docs/migrate-from-warp.zh-CN.md) 把设置
+带过来。
 
 ## 后续计划
 
@@ -35,5 +38,5 @@ Zap 是一个开放、本地优先的终端,带一等公民的 AI 与 Agent 体�
 
 ## 鸣谢
 
-- [Warp](https://github.com/warpdotdev/warp) —— Zap 所基于的上游终端。
+- [Warp](https://github.com/warpdotdev/warp) —— InfiniShell 所基于的上游终端。
 - [DeepSeek-TUI](https://github.com/Hmbown/DeepSeek-TUI) —— 深度适配的 CLI Agent 合作伙伴。

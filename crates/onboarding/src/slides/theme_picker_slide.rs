@@ -1,28 +1,31 @@
+use pathfinder_color::ColorU;
+use ui_components::{Component as _, Options as _, button};
+use warp_core::features::FeatureFlag;
+use warp_core::send_telemetry_from_ctx;
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::theme::WarpTheme;
+use warp_core::ui::theme::color::internal_colors;
+use warpui_core::elements::{
+    Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+    Empty, Flex, FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize,
+    MouseStateHandle, ParentElement, Radius, Text,
+};
+use warpui_core::fonts::{Properties, Weight};
+use warpui_core::keymap::Keystroke;
+use warpui_core::platform::Cursor;
+use warpui_core::text_layout::TextAlignment;
+use warpui_core::ui_components::components::{UiComponent, UiComponentStyles};
+use warpui_core::{
+    AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
+};
+
 use super::OnboardingSlide;
+use crate::OnboardingIntention;
 use crate::localization::localized;
 use crate::model::{OnboardingStateEvent, OnboardingStateModel};
 use crate::slides::{bottom_nav, layout, slide_content};
 use crate::telemetry::OnboardingEvent;
 use crate::visuals::theme_picker_visual;
-use crate::OnboardingIntention;
-use pathfinder_color::ColorU;
-use ui_components::{button, Component as _, Options as _};
-use warp_core::features::FeatureFlag;
-use warp_core::send_telemetry_from_ctx;
-use warp_core::ui::{appearance::Appearance, theme::color::internal_colors, theme::WarpTheme};
-use warpui::{
-    elements::{
-        Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
-        CrossAxisAlignment, Empty, Flex, FormattedTextElement, Hoverable, MainAxisAlignment,
-        MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
-    },
-    fonts::{Properties, Weight},
-    keymap::Keystroke,
-    platform::Cursor,
-    text_layout::TextAlignment,
-    ui_components::components::{UiComponent, UiComponentStyles},
-    AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
-};
 
 #[derive(Debug, Clone)]
 pub enum ThemePickerSlideEvent {
@@ -116,12 +119,15 @@ impl ThemePickerSlide {
         app: &AppContext,
     ) -> Box<dyn Element> {
         // The option "chrome" (background, borders, text) should be styled using the currently
-        // selected theme.
-        let selected_theme = self
-            .theme_options
-            .get(self.selected_theme_index)
-            .map(|option| option.theme.clone())
-            .unwrap_or_else(|| self.theme_options[0].theme.clone());
+        // selected theme, if sync_with_os is not selected.
+        let selected_theme = if self.sync_with_os {
+            appearance.theme().clone()
+        } else {
+            self.theme_options
+                .get(self.selected_theme_index)
+                .map(|option| option.theme.clone())
+                .unwrap_or_else(|| self.theme_options[0].theme.clone())
+        };
 
         let bottom_nav = self.render_bottom_nav(appearance, app);
 
@@ -276,11 +282,7 @@ impl ThemePickerSlide {
                 self.onboarding_state.as_ref(app).intention(),
                 OnboardingIntention::Terminal
             );
-            if is_terminal {
-                (3, 4)
-            } else {
-                (4, 5)
-            }
+            if is_terminal { (3, 4) } else { (4, 5) }
         } else {
             (0, 4)
         };
@@ -549,7 +551,7 @@ impl ThemePickerSlide {
                 ui_builder
                     .span(localized(
                         "auth-local-privacy-note",
-                        "Zap stores onboarding choices locally on this device.",
+                        "InfiniShell stores onboarding choices locally on this device.",
                     ))
                     .with_style(disclaimer_styles)
                     .build()

@@ -1,51 +1,53 @@
+use std::fmt;
+use std::ops::Range;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+
 use float_cmp::ApproxEq;
 use instant::Instant;
 use parking_lot::Mutex;
-use std::{
-    fmt,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
-};
+use string_offset::CharOffset;
 use temporary_block::RenderableTemporaryBlock;
 use vim::vim::VimMode;
 use warp_core::ui::theme::Fill as ThemeFill;
-use warpui::{
+use warp_errors::report_error;
+use warpui_core::color::ColorU;
+use warpui_core::elements::new_scrollable::{NewScrollableElement, ScrollableAxis};
+use warpui_core::elements::{
+    Axis, Border, Dash, Point, ScrollData, ScrollableElement, Vector2FExt, ZIndex,
+};
+use warpui_core::event::{DispatchedEvent, ModifiersState};
+use warpui_core::geometry::rect::RectF;
+use warpui_core::geometry::vector::{Vector2F, vec2f};
+use warpui_core::platform::Cursor;
+use warpui_core::units::{IntoPixels, Pixels};
+use warpui_core::{
     AfterLayoutContext, AppContext, Element, Event, EventContext, LayoutContext, ModelHandle,
     PaintContext, SizeConstraint, WeakViewHandle,
-    color::ColorU,
-    elements::{
-        Axis, Border, Dash, Point, ScrollData, ScrollableElement, Vector2FExt, ZIndex,
-        new_scrollable::{NewScrollableElement, ScrollableAxis},
-    },
-    event::{DispatchedEvent, ModifiersState},
-    geometry::{
-        rect::RectF,
-        vector::{Vector2F, vec2f},
-    },
-    platform::Cursor,
-    units::{IntoPixels, Pixels},
 };
 
-use super::model::{
-    BlockItem, ElementUpdate, HitTestOptions, Location, RenderState, RichTextStyles, UNIT_MARGIN,
-    viewport::{SizeInfo, ViewportItem},
-};
-use crate::{content::version::BufferVersion, editor::EditorView};
-use string_offset::CharOffset;
-
-use self::{
-    empty::Empty, header::RenderableHeader, hidden_section::RenderableHiddenSection,
-    horizontal_rule::HorizontalRule, image::RenderableImage, mermaid::RenderableMermaidDiagram,
-    ordered_list::RenderableOrderedListItem, paragraph::RenderableParagraph,
-    runnable_command::RenderableRunnableCommand, table::RenderableTable,
-    task_list::RenderableTaskList, text_block::RenderableTextBlock,
-    unordered_list::RenderableBulletList,
-};
-
+use self::empty::Empty;
+use self::header::RenderableHeader;
+use self::hidden_section::RenderableHiddenSection;
+use self::horizontal_rule::HorizontalRule;
+use self::image::RenderableImage;
+use self::mermaid::RenderableMermaidDiagram;
+use self::ordered_list::RenderableOrderedListItem;
 pub use self::paint::{CursorData, CursorDisplayType, RenderContext};
+use self::paragraph::RenderableParagraph;
+use self::runnable_command::RenderableRunnableCommand;
+use self::table::RenderableTable;
+use self::task_list::RenderableTaskList;
+use self::text_block::RenderableTextBlock;
+use self::unordered_list::RenderableBulletList;
+use super::model::viewport::{SizeInfo, ViewportItem};
+use super::model::{
+    BlockItem, ElementUpdate, HitTestOptions, LineCount, Location, RenderState, RichTextStyles,
+    UNIT_MARGIN,
+};
+use crate::content::version::BufferVersion;
+use crate::editor::EditorView;
 
 pub mod broken_embedding;
 mod empty;
@@ -85,7 +87,7 @@ pub enum VerticalExpansionBehavior {
 /// An element that renders rich text, with no additional UI or decorations.
 ///
 /// This element caches the positions listed in [`super::model::saved_positions::SavedPositions`],
-/// and the parent view can overlay UI controls on top of them using a [`warpui::elements::Stack`].
+/// and the parent view can overlay UI controls on top of them using a [`warpui_core::elements::Stack`].
 ///
 /// It additionally reserves horizontal gutters, which are considered in-bounds for content hit
 /// testing.
@@ -369,6 +371,18 @@ pub trait RichTextAction<V>: Sized {
         parent_view: &WeakViewHandle<V>,
         ctx: &AppContext,
     ) -> Option<Self>;
+
+    /// Dispatch an event when a hidden-section bar is clicked, to fully
+    /// expand the entire hidden section it represents. `line_range` is the
+    /// section's complete hidden line range. Defaults to no action; only the
+    /// code-review editor implements it.
+    fn hidden_section_clicked(
+        _line_range: Range<LineCount>,
+        _parent_view: &WeakViewHandle<V>,
+        _ctx: &AppContext,
+    ) -> Option<Self> {
+        None
+    }
 
     /// Dispatch an event when the mouse wheel is clicked.
     fn middle_mouse_down(ctx: &AppContext) -> Option<Self>;
@@ -826,7 +840,7 @@ impl<V: EditorView> RichTextElement<V> {
         let parent = match self.parent_view.upgrade(ctx) {
             Some(handle) => handle.as_ref(ctx),
             None => {
-                log::error!("Parent rich-text editor view dropped before layout");
+                report_error!("Parent rich-text editor view dropped before layout");
                 return;
             }
         };
@@ -886,7 +900,15 @@ impl<V: EditorView> RichTextElement<V> {
                         .finish()
                     }
                     BlockItem::MermaidDiagram { .. } => {
-                        RenderableMermaidDiagram::new(item).finish()
+                        let start_offset = item.block_offset;
+                        let runnable_command = parent.runnable_command_at(start_offset, ctx);
+                        RenderableMermaidDiagram::new(
+                            item,
+                            runnable_command,
+                            self.display_options.focused,
+                            ctx,
+                        )
+                        .finish()
                     }
                     BlockItem::TemporaryBlock {
                         decoration,
@@ -898,7 +920,19 @@ impl<V: EditorView> RichTextElement<V> {
                     BlockItem::Image { .. } => RenderableImage::new(item).finish(),
                     BlockItem::Table { .. } => RenderableTable::new(item).finish(),
                     BlockItem::TrailingNewLine(_) => Empty::new(item).finish(),
-                    BlockItem::Hidden { .. } => RenderableHiddenSection::new(item, ctx).finish(),
+                    BlockItem::Hidden(config) => {
+                        let full_line_range = model.line_range_at_offset(item.block_offset);
+                        RenderableHiddenSection::new(
+                            item,
+                            config.mouse_state(),
+                            config.line_count(),
+                            full_line_range,
+                            styles,
+                            self.parent_view.clone(),
+                            ctx,
+                        )
+                        .finish()
+                    }
                     BlockItem::Embedded(embed) => {
                         let start_offset = item.block_offset;
                         let child_model = parent.embedded_item_at(start_offset, ctx);
@@ -1015,7 +1049,7 @@ impl<V: EditorView> Element for RichTextElement<V> {
                     block.layout(model, ctx, app);
                 }
             }
-            None => log::error!("Rich-text blocks missing for layout"),
+            None => report_error!("Rich-text blocks missing for layout"),
         }
 
         size
@@ -1028,7 +1062,7 @@ impl<V: EditorView> Element for RichTextElement<V> {
                     block.after_layout(ctx, app);
                 }
             }
-            None => log::error!("Rich-text blocks missing after layout"),
+            None => report_error!("Rich-text blocks missing after layout"),
         }
 
         // Even though this state is calculated in Self::layout, don't submit it until after all
@@ -1045,7 +1079,7 @@ impl<V: EditorView> Element for RichTextElement<V> {
         let parent = match self.parent_view.upgrade(app) {
             Some(handle) => handle.as_ref(app),
             None => {
-                log::error!("Parent rich-text editor view dropped before layout");
+                report_error!("Parent rich-text editor view dropped before layout");
                 return;
             }
         };
@@ -1077,7 +1111,7 @@ impl<V: EditorView> Element for RichTextElement<V> {
             return;
         };
         ctx.scene
-            .start_layer(warpui::ClipBounds::BoundedBy(clip_bounds));
+            .start_layer(warpui_core::ClipBounds::BoundedBy(clip_bounds));
         // Save the clipped content layer z-index for hover detection.
         self.content_z_index = Some(ctx.scene.z_index());
 
@@ -1142,7 +1176,7 @@ impl<V: EditorView> Element for RichTextElement<V> {
                     }
                 }
             }
-            None => log::error!("Rich-text blocks missing after layout"),
+            None => report_error!("Rich-text blocks missing after layout"),
         }
 
         ctx.paint.scene.stop_layer();
@@ -1177,7 +1211,7 @@ impl<V: EditorView> Element for RichTextElement<V> {
                     block_handled |= block.dispatch_event(self.model.as_ref(app), event, ctx, app);
                 }
             }
-            None => log::error!("Rich-text blocks missing for event dispatching"),
+            None => report_error!("Rich-text blocks missing for event dispatching"),
         }
 
         match event.at_z_index(z_index, ctx) {
@@ -1236,7 +1270,7 @@ impl<V: EditorView> NewScrollableElement for RichTextElement<V> {
         })
     }
 
-    fn scroll(&mut self, delta: warpui::units::Pixels, axis: Axis, ctx: &mut EventContext) {
+    fn scroll(&mut self, delta: warpui_core::units::Pixels, axis: Axis, ctx: &mut EventContext) {
         if let Some(action) = V::Action::scroll(delta, axis) {
             ctx.dispatch_typed_action(action);
         }
@@ -1257,7 +1291,7 @@ impl<V: EditorView> ScrollableElement for RichTextElement<V> {
         Some(self.vertical_scroll_data(app))
     }
 
-    fn scroll(&mut self, delta: warpui::units::Pixels, ctx: &mut EventContext) {
+    fn scroll(&mut self, delta: warpui_core::units::Pixels, ctx: &mut EventContext) {
         if let Some(action) = V::Action::scroll(delta, Axis::Vertical) {
             ctx.dispatch_typed_action(action);
         }

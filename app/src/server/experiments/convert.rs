@@ -24,6 +24,12 @@ impl Display for ServerExperiment {
             }
             Self::OzMultiHarnessControl => "OZ_MULTI_HARNESS_CONTROL",
             Self::OzMultiHarnessExperiment => "OZ_MULTI_HARNESS_EXPERIMENT",
+            Self::MacosRunnersControl => "MACOS_RUNNERS_CONTROL",
+            Self::MacosRunnersExperiment => "MACOS_RUNNERS_EXPERIMENT",
+            Self::OnboardingChooseHowToStartControl => "ONBOARDING_CHOOSE_HOW_TO_START_CONTROL",
+            Self::OnboardingChooseHowToStartExperiment => {
+                "ONBOARDING_CHOOSE_HOW_TO_START_EXPERIMENT"
+            }
             #[cfg(test)]
             Self::TestExperiment => "TEST_EXPERIMENT",
         };
@@ -46,6 +52,12 @@ impl ServerExperiment {
             "PROMPT_SUGGESTIONS_VIA_MAA_EXPERIMENT" => Ok(Self::PromptSuggestionsViaMaaExperiment),
             "OZ_MULTI_HARNESS_CONTROL" => Ok(Self::OzMultiHarnessControl),
             "OZ_MULTI_HARNESS_EXPERIMENT" => Ok(Self::OzMultiHarnessExperiment),
+            "MACOS_RUNNERS_CONTROL" => Ok(Self::MacosRunnersControl),
+            "MACOS_RUNNERS_EXPERIMENT" => Ok(Self::MacosRunnersExperiment),
+            "ONBOARDING_CHOOSE_HOW_TO_START_CONTROL" => Ok(Self::OnboardingChooseHowToStartControl),
+            "ONBOARDING_CHOOSE_HOW_TO_START_EXPERIMENT" => {
+                Ok(Self::OnboardingChooseHowToStartExperiment)
+            }
             s => Err(anyhow::anyhow!(
                 "String doesn't match any server experiment variant {s}"
             )),

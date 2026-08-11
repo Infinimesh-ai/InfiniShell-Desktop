@@ -1,36 +1,34 @@
-use super::two_line_button::{render_two_line_button, TwoLineButtonSpec};
+use ai::LLMId;
+use pathfinder_color::ColorU;
+use ui_components::{Component as _, Options as _, button};
+use warp_core::features::FeatureFlag;
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::icons::Icon;
+use warp_core::ui::theme::Fill;
+use warp_core::ui::theme::color::internal_colors;
+use warpui_core::elements::{
+    AnchorPair, Border, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
+    CornerRadius, CrossAxisAlignment, Dismiss, Empty, Flex, FormattedTextElement, Hoverable,
+    Icon as WarpUiIcon, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
+    OffsetType, ParentElement, ParentOffsetBounds, PositioningAxis, Radius, SavePosition,
+    ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Stack, Text, XAxisAnchor, YAxisAnchor,
+};
+use warpui_core::fonts::{Properties, Weight};
+use warpui_core::keymap::Keystroke;
+use warpui_core::platform::Cursor;
+use warpui_core::scene::DropShadow;
+use warpui_core::text_layout::TextAlignment;
+use warpui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use warpui_core::{
+    AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
+};
+
 use super::OnboardingSlide;
+use super::two_line_button::{TwoLineButtonSpec, render_two_line_button};
 use crate::localization::localized;
 use crate::model::{OnboardingStateEvent, OnboardingStateModel};
 use crate::slides::{bottom_nav, layout, slide_content};
 use crate::visuals::agent_visual;
-use ui_components::{button, Component as _, Options as _};
-use warp_core::features::FeatureFlag;
-use warp_core::ui::{
-    appearance::Appearance,
-    theme::{color::internal_colors, Fill},
-};
-use warpui::{
-    elements::{
-        AnchorPair, Border, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
-        CornerRadius, CrossAxisAlignment, Dismiss, Empty, Flex, FormattedTextElement, Hoverable,
-        Icon as WarpUiIcon, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
-        OffsetType, ParentElement, ParentOffsetBounds, PositioningAxis, Radius, SavePosition,
-        ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Stack, Text, XAxisAnchor, YAxisAnchor,
-    },
-    fonts::Properties,
-    fonts::Weight,
-    keymap::Keystroke,
-    platform::Cursor,
-    scene::DropShadow,
-    text_layout::TextAlignment,
-    ui_components::components::{UiComponent as _, UiComponentStyles},
-    AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
-};
-
-use ai::LLMId;
-use pathfinder_color::ColorU;
-use warp_core::ui::icons::Icon;
 
 /// Information about a model displayed on the onboarding slide.
 #[derive(Clone, Debug)]
@@ -103,7 +101,7 @@ pub enum AgentSlideAction {
 }
 
 pub struct AgentSlide {
-    onboarding_state: warpui::ModelHandle<OnboardingStateModel>,
+    onboarding_state: warpui_core::ModelHandle<OnboardingStateModel>,
 
     /// Mouse state handles for each model row.
     model_mouse_states: Vec<MouseStateHandle>,
@@ -114,8 +112,6 @@ pub struct AgentSlide {
     autonomy_full_mouse_state: MouseStateHandle,
     autonomy_partial_mouse_state: MouseStateHandle,
     autonomy_none_mouse_state: MouseStateHandle,
-
-    disable_oz_mouse: MouseStateHandle,
 
     back_button: button::Button,
     next_button: button::Button,
@@ -132,16 +128,9 @@ fn model_row_position_id(index: usize) -> String {
     format!("agent_slide_model_row_{index}")
 }
 
-/// Returns the slide's view of the model list: free-tier before premium,
-/// with server order preserved within each tier. The slide owns this sort so
-/// state storage can stay in server order.
-fn sorted_models(models: &[OnboardingModelInfo]) -> Vec<OnboardingModelInfo> {
-    models.to_vec()
-}
-
 impl AgentSlide {
     pub(crate) fn new(
-        onboarding_state: warpui::ModelHandle<OnboardingStateModel>,
+        onboarding_state: warpui_core::ModelHandle<OnboardingStateModel>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
         let model_count = onboarding_state.as_ref(ctx).models().len();
@@ -177,7 +166,6 @@ impl AgentSlide {
             autonomy_full_mouse_state: MouseStateHandle::default(),
             autonomy_partial_mouse_state: MouseStateHandle::default(),
             autonomy_none_mouse_state: MouseStateHandle::default(),
-            disable_oz_mouse: MouseStateHandle::default(),
             back_button: button::Button::default(),
             next_button: button::Button::default(),
             scroll_state: ClippedScrollStateHandle::new(),
@@ -218,7 +206,7 @@ impl AgentSlide {
         // state is a floating overlay (built in `View::render`) that sits *on top
         // of* this content, so the underlying layout never shifts between the two
         // states. That keeps the header + picker chip pinned in place.
-        let bottom_nav = self.render_bottom_nav(appearance);
+        let bottom_nav = self.render_bottom_nav(appearance, app);
         slide_content::onboarding_slide_content(
             vec![
                 self.render_header(appearance),
@@ -235,7 +223,7 @@ impl AgentSlide {
             .ui_builder()
             .paragraph(localized(
                 "onboarding-agent-title",
-                "Customize your Zap Agent",
+                "Customize your InfiniShell Agent",
             ))
             .with_style(UiComponentStyles {
                 font_size: Some(36.),
@@ -305,18 +293,9 @@ impl AgentSlide {
             upper_col.finish()
         };
 
-        let mut col = Flex::column()
+        let col = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .with_child(upper_sections);
-
-        if FeatureFlag::ZapNewSettingsModes.is_enabled() {
-            let disable_oz_section = self.render_disable_oz_section(appearance, settings);
-            col = col.with_child(
-                Container::new(disable_oz_section)
-                    .with_margin_top(24.)
-                    .finish(),
-            );
-        }
 
         Container::new(col.finish()).with_margin_top(40.).finish()
     }
@@ -507,7 +486,7 @@ impl AgentSlide {
         let state = self.onboarding_state.as_ref(app);
         let highlighted_id = self.highlighted_model_id.clone();
         let selected_id = state.agent_settings().selected_model_id.clone();
-        let models = sorted_models(state.models());
+        let models = state.models();
 
         let mut col = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
 
@@ -843,43 +822,7 @@ impl AgentSlide {
             .finish()
     }
 
-    fn render_disable_oz_section(
-        &self,
-        appearance: &Appearance,
-        settings: &AgentDevelopmentSettings,
-    ) -> Box<dyn Element> {
-        let theme = appearance.theme();
-        let background_for_text = theme.background().into_solid();
-
-        let checkbox = appearance
-            .ui_builder()
-            .checkbox(self.disable_oz_mouse.clone(), Some(12.))
-            .check(settings.disable_oz)
-            .build()
-            .on_click(|ctx, _, _| ctx.dispatch_typed_action(AgentSlideAction::ToggleDisableOz))
-            .finish();
-
-        let label = Text::new(
-            localized("onboarding-agent-disable-warp-agent", "Disable Zap Agent"),
-            appearance.ui_font_family(),
-            14.0,
-        )
-        .with_color(internal_colors::text_sub(theme, background_for_text))
-        .with_style(Properties {
-            weight: Weight::Normal,
-            ..Default::default()
-        })
-        .with_line_height_ratio(1.0)
-        .finish();
-
-        Flex::row()
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(checkbox)
-            .with_child(Container::new(label).with_margin_left(8.).finish())
-            .finish()
-    }
-
-    fn render_bottom_nav(&self, appearance: &Appearance) -> Box<dyn Element> {
+    fn render_bottom_nav(&self, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
         let back_button = self.back_button.render(
             appearance,
             button::Params {
@@ -910,13 +853,7 @@ impl AgentSlide {
             },
         );
 
-        let step_index = 2;
-        let step_count = if warp_core::features::FeatureFlag::ZapNewSettingsModes.is_enabled()
-        {
-            5
-        } else {
-            4
-        };
+        let (step_index, step_count) = self.onboarding_state.as_ref(app).progress();
         bottom_nav::onboarding_bottom_nav(
             appearance,
             step_index,
@@ -998,10 +935,7 @@ impl AgentSlide {
             // starts on the selected row.
             let state = self.onboarding_state.as_ref(ctx);
             let selected_id = state.agent_settings().selected_model_id.clone();
-            if let Some(index) = sorted_models(state.models())
-                .iter()
-                .position(|m| m.id == selected_id)
-            {
+            if let Some(index) = state.models().iter().position(|m| m.id == selected_id) {
                 self.dropdown_scroll_state.scroll_to_position(ScrollTarget {
                     position_id: model_row_position_id(index),
                     mode: ScrollToPositionMode::FullyIntoView,
@@ -1012,44 +946,33 @@ impl AgentSlide {
         ctx.notify();
     }
 
-    /// Finds the next model index in the given direction, wrapping around.
-    /// Indices are into the slide's sorted view of the model list.
-    fn next_model_index(&self, start: usize, forward: bool, ctx: &AppContext) -> Option<usize> {
-        let models = sorted_models(self.onboarding_state.as_ref(ctx).models());
-        let count = models.len();
-        if count == 0 {
-            return None;
-        }
-        let idx = if forward {
-            (start + 1) % count
-        } else {
-            (start + count - 1) % count
-        };
-        Some(idx)
-    }
-
-    /// Advances the highlight cursor to the next/previous model, wrapping.
-    /// The origin of the walk is the currently-highlighted id (if any), else the
+    /// Advances the highlight cursor to the next/previous model, wrapping. The
+    /// origin of the walk is the currently-highlighted id (if any), else the
     /// currently-selected id. Also scrolls the dropdown so the newly-highlighted
     /// row stays visible — same `SavePosition` + `scroll_to_position` pattern
     /// used by `VerticalTabsPanelState::scroll_to_tab`.
     fn advance_highlighted_model(&mut self, forward: bool, ctx: &mut ViewContext<Self>) {
-        let state = self.onboarding_state.as_ref(ctx);
-        let sorted = sorted_models(state.models());
-        let selected_id = state.agent_settings().selected_model_id.clone();
+        let (model_ids, selected_id) = {
+            let state = self.onboarding_state.as_ref(ctx);
+            let ids: Vec<LLMId> = state.models().iter().map(|m| m.id.clone()).collect();
+            (ids, state.agent_settings().selected_model_id.clone())
+        };
+        let count = model_ids.len();
+        if count == 0 {
+            return;
+        }
         let start_index = self
             .highlighted_model_id
             .as_ref()
-            .and_then(|id| sorted.iter().position(|m| &m.id == id))
-            .or_else(|| sorted.iter().position(|m| m.id == selected_id))
+            .and_then(|id| model_ids.iter().position(|m| m == id))
+            .or_else(|| model_ids.iter().position(|m| *m == selected_id))
             .unwrap_or(0);
-        let Some(next_index) = self.next_model_index(start_index, forward, ctx) else {
-            return;
+        let next_index = if forward {
+            (start_index + 1) % count
+        } else {
+            (start_index + count - 1) % count
         };
-        let Some(next_id) = sorted.get(next_index).map(|m| m.id.clone()) else {
-            return;
-        };
-        self.highlighted_model_id = Some(next_id);
+        self.highlighted_model_id = Some(model_ids[next_index].clone());
         // Scroll the dropdown so the new highlight is visible. `FullyIntoView`
         // is a no-op when the row is already fully in view, otherwise it
         // scrolls the minimum amount to show it.

@@ -14,11 +14,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'zap-oss'",
+      "name": "Debug executable 'infinishell'",
       "cargo": {
-        "args": ["build", "--bin=zap-oss"],
+        "args": ["build", "--bin=infinishell"],
         "filter": {
-          "name": "zap-oss",
+          "name": "infinishell",
           "kind": "bin"
         }
       },
@@ -31,7 +31,7 @@
       "request": "launch",
       "name": "Debug MacOS executable",
       "preLaunchTask": "build_warplocal",
-      "program": "${workspaceFolder}/target/debug/bundle/osx/Zap.app/Contents/MacOS/zap-oss",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
       "args": [],
       "cwd": "${workspaceFolder}",
       "sourceLanguages": ["rust"]
@@ -39,11 +39,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'zap-oss' with fast_dev",
+      "name": "Debug executable 'infinishell' with fast_dev",
       "cargo": {
-        "args": ["build", "--bin=zap-oss", "--features=fast_dev"],
+        "args": ["build", "--bin=infinishell", "--features=fast_dev"],
         "filter": {
-          "name": "zap-oss",
+          "name": "infinishell",
           "kind": "bin"
         }
       },
@@ -54,11 +54,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'zap-oss' with with_local_server",
+      "name": "Debug executable 'infinishell' with with_local_server",
       "cargo": {
-        "args": ["build", "--bin=zap-oss", "--features=with_local_server"],
+        "args": ["build", "--bin=infinishell", "--features=with_local_server"],
         "filter": {
-          "name": "zap-oss",
+          "name": "infinishell",
           "kind": "bin"
         }
       },
@@ -71,7 +71,7 @@
       "request": "launch",
       "name": "Debug MacOS executable local session sharing server",
       "preLaunchTask": "build_warplocal_localsessionsharing",
-      "program": "${workspaceFolder}/target/debug/bundle/osx/Zap.app/Contents/MacOS/zap-oss",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
       "args": [],
       "cwd": "${workspaceFolder}",
       "sourceLanguages": ["rust"]
@@ -84,7 +84,7 @@
         "RUST_BACKTRACE": "1"
       },
       "preLaunchTask": "build_warplocal_fastdev",
-      "program": "${workspaceFolder}/target/debug/bundle/osx/Zap.app/Contents/MacOS/zap-oss",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
       "args": [],
       "cwd": "${workspaceFolder}",
       "sourceLanguages": ["rust"]
@@ -94,7 +94,7 @@
       "request": "launch",
       "name": "Debug MacOS executable with fast_dev + local session sharing server",
       "preLaunchTask": "build_warplocal_fastdev_localsessionsharing",
-      "program": "${workspaceFolder}/target/debug/bundle/osx/Zap.app/Contents/MacOS/zap-oss",
+      "program": "${workspaceFolder}/target/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
       "args": [],
       "cwd": "${workspaceFolder}",
       "sourceLanguages": ["rust"]
@@ -102,11 +102,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in executable 'zap-oss'",
+      "name": "Debug unit tests in executable 'infinishell'",
       "cargo": {
-        "args": ["test", "--no-run", "--bin=zap-oss", "--package=warp"],
+        "args": ["test", "--no-run", "--bin=infinishell", "--package=warp"],
         "filter": {
-          "name": "zap-oss",
+          "name": "infinishell",
           "kind": "bin"
         }
       },

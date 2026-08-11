@@ -3,14 +3,16 @@ use pathfinder_color::ColorU;
 use plist::{Dictionary, Value};
 use virtual_fs::{Stub, VirtualFS};
 use warp_core::ui::theme::{Fill, WarpTheme};
-use warpui::{fonts::FontInfo, keymap::Keystroke};
+use warpui::fonts::FontInfo;
+use warpui::keymap::Keystroke;
 
-use crate::settings::import::{
-    config::{GlobalHotkey, HotkeyError, ImportedFont, ParseableConfig, ThemeType},
-    iterm_parser::{default_dark_theme, default_light_theme, Flags, ITermKeystroke, ITermProfile},
+use super::{ITermTheme, ITermThemeType, color_dictionary_to_coloru};
+use crate::settings::import::config::{
+    GlobalHotkey, HotkeyError, ImportedFont, ParseableConfig, ThemeType,
 };
-
-use super::{color_dictionary_to_coloru, ITermTheme, ITermThemeType};
+use crate::settings::import::iterm_parser::{
+    Flags, ITermKeystroke, ITermProfile, default_dark_theme, default_light_theme,
+};
 
 fn courier_new() -> Vec<FontInfo> {
     vec![FontInfo {
@@ -171,7 +173,7 @@ fn test_import_from_file() {
 
         let config = profile.parse(&[]);
 
-        let ThemeType::Single(ref warp_theme) =
+        let ThemeType::Single(warp_theme) =
             config.theme.value().as_ref().expect("Should import theme!")
         else {
             panic!("Should have read a single theme!")

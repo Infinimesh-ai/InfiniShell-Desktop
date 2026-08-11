@@ -3,25 +3,25 @@ pub mod uniforms;
 
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::rendering::OnGPUDeviceSelected;
-use crate::windowing;
-use crate::{r#async::block_on, rendering::GPUPowerPreference};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use pathfinder_geometry::vector::Vector2F;
 use thiserror::Error;
 use version_compare::Version;
+use warp_errors::report_error;
 use warpui_core::rendering::{GPUBackend, GPUDeviceInfo, GPUDeviceType};
 use wgpu::{
     Adapter, Backend, CompositeAlphaMode, CurrentSurfaceTexture, Device, DeviceType, PresentMode,
     Queue, Surface, SurfaceConfiguration,
 };
+
+use crate::r#async::block_on;
+use crate::rendering::{GPUPowerPreference, OnGPUDeviceSelected};
+use crate::windowing;
 
 /// A mostly-arbitrary value to use as the height/width of a surface when
 /// creating a default surface configuration.
@@ -121,7 +121,9 @@ impl Resources {
             let device_lost_clone = device_lost.clone();
             device.set_device_lost_callback(move |device_lost_reason, message| {
                 device_lost_clone.store(true, Ordering::SeqCst);
-                log::warn!("The current device is lost. Reason: {device_lost_reason:?}. Message: {message}")
+                log::warn!(
+                    "The current device is lost. Reason: {device_lost_reason:?}. Message: {message}"
+                )
             });
 
             Ok(Self {
@@ -271,6 +273,7 @@ async fn select_adapter(
                 power_preference,
                 force_fallback_adapter: false,
                 compatible_surface: Some(surface),
+                apply_limit_buckets: true,
             };
 
             let adapter = instance.request_adapter(&request_adapter_options).await.ok()?;
@@ -374,7 +377,9 @@ fn is_supported_adapter(adapter: &wgpu::Adapter, surface: &wgpu::Surface) -> boo
     } else {
         format!(" ({})", info.driver_info)
     };
-    log::info!("{device_type:?}: {device_name}\n\tBackend: {backend:?}\n\tDriver: {driver}{driver_info}\n\tCan present: {can_present}\n\tSupported texture format: {supported_texture_format:?}\n\tSupported alpha mode: {supported_alpha_modes:?}");
+    log::info!(
+        "{device_type:?}: {device_name}\n\tBackend: {backend:?}\n\tDriver: {driver}{driver_info}\n\tCan present: {can_present}\n\tSupported texture format: {supported_texture_format:?}\n\tSupported alpha mode: {supported_alpha_modes:?}"
+    );
 
     can_present && supported_texture_format.is_some()
 }
@@ -416,10 +421,9 @@ fn is_older_nvidia_adapter(adapter_info: &wgpu::AdapterInfo) -> bool {
 
     let Some(version) = Version::from(&adapter_info.driver_info) else {
         // Log an error so we know this occurred and can improve the logic as-needed.
-        log::error!(
-            "Unable to parse Vulkan-backed Nvidia adapter version {:?}; de-prioritizing out of an \
-            abundance of caution.",
-            adapter_info.driver_info
+        report_error!(
+            "Unable to parse Vulkan-backed Nvidia adapter version; de-prioritizing",
+            extra: { "driver_info" => ?adapter_info.driver_info }
         );
         return true;
     };
@@ -445,9 +449,9 @@ fn is_newer_nondx12_nvidia_adapter_on_windows(adapter_info: &wgpu::AdapterInfo) 
 
     let Some(version) = Version::from(&adapter_info.driver_info) else {
         // Log an error so we know this occurred and can improve the logic as-needed.
-        log::error!(
-            "Unable to parse Nvidia adapter version {:?} adapter_info.driver_info",
-            adapter_info.driver_info
+        report_error!(
+            "Unable to parse Nvidia adapter version",
+            extra: { "driver_info" => ?adapter_info.driver_info }
         );
         return false;
     };
@@ -467,13 +471,32 @@ fn is_gl_to_metal_adapter_on_windows_in_parallels(adapter_info: &wgpu::AdapterIn
 }
 
 /// Returns whether or not the provided adapter is an unsupported Intel UHD Mesa driver version for
-/// warpui to render properly. Currently, we limit this to "Intel UHD Graphics 620", but we do have
-/// some suspicion that more Intel UHD devices are affected, e.g. PLAT-599 has a "Intel(R) UHD
-/// Graphics (TGL GT1)" user seeing the exact same issue.
+/// warpui to render properly. Affected adapters include:
+/// - `Intel(R) HD Graphics 620` (KBL GT2) — flickering (PLAT-744)
+/// - `Intel(R) UHD Graphics (ICL GT1)` — stuck at "Starting zsh..." on Mesa 21.2.6 (GH #14325)
+/// - `Intel(R) UHD Graphics (TGL GT1)` — window flashing/flicker on older Mesa (PLAT-599, GH #4533)
+/// - `Intel(R) Xe Graphics (TGL GT2)` — frozen window; every `get_current_texture` call returns a
+///   validation error on Mesa 21.2.6 (GH #14577)
+///
+/// See the Mesa 21.3.6 changelog for the upstream fix:
+/// <https://docs.mesa3d.org/relnotes/21.3.6.html#:~:text=Flickering%20Intel%20Uhd%20620%20Graphics>
 fn is_older_vulkan_intel_uhd_adapter(adapter_info: &wgpu::AdapterInfo) -> bool {
     if adapter_info.backend != wgpu::Backend::Vulkan
         || adapter_info.device_type != wgpu::DeviceType::IntegratedGpu
-        || !adapter_info.name.contains("Intel(R) HD Graphics 620")
+    {
+        return false;
+    }
+
+    let affected_names = [
+        "Intel(R) HD Graphics 620",
+        "Intel(R) UHD Graphics (ICL GT1)",
+        "Intel(R) UHD Graphics (TGL GT1)",
+        "Intel(R) Xe Graphics (TGL GT2)",
+    ];
+
+    if !affected_names
+        .iter()
+        .any(|name| adapter_info.name.contains(name))
     {
         return false;
     }
@@ -501,6 +524,21 @@ fn is_intel_uhd_620_adapter_on_windows_with_vulkan_backend(
             || adapter_info.name.contains("Intel(R) HD Graphics 620"))
 }
 
+/// Returns true if this is an Intel UHD Graphics 770 integrated GPU on Windows, using either the
+/// DX12 or Vulkan backend.
+///
+/// This integrated GPU's drivers introduce severe latency/stutter in the present path.
+/// Public reports of latency/stutter bugs on Intel integrated GPU drivers (including the UHD 770):
+/// https://github.com/IGCIT/Intel-GPU-Community-Issue-Tracker-IGCIT/issues/1002
+/// https://github.com/libsdl-org/SDL/issues/5628
+/// See also https://github.com/warpdotdev/warp/issues/4856
+fn is_intel_uhd_770_adapter_on_windows(adapter_info: &wgpu::AdapterInfo) -> bool {
+    cfg!(windows)
+        && matches!(adapter_info.backend, Backend::Dx12 | Backend::Vulkan)
+        && adapter_info.device_type == DeviceType::IntegratedGpu
+        && adapter_info.name.contains("Intel(R) UHD Graphics 770")
+}
+
 /// Returns whether the given adapter is known to have a rendering offset bug on Windows.
 ///
 /// Certain Intel integrated GPU drivers using the GL backend render the scene at an offset from
@@ -522,6 +560,7 @@ pub fn adapter_has_rendering_offset_bug(adapter_info: &wgpu::AdapterInfo) -> boo
     // Known affected Intel integrated GPU models. This list is based on user reports from
     // https://github.com/zerx-lab/warp/issues/6120.
     let affected_models = [
+        "Intel(R) HD Graphics 2500",
         "Intel(R) HD Graphics 4000",
         "Intel(R) HD Graphics 4400",
         "Intel(R) HD Graphics 4600",
@@ -534,6 +573,20 @@ pub fn adapter_has_rendering_offset_bug(adapter_info: &wgpu::AdapterInfo) -> boo
     affected_models
         .iter()
         .any(|model| adapter_info.name.contains(model))
+}
+
+/// Returns whether the adapter is the Broadcom V3D Vulkan driver (V3DV).
+///
+/// The V3D Vulkan driver on Raspberry Pi and similar ARM SBCs have panics and flickering issues.
+/// The logs have warnings about these drivers missing the `FULL_DRAW_INDEX_UINT32` downlevel flag
+/// but if it's unclear if that is the actual cause. See:
+/// https://github.com/warpdotdev/warp/issues/10618
+/// https://github.com/warpdotdev/warp/issues/4879
+fn is_v3d_vulkan_adapter(adapter_info: &wgpu::AdapterInfo) -> bool {
+    cfg!(target_os = "linux")
+        && adapter_info.backend == wgpu::Backend::Vulkan
+        && adapter_info.driver.contains("V3DV")
+        && adapter_info.name.starts_with("V3D 4.2.14.")
 }
 
 /// Checks whether the provided adapter info describes a lavapipe
@@ -550,8 +603,9 @@ fn is_older_lavapipe_adapter(adapter_info: &wgpu::AdapterInfo) -> bool {
 fn mesa_driver_version_is_below_minimum(info_str: &str, min_version: &Version) -> bool {
     let &[name, version, ..] = info_str.splitn(3, ' ').collect_vec().as_slice() else {
         // Log an error so we know this occurred and can improve the logic as-needed.
-        log::error!(
-            "Encountered Mesa driver info {info_str:?} with an unexpected format! (too few parts)"
+        report_error!(
+            "Encountered Mesa driver info with an unexpected format (too few parts)",
+            extra: { "info" => ?info_str }
         );
         return false;
     };
@@ -559,8 +613,9 @@ fn mesa_driver_version_is_below_minimum(info_str: &str, min_version: &Version) -
     // Perform an extra check that we parsed the driver info string properly.
     if name.trim() != "Mesa" {
         // Log an error so we know this occurred and can improve the logic as-needed.
-        log::error!(
-            "Encountered Mesa driver info {info_str:?} with an unexpected format! (name != Mesa)"
+        report_error!(
+            "Encountered Mesa driver info with an unexpected format (name != Mesa)",
+            extra: { "info" => ?info_str }
         );
         return false;
     }
@@ -572,8 +627,9 @@ fn mesa_driver_version_is_below_minimum(info_str: &str, min_version: &Version) -
     };
     let Some(version) = Version::from_manifest(version, &manifest) else {
         // Log an error so we know this occurred and can improve the logic as-needed.
-        log::error!(
-            "Unable to parse Mesa version {version:?}; de-prioritizing out of an abundance of caution."
+        report_error!(
+            "Unable to parse Mesa version; de-prioritizing",
+            extra: { "version" => ?version }
         );
         return true;
     };
@@ -713,12 +769,24 @@ fn adapter_stability_sort_func(
         && adapter_info.backend == Backend::Vulkan
         && !is_vulkan_nvidia_adapter(&adapter_info)
     {
-        log::info!("Deprioritizing non-NVIDIA Vulkan adapter (the PRIME performance profile is likely enabled)");
+        log::info!(
+            "Deprioritizing non-NVIDIA Vulkan adapter (the PRIME performance profile is likely enabled)"
+        );
+        return AdapterSupport::Unsupported;
+    }
+
+    if is_v3d_vulkan_adapter(&adapter_info) {
+        log::warn!("Deprioritizing Vulkan-backed V3D adapter");
         return AdapterSupport::Unsupported;
     }
 
     if is_intel_uhd_620_adapter_on_windows_with_vulkan_backend(&adapter_info) {
         log::warn!("Deprioritizing Vulkan-backed Intel UHD 620 adapter");
+        return AdapterSupport::SupportedWithIssues;
+    }
+
+    if is_intel_uhd_770_adapter_on_windows(&adapter_info) {
+        log::warn!("Deprioritizing Intel UHD 770 integrated GPU on Windows");
         return AdapterSupport::SupportedWithIssues;
     }
 
@@ -873,7 +941,7 @@ fn get_surface_texture(
 ) -> Result<wgpu::SurfaceTexture, GetSurfaceTextureError> {
     let error = match surface.get_current_texture() {
         CurrentSurfaceTexture::Success(texture) | CurrentSurfaceTexture::Suboptimal(texture) => {
-            return Ok(texture)
+            return Ok(texture);
         }
         CurrentSurfaceTexture::Timeout => GetSurfaceTextureError::Timeout,
         CurrentSurfaceTexture::Occluded => GetSurfaceTextureError::Occluded,

@@ -1,6 +1,7 @@
-use getset::Getters;
 use std::path::PathBuf;
-use tempfile::{tempdir, TempDir};
+
+use getset::Getters;
+use tempfile::{TempDir, tempdir};
 
 /// A virtual filesystem for testing purposes.
 #[derive(Getters)]

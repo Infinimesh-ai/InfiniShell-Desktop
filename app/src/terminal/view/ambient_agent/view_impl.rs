@@ -3,6 +3,7 @@
 use warp_cli::agent::Harness;
 
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
+use crate::ai::agent::RenderableAIError;
 use crate::ai::AIRequestUsageModel;
 use warpui::prelude::Empty;
 
@@ -45,7 +46,7 @@ impl TerminalView {
     fn update_active_ambient_agent_conversation_status(
         &self,
         status: ConversationStatus,
-        error_message: Option<String>,
+        error: Option<RenderableAIError>,
         ctx: &mut ViewContext<Self>,
     ) {
         let Some(conversation_id) = self.active_ambient_agent_conversation_id(ctx) else {
@@ -53,11 +54,11 @@ impl TerminalView {
         };
 
         BlocklistAIHistoryModel::handle(ctx).update(ctx, |history_model, ctx| {
-            history_model.update_conversation_status_with_error_message(
+            history_model.update_conversation_status_with_error(
                 self.id(),
                 conversation_id,
                 status,
-                error_message,
+                error,
                 ctx,
             );
         });
@@ -83,6 +84,12 @@ impl TerminalView {
         event: &AmbientAgentViewModelEvent,
         ctx: &mut ViewContext<Self>,
     ) {
+        // `ambient_agent_view_model` 现在是 `Option`(pane 可能尚未 / 从不承载 ambient agent),
+        // 没有模型时本处理器无事可做。
+        let Some(ambient_agent_view_model) = self.ambient_agent_view_model.clone() else {
+            return;
+        };
+
         // Tear down the non-oz ambient-agent queued-prompt block on terminal / transition
         // events that replace it. `Failed`, `NeedsGithubAuth`, and `Cancelled` hand off
         // to the existing error / auth / cancelled UI; `HarnessCommandStarted` hands
@@ -121,16 +128,11 @@ impl TerminalView {
                     return;
                 }
                 if false {
-                    if self
-                        .ambient_agent_view_model
-                        .as_ref(ctx)
-                        .is_third_party_harness()
-                    {
+                    if ambient_agent_view_model.as_ref(ctx).is_third_party_harness() {
                         // Non-oz runs: render the submitted prompt via the queued-prompt UI.
                         // The block is removed later by `HarnessCommandStarted` / failure /
                         // cancel / auth handlers.
-                        let prompt = self
-                            .ambient_agent_view_model
+                        let prompt = ambient_agent_view_model
                             .as_ref(ctx)
                             .request()
                             .map(|request| request.prompt.clone())
@@ -141,7 +143,7 @@ impl TerminalView {
                     } else {
                         let initial_user_query = ctx.add_view(|ctx| {
                             AmbientAgentInitialUserQuery::new(
-                                self.ambient_agent_view_model.clone(),
+                                ambient_agent_view_model.clone(),
                                 ctx,
                             )
                         });
@@ -154,14 +156,13 @@ impl TerminalView {
                             },
                             ctx,
                         );
-                        self.ambient_agent_view_model.update(ctx, |model, _| {
+                        ambient_agent_view_model.update(ctx, |model, _| {
                             model.set_has_inserted_ambient_agent_user_query_block(true);
                         });
                     }
                 } else {
                     // Reset tip cooldown so the first tip shows for 60 seconds
-                    let tip_model = self
-                        .ambient_agent_view_model
+                    let tip_model = ambient_agent_view_model
                         .as_ref(ctx)
                         .ui_state
                         .tip_model
@@ -181,8 +182,7 @@ impl TerminalView {
             }
             AmbientAgentViewModelEvent::ProgressUpdated => {
                 // Refresh the tip (respects 60s cooldown internally)
-                let tip_model = self
-                    .ambient_agent_view_model
+                let tip_model = ambient_agent_view_model
                     .as_ref(ctx)
                     .ui_state
                     .tip_model
@@ -197,7 +197,7 @@ impl TerminalView {
             AmbientAgentViewModelEvent::Failed { error_message } => {
                 self.update_active_ambient_agent_conversation_status(
                     ConversationStatus::Error,
-                    Some(error_message.clone()),
+                    Some(RenderableAIError::other(error_message.clone(), false)),
                     ctx,
                 );
                 // Re-render to show the error state in the footer.
@@ -255,6 +255,8 @@ impl TerminalView {
                 self.force_report_viewer_terminal_size(ctx);
                 ctx.notify();
             }
+            // auth secret 的选择由 `AuthSecretSelector` 自行处理,终端视图无需响应。
+            AmbientAgentViewModelEvent::AuthSecretSelected => (),
         }
     }
 
@@ -282,8 +284,10 @@ impl TerminalView {
         {
             return;
         }
-        if !self
-            .ambient_agent_view_model
+        let Some(ambient_agent_view_model) = self.ambient_agent_view_model.clone() else {
+            return;
+        };
+        if !ambient_agent_view_model
             .as_ref(ctx)
             .is_third_party_harness()
         {
@@ -345,11 +349,15 @@ impl TerminalView {
         let Some(cli_agent) = CLIAgent::detect(&command, None, None, ctx) else {
             return false;
         };
-        match self.ambient_agent_view_model.as_ref(ctx).selected_harness() {
+        let Some(ambient_agent_view_model) = self.ambient_agent_view_model.as_ref() else {
+            return false;
+        };
+        match ambient_agent_view_model.as_ref(ctx).selected_harness() {
             Harness::Oz => false,
             Harness::Claude => matches!(cli_agent, CLIAgent::Claude),
             Harness::OpenCode => matches!(cli_agent, CLIAgent::OpenCode),
             Harness::Gemini => matches!(cli_agent, CLIAgent::Gemini),
+            Harness::Codex => matches!(cli_agent, CLIAgent::Codex),
             Harness::Unknown => false,
         }
     }
@@ -360,7 +368,10 @@ impl TerminalView {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let ambient_agent_model = self.ambient_agent_view_model.as_ref(app);
+        let Some(ambient_agent_view_model) = self.ambient_agent_view_model.as_ref() else {
+            return Empty::new().finish();
+        };
+        let ambient_agent_model = ambient_agent_view_model.as_ref(app);
         let Some(progress) = ambient_agent_model.agent_progress() else {
             return Empty::new().finish();
         };

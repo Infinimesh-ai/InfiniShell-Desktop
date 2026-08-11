@@ -1,6 +1,6 @@
-# Contributing to Zap
+# Contributing to InfiniShell
 
-Thanks for helping improve Zap! This guide explains how to open issues, propose changes, and get your work reviewed.
+Thanks for helping improve InfiniShell! This guide explains how to open issues, propose changes, and get your work reviewed.
 
 ## TL;DR
 
@@ -9,34 +9,34 @@ Thanks for helping improve Zap! This guide explains how to open issues, propose 
 - Specs are the place where technical and design discussion on larger issues happen.
 - Oz automatically triages incoming issues and reviews open PRs.
 
-## How Contributing to Zap Works
+## How Contributing to InfiniShell Works
 
-Zap's contribution model is shaped by Oz, an agent that automates parts of triage, spec writing, implementation, and review. Compared with a typical open-source repository, a few things work differently here:
+InfiniShell's contribution model is shaped by Oz, an agent that automates parts of triage, spec writing, implementation, and review. Compared with a typical open-source repository, a few things work differently here:
 
 - **Issues are the starting point for everything.** Discussion, scoping, and design happen on the issue before any PR is opened.
 - **Feature requests differ from bug fixes:**
   - Features are gated by readiness labels — `ready-to-spec`, then `ready-to-implement` once the design is settled — that signal when contributors can pick up the work. Discussion alone is not approval to begin work.
   - Feature work needs a written spec first: feature requests go through a spec PR (a *product spec* + *tech spec* committed under [`specs/`](specs/)) before any code is written.
   - Bug fixes skip both steps; they are implicitly `ready-to-implement` once triaged.
-- **Review is largely automated.** When you open a PR, Oz is auto-assigned and produces an initial review. Once Oz approves, it automatically requests a follow-up review from a Zap team subject-matter expert — you do not need to assign human reviewers yourself.
+- **Review is largely automated.** When you open a PR, Oz is auto-assigned and produces an initial review. Once Oz approves, it automatically requests a follow-up review from an InfiniShell team subject-matter expert — you do not need to assign human reviewers yourself.
 
 ### Readiness labels
 
-The Zap team applies one of the following labels when an issue is ready for contribution:
+The InfiniShell team applies one of the following labels when an issue is ready for contribution:
 
 - **`ready-to-spec`** — The problem is understood but the design is open. Open a spec PR with a *product spec* (`product.md`) and a *tech spec* (`tech.md`) under [`specs/`](specs/) — see [Opening a Spec PR](#opening-a-spec-pr) for what goes in each. This label is **reserved for feature requests**.
 - **`ready-to-implement`** — The design is settled. Open a code PR. **All triaged bug reports are implicitly `ready-to-implement`** once accepted — you don't need to wait for an explicit label on a confirmed bug.
-- **`needs-mocks`** — Design mocks are required before implementation can begin. Wait for the Zap team to land them.
+- **`needs-mocks`** — Design mocks are required before implementation can begin. Wait for the InfiniShell team to land them.
 
 Anyone can pick up a ready issue — readiness labels are not assignments, and the best implementation wins through normal review. If an issue has been sitting un-triaged or you'd like readiness re-evaluated, mention **@oss-maintainers** in a comment to flag it for the team.
 
 ## Contribution Flow
 
-Steps owned by you (the contributor) are shown in yellow; steps owned by the Zap team or Oz are shown in blue.
+Steps owned by you (the contributor) are shown in yellow; steps owned by the InfiniShell team or Oz are shown in blue.
 
 ```mermaid
 flowchart TD
-    A[File an issue] --> B{Zap team triages}
+    A[File an issue] --> B{InfiniShell team triages}
     B -- ready-to-spec<br/>(feature requests) --> C[Open spec PR<br/>product.md + tech.md]
     B -- needs-mocks --> D[Design mocks produced]
     D --> E[Open code PR]
@@ -54,7 +54,7 @@ flowchart TD
 
 Search [existing issues](https://github.com/zerx-lab/warp/issues) before filing to avoid duplicates. Use the issue templates when filing.
 
-If you're already running Zap, the fastest way to file is the `/feedback` command — it opens a public GitHub issue with relevant context (logs, environment details) automatically attached.
+If you're already running InfiniShell, the fastest way to file is the `/feedback` command — it opens a public GitHub issue with relevant context (logs, environment details) automatically attached.
 
 ### Bug reports
 
@@ -63,7 +63,7 @@ A good bug report includes:
 - A clear title and a one-paragraph summary of the problem.
 - Steps to reproduce (with a minimal example where possible).
 - Expected vs. actual behavior.
-- Zap version and OS (see `Settings → About`).
+- InfiniShell version and OS (see `Settings → About`).
 - Logs, screenshots, or screen recordings when relevant.
 
 Once an issue is triaged as a bug (by Oz's triage agent or a maintainer), it is implicitly **`ready-to-implement`** — you can pick it up and open a code PR without waiting for a separate label.
@@ -104,13 +104,13 @@ For issues labeled `ready-to-implement` (this includes any triaged bug):
 4. Open a PR using the [pull request template](.github/pull_request_template.md) and add a changelog entry (`CHANGELOG-NEW-FEATURE`, `CHANGELOG-IMPROVEMENT`, or `CHANGELOG-BUG-FIX`); omit only for docs-only or refactoring-only changes.
 5. Keep the PR focused on a single logical change and merge `master` in before the PR enters review.
 
-You **do not need to manually request reviewers**. Oz is auto-assigned to PRs that target a ready issue and produces an initial review. After Oz approves, it automatically requests a follow-up review from the appropriate Zap team subject-matter expert.
+You **do not need to manually request reviewers**. Oz is auto-assigned to PRs that target a ready issue and produces an initial review. After Oz approves, it automatically requests a follow-up review from the appropriate InfiniShell team subject-matter expert.
 
 After you push changes that address Oz's feedback, comment `/oz-review` on the PR to request a re-review — you can do this up to **three times** per PR. If something looks stuck or you need more reviews than that, mention **@oss-maintainers** on the PR to escalate to the team.
 
 ## Using a Coding Agent
 
-You can use **any coding agent** to implement a contribution — for example, Zap's built-in agent, Claude Code, Codex, Gemini CLI, or others — or no agent at all. This repository ships agent-readable context (skills under [`.agents/skills/`](.agents/skills/), specs under [`specs/`](specs/), and [`WARP.md`](WARP.md)) that any harness supporting these formats can pick up.
+You can use **any coding agent** to implement a contribution — for example, InfiniShell's built-in agent, Claude Code, Codex, Gemini CLI, or others — or no agent at all. This repository ships agent-readable context (skills under [`.agents/skills/`](.agents/skills/), specs under [`specs/`](specs/), and [`WARP.md`](WARP.md)) that any harness supporting these formats can pick up.
 
 If you'd rather have an **Oz cloud agent** implement a ready issue for you, mention **@oss-maintainers** on the issue to request it. Approved requests run **for free** on complimentary Oz credits — you don't need to set up your own Oz account or pay for compute.
 
@@ -128,7 +128,7 @@ See [README.md](README.md) and [WARP.md](WARP.md) for the full engineering guide
 
 ```bash
 ./script/bootstrap   # platform-specific setup
-cargo run            # build and run Zap
+cargo run            # build and run InfiniShell
 ./script/presubmit   # fmt, clippy, and tests
 ```
 

@@ -4,27 +4,25 @@
 #[path = "editing_tests.rs"]
 mod tests;
 
-use repo_metadata::file_tree_store::FileTreeEntryState;
-use repo_metadata::{FileMetadata, FileTreeEntry};
 use std::cmp::Ordering;
 use std::sync::Arc;
+
+use repo_metadata::file_tree_store::FileTreeEntryState;
+use repo_metadata::{FileMetadata, FileTreeEntry};
 use warp_util::standardized_path::StandardizedPath;
-use warpui::{elements::MouseStateHandle, ViewContext};
+use warpui::ViewContext;
+use warpui::elements::MouseStateHandle;
 
 use super::{FileTreeIdentifier, FileTreeItem, FileTreeView};
-use crate::{
-    code::file_tree::{
-        view::{PendingEdit, PendingEditKind},
-        FileTreeEvent,
-    },
-    send_telemetry_from_ctx,
-    server::telemetry::TelemetryEvent,
-};
+use crate::code::file_tree::FileTreeEvent;
+use crate::code::file_tree::view::{PendingEdit, PendingEditKind};
+use crate::send_telemetry_from_ctx;
+use crate::server::telemetry::TelemetryEvent;
 
 /// Custom ordering function for items in the file tree.
 ///
-/// Directories are ordered first, sorted alphabetically.
-/// Files are ordered second, sorted alphabetically.
+/// Directories are ordered first, sorted by natural (numeric-aware) order.
+/// Files are ordered second, sorted by natural (numeric-aware) order.
 /// Within each group, dotfiles (entries starting with a dot) are ordered first.
 pub(super) fn sort_entries_for_file_tree(
     entry_1: &StandardizedPath,
@@ -70,7 +68,7 @@ pub(super) fn sort_entries_for_file_tree(
     match (starts_with_dot_1, starts_with_dot_2) {
         (true, false) => Ordering::Less,
         (false, true) => Ordering::Greater,
-        _ => name_1.cmp(name_2),
+        _ => alphanumeric_sort::compare_str(name_1, name_2),
     }
 }
 
@@ -240,7 +238,7 @@ impl FileTreeView {
                 });
 
                 // Rebuild and select the renamed item using its FileTreeIdentifier
-                self.rebuild_flatten_items_and_select_path(Some(&file_tree_id), None);
+                self.rebuild_flatten_items_impl(Some(&file_tree_id), None, None);
                 ctx.notify();
             }
         }
@@ -257,10 +255,10 @@ impl FileTreeView {
                 view.clear_buffer(ctx);
             });
             // Only remove placeholder in the create-new-file flow.
-            if pending_edit.kind == PendingEditKind::CreateNewFile {
-                if let Some(root_dir) = self.root_directories.get_mut(&id.root) {
-                    root_dir.items.remove(id.index);
-                }
+            if pending_edit.kind == PendingEditKind::CreateNewFile
+                && let Some(root_dir) = self.root_directories.get_mut(&id.root)
+            {
+                root_dir.items.remove(id.index);
             }
         }
         ctx.notify();

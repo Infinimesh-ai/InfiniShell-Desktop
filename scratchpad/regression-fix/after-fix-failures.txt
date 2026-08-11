@@ -1,0 +1,195 @@
+FAIL [   0.013s] (5105/5562) warp uri::tests::test_app_web_link_rewrites_to_home
+FAIL [   0.013s] (5105/5562) warp uri::tests::test_app_web_link_rewrites_to_home
+FAIL [   0.014s] (4679/5562) warp terminal::shared_session::tests::maybe_rewrite_web_url_to_shared_session_intent_rewrites_matching_web_url
+FAIL [   0.014s] (4679/5562) warp terminal::shared_session::tests::maybe_rewrite_web_url_to_shared_session_intent_rewrites_matching_web_url
+FAIL [   0.015s] (4373/5562) warp terminal::model::grid::grid_handler::tests::regex_right
+FAIL [   0.015s] (4373/5562) warp terminal::model::grid::grid_handler::tests::regex_right
+FAIL [   0.015s] (4397/5562) warp terminal::model::grid::grid_handler::tests::test_find_url_omits_trailing_periods
+FAIL [   0.015s] (4397/5562) warp terminal::model::grid::grid_handler::tests::test_find_url_omits_trailing_periods
+FAIL [   0.016s] (1568/5562) warp ai::skills::skill_manager::tests::test_read_bundled_skills_with_variable_substitution
+FAIL [   0.016s] (1568/5562) warp ai::skills::skill_manager::tests::test_read_bundled_skills_with_variable_substitution
+FAIL [   0.016s] (4361/5562) warp terminal::model::grid::grid_handler::tests::nested_regex
+FAIL [   0.016s] (4361/5562) warp terminal::model::grid::grid_handler::tests::nested_regex
+FAIL [   0.016s] ( 937/5562) warp ai::blocklist::history_model::tests::test_initialize_historical_conversations_eagerly_hydrates_orchestration_children
+FAIL [   0.016s] ( 937/5562) warp ai::blocklist::history_model::tests::test_initialize_historical_conversations_eagerly_hydrates_orchestration_children
+FAIL [   0.016s] ( 939/5562) warp ai::blocklist::history_model::tests::test_initialize_historical_conversations_resolves_parent_agent_id_children_via_seeded_run_ids
+FAIL [   0.016s] ( 939/5562) warp ai::blocklist::history_model::tests::test_initialize_historical_conversations_resolves_parent_agent_id_children_via_seeded_run_ids
+FAIL [   0.017s] ( 225/5562) warp ai::agent_events::driver_tests::non_actionable_stream_statuses_do_not_report_at_threshold
+FAIL [   0.017s] ( 225/5562) warp ai::agent_events::driver_tests::non_actionable_stream_statuses_do_not_report_at_threshold
+FAIL [   0.017s] (4366/5562) warp terminal::model::grid::grid_handler::tests::regex_left
+FAIL [   0.017s] (4366/5562) warp terminal::model::grid::grid_handler::tests::regex_left
+FAIL [   0.017s] ( 759/5562) warp ai::blocklist::agent_view::orchestration_pill_bar::tests::pill_bar_data_layer_finds_restored_children_before_pane_creation
+FAIL [   0.017s] ( 759/5562) warp ai::blocklist::agent_view::orchestration_pill_bar::tests::pill_bar_data_layer_finds_restored_children_before_pane_creation
+FAIL [   0.018s] ( 945/5562) warp ai::blocklist::history_model::tests::test_initialize_historical_conversations_uses_summary_column_without_tasks
+FAIL [   0.018s] ( 945/5562) warp ai::blocklist::history_model::tests::test_initialize_historical_conversations_uses_summary_column_without_tasks
+FAIL [   0.019s] ( 226/5562) warp ai::agent_events::driver_tests::http_status_error_actionability_follows_status_classification
+FAIL [   0.019s] ( 226/5562) warp ai::agent_events::driver_tests::http_status_error_actionability_follows_status_classification
+FAIL [   0.019s] (2822/5562) warp search::ai_context_menu::files::data_source::tests::test_directory_search_support
+FAIL [   0.019s] (2822/5562) warp search::ai_context_menu::files::data_source::tests::test_directory_search_support
+FAIL [   0.019s] ( 756/5562) warp ai::blocklist::agent_view::orchestration_pill_bar::tests::breadcrumbs_resolve_token_only_parent_linkage_after_restore
+FAIL [   0.019s] ( 756/5562) warp ai::blocklist::agent_view::orchestration_pill_bar::tests::breadcrumbs_resolve_token_only_parent_linkage_after_restore
+FAIL [   0.022s] (2041/5562) warp drive::export::tests::test_export_untitled_notebook
+FAIL [   0.022s] (2041/5562) warp drive::export::tests::test_export_untitled_notebook
+FAIL [   0.023s] (5183/5562) warp util::bindings::tests::test_toggle_maximize_pane_binding_is_editable
+FAIL [   0.023s] (5183/5562) warp util::bindings::tests::test_toggle_maximize_pane_binding_is_editable
+FAIL [   0.024s] (4770/5562) warp terminal::view::shared_session::cloud_conversation_continuation::tests::unknown_access_returns_error
+FAIL [   0.024s] (4770/5562) warp terminal::view::shared_session::cloud_conversation_continuation::tests::unknown_access_returns_error
+FAIL [   0.026s] (5524/5562) warp workspace::view::vertical_tabs::tests::terminal_primary_line_falls_back_to_new_session
+FAIL [   0.026s] (5524/5562) warp workspace::view::vertical_tabs::tests::terminal_primary_line_falls_back_to_new_session
+FAIL [   0.027s] (1642/5562) warp cloud_object::model::persistence::tests::test_unshared_team_object
+FAIL [   0.027s] (1642/5562) warp cloud_object::model::persistence::tests::test_unshared_team_object
+FAIL [   0.108s] ( 981/5562) warp ai::blocklist::history_model::tests::test_initialize_output_for_response_stream_persists_updated_conversation_state
+FAIL [   0.108s] ( 981/5562) warp ai::blocklist::history_model::tests::test_initialize_output_for_response_stream_persists_updated_conversation_state
+FAIL [   0.112s] ( 987/5562) warp ai::blocklist::history_model::tests::test_mark_conversation_as_remote_child_persists_updated_conversation_state
+FAIL [   0.112s] ( 987/5562) warp ai::blocklist::history_model::tests::test_mark_conversation_as_remote_child_persists_updated_conversation_state
+FAIL [   0.116s] (1017/5562) warp ai::blocklist::history_model::tests::test_truncate_from_exchange_to_empty_persist_event_has_empty_updated_tasks
+FAIL [   0.116s] (1017/5562) warp ai::blocklist::history_model::tests::test_truncate_from_exchange_to_empty_persist_event_has_empty_updated_tasks
+FAIL [   0.120s] ( 942/5562) warp ai::blocklist::history_model::tests::test_assign_run_id_for_conversation_persists_updated_conversation_state
+FAIL [   0.120s] ( 942/5562) warp ai::blocklist::history_model::tests::test_assign_run_id_for_conversation_persists_updated_conversation_state
+FAIL [   0.123s] ( 998/5562) warp ai::blocklist::history_model::tests::test_optimistic_root_restore_round_trip_yields_in_progress_optimistic_root
+FAIL [   0.123s] ( 998/5562) warp ai::blocklist::history_model::tests::test_optimistic_root_restore_round_trip_yields_in_progress_optimistic_root
+FAIL [   0.125s] (2883/5562) warp search::command_palette::data_sources::tests::test_drive_data_source_only_returns_objects_visible_in_the_window
+FAIL [   0.125s] (2883/5562) warp search::command_palette::data_sources::tests::test_drive_data_source_only_returns_objects_visible_in_the_window
+FAIL [   0.127s] (2884/5562) warp search::command_palette::data_sources::tests::test_drive_data_sources_for_different_windows_stay_independent
+FAIL [   0.127s] (2884/5562) warp search::command_palette::data_sources::tests::test_drive_data_sources_for_different_windows_stay_independent
+FAIL [   0.130s] (2474/5562) warp notebooks::context_menu::tests::test_plain_text_actions
+FAIL [   0.130s] (2474/5562) warp notebooks::context_menu::tests::test_plain_text_actions
+FAIL [   0.131s] ( 901/5562) warp ai::blocklist::context_model::tests::has_locking_attachment_is_false_with_only_pending_block_id
+FAIL [   0.131s] ( 901/5562) warp ai::blocklist::context_model::tests::has_locking_attachment_is_false_with_only_pending_block_id
+FAIL [   0.136s] (2475/5562) warp notebooks::context_menu::tests::test_copy_file_path_action
+FAIL [   0.136s] (2475/5562) warp notebooks::context_menu::tests::test_copy_file_path_action
+FAIL [   0.136s] (2476/5562) warp notebooks::context_menu::tests::test_rich_text_actions
+FAIL [   0.136s] (2476/5562) warp notebooks::context_menu::tests::test_rich_text_actions
+FAIL [   0.151s] ( 715/5562) warp ai::blocklist::action_model::execute::read_documents::tests::execute_lazily_hydrates_missing_plan_for_remote_child_without_local_parent
+FAIL [   0.151s] ( 715/5562) warp ai::blocklist::action_model::execute::read_documents::tests::execute_lazily_hydrates_missing_plan_for_remote_child_without_local_parent
+FAIL [   0.152s] (4719/5562) warp terminal::view::open_in_warp::tests::test_single_code_file
+FAIL [   0.152s] (4719/5562) warp terminal::view::open_in_warp::tests::test_single_code_file
+FAIL [   0.170s] (2672/5562) warp notebooks::notebook::tests::test_untitled_notebook
+FAIL [   0.170s] (2672/5562) warp notebooks::notebook::tests::test_untitled_notebook
+FAIL [   0.184s] (1062/5562) warp ai::blocklist::history_model::tests::test_start_new_child_conversation_persists_child_metadata_for_restore
+FAIL [   0.184s] (1062/5562) warp ai::blocklist::history_model::tests::test_start_new_child_conversation_persists_child_metadata_for_restore
+FAIL [   0.184s] (4786/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_inserts_tombstone_when_handoff_enabled
+FAIL [   0.184s] (4786/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_inserts_tombstone_when_handoff_enabled
+FAIL [   0.185s] (2485/5562) warp notebooks::context_menu::tests::test_split_pane_actions
+FAIL [   0.185s] (2485/5562) warp notebooks::context_menu::tests::test_split_pane_actions
+FAIL [   0.188s] (4734/5562) warp terminal::view::queued_prompts_tests::dispatched_cloud_prompt_uses_locked_queue_row_when_v2_is_enabled
+FAIL [   0.188s] (4734/5562) warp terminal::view::queued_prompts_tests::dispatched_cloud_prompt_uses_locked_queue_row_when_v2_is_enabled
+FAIL [   0.189s] (4785/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_enables_followup_input_for_editable_non_owner_finished_view
+FAIL [   0.189s] (4785/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_enables_followup_input_for_editable_non_owner_finished_view
+FAIL [   0.189s] (4964/5562) warp terminal::view::tests::test_prompt_context_menu_items_for_context_chips
+FAIL [   0.189s] (4964/5562) warp terminal::view::tests::test_prompt_context_menu_items_for_context_chips
+FAIL [   0.196s] (4802/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_does_not_insert_tombstone_for_owned_ambient_session_without_handoff
+FAIL [   0.196s] (4802/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_does_not_insert_tombstone_for_owned_ambient_session_without_handoff
+FAIL [   0.196s] (4806/5562) warp terminal::view::shared_session::view_impl::tests::test_resize_shared_session_viewer_independent_of_sharer
+FAIL [   0.196s] (4806/5562) warp terminal::view::shared_session::view_impl::tests::test_resize_shared_session_viewer_independent_of_sharer
+FAIL [   0.200s] (4970/5562) warp terminal::view::tests::test_prompt_context_menu_items_for_ps1
+FAIL [   0.200s] (4970/5562) warp terminal::view::tests::test_prompt_context_menu_items_for_ps1
+FAIL [   0.201s] (4969/5562) warp terminal::view::tests::test_prompt_context_menu_items_for_no_context_chips
+FAIL [   0.201s] (4969/5562) warp terminal::view::tests::test_prompt_context_menu_items_for_no_context_chips
+FAIL [   0.202s] (4799/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_does_not_insert_tombstone_for_ambient_session_under_cloud_mode_setup_v2
+FAIL [   0.202s] (4799/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_does_not_insert_tombstone_for_ambient_session_under_cloud_mode_setup_v2
+FAIL [   0.203s] (4963/5562) warp terminal::view::tests::test_prompt_context_menu_items_for_agent_toolbelt_flag
+FAIL [   0.203s] (4963/5562) warp terminal::view::tests::test_prompt_context_menu_items_for_agent_toolbelt_flag
+FAIL [   0.205s] (4862/5562) warp terminal::view::tests::ctrl_c_after_stop_takeover_cancels_conversation
+FAIL [   0.205s] (4862/5562) warp terminal::view::tests::ctrl_c_after_stop_takeover_cancels_conversation
+FAIL [   0.208s] (4784/5562) warp terminal::view::queued_prompts_tests::terminal_cloud_status_transition_drains_once_through_cloud_followup_input_event
+FAIL [   0.208s] (4784/5562) warp terminal::view::queued_prompts_tests::terminal_cloud_status_transition_drains_once_through_cloud_followup_input_event
+FAIL [   0.208s] (4831/5562) warp terminal::view::tests::cli_agent_rich_input_shell_mode_uses_run_commands_hint_text
+FAIL [   0.208s] (4831/5562) warp terminal::view::tests::cli_agent_rich_input_shell_mode_uses_run_commands_hint_text
+FAIL [   0.209s] (4792/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_shows_tombstone_for_github_action_ambient_session
+FAIL [   0.209s] (4792/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_shows_tombstone_for_github_action_ambient_session
+FAIL [   0.210s] (2178/5562) warp drive::index::tests::test_retry_menu_item_visibility
+FAIL [   0.210s] (2178/5562) warp drive::index::tests::test_retry_menu_item_visibility
+FAIL [   0.212s] (4750/5562) warp terminal::view::queued_prompts_tests::failed_event_removes_locked_queue_row_without_cloud_mode_setup_v2
+FAIL [   0.212s] (4750/5562) warp terminal::view::queued_prompts_tests::failed_event_removes_locked_queue_row_without_cloud_mode_setup_v2
+FAIL [   0.213s] (4791/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_keeps_live_owned_session_on_session_sharing_path
+FAIL [   0.213s] (4791/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_keeps_live_owned_session_on_session_sharing_path
+FAIL [   0.214s] (4826/5562) warp terminal::view::tests::agent_view_lifecycle_updates_input_mode
+FAIL [   0.214s] (4826/5562) warp terminal::view::tests::agent_view_lifecycle_updates_input_mode
+FAIL [   0.215s] (4805/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_shows_tombstone_for_github_action_ambient_session
+FAIL [   0.215s] (4805/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_shows_tombstone_for_github_action_ambient_session
+FAIL [   0.216s] (4787/5562) warp terminal::view::shared_session::view_impl::tests::test_begin_viewing_ambient_session_emits_view_model_created_event_once
+FAIL [   0.216s] (4787/5562) warp terminal::view::shared_session::view_impl::tests::test_begin_viewing_ambient_session_emits_view_model_created_event_once
+FAIL [   0.218s] (4725/5562) warp terminal::view::queued_prompts_tests::cloud_setup_cleanup_events_remove_the_locked_queue_row
+FAIL [   0.218s] (4725/5562) warp terminal::view::queued_prompts_tests::cloud_setup_cleanup_events_remove_the_locked_queue_row
+FAIL [   0.218s] (4811/5562) warp terminal::view::shared_session::view_impl::tests::test_resize_shared_session_viewer_from_server
+FAIL [   0.218s] (4811/5562) warp terminal::view::shared_session::view_impl::tests::test_resize_shared_session_viewer_from_server
+FAIL [   0.220s] (4789/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_enables_followup_for_owned_task_without_metadata
+FAIL [   0.220s] (4789/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_enables_followup_for_owned_task_without_metadata
+FAIL [   0.223s] (4803/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_enables_followup_input_without_tombstone_for_owned_ambient_session
+FAIL [   0.223s] (4803/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_enables_followup_input_without_tombstone_for_owned_ambient_session
+FAIL [   0.223s] (4844/5562) warp terminal::view::tests::cloud_mode_failed_keeps_queued_query_above_tombstone_and_hides_input
+FAIL [   0.223s] (4844/5562) warp terminal::view::tests::cloud_mode_failed_keeps_queued_query_above_tombstone_and_hides_input
+FAIL [   0.225s] (4790/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_enables_followup_input_without_tombstone_for_owned_task
+FAIL [   0.225s] (4790/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_enables_followup_input_without_tombstone_for_owned_task
+FAIL [   0.225s] (4801/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_does_not_insert_tombstone_for_non_ambient_session_under_cloud_mode_setup_v2
+FAIL [   0.225s] (4801/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_does_not_insert_tombstone_for_non_ambient_session_under_cloud_mode_setup_v2
+FAIL [   0.226s] (4845/5562) warp terminal::view::tests::cloud_mode_dispatched_agent_inserts_queued_user_query
+FAIL [   0.226s] (4845/5562) warp terminal::view::tests::cloud_mode_dispatched_agent_inserts_queued_user_query
+FAIL [   0.234s] (5403/5562) warp workspace::view::tests::copy_model_and_profile_preserves_explicit_model_over_source_profile_default
+FAIL [   0.234s] (5403/5562) warp workspace::view::tests::copy_model_and_profile_preserves_explicit_model_over_source_profile_default
+FAIL [   0.237s] (4788/5562) warp terminal::view::shared_session::view_impl::tests::passive_suggestions_suppressed_for_shared_ambient_viewer
+FAIL [   0.237s] (4788/5562) warp terminal::view::shared_session::view_impl::tests::passive_suggestions_suppressed_for_shared_ambient_viewer
+FAIL [   0.237s] (4800/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_clears_frozen_followup_input_for_owned_ambient_session
+FAIL [   0.237s] (4800/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_clears_frozen_followup_input_for_owned_ambient_session
+FAIL [   0.241s] (4794/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_inserts_tombstone_without_handoff
+FAIL [   0.241s] (4794/5562) warp terminal::view::shared_session::view_impl::tests::test_on_ambient_agent_execution_ended_inserts_tombstone_without_handoff
+FAIL [   0.246s] (4812/5562) warp terminal::view::shared_session::view_impl::tests::test_prompt_context_menu_items_shared_session_viewer_no_edit_prompt
+FAIL [   0.246s] (4812/5562) warp terminal::view::shared_session::view_impl::tests::test_prompt_context_menu_items_shared_session_viewer_no_edit_prompt
+FAIL [   0.248s] (4807/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_hides_input_for_no_cta_tombstone
+FAIL [   0.248s] (4807/5562) warp terminal::view::shared_session::view_impl::tests::test_on_session_share_ended_hides_input_for_no_cta_tombstone
+FAIL [   0.248s] (4815/5562) warp terminal::view::shared_session::view_impl::tests::test_shared_followup_on_existing_conversation_converts_user_query_input
+FAIL [   0.248s] (4815/5562) warp terminal::view::shared_session::view_impl::tests::test_shared_followup_on_existing_conversation_converts_user_query_input
+FAIL [   0.249s] (4846/5562) warp terminal::view::tests::cloud_mode_v1_agent_prefixed_query_spawns_cloud_agent
+FAIL [   0.249s] (4846/5562) warp terminal::view::tests::cloud_mode_v1_agent_prefixed_query_spawns_cloud_agent
+FAIL [   0.252s] (4835/5562) warp terminal::view::tests::cli_agent_rich_input_hint_text_mentions_active_cli_agent
+FAIL [   0.252s] (4835/5562) warp terminal::view::tests::cli_agent_rich_input_hint_text_mentions_active_cli_agent
+FAIL [   0.258s] (4793/5562) warp terminal::view::shared_session::view_impl::tests::test_begin_viewing_ambient_session_creates_and_wires_model_for_link_join_viewer
+FAIL [   0.258s] (4793/5562) warp terminal::view::shared_session::view_impl::tests::test_begin_viewing_ambient_session_creates_and_wires_model_for_link_join_viewer
+FAIL [   0.258s] (4796/5562) warp terminal::view::shared_session::view_impl::tests::test_non_owned_tombstone_is_removed_for_followup_and_reinserted_after_completion
+FAIL [   0.258s] (4796/5562) warp terminal::view::shared_session::view_impl::tests::test_non_owned_tombstone_is_removed_for_followup_and_reinserted_after_completion
+FAIL [   0.258s] (4916/5562) warp terminal::view::tests::root_cloud_mode_pane_sets_root_cloud_mode_context_key
+FAIL [   0.258s] (4916/5562) warp terminal::view::tests::root_cloud_mode_pane_sets_root_cloud_mode_context_key
+FAIL [   0.262s] (4730/5562) warp terminal::view::queued_prompts_tests::cloud_setup_enter_queues_followup_while_setup_commands_run
+FAIL [   0.262s] (4730/5562) warp terminal::view::queued_prompts_tests::cloud_setup_enter_queues_followup_while_setup_commands_run
+FAIL [   0.276s] (4837/5562) warp terminal::view::tests::clicking_old_banner_for_open_conversation_focuses_current_terminal_surface_without_transferring_blocks
+FAIL [   0.276s] (4837/5562) warp terminal::view::tests::clicking_old_banner_for_open_conversation_focuses_current_terminal_surface_without_transferring_blocks
+FAIL [   0.308s] (4886/5562) warp terminal::view::tests::escape_pops_nested_cloud_agent_view_with_long_running_command
+FAIL [   0.308s] (4886/5562) warp terminal::view::tests::escape_pops_nested_cloud_agent_view_with_long_running_command
+FAIL [   0.315s] (4855/5562) warp terminal::view::tests::cmd_enter_from_active_non_empty_agent_view_requires_confirmation
+FAIL [   0.315s] (4855/5562) warp terminal::view::tests::cmd_enter_from_active_non_empty_agent_view_requires_confirmation
+FAIL [   0.355s] (3941/5562) warp terminal::input::tests::test_histignorespace_support_in_zsh
+FAIL [   0.355s] (3941/5562) warp terminal::input::tests::test_histignorespace_support_in_zsh
+FAIL [   0.361s] (5544/5562) warp workspace::view::tests::test_view_only_session
+FAIL [   0.361s] (5544/5562) warp workspace::view::tests::test_view_only_session
+FAIL [   0.397s] (5458/5562) warp workspace::view::tests::test_unified_new_session_menu_includes_reopen_closed_session
+FAIL [   0.397s] (5458/5562) warp workspace::view::tests::test_unified_new_session_menu_includes_reopen_closed_session
+FAIL [   0.411s] (5406/5562) warp workspace::view::tests::test_close_other_tabs_confirmation_dialog
+FAIL [   0.411s] (5406/5562) warp workspace::view::tests::test_close_other_tabs_confirmation_dialog
+FAIL [   0.411s] (5473/5562) warp workspace::view::tests::test_unified_new_session_menu_uses_new_worktree_config_label_and_order
+FAIL [   0.411s] (5473/5562) warp workspace::view::tests::test_unified_new_session_menu_uses_new_worktree_config_label_and_order
+FAIL [   0.419s] (3855/5562) warp terminal::input::decorations::tests::test_decorations_with_multibyte_chars
+FAIL [   0.419s] (3855/5562) warp terminal::input::decorations::tests::test_decorations_with_multibyte_chars
+FAIL [   0.521s] (5418/5562) warp workspace::view::tests::test_close_tab_confirmation_dialog
+FAIL [   0.521s] (5418/5562) warp workspace::view::tests::test_close_tab_confirmation_dialog
+FAIL [   0.521s] (5420/5562) warp workspace::view::tests::test_confirmation_dialog_dont_show_again
+FAIL [   0.521s] (5420/5562) warp workspace::view::tests::test_confirmation_dialog_dont_show_again
+FAIL [   0.596s] (5452/5562) warp workspace::view::tests::test_reopen_closed_shared_tab
+FAIL [   0.596s] (5452/5562) warp workspace::view::tests::test_reopen_closed_shared_tab
+FAIL [   0.597s] (5423/5562) warp workspace::view::tests::test_close_tabs_right_confirmation_dialog
+FAIL [   0.597s] (5423/5562) warp workspace::view::tests::test_close_tabs_right_confirmation_dialog
+FAIL [   0.619s] (5422/5562) warp workspace::view::tests::test_close_pane_confirmation_dialog
+FAIL [   0.619s] (5422/5562) warp workspace::view::tests::test_close_pane_confirmation_dialog
+FAIL [   0.708s] (5424/5562) warp workspace::view::tests::test_close_last_tab_skip_confirmation
+FAIL [   0.708s] (5424/5562) warp workspace::view::tests::test_close_last_tab_skip_confirmation
+FAIL [  10.135s] (5408/5562) warp search::command_palette::data_sources::tests::test_full_text_drive_data_source_removes_an_object_that_moves_out_of_the_window
+FAIL [  10.135s] (5408/5562) warp search::command_palette::data_sources::tests::test_full_text_drive_data_source_removes_an_object_that_moves_out_of_the_window
+FAIL [  10.138s] (5407/5562) warp search::command_palette::data_sources::tests::test_full_text_drive_data_source_finds_in_window_objects_outranked_by_another_team
+FAIL [  10.138s] (5407/5562) warp search::command_palette::data_sources::tests::test_full_text_drive_data_source_finds_in_window_objects_outranked_by_another_team
+FAIL [  10.225s] (5412/5562) warp search::command_palette::data_sources::tests::test_full_text_drive_data_source_rebuilds_when_the_windows_team_changes
+FAIL [  10.225s] (5412/5562) warp search::command_palette::data_sources::tests::test_full_text_drive_data_source_rebuilds_when_the_windows_team_changes
+FAIL [  10.225s] (5413/5562) warp search::command_palette::data_sources::tests::test_full_text_drive_data_source_reindexes_when_a_team_stops_being_a_member_team
+FAIL [  10.225s] (5413/5562) warp search::command_palette::data_sources::tests::test_full_text_drive_data_source_reindexes_when_a_team_stops_being_a_member_team
+FAIL [  10.279s] (5419/5562) warp search::command_palette::data_sources::tests::test_full_text_drive_data_source_indexes_an_object_that_moves_into_the_window
+FAIL [  10.279s] (5419/5562) warp search::command_palette::data_sources::tests::test_full_text_drive_data_source_indexes_an_object_that_moves_into_the_window
+Summary [  20.777s] 5562 tests run: 5465 passed, 97 failed, 10 skipped

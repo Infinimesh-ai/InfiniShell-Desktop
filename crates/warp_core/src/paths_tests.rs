@@ -8,11 +8,11 @@ fn test_data_dir_path() {
     // ChannelState, by default, is configured for Channel::Oss.
     cfg_if::cfg_if! {
         if #[cfg(target_os = "macos")] {
-            assert_eq!(data_dir(), home_dir.join(".zap"));
+            assert_eq!(data_dir(), home_dir.join(".infinishell"));
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            assert_eq!(data_dir(), home_dir.join(".local/share/zap"));
+            assert_eq!(data_dir(), home_dir.join(".local/share/infinishell"));
         } else if #[cfg(windows)] {
-            assert_eq!(data_dir(), home_dir.join("AppData\\Roaming\\zap\\Zap\\data"));
+            assert_eq!(data_dir(), home_dir.join("AppData\\Roaming\\infinishell\\InfiniShell\\data"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -25,23 +25,76 @@ fn test_config_local_dir_path() {
     // ChannelState, by default, is configured for Channel::Oss.
     cfg_if::cfg_if! {
         if #[cfg(target_os = "macos")] {
-            assert_eq!(config_local_dir(), home_dir.join(".zap"));
+            assert_eq!(config_local_dir(), home_dir.join(".infinishell"));
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            assert_eq!(config_local_dir(), home_dir.join(".config/zap"));
+            assert_eq!(config_local_dir(), home_dir.join(".config/infinishell"));
         } else if #[cfg(windows)] {
-            assert_eq!(config_local_dir(), home_dir.join("AppData\\Local\\zap\\Zap\\config"));
+            assert_eq!(config_local_dir(), home_dir.join("AppData\\Local\\infinishell\\InfiniShell\\config"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
     }
 }
 
+#[cfg(target_os = "macos")]
+#[test]
+fn test_macos_config_dir_name_scopes_to_data_profile() {
+    assert_eq!(macos_config_dir_name_for(Channel::Stable, None), ".warp");
+    assert_eq!(
+        macos_config_dir_name_for(Channel::Local, None),
+        ".warp-local"
+    );
+
+    // Each development profile must get its own directory so shared config
+    // (notably settings.toml) cannot leak between profiles.
+    assert_eq!(
+        macos_config_dir_name_for(Channel::Local, Some("myprofile")),
+        ".warp-local-myprofile"
+    );
+    assert_eq!(
+        macos_config_dir_name_for(Channel::Stable, Some("myprofile")),
+        ".warp-myprofile"
+    );
+}
+
+#[test]
+fn test_gui_app_id_maps_oss_tui_to_oss_gui() {
+    let gui_app_id = gui_app_id_for_channel(Channel::Oss, AppId::new("dev", "warp", "WarpTui"));
+
+    assert_eq!(gui_app_id.to_string(), "dev.infinishell.InfiniShell");
+}
+
+#[test]
+fn test_gui_config_and_mcp_paths_resolve_explicit_sources() {
+    let home_dir = home_dir().expect("Should be able to compute home directory");
+    let gui_config_dir = gui_config_local_dir().expect("GUI config path should resolve");
+
+    cfg_if::cfg_if! {
+        if #[cfg(target_os = "macos")] {
+            // InfiniShell 的 OSS 通道 macOS 配置目录是 `.infinishell`(见 `macos_config_dir_name_for`)。
+            assert_eq!(gui_config_dir, home_dir.join(".infinishell"));
+        } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
+            // `project_dirs_for_app_id` 把 `InfiniShell` 应用名改写成小写包名形式,
+            // 所以 TUI 解析出来的 GUI 配置目录与 GUI 自己的 `.config/infinishell` 一致。
+            assert_eq!(gui_config_dir, home_dir.join(".config/infinishell"));
+        } else if #[cfg(windows)] {
+            assert_eq!(
+                gui_config_dir,
+                home_dir.join("AppData\\Local\\infinishell\\InfiniShell\\config")
+            );
+        } else {
+            unimplemented!("Need to update tests for current platform!");
+        }
+    }
+
+    assert_eq!(gui_mcp_config_file_path(), warp_home_mcp_config_file_path());
+}
 #[test]
 fn test_warp_home_config_dir_path() {
     let home_dir = home_dir().expect("Should be able to compute home directory");
     let expected_dir_name = match ChannelState::data_profile() {
-        Some(data_profile) => format!(".zap-{data_profile}"),
-        None => ".zap".to_string(),
+        Some(data_profile) => format!(".infinishell-{data_profile}"),
+        None => ".infinishell".to_string(),
     };
 
     assert_eq!(
@@ -53,7 +106,7 @@ fn test_warp_home_config_dir_path() {
 #[test]
 fn test_warp_home_skills_and_mcp_paths() {
     let Some(config_dir) = warp_home_config_dir() else {
-        panic!("Should be able to compute Zap home config directory");
+        panic!("Should be able to compute InfiniShell home config directory");
     };
 
     assert_eq!(warp_home_skills_dir(), Some(config_dir.join("skills")));
@@ -62,17 +115,29 @@ fn test_warp_home_skills_and_mcp_paths() {
         Some(config_dir.join(".mcp.json"))
     );
 }
+
+#[test]
+fn test_tui_mcp_config_path_is_separate_from_gui() {
+    let tui_mcp_path = tui_mcp_config_file_path();
+
+    assert_eq!(tui_mcp_path, tui_config_local_dir().join(".mcp.json"));
+    assert_ne!(
+        Some(tui_mcp_path),
+        warp_home_mcp_config_file_path(),
+        "GUI and TUI MCP configuration must remain isolated"
+    );
+}
 #[test]
 fn test_cache_dir_path() {
     let home_dir = home_dir().expect("Should be able to compute home directory");
     // ChannelState, by default, is configured for Channel::Oss.
     cfg_if::cfg_if! {
         if #[cfg(target_os = "macos")] {
-            assert_eq!(cache_dir(), home_dir.join("Library/Application Support/dev.zap.Zap"));
+            assert_eq!(cache_dir(), home_dir.join("Library/Application Support/dev.infinishell.InfiniShell"));
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            assert_eq!(cache_dir(), home_dir.join(".cache/zap"));
+            assert_eq!(cache_dir(), home_dir.join(".cache/infinishell"));
         } else if #[cfg(windows)] {
-            assert_eq!(cache_dir(), home_dir.join("AppData\\Local\\zap\\Zap\\cache"));
+            assert_eq!(cache_dir(), home_dir.join("AppData\\Local\\infinishell\\InfiniShell\\cache"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -85,11 +150,11 @@ fn test_state_dir_path() {
     cfg_if::cfg_if! {
         // ChannelState, by default, is configured for Channel::Oss.
         if #[cfg(target_os = "macos")] {
-            assert_eq!(state_dir(), home_dir.join("Library/Application Support/dev.zap.Zap"));
+            assert_eq!(state_dir(), home_dir.join("Library/Application Support/dev.infinishell.InfiniShell"));
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            assert_eq!(state_dir(), home_dir.join(".local/state/zap"));
+            assert_eq!(state_dir(), home_dir.join(".local/state/infinishell"));
         } else if #[cfg(windows)] {
-            assert_eq!(state_dir(), home_dir.join("AppData\\Local\\zap\\Zap\\data"));
+            assert_eq!(state_dir(), home_dir.join("AppData\\Local\\infinishell\\InfiniShell\\data"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -98,25 +163,39 @@ fn test_state_dir_path() {
 
 #[test]
 fn test_oss_secure_state_dir_is_disabled() {
-    // ChannelState 默认是 Channel::Oss。Zap 不应该探测 Zap 官方 App Group,
+    // ChannelState 默认是 Channel::Oss。InfiniShell 不应该探测 Warp 官方 App Group,
     // 否则 macOS 会把它识别成访问其他 App 数据并在每次启动时弹权限窗。
     assert_eq!(secure_state_dir(), None);
 }
 
 #[test]
-fn test_project_path_for_zap_dev_app_id() {
-    // Covers the `starts_with("Zap")` branch in `project_dirs_for_app_id` on Linux,
-    // which maps suffixed application names like `ZapDev` to a dashed lowercase
-    // directory matching the Linux package name (e.g. `zap-dev`).
-    let project_dirs = project_dirs_for_app_id(AppId::new("dev", "zap", "ZapDev"), None)
-        .expect("should be able to compute project dirs");
+fn test_tui_state_dir_is_tui_subdir_of_gui_state_base() {
+    let tui_dir = tui_state_dir();
+    assert_eq!(tui_dir.file_name(), Some(std::ffi::OsStr::new("tui")));
+
+    // The TUI state dir must be a direct `tui` child of the same base
+    // directory that holds the GUI's SQLite database (the secure state dir
+    // when available, otherwise the plain state dir), so the two front-ends
+    // keep sibling — never shared — databases.
+    let gui_state_base = secure_state_dir().unwrap_or_else(state_dir);
+    assert_eq!(tui_dir.parent(), Some(gui_state_base.as_path()));
+}
+
+#[test]
+fn test_project_path_for_infinishell_dev_app_id() {
+    // Covers the `starts_with("InfiniShell")` branch in `project_dirs_for_app_id` on
+    // Linux, which maps suffixed application names like `InfiniShellDev` to a dashed
+    // lowercase directory matching the Linux package name (e.g. `infinishell-dev`).
+    let project_dirs =
+        project_dirs_for_app_id(AppId::new("dev", "infinishell", "InfiniShellDev"), None)
+            .expect("should be able to compute project dirs");
     cfg_if::cfg_if! {
         if #[cfg(target_os = "macos")] {
-            assert_eq!(project_dirs.project_path(), "dev.zap.ZapDev");
+            assert_eq!(project_dirs.project_path(), "dev.infinishell.InfiniShellDev");
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            assert_eq!(project_dirs.project_path(), "zap-dev");
+            assert_eq!(project_dirs.project_path(), "infinishell-dev");
         } else if #[cfg(windows)] {
-            assert_eq!(project_dirs.project_path(), "zap\\ZapDev");
+            assert_eq!(project_dirs.project_path(), "infinishell\\InfiniShellDev");
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -125,15 +204,16 @@ fn test_project_path_for_zap_dev_app_id() {
 
 #[test]
 fn test_project_path_for_oss_app_id() {
-    let project_dirs = project_dirs_for_app_id(AppId::new("dev", "zap", "Zap"), None)
-        .expect("should be able to compute project dirs");
+    let project_dirs =
+        project_dirs_for_app_id(AppId::new("dev", "infinishell", "InfiniShell"), None)
+            .expect("should be able to compute project dirs");
     cfg_if::cfg_if! {
         if #[cfg(target_os = "macos")] {
-            assert_eq!(project_dirs.project_path(), "dev.zap.Zap");
+            assert_eq!(project_dirs.project_path(), "dev.infinishell.InfiniShell");
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            assert_eq!(project_dirs.project_path(), "zap");
+            assert_eq!(project_dirs.project_path(), "infinishell");
         } else if #[cfg(windows)] {
-            assert_eq!(project_dirs.project_path(), "zap\\Zap");
+            assert_eq!(project_dirs.project_path(), "infinishell\\InfiniShell");
         } else {
             unimplemented!("Need to update tests for current platform!");
         }

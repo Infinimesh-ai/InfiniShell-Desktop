@@ -1,39 +1,33 @@
-use std::{ops::Range, rc::Rc, sync::MutexGuard};
+use std::ops::Range;
+use std::rc::Rc;
+use std::sync::MutexGuard;
 
 use pathfinder_geometry::vector::Vector2F;
 use serde::{Deserialize, Serialize};
 use sum_tree::{Cursor, SeekBias};
 use warp_core::features::FeatureFlag;
-use warpui::{
-    elements::ClippedScrollStateHandle,
-    units::{IntoLines, IntoPixels, Lines, Pixels},
-    AppContext, ModelHandle,
-};
+use warpui::elements::ClippedScrollStateHandle;
+use warpui::units::{IntoLines, IntoPixels, Lines, Pixels};
+use warpui::{AppContext, ModelHandle};
 
-use crate::{
-    ai::blocklist::agent_view::AgentViewDisplayMode,
-    terminal::{input::inline_menu::InlineMenuPositioner, model::index::Point as IndexPoint},
+use super::block_list_element::{
+    GridType, SnackbarHeader, SnackbarHeaderState, SnackbarPoint, VisibleItem,
 };
-use crate::{ai::blocklist::agent_view::AgentViewState, terminal::model::blocks::RichContentItem};
-
+use super::model::block::{Block, BlockSection, TranscriptScope};
+use super::model::blocks::{
+    BlockHeight, BlockHeightItem, BlockHeightSummary, BlockList, BlockListPoint, SelectionRange,
+    TotalIndex,
+};
+use super::model::selection::SelectionPoint;
+use super::model::terminal_model::{BlockIndex, BlockSortDirection, WithinBlock};
+use super::view::BlockVisibilityMode;
 use super::{
-    block_list_element::{
-        GridType, SnackbarHeader, SnackbarHeaderState, SnackbarPoint, VisibleItem,
-    },
-    height_in_range_approx, heights_approx_gt, heights_approx_gte, heights_approx_lt,
-    heights_approx_lte,
-    model::{
-        block::{Block, BlockSection},
-        blocks::{
-            BlockHeight, BlockHeightItem, BlockHeightSummary, BlockList, BlockListPoint,
-            SelectionRange, TotalIndex,
-        },
-        selection::SelectionPoint,
-        terminal_model::{BlockIndex, BlockSortDirection, WithinBlock},
-    },
-    view::BlockVisibilityMode,
-    SizeInfo, HEIGHT_FUDGE_FACTOR_LINES,
+    HEIGHT_FUDGE_FACTOR_LINES, SizeInfo, height_in_range_approx, heights_approx_gt,
+    heights_approx_gte, heights_approx_lt, heights_approx_lte,
 };
+use crate::terminal::input::inline_menu::InlineMenuPositioner;
+use crate::terminal::model::blocks::RichContentItem;
+use crate::terminal::model::index::Point as IndexPoint;
 
 /// Wraps a scroll position for the purposes of centralizing update logic.
 pub struct ScrollState {
@@ -113,7 +107,7 @@ impl ScrollLines {
                 if is_long_running
                     && scroll_top
                         < active_block
-                            .height(block_list.agent_view_state())
+                            .height(block_list.transcript_scope())
                             .into_lines()
                 {
                     ScrollLines::ScrollTop(scroll_top)
@@ -349,7 +343,7 @@ pub struct ViewportIter<'a> {
 
     /// The current input mode.
     input_mode: InputMode,
-    agent_view_state: &'a AgentViewState,
+    transcript_scope: &'a TranscriptScope,
 
     /// The y-offset of the current block in lines from the viewport origin.
     top_of_current_block: Lines,
@@ -515,7 +509,7 @@ impl<'a> ViewportState<'a> {
                 ViewportIter {
                     block_heights_iter: Box::new(cursor),
                     input_mode: self.input_mode,
-                    agent_view_state: self.block_list.agent_view_state(),
+                    transcript_scope: self.block_list.transcript_scope(),
                     top_of_current_block: top_of_block,
                     bottom_offset,
                     start_block_index: block_index,
@@ -535,7 +529,7 @@ impl<'a> ViewportState<'a> {
                 ViewportIter {
                     block_heights_iter: Box::new(cursor.rev()),
                     input_mode: self.input_mode,
-                    agent_view_state: self.block_list.agent_view_state(),
+                    transcript_scope: self.block_list.transcript_scope(),
                     top_of_current_block: top_of_block,
                     bottom_offset,
                     start_block_index: block_index,
@@ -700,7 +694,7 @@ impl<'a> ViewportState<'a> {
                     None => index.and_then(|last_index| {
                         self.block_list.block_at(last_index).map(|block| {
                             block
-                                .height(self.block_list.agent_view_state())
+                                .height(self.block_list.transcript_scope())
                                 .into_lines()
                         })
                     }),
@@ -799,12 +793,11 @@ impl<'a> ViewportState<'a> {
                 // are rendered in one line. This changes the value of maximum scroll top and could
                 // make the previous scroll position invalid. Thus we add an additional check here
                 // to change the scroll position to stick to the bottom if previous scroll top is invalid.
-                if let ScrollPosition::FixedAtPosition { scroll_lines } = self.scroll_position {
-                    if scroll_lines.scroll_top(self.block_list, self.content_element_height_lines())
+                if let ScrollPosition::FixedAtPosition { scroll_lines } = self.scroll_position
+                    && scroll_lines.scroll_top(self.block_list, self.content_element_height_lines())
                         > max_scroll_top
-                    {
-                        return ScrollPosition::FollowsBottomOfMostRecentBlock;
-                    }
+                {
+                    return ScrollPosition::FollowsBottomOfMostRecentBlock;
                 }
                 self.scroll_position
             }
@@ -1556,7 +1549,7 @@ impl<'a> ViewportState<'a> {
             .block_list
             .block_at(block_index)
             .map_or(Lines::zero(), |b| {
-                b.height(self.block_list.agent_view_state())
+                b.height(self.block_list.transcript_scope())
             });
         top_of_block + block_height
     }
@@ -2023,12 +2016,9 @@ impl Iterator for ViewportIter<'_> {
                 BlockHeightItem::RichContent(RichContentItem {
                     agent_view_conversation_id: fullscreen_agent_view_conversation_id,
                     ..
-                }) => match self.agent_view_state {
-                    AgentViewState::Active {
-                        conversation_id,
-                        display_mode: AgentViewDisplayMode::FullScreen,
-                        ..
-                    } => {
+                }) => match self.transcript_scope {
+                    TranscriptScope::Unfiltered => return next,
+                    TranscriptScope::Conversation(conversation_id) => {
                         // If currently in a fullscreen agent view, only return this item if its
                         // conversation id matches that of the active agent view.
                         if fullscreen_agent_view_conversation_id
@@ -2037,11 +2027,7 @@ impl Iterator for ViewportIter<'_> {
                             return next;
                         }
                     }
-                    AgentViewState::Active {
-                        display_mode: AgentViewDisplayMode::Inline,
-                        ..
-                    }
-                    | AgentViewState::Inactive => {
+                    TranscriptScope::Terminal => {
                         // If not in a fullscreen agent view, return the item only if it 'belongs'
                         // to the terminal mode (represented as no `ai_conversation_id`).
                         if fullscreen_agent_view_conversation_id.is_none() {

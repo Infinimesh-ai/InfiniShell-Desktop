@@ -7,10 +7,9 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use lazy_static::lazy_static;
 use memo_map::MemoMap;
+use overrides::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-
-use overrides::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChannelVersions {
@@ -169,6 +168,9 @@ pub struct VersionInfo {
     /// The version to use for CLI downloads, falling back to `version` if not set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cli_version: Option<String>,
+    /// The version to use for TUI downloads, falling back to `version` if not set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tui_version: Option<String>,
 }
 
 impl VersionInfo {
@@ -181,12 +183,18 @@ impl VersionInfo {
             version_for_new_users: None,
             is_rollback: None,
             cli_version: None,
+            tui_version: None,
         }
     }
 
     /// Returns the CLI version, falling back to the app version if not set.
     pub fn cli_version(&self) -> &str {
         self.cli_version.as_deref().unwrap_or(&self.version)
+    }
+
+    /// Returns the TUI version, falling back to the app version if not set.
+    pub fn tui_version(&self) -> &str {
+        self.tui_version.as_deref().unwrap_or(&self.version)
     }
 }
 
@@ -208,6 +216,8 @@ pub struct Changelog {
     pub image_url: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub oz_updates: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tui_updates: Vec<String>,
 }
 
 // Default value for when the changelog JSON doesn't have the markdown_sections field

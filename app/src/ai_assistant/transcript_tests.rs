@@ -1,20 +1,18 @@
-use crate::{
-    appearance, test_util::settings::initialize_settings_for_tests,
-    workspaces::user_workspaces::UserWorkspaces,
-};
-
-use warpui::{platform::WindowStyle, App};
-
-use crate::ai_assistant::{
-    requests::Requests,
-    test_util::{
-        default_assistant_transcript_part, default_code_block_segment, default_formatted_message,
-        default_other_segment,
-    },
-    utils::{CodeBlockIndex, TranscriptPart, TranscriptPartSubType},
-};
+use warpui::platform::WindowStyle;
+use warpui::{App, SingletonEntity};
 
 use super::Transcript;
+use crate::ai::AIRequestUsageModel;
+use crate::ai_assistant::requests::Requests;
+use crate::ai_assistant::test_util::{
+    default_assistant_transcript_part, default_code_block_segment, default_formatted_message,
+    default_other_segment,
+};
+use crate::ai_assistant::utils::{CodeBlockIndex, TranscriptPart, TranscriptPartSubType};
+use crate::appearance;
+use crate::auth::AuthStateProvider;
+use crate::test_util::settings::initialize_settings_for_tests;
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 // Mocked data to make it easy to test.
 lazy_static::lazy_static! {
@@ -49,6 +47,10 @@ fn initialize_app(app: &mut App) {
     initialize_settings_for_tests(app);
     appearance::register(app);
     app.add_singleton_model(UserWorkspaces::default_mock);
+    app.add_singleton_model(|_| AuthStateProvider::new_for_test());
+    // Zap:`ServerApiProvider`(云端 API 网关)已剥离,`AIRequestUsageModel` 也不再
+    // 持有 AI client,`new_for_test` 只收 ctx。
+    app.add_singleton_model(AIRequestUsageModel::new_for_test);
 }
 
 #[test]

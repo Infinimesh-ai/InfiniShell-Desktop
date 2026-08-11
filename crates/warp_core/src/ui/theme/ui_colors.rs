@@ -3,7 +3,7 @@
 //! 所有字段为 Option，未设置时回退到 WarpTheme 的程序化派生值。
 
 use serde::{Deserialize, Serialize};
-use warpui::color::ColorU;
+use warpui_core::color::ColorU;
 
 use crate::ui::color::hex_color_alpha;
 

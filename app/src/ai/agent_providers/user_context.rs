@@ -84,12 +84,16 @@ pub fn collect_user_attachments(ctx: &[AIAgentContext]) -> UserAttachments {
             },
             AIAgentContext::Image(img) => images.push(img),
             // 环境型 context 由 prompt_renderer 处理,不进 user message。
+            // Repository / PullRequest 是随 git 仓库元数据一起采集的环境信息
+            // (与 Git 同类),同样归 system prompt 侧,不作为附件渲染。
             AIAgentContext::Directory { .. }
             | AIAgentContext::ExecutionEnvironment(_)
             | AIAgentContext::CurrentTime { .. }
             | AIAgentContext::Codebase { .. }
             | AIAgentContext::ProjectRules { .. }
             | AIAgentContext::Git { .. }
+            | AIAgentContext::Repository { .. }
+            | AIAgentContext::PullRequest { .. }
             | AIAgentContext::Skills { .. } => {}
         }
     }

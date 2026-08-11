@@ -1,7 +1,7 @@
-use command::blocking::Command;
 use std::path::Path;
 
 use anyhow::anyhow;
+use command::blocking::Command;
 
 fn main() -> anyhow::Result<()> {
     println!("cargo:rerun-if-changed=js/src");
@@ -24,7 +24,9 @@ If you continue to encounter issues, ensure you don't have conflicting Node inst
 "#
             )
         } else {
-            println!("cargo:warning=Failed to build command signatures JS: {e:?}. Proceeding with stale command signatures!");
+            println!(
+                "cargo:warning=Failed to build command signatures JS: {e:?}. Proceeding with stale command signatures!"
+            );
         }
     }
     Ok(())

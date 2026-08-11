@@ -1,10 +1,9 @@
+use std::collections::HashMap;
+use std::ops::Range;
+
 use anyhow::{Context, Result};
 use regex::Regex;
 use serde_yaml::Value;
-use std::collections::HashMap;
-use std::fs;
-use std::ops::Range;
-use std::path::Path;
 
 /// Represents a parsed markdown file with YAML front matter
 #[derive(Debug)]
@@ -18,19 +17,6 @@ pub struct ParsedMarkdown {
     /// The line range where the markdown content (without front matter) is located (1-indexed)
     /// None if there is no front matter (content is the entire file)
     pub line_range: Option<Range<usize>>,
-}
-
-/// Parse a markdown file with YAML front matter
-///
-/// # Arguments
-/// * `path` - Path to the markdown file to parse
-///
-/// # Returns
-/// * `Result<ParsedMarkdown>` - Parsed document with front matter and content
-#[allow(dead_code)]
-pub fn parse_markdown_file(path: &Path) -> Result<ParsedMarkdown> {
-    let content = fs::read_to_string(path)?;
-    parse_markdown_content(&content)
 }
 
 /// Parse markdown content with YAML front matter
@@ -59,10 +45,10 @@ pub(crate) fn parse_markdown_content(content: &str) -> Result<ParsedMarkdown> {
                 Value::Mapping(map) => map
                     .iter()
                     .filter_map(|(key, value)| {
-                        if let Value::String(key_str) = key {
-                            if let Value::String(value_str) = value {
-                                return Some((key_str.clone(), value_str.clone()));
-                            }
+                        if let Value::String(key_str) = key
+                            && let Value::String(value_str) = value
+                        {
+                            return Some((key_str.clone(), value_str.clone()));
                         }
 
                         None
@@ -97,5 +83,5 @@ pub(crate) fn parse_markdown_content(content: &str) -> Result<ParsedMarkdown> {
 }
 
 #[cfg(test)]
-#[path = "parser_test.rs"]
+#[path = "parser_tests.rs"]
 mod parser_test;

@@ -3,6 +3,9 @@ use std::iter::FromIterator;
 
 use typed_path::TypedPathBuf;
 
+use super::{
+    CompleterOptions, CompletionsFallbackStrategy, SuggestionResults, SuggestionType, suggestions,
+};
 use crate::completer::context::CompletionContext;
 use crate::completer::engine::EngineDirEntry;
 use crate::completer::matchers::MatchStrategy;
@@ -10,14 +13,11 @@ use crate::completer::testing::{
     FakeCompletionContext, MockGeneratorContext, MockPathCompletionContext,
 };
 use crate::meta::Span;
+use crate::signatures::CommandRegistry;
 use crate::signatures::testing::{
     cd_signature, create_test_command_registry, fuzzy_signature, git_signature, java_signature,
     ls_signature, npm_signature, signature_with_empty_positional, test_signature,
 };
-use crate::signatures::CommandRegistry;
-
-use super::CompleterOptions;
-use super::{suggestions, CompletionsFallbackStrategy, SuggestionResults, SuggestionType};
 
 cfg_if::cfg_if! {
     if #[cfg(not(feature = "v2"))] {
@@ -51,7 +51,7 @@ fn suggestions_for_test<T: CompletionContext>(
     options: CompleterOptions,
     ctx: &T,
 ) -> Option<SuggestionResults> {
-    warpui::r#async::block_on(suggestions(line, pos, None, options, ctx))
+    warpui_core::r#async::block_on(suggestions(line, pos, None, options, ctx))
 }
 
 /// Runs the completer at the end of the given line and returns the associated
@@ -907,7 +907,9 @@ pub fn test_equal_sign_flag_does_not_bleed_variadic_suggestions() {
     eq_results.sort();
     assert_eq!(
         eq_results,
-        vec!["eight", "five", "four", "nine", "one", "seven", "six", "three", "two"]
+        vec![
+            "eight", "five", "four", "nine", "one", "seven", "six", "three", "two"
+        ]
     );
 }
 

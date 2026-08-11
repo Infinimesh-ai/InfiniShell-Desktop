@@ -1,9 +1,10 @@
-use super::{Space, StoredObject};
-use crate::{
-    drive::{folders::FolderObject, items::WarpDriveItemId, ObjectTypeAndId},
-    ui_components::breadcrumb::Breadcrumb,
-};
 use warpui::AppContext;
+
+use super::{Space, StoredObject};
+use crate::drive::ObjectTypeAndId;
+use crate::drive::folders::FolderObject;
+use crate::drive::items::WarpDriveItemId;
+use crate::ui_components::breadcrumb::Breadcrumb;
 
 // Encapsulates an object that can contain other objects, and keeps
 // information necessary to show breadcrumbs.

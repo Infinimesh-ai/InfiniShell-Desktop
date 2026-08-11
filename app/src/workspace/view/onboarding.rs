@@ -1,16 +1,19 @@
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use onboarding::{ProjectOnboardingSettings, SelectedSettings};
+use warp_core::execution_mode::AppExecutionMode;
+use warp_errors::report_error;
+use warpui::{SingletonEntity as _, ViewContext};
+
 use crate::pane_group::{NewTerminalOptions, PanesLayout};
 use crate::settings::AISettings;
-use crate::terminal;
 use crate::terminal::view::{
     AgentOnboardingVersion, OnboardingIntention, OnboardingVersion, TerminalAction,
 };
 use crate::workspace::Workspace;
-use crate::FeatureFlag;
-use onboarding::{ProjectOnboardingSettings, SelectedSettings};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use warpui::{SingletonEntity as _, ViewContext};
+use crate::{FeatureFlag, terminal};
 
 /// Configuration for starting the agent onboarding tutorial.
 #[derive(Debug, Clone)]
@@ -87,6 +90,12 @@ impl Workspace {
         tutorial: OnboardingTutorial,
         ctx: &mut ViewContext<Self>,
     ) {
+        // Onboarding requires a real user to interact with it; skip when running
+        // in a headless mode like the SDK/CLI.
+        if !AppExecutionMode::as_ref(ctx).can_show_onboarding() {
+            return;
+        }
+
         match tutorial {
             OnboardingTutorial::InitProject {
                 ref path,
@@ -94,7 +103,10 @@ impl Workspace {
             } => {
                 // Open the repository - this will create a new terminal and trigger init
                 let Some(path_str) = path.to_str() else {
-                    log::error!("Failed to convert path to string: {path:?}");
+                    report_error!(
+                        "Failed to convert path to string",
+                        extra: { "path" => ?path }
+                    );
                     return;
                 };
                 self.handle_open_repository(path_str, ctx);
@@ -143,6 +155,12 @@ impl Workspace {
         intention: OnboardingIntention,
         ctx: &mut ViewContext<Self>,
     ) {
+        // Onboarding requires a real user to interact with it; skip when running
+        // in a headless mode like the SDK/CLI.
+        if !AppExecutionMode::as_ref(ctx).can_show_onboarding() {
+            return;
+        }
+
         // Zap 智能体固定开启；这里保留运行时守卫,避免未来平台策略改变时误启动引导。
         if FeatureFlag::ZapNewSettingsModes.is_enabled()
             && !AISettings::as_ref(ctx).is_any_ai_enabled(ctx)
@@ -236,7 +254,12 @@ impl Workspace {
         );
     }
 
-    pub(crate) fn should_show_agent_onboarding(&self, _ctx: &mut ViewContext<Self>) -> bool {
+    pub(crate) fn should_show_agent_onboarding(&self, ctx: &mut ViewContext<Self>) -> bool {
+        // Onboarding requires a real user to interact with it; suppress when
+        // running in a headless mode like the SDK/CLI.
+        if !AppExecutionMode::as_ref(ctx).can_show_onboarding() {
+            return false;
+        }
         FeatureFlag::AgentOnboarding.is_enabled()
     }
 }

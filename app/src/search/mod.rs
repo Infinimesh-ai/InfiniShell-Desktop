@@ -5,29 +5,26 @@ pub(crate) mod async_snapshot_data_source;
 pub mod binding_source;
 pub mod command_palette;
 pub mod command_search;
-pub mod data_source;
 mod env_var_collections;
 pub mod external_secrets;
 pub mod files;
 mod filter_chip_renderer;
-pub mod item;
-pub mod macros;
-pub mod mixer;
 pub mod notebook_embedding;
 mod notebooks;
 mod palette_styles;
-pub mod result_renderer;
 mod search_bar;
 pub mod search_results_menu;
-pub mod searcher;
 pub mod slash_command_menu;
+// Zap:WelcomePalette 是我方保留的欢迎页(上游 #12614 删除了它,但我方
+// `pane_group/pane/welcome_view.rs` 仍在用),合并时被连带删掉,这里恢复。
 pub mod welcome_palette;
 mod workflows;
 
+pub use data_source::QueryFilter;
+use filter_chip_renderer::FilterChipRenderer;
 pub use item::SearchItem;
 pub use mixer::SyncDataSource;
 pub use result_renderer::ItemHighlightState;
-
-pub use data_source::QueryFilter;
-use filter_chip_renderer::FilterChipRenderer;
+// Re-export core search types.
+pub use warp_search_core::*;
 pub use workflows::fuzzy_match::FuzzyMatchWorkflowResult;

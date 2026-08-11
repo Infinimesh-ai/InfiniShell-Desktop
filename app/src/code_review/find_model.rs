@@ -1,9 +1,6 @@
-use crate::code::local_code_editor::LocalCodeEditorView;
-use crate::code_review::code_review_view::CodeReviewView;
-use crate::code_review::telemetry_event::CodeReviewTelemetryEvent;
-use crate::view_components::find::{FindDirection, FindEvent, FindModel};
 use std::collections::HashMap;
 use std::ops::Range;
+
 use string_offset::CharOffset;
 #[cfg(not(target_family = "wasm"))]
 use warp_core::channel::ChannelState;
@@ -13,10 +10,15 @@ use warp_editor::content::find::SearchConfig;
 #[cfg(not(target_family = "wasm"))]
 use warp_editor::search::Searcher;
 use warp_editor::search::{RestorableSearchResults, SelectedResult};
-use warpui::WeakViewHandle;
-use warpui::{
-    r#async::SpawnedFutureHandle, AppContext, Entity, EntityId, ModelContext, ViewHandle,
-};
+#[cfg(not(target_family = "wasm"))]
+use warp_errors::report_error;
+use warpui::r#async::SpawnedFutureHandle;
+use warpui::{AppContext, Entity, EntityId, ModelContext, ViewHandle, WeakViewHandle};
+
+use crate::code::local_code_editor::LocalCodeEditorView;
+use crate::code_review::code_review_view::CodeReviewView;
+use crate::code_review::telemetry_event::CodeReviewTelemetryEvent;
+use crate::view_components::find::{FindDirection, FindEvent, FindModel};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SearchMatch {
@@ -97,6 +99,12 @@ impl CodeReviewFindModel {
         self.results = None;
     }
 
+    fn repo_is_local(&self, ctx: &AppContext) -> Option<bool> {
+        self.weak_view_handle
+            .upgrade(ctx)
+            .and_then(|view| view.as_ref(ctx).repo_is_local())
+    }
+
     pub fn update_query(
         &mut self,
         query: Option<String>,
@@ -116,6 +124,7 @@ impl CodeReviewFindModel {
         self.case_sensitive = case_sensitive;
         send_telemetry_from_ctx!(
             CodeReviewTelemetryEvent::FindBarModeChanged {
+                is_local: self.repo_is_local(ctx),
                 case_sensitive: self.case_sensitive,
                 regex: self.regex,
             },
@@ -133,6 +142,7 @@ impl CodeReviewFindModel {
         self.regex = regex;
         send_telemetry_from_ctx!(
             CodeReviewTelemetryEvent::FindBarModeChanged {
+                is_local: self.repo_is_local(ctx),
                 case_sensitive: self.case_sensitive,
                 regex: self.regex,
             },
@@ -156,7 +166,13 @@ impl CodeReviewFindModel {
             return;
         }
 
-        send_telemetry_from_ctx!(CodeReviewTelemetryEvent::FindNavigated { direction }, ctx);
+        send_telemetry_from_ctx!(
+            CodeReviewTelemetryEvent::FindNavigated {
+                is_local: self.repo_is_local(ctx),
+                direction,
+            },
+            ctx
+        );
 
         let next_index = if let Some(selected) = &self.selected_match {
             match direction {
@@ -226,7 +242,7 @@ impl CodeReviewFindModel {
         let view = self.weak_view_handle.upgrade(ctx);
         if view.is_none() {
             if ChannelState::enable_debug_features() {
-                log::error!(
+                report_error!(
                     "Failed to upgrade WeakViewHandle<CodeReviewView> in get_editor_searcher"
                 );
             }
@@ -241,8 +257,9 @@ impl CodeReviewFindModel {
 
         if editor_handle.is_none() {
             if ChannelState::enable_debug_features() {
-                log::error!(
-                    "Failed to find editor with id {editor_id:?} in CodeReviewView editor handles"
+                report_error!(
+                    "Failed to find editor in CodeReviewView editor handles",
+                    extra: { "editor_id" => ?editor_id }
                 );
             }
             return None;
@@ -266,21 +283,21 @@ impl CodeReviewFindModel {
         ctx: &mut ModelContext<Self>,
     ) {
         // Try to restore the previous selection if there was one
-        if let Some(selected) = self.selected_match.take() {
-            if let Some(searcher) = self.get_editor_searcher(selected.editor_id, ctx) {
-                let candidates = MultiEditorSearchMatches {
-                    editor_id: selected.editor_id,
-                    matches: all_matches.clone(),
-                };
+        if let Some(selected) = self.selected_match.take()
+            && let Some(searcher) = self.get_editor_searcher(selected.editor_id, ctx)
+        {
+            let candidates = MultiEditorSearchMatches {
+                editor_id: selected.editor_id,
+                matches: all_matches.clone(),
+            };
 
-                if let Some(restored_result) = searcher.update(ctx, |searcher, ctx| {
-                    searcher.restore_selected_result(selected.selected_result, candidates, ctx)
-                }) {
-                    self.selected_match = Some(MultiEditorSelectedResult {
-                        editor_id: selected.editor_id,
-                        selected_result: restored_result,
-                    });
-                }
+            if let Some(restored_result) = searcher.update(ctx, |searcher, ctx| {
+                searcher.restore_selected_result(selected.selected_result, candidates, ctx)
+            }) {
+                self.selected_match = Some(MultiEditorSelectedResult {
+                    editor_id: selected.editor_id,
+                    selected_result: restored_result,
+                });
             }
         }
 

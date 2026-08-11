@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::io::Write;
 use std::path::Path;
@@ -14,6 +14,7 @@ use warpui::{ModelHandle, ModelSpawner, SingletonEntity};
 
 use crate::ai::agent_events::AgentEventStreamClient;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::ai::ambient_agents::task::HarnessModelConfig;
 use crate::terminal::cli_agent_sessions::{CLIAgentSessionStatus, CLIAgentSessionsModel};
 use crate::terminal::CLIAgent;
 use crate::util::path::resolve_executable;
@@ -56,6 +57,21 @@ pub(crate) trait ThirdPartyHarness: Send + Sync {
     /// CLI is installed on `PATH`; override for additional checks.
     fn validate(&self) -> Result<(), AgentDriverError> {
         validate_cli_installed(self.cli_agent().command_prefix(), self.install_docs_url())
+    }
+
+    /// Shell command to verify authentication credentials are valid.
+    /// Exit code 0 = pass; non-zero = fail.
+    fn auth_check_command(&self) -> Option<String> {
+        None
+    }
+
+    /// Substrings to scan for in the running harness block's output. A hit
+    /// indicates the harness can't make a successful API request (e.g.
+    /// invalid key, no billing, quota exhausted). The monitor matches
+    /// case-insensitively against the block's plaintext via the same DFA
+    /// machinery used by the find feature.
+    fn runtime_error_patterns(&self) -> &'static [&'static str] {
+        &[]
     }
 
     /// Prepare CLI-specific config files before launching the harness command.
@@ -118,10 +134,27 @@ pub(crate) fn harness_kind(harness: Harness) -> Result<HarnessKind, AgentDriverE
     match harness {
         Harness::Oz => Ok(HarnessKind::Oz),
         Harness::Claude => Ok(HarnessKind::ThirdParty(Box::new(ClaudeHarness))),
+        // Zap:Codex 走本地子 pane 直启路径(见
+        // `pane_group::pane::local_harness_launch`),不接 AgentDriver 的
+        // 第三方 harness runner——上游的 CodexHarness 依赖已剥离的服务端
+        // 会话上传/恢复链路,这里按 OpenCode 的方式标记为 driver 不支持。
+        Harness::Codex => Ok(HarnessKind::Unsupported(Harness::Codex)),
         Harness::OpenCode => Ok(HarnessKind::Unsupported(Harness::OpenCode)),
         Harness::Gemini => Ok(HarnessKind::ThirdParty(Box::new(GeminiHarness))),
         Harness::Unknown => Err(AgentDriverError::InvalidRuntimeState),
     }
+}
+
+/// Auth-verification command for the harness's CLI, if it has one.
+///
+/// Returns `None` for [`Harness::Oz`], for unsupported harnesses, and
+/// for any third-party harness whose `auth_check_command` returns `None`
+/// (e.g. Gemini today).
+pub(crate) fn auth_check_command_for(harness: Harness) -> Option<String> {
+    let HarnessKind::ThirdParty(third_party) = harness_kind(harness).ok()? else {
+        return None;
+    };
+    third_party.auth_check_command()
 }
 
 /// Check that `cli` is installed and on PATH, returning a `HarnessSetupFailed`
@@ -233,12 +266,52 @@ fn task_env_vars_for_harness_name(
     env_vars
 }
 
+/// Drops the "listener is managed externally" markers from a Claude env var set.
+///
+/// Used by launch paths that start the Claude CLI directly (e.g. hidden local
+/// child panes) instead of through `AgentDriver`'s harness runner: there is no
+/// external MessageBridge in that case, so the plugin has to manage its own
+/// listener.
+pub(crate) fn remove_claude_externally_managed_listener_env_vars(
+    env_vars: &mut HashMap<OsString, OsString>,
+) {
+    for env_name in [
+        OZ_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
+        LEGACY_OZ_PARENT_LISTENER_MANAGED_EXTERNALLY_ENV,
+    ] {
+        env_vars.remove(OsStr::new(env_name));
+    }
+}
+
 pub(crate) fn task_env_vars(
     task_id: Option<&AmbientAgentTaskId>,
     parent_run_id: Option<&str>,
     selected_harness: Harness,
 ) -> HashMap<OsString, OsString> {
     task_env_vars_for_harness_name(task_id, parent_run_id, selected_harness)
+}
+
+/// Env vars that propagate the user-selected model to a third-party harness CLI.
+pub(crate) fn harness_model_env_vars(
+    selected_harness: Harness,
+    third_party_harness_model_config: Option<&HarnessModelConfig>,
+) -> HashMap<OsString, OsString> {
+    let mut env_vars = HashMap::new();
+    let Some(model_id) = third_party_harness_model_config
+        .map(|config| config.model_id.as_str())
+        .filter(|id| !id.is_empty())
+    else {
+        return env_vars;
+    };
+
+    match selected_harness {
+        Harness::Claude => {
+            env_vars.insert(OsString::from("ANTHROPIC_MODEL"), OsString::from(model_id));
+        }
+        Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Codex | Harness::Unknown => {}
+    }
+
+    env_vars
 }
 
 /// Indicates when the harness conversation is being saved.
@@ -342,5 +415,5 @@ pub(super) fn write_temp_file(
 }
 
 #[cfg(test)]
-#[path = "mod_test.rs"]
+#[path = "mod_tests.rs"]
 mod tests;

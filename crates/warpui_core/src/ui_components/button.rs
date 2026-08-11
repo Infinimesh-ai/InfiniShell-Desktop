@@ -1,23 +1,16 @@
-use pathfinder_geometry::vector::vec2f;
 use std::borrow::Cow;
 
+use pathfinder_geometry::vector::vec2f;
+
 use crate::elements::{
-    Align, ChildAnchor, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
+    Align, Border, ChildAnchor, ConstrainedBox, Container, CrossAxisAlignment, Element, Empty,
+    Flex, Hoverable, Icon, MainAxisAlignment, MainAxisSize, MouseState, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Shrinkable, Stack,
 };
 use crate::geometry::vector::Vector2F;
-
 use crate::platform::Cursor;
-use crate::{
-    elements::{
-        Border, ConstrainedBox, Container, Element, Empty, Hoverable, Icon, MouseState,
-        MouseStateHandle,
-    },
-    ui_components::{
-        components::{UiComponent, UiComponentStyles},
-        text::Span,
-    },
-};
+use crate::ui_components::components::{UiComponent, UiComponentStyles};
+use crate::ui_components::text::Span;
 
 /// Enum specifying relative alignment of the text and icon within
 /// a button.  "First" is used instead of left/right to make this
@@ -393,53 +386,53 @@ impl Button {
 
         // The tooltip should only be shown if the element
         // is considered hovered (accounting for delays).
-        if state.is_hovered() {
-            if let Some(render_tooltip_fn) = self.render_tooltip_fn.take() {
-                // Keep stack within this rather than using a stack for all cases to allow multiple stack overlays to work
-                let mut stack = Stack::new();
-                stack.add_child(container);
-                let tooltip = render_tooltip_fn();
-                let tooltip_offset = match self.tooltip_position {
-                    ButtonTooltipPosition::Above => OffsetPositioning::offset_from_parent(
-                        vec2f(0., -8.),
-                        ParentOffsetBounds::WindowByPosition,
-                        ParentAnchor::TopMiddle,
-                        ChildAnchor::BottomMiddle,
-                    ),
-                    ButtonTooltipPosition::Below => OffsetPositioning::offset_from_parent(
-                        vec2f(0., 8.),
-                        ParentOffsetBounds::WindowByPosition,
-                        ParentAnchor::BottomMiddle,
-                        ChildAnchor::TopMiddle,
-                    ),
-                    ButtonTooltipPosition::AboveLeft => OffsetPositioning::offset_from_parent(
-                        vec2f(0., -8.),
-                        ParentOffsetBounds::WindowByPosition,
-                        ParentAnchor::TopLeft,
-                        ChildAnchor::BottomLeft,
-                    ),
-                    ButtonTooltipPosition::BelowLeft => OffsetPositioning::offset_from_parent(
-                        vec2f(0., 8.),
-                        ParentOffsetBounds::WindowByPosition,
-                        ParentAnchor::BottomLeft,
-                        ChildAnchor::TopLeft,
-                    ),
-                    ButtonTooltipPosition::AboveRight => OffsetPositioning::offset_from_parent(
-                        vec2f(0., -8.),
-                        ParentOffsetBounds::WindowByPosition,
-                        ParentAnchor::TopRight,
-                        ChildAnchor::BottomRight,
-                    ),
-                    ButtonTooltipPosition::BelowRight => OffsetPositioning::offset_from_parent(
-                        vec2f(0., 8.),
-                        ParentOffsetBounds::WindowByPosition,
-                        ParentAnchor::BottomRight,
-                        ChildAnchor::TopRight,
-                    ),
-                };
-                stack.add_positioned_overlay_child(tooltip, tooltip_offset);
-                return stack.finish();
-            }
+        if state.is_hovered()
+            && let Some(render_tooltip_fn) = self.render_tooltip_fn.take()
+        {
+            // Keep stack within this rather than using a stack for all cases to allow multiple stack overlays to work
+            let mut stack = Stack::new();
+            stack.add_child(container);
+            let tooltip = render_tooltip_fn();
+            let tooltip_offset = match self.tooltip_position {
+                ButtonTooltipPosition::Above => OffsetPositioning::offset_from_parent(
+                    vec2f(0., -8.),
+                    ParentOffsetBounds::WindowByPosition,
+                    ParentAnchor::TopMiddle,
+                    ChildAnchor::BottomMiddle,
+                ),
+                ButtonTooltipPosition::Below => OffsetPositioning::offset_from_parent(
+                    vec2f(0., 8.),
+                    ParentOffsetBounds::WindowByPosition,
+                    ParentAnchor::BottomMiddle,
+                    ChildAnchor::TopMiddle,
+                ),
+                ButtonTooltipPosition::AboveLeft => OffsetPositioning::offset_from_parent(
+                    vec2f(0., -8.),
+                    ParentOffsetBounds::WindowByPosition,
+                    ParentAnchor::TopLeft,
+                    ChildAnchor::BottomLeft,
+                ),
+                ButtonTooltipPosition::BelowLeft => OffsetPositioning::offset_from_parent(
+                    vec2f(0., 8.),
+                    ParentOffsetBounds::WindowByPosition,
+                    ParentAnchor::BottomLeft,
+                    ChildAnchor::TopLeft,
+                ),
+                ButtonTooltipPosition::AboveRight => OffsetPositioning::offset_from_parent(
+                    vec2f(0., -8.),
+                    ParentOffsetBounds::WindowByPosition,
+                    ParentAnchor::TopRight,
+                    ChildAnchor::BottomRight,
+                ),
+                ButtonTooltipPosition::BelowRight => OffsetPositioning::offset_from_parent(
+                    vec2f(0., 8.),
+                    ParentOffsetBounds::WindowByPosition,
+                    ParentAnchor::BottomRight,
+                    ChildAnchor::TopRight,
+                ),
+            };
+            stack.add_positioned_overlay_child(tooltip, tooltip_offset);
+            return stack.finish();
         }
 
         container

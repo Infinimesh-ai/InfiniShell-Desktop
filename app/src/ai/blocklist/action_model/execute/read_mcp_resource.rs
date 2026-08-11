@@ -1,20 +1,21 @@
+use futures::FutureExt;
+use futures::future::BoxFuture;
+#[cfg(not(target_family = "wasm"))]
+use warpui::SingletonEntity;
+use warpui::{Entity, EntityId, ModelContext, ModelHandle};
+
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::mcp::TemplatableMCPServerManager;
-use crate::terminal::model::session::active_session::ActiveSession;
-use futures::{future::BoxFuture, FutureExt};
-use warpui::{Entity, EntityId, ModelContext, ModelHandle};
-
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::{
     agent::{AIAgentActionResultType, ReadMCPResourceResult},
     blocklist::{
-        action_model::{AIAgentAction, AIAgentActionType},
         BlocklistAIPermissions,
+        action_model::{AIAgentAction, AIAgentActionType},
     },
 };
-#[cfg(not(target_family = "wasm"))]
-use warpui::SingletonEntity;
+use crate::terminal::model::session::active_session::ActiveSession;
 
 pub struct ReadMCPResourceExecutor {
     _active_session: ModelHandle<ActiveSession>,
@@ -77,7 +78,7 @@ impl ReadMCPResourceExecutor {
         &mut self,
         input: ExecuteActionInput,
         ctx: &mut ModelContext<Self>,
-    ) -> impl Into<AnyActionExecution> {
+    ) -> impl Into<AnyActionExecution> + use<> {
         #[cfg(target_family = "wasm")]
         {
             ActionExecution::<()>::InvalidAction
@@ -128,7 +129,7 @@ impl ReadMCPResourceExecutor {
             ActionExecution::new_async(
                 async move {
                     reconnecting_peer
-                        .read_resource(rmcp::model::ReadResourceRequestParam { uri })
+                        .read_resource(rmcp::model::ReadResourceRequestParams::new(uri))
                         .await
                 },
                 |res, _ctx| handle_read_resource_result(res),

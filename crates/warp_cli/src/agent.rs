@@ -1,10 +1,15 @@
-use std::{fmt, path::PathBuf};
+use std::fmt;
+use std::path::PathBuf;
 
+use clap::builder::PossibleValue;
 use clap::{Args, Subcommand, ValueEnum};
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    config_file::ConfigFileArgs, mcp::MCPSpec, model::ModelArgs, share::ShareArgs, skill::SkillSpec,
-};
+use crate::config_file::ConfigFileArgs;
+use crate::mcp::MCPSpec;
+use crate::model::ModelArgs;
+use crate::share::ShareArgs;
+use crate::skill::SkillSpec;
 
 /// Output format for agent results.
 #[derive(Debug, Copy, Clone, ValueEnum, Eq, PartialEq, Default)]
@@ -117,28 +122,62 @@ impl HiddenComputerUseArgs {
         }
     }
 }
+const HARNESS_VALUE_VARIANTS: [Harness; 5] = [
+    Harness::Oz,
+    Harness::Claude,
+    Harness::OpenCode,
+    Harness::Gemini,
+    Harness::Codex,
+];
+
 /// The execution harness for an agent run.
-#[derive(Debug, Copy, Clone, ValueEnum, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Harness {
     /// Use Zap's built-in MAA infrastructure (default).
     #[default]
-    #[value(name = "oz")]
     Oz,
     /// Delegate to the `claude` CLI.
-    #[value(name = "claude", alias = "claude-code")]
     Claude,
     /// Delegate to the `opencode` CLI.
-    #[value(name = "opencode", alias = "open-code")]
     OpenCode,
     /// Delegate to the `gemini` CLI.
-    #[value(name = "gemini")]
     Gemini,
+    /// Delegate to the `codex` CLI.
+    Codex,
     /// A harness produced by a newer client/server that this client doesn't
     /// recognize. Surfaced via deserialization fallbacks (e.g. unknown serialized
     /// enum values, unknown `harness_type` strings); never selectable from the
     /// CLI or harness dropdown.
-    #[value(skip)]
+    #[serde(other)]
     Unknown,
+}
+
+impl ValueEnum for Harness {
+    fn value_variants<'a>() -> &'a [Self] {
+        &HARNESS_VALUE_VARIANTS
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        let mut pv = match self {
+            Harness::Oz => {
+                PossibleValue::new("oz").help("Use Warp's built-in MAA infrastructure (default)")
+            }
+            Harness::Claude => PossibleValue::new("claude")
+                .alias("claude-code")
+                .help("Delegate to the `claude` CLI"),
+            Harness::OpenCode => PossibleValue::new("opencode")
+                .alias("open-code")
+                .help("Delegate to the `opencode` CLI"),
+            Harness::Gemini => PossibleValue::new("gemini").help("Delegate to the `gemini` CLI"),
+            Harness::Codex => PossibleValue::new("codex").help("Delegate to the `codex` CLI"),
+            Harness::Unknown => return None,
+        };
+        if !self.should_display_in_help_text() {
+            pv = pv.hide(true);
+        }
+        Some(pv)
+    }
 }
 
 impl Harness {
@@ -149,8 +188,25 @@ impl Harness {
 
     pub fn parse_local_child_harness(value: &str) -> Option<Self> {
         match Self::parse_orchestration_harness(value) {
-            Some(harness @ (Self::Claude | Self::OpenCode)) => Some(harness),
+            Some(harness @ (Self::Claude | Self::OpenCode | Self::Codex)) => Some(harness),
             Some(Self::Oz) | Some(Self::Gemini) | Some(Self::Unknown) | None => None,
+        }
+    }
+
+    /// Whether this harness is surfaced to users in CLI `--help` for cloud runs
+    /// (`oz agent run-cloud --harness`). Only the harnesses that are generally
+    /// available for cloud runs are shown; gemini and opencode aren't available
+    /// yet, so they're hidden from help. Update this when a harness becomes GA
+    /// for cloud.
+    ///
+    /// This is the single source of truth for the `ValueEnum` help text; the
+    /// per-variant `#[value(hide = ...)]` attributes are no longer used. It does
+    /// not affect runtime acceptance — the server decides which harnesses are
+    /// actually runnable.
+    pub fn should_display_in_help_text(self) -> bool {
+        match self {
+            Self::Oz | Self::Claude | Self::Codex => true,
+            Self::OpenCode | Self::Gemini | Self::Unknown => false,
         }
     }
 
@@ -160,23 +216,56 @@ impl Harness {
             Self::Claude => "Claude Code",
             Self::OpenCode => "OpenCode",
             Self::Gemini => "Gemini CLI",
+            Self::Codex => "Codex",
             Self::Unknown => "Unknown",
+        }
+    }
+
+    /// Parses a harness config-name string (the lowercase name written into
+    /// `HarnessConfig::harness_type` by the spawner, e.g. `"claude"`, `"gemini"`, `"oz"`)
+    /// into a [`Harness`] variant. Inverse of [`Harness::config_name`]. Returns `None` for
+    /// unrecognized names so callers can distinguish a future-server harness from a
+    /// round-tripped [`Harness::Unknown`]; callers that want to fall back to `Unknown`
+    /// should `.unwrap_or(Harness::Unknown)`. UI surfaces should treat `Unknown` as a
+    /// non-Oz, non-runnable harness.
+    pub fn from_config_name(name: &str) -> Option<Self> {
+        match name {
+            "oz" => Some(Harness::Oz),
+            "claude" => Some(Harness::Claude),
+            "opencode" => Some(Harness::OpenCode),
+            "gemini" => Some(Harness::Gemini),
+            "codex" => Some(Harness::Codex),
+            "unknown" => Some(Harness::Unknown),
+            _ => None,
+        }
+    }
+
+    /// Canonical config name for this harness (the lowercase string written into
+    /// `HarnessConfig::harness_type`). Inverse of [`Harness::from_config_name`].
+    /// The exhaustive match here forces every new [`Harness`] variant to declare a
+    /// canonical name, which prevents `from_config_name` from silently falling back to
+    /// `Unknown` when a new variant is added.
+    pub fn config_name(self) -> &'static str {
+        match self {
+            Harness::Oz => "oz",
+            Harness::Claude => "claude",
+            Harness::OpenCode => "opencode",
+            Harness::Gemini => "gemini",
+            Harness::Codex => "codex",
+            Harness::Unknown => "unknown",
         }
     }
 }
 
 impl fmt::Display for Harness {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self {
-            Harness::Oz => "oz",
-            Harness::Claude => "claude",
-            Harness::OpenCode => "opencode",
-            Harness::Gemini => "gemini",
-            Harness::Unknown => "unknown",
-        };
-        f.write_str(name)
+        f.write_str(self.config_name())
     }
 }
+
+#[cfg(test)]
+#[path = "agent_tests.rs"]
+mod tests;
 
 /// Profile subcommands.
 #[derive(Debug, Clone, Subcommand)]
@@ -195,6 +284,16 @@ pub enum AgentCommand {
     Profile(AgentProfileCommand),
     /// List all available agents.
     List(ListAgentConfigsArgs),
+}
+
+impl AgentCommand {
+    pub(crate) fn as_str_for_tracing(&self) -> &'static str {
+        match self {
+            AgentCommand::Run(_) => "agent run",
+            AgentCommand::Profile(_) => "agent profile",
+            AgentCommand::List(_) => "agent list",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Args)]
@@ -227,8 +326,8 @@ pub struct RunAgentArgs {
     ///
     /// When used with --prompt, the skill provides the base context and the prompt is the task.
     ///
-    /// To automate a skill on a schedule, use `oz schedule create --skill <SPEC>`.
-    #[arg(long = "skill", value_name = "SPEC")]
+    /// To automate a skill on a schedule, use `oz schedule create --skill <SKILL>`.
+    #[arg(long = "skill", value_name = "SKILL")]
     pub skill: Option<SkillSpec>,
 
     /// Name for this agent task.
@@ -254,6 +353,15 @@ pub struct RunAgentArgs {
     /// LEGACY: MCP servers to start before executing the agent, identified by UUID.
     #[arg(long = "mcp-server", value_name = "UUID", hide = true)]
     pub mcp_servers: Vec<uuid::Uuid>,
+    /// Fail the run when any requested MCP server fails to start.
+    ///
+    /// By default, MCP servers that don't start within the startup timeout are
+    /// skipped and the agent runs without their tools.
+    #[arg(long = "strict-mcp-startup")]
+    pub strict_mcp_startup: bool,
+    /// Maximum time to wait for requested MCP servers to start (e.g. `30s`, `1m`).
+    #[arg(long = "mcp-startup-timeout", value_name = "DURATION")]
+    pub mcp_startup_timeout: Option<humantime::Duration>,
     // Zap Wave 7-2:`--environment` 参数 随 cloud ambient agent 主体子系统物理删。
     /// Keep the agent's session open after the conversation completes.
     ///
@@ -273,8 +381,24 @@ pub struct RunAgentArgs {
     #[arg(long = "sandboxed", hide = true)]
     pub sandboxed: bool,
     /// IAM role ARN to use for federated AWS Bedrock credentials for this run.
-    #[arg(long = "bedrock-inference-role", value_name = "ROLE_ARN", hide = true)]
+    #[arg(
+        long = "bedrock-inference-role",
+        value_name = "ROLE_ARN",
+        requires = "bedrock_role_region",
+        hide = true
+    )]
     pub bedrock_inference_role: Option<String>,
+
+    /// AWS region to use for the STS `AssumeRoleWithWebIdentity` call that
+    /// mints federated Bedrock credentials. Required together with
+    /// `--bedrock-inference-role`.
+    #[arg(
+        long = "bedrock-role-region",
+        value_name = "REGION",
+        requires = "bedrock_inference_role",
+        hide = true
+    )]
+    pub bedrock_role_region: Option<String>,
 
     #[command(flatten)]
     pub computer_use: HiddenComputerUseArgs,

@@ -1,31 +1,26 @@
 use std::sync::Arc;
 
-use crate::{
-    appearance::Appearance,
-    settings::{AISettings, InputSettings},
-    terminal::{
-        input::{Input, InputAction, InputSuggestionsMode, MenuPositioning},
-        model::TerminalModel,
-        view::{TerminalAction, PADDING_LEFT},
-    },
-    ui_components::icons::Icon,
-};
 use pathfinder_geometry::vector::vec2f;
 use vim::vim::{VimMode, VimState};
 use warp_completer::completer::Description;
 use warp_core::features::FeatureFlag;
-use warpui::{
-    elements::{
-        AnchorPair, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius,
-        CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Flex, OffsetPositioning,
-        OffsetType, ParentAnchor, ParentElement, ParentOffsetBounds, PositionedElementOffsetBounds,
-        PositioningAxis, Radius, Shrinkable, Stack, Text, XAxisAnchor,
-    },
-    fonts::Weight,
-    presenter::ChildView,
-    ui_components::components::{UiComponent, UiComponentStyles},
-    AppContext, SingletonEntity, ViewHandle,
+use warpui::elements::{
+    AnchorPair, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+    DispatchEventResult, Element, EventHandler, Flex, OffsetPositioning, OffsetType, ParentAnchor,
+    ParentElement, ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius,
+    Shrinkable, Stack, Text, XAxisAnchor,
 };
+use warpui::fonts::Weight;
+use warpui::presenter::ChildView;
+use warpui::ui_components::components::{UiComponent, UiComponentStyles};
+use warpui::{AppContext, SingletonEntity, ViewHandle};
+
+use crate::appearance::Appearance;
+use crate::settings::{AISettings, InputSettings};
+use crate::terminal::input::{Input, InputAction, InputSuggestionsMode, MenuPositioning};
+use crate::terminal::model::TerminalModel;
+use crate::terminal::view::{PADDING_LEFT, TerminalAction};
+use crate::ui_components::icons::Icon;
 
 /// Whether the terminal input message bar should be shown.
 ///
@@ -468,3 +463,9 @@ fn render_command_token_description(
     .with_width(TOKEN_DESCRIPTION_WIDTH)
     .finish()
 }
+
+// Zap:上游在输入框上叠加"购买 credits"横幅(`maybe_add_buy_credits_banner` /
+// `add_buy_credits_banner_overlay`)。Zap 无云端计费与 credits 概念,
+// `crate::terminal::buy_credits_banner` 视图已物理删除,
+// `AIRequestUsageModel::compute_buy_addon_credits_banner_display_state` 也恒返回
+// `Hidden`,这两个函数及其唯一调用点(`input/agent.rs`)一并删除。

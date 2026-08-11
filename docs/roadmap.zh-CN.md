@@ -1,10 +1,10 @@
 # 后续计划
 
-Zap 的 Agent 能力将以独立开源服务的形式实现,不绑定 Warp 客户端。终端只是它的其中一个载体 —— TUI、IDE 插件、云端 worker 都可以驱动同一个引擎。
+InfiniShell 的 Agent 能力将以独立开源服务的形式实现,不绑定 Warp 客户端。终端只是它的其中一个载体 —— TUI、IDE 插件、云端 worker 都可以驱动同一个引擎。
 
 ## Phase 1 — 自研 Agent Harness Core
 
-- 独立设计并从零实现一个开源 Agent 服务—— 涵盖 Agent 循环、工具运行时、会话 / 历史状态、提示词模板、提供商路由;不绑定 Warp 现有客户端代码。Zap 作为它的首个官方载体。
+- 独立设计并从零实现一个开源 Agent 服务—— 涵盖 Agent 循环、工具运行时、会话 / 历史状态、提示词模板、提供商路由;不绑定 Warp 现有客户端代码。InfiniShell 作为它的首个官方载体。
 - 定义稳定的 IPC / JSON-RPC 协议:提示词、流式 Token、工具调用、文件 diff、状态、附件。
 - Harness 以可复用的开源服务形式发布,headless 守护进程、独立 TUI、IDE 插件、其它终端都能接入。
 - 默认纯本地运行;凭证、历史、Skills 与 MCP 服务器配置均保留在本地。
@@ -25,7 +25,7 @@ Zap 的 Agent 能力将以独立开源服务的形式实现,不绑定 Warp 客�
 
 ## Phase 3 — 多载体协作
 
-- 在 Zap 终端、独立 TUI、IDE 插件与 Web UI 间共享同一身份 / 账号。
+- 在 InfiniShell 终端、独立 TUI、IDE 插件与 Web UI 间共享同一身份 / 账号。
 - 会话接力:Web 开启任务,终端里接着干;或者把终端会话交给桌面端评审。
 - 后台 Agent 与多 Agent 团队:Lead Agent 拆解任务,分发给并发的子 Agent。
 - Routines:定时 / API 调用 / 仓库事件 / CI / Issue tracker 事件触发任务。

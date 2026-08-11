@@ -1,31 +1,28 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
+use std::sync::Arc;
 
+use async_trait::async_trait;
 use pathfinder_color::ColorU;
 use serde::Serialize;
 use strum_macros::EnumIter;
-use warp_core::ui::{
-    color::hex_color::HexColorError as UiHexColorError,
-    theme::{AnsiColors, WarpTheme},
-};
-
-use async_trait::async_trait;
 use thiserror::Error;
-use warpui::{fonts::FontInfo, keymap::Keystroke, DisplayIdx};
+use warp_core::ui::color::hex_color::HexColorError as UiHexColorError;
+use warp_core::ui::theme::{AnsiColors, WarpTheme};
+use warpui::DisplayIdx;
+use warpui::fonts::FontInfo;
+use warpui::keymap::Keystroke;
 
-use crate::{
-    interval_timer::IntervalTimer,
-    root_view::QuakeModePinPosition,
-    settings::ExtraMetaKeys,
-    terminal::session_settings::{StartupShell, WorkingDirectoryConfig},
-    themes::theme_creator::pick_accent_color_from_options,
-};
-#[cfg(feature = "local_fs")]
-use crate::{themes::theme_creator_body::ThemeCreatorBody, user_config};
-
-use super::{alacritty_parser::AlacrittyConfig, model::TerminalType};
-
+use super::alacritty_parser::AlacrittyConfig;
 #[cfg(target_os = "macos")]
 use super::iterm_parser::ITermProfile;
+use super::model::TerminalType;
+use crate::interval_timer::IntervalTimer;
+use crate::root_view::QuakeModePinPosition;
+use crate::settings::ExtraMetaKeys;
+use crate::terminal::session_settings::{StartupShell, WorkingDirectoryConfig};
+use crate::themes::theme_creator::pick_accent_color_from_options;
+#[cfg(feature = "local_fs")]
+use crate::{themes::theme_creator_body::ThemeCreatorBody, user_config};
 
 #[derive(Debug)]
 pub enum ThemeType {
@@ -43,7 +40,7 @@ pub enum ThemeError {
 
 #[derive(Clone, Error, Debug)]
 pub enum HotkeyError {
-    #[error("A hotkey window opens in a way Zap does not support")]
+    #[error("A hotkey window opens in a way InfiniShell does not support")]
     UnsupportedWindowType,
     #[error("There are multiple hotkeys configured")]
     MultipleHotkeys,
@@ -213,10 +210,9 @@ impl Config {
                         |_| dark.clone(),
                     );
 
-                    if let (Some(light), Some(dark)) = (light_written, dark_written) {
-                        Some(ThemeType::LightAndDark { light, dark })
-                    } else {
-                        None
+                    match (light_written, dark_written) {
+                        (Some(light), Some(dark)) => Some(ThemeType::LightAndDark { light, dark }),
+                        _ => None,
                     }
                 }
                 ThemeType::Single(normal) => {

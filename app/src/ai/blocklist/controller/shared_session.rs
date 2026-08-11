@@ -10,6 +10,7 @@ use crate::ai::agent::AIAgentActionId;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
 use crate::terminal::shared_session::ParticipantId;
+use ai::skills::SkillPathOrigin;
 use warpui::{AppContext, ModelContext, SingletonEntity};
 
 #[derive(Default)]
@@ -109,7 +110,8 @@ impl BlocklistAIController {
             })
             .unwrap_or_else(|| {
                 history.update(ctx, |h, ctx| {
-                    h.start_new_conversation(terminal_view_id, false, true, ctx)
+                    // 最后一个参数是 is_cli_agent_transcript:共享会话不是 CLI agent 转录,传 false。
+                    h.start_new_conversation(terminal_view_id, false, true, false, ctx)
                 })
             });
 
@@ -196,6 +198,9 @@ impl BlocklistAIController {
                 actions.actions,
                 conversation_id,
                 self.terminal_view_id,
+                // 共享会话的 skill 路径来自分享方机器,本地无法还原真实 local/remote 归属,
+                // 只用于渲染转录,所以用 RestoredDisplayOnly。
+                &SkillPathOrigin::RestoredDisplayOnly,
                 ctx,
             ) {
                 log::error!(
@@ -342,7 +347,7 @@ impl BlocklistAIController {
         let history = BlocklistAIHistoryModel::handle(ctx);
         history
             .as_ref(ctx)
-            .all_live_conversations_for_terminal_view(self.terminal_view_id)
+            .all_live_conversations_for_terminal_surface(self.terminal_view_id)
             .find_map(|conv| {
                 conv.server_conversation_token()
                     .and_then(|t| (t.as_str() == conversation_token).then_some(conv.id()))

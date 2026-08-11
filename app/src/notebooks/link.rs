@@ -1,33 +1,26 @@
 //! Link-opening behavior for notebooks.
-use std::{
-    borrow::Cow,
-    fmt,
-    future::{self, Future},
-    net::IpAddr,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::borrow::Cow;
+use std::fmt;
+use std::future::{self, Future};
+use std::net::IpAddr;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use futures_util::future::Either;
 use url::Url;
 use warp_util::path::{CleanPathResult, LineAndColumnArg};
-use warpui::{
-    r#async::SpawnedFutureHandle, AppContext, Entity, ModelContext, ModelHandle, SingletonEntity,
-    WindowId,
-};
+use warpui::r#async::SpawnedFutureHandle;
+use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, WindowId};
 
+use super::file::is_markdown_file;
+use crate::drive::ZapDriveObjectArgs;
+use crate::terminal::model::session::Session;
+use crate::uri::parse_url_paths::{WarpWebLink, get_item_data_from_warp_link};
 #[cfg(feature = "local_fs")]
 use crate::util::file::external_editor::EditorSettings;
 #[cfg(feature = "local_fs")]
-use crate::util::openable_file_type::{is_supported_image_file, resolve_file_target, FileTarget};
-use crate::{
-    drive::ZapDriveObjectArgs,
-    terminal::model::session::Session,
-    uri::parse_url_paths::{get_item_data_from_warp_link, WarpWebLink},
-    workspace::ActiveSession,
-};
-
-use super::file::is_markdown_file;
+use crate::util::openable_file_type::{FileTarget, is_supported_image_file, resolve_file_target};
+use crate::workspace::ActiveSession;
 
 #[cfg(test)]
 #[path = "link_tests.rs"]
@@ -136,18 +129,18 @@ impl NotebookLinks {
         &self,
         link: &str,
         ctx: &AppContext,
-    ) -> impl Future<Output = Result<LinkTarget, ResolveError>> {
+    ) -> impl Future<Output = Result<LinkTarget, ResolveError>> + use<> {
         if let Ok(url) = Url::parse(link) {
             // The `url` crate only provides `to_file_path` on certain platforms.
             #[cfg(feature = "local_fs")]
             if url.scheme() == "file" {
                 // Unlike below, if there's missing information, we can still fall back to the
                 // system for file:// URL handling.
-                if let Some(session) = self.session_source.session(ctx) {
-                    if let Ok(file) = url.to_file_path() {
-                        // TODO(ben): Support line and column in file:// URLs.
-                        return Either::Left(Self::resolve_file(file, session, None));
-                    }
+                if let Some(session) = self.session_source.session(ctx)
+                    && let Ok(file) = url.to_file_path()
+                {
+                    // TODO(ben): Support line and column in file:// URLs.
+                    return Either::Left(Self::resolve_file(file, session, None));
                 }
             }
 
@@ -158,13 +151,12 @@ impl NotebookLinks {
         // The heuristic we use is to take the substring up to the first slash (if present), and
         // check for a valid public domain name or IP address.
         let maybe_domain = link.split_once('/').map_or(link, |(start, _)| start);
-        if addr::parse_domain_name(maybe_domain)
+        if (addr::parse_domain_name(maybe_domain)
             .is_ok_and(|domain| domain.has_known_suffix() && domain.root().is_some())
-            || maybe_domain.parse::<IpAddr>().is_ok()
+            || maybe_domain.parse::<IpAddr>().is_ok())
+            && let Ok(url) = Url::parse(&format!("http://{link}"))
         {
-            if let Ok(url) = Url::parse(&format!("http://{link}")) {
-                return Either::Right(future::ready(Ok(LinkTarget::Url(url))));
-            }
+            return Either::Right(future::ready(Ok(LinkTarget::Url(url))));
         }
 
         // At this point, we can only resolve file targets, which require a session.
@@ -222,7 +214,7 @@ impl NotebookLinks {
                     match self.session_source.base_directory(ctx) {
                         Some(directory) => directory.join(clean_path),
                         None => {
-                            return Either::Right(future::ready(Err(ResolveError::MissingContext)))
+                            return Either::Right(future::ready(Err(ResolveError::MissingContext)));
                         }
                     }
                 } else {
@@ -261,7 +253,7 @@ impl NotebookLinks {
 
     /// Open a resolved link:
     /// * URLs are opened in the web browser or system-default application.
-    /// * Markdown files are opened in Zap (if the `FileNotebooks` feature flag is enabled).
+    /// * Markdown files are opened according to the user's Markdown Viewer preference.
     /// * Other files are opened in the configured editor or system-default application.
     pub fn open(&self, link: LinkTarget, ctx: &mut ModelContext<Self>) {
         match link {
@@ -276,11 +268,27 @@ impl NotebookLinks {
             }
             LinkTarget::LocalFile {
                 path,
+                line_and_column,
                 session,
                 is_markdown: true,
-                ..
             } => {
-                ctx.emit(LinkEvent::OpenFileNotebook { path, session });
+                #[cfg(not(feature = "local_fs"))]
+                let _ = line_and_column;
+
+                #[cfg(feature = "local_fs")]
+                {
+                    let settings = EditorSettings::as_ref(ctx);
+                    if *settings.prefer_markdown_viewer {
+                        ctx.emit(LinkEvent::OpenFileNotebook { path, session });
+                    } else {
+                        open_file(path, line_and_column, ctx);
+                    }
+                }
+
+                #[cfg(not(feature = "local_fs"))]
+                {
+                    ctx.emit(LinkEvent::OpenFileNotebook { path, session });
+                }
             }
             LinkTarget::LocalFile {
                 path,
@@ -344,6 +352,11 @@ impl NotebookLinks {
 }
 
 /// Open a file respecting user's editor settings.
+///
+/// For targets that would be handed to the OS default handler (`SystemGeneric` /
+/// `SystemDefault`), we reveal the file in Finder / Explorer instead of opening it.
+/// This prevents a malicious markdown link from triggering arbitrary code execution
+/// via an executable disguised as a local file (e.g. an extensionless shell script).
 // The `line_and_column` argument is unused when there is no local filesystem.
 #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
 fn open_file(
@@ -353,17 +366,39 @@ fn open_file(
 ) {
     #[cfg(feature = "local_fs")]
     {
-        let target = if is_supported_image_file(&path) {
-            FileTarget::SystemGeneric
-        } else {
-            let settings = EditorSettings::as_ref(ctx);
-            resolve_file_target(&path, settings, None)
-        };
-        ctx.emit(LinkEvent::OpenFileWithTarget {
-            path,
-            target,
-            line_col: line_and_column,
-        });
+        // Images are safe to open with the system default viewer.
+        if is_supported_image_file(&path) {
+            ctx.emit(LinkEvent::OpenFileWithTarget {
+                path,
+                target: FileTarget::SystemGeneric,
+                line_col: line_and_column,
+            });
+            return;
+        }
+
+        let settings = EditorSettings::as_ref(ctx);
+        let target = resolve_file_target(&path, settings, None);
+        match target {
+            // Safe targets: open in a viewer/editor that won't execute the file.
+            // `ImageViewer` 是 Zap 侧新增的应用内图片查看器,只做解码渲染、
+            // 不会把文件交给系统默认处理器执行,因此归入安全目标。
+            FileTarget::MarkdownViewer(_)
+            | FileTarget::CodeEditor(_)
+            | FileTarget::ImageViewer(_)
+            | FileTarget::ExternalEditor(_)
+            | FileTarget::EnvEditor => {
+                ctx.emit(LinkEvent::OpenFileWithTarget {
+                    path,
+                    target,
+                    line_col: line_and_column,
+                });
+            }
+            // Dangerous targets: the OS default handler could execute the file.
+            // Reveal in Finder / Explorer instead.
+            FileTarget::SystemGeneric | FileTarget::SystemDefault => {
+                ctx.open_file_path_in_explorer(&path);
+            }
+        }
     }
     #[cfg(not(feature = "local_fs"))]
     ctx.open_file_path(&path);

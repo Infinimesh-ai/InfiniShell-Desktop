@@ -1,0 +1,24 @@
+[package]
+name = "warp_multi_agent_client"
+version = "0.1.0"
+edition = "2024"
+authors.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[features]
+# 上游把这个 feature 透传给 `warp_server_client`;该 crate 已随云端路径一并剥离,
+# 这里只保留本 crate 自己的端点前缀切换(见 `endpoint_url`)。
+agent_mode_evals = []
+
+[dependencies]
+anyhow.workspace = true
+base64.workspace = true
+cfg-if.workspace = true
+futures.workspace = true
+prost.workspace = true
+reqwest-eventsource.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+warp_core.workspace = true
+warp_multi_agent_api.workspace = true

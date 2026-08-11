@@ -2,31 +2,31 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use ai::agent::UnknownCitationTypeError;
+use ai::agent::action::ReadSkillRequest;
+use ai::agent::convert::ToolToAIAgentActionError;
+use ai::skills::{
+    SkillPathOrigin, skill_reference_from_api_skill_ref, skill_reference_from_read_skill_ref,
+};
+use api::ask_user_question::question::QuestionType;
+use warp_core::channel::ChannelState;
+use warp_multi_agent_api as api;
+
 use crate::ai::agent::api::convert_conversation::{
     convert_input_context, convert_tool_call_result_to_input,
 };
 use crate::ai::agent::comment::CodeReview;
 use crate::ai::agent::task::TaskId;
 use crate::ai::agent::todos::AIAgentTodoList;
+use crate::ai::agent::util::parse_markdown_into_text_and_code_sections;
 use crate::ai::agent::{
-    util::parse_markdown_into_text_and_code_sections, AIAgentAction, AIAgentActionType,
-    AIAgentCitation, AIAgentInput, AIAgentOutputMessage, AIAgentText, AIAgentTodo,
-    ArtifactCreatedData, MessageId, SuggestedAgentModeWorkflow, SuggestedRule, Suggestions,
-    TodoOperation,
-};
-use crate::ai::agent::{
-    CloneRepositoryURL, SubagentCall, SubagentType, SummarizationType, WebFetchStatus,
-    WebSearchStatus,
+    AIAgentAction, AIAgentActionType, AIAgentAttachment, AIAgentCitation, AIAgentInput,
+    AIAgentOutputMessage, AIAgentText, AIAgentTodo, ArtifactCreatedData, CloneRepositoryURL,
+    MessageId, SubagentCall, SubagentType, SuggestedAgentModeWorkflow, SuggestedRule, Suggestions,
+    SummarizationType, TodoOperation, UserQueryMode, WebFetchStatus, WebSearchStatus,
 };
 use crate::ai::artifact_download::sanitized_basename;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentVersion};
-use ai::agent::convert::ToolToAIAgentActionError;
-use ai::agent::UnknownCitationTypeError;
-use api::ask_user_question::question::QuestionType;
-use warp_core::channel::ChannelState;
-use warp_multi_agent_api as api;
-
-use crate::ai::agent::{AIAgentAttachment, UserQueryMode};
 
 impl TryFrom<api::Attachment> for AIAgentAttachment {
     type Error = anyhow::Error;
@@ -48,6 +48,18 @@ impl TryFrom<api::Attachment> for AIAgentAttachment {
             _ => anyhow::bail!("Unsupported attachment type for conversion"),
         }
     }
+}
+
+fn convert_read_skill(
+    read_skill: api::message::tool_call::ReadSkill,
+    skill_path_origin: &SkillPathOrigin,
+) -> Result<AIAgentActionType, ToolToAIAgentActionError> {
+    let Some(reference) = read_skill.skill_reference else {
+        return Err(ToolToAIAgentActionError::MissingSkillReference);
+    };
+    let skill = skill_reference_from_read_skill_ref(reference, skill_path_origin)
+        .map_err(|_| ToolToAIAgentActionError::MissingSkillReference)?;
+    Ok(AIAgentActionType::ReadSkill(ReadSkillRequest { skill }))
 }
 
 /// Converts proto UserQueryMode to the internal UserQueryMode type
@@ -97,6 +109,7 @@ pub struct ConversionParams<'a> {
     pub task_id: &'a TaskId,
     pub current_todo_list: Option<&'a AIAgentTodoList>,
     pub active_code_review: Option<&'a CodeReview>,
+    pub skill_path_origin: &'a SkillPathOrigin,
 }
 
 /// Trait for converting an [`api::Message`] to an [`AIAgentOutputMessage`].
@@ -514,7 +527,11 @@ impl ConvertAPIMessageToClientOutputMessage for api::Message {
             | api::message::Message::CodeReview(_)
             | api::message::Message::ServerEvent(_)
             | api::message::Message::InvokeSkill(_)
-            | api::message::Message::PassiveSuggestionResult(_) => {
+            | api::message::Message::PassiveSuggestionResult(_)
+            // Stage 2 plan-card config snapshot: hydrated separately by the
+            // plan card's `AIDocumentModel` subscription, not via the
+            // exchange/output stream. No client output message representation.
+            | api::message::Message::OrchestrationConfigSnapshot(_) => {
                 Ok(MaybeAIAgentOutputMessage::NoClientRepresentation)
             }
         }
@@ -648,6 +665,7 @@ impl ConvertAPIToolCallToAIAgentAction for api::message::ToolCall {
             }
             api::message::tool_call::Tool::Subagent(subagent) => {
                 use api::message::tool_call::subagent::Metadata;
+                use api::message::tool_call::subagent::conversation_search_metadata::Target;
                 let subagent_type = match subagent.metadata {
                     Some(Metadata::Cli(_)) => SubagentType::Cli,
                     Some(Metadata::Research(_)) => SubagentType::Research,
@@ -660,14 +678,23 @@ impl ConvertAPIToolCallToAIAgentAction for api::message::ToolCall {
                         } else {
                             Some(cs_meta.query)
                         };
-                        let conversation_id = if cs_meta.conversation_id.is_empty() {
-                            None
-                        } else {
-                            Some(cs_meta.conversation_id)
+                        let (conversation_id, agent_run_id) = match cs_meta.target {
+                            Some(Target::ConversationId(conversation_id))
+                                if !conversation_id.is_empty() =>
+                            {
+                                (Some(conversation_id), None)
+                            }
+                            Some(Target::AgentRunId(agent_run_id)) if !agent_run_id.is_empty() => {
+                                (None, Some(agent_run_id))
+                            }
+                            Some(Target::ConversationId(_))
+                            | Some(Target::AgentRunId(_))
+                            | None => (None, None),
                         };
                         SubagentType::ConversationSearch {
                             query,
                             conversation_id,
+                            agent_run_id,
                         }
                     }
                     Some(Metadata::WarpDocumentationSearch(_)) => {
@@ -684,7 +711,7 @@ impl ConvertAPIToolCallToAIAgentAction for api::message::ToolCall {
                 create_standard_action(insert_review_comments.into())
             }
             api::message::tool_call::Tool::ReadSkill(read_skill) => {
-                create_standard_action(read_skill.try_into()?)
+                create_standard_action(convert_read_skill(read_skill, params.skill_path_origin)?)
             }
             api::message::tool_call::Tool::AskUserQuestion(ask) => {
                 let questions = ask
@@ -788,12 +815,6 @@ pub fn user_inputs_from_messages(messages: &[api::Message]) -> Vec<AIAgentInput>
                         api::message::system_query::Type::AutoCodeDiff(p) => {
                             inputs.push(AIAgentInput::AutoCodeDiffQuery {
                                 query: p.query.clone(),
-                                context: ctx,
-                            });
-                        }
-                        api::message::system_query::Type::FetchReviewComments(fetch) => {
-                            inputs.push(AIAgentInput::FetchReviewComments {
-                                repo_path: fetch.repo_path.clone(),
                                 context: ctx,
                             });
                         }

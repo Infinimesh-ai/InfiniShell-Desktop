@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::launch_configs::launch_config::{PaneTemplateType, SplitDirection};
-
 use super::*;
+use crate::launch_configs::launch_config::{PaneTemplateType, SplitDirection};
 
 const WORKTREE_TOML: &str = r#"
 name = "New Worktree"
@@ -814,14 +813,14 @@ fn test_build_worktree_toml_autogenerate_round_trips() {
         assert_eq!(
             commands[0].exec,
             format!(
-                "git worktree add -b obsidian-hawk {} main",
+                "git worktree add -b obsidian-hawk \"{}\" main",
                 generated_worktree_path_string("/Users/me/repo", "obsidian-hawk")
             )
         );
         assert_eq!(
             commands[1].exec,
             format!(
-                "cd {}",
+                "cd \"{}\"",
                 generated_worktree_path_string("/Users/me/repo", "obsidian-hawk")
             )
         );
@@ -864,14 +863,14 @@ fn test_build_worktree_toml_manual_round_trips() {
         assert_eq!(
             commands[0].exec,
             format!(
-                "git worktree add -b my-feature {} main",
+                "git worktree add -b my-feature \"{}\" main",
                 generated_worktree_path_string("/Users/me/repo", "my-feature")
             )
         );
         assert_eq!(
             commands[1].exec,
             format!(
-                "cd {}",
+                "cd \"{}\"",
                 generated_worktree_path_string("/Users/me/repo", "my-feature")
             )
         );

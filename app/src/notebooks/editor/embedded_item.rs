@@ -1,45 +1,40 @@
-use std::{collections::HashMap, ops::Range, sync::Arc};
+use std::collections::HashMap;
+use std::ops::Range;
+use std::sync::Arc;
 
 use itertools::Itertools;
 use markdown_parser::html_parser::WARP_EMBED_ATTRIBUTE_NAME;
 use pathfinder_color::ColorU;
-use pathfinder_geometry::vector::{vec2f, Vector2F};
+use pathfinder_geometry::vector::{Vector2F, vec2f};
 use serde_yaml::Mapping;
 use string_offset::ByteOffset;
 use warp_core::ui::appearance::Appearance;
-use warp_editor::{
-    content::{markdown::MarkdownStyle, text::TextStylesWithMetadata},
-    editor::EmbeddedItemModel,
-    extract_block,
-    render::{
-        element::{CursorData, CursorDisplayType, RenderContext, RenderableBlock},
-        layout::TextLayout,
-        model::{
-            viewport::ViewportItem, BlockItem, BlockSpacing, BrokenBlockEmbedding, EmbeddedItem,
-            EmbeddedItemHTMLRepresentation, EmbeddedItemRichFormat, LaidOutEmbeddedItem,
-            ParagraphStyles, RenderState, EMBEDDED_ITEM_FIRST_LINE_HEIGHT,
-        },
-        BLOCK_FOOTER_HEIGHT,
-    },
+use warp_editor::content::markdown::MarkdownStyle;
+use warp_editor::content::text::TextStylesWithMetadata;
+use warp_editor::editor::EmbeddedItemModel;
+use warp_editor::extract_block;
+use warp_editor::render::BLOCK_FOOTER_HEIGHT;
+use warp_editor::render::element::{CursorData, CursorDisplayType, RenderContext, RenderableBlock};
+use warp_editor::render::layout::TextLayout;
+use warp_editor::render::model::viewport::ViewportItem;
+use warp_editor::render::model::{
+    BlockItem, BlockSpacing, BrokenBlockEmbedding, EMBEDDED_ITEM_FIRST_LINE_HEIGHT, EmbeddedItem,
+    EmbeddedItemHTMLRepresentation, EmbeddedItemRichFormat, LaidOutEmbeddedItem, ParagraphStyles,
+    RenderState,
 };
-use warpui::{
-    elements::{Border, Empty},
-    SingletonEntity,
-};
-use warpui::{
-    elements::{ConstrainedBox, CornerRadius, Margin, Padding, Radius},
-    text_layout::TextFrame,
-    units::{IntoPixels, Pixels},
-    AppContext, Element, LayoutContext, SizeConstraint,
-};
+use warpui::elements::{Border, ConstrainedBox, CornerRadius, Empty, Margin, Padding, Radius};
+use warpui::text_layout::TextFrame;
+use warpui::units::{IntoPixels, Pixels};
+use warpui::{AppContext, Element, LayoutContext, SingletonEntity, SizeConstraint};
 
-use crate::{
-    cloud_object::{model::persistence::ObjectStoreModel, StoredObject},
-    drive::{cloud_object_styling::warp_drive_icon_color, DriveObjectType},
-    server::ids::{HashableId, ToServerId},
-    ui_components::icons::Icon,
-    workflows::{workflow::Workflow, WorkflowId, WorkflowObject},
-};
+use crate::cloud_object::StoredObject;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::drive::DriveObjectType;
+use crate::drive::cloud_object_styling::warp_drive_icon_color;
+use crate::server::ids::{HashableId, ToServerId};
+use crate::ui_components::icons::Icon;
+use crate::workflows::workflow::Workflow;
+use crate::workflows::{WorkflowId, WorkflowObject};
 
 // Spacing for the embedded workflow card.
 const EMBED_WORKFLOW_SPACING: BlockSpacing = BlockSpacing {

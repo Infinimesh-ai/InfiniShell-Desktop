@@ -1,7 +1,8 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use chrono::Local;
+use pathfinder_color::ColorU;
 use smol_str::SmolStr;
 use warp_editor::render::model::LineCount;
 use warp_util::path::EscapeChar;
@@ -10,15 +11,17 @@ use warpui::App;
 #[cfg(unix)]
 use super::cli_agent_search_dirs;
 use super::{
-    build_diff_hunk_prompt, build_review_prompt, build_selection_line_range_prompt,
-    build_selection_substring_prompt, CLIAgent, UBER_TEAM_UID,
+    CLIAgent, UBER_TEAM_UID, build_diff_hunk_prompt, build_review_prompt,
+    build_selection_line_range_prompt, build_selection_substring_prompt,
 };
 use crate::ai::agent::{AgentReviewCommentBatch, DiffSetHunk};
+use crate::code::buffer_location::LocalOrRemotePath;
 use crate::code::editor::line::EditorLineLocation;
 use crate::code_review::comments::{
     AttachedReviewComment, AttachedReviewCommentTarget, CommentOrigin, LineDiffContent,
 };
 use crate::server::ids::ServerId;
+use crate::ui_components::icons::Icon;
 use crate::workspaces::team::Team;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::workspaces::workspace::Workspace;
@@ -59,6 +62,10 @@ fn batch(comments: Vec<AttachedReviewComment>) -> AgentReviewCommentBatch {
     }
 }
 
+fn local_path(path: &str) -> LocalOrRemotePath {
+    LocalOrRemotePath::Local(path.into())
+}
+
 // ---------------------------------------------------------------------------
 // build_review_prompt tests
 // ---------------------------------------------------------------------------
@@ -69,7 +76,7 @@ fn test_build_review_prompt_current_line_is_1_indexed() {
     let comment = make_comment(
         "fix this",
         AttachedReviewCommentTarget::Line {
-            absolute_file_path: PathBuf::from("/repo/src/main.rs"),
+            absolute_file_path: local_path("/repo/src/main.rs"),
             line: EditorLineLocation::Current {
                 line_number: LineCount::from(0),
                 line_range: LineCount::from(0)..LineCount::from(1),
@@ -91,7 +98,7 @@ fn test_build_review_prompt_removed_line_is_1_indexed() {
     let comment = make_comment(
         "why was this deleted?",
         AttachedReviewCommentTarget::Line {
-            absolute_file_path: PathBuf::from("/repo/old.rs"),
+            absolute_file_path: local_path("/repo/old.rs"),
             line: EditorLineLocation::Removed {
                 line_number: LineCount::from(9),
                 line_range: LineCount::from(9)..LineCount::from(10),
@@ -113,7 +120,7 @@ fn test_build_review_prompt_collapsed_range_is_1_indexed_start() {
     let comment = make_comment(
         "check this hunk",
         AttachedReviewCommentTarget::Line {
-            absolute_file_path: PathBuf::from("/repo/lib.rs"),
+            absolute_file_path: local_path("/repo/lib.rs"),
             line: EditorLineLocation::Collapsed {
                 line_range: LineCount::from(4)..LineCount::from(10),
             },
@@ -131,7 +138,7 @@ fn test_build_review_prompt_file_level_comment() {
     let comment = make_comment(
         "needs refactoring",
         AttachedReviewCommentTarget::File {
-            absolute_file_path: PathBuf::from("/repo/src/utils.rs"),
+            absolute_file_path: local_path("/repo/src/utils.rs"),
         },
         false,
     );
@@ -146,7 +153,7 @@ fn test_build_review_prompt_deleted_file_comment() {
     let comment = make_comment(
         "why remove this?",
         AttachedReviewCommentTarget::File {
-            absolute_file_path: PathBuf::from("/repo/src/old.rs"),
+            absolute_file_path: local_path("/repo/src/old.rs"),
         },
         false,
     );
@@ -192,7 +199,7 @@ fn test_build_review_prompt_multiple_comments() {
     let c1 = make_comment(
         "first",
         AttachedReviewCommentTarget::Line {
-            absolute_file_path: PathBuf::from("/repo/a.rs"),
+            absolute_file_path: local_path("/repo/a.rs"),
             line: EditorLineLocation::Current {
                 line_number: LineCount::from(4),
                 line_range: LineCount::from(4)..LineCount::from(5),
@@ -221,7 +228,7 @@ fn test_build_review_prompt_exports_internal_markdown_without_punctuation_escape
 
 #[test]
 fn test_build_diff_hunk_prompt_format() {
-    let prompt = build_diff_hunk_prompt(Path::new("/repo/src/main.rs"), 10, 20, 3, 2);
+    let prompt = build_diff_hunk_prompt("/repo/src/main.rs", 10, 20, 3, 2);
     assert_eq!(
         prompt,
         "/repo/src/main.rs L10-L20 (+3 -2) -- run `git diff` to see the full context.",
@@ -261,7 +268,11 @@ fn test_detect_known_agents() {
                 ("copilot", CLIAgent::Copilot),
                 ("agent", CLIAgent::CursorCli),
                 ("goose", CLIAgent::Goose),
-                ("omp", CLIAgent::Omp),
+                ("vibe", CLIAgent::Vibe),
+                ("omp", CLIAgent::OhMyPi),
+                ("warp", CLIAgent::WarpTui),
+                ("warp-dev", CLIAgent::WarpTui),
+                ("./script/run-tui", CLIAgent::WarpTui),
             ] {
                 assert_eq!(
                     CLIAgent::detect(command, None, None, ctx),
@@ -285,6 +296,26 @@ fn test_detect_with_arguments() {
                 CLIAgent::detect("gemini chat", None, None, ctx),
                 Some(CLIAgent::Gemini),
             );
+        });
+    });
+}
+
+#[test]
+fn test_detect_vibe_acp_binary() {
+    // The mistral-vibe package ships a `vibe-acp` ACP-mode binary alongside
+    // the user-facing `vibe` TUI. Both must be detected as the same agent.
+    App::test((), |mut app| async move {
+        app.update(|ctx| {
+            assert_eq!(
+                CLIAgent::detect("vibe-acp", None, None, ctx),
+                Some(CLIAgent::Vibe),
+            );
+            assert_eq!(
+                CLIAgent::detect("vibe-acp --some-flag", None, None, ctx),
+                Some(CLIAgent::Vibe),
+            );
+            // Distinct binary names should not bleed into Vibe.
+            assert_eq!(CLIAgent::detect("vibe-other", None, None, ctx), None);
         });
     });
 }
@@ -329,6 +360,12 @@ fn test_detect_with_alias() {
                 CLIAgent::detect("c --help", None, Some(&map), ctx),
                 Some(CLIAgent::Claude),
             );
+
+            let map = aliases(&[("o", "omp")]);
+            assert_eq!(
+                CLIAgent::detect("o", None, Some(&map), ctx),
+                Some(CLIAgent::OhMyPi),
+            );
         });
     });
 }
@@ -369,6 +406,10 @@ fn test_detect_with_env_var_prefix() {
                     ctx,
                 ),
                 Some(CLIAgent::OpenCode),
+            );
+            assert_eq!(
+                CLIAgent::detect("FOO=1 omp", Some(EscapeChar::Backslash), None, ctx,),
+                Some(CLIAgent::OhMyPi),
             );
         });
     });
@@ -535,4 +576,90 @@ fn test_cli_agent_search_dirs_include_home_managed_bins() {
     assert!(dirs.contains(&home.join(".cargo/bin")));
     assert!(dirs.contains(&home.join(".bun/bin")));
     assert!(dirs.contains(&home.join(".local/bin")));
+}
+
+#[test]
+fn test_oh_my_pi_supports_bash_mode() {
+    assert!(CLIAgent::OhMyPi.supports_bash_mode());
+}
+
+#[test]
+fn test_warp_tui_matches_binaries_and_launchers() {
+    // Direct binary names.
+    assert!(CLIAgent::WarpTui.matches_command("warp", None));
+    assert!(CLIAgent::WarpTui.matches_command("warp-preview", None));
+    assert!(CLIAgent::WarpTui.matches_command("warp-dev", None));
+    assert!(CLIAgent::WarpTui.matches_command("warp-tui", None));
+    assert!(CLIAgent::WarpTui.matches_command("warp-tui-oss", None));
+    // The dev launcher script.
+    assert!(CLIAgent::WarpTui.matches_command("./script/run-tui", None));
+    assert!(CLIAgent::WarpTui.matches_command("script/run-tui", None));
+    // Absolute / relative paths to the binary.
+    assert!(CLIAgent::WarpTui.matches_command("/workspace/warp/target/debug/warp-tui", None,));
+    assert!(CLIAgent::WarpTui.matches_command("./target/debug/warp-tui", None));
+    assert!(CLIAgent::WarpTui.matches_command(
+        "/Applications/WarpPreview.app/Contents/MacOS/warp-preview --resume abc",
+        None,
+    ));
+    // With arguments and leading whitespace.
+    assert!(CLIAgent::WarpTui.matches_command("  warp --resume abc", None));
+}
+
+#[test]
+fn test_warp_tui_matches_with_env_var_prefix() {
+    // Env-var assignments before the command are skipped when an escape char is
+    // provided (mirrors `CLIAgent::detect`).
+    assert!(
+        CLIAgent::WarpTui.matches_command("WARP_API_KEY=secret warp", Some(EscapeChar::Backslash),)
+    );
+}
+
+#[test]
+fn test_warp_tui_does_not_match_other_commands() {
+    assert!(!CLIAgent::WarpTui.matches_command("vim", None));
+    assert!(!CLIAgent::WarpTui.matches_command("htop", None));
+    assert!(!CLIAgent::WarpTui.matches_command("claude", None));
+    // Lookalikes / substrings should not match.
+    assert!(!CLIAgent::WarpTui.matches_command("warp-preview-wrapper", None));
+    assert!(!CLIAgent::WarpTui.matches_command("mywarp-dev", None));
+    assert!(!CLIAgent::WarpTui.matches_command("warp-tui-wrapper", None));
+    assert!(!CLIAgent::WarpTui.matches_command("mywarp-tui", None));
+    assert!(!CLIAgent::WarpTui.matches_command("", None));
+    // `cargo run` is a known non-match (the first token is `cargo`).
+    assert!(!CLIAgent::WarpTui.matches_command("cargo run -p warp_tui", None));
+}
+
+#[test]
+fn test_warp_tui_variant_properties() {
+    assert!(CLIAgent::Claude.supports_cli_agent_footer());
+    assert_eq!(CLIAgent::WarpTui.command_prefix(), "warp");
+    assert_eq!(
+        CLIAgent::WarpTui.command_prefixes(),
+        &[
+            "warp",
+            "warp-preview",
+            "warp-dev",
+            "warp-tui",
+            "warp-tui-oss",
+            "run-tui",
+        ]
+    );
+    assert_eq!(CLIAgent::WarpTui.display_name(), "Warp TUI");
+    assert_eq!(CLIAgent::WarpTui.brand_color(), Some(ColorU::black()));
+    // Zap 品牌图标(我方 `Icon::Warp` 已更名为 `Icon::Zap`)。
+    assert_eq!(CLIAgent::WarpTui.icon(), Some(Icon::Zap));
+    assert_eq!(CLIAgent::WarpTui.brand_icon_color(), ColorU::white());
+    assert!(CLIAgent::WarpTui.supported_skill_providers().is_empty());
+    assert!(!CLIAgent::WarpTui.supports_bash_mode());
+    assert!(!CLIAgent::WarpTui.supports_cli_agent_footer());
+    assert!(matches!(
+        crate::server::telemetry::CLIAgentType::from(CLIAgent::WarpTui),
+        crate::server::telemetry::CLIAgentType::WarpTui
+    ));
+    // Serialized name round-trips (also covered by
+    // `test_serialized_name_round_trips_known_agents`, asserted explicitly here).
+    assert_eq!(
+        CLIAgent::from_serialized_name(&CLIAgent::WarpTui.to_serialized_name()),
+        CLIAgent::WarpTui
+    );
 }

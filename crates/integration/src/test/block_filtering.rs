@@ -1,17 +1,3 @@
-use crate::test::integration_testing::block_filtering::{
-    open_block_filter_editor, open_block_filter_editor_for_long_running_command,
-    open_block_filter_editor_via_keybinding,
-    open_block_filter_editor_via_keybinding_long_running_command,
-};
-use crate::test::integration_testing::block_filtering::{
-    LongRunningCommandTestCase, SecretTestCase, SimpleTestCase,
-};
-use crate::test::integration_testing::secret_redaction::assert_secret_tooltip_open;
-use crate::test::integration_testing::terminal::{
-    clear_blocklist_to_remove_bootstrapped_blocks, hover_over_block_zero,
-};
-use crate::test::new_step_with_default_assertions;
-use crate::test::TestStep;
 use warp::cmd_or_ctrl_shift;
 use warp::integration_testing::settings::{
     toggle_hide_secrets_in_block_list_setting, toggle_safe_mode_setting,
@@ -22,16 +8,26 @@ use warp::integration_testing::terminal::{
     wait_until_bootstrapped_single_pane_for_tab,
 };
 use warp::integration_testing::view_getters::single_terminal_view_for_tab;
-
+// Zap 无独立隐私设置页(见 settings_view/mod.rs),沿用 integration_testing 的开关辅助函数,
+// 不引入上游的 SettingsAction::PrivacyPageToggle。
+use warp::terminal::GridType;
 use warp::terminal::model::index::Point;
 use warp::terminal::model::terminal_model::{BlockIndex, WithinBlock, WithinModel};
 use warp::terminal::shell::ShellType;
-use warp::terminal::GridType;
-use warpui::{async_assert, async_assert_eq};
-
-use crate::Builder;
+use warpui_core::{async_assert, async_assert_eq};
 
 use super::new_builder;
+use crate::Builder;
+use crate::test::integration_testing::block_filtering::{
+    LongRunningCommandTestCase, SecretTestCase, SimpleTestCase, open_block_filter_editor,
+    open_block_filter_editor_for_long_running_command, open_block_filter_editor_via_keybinding,
+    open_block_filter_editor_via_keybinding_long_running_command,
+};
+use crate::test::integration_testing::secret_redaction::assert_secret_tooltip_open;
+use crate::test::integration_testing::terminal::{
+    clear_blocklist_to_remove_bootstrapped_blocks, hover_over_block_zero,
+};
+use crate::test::{TestStep, new_step_with_default_assertions};
 
 // TODO(CORE-2721): Block count / index Failed b/c of in-band generators
 pub fn test_block_filtering_keybinding() -> Builder {

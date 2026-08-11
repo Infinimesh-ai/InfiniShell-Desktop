@@ -2,56 +2,51 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Local;
-
-use pathfinder_geometry::vector::{vec2f, Vector2F};
+use pathfinder_geometry::vector::{Vector2F, vec2f};
 use warp_editor::editor::NavigationKey;
+use warp_errors::report_error;
+use warpui::r#async::Timer;
 use warpui::clipboard::ClipboardContent;
 use warpui::elements::{
-    resizable_state_handle, Align, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius,
-    CrossAxisAlignment, DispatchEventResult, DragBarSide, Empty, EventHandler, Fill, Flex,
-    HyperlinkUrl, Icon, MainAxisAlignment, MainAxisSize, OffsetPositioning, ParentAnchor,
-    PositionedElementAnchor, PositionedElementOffsetBounds, Radius, SavePosition, Shrinkable,
-    Stack, Text,
+    Align, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+    DispatchEventResult, DragBarSide, Element, Empty, EventHandler, Fill, Flex, HyperlinkUrl, Icon,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    ParentElement, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Resizable,
+    ResizableStateHandle, SavePosition, Shrinkable, Stack, Text, resizable_state_handle,
 };
 use warpui::fonts::Properties;
 use warpui::keymap::{EditableBinding, FixedBinding};
 use warpui::platform::Cursor;
 use warpui::presenter::ChildView;
-use warpui::r#async::Timer;
 use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{elements::Element, AppContext, Entity, TypedActionView, View, ViewContext};
-use warpui::{FocusContext, ModelHandle, SingletonEntity, ViewHandle};
+use warpui::{
+    AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
+    ViewContext, ViewHandle, WeakViewHandle,
+};
 
+use super::execution_context::WarpAiExecutionContext;
+use super::requests::{Event as RequestsEvent, RequestStatus, Requests};
+use super::transcript::{Transcript, TranscriptEvent};
+use super::utils::{TranscriptPart, render_prepared_response_button, render_request_limit_info};
+use super::{
+    AI_ASSISTANT_FEATURE_NAME, AI_ASSISTANT_LOGO_COLOR, AI_ASSISTANT_SVG_PATH,
+    ASK_AI_ASSISTANT_TEXT, AskAIType, PROMPT_CHARACTER_LIMIT,
+};
+use crate::ai::AIRequestUsageModel;
 use crate::appearance::Appearance;
 use crate::editor::{
     EditorOptions, EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys, TextOptions,
 };
 use crate::input_suggestions::{Event as InputSuggestionsEvent, InputSuggestions};
-
 use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::{TelemetryEvent, WarpAIActionType};
-use crate::terminal::resizable_data::{ModalType, ResizableData, DEFAULT_WARP_AI_WIDTH};
+use crate::terminal::resizable_data::{DEFAULT_WARP_AI_WIDTH, ModalType, ResizableData};
 use crate::ui_components::blended_colors;
-use crate::workspaces::user_workspaces::UserWorkspaces;
-
 use crate::ui_components::buttons::icon_button;
+use crate::util::bindings::{CustomAction, cmd_or_ctrl_shift};
 use crate::workspace::{ActiveSession, TAB_BAR_HEIGHT};
-
-use crate::util::bindings::{cmd_or_ctrl_shift, CustomAction};
-use warpui::elements::MouseStateHandle;
-use warpui::elements::ParentElement;
-use warpui::elements::Resizable;
-use warpui::elements::ResizableStateHandle;
-
-use super::execution_context::WarpAiExecutionContext;
-use super::requests::{Event as RequestsEvent, RequestStatus, Requests};
-use super::transcript::{Transcript, TranscriptEvent};
-use super::utils::{render_prepared_response_button, render_request_limit_info, TranscriptPart};
-use super::{
-    AskAIType, AI_ASSISTANT_FEATURE_NAME, AI_ASSISTANT_LOGO_COLOR, AI_ASSISTANT_SVG_PATH,
-    ASK_AI_ASSISTANT_TEXT, PROMPT_CHARACTER_LIMIT,
-};
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const INFO_ICON_SVG_PATH: &str = "bundled/svg/info.svg";
 pub const HEXAGON_ALERT_SVG_PATH: &str = "bundled/svg/alert-hexagon.svg";
@@ -70,7 +65,7 @@ const EDITOR_MARGIN: f32 = 16.;
 const LOGO_SIZE: f32 = 20.;
 
 
-const ZERO_STATE_HELP_TEXT: &str = "Shift + ctrl + space a block or text selection to ask Zap AI.";
+const ZERO_STATE_HELP_TEXT: &str = "Shift + ctrl + space a block or text selection to ask InfiniShell AI.";
 const SCRIPT_ZERO_STATE_PROMPT: &str = "Write a script to connect to an AWS EC2 instance.";
 const GIT_ZERO_STATE_PROMPT: &str = "How do I undo the most recent commits in git?";
 const FILES_ZERO_STATE_PROMPT: &str = "How do I find all files containing specific text?";
@@ -117,6 +112,7 @@ enum InputSuggestionsMode {
 /// TODO: we should eventually refactor this and other panels into a more
 /// general Panel view.
 pub struct AIAssistantPanelView {
+    view_handle: WeakViewHandle<Self>,
     editor: ViewHandle<EditorView>,
     transcript_view: ViewHandle<Transcript>,
     input_suggestions_view: ViewHandle<InputSuggestions>,
@@ -227,12 +223,13 @@ impl AIAssistantPanelView {
         {
             Some(handle) => handle,
             None => {
-                log::error!("Couldn't retrieve warp ai resizable state handle.");
+                report_error!("Couldn't retrieve warp ai resizable state handle.");
                 resizable_state_handle(DEFAULT_WARP_AI_WIDTH)
             }
         };
 
         let mut panel = Self {
+            view_handle: ctx.handle(),
             editor,
             transcript_view,
             input_suggestions_view,
@@ -452,10 +449,9 @@ impl AIAssistantPanelView {
                     .input_suggestions_view
                     .as_ref(ctx)
                     .get_selected_item_text()
+                    && selected_text == self.editor.as_ref(ctx).buffer_text(ctx)
                 {
-                    if selected_text == self.editor.as_ref(ctx).buffer_text(ctx) {
-                        return;
-                    }
+                    return;
                 }
                 self.input_suggestions_mode = InputSuggestionsMode::Closed;
             }
@@ -651,14 +647,14 @@ impl AIAssistantPanelView {
         let time_now = Local::now();
 
         result.push_str(&format!(
-            "## Zap AI Transcript ({})\n\n",
+            "## InfiniShell AI Transcript ({})\n\n",
             time_now.format("%x %l:%M %p")
         ));
 
         for part in transcript {
             result.push_str(&format!("Prompt: {}\n\n", part.raw_user_prompt().trim()));
             result.push_str(&format!(
-                "Zap AI: {}\n\n",
+                "InfiniShell AI: {}\n\n",
                 part.raw_assistant_answer().trim()
             ));
         }
@@ -678,10 +674,6 @@ impl AIAssistantPanelView {
 
     fn request_status<'a>(&self, app: &'a AppContext) -> &'a RequestStatus {
         self.requests_model.as_ref(app).request_status()
-    }
-
-    fn num_remaining_reqs(&self, app: &AppContext) -> usize {
-        self.requests_model.as_ref(app).num_remaining_reqs()
     }
 
     #[cfg(feature = "integration_tests")]
@@ -908,7 +900,7 @@ impl AIAssistantPanelView {
                 .finish(),
             );
 
-        if self.num_remaining_reqs(app) > 0 {
+        if AIRequestUsageModel::as_ref(app).has_any_ai_remaining(app) {
             column.add_children([
                 Container::new(render_prepared_response_button(
                     appearance,
@@ -981,9 +973,10 @@ impl AIAssistantPanelView {
             .finish(),
         );
 
-        let is_custom_llm_enabled: bool = UserWorkspaces::as_ref(app)
-            .current_team()
-            .is_some_and(|team| team.is_custom_llm_enabled());
+        let user_workspaces = UserWorkspaces::as_ref(app);
+        let is_custom_llm_enabled = user_workspaces.is_custom_llm_enabled_for_team(
+            user_workspaces.team_for_view_handle(&self.view_handle, app),
+        );
 
         if !is_custom_llm_enabled {
             column.add_child(

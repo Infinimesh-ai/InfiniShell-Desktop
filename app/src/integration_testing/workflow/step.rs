@@ -1,20 +1,18 @@
-use warpui::{
-    async_assert, integration::TestStep, windowing::WindowManager, SingletonEntity, WindowId,
-};
-
-use crate::{
-    cloud_object::{
-        model::persistence::ObjectStoreModel, update_manager::UpdateManager, Space,
-        StoredObjectEventEntrypoint,
-    },
-    drive::ZapDriveObjectSettings,
-    integration_testing::view_getters::workspace_view,
-    server::ids::{ClientId, SyncId},
-    workflows::{manager::WorkflowOpenSource, workflow::Workflow, WorkflowViewMode},
-    workspaces::user_workspaces::UserWorkspaces,
-};
+use warpui::integration::TestStep;
+use warpui::windowing::WindowManager;
+use warpui::{SingletonEntity, WindowId, async_assert};
 
 use super::open_workflow_count;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::update_manager::UpdateManager;
+use crate::cloud_object::{Space, StoredObjectEventEntrypoint};
+use crate::drive::ZapDriveObjectSettings;
+use crate::integration_testing::view_getters::workspace_view;
+use crate::server::ids::{ClientId, SyncId};
+use crate::workflows::WorkflowViewMode;
+use crate::workflows::manager::WorkflowOpenSource;
+use crate::workflows::workflow::Workflow;
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// Create a personal workflow and save its sync ID into the step data.
 pub fn create_a_personal_workflow(key: impl Into<String>) -> TestStep {

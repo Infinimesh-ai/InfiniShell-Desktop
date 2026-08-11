@@ -1,3 +1,11 @@
+use std::sync::LazyLock;
+use std::time::Duration;
+
+use markdown_parser::FormattedTextFragment;
+use warpui::r#async::{SpawnedFutureHandle, Timer};
+use warpui::keymap::Keystroke;
+use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
+
 use crate::palette::PaletteMode;
 use crate::server::telemetry::PaletteSource;
 use crate::settings::AISettings;
@@ -7,19 +15,11 @@ use crate::terminal::view::init::{
     TOGGLE_AUTOEXECUTE_MODE_KEYBINDING,
 };
 use crate::util::bindings::trigger_to_keystroke;
+use crate::workspace::WorkspaceAction;
 use crate::workspace::view::{
     TOGGLE_COMMAND_PALETTE_KEYBINDING_NAME, TOGGLE_RIGHT_PANEL_BINDING_NAME,
 };
-use crate::workspace::WorkspaceAction;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-
-use markdown_parser::FormattedTextFragment;
-
-use std::sync::LazyLock;
-use std::time::Duration;
-use warpui::keymap::Keystroke;
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 /// Trait for tip implementations that can be displayed to users.
 /// Tips provide helpful information with optional links and keybindings.
@@ -140,7 +140,6 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             action: None,
             kind: AgentTipKind::Context,
         },
-
         AgentTip {
             description: crate::t!("agent-tip-agent-profiles"),
             link: Some("".to_string()),
@@ -384,8 +383,14 @@ impl AITip for AgentTip {
     fn is_tip_applicable(
         &self,
         _current_working_directory: Option<&str>,
-        _app: &AppContext,
+        app: &AppContext,
     ) -> bool {
+        // Tips whose description references a keybinding placeholder should only be shown
+        // when the keybinding is actually configured, so we never display the raw
+        // "<keybinding>" string to users.
+        if self.description.contains("<keybinding>") && self.keystroke(app).is_none() {
+            return false;
+        }
         true
     }
 }
@@ -411,10 +416,7 @@ pub fn get_agent_tips(ctx: &AppContext) -> Vec<AgentTip> {
     {
         tips.push(AgentTip {
             description: crate::t!("agent-tip-voice-input"),
-            link: Some(
-                ""
-                    .to_string(),
-            ),
+            link: Some("".to_string()),
             binding_name: Some("FN"),
             action: None,
             kind: AgentTipKind::General,
@@ -464,7 +466,44 @@ impl AITipModel<AgentTip> {
     /// This is the constructor used for the singleton model.
     pub fn new_for_agent_tips(ctx: &AppContext) -> Self {
         let tips = get_agent_tips(ctx);
-        Self::new(tips)
+        // Pick an applicable tip so we never show a raw "<keybinding>" placeholder on first render.
+        let current_tip = Self::pick_random_applicable_tip(&tips, None, ctx);
+
+        Self {
+            tips,
+            current_tip,
+            cooldown_handle: None,
+        }
+    }
+
+    /// Rebuilds the tip pool from current settings and invalidates the current tip
+    /// if it is no longer applicable. Resets the cooldown timer so the revalidated
+    /// tip is shown for the full cooldown period before the next rotation.
+    pub fn revalidate_tips(&mut self, ctx: &mut ModelContext<Self>) {
+        self.tips = get_agent_tips(ctx);
+
+        // If the current tip is no longer in the pool or no longer applicable, pick a new one.
+        let should_replace = self
+            .current_tip
+            .as_ref()
+            .map(|current_tip| {
+                let still_in_pool = self
+                    .tips
+                    .iter()
+                    .any(|tip| tip.description == current_tip.description);
+
+                !still_in_pool || !current_tip.is_tip_applicable(None, ctx)
+            })
+            .unwrap_or(true);
+
+        if should_replace {
+            let new_tip = Self::pick_random_applicable_tip(&self.tips, None, ctx);
+            if new_tip.is_some() || self.current_tip.is_some() {
+                self.current_tip = new_tip;
+                self.reset_cooldown(ctx);
+                ctx.notify();
+            }
+        }
     }
 
     /// Refreshes the current tip with a new random selection that is applicable
@@ -480,24 +519,16 @@ impl AITipModel<AgentTip> {
             return;
         }
 
-        use rand::seq::SliceRandom;
+        // Rebuild tips from current settings so changes are picked up.
+        self.tips = get_agent_tips(ctx);
 
-        // Filter applicable tips based on working directory
-        let available_tips: Vec<AgentTip> = self
-            .tips
-            .iter()
-            .filter(|tip| tip.is_tip_applicable(current_working_directory, ctx))
-            .cloned()
-            .collect();
-
-        // Select a random tip
-        let mut rng = rand::thread_rng();
-        self.current_tip = available_tips.choose(&mut rng).cloned();
+        self.current_tip =
+            Self::pick_random_applicable_tip(&self.tips, current_working_directory, ctx);
 
         // Start 60-second cooldown
         let handle = ctx.spawn(
             async {
-                warpui::r#async::Timer::after(Duration::from_secs(60)).await;
+                Timer::after(Duration::from_secs(60)).await;
             },
             |me, _, _| {
                 me.cooldown_handle = None;
@@ -505,6 +536,39 @@ impl AITipModel<AgentTip> {
         );
         self.cooldown_handle = Some(handle);
         ctx.notify();
+    }
+
+    /// Picks a random applicable tip from the given pool, filtered by working directory.
+    /// Returns `None` if no tips are applicable.
+    fn pick_random_applicable_tip(
+        tips: &[AgentTip],
+        current_working_directory: Option<&str>,
+        ctx: &AppContext,
+    ) -> Option<AgentTip> {
+        use rand::seq::SliceRandom;
+        let available: Vec<&AgentTip> = tips
+            .iter()
+            .filter(|tip| tip.is_tip_applicable(current_working_directory, ctx))
+            .collect();
+        let mut rng = rand::thread_rng();
+        available.choose(&mut rng).copied().cloned()
+    }
+
+    /// Resets the cooldown timer so the current tip is shown for the full
+    /// cooldown period before the next rotation.
+    fn reset_cooldown(&mut self, ctx: &mut ModelContext<Self>) {
+        if let Some(handle) = self.cooldown_handle.take() {
+            handle.abort();
+        }
+        let handle = ctx.spawn(
+            async {
+                Timer::after(Duration::from_secs(60)).await;
+            },
+            |me, _, _| {
+                me.cooldown_handle = None;
+            },
+        );
+        self.cooldown_handle = Some(handle);
     }
 }
 
@@ -529,7 +593,7 @@ impl AITipModel<crate::terminal::view::ambient_agent::AmbientAgentTip> {
         // Start 60-second cooldown
         let handle = ctx.spawn(
             async {
-                warpui::r#async::Timer::after(Duration::from_secs(60)).await;
+                Timer::after(Duration::from_secs(60)).await;
             },
             |me, _, _| {
                 me.cooldown_handle = None;
@@ -550,7 +614,7 @@ impl AITipModel<crate::terminal::view::ambient_agent::AmbientAgentTip> {
         // Start a new 60-second cooldown
         let handle = ctx.spawn(
             async {
-                warpui::r#async::Timer::after(Duration::from_secs(60)).await;
+                Timer::after(Duration::from_secs(60)).await;
             },
             |me, _, _| {
                 me.cooldown_handle = None;

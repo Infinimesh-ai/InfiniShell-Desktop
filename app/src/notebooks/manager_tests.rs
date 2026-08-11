@@ -1,35 +1,31 @@
 use std::sync::mpsc;
 
 use warp_core::ui::appearance::Appearance;
-use warpui::{
-    platform::WindowStyle, AddSingletonModel, App, EntityId, ModelHandle, ViewContext, ViewHandle,
-};
-
-use crate::{
-    ai::blocklist::BlocklistAIHistoryModel,
-    auth::{AuthManager, AuthStateProvider},
-    cloud_object::update_manager::UpdateManager,
-    cloud_object::{
-        model::{
-            actions::ObjectActions, persistence::ObjectStoreModel, view::ObjectStoreViewModel,
-        },
-        Owner,
-    },
-    network::NetworkStatus,
-    notebooks::{editor::keys::NotebookKeybindings, notebook::NotebookView},
-    pane_group::NotebookPane,
-    persistence::ModelEvent,
-    search::files::model::FileSearchModel,
-    settings::PrivacySettings,
-    settings_view::keybindings::KeybindingChangedNotifier,
-    terminal::keys::TerminalKeybindings,
-    test_util::settings::initialize_settings_for_tests,
-    workspace::ActiveSession,
-    workspaces::{user_profiles::UserProfiles, user_workspaces::UserWorkspaces},
-    GlobalResourceHandles, GlobalResourceHandlesProvider,
-};
+use warpui::platform::WindowStyle;
+use warpui::{AddSingletonModel, App, EntityId, ModelHandle, ViewContext, ViewHandle};
 
 use super::NotebookManager;
+use crate::ai::blocklist::BlocklistAIHistoryModel;
+use crate::auth::{AuthManager, AuthStateProvider};
+use crate::cloud_object::Owner;
+use crate::cloud_object::model::actions::ObjectActions;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::model::view::ObjectStoreViewModel;
+use crate::cloud_object::update_manager::UpdateManager;
+use crate::network::NetworkStatus;
+use crate::notebooks::editor::keys::NotebookKeybindings;
+use crate::notebooks::notebook::NotebookView;
+use crate::pane_group::NotebookPane;
+use crate::persistence::ModelEvent;
+use crate::search::files::model::FileSearchModel;
+use crate::settings::PrivacySettings;
+use crate::settings_view::keybindings::KeybindingChangedNotifier;
+use crate::terminal::keys::TerminalKeybindings;
+use crate::test_util::settings::initialize_settings_for_tests;
+use crate::workspace::ActiveSession;
+use crate::workspaces::user_profiles::UserProfiles;
+use crate::workspaces::user_workspaces::UserWorkspaces;
+use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 struct TestState {
     manager: ModelHandle<NotebookManager>,

@@ -1,20 +1,21 @@
+use std::cmp::Ordering;
+use std::path::PathBuf;
+
 use chrono::NaiveDateTime;
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use std::{cmp::Ordering, path::PathBuf};
 use warp_core::ui::theme::Fill;
-use warpui::{
-    elements::{Align, ConstrainedBox, Flex, Highlight, ParentElement, Shrinkable, Text},
-    fonts::{Properties, Weight},
-    AppContext, Element, SingletonEntity,
-};
+use warpui::elements::{Align, ConstrainedBox, Flex, Highlight, ParentElement, Shrinkable, Text};
+use warpui::fonts::{Properties, Weight};
+use warpui::{AppContext, Element, SingletonEntity};
 
+use crate::appearance::Appearance;
 use crate::search::action::search_item::styles;
+use crate::search::command_palette::mixer::CommandPaletteItemAction;
 use crate::search::command_palette::render_util::render_search_item_icon;
 use crate::search::item::SearchItem;
 use crate::search::result_renderer::ItemHighlightState;
 use crate::ui_components::icons::Icon as UiIcon;
-use crate::{appearance::Appearance, search::command_palette::mixer::CommandPaletteItemAction};
 
 /// Stores data needed to display a project search result item in Command Search.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,6 +29,7 @@ pub struct ProjectSearchItem {
 
 /// Mac and windows are insensitive, Linux probably IS sensitive
 /// WARNING: Don't use this function for use cases dependent on the session, e.g. a remote session or WSL on Windows. It only considers this specific host.
+// Zap:WelcomePalette 供欢迎页的项目去重使用,上游随欢迎页删除,这里恢复。
 pub fn os_probably_case_sensitive() -> bool {
     !(cfg!(target_os = "macos") || cfg!(target_family = "windows"))
 }

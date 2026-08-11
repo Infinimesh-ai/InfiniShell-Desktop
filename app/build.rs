@@ -3,12 +3,13 @@
 // Windows).
 #![allow(clippy::disallowed_types)]
 
-use cfg_aliases::cfg_aliases;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::{env, fs};
 
 use anyhow::Result;
+use cfg_aliases::cfg_aliases;
 use sha2::Digest;
-use std::path::Path;
-use std::{env, fs, process::Command};
 use walkdir::WalkDir;
 use warp_util::assets::{
     ASSETS_DIR, ASYNC_ASSETS_DIR, CONPTY_DLL_FILE, DXCOMPILER_DLL_FILE, DXIL_DLL_FILE,
@@ -36,19 +37,16 @@ fn main() -> Result<()> {
         println!("cargo:rustc-link-lib=framework=MetalKit");
         println!("cargo:rustc-link-lib=framework=UserNotifications");
 
-        println!("cargo:rerun-if-changed=src/platform/mac/objc/app_bundle.h");
-        println!("cargo:rerun-if-changed=src/platform/mac/objc/app_bundle.m");
         println!("cargo:rerun-if-changed=src/platform/mac/objc/services.h");
         println!("cargo:rerun-if-changed=src/platform/mac/objc/services.m");
 
         cc::Build::new()
-            .file("src/platform/mac/objc/app_bundle.m")
             .file("src/platform/mac/objc/services.m")
             .compile("warp_objc");
 
         // Build the dock tile plugin
-        println!("cargo:rerun-if-changed=DockTilePlugin/ZapDockTilePlugin.m");
-        println!("cargo:rerun-if-changed=DockTilePlugin/ZapDockTilePlugin.h");
+        println!("cargo:rerun-if-changed=DockTilePlugin/InfiniShellDockTilePlugin.m");
+        println!("cargo:rerun-if-changed=DockTilePlugin/InfiniShellDockTilePlugin.h");
         println!("cargo:rerun-if-changed=DockTilePlugin/Info.plist");
         println!("cargo:rerun-if-changed=DockTilePlugin/Makefile");
 
@@ -66,8 +64,8 @@ fn main() -> Result<()> {
         // Copy the dock tile plugin to the output directory
         let profile = get_build_profile_name();
         let target_dir = app_target_dir(&profile).expect("Failed to get app target directory");
-        let plugin_src = Path::new("DockTilePlugin/ZapDockTilePlugin.docktileplugin");
-        let plugin_dst = target_dir.join("ZapDockTilePlugin.docktileplugin");
+        let plugin_src = Path::new("DockTilePlugin/InfiniShellDockTilePlugin.docktileplugin");
+        let plugin_dst = target_dir.join("InfiniShellDockTilePlugin.docktileplugin");
 
         if !status.success() {
             fs::remove_dir_all(plugin_src).expect("Failed to clean up plugin directory");
@@ -119,26 +117,30 @@ fn main() -> Result<()> {
         if target_env == "msvc"
             && env::var("CARGO_FEATURE_WINDOWS_HIGH_PERFORMANCE_GPU_DEFAULT").is_ok()
         {
-            println!("cargo:rustc-link-arg-bin=zap-oss=/EXPORT:NvOptimusEnablement,DATA");
+            println!("cargo:rustc-link-arg-bin=infinishell=/EXPORT:NvOptimusEnablement,DATA");
             println!(
-                "cargo:rustc-link-arg-bin=zap-oss=/EXPORT:AmdPowerXpressRequestHighPerformance,DATA"
+                "cargo:rustc-link-arg-bin=infinishell=/EXPORT:AmdPowerXpressRequestHighPerformance,DATA"
             );
         }
 
+        // These values change copied assets and embedded version metadata without changing sources.
+        println!("cargo:rerun-if-env-changed=CARGO_FULL_PROFILE");
+        println!("cargo:rerun-if-env-changed=CARGO_BIN_NAME");
+        println!("cargo:rerun-if-env-changed=GIT_RELEASE_TAG");
+        println!("cargo:rerun-if-env-changed=WARP_APP_NAME");
         // Retrieve the Cargo profile name so that we can put a copy of ConPTY in
         // the correct target subdirectory.
         //
-        // We need to pass this information manually through an environment variable.
-        // Of the built-in variables set by Cargo: `OUT_DIR` is only a temporary
-        // directory, and `PROFILE` can only be `debug` or `release`.
-        // See https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
-        // for more on Cargo environment variables.
+        // `CARGO_FULL_PROFILE` is set by bundle scripts for custom profiles (e.g.
+        // release-lto). Fall back to Cargo's built-in `PROFILE` ("debug"/"release")
+        // for direct `cargo build` invocations. See also:
+        // https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
         //
         // Ideally we could access `CARGO_TARGET_DIR` but this doesn't exist at build time.
         // See https://github.com/rust-lang/cargo/issues/9661.
-        //
-        // Cargo defaults to the `debug` profile.
-        let cargo_full_profile = env::var("CARGO_FULL_PROFILE").unwrap_or(String::from("debug"));
+        let cargo_full_profile = env::var("CARGO_FULL_PROFILE")
+            .or_else(|_| env::var("PROFILE"))
+            .unwrap_or_else(|_| String::from("debug"));
         let target_dir =
             app_target_dir(&cargo_full_profile).expect("Could not get app target directory");
         copy_windows_assets(&target_dir);
@@ -225,12 +227,14 @@ fn generate_channel_config_if_needed(target_family: &str, target_os: &str) {
 fn get_build_profile_name() -> String {
     // The profile name is always the 3rd last part of the path (with 1 based indexing).
     // e.g. /code/core/target/cli/build/my-build-info-9f91ba6f99d7a061/out
-    env::var("OUT_DIR")
-        .expect("OUT_DIR must be set")
-        .split(std::path::MAIN_SEPARATOR)
-        .nth_back(3)
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR must be set"));
+    out_dir
+        .ancestors()
+        .nth(3)
+        .and_then(Path::file_name)
         .expect("could not get profile name")
-        .to_string()
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn add_features(target_family: &str, target_os: &str) {
@@ -367,19 +371,20 @@ fn embed_resource_file(target_dir: &Path) {
     use std::io::Write;
 
     let version = env::var("GIT_RELEASE_TAG").unwrap_or("v0".to_owned());
-    // 默认值与 publisher 一致定为「Zap」,与 `script/windows/bundle.ps1` OSS 分支
-    // (`$APP_NAME = 'Zap'`) + AUMID `dev.zap.Zap` + Cargo bundle
-    // metadata 全局对齐。Windows 任务管理器的进程分组名实际取自 PE 资源中的
-    // `FileDescription` / `ProductName`(不是窗口标题),所以这里若回退默认 "Zap",
-    // 直接 `cargo build` 出来的 dev 二进制在任务管理器里会显示成 `Zap(N)`。
+    // 默认值与 publisher 一致定为「InfiniShell」,与 `script/windows/bundle.ps1` OSS
+    // 分支导出的 `WARP_APP_NAME='InfiniShell'` + AUMID `dev.infinishell.InfiniShell`
+    // + Cargo bundle metadata 全局对齐。Windows 任务管理器的进程分组名实际取自 PE
+    // 资源中的 `FileDescription` / `ProductName`(不是窗口标题),所以这里若回退默认
+    // "InfiniShell",直接 `cargo build` 出来的 dev 二进制在任务管理器里会显示成
+    // `InfiniShell(N)`。
     // 上游官方流水线在调用前会显式 `export WARP_APP_NAME=...` 覆盖,不受影响。
-    let app_name = env::var("WARP_APP_NAME").unwrap_or_else(|_| "Zap".to_owned());
+    let app_name = env::var("WARP_APP_NAME").unwrap_or_else(|_| "InfiniShell".to_owned());
     let bin_name = env::var("CARGO_BIN_NAME").unwrap_or("oss".to_owned());
-    // 以 `WARP_APP_PUBLISHER` 覆盖;默认与 installer / AUMID 一致为「Zap」。
+    // 以 `WARP_APP_PUBLISHER` 覆盖;默认与 installer / AUMID 一致为「InfiniShell」。
     // 保持 installer `MyAppPublisher`、Cargo bundle metadata `copyright`、
-    // 进程 AUMID `dev.zap.Zap` 三处全局对齐，避免 Windows Shell
+    // 进程 AUMID `dev.infinishell.InfiniShell` 三处全局对齐，避免 Windows Shell
     // 因 publisher / product name fingerprint 不一致而 miss 掉 icon cache。
-    let publisher = env::var("WARP_APP_PUBLISHER").unwrap_or_else(|_| "Zap".to_owned());
+    let publisher = env::var("WARP_APP_PUBLISHER").unwrap_or_else(|_| "InfiniShell".to_owned());
     let (ver_major, ver_minor, ver_patch, ver_build) = parse_file_version_quad(&version);
 
     let icon_path = Path::new("channels")
@@ -448,7 +453,9 @@ END
     let target = env::var("TARGET").unwrap();
     if let Some(tool) = cc::windows_registry::find_tool(target.as_str(), "cl.exe") {
         for (key, value) in tool.env() {
-            env::set_var(key, value);
+            unsafe {
+                env::set_var(key, value);
+            }
         }
     }
     embed_resource::compile(resource_file_path, embed_resource::NONE)

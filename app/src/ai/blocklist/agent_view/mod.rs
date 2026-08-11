@@ -3,29 +3,39 @@ mod agent_message_bar;
 mod agent_view_block;
 pub mod child_agent_status_card;
 mod controller;
-pub(crate) mod conversation_navigation_links;
+mod conversation_selection;
 mod ephemeral_message_model;
+mod gui_input_mode_policy;
 mod inline_agent_view_header;
+// TODO: Move orchestration_conversation_links module import elsewhere.
+pub(crate) mod orchestration_avatar;
+pub(crate) mod orchestration_conversation_links;
+pub mod orchestration_pill_bar;
+pub mod orchestration_pill_bar_model;
 pub mod shortcuts;
 mod zero_state_block;
+
+use std::sync::LazyLock;
 
 pub use agent_input_footer::*;
 pub use agent_message_bar::*;
 pub use agent_view_block::*;
 pub use controller::*;
+pub(crate) use conversation_selection::AgentViewConversationSelection;
 pub use ephemeral_message_model::*;
+pub(crate) use gui_input_mode_policy::GuiInputModePolicy;
 pub use inline_agent_view_header::*;
-use warpui::fonts::Properties;
-pub use zero_state_block::*;
-
-use std::sync::LazyLock;
-
+pub use orchestration_pill_bar::{OrchestrationPillBar, render_orchestration_breadcrumbs};
 use pathfinder_color::ColorU;
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::color::blend::Blend;
 use warp_core::ui::theme::Fill;
-use warp_core::ui::{appearance::Appearance, color::blend::Blend};
+use warpui::fonts::Properties;
 use warpui::keymap::Keystroke;
 use warpui::{AppContext, SingletonEntity};
+pub use zero_state_block::*;
 
+use crate::terminal::model::TerminalModel;
 use crate::view_components::action_button::ActionButtonTheme;
 
 pub static ENTER_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE: LazyLock<Keystroke> = LazyLock::new(|| {
@@ -46,6 +56,15 @@ pub static ENTER_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE: LazyLock<Keystroke> = La
         }
     }
 });
+
+/// Returns `true` when the current pane is in a cloud or remote context.
+///
+/// Zap:上游还会检查 `is_dummy_cloud_mode_session`,该云端会话概念已随账号/
+/// 云同步一并剥离,这里只保留本地可判定的两个条件。
+pub fn is_in_cloud_context(terminal_model: &TerminalModel) -> bool {
+    terminal_model.block_list().is_cloud_conversation_context()
+        || terminal_model.is_conversation_transcript_viewer()
+}
 
 pub fn agent_view_bg_fill(app: &AppContext) -> Fill {
     let appearance = Appearance::as_ref(app);

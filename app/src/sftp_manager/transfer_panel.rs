@@ -266,7 +266,6 @@ mod tests {
     use super::*;
 
     use std::cell::RefCell;
-    use std::collections::HashSet;
     use std::path::PathBuf;
     use std::rc::Rc;
 
@@ -345,7 +344,10 @@ mod tests {
             let root_view_id = app.root_view_id(window_id).expect("测试窗口应包含根视图");
             let presenter = Rc::new(RefCell::new(Presenter::new(window_id)));
             let invalidation = WindowInvalidation {
-                updated: HashSet::from([root_view_id]),
+                // `WindowInvalidation::updated` 是 `EntityIdSet`(FxHashSet),
+                // 不能用 std `HashSet::from`(RandomState hasher)构造,
+                // 这里靠 collect 让 hasher 由字段类型推导。
+                updated: [root_view_id].into_iter().collect(),
                 ..Default::default()
             };
 

@@ -1,38 +1,78 @@
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::mpsc::SyncSender;
+
+use anyhow::Result;
+use cfg_if::cfg_if;
+use lazy_static::lazy_static;
+use onboarding::{AgentOnboardingEvent, AgentOnboardingView, OnboardingIntention};
+use parking_lot::Mutex;
+use pathfinder_geometry::rect::RectF;
+use pathfinder_geometry::vector::{Vector2F, vec2f};
+use serde::{Deserialize, Serialize};
+use settings::Setting as _;
+use warp_core::context_flag::ContextFlag;
+use warp_core::safe_error;
+use warp_core::user_preferences::GetUserPreferences as _;
+use warp_errors::{report_error, report_if_error};
+use warpui::elements::{
+    Border, ChildAnchor, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
+};
+use warpui::keymap::{EditableBinding, FixedBinding};
+use warpui::platform::{WindowBounds, WindowStyle};
+use warpui::presenter::ChildView;
+use warpui::rendering::OnGPUDeviceSelected;
+use warpui::windowing::WindowManager;
+use warpui::{
+    AddWindowOptions, AppContext, DisplayId, Element, Entity, EntityId, FocusContext,
+    NextNewWindowsHasThisWindowsBoundsUponClose, SingletonEntity, TypedActionView, View,
+    ViewContext, ViewHandle, WindowId, id,
+};
+
+use crate::ai::AIRequestUsageModel;
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::blocklist::SerializedBlockListItem;
+use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
+use crate::ai::onboarding::{
+    build_onboarding_models, current_onboarding_auth_state, onboarding_credit_packs,
+    onboarding_pricing_promotion_message,
+};
+use crate::ai::request_usage_model::AIRequestUsageModelEvent;
+use crate::app_state::{AppState, PaneUuid, WindowSnapshot};
 use crate::appearance::Appearance;
-use crate::auth::AuthOverrideWarningModalVariant;
-use crate::auth::AuthState;
-use crate::auth::AuthStateProvider;
-use crate::auth::NeedsSsoLinkView;
-use crate::auth::{AuthManager, AuthManagerEvent};
-use crate::autoupdate::{AutoupdateState, AutoupdateStateEvent};
+// Zap 的 `crate::auth` 是本地身份 facade(扁平导出),上游按 `auth::auth_manager` 等
+// 子模块拆分的路径在这里不适用;login_slide / paste_auth_token_modal / auth_view_modal
+// 等随外部账号体系一并下线。
+use crate::auth::{
+    AuthManager, AuthManagerEvent, AuthOverrideWarningModal, AuthOverrideWarningModalEvent,
+    AuthOverrideWarningModalVariant, AuthState, AuthStateProvider, AuthView, AuthViewVariant,
+    NeedsSsoLinkView, UserAuthenticationError,
+};
+#[cfg(target_family = "wasm")]
+use crate::auth::{WebHandoffEvent, WebHandoffView};
+use crate::autoupdate::{AutoupdateState, AutoupdateStateEvent, RequestType, UpdateReady};
+use crate::changelog_model::ChangelogRequestType;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::cloud_object::{GenericStringObjectFormat, JsonObjectType, ObjectType};
 use crate::drive::export::ExportManager;
 use crate::drive::items::WarpDriveItemId;
 use crate::drive::{ObjectTypeAndId, ZapDriveObjectArgs, ZapDriveObjectSettings};
 use crate::experiments::{BlockOnboarding, Experiment};
+use crate::features::FeatureFlag;
 use crate::interval_timer::IntervalTimer;
 use crate::launch_configs::launch_config;
 use crate::linear::LinearIssueWork;
 use crate::notebooks::manager::NotebookSource;
-use crate::settings::apply_onboarding_settings;
-use crate::settings::AISettings;
-use onboarding::{
-    AgentOnboardingEvent, AgentOnboardingView, OnboardingIntention, SelectedSettings,
-};
-
-use crate::auth::UserAuthenticationError;
+use crate::pane_group::{NewTerminalOptions, PanesLayout};
 use crate::persistence::ModelEvent;
-use crate::report_if_error;
-use crate::server::ids::SyncId;
-use crate::server::telemetry::LaunchConfigUiLocation;
-use crate::settings::QuakeModeSettings;
-use crate::settings::ThemeSettings;
-use crate::settings_view::flags;
+use crate::pricing::{PricingInfoModel, PricingInfoModelEvent};
+use crate::server::ids::{ServerId, SyncId};
+use crate::server::telemetry::{LaunchConfigUiLocation, TelemetryEvent};
+use crate::server_time::ServerTime;
+use crate::settings::{AISettings, QuakeModeSettings, ThemeSettings, apply_onboarding_settings};
 use crate::settings_view::mcp_servers_page::MCPServersSettingsPage;
-use crate::settings_view::SettingsSection;
+use crate::settings_view::{SettingsSection, flags};
 use crate::terminal::available_shells::AvailableShell;
 use crate::terminal::general_settings::GeneralSettings;
 use crate::terminal::keys_settings::KeysSettings;
@@ -40,72 +80,26 @@ use crate::terminal::shell::ShellType;
 use crate::terminal::view::cell_size_and_padding;
 use crate::themes::onboarding_theme_picker_themes;
 use crate::themes::theme::{AnsiColorIdentifier, Blend, Fill, ThemeKind, WarpThemeConfig};
-use crate::uri::OpenMCPSettingsArgs;
+use crate::uri::{OpenMCPSettingsArgs, OpenSettingsArgs};
 use crate::util::bindings::{self, is_binding_pty_compliant};
-use crate::util::traffic_lights::{traffic_light_data, TrafficLightData, TrafficLightMouseStates};
+use crate::util::traffic_lights::{TrafficLightData, TrafficLightMouseStates, traffic_light_data};
 use crate::view_components::DismissibleToast;
 use crate::window_settings::WindowSettings;
 use crate::workspace::hoa_onboarding::mark_hoa_onboarding_completed;
-use crate::workspace::WorkspaceAction;
+use crate::workspace::view::OnboardingTutorial;
+use crate::workspace::{PaneViewLocator, Workspace, WorkspaceAction, WorkspaceRegistry};
 use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 use crate::{
-    app_state::{AppState, PaneUuid, WindowSnapshot},
-    autoupdate::{RequestType, UpdateReady},
-    changelog_model::ChangelogRequestType,
-    pane_group::{NewTerminalOptions, PanesLayout},
-    send_telemetry_from_ctx,
-    server::telemetry::TelemetryEvent,
-    server_time::ServerTime,
-    UpdateQuakeModeEventArg,
+    ChannelState, GlobalResourceHandles, GlobalResourceHandlesProvider, UpdateQuakeModeEventArg,
+    send_telemetry_from_app_ctx, send_telemetry_from_ctx,
 };
-use crate::{
-    auth::{AuthOverrideWarningModal, AuthOverrideWarningModalEvent},
-    auth::{AuthView, AuthViewVariant},
-    workspace::{view::OnboardingTutorial, PaneViewLocator, Workspace, WorkspaceRegistry},
-};
-use crate::{features::FeatureFlag, ChannelState};
-use crate::{send_telemetry_from_app_ctx, GlobalResourceHandles, GlobalResourceHandlesProvider};
-use anyhow::Result;
-use cfg_if::cfg_if;
-use lazy_static::lazy_static;
-use parking_lot::Mutex;
-use pathfinder_geometry::rect::RectF;
-use pathfinder_geometry::vector::{vec2f, Vector2F};
-use serde::{Deserialize, Serialize};
-use settings::Setting as _;
-use std::path::Path;
-use std::sync::mpsc::SyncSender;
-use std::sync::Arc;
-use std::{collections::HashMap, path::PathBuf};
-use warp_core::context_flag::ContextFlag;
-use warp_core::user_preferences::GetUserPreferences as _;
-use warpui::keymap::{EditableBinding, FixedBinding};
-use warpui::windowing::WindowManager;
-
-use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
-use crate::ai::onboarding::build_onboarding_models;
-
-use warpui::elements::{
-    Border, ChildAnchor, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
-};
-use warpui::rendering::OnGPUDeviceSelected;
-use warpui::{id, AddWindowOptions, DisplayId, SingletonEntity};
-use warpui::{
-    platform::{WindowBounds, WindowStyle},
-    presenter::ChildView,
-    AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle, WindowId,
-};
-use warpui::{FocusContext, NextNewWindowsHasThisWindowsBoundsUponClose};
-
-#[cfg(target_family = "wasm")]
-use crate::auth::{WebHandoffEvent, WebHandoffView};
 
 /// 返回当前 channel 的产品名,作为窗口标题初始值与 quake/transferred 窗口标题。
 ///
-/// 取 `ChannelState::app_id().application_name()` 是为了让 OSS 构建显示 `Zap`、
-/// 而 Stable/Preview/Dev 等上游 channel 仍显示各自的 `Zap` / `WarpPreview` / `WarpDev`,
+/// 取 `ChannelState::app_id().application_name()` 是为了让 OSS 构建显示 `InfiniShell`、
+/// 而 Stable/Preview/Dev 等上游 channel 仍显示各自的 `Warp` / `WarpPreview` / `WarpDev`,
 /// 避免在 fork 中跨多处硬编码字符串(Windows 任务管理器按窗口标题做进程分组,
-/// 硬编码 `"Zap"` 会让 Zap 在任务管理器里显示成 `Zap(N)`)。
+/// 硬编码 `"InfiniShell"` 会让 InfiniShell 在任务管理器里显示成 `InfiniShell(N)`)。
 ///
 /// 注意:窗口创建后,`Workspace::update_window_title()` 会在每次 tab 切换/重命名时
 /// 用 tab 标题覆盖此值,所以此函数仅决定窗口刚打开、还未挂上 tab 时的初始标题。
@@ -131,6 +125,66 @@ pub(crate) fn unthemed_window_border() -> Border {
     } else {
         Border::all(1.).with_border_fill(Fill::black().with_opacity(0))
     }
+}
+
+/// Relays the outcome of an onboarding-initiated credit purchase back to the
+/// onboarding view. On the checkout path the credits arrive asynchronously, so
+/// this only opens the browser; completion is detected later from the server's
+/// AI credit availability decision.
+fn handle_onboarding_credit_purchase_event(
+    onboarding_view: &ViewHandle<AgentOnboardingView>,
+    event: &UserWorkspacesEvent,
+    ctx: &mut ViewContext<RootView>,
+) {
+    if !onboarding_view
+        .as_ref(ctx)
+        .is_awaiting_purchased_credits(ctx)
+    {
+        return;
+    }
+    match event {
+        UserWorkspacesEvent::PurchaseAddonCreditsSuccess => {
+            onboarding_view.update(ctx, |onboarding_view, ctx| {
+                onboarding_view.on_credit_purchase_completed(ctx);
+            });
+        }
+        UserWorkspacesEvent::PurchaseAddonCreditsCheckoutRequired { checkout_url } => {
+            let checkout_url = checkout_url.clone();
+            onboarding_view.update(ctx, |onboarding_view, ctx| {
+                onboarding_view.on_credit_purchase_checkout_opened(ctx);
+            });
+            ctx.open_url(&checkout_url);
+        }
+        UserWorkspacesEvent::PurchaseAddonCreditsRejected(err) => {
+            safe_error!(
+                safe: ("Onboarding add-on credits purchase failed"),
+                full: ("Onboarding add-on credits purchase failed: {err}")
+            );
+            onboarding_view.update(ctx, |onboarding_view, ctx| {
+                onboarding_view.on_credit_purchase_failed(ctx);
+            });
+        }
+        _ => {}
+    }
+}
+
+/// Re-reads the account state onboarding decides on once the user has been out
+/// in the browser: whether they can now use AI, and which models they may pick.
+/// The AI availability read is what the offer slide advances off, so every path
+/// that could follow a purchase goes through here rather than refreshing its own
+/// subset.
+///
+/// Zap 无云端团队/计费同步(`TeamUpdateManager` 随 workspaces 云端模块一并下线),
+/// 因此这里只刷新本地可读到的 AI 额度与可用模型。
+fn refresh_onboarding_account_state(ctx: &mut ViewContext<RootView>) {
+    AIRequestUsageModel::handle(ctx).update(ctx, |usage, ctx| {
+        // 上游的 `request_availability_refresh`(向服务端拉取额度可用性裁决)在 Zap
+        // 不存在;本地只有这个 no-op 形状的刷新入口。
+        usage.refresh_request_usage_async(ctx);
+    });
+    LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
+        prefs.refresh_available_models(ctx);
+    });
 }
 
 #[derive(Debug, Clone)]
@@ -274,6 +328,10 @@ pub fn init(app: &mut AppContext) {
         "root_view:handle_pane_navigation_event",
         RootView::focus_pane,
     );
+    app.add_action(
+        "root_view:activate_tab_by_pane_group_id",
+        RootView::activate_tab_by_pane_group_id,
+    );
     app.add_action("root_view:close_window", RootView::close_window);
     app.add_action("root_view:minimize_window", RootView::minimize_window);
     app.add_action(
@@ -307,6 +365,15 @@ pub fn init(app: &mut AppContext) {
     app.add_action(
         "root_view:open_settings_page_in_existing_window",
         RootView::open_settings_page_in_existing_window,
+    );
+
+    app.add_global_action(
+        "root_view:open_settings_in_new_window",
+        open_settings_in_new_window,
+    );
+    app.add_action(
+        "root_view:open_settings_in_existing_window",
+        RootView::open_settings_in_existing_window,
     );
 
     app.add_global_action(
@@ -485,12 +552,15 @@ fn open_launch_config(arg: &OpenLaunchConfigArg, ctx: &mut AppContext) {
 }
 
 fn send_feedback(_: &(), ctx: &mut AppContext) {
-    if let Some(workspace) = active_workspace(ctx) {
-        workspace.update(ctx, |workspace, ctx| {
-            workspace.handle_action(&WorkspaceAction::SendFeedback, ctx);
-        });
-    } else {
-        ctx.open_url(&crate::util::links::feedback_form_url());
+    match active_workspace(ctx) {
+        Some(workspace) => {
+            workspace.update(ctx, |workspace, ctx| {
+                workspace.handle_action(&WorkspaceAction::SendFeedback, ctx);
+            });
+        }
+        _ => {
+            ctx.open_url(&crate::util::links::feedback_form_url());
+        }
     }
 }
 
@@ -536,6 +606,7 @@ pub fn create_transferred_window(
             let mut view = RootView::new(
                 global_resource_handles.clone(),
                 NewWorkspaceSource::TransferredTab {
+                    source_window_id,
                     tab_color: transferred_tab.color,
                     custom_title: transferred_tab.custom_title.clone(),
                     left_panel_open: transferred_tab.left_panel_open,
@@ -556,12 +627,15 @@ pub fn create_transferred_window(
     let pane_group_id = transferred_tab.pane_group.id();
     ctx.transfer_view_tree_to_window(pane_group_id, source_window_id, new_window_id);
 
-    if let Some(new_workspace) = WorkspaceRegistry::as_ref(ctx).get(new_window_id, ctx) {
-        new_workspace.update(ctx, |workspace, ctx| {
-            workspace.adopt_transferred_pane_group(transferred_tab.pane_group.clone(), ctx);
-        });
-    } else {
-        log::warn!("Failed to find workspace in newly created window {new_window_id:?}");
+    match WorkspaceRegistry::as_ref(ctx).get(new_window_id, ctx) {
+        Some(new_workspace) => {
+            new_workspace.update(ctx, |workspace, ctx| {
+                workspace.adopt_transferred_pane_group(transferred_tab.pane_group.clone(), ctx);
+            });
+        }
+        _ => {
+            log::warn!("Failed to find workspace in newly created window {new_window_id:?}");
+        }
     }
     new_window_id
 }
@@ -803,6 +877,34 @@ fn open_settings_page_in_new_window(section: &SettingsSection, ctx: &mut AppCont
                 workspace_view_handle.id(),
                 &WorkspaceAction::ShowSettingsPage(*section),
             );
+        }
+    });
+}
+
+/// Maps a `warp://settings` deeplink to the workspace action that opens it.
+fn workspace_action_for_open_settings(args: &OpenSettingsArgs) -> WorkspaceAction {
+    match args {
+        OpenSettingsArgs::Default => WorkspaceAction::ShowSettings,
+        OpenSettingsArgs::Search { query } => WorkspaceAction::ShowSettingsPageWithSearch {
+            search_query: query.clone(),
+            section: None,
+        },
+        OpenSettingsArgs::Widget { page, widget_id } => WorkspaceAction::ScrollToSettingsWidget {
+            page: *page,
+            widget_id,
+        },
+    }
+}
+
+fn open_settings_in_new_window(args: &OpenSettingsArgs, ctx: &mut AppContext) {
+    let action = workspace_action_for_open_settings(args);
+    let root_handle = open_new_window_get_handles(None, ctx).1;
+    root_handle.update(ctx, |root_view, ctx| {
+        if let AuthOnboardingState::Terminal(workspace_view_handle) =
+            &root_view.auth_onboarding_state
+        {
+            let window_id = ctx.window_id();
+            ctx.dispatch_typed_action_for_view(window_id, workspace_view_handle.id(), &action);
         }
     });
 }
@@ -1320,10 +1422,17 @@ pub enum NewWorkspaceSource {
         options: Box<NewTerminalOptions>,
         initial_query: Option<String>,
     },
+    /// Starts the workspace with the Cloud Agent setup tab.
+    AmbientAgent,
+    /// Opens a new window pre-scoped to a specific team, chosen via the title-bar team switcher.
+    TeamSwitched {
+        team_uid: ServerId,
+    },
     /// A tab is being transferred from another window via the transferable views framework.
     /// The workspace will create a placeholder tab, which will be replaced by the transferred
     /// PaneGroup after window creation.
     TransferredTab {
+        source_window_id: WindowId,
         /// Tab color from the source tab
         tab_color: Option<AnsiColorIdentifier>,
         /// Custom title from the source tab
@@ -1360,6 +1469,37 @@ impl NewWorkspaceSource {
             }
             _ => false,
         }
+    }
+
+    pub fn team_uid(&self, ctx: &AppContext) -> Option<ServerId> {
+        let source_window_id = match self {
+            Self::Empty {
+                previous_active_window,
+                ..
+            } => *previous_active_window,
+            Self::TransferredTab {
+                source_window_id, ..
+            } => Some(*source_window_id),
+            Self::FromTemplate { .. }
+            | Self::Session { .. }
+            | Self::FromCloudConversationId { .. }
+            | Self::NotebookFromFilePath { .. }
+            | Self::NotebookById { .. }
+            | Self::WorkflowById { .. }
+            | Self::AgentSession { .. }
+            | Self::AmbientAgent => None,
+            Self::TeamSwitched { team_uid } => return Some(*team_uid),
+            Self::Restored {
+                window_snapshot, ..
+            } => {
+                if let Some(team_uid) = window_snapshot.team_uid {
+                    return Some(team_uid);
+                }
+                None
+            }
+        };
+
+        UserWorkspaces::as_ref(ctx).inherited_or_default_team_uid(source_window_id)
     }
 }
 
@@ -1441,6 +1581,11 @@ impl RootView {
         workspace_setting: NewWorkspaceSource,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
+        let window_id = ctx.window_id();
+        let team_uid = workspace_setting.team_uid(ctx);
+        UserWorkspaces::handle(ctx).update(ctx, |user_workspaces, ctx| {
+            user_workspaces.register_window(window_id, team_uid, ctx);
+        });
         let auth_state = AuthStateProvider::as_ref(ctx).get().clone();
 
         ctx.subscribe_to_model(&AuthManager::handle(ctx), |me, _, event, ctx| {
@@ -1480,9 +1625,10 @@ impl RootView {
                 } else {
                     // When ZapNewSettingsModes is enabled, show onboarding before login for
                     // users who haven't completed it yet (tracked via a local UserPreferences key).
-                    let has_completed_local_onboarding = FeatureFlag::ZapNewSettingsModes.is_enabled()
+                    let pre_login_onboarding_enabled = FeatureFlag::ZapNewSettingsModes.is_enabled();
+                    let has_completed_local_onboarding = pre_login_onboarding_enabled
                         && has_completed_local_onboarding(ctx);
-                    let should_show_pre_login_onboarding = FeatureFlag::ZapNewSettingsModes.is_enabled()
+                    let should_show_pre_login_onboarding = pre_login_onboarding_enabled
                         && FeatureFlag::AgentOnboarding.is_enabled()
                         && !has_completed_local_onboarding;
                     if FeatureFlag::ForceLogin.is_enabled() {
@@ -1591,7 +1737,21 @@ impl RootView {
             ctx.focus(onboarding_view);
         }
 
+        // For users who bypass onboarding (already logged in, or onboarding flags not active),
+        // start autoupdate polling immediately. For new users in onboarding, this is a no-op;
+        // polling will be started once onboarding completes.
+        root_view.start_autoupdate_polling(ctx);
+
         root_view
+    }
+
+    /// Starts the autoupdate polling loop, but only if we are already in the `Terminal` state
+    /// (i.e. onboarding has completed or was not shown). Safe to call unconditionally — it is
+    /// a no-op when still in a pre-terminal state.
+    fn start_autoupdate_polling(&self, ctx: &mut ViewContext<Self>) {
+        if matches!(self.auth_onboarding_state, AuthOnboardingState::Terminal(_)) {
+            AutoupdateState::handle(ctx).update(ctx, |state, ctx| state.start_polling(ctx));
+        }
     }
 
     /// Used for integration tests.
@@ -1607,10 +1767,7 @@ impl RootView {
         result: &Result<UpdateReady>,
         ctx: &mut ViewContext<Self>,
     ) {
-        if let Ok(UpdateReady::Yes {
-            ref new_version, ..
-        }) = result
-        {
+        if let Ok(UpdateReady::Yes { new_version, .. }) = result {
             log::info!("Update ready for channel version {new_version:?}");
             if new_version.update_by.is_some() {
                 log::info!("Update ready, there is an update-by time, checking local time.");
@@ -1638,11 +1795,13 @@ impl RootView {
                 })
             }
         } else {
-            log::error!("Error fetching server time {:?}", server_time.err());
+            report_error!(anyhow::anyhow!(
+                "Error fetching server time {:?}",
+                server_time.err()
+            ));
         }
     }
 
-    // Switch to Auth Screen while destroying Workspace.
     fn show_needs_sso_link_view(&mut self, email: String, ctx: &mut ViewContext<Self>) -> bool {
         self.needs_sso_link_view.update(ctx, |view, _| {
             view.set_email(email);
@@ -1694,23 +1853,43 @@ impl RootView {
 
         let themes = onboarding_theme_picker_themes();
         let onboarding_view = ctx.add_typed_action_view(move |ctx| {
-            let llm_preferences = LLMPreferences::as_ref(ctx);
-            let (models, default_model_id) = build_onboarding_models(llm_preferences);
+            let (models, default_model_id) =
+                build_onboarding_models(LLMPreferences::as_ref(ctx), ctx);
 
             let workspace_enforces_autonomy = UserWorkspaces::as_ref(ctx)
                 .ai_autonomy_settings()
                 .has_any_overrides();
 
-            AgentOnboardingView::new(
+            let auth_state = current_onboarding_auth_state(ctx);
+
+            let mut view = AgentOnboardingView::new(
                 themes.clone(),
                 false, // Always use unskippable onboarding.
                 models,
                 default_model_id,
                 workspace_enforces_autonomy,
                 FeatureFlag::AgentView.is_enabled(),
+                auth_state,
                 ctx,
-            )
+            );
+            view.set_credit_pack_options(onboarding_credit_packs(ctx), ctx);
+            view.set_pricing_promotion_message(onboarding_pricing_promotion_message(ctx), ctx);
+            view
         });
+        // Keep the offer slide's credit packs and promotion in sync with server pricing.
+        let onboarding_view_for_pricing = onboarding_view.clone();
+        ctx.subscribe_to_model(
+            &PricingInfoModel::handle(ctx),
+            move |_, _pricing, event, ctx| {
+                let PricingInfoModelEvent::PricingInfoUpdated = event;
+                let options = onboarding_credit_packs(ctx);
+                let promotion_message = onboarding_pricing_promotion_message(ctx);
+                onboarding_view_for_pricing.update(ctx, |onboarding_view, ctx| {
+                    onboarding_view.set_credit_pack_options(options, ctx);
+                    onboarding_view.set_pricing_promotion_message(promotion_message, ctx);
+                });
+            },
+        );
 
         let onboarding_view_clone = onboarding_view.clone();
         ctx.subscribe_to_model(
@@ -1718,7 +1897,7 @@ impl RootView {
             move |_, llm_preferences, event, ctx| match event {
                 LLMPreferencesEvent::UpdatedAvailableLLMs => {
                     let (models, default_model_id) =
-                        build_onboarding_models(llm_preferences.as_ref(ctx));
+                        build_onboarding_models(llm_preferences.as_ref(ctx), ctx);
                     onboarding_view_clone.update(ctx, |onboarding_view, ctx| {
                         onboarding_view.set_onboarding_models(models, default_model_id, ctx);
                     })
@@ -1730,12 +1909,13 @@ impl RootView {
             },
         );
 
-        // Subscribe to workspace changes to update local autonomy enforcement state.
+        // Subscribe to workspace changes to update autonomy enforcement state and auth/billing
+        // state (e.g. a free→paid upgrade reflected by the workspace/billing metadata poll).
         let onboarding_view_for_workspaces = onboarding_view.clone();
         ctx.subscribe_to_model(
             &UserWorkspaces::handle(ctx),
-            move |_, user_workspaces, event, ctx| match event {
-                UserWorkspacesEvent::UpdateWorkspaceSettingsSuccess => {
+            move |_, user_workspaces, event, ctx| {
+                if matches!(event, UserWorkspacesEvent::UpdateWorkspaceSettingsSuccess) {
                     let workspace_enforces_autonomy = user_workspaces
                         .as_ref(ctx)
                         .ai_autonomy_settings()
@@ -1745,10 +1925,39 @@ impl RootView {
                             .set_workspace_enforces_autonomy(workspace_enforces_autonomy, ctx);
                     });
                 }
-                UserWorkspacesEvent::TeamsChanged => {
+                if matches!(event, UserWorkspacesEvent::TeamsChanged) {
                     ctx.notify();
                 }
-                _ => {}
+                handle_onboarding_credit_purchase_event(
+                    &onboarding_view_for_workspaces,
+                    event,
+                    ctx,
+                );
+                let auth_state = current_onboarding_auth_state(ctx);
+                let credit_pack_options = onboarding_credit_packs(ctx);
+                onboarding_view_for_workspaces.update(ctx, |onboarding_view, ctx| {
+                    onboarding_view.set_auth_state(auth_state, ctx);
+                    // The purchase policy (and so the premium) comes from the
+                    // user's workspace, so a metadata refresh can move the
+                    // displayed prices.
+                    onboarding_view.set_credit_pack_options(credit_pack_options, ctx);
+                });
+            },
+        );
+
+        // Browser checkout doesn't report back to the app, so the purchase is
+        // only complete once the user can actually make an AI request.
+        let onboarding_view_for_usage = onboarding_view.clone();
+        ctx.subscribe_to_model(
+            &AIRequestUsageModel::handle(ctx),
+            move |_, _usage, event, ctx| {
+                if !matches!(event, AIRequestUsageModelEvent::CreditAvailabilityUpdated) {
+                    return;
+                }
+                let available = AIRequestUsageModel::as_ref(ctx).has_any_ai_remaining(ctx);
+                onboarding_view_for_usage.update(ctx, |onboarding_view, ctx| {
+                    onboarding_view.on_ai_credit_availability_observed(available, ctx);
+                });
             },
         );
 
@@ -1763,6 +1972,9 @@ impl RootView {
                     LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
                         prefs.refresh_available_models(ctx);
                     });
+                    if matches!(event, AuthManagerEvent::AuthComplete) {
+                        refresh_onboarding_account_state(ctx);
+                    }
                 }
             },
         );
@@ -1835,15 +2047,9 @@ impl RootView {
                     mark_hoa_onboarding_completed(ctx);
                 }
 
-                // Terminal-intent users should not see the conversation list
-                // auto-opened for discoverability.
-                if matches!(selected_settings, SelectedSettings::Terminal { .. }) {
-                    AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                        report_if_error!(settings
-                            .has_auto_opened_conversation_list
-                            .set_value(true, ctx));
-                    });
-                }
+                // 会话列表的一次性自动展开(`AISettings::has_auto_opened_conversation_list`
+                // + `WorkspaceView::maybe_auto_open_conversation_list`)在本次合并中随上游
+                // 版本一并去掉了,不再需要为 terminal 意图的用户预先标记该开关。
 
                 let is_logged_in = AuthStateProvider::as_ref(ctx).get().is_logged_in();
 
@@ -1860,6 +2066,7 @@ impl RootView {
                 self.auth_onboarding_state = AuthOnboardingState::Terminal(workspace);
                 ctx.emit(RootViewEvent::AuthOnboardingStateChanged);
                 self.start_pending_tutorial(ctx);
+                self.start_autoupdate_polling(ctx);
                 ctx.notify();
             }
             AgentOnboardingEvent::OnboardingSkipped => {
@@ -1881,8 +2088,13 @@ impl RootView {
                 let workspace = target.to_workspace(ctx);
                 self.auth_onboarding_state = AuthOnboardingState::Terminal(workspace);
                 ctx.emit(RootViewEvent::AuthOnboardingStateChanged);
+                self.start_autoupdate_polling(ctx);
                 ctx.notify();
             }
+            // Zap 无云端账号 / 订阅计费,上游新增的登录页(LoginSlide)、升级、
+            // offer / credit pack 等 onboarding 事件在本 fork 下不会被触发,
+            // 这里统一忽略,避免引入已下线的 auth / billing 依赖。
+            _ => {}
         }
     }
 
@@ -1901,10 +2113,10 @@ impl RootView {
 
         let mut quake_mode_state = QUAKE_STATE.lock();
         // If the window we are focusing is the Quake Mode window, then update the QuakeModeState.
-        if let Some(mode) = quake_mode_state.as_mut() {
-            if mode.window_id == window_id {
-                mode.window_state = WindowState::Open;
-            }
+        if let Some(mode) = quake_mode_state.as_mut()
+            && mode.window_id == window_id
+        {
+            mode.window_state = WindowState::Open;
         }
 
         ctx.windows().show_window_and_focus_app(window_id);
@@ -1913,6 +2125,20 @@ impl RootView {
         if let AuthOnboardingState::Terminal(workspace) = &self.auth_onboarding_state {
             workspace.update(ctx, |view, ctx| {
                 view.focus_pane(*pane_view_locator, ctx);
+            });
+        }
+        true
+    }
+
+    fn activate_tab_by_pane_group_id(
+        &mut self,
+        pane_group_id: &EntityId,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        ctx.windows().show_window_and_focus_app(ctx.window_id());
+        if let AuthOnboardingState::Terminal(workspace) = &self.auth_onboarding_state {
+            workspace.update(ctx, |view, ctx| {
+                view.activate_tab_by_pane_group_id(*pane_group_id, ctx);
             });
         }
         true
@@ -2123,8 +2349,28 @@ impl RootView {
                 &WorkspaceAction::ShowSettingsPage(*section),
             );
             ctx.windows().show_window_and_focus_app(window_id);
+            return true;
+        }
+
+        report_error!(
+            "Auth not complete before trying to open settings page",
+            extra: { "section" => ?section }
+        );
+        true
+    }
+
+    pub fn open_settings_in_existing_window(
+        &mut self,
+        args: &OpenSettingsArgs,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let window_id = ctx.window_id();
+        if let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state {
+            let action = workspace_action_for_open_settings(args);
+            ctx.dispatch_typed_action_for_view(window_id, handle.id(), &action);
+            ctx.windows().show_window_and_focus_app(window_id);
         } else {
-            log::error!("Auth not complete before trying to open settings page {section:?}");
+            report_error!("Auth not complete before trying to open settings");
         }
         true
     }
@@ -2151,7 +2397,7 @@ impl RootView {
             let window_id = ctx.window_id();
             ctx.windows().show_window_and_focus_app(window_id);
         } else {
-            log::error!("Auth not complete before trying to open MCP settings page");
+            report_error!("Auth not complete before trying to open MCP settings page");
         }
         true
     }
@@ -2165,7 +2411,7 @@ impl RootView {
             });
             ctx.windows().show_window_and_focus_app(window_id);
         } else {
-            log::error!("Auth not complete before trying to open Codex modal");
+            report_error!("Auth not complete before trying to open Codex modal");
         }
         true
     }
@@ -2184,7 +2430,7 @@ impl RootView {
             });
             ctx.windows().show_window_and_focus_app(window_id);
         } else {
-            log::error!("Auth not complete before trying to open Linear issue work");
+            report_error!("Auth not complete before trying to open Linear issue work");
         }
         true
     }
@@ -2250,6 +2496,7 @@ impl RootView {
                         .complete_auth_and_create_workspace(ctx);
                 }
 
+                self.start_autoupdate_polling(ctx);
                 self.focus(ctx);
             }
             AuthManagerEvent::AuthFailed(err) => match err {
@@ -2270,10 +2517,12 @@ impl RootView {
                             self.web_handoff(ctx);
                         } else {
                             // Zap 已移除 log_out UI 入口,native 不再强制登出。
-                            log::warn!("User account disabled; ignoring (Zap 已移除 log_out)");
+                            log::warn!("User account disabled; ignoring (InfiniShell 已移除 log_out)");
                         }
                     }
                 }
+                // `UserAuthenticationError` 在 Zap 是 facade,没有 `register_error!` /
+                // `ErrorExt` 实现,不能走 `report_error!`;沿用我方 HEAD 的纯日志处理。
                 UserAuthenticationError::Unexpected(err) => {
                     log::error!("Encountered unexpected error when trying to fetch user: {err:#}");
                 }
@@ -2288,6 +2537,7 @@ impl RootView {
                         .complete_auth_and_create_workspace(ctx);
                     self.start_pending_tutorial(ctx);
                 }
+                self.start_autoupdate_polling(ctx);
                 self.focus(ctx);
             }
             _ => {}
@@ -2346,7 +2596,7 @@ impl RootView {
                     };
                     ctx.emit(RootViewEvent::AuthOnboardingStateChanged);
                 } else {
-                    log::error!("Received web handoff event in unexpected state");
+                    report_error!("Received web handoff event in unexpected state");
                 }
                 self.focus(ctx);
             }
@@ -2388,35 +2638,33 @@ impl RootView {
         key_code: &warpui::platform::keyboard::KeyCode,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
-        use crate::settings::AISettings;
         use voice_input::{VoiceInput, VoiceInputState, VoiceInputToggledFrom};
         use warpui::event::KeyState;
+
+        use crate::settings::AISettings;
 
         // Check that the released key matches the configured voice input toggle key.
         let ai_settings = AISettings::as_ref(ctx);
         if let Some(configured_key_code) = ai_settings.voice_input_toggle_key.value().to_key_code()
+            && configured_key_code == *key_code
         {
-            if configured_key_code == *key_code {
-                let voice_input = VoiceInput::handle(ctx);
-                // Check if we're actively listening and it was started from a key press.
-                if let VoiceInputState::Listening { enabled_from, .. } =
-                    voice_input.as_ref(ctx).state()
-                {
-                    if matches!(
-                        enabled_from,
-                        VoiceInputToggledFrom::Key {
-                            state: KeyState::Pressed
-                        }
-                    ) {
-                        log::debug!("Voice input key release detected: {key_code:?}");
-                        // Stop listening and proceed to transcription (don't abort).
-                        voice_input.update(ctx, |voice_input, ctx| {
-                            if let Err(e) = voice_input.stop_listening(ctx) {
-                                log::error!("Failed to stop voice input on key release: {e:?}");
-                            }
-                        });
+            let voice_input = VoiceInput::handle(ctx);
+            // Check if we're actively listening and it was started from a key press.
+            if let VoiceInputState::Listening { enabled_from, .. } = voice_input.as_ref(ctx).state()
+                && matches!(
+                    enabled_from,
+                    VoiceInputToggledFrom::Key {
+                        state: KeyState::Pressed
                     }
-                }
+                )
+            {
+                log::debug!("Voice input key release detected: {key_code:?}");
+                // Stop listening and proceed to transcription (don't abort).
+                voice_input.update(ctx, |voice_input, ctx| {
+                    if let Err(e) = voice_input.stop_listening(ctx) {
+                        report_error!(e.context("Failed to stop voice input on key release"));
+                    }
+                });
             }
         }
         true
@@ -2425,6 +2673,7 @@ impl RootView {
     /// Zap(本地化,Phase 5):原 `handle_preferences_syncer_event` 在云端
     /// preferences 同步初始加载完成后应用 onboarding settings,随同步器物理删除。
     /// onboarding settings 现在在 onboarding 完成时直接应用,不需要延迟到 cloud sync 后。
+    ///
     /// If onboarding stored a pending tutorial (because login was required first),
     /// start it now that the workspace exists.
     fn start_pending_tutorial(&mut self, ctx: &mut ViewContext<Self>) {
@@ -2436,16 +2685,12 @@ impl RootView {
             return;
         };
 
-        if FeatureFlag::ZapNewSettingsModes.is_enabled()
-            && FeatureFlag::TabConfigs.is_enabled()
-        {
+        if FeatureFlag::ZapNewSettingsModes.is_enabled() && FeatureFlag::TabConfigs.is_enabled() {
             let intention = tutorial.intention();
-            // Terminal-intent users skip the session config modal.
             if matches!(intention, OnboardingIntention::AgentDrivenDevelopment) {
                 workspace.update(ctx, |view, ctx| {
-                    view.set_pending_onboarding_intention(intention);
                     view.open_vertical_tabs_panel_if_enabled(ctx);
-                    view.show_session_config_modal(ctx);
+                    view.start_agent_onboarding_tutorial(tutorial, ctx);
                 });
             } else {
                 workspace.update(ctx, |view, ctx| {
@@ -2635,8 +2880,8 @@ impl AuthOnboardingState {
 
         // If we didn't transition to Onboarding, set the Terminal state.
         match self {
-            AuthOnboardingState::Auth(ref args)
-            | AuthOnboardingState::ConfirmIncomingAuth(ref args) => {
+            &mut AuthOnboardingState::Auth(ref args)
+            | &mut AuthOnboardingState::ConfirmIncomingAuth(ref args) => {
                 let workspace = args.clone().create_workspace(ctx);
                 *self = AuthOnboardingState::Terminal(workspace);
             }
@@ -2717,7 +2962,7 @@ impl AuthOnboardingState {
             AuthOnboardingState::WebImport(_) => {
                 // This case _shouldn't_ be possible - if SSO were required, it should be handled
                 // in the host app.
-                log::error!("SSO link required after web user import");
+                report_error!("SSO link required after web user import");
             }
             AuthOnboardingState::NeedsSsoLink { .. } => (),
             AuthOnboardingState::Onboarding { .. } => {

@@ -32,7 +32,7 @@ use crate::{
 
 type SortByComparator<'a> = dyn FnMut(&&dyn StoredObject, &&dyn StoredObject) -> Ordering + 'a;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DriveObjectType {
     Workflow,
     AgentModeWorkflow,
@@ -266,7 +266,7 @@ pub fn write_has_auto_opened_welcome_folder_to_user_defaults(app: &mut AppContex
     settings_value::SettingsValue,
 )]
 #[schemars(
-    description = "Sort order for Zap Drive items.",
+    description = "Sort order for InfiniShell Drive items.",
     rename_all = "snake_case"
 )]
 pub enum DriveSortOrder {

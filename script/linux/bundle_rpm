@@ -19,11 +19,11 @@ set -e
 if [ "$RELEASE_CHANNEL" = "oss" ]; then
   CHANNEL_SUFFIX=""
   if [ "$ARTIFACT" = "app" ]; then
-    PACKAGE_NAME="zap"
+    PACKAGE_NAME="infinishell"
   else
-    PACKAGE_NAME="zap-cli"
+    PACKAGE_NAME="infinishell-cli"
   fi
-  REPO_NAME="zap"
+  REPO_NAME="infinishell"
   OPT_DIR="/opt/$PACKAGE_NAME"
 elif [ "$ARTIFACT" = "cli" ]; then
   CHANNEL_SUFFIX="${BINARY_NAME#oz}"
@@ -102,9 +102,9 @@ fakeroot rpmbuild -v -bb "$RPMBUILD_DIR/SPEC/warp.spec" --target="$ARCH" --defin
 RPM_NAME="$PACKAGE_NAME-$VERSION-$RELEASE.$ARCH.rpm"
 cp "$RPMBUILD_DIR/RPMS/$ARCH/$RPM_NAME" "$OUT_DIR"
 
-# Zap 不使用上游 Zap 的 RPM 签名 key；GitHub 构建只产出未签名本地包。
+# InfiniShell 不使用上游 Warp 的 RPM 签名 key；GitHub 构建只产出未签名本地包。
 if [ "${GITHUB_ACTIONS}" == "true" ]; then
-  echo "Skipping upstream Zap RPM signing for Zap."
+  echo "Skipping upstream Warp RPM signing for InfiniShell."
 fi
 
 echo "Successfully built .rpm package at $OUT_DIR/$RPM_NAME!"

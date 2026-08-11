@@ -1,5 +1,11 @@
+use std::collections::HashMap;
+
+use itertools::Itertools;
+use warpui::{AppContext, Entity};
+
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
 use crate::ai::conversation_navigation::ConversationNavigationData;
+use crate::search::SyncDataSource;
 use crate::search::command_palette::conversations::search::{
     ConversationMatchResult, ConversationSearcher, FuzzyConversationSearcher, MatchedConversation,
 };
@@ -10,11 +16,7 @@ use crate::search::command_palette::mixer::CommandPaletteItemAction;
 use crate::search::command_palette::separator_search_item::SeparatorSearchItem;
 use crate::search::data_source::{DataSourceSearchError, Query, QueryResult};
 use crate::search::mixer::DataSourceRunErrorWrapper;
-use crate::search::SyncDataSource;
 use crate::workspace::Workspace;
-use itertools::Itertools;
-use std::collections::HashMap;
-use warpui::{AppContext, Entity};
 
 /// Sections for grouping conversations in the command palette.
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -79,13 +81,6 @@ impl DataSource {
         }
     }
 
-    pub fn historical() -> Self {
-        Self {
-            searcher: FuzzyConversationSearcher::historical(),
-            add_conversation_actions: false,
-        }
-    }
-
     /// Returns a [`QueryResult`] for a conversation identified by `conversation_id`. `None` if no result was
     /// found with the given ID.
     pub fn query_result(
@@ -112,7 +107,7 @@ impl DataSource {
         &self,
         limit: usize,
         app: &AppContext,
-    ) -> impl Iterator<Item = QueryResult<<Self as SyncDataSource>::Action>> {
+    ) -> impl Iterator<Item = QueryResult<<Self as SyncDataSource>::Action>> + use<> {
         self.searcher
             .searchable_conversations(app)
             .into_iter()
@@ -180,22 +175,22 @@ impl SyncDataSource for DataSource {
             // The command palette renders items in reverse order, so we need to add the sections in reverse order
             // and add each separator item after all of the items in the section.
             for section in ConversationSection::reverse_order() {
-                if let Some(conversations) = grouped.get(&section) {
-                    if !conversations.is_empty() {
-                        for conversation in conversations {
-                            let matched_conversation = MatchedConversation {
-                                conversation: conversation.clone(),
-                                match_result: ConversationMatchResult::no_match(),
-                            };
-                            results.push(
-                                ConversationSearchItem::new(ConversationAction::Resume(Box::new(
-                                    matched_conversation,
-                                )))
-                                .into(),
-                            );
-                        }
-                        results.push(SeparatorSearchItem::new(section.title()).into());
+                if let Some(conversations) = grouped.get(&section)
+                    && !conversations.is_empty()
+                {
+                    for conversation in conversations {
+                        let matched_conversation = MatchedConversation {
+                            conversation: conversation.clone(),
+                            match_result: ConversationMatchResult::no_match(),
+                        };
+                        results.push(
+                            ConversationSearchItem::new(ConversationAction::Resume(Box::new(
+                                matched_conversation,
+                            )))
+                            .into(),
+                        );
                     }
+                    results.push(SeparatorSearchItem::new(section.title().to_string()).into());
                 }
             }
 
@@ -204,9 +199,7 @@ impl SyncDataSource for DataSource {
             self.searcher
                 .search(&query.text.trim().to_lowercase(), app)
                 .map_err(|err| {
-                    let search_error = DataSourceSearchError {
-                        message: err.to_string(),
-                    };
+                    let search_error = DataSourceSearchError::new(err.to_string());
                     Box::new(search_error) as DataSourceRunErrorWrapper
                 })
         };
@@ -214,18 +207,18 @@ impl SyncDataSource for DataSource {
         // When the query is empty, we want to add the "new conversation" and "fork conversation" items.
         if self.add_conversation_actions && query.text.trim().is_empty() {
             result.map(|mut results| {
-                if !cfg!(target_family = "wasm") {
-                    if let Some(conversation) = selected_conversation_in_focused_pane(app) {
-                        // Only surface the fork option if the selected conversation is done.
-                        if conversation.status().is_done() {
-                            results.push(
-                                ConversationSearchItem::new(ConversationAction::Fork {
-                                    conversation_id: conversation.id(),
-                                    title: conversation.title().unwrap_or_default().to_string(),
-                                })
-                                .into(),
-                            );
-                        }
+                if !cfg!(target_family = "wasm")
+                    && let Some(conversation) = selected_conversation_in_focused_pane(app)
+                {
+                    // Only surface the fork option if the selected conversation is done.
+                    if conversation.status().is_done() {
+                        results.push(
+                            ConversationSearchItem::new(ConversationAction::Fork {
+                                conversation_id: conversation.id(),
+                                title: conversation.title().unwrap_or_default().to_string(),
+                            })
+                            .into(),
+                        );
                     }
                 }
                 results.push(ConversationSearchItem::new(ConversationAction::New).into());

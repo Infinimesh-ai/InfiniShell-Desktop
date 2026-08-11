@@ -9,37 +9,31 @@
 //! into [`View`] components as well. If that's ever deemed necessary, see [`RequestedCommandView`]
 //! for an example on how that transformation could be made.
 
-use lazy_static::lazy_static;
-use markdown_parser::FormattedText;
-use markdown_parser::FormattedTextFragment;
-use markdown_parser::FormattedTextLine;
-use pathfinder_color::ColorU;
 use std::borrow::Cow;
 use std::rc::Rc;
+
+use lazy_static::lazy_static;
+use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
+use pathfinder_color::ColorU;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors::neutral_2;
-use warpui::elements::Align;
-use warpui::elements::Clipped;
-use warpui::elements::FormattedTextElement;
-use warpui::fonts::FamilyId;
-use warpui::{
-    elements::{
-        Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Flex,
-        Hoverable, MainAxisAlignment, MouseStateHandle, ParentElement, Radius, Shrinkable,
-        SizeConstraintCondition, SizeConstraintSwitch, Text, Wrap, WrapFill,
-    },
-    keymap::Keystroke,
-    platform::Cursor,
-    ui_components::components::{UiComponent, UiComponentStyles},
-    AppContext, Element, EventContext, SingletonEntity,
+use warpui::elements::{
+    Align, Border, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
+    Flex, FormattedTextElement, Hoverable, MainAxisAlignment, MouseStateHandle, ParentElement,
+    Radius, Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Text, Wrap, WrapFill,
 };
+use warpui::fonts::FamilyId;
+use warpui::keymap::Keystroke;
+use warpui::platform::Cursor;
+use warpui::ui_components::components::{UiComponent, UiComponentStyles};
+use warpui::{AppContext, Element, EventContext, SingletonEntity};
 
 use super::inline_action_header::HeaderConfig;
 use crate::ai::blocklist::block::view_impl::WithContentItemSpacing;
 use crate::ai::blocklist::inline_action::inline_action_header;
-use crate::ai::blocklist::inline_action::inline_action_header::INLINE_ACTION_VERTICAL_PADDING;
 use crate::ai::blocklist::inline_action::inline_action_header::{
     INLINE_ACTION_HEADER_VERTICAL_PADDING, INLINE_ACTION_HORIZONTAL_PADDING,
+    INLINE_ACTION_VERTICAL_PADDING,
 };
 use crate::ai::blocklist::inline_action::inline_action_icons::icon_size;
 use crate::ui_components::blended_colors;
@@ -188,6 +182,8 @@ impl RenderableAction {
         let mut has_header = false;
         let mut content = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
         if let Some(header) = self.header {
+            let header =
+                header.with_corner_radius_override(CornerRadius::with_top(Radius::Pixels(7.)));
             content.add_child(Clipped::new(header.render(app)).finish());
             has_header = true;
         }
@@ -207,7 +203,7 @@ impl RenderableAction {
                     .with_horizontal_padding(INLINE_ACTION_HORIZONTAL_PADDING)
                     .with_vertical_padding(4.)
                     .with_background(theme.surface_1())
-                    .with_corner_radius(CornerRadius::with_bottom(Radius::Pixels(8.)))
+                    .with_corner_radius(CornerRadius::with_bottom(Radius::Pixels(7.)))
                     .finish(),
             );
         }

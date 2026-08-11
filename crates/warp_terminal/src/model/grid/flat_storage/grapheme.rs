@@ -2,12 +2,9 @@ use std::num::NonZeroU16;
 
 use string_offset::ByteOffset;
 
-use crate::model::{
-    char_or_str::CharOrStr,
-    grid::cell::{self, Cell},
-};
-
 use super::index::GraphemeInfo;
+use crate::model::char_or_str::CharOrStr;
+use crate::model::grid::cell::{self, Cell};
 
 /// A grapheme is a collection of [`char`]s that, together, represent a single
 /// "user-perceived character".
@@ -113,7 +110,7 @@ impl<'a> Grapheme<'a> {
     }
 
     /// Returns an iterator over the characters in this grapheme.
-    pub fn chars(&self) -> impl Iterator<Item = char> + 'a {
+    pub fn chars(&self) -> impl Iterator<Item = char> + 'a + use<'a> {
         match self.content {
             CharOrStr::Char(c) => itertools::Either::Left(std::iter::once(c)),
             CharOrStr::Str(s) => itertools::Either::Right(s.chars()),

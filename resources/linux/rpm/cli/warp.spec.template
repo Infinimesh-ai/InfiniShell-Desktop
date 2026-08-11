@@ -2,13 +2,13 @@
 # Package Spec
 ###############################################################################
 
-Summary:     Zap CLI — community fork of Warp's local orchestration platform
+Summary:     InfiniShell CLI — community fork of Warp's local orchestration platform
 Name:        @@PACKAGE_NAME@@
 Version:     @@VERSION@@
 Release:     @@RELEASE@@
-Vendor:      Zap Maintainers
+Vendor:      InfiniShell Maintainers
 Url:         https://github.com/zerx-lab/warp
-Packager:    Zap Maintainers <zap-maintainers@localhost>
+Packager:    InfiniShell Maintainers <infinishell-maintainers@localhost>
 License:     AGPL-3.0-only AND MIT
 Obsoletes:   warp-cli < %{version}
 
@@ -26,8 +26,8 @@ prefix:      /opt
 ###############################################################################
 
 %description
-Zap CLI is a tool for running, managing, and orchestrating coding agents
-locally. It is the CLI half of the Zap community fork of Warp.
+InfiniShell CLI is a tool for running, managing, and orchestrating coding agents
+locally. It is the CLI half of the InfiniShell community fork of Warp.
 
 ###############################################################################
 # Build rule - how does the package get built?
@@ -68,6 +68,6 @@ ln -s @@OPT_DIR@@/@@BINARY_NAME@@ %{buildroot}%{_bindir}/@@BINARY_NAME@@
 ###############################################################################
 %post
 
-# Zap 不配置上游 Warp RPM 软件源,也不安装上游签名 key。
-# Zap 不做 post-install repo 配置；deb/rpm 包通过 GitHub Release 分发。
+# InfiniShell 不配置上游 Warp RPM 软件源,也不安装上游签名 key。
+# InfiniShell 不做 post-install repo 配置；deb/rpm 包通过 GitHub Release 分发。
 exit 0

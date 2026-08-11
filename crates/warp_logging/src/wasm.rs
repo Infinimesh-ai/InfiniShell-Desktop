@@ -1,10 +1,11 @@
 // Vendored wasm-logger.
 // MIT License: Copyright (c) 2018 Limira
-use crate::LogConfig;
 use anyhow::Result;
 use log::{Level, Log, Metadata, Record};
 use wasm_bindgen::prelude::*;
 use web_sys::console;
+
+use crate::LogConfig;
 
 /// Initializes the global logger for the application.
 /// Note: On WASM, `config` is ignored since we always log to the browser console.
@@ -161,18 +162,21 @@ impl Log for WasmLogger {
                     console::warn_4(&s, &JsValue::from(&style.lvl_warn), &tgt_style, &args_style)
                 }
                 Level::Error => {
-                    let error = format!(
-                        "ERROR: {}\n\n{}:{}",
-                        record.args(),
-                        record.file().unwrap_or_else(|| record.target()),
-                        record
-                            .line()
-                            .map_or_else(|| "[Unknown]".to_string(), |line| line.to_string()),
-                    );
-                    // 把错误日志发给宿主层做本地处理。
-                    warp_web_event_bus::emit_event(warp_web_event_bus::WarpEvent::ErrorLogged {
-                        error,
-                    });
+                    // 只把 report_error! 上报的错误发给宿主层做本地处理,避免普通
+                    // ERROR 日志刷屏(上游 LOG_TARGET 门控)。
+                    if record.target() == warp_errors::LOG_TARGET {
+                        let error = format!(
+                            "ERROR: {}\n\n{}:{}",
+                            record.args(),
+                            record.file().unwrap_or_else(|| record.target()),
+                            record
+                                .line()
+                                .map_or_else(|| "[Unknown]".to_string(), |line| line.to_string()),
+                        );
+                        warp_web_event_bus::emit_event(
+                            warp_web_event_bus::WarpEvent::ErrorLogged { error },
+                        );
+                    }
 
                     console::error_4(
                         &s,

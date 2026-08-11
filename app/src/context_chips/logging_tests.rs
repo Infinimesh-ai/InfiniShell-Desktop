@@ -1,5 +1,6 @@
-use super::*;
 use warp_completer::completer::{CommandExitStatus, CommandOutput};
+
+use super::*;
 
 #[test]
 fn test_prompt_chip_log_filename_uses_channel_logfile_stem() {
@@ -11,6 +12,29 @@ fn test_prompt_chip_log_filename_uses_channel_logfile_stem() {
         prompt_chip_log_filename("warp_local"),
         "warp_local.prompt_chips.log"
     );
+}
+
+#[test]
+fn prompt_chip_log_path_stays_beside_resolved_frontend_log() {
+    for (active_log, expected_sidecar) in [
+        (
+            "/tmp/warp-logs/warp_dev.log",
+            "/tmp/warp-logs/warp_dev.prompt_chips.log",
+        ),
+        (
+            "/tmp/warp-logs/warp-cli/warp_preview.log",
+            "/tmp/warp-logs/warp-cli/warp_preview.prompt_chips.log",
+        ),
+        (
+            "/tmp/warp-logs/oz/warp.log",
+            "/tmp/warp-logs/oz/warp.prompt_chips.log",
+        ),
+    ] {
+        assert_eq!(
+            prompt_chip_log_file_path(std::path::Path::new(active_log)).unwrap(),
+            std::path::PathBuf::from(expected_sidecar)
+        );
+    }
 }
 
 #[test]

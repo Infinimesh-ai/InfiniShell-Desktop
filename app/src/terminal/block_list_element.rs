@@ -1,6 +1,67 @@
-use crate::ai::blocklist::agent_view::{agent_view_bg_fill, AgentViewState};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::mem;
+use std::ops::{Deref, Range, RangeInclusive};
+use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
+
+use enum_iterator::Sequence;
+use itertools::Itertools;
+use parking_lot::FairMutex;
+use pathfinder_color::ColorU;
+use vec1::Vec1;
+use warp_core::semantic_selection::SemanticSelection;
+use warp_core::ui::builder::UiBuilder;
+use warp_core::ui::theme::AnsiColorIdentifier;
+use warp_util::user_input::UserInput;
+use warpui::elements::new_scrollable::{NewScrollableElement, ScrollableAxis};
+use warpui::elements::{
+    Axis, Border, ChildAnchor, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
+    Hoverable, Icon, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
+    ParentOffsetBounds, Point, Radius, SavePosition, ScrollData, ScrollableElement, Stack, Text,
+    ZIndex,
+};
+use warpui::event::{DispatchedEvent, KeyState, ModifiersState};
+use warpui::fonts::{FamilyId, Properties, Weight};
+use warpui::geometry::rect::RectF;
+use warpui::geometry::vector::{Vector2F, vec2f};
+use warpui::platform::Cursor;
+use warpui::platform::keyboard::KeyCode;
+use warpui::text::SelectionType;
+use warpui::ui_components::components::UiComponent;
+use warpui::units::{IntoLines, IntoPixels, Lines, Pixels};
+use warpui::{
+    AfterLayoutContext, AppContext, ClipBounds, Element, EntityId, Event, EventContext,
+    LayoutContext, ModelHandle, PaintContext, SingletonEntity as _, SizeConstraint,
+};
+
+use super::block_list_viewport::{ClampingMode, InputMode, ScrollPosition, ViewportState};
+use super::blockgrid_renderer::GridRenderParams;
+use super::find::{BlockFindRenderData, TerminalFindModel};
+use super::grid_renderer::CellGlyphCache;
+use super::meta_shortcuts::handle_keystroke_despite_composing;
+use super::model::SecretHandle;
+use super::model::block::BlockId;
+use super::model::blocks::{RichContentItem, SelectionRange};
+use super::model::grid::grid_handler::{Link, TermMode};
+use super::model::image_map::StoredImageMetadata;
+use super::model::mouse::{MouseAction, MouseButton, MouseState};
+use super::model::session::SessionId;
+use super::model::terminal_model::{SelectedBlocks, WithinBlock, WithinModel};
+use super::shared_session::presence_manager::{
+    MUTED_PARTICIPANT_COLOR, PresenceManager, text_selection_color,
+};
+use super::shared_session::render_util::SHARED_SESSION_AVATAR_DIAMETER;
+use super::view::{
+    BLOCK_BANNER_HEIGHT, BlocklistAIRenderContext, InlineBannerId, RichContentMetadata,
+    SeparatorId, SharedSessionBanners, TerminalEditor, TerminalViewRenderContext,
+};
+use super::warpify::render::{draw_flag_pole, render_subshell_flag};
+use super::{HEIGHT_FUDGE_FACTOR_LINES, TerminalModel, heights_approx_eq};
 use crate::ai::blocklist::block::cli::CLI_SUBAGENT_MIN_RESIZABLE_WIDTH;
-use crate::ai::blocklist::{ai_brand_color, ATTACH_AS_AGENT_MODE_CONTEXT_TEXT};
+use crate::ai::blocklist::{ATTACH_AS_AGENT_MODE_CONTEXT_TEXT, ai_brand_color};
+use crate::terminal::shared_session::protocol::{ParticipantId, Selection};
 use crate::ai_assistant::{AI_ASSISTANT_SVG_PATH, ASK_AI_ASSISTANT_TEXT};
 use crate::appearance::Appearance;
 use crate::drive::settings::WarpDriveSettings;
@@ -11,91 +72,25 @@ use crate::settings::{
 };
 use crate::terminal::alt_screen::{should_intercept_mouse, should_intercept_scroll};
 use crate::terminal::block_list_viewport::AutoscrollBehavior;
+use crate::terminal::blockgrid_renderer::BlockGridParams;
 use crate::terminal::input::inline_menu::InlineMenuPositioner;
-use crate::terminal::model::block::{Block, BlockSection};
+use crate::terminal::model::block::{Block, BlockSection, TranscriptScope};
 use crate::terminal::model::blocks::{
     BlockHeight, BlockHeightItem, BlockHeightSummary, BlockList, BlockListPoint, TotalIndex,
 };
+use crate::terminal::model::escape_sequences::{
+    KeystrokeWithDetails, ToEscapeSequence, maybe_kitty_keyboard_escape_sequence,
+};
 use crate::terminal::model::index::Point as IndexPoint;
 use crate::terminal::model::selection::{SelectAction, SelectionPoint};
+use crate::terminal::model::terminal_model::BlockIndex;
 use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
 use crate::terminal::view::TerminalAction;
-use crate::terminal::{grid_renderer, SizeInfo};
+use crate::terminal::warpify::SubshellSource;
+use crate::terminal::{SizeInfo, grid_renderer};
 use crate::themes::theme::{Fill, WarpTheme};
 use crate::ui_components::{self, icons as UIIcon};
 use crate::util::color::Opacity;
-use enum_iterator::Sequence;
-use itertools::Itertools;
-use parking_lot::FairMutex;
-use vec1::Vec1;
-use warp_core::semantic_selection::SemanticSelection;
-use warp_core::ui::builder::UiBuilder;
-use warp_core::ui::theme::AnsiColorIdentifier;
-use warp_util::user_input::UserInput;
-use warpui::platform::Cursor;
-use warpui::text::SelectionType;
-
-use crate::terminal::shared_session::protocol::{ParticipantId, Selection};
-use pathfinder_color::ColorU;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::mem;
-use std::ops::{Deref, Range, RangeInclusive};
-use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
-use warpui::elements::new_scrollable::{NewScrollableElement, ScrollableAxis};
-use warpui::elements::{
-    Axis, Border, ChildAnchor, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
-    Hoverable, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
-    ParentOffsetBounds, Point, Radius, ScrollData, ScrollableElement, Stack, Text, ZIndex,
-};
-use warpui::event::{KeyState, ModifiersState};
-use warpui::fonts::{FamilyId, Properties, Weight};
-use warpui::geometry::rect::RectF;
-use warpui::geometry::vector::{vec2f, Vector2F};
-use warpui::platform::keyboard::KeyCode;
-use warpui::ui_components::components::UiComponent;
-use warpui::units::{IntoLines, IntoPixels, Lines, Pixels};
-use warpui::{elements::Icon, ClipBounds};
-use warpui::{
-    elements::SavePosition, event::DispatchedEvent, AfterLayoutContext, AppContext, Element, Event,
-    EventContext, LayoutContext, PaintContext, SizeConstraint,
-};
-use warpui::{EntityId, ModelHandle, SingletonEntity as _};
-
-use super::block_list_viewport::{ClampingMode, InputMode, ScrollPosition, ViewportState};
-use super::blockgrid_renderer::GridRenderParams;
-use super::find::{BlockListFindRun, BlockListMatch, TerminalFindModel};
-use super::grid_renderer::CellGlyphCache;
-
-use super::meta_shortcuts::handle_keystroke_despite_composing;
-use super::model::block::BlockId;
-use super::model::blocks::{RichContentItem, SelectionRange};
-use super::model::grid::grid_handler::{Link, TermMode};
-use super::model::image_map::StoredImageMetadata;
-use super::model::mouse::{MouseAction, MouseButton, MouseState};
-use super::model::session::SessionId;
-use super::model::terminal_model::{SelectedBlocks, WithinBlock, WithinModel};
-use super::model::SecretHandle;
-use super::shared_session::presence_manager::{
-    text_selection_color, PresenceManager, MUTED_PARTICIPANT_COLOR,
-};
-use super::shared_session::render_util::SHARED_SESSION_AVATAR_DIAMETER;
-use super::view::{
-    BlocklistAIRenderContext, InlineBannerId, RichContentMetadata, SeparatorId,
-    SharedSessionBanners, TerminalEditor, TerminalViewRenderContext, BLOCK_BANNER_HEIGHT,
-};
-use super::warpify::render::{draw_flag_pole, render_subshell_flag};
-use super::TerminalModel;
-use super::{heights_approx_eq, HEIGHT_FUDGE_FACTOR_LINES};
-use crate::terminal::blockgrid_renderer::BlockGridParams;
-use crate::terminal::model::terminal_model::BlockIndex;
-use crate::terminal::warpify::SubshellSource;
-
-use crate::terminal::model::escape_sequences::{
-    maybe_kitty_keyboard_escape_sequence, KeystrokeWithDetails, ToEscapeSequence,
-};
 
 /// The number of pixels at the bottom of padding where selection scrolling is performed.
 const BOTTOM_VERTICAL_MARGIN: f32 = 10.0;
@@ -237,7 +232,7 @@ pub type FilterBuilderFn = dyn Fn(
     &AppContext,
 ) -> Vec<Option<Box<dyn Element>>>;
 
-#[derive(Debug, PartialEq, Copy, Clone, Eq, PartialOrd, Sequence)]
+#[derive(Debug, PartialEq, Copy, Clone, Eq, PartialOrd, Sequence, Hash)]
 pub enum GridType {
     Prompt,
     Rprompt,          // Right side prompt
@@ -1254,9 +1249,7 @@ impl BlockListElement {
             self.ask_ai_assistant_button = Some(element);
         }
 
-        if FeatureFlag::BlockToolbeltSaveAsWorkflow.is_enabled()
-            && WarpDriveSettings::is_warp_drive_enabled(app)
-        {
+        if WarpDriveSettings::is_warp_drive_enabled(app) {
             let icon = Container::new(
                 ConstrainedBox::new(
                     ui_components::icons::Icon::Save
@@ -1414,34 +1407,34 @@ impl BlockListElement {
             let model = self.model.lock();
             let viewport = self.viewport_state_after_layout(model.block_list());
 
-            if let Some(blocklist_point) = blocklist_point {
-                if let Some(block_index) = viewport.block_index_from_point(blocklist_point) {
-                    let on_long_running_block = model
-                        .block_list()
-                        .block_at(block_index)
-                        .is_some_and(|block| block.is_active_and_long_running());
+            if let Some(blocklist_point) = blocklist_point
+                && let Some(block_index) = viewport.block_index_from_point(blocklist_point)
+            {
+                let on_long_running_block = model
+                    .block_list()
+                    .block_at(block_index)
+                    .is_some_and(|block| block.is_active_and_long_running());
 
-                    if on_long_running_block && !should_intercept_scroll(&model, app) {
-                        // Send scroll event to PTY as mouse wheel action.
-                        // Convert Lines to i32 by rounding to nearest non-zero integer.
-                        let delta = round_nonzero(delta_lines.as_f64());
-                        if delta != 0 {
-                            let mouse_state = MouseState::new(
-                                MouseButton::Wheel,
-                                MouseAction::Scrolled { delta },
-                                Default::default(),
-                            );
-                            let grid_point = IndexPoint::new(
-                                blocklist_point.row.as_f64().round() as usize,
-                                blocklist_point.column,
-                            );
+                if on_long_running_block && !should_intercept_scroll(&model, app) {
+                    // Send scroll event to PTY as mouse wheel action.
+                    // Convert Lines to i32 by rounding to nearest non-zero integer.
+                    let delta = round_nonzero(delta_lines.as_f64());
+                    if delta != 0 {
+                        let mouse_state = MouseState::new(
+                            MouseButton::Wheel,
+                            MouseAction::Scrolled { delta },
+                            Default::default(),
+                        );
+                        let grid_point = IndexPoint::new(
+                            blocklist_point.row.as_f64().round() as usize,
+                            blocklist_point.column,
+                        );
 
-                            drop(model);
-                            ctx.dispatch_typed_action(TerminalAction::AltMouseAction(
-                                mouse_state.set_point(grid_point),
-                            ));
-                            return true;
-                        }
+                        drop(model);
+                        ctx.dispatch_typed_action(TerminalAction::AltMouseAction(
+                            mouse_state.set_point(grid_point),
+                        ));
+                        return true;
                     }
                 }
             }
@@ -1707,9 +1700,13 @@ impl BlockListElement {
                                 return true;
                             }
 
-                            if let Some(RichContentMetadata::AIBlock { .. }) =
-                                self.rich_content_metadata.get(view_id)
-                            {
+                            if matches!(
+                                self.rich_content_metadata.get(view_id),
+                                Some(
+                                    RichContentMetadata::AIBlock(_)
+                                        | RichContentMetadata::PendingUserQuery { .. }
+                                )
+                            ) {
                                 should_redetermine_focus = false;
                             }
 
@@ -1765,7 +1762,7 @@ impl BlockListElement {
             ctx.dispatch_typed_action(TerminalAction::BlockTextSelect(BlockTextSelectAction::End));
         }
 
-        let handled = if self.is_mouse_position_within_bounds(position) {
+        if self.is_mouse_position_within_bounds(position) {
             if let Some(point) = self.coord_to_point(
                 SnackbarPoint::within_snackbar(position),
                 ClampingMode::ReturnNoneIfNotInGrid,
@@ -1832,9 +1829,7 @@ impl BlockListElement {
             true
         } else {
             false
-        };
-
-        handled
+        }
     }
 
     /// Handle a mouse move event when we've determined the mouse is over the block list (and not
@@ -2025,20 +2020,20 @@ impl BlockListElement {
             let side = self
                 .size_info
                 .get_mouse_side(position - vec2f(bounds.origin().x(), snackbar_bottom));
-            if !is_selecting_blocks {
-                if let Some(point) = self.coord_to_point(
+            if !is_selecting_blocks
+                && let Some(point) = self.coord_to_point(
                     SnackbarPoint::underneath_snackbar(position),
                     ClampingMode::ClampToGrid,
-                ) {
-                    ctx.dispatch_typed_action(TerminalAction::BlockTextSelect(
-                        BlockTextSelectAction::Update {
-                            point,
-                            delta: delta_y.into_lines(),
-                            side,
-                            position,
-                        },
-                    ));
-                }
+                )
+            {
+                ctx.dispatch_typed_action(TerminalAction::BlockTextSelect(
+                    BlockTextSelectAction::Update {
+                        point,
+                        delta: delta_y.into_lines(),
+                        side,
+                        position,
+                    },
+                ));
             }
 
             if let Some(point) = self.coord_to_point(
@@ -2212,7 +2207,7 @@ impl BlockListElement {
                 {
                     if block_list
                         .block_at(block_index)
-                        .map(|block| block.should_hide_block(block_list.agent_view_state()))
+                        .map(|block| block.should_hide_block(block_list.transcript_scope()))
                         .unwrap_or(true)
                     {
                         any_hidden = true;
@@ -2418,13 +2413,12 @@ impl BlockListElement {
         block_borders_enabled: bool,
         snackbar_header: &Option<SnackbarHeader>,
         ai_render_context: &BlocklistAIRenderContext,
-        agent_view_state: &AgentViewState,
+        transcript_scope: &TranscriptScope,
         ctx: &mut PaintContext,
-        app: &AppContext,
     ) {
-        let block_height = block.height(agent_view_state).as_f64() as f32 * cell_size.y();
+        let block_height = block.height(transcript_scope).as_f64() as f32 * cell_size.y();
         if block.is_restored()
-            && (!FeatureFlag::AgentView.is_enabled() || !agent_view_state.is_fullscreen())
+            && (!FeatureFlag::AgentView.is_enabled() || !transcript_scope.is_conversation())
         {
             ctx.scene
                 .draw_rect_with_hit_recording(RectF::new(
@@ -2434,24 +2428,13 @@ impl BlockListElement {
                 .with_background(warp_theme.restored_blocks_overlay());
         }
 
-        // Update the background for the current active long running command when the inline agent view is active.
-        if agent_view_state.is_inline() && block.is_active_and_long_running() {
-            ctx.scene
-                .draw_rect_with_hit_recording(RectF::new(
-                    grid_origin,
-                    Vector2F::new(bounds.width(), block_height),
-                ))
-                .with_background(agent_view_bg_fill(app));
-        }
-
         let mut did_render_ai_stripe = false;
-        if !FeatureFlag::AgentView.is_enabled() {
-            if let Some(ai_context_stripe_color) =
+        if !FeatureFlag::AgentView.is_enabled()
+            && let Some(ai_context_stripe_color) =
                 ai_render_context.context_color_for_block(block, warp_theme)
-            {
-                draw_flag_pole(grid_origin, block_height, ai_context_stripe_color, ctx);
-                did_render_ai_stripe = true;
-            }
+        {
+            draw_flag_pole(grid_origin, block_height, ai_context_stripe_color, ctx);
+            did_render_ai_stripe = true;
         }
 
         if block.has_failed() {
@@ -2518,7 +2501,7 @@ impl BlockListElement {
         block: &Block,
         grid_origin: &mut Vector2F,
         element_origin: Vector2F,
-        block_list_find_run: Option<&BlockListFindRun>,
+        find_render_data: Option<BlockFindRenderData>,
         highlighted_url: Option<&WithinBlock<Link>>,
         link_tool_tip: Option<&WithinBlock<Link>>,
         hovered_secret: Option<SecretHandle>,
@@ -2535,7 +2518,7 @@ impl BlockListElement {
         ai_render_context: &BlocklistAIRenderContext,
         cursor_hint_text: Option<&mut Box<dyn Element>>,
         image_metadata: &HashMap<u32, StoredImageMetadata>,
-        agent_view_state: &AgentViewState,
+        transcript_scope: &TranscriptScope,
         ctx: &mut PaintContext,
         app: &AppContext,
     ) {
@@ -2549,9 +2532,8 @@ impl BlockListElement {
             block_borders_enabled,
             snackbar_header,
             ai_render_context,
-            agent_view_state,
+            transcript_scope,
             ctx,
-            app,
         );
 
         let cell_size_height = block_grid_params.grid_render_params.cell_size.y();
@@ -2565,129 +2547,133 @@ impl BlockListElement {
             Self::draw_border_between_blocks(border_origin, block_grid_params, ctx);
         }
 
-        let prompt_height_offset = cell_size_height * block.padding_top().as_f64() as f32;
-
-        *grid_origin += vec2f(0., prompt_height_offset);
-
-        let prompt_origin = snackbar_header
-            .and_then(|header| header.header_rect())
-            .map_or(*grid_origin, |r| {
-                let y = r.origin().y() + prompt_height_offset + block_banner_height;
-                vec2f(grid_origin.x(), y)
-            });
-
         let cursor_visible = block.is_mode_set(TermMode::SHOW_CURSOR);
-        // Draw prompt
-        if let Some(label_element) = label_element {
-            label_element.paint(prompt_origin, ctx, app);
-        } else {
-            let size_info = &block_grid_params.grid_render_params.size_info;
-            if block.should_display_rprompt(size_info) {
-                let rprompt_origin = prompt_origin + block.rprompt_render_offset(size_info);
-                block.rprompt_grid().draw(
-                    rprompt_origin,
-                    element_origin,
-                    glyphs,
-                    COMMAND_ALPHA,
-                    None,
-                    None,
-                    hovered_secret,
-                    None::<std::iter::Empty<&RangeInclusive<IndexPoint>>>,
-                    None,
-                    Properties::default(),
-                    block_grid_params,
-                    None,
-                    image_metadata,
+        let command_origin = if !block.should_hide_command_grid() {
+            let prompt_height_offset = cell_size_height * block.padding_top().as_f64() as f32;
+
+            *grid_origin += vec2f(0., prompt_height_offset);
+
+            let prompt_origin = snackbar_header
+                .and_then(|header| header.header_rect())
+                .map_or(*grid_origin, |r| {
+                    let y = r.origin().y() + prompt_height_offset + block_banner_height;
+                    vec2f(grid_origin.x(), y)
+                });
+
+            // Draw prompt
+            if let Some(label_element) = label_element {
+                label_element.paint(prompt_origin, ctx, app);
+            } else {
+                let size_info = &block_grid_params.grid_render_params.size_info;
+                if block.should_display_rprompt(size_info) {
+                    let rprompt_origin = prompt_origin + block.rprompt_render_offset(size_info);
+                    block.rprompt_grid().draw(
+                        rprompt_origin,
+                        element_origin,
+                        glyphs,
+                        COMMAND_ALPHA,
+                        None,
+                        None,
+                        hovered_secret,
+                        None::<std::iter::Empty<&RangeInclusive<IndexPoint>>>,
+                        None,
+                        Properties::default(),
+                        block_grid_params,
+                        None,
+                        image_metadata,
+                        ctx,
+                        app,
+                    );
+                }
+            }
+
+            // If Warp prompt (non-PS1) is being used, the command is drawn below the prompt,
+            // hence we account for the prompt's vertical offset.
+            let prompt_vertical_offset_px = if !block.honor_ps1() {
+                cell_size_height
+                    * (block.command_padding_top() + block.prompt_height()).as_f64() as f32
+            } else {
+                // Otherwise, the prompt/command are drawn together, in a single grid. Hence, we haven't
+                // drawn the prompt above and we do not account for the offset.
+                0.0
+            };
+
+            *grid_origin += vec2f(0.0, prompt_vertical_offset_px);
+
+            // Determine command_origin based on snackbar_header.
+            let command_origin = if snackbar_header.is_some() {
+                prompt_origin + vec2f(0.0, prompt_vertical_offset_px)
+            } else {
+                *grid_origin
+            };
+
+            // Update grid_origin and draw command.
+            let command_grid_properties = Properties::default();
+            let command_focused_range =
+                find_render_data
+                    .as_ref()
+                    .and_then(|data: &BlockFindRenderData<'_>| {
+                        data.focused_range_for_grid(GridType::PromptAndCommand)
+                    });
+            block.prompt_and_command_grid().draw(
+                command_origin,
+                element_origin,
+                glyphs,
+                COMMAND_ALPHA,
+                highlighted_url
+                    .filter(|url| url.is_in_command_content() && url.block_index == block_index)
+                    .map(|url| &url.inner),
+                link_tool_tip
+                    .filter(|url| url.is_in_command_content() && url.block_index == block_index)
+                    .map(|url| &url.inner),
+                hovered_secret,
+                find_render_data
+                    .as_ref()
+                    .and_then(|data: &BlockFindRenderData<'_>| data.command_grid_matches()),
+                command_focused_range.as_ref(),
+                command_grid_properties,
+                block_grid_params,
+                cursor_visible.then(|| block.prompt_and_command_grid().cursor_style().shape),
+                image_metadata,
+                ctx,
+                app,
+            );
+
+            // Only render the cursor in the command grid if the command grid is active and if it's
+            // long running. This is to avoid jitter where a cursor just flickers while the pty is
+            // initializing.
+            if block.is_active_and_long_running()
+                && block.is_command_grid_active()
+                // Check if the "hide cursor" escape sequence is present.
+                && block.is_mode_set(TermMode::SHOW_CURSOR)
+            {
+                block.prompt_and_command_grid().draw_cursor(
+                    command_origin,
+                    &block_grid_params.grid_render_params,
                     ctx,
+                    terminal_view_id,
+                    None,
+                    block_grid_params
+                        .grid_render_params
+                        .warp_theme
+                        .cursor()
+                        .into(),
                     app,
                 );
             }
-        }
 
-        // If Zap prompt (non-PS1) is being used, the command is drawn below the prompt,
-        // hence we account for the prompt's vertical offset.
-        let prompt_vertical_offset_px = if !block.honor_ps1() {
-            cell_size_height * (block.command_padding_top() + block.prompt_height()).as_f64() as f32
-        } else {
-            // Otherwise, the prompt/command are drawn together, in a single grid. Hence, we haven't
-            // drawn the prompt above and we do not account for the offset.
-            0.0
-        };
+            // Update grid_origin & draw output
+            *grid_origin += vec2f(
+                0.,
+                cell_size_height
+                    * (block.padding_middle() + block.prompt_and_command_grid().len().into_lines())
+                        .as_f64() as f32,
+            );
 
-        *grid_origin += vec2f(0.0, prompt_vertical_offset_px);
-
-        // Determine command_origin based on snackbar_header.
-        let command_origin = if snackbar_header.is_some() {
-            prompt_origin + vec2f(0.0, prompt_vertical_offset_px)
+            command_origin
         } else {
             *grid_origin
         };
-
-        // Update grid_origin and draw command.
-        let command_grid_properties = Properties::default();
-        block.prompt_and_command_grid().draw(
-            command_origin,
-            element_origin,
-            glyphs,
-            COMMAND_ALPHA,
-            highlighted_url
-                .filter(|url| url.is_in_command_content() && url.block_index == block_index)
-                .map(|url| &url.inner),
-            link_tool_tip
-                .filter(|url| url.is_in_command_content() && url.block_index == block_index)
-                .map(|url| &url.inner),
-            hovered_secret,
-            block_list_find_run
-                .map(|run| run.matches_for_block_grid(block_index, GridType::PromptAndCommand)),
-            block_list_find_run
-                .and_then(|run| run.focused_match())
-                .and_then(|focused_match| match focused_match {
-                    BlockListMatch::CommandBlock(m)
-                        if m.block_index == block_index
-                            && m.grid_type == GridType::PromptAndCommand =>
-                    {
-                        Some(&m.range)
-                    }
-                    _ => None,
-                }),
-            command_grid_properties,
-            block_grid_params,
-            cursor_visible.then(|| block.prompt_and_command_grid().cursor_style().shape),
-            image_metadata,
-            ctx,
-            app,
-        );
-
-        // Only render the cursor in the command grid if the command grid is active and if it's
-        // long running. This is to avoid jitter where a cursor just flickers while the pty is
-        // initializing.
-        if block.is_active_and_long_running()
-            && block.is_command_grid_active()
-            // Check if the "hide cursor" escape sequence is present.
-            && block.is_mode_set(TermMode::SHOW_CURSOR)
-        {
-            block.prompt_and_command_grid().draw_cursor(
-                command_origin,
-                &block_grid_params.grid_render_params,
-                ctx,
-                terminal_view_id,
-                None,
-                block_grid_params
-                    .grid_render_params
-                    .warp_theme
-                    .cursor()
-                    .into(),
-                app,
-            );
-        }
-
-        // Update grid_origin & draw output
-        *grid_origin += vec2f(
-            0.,
-            cell_size_height
-                * (block.padding_middle() + block.prompt_and_command_grid().len().into_lines())
-                    .as_f64() as f32,
-        );
 
         let block_middle_lines =
             block.padding_middle() + block.prompt_and_command_number_of_rows().into_lines();
@@ -2725,6 +2711,12 @@ impl BlockListElement {
 
             let output_grid_properties =
                 Properties::default().weight(block_grid_params.grid_render_params.font_weight);
+            let output_focused_range =
+                find_render_data
+                    .as_ref()
+                    .and_then(|data: &BlockFindRenderData<'_>| {
+                        data.focused_range_for_grid(GridType::Output)
+                    });
             block.output_grid().draw(
                 *grid_origin,
                 viewport_origin,
@@ -2737,19 +2729,11 @@ impl BlockListElement {
                     .filter(|url| !url.is_in_command_content() && url.block_index == block_index)
                     .map(|url| &url.inner),
                 hovered_secret,
-                // Render find matches in output grid
-                block_list_find_run
-                    .map(|run| run.matches_for_block_grid(block_index, GridType::Output)),
-                block_list_find_run
-                    .and_then(|run| run.focused_match())
-                    .and_then(|focused_match| match focused_match {
-                        BlockListMatch::CommandBlock(m)
-                            if m.block_index == block_index && m.grid_type == GridType::Output =>
-                        {
-                            Some(&m.range)
-                        }
-                        _ => None,
-                    }),
+                // Render find matches in output grid.
+                find_render_data
+                    .as_ref()
+                    .and_then(|data: &BlockFindRenderData<'_>| data.output_grid_matches()),
+                output_focused_range.as_ref(),
                 output_grid_properties,
                 block_grid_params,
                 cursor_visible.then(|| block.output_grid().cursor_style().shape),
@@ -3110,13 +3094,13 @@ impl BlockListElement {
     ) -> bool {
         use crate::terminal::view::TerminalAction;
 
-        if let Some(voice_input_toggle_key_code) = self.voice_input_toggle_key_code {
-            if *key_code == voice_input_toggle_key_code {
-                ctx.dispatch_typed_action(TerminalAction::ToggleCLIAgentVoiceInput(
-                    voice_input::VoiceInputToggledFrom::Key { state: *state },
-                ));
-                return true;
-            }
+        if let Some(voice_input_toggle_key_code) = self.voice_input_toggle_key_code
+            && *key_code == voice_input_toggle_key_code
+        {
+            ctx.dispatch_typed_action(TerminalAction::ToggleCLIAgentVoiceInput(
+                voice_input::VoiceInputToggledFrom::Key { state: *state },
+            ));
+            return true;
         }
         false
     }
@@ -3237,7 +3221,7 @@ impl Element for BlockListElement {
 
         // Use a macro for creating a viewport, to ensure that callers use consistent parameters
         macro_rules! create_viewport {
-            ($block_list:expr) => {
+            ($block_list:expr_2021) => {
                 ViewportState::new(
                     $block_list,
                     self.snackbar_header_state.clone(),
@@ -3610,7 +3594,8 @@ impl Element for BlockListElement {
 
                     let total_lines = grid_storage_lines + flat_storage_lines;
                     let total_bytes = grid_storage_bytes + flat_storage_bytes;
-                    let text = format!("\
+                    let text = format!(
+                        "\
                             Lines: {total_lines} (grid: {grid_storage_lines}, flat: {flat_storage_lines}); \
                             Size: {:#.1} (grid: {:#.1}, flat: {:#.1})\
                         ",
@@ -3796,16 +3781,15 @@ impl Element for BlockListElement {
         let mut visible_selected_blocks = HashSet::new();
         let mut start_of_continuous_selected_blocks = HashSet::new();
         let mut end_of_continuous_selected_blocks = HashSet::new();
-        if let Some(visible_blocks) = &self.visible_blocks {
-            if !visible_blocks.is_empty() {
-                let visible_blocks_inclusive_range =
-                    visible_blocks.start..=(visible_blocks.end - 1.into());
-                for range in self.selected_blocks.ranges() {
-                    visible_selected_blocks
-                        .extend(range.intersection(&visible_blocks_inclusive_range));
-                    start_of_continuous_selected_blocks.insert(range.start());
-                    end_of_continuous_selected_blocks.insert(range.end());
-                }
+        if let Some(visible_blocks) = &self.visible_blocks
+            && !visible_blocks.is_empty()
+        {
+            let visible_blocks_inclusive_range =
+                visible_blocks.start..=(visible_blocks.end - 1.into());
+            for range in self.selected_blocks.ranges() {
+                visible_selected_blocks.extend(range.intersection(&visible_blocks_inclusive_range));
+                start_of_continuous_selected_blocks.insert(range.start());
+                end_of_continuous_selected_blocks.insert(range.end());
             }
         }
 
@@ -3824,7 +3808,7 @@ impl Element for BlockListElement {
         }
 
         let mut cli_subagent_views_to_paint = vec![];
-        let agent_view_state = model.block_list().agent_view_state();
+        let transcript_scope = model.block_list().transcript_scope();
 
         let items = self
             .visible_items
@@ -3878,7 +3862,7 @@ impl Element for BlockListElement {
 
                     // TODO(vorporeal): should probably use `Pixels` here
                     let block_pixel_height =
-                        block.height(agent_view_state).as_f64() as f32 * cell_size.y();
+                        block.height(transcript_scope).as_f64() as f32 * cell_size.y();
 
                     let block_bottom_y = grid_origin.y() + block_pixel_height;
                     let selection_bottom_y = snackbar_header
@@ -3901,7 +3885,7 @@ impl Element for BlockListElement {
                         );
 
                         let can_be_ai_context = self.ai_render_context.borrow().is_ai_input_enabled
-                            && block.can_be_ai_context(agent_view_state);
+                            && block.can_be_ai_context(transcript_scope);
 
                         ctx.scene
                             .draw_rect_with_hit_recording(RectF::new(
@@ -4018,7 +4002,9 @@ impl Element for BlockListElement {
                                     - SPACE_BETWEEN_SELECTED_BLOCK_AVATARS,
                             );
                         } else {
-                            log::warn!("Should show avatar for shared session participant at selected block but avatar element was not found")
+                            log::warn!(
+                                "Should show avatar for shared session participant at selected block but avatar element was not found"
+                            )
                         }
                     }
 
@@ -4078,7 +4064,13 @@ impl Element for BlockListElement {
                         self.find_model
                             .as_ref(app)
                             .is_find_bar_open()
-                            .then(|| self.find_model.as_ref(app).block_list_find_run())
+                            .then(|| {
+                                self.find_model.as_ref(app).find_render_data_for_block(
+                                    *block_index,
+                                    Some(block.prompt_and_command_grid().grid_handler()),
+                                    Some(block.output_grid().grid_handler()),
+                                )
+                            })
                             .flatten(),
                         self.highlighted_url.as_ref(),
                         self.link_tool_tip.as_ref(),
@@ -4096,7 +4088,7 @@ impl Element for BlockListElement {
                         self.ai_render_context.borrow().deref(),
                         self.cursor_hint_text_element.as_mut(),
                         &model.image_id_to_metadata,
-                        agent_view_state,
+                        transcript_scope,
                         ctx,
                         app,
                     );
@@ -4127,10 +4119,9 @@ impl Element for BlockListElement {
 
                     if let Some(snackbar_toggle_button_origin) =
                         self.compute_snackbar_toggle_button_draw_location(&block_grid_params)
+                        && let Some(snackbar_toggle_button) = self.snackbar_toggle_button.as_mut()
                     {
-                        if let Some(snackbar_toggle_button) = self.snackbar_toggle_button.as_mut() {
-                            snackbar_toggle_button.paint(snackbar_toggle_button_origin, ctx, app);
-                        }
+                        snackbar_toggle_button.paint(snackbar_toggle_button_origin, ctx, app);
                     }
 
                     // The block buttons might overlap with the prompt. If that's the case,
@@ -4223,27 +4214,15 @@ impl Element for BlockListElement {
                             ask_ai_assistant_button.paint(ask_ai_assistant_button_origin, ctx, app);
                         }
 
-                        if FeatureFlag::BlockToolbeltSaveAsWorkflow.is_enabled() {
-                            if let Some(save_as_workflow_button) =
-                                self.save_as_workflow_button.as_mut()
-                            {
-                                save_as_workflow_button.paint(bookmark_button_origin, ctx, app);
-                            }
+                        if let Some(save_as_workflow_button) = self.save_as_workflow_button.as_mut()
+                        {
+                            save_as_workflow_button.paint(bookmark_button_origin, ctx, app);
                         }
                     }
 
                     // When a block has an active filter on it, we want the filter icon to show even when the block is not hovered over.
                     if let Some(filter_element) = self.filter_elements.get_mut(block_index) {
                         filter_element.paint(filter_button_origin, ctx, app);
-                    }
-
-                    if !FeatureFlag::BlockToolbeltSaveAsWorkflow.is_enabled() {
-                        // When a block is bookmarked, we want the bookmark icon to show even when the block is not hovered over.
-                        if let Some(bookmark_element) = self.bookmark_elements.get_mut(block_index)
-                        {
-                            // Paint the bookmark icon to the left of the overflow button.
-                            bookmark_element.paint(bookmark_button_origin, ctx, app);
-                        }
                     }
 
                     // Paint the CLI subagent view on top of everything else for this block
@@ -4387,7 +4366,11 @@ impl Element for BlockListElement {
                         }
                     }
 
-                    draw_border_above_block = true;
+                    // Don't draw a border below session headers (i.e. above the next block).
+                    draw_border_above_block = !matches!(
+                        self.rich_content_metadata.get(view_id),
+                        Some(RichContentMetadata::HarnessSessionHeader)
+                    );
 
                     grid_origin += vec2f(0., *height_px);
                 }
@@ -4486,7 +4469,29 @@ impl Element for BlockListElement {
             event.raw_event()
         } else {
             let Some(e) = event.at_z_index(z_index, ctx) else {
-                // Only proceed if there's a relevant event at this z-index.
+                // The event is behind an overlay. Still dispatch interactive
+                // events to rich content views so overlay children (e.g.
+                // ask-user-question speedbump dropdowns) can handle them.
+                if matches!(
+                    event.raw_event(),
+                    Event::ScrollWheel { .. }
+                        | Event::LeftMouseDown { .. }
+                        | Event::LeftMouseUp { .. }
+                        | Event::LeftMouseDragged { .. }
+                        | Event::MiddleMouseDown { .. }
+                        | Event::RightMouseDown { .. }
+                        | Event::BackMouseDown { .. }
+                        | Event::ForwardMouseDown { .. }
+                ) && self.pane_state.is_focused()
+                {
+                    let mut handled = false;
+                    for view_id in self.visible_rich_content_views() {
+                        if let Some(rich_content) = self.rich_content_elements.get_mut(&view_id) {
+                            handled |= rich_content.dispatch_event(event, ctx, app);
+                        }
+                    }
+                    return handled;
+                }
                 return false;
             };
             e
@@ -4854,33 +4859,33 @@ where
         };
         let mut stack = Stack::new().with_child(container.finish());
 
-        if let Some(tooltip_info) = tooltip_info {
-            if state.is_hovered() {
-                let tool_tip = ui_builder.tool_tip(tooltip_info.label).build().finish();
-                // Adjust the position of the tooltip depending on whether it is showing on the snackbar header
-                let (parent_anchor, child_anchor, offset) = if tooltip_info.tool_tip_below_button {
-                    (
-                        ParentAnchor::BottomRight,
-                        ChildAnchor::TopRight,
-                        vec2f(0., 5.),
-                    )
-                } else {
-                    (
-                        ParentAnchor::TopRight,
-                        ChildAnchor::BottomRight,
-                        vec2f(0., -5.),
-                    )
-                };
-                stack.add_positioned_overlay_child(
-                    tool_tip,
-                    OffsetPositioning::offset_from_parent(
-                        offset,
-                        ParentOffsetBounds::Unbounded,
-                        parent_anchor,
-                        child_anchor,
-                    ),
-                );
-            }
+        if let Some(tooltip_info) = tooltip_info
+            && state.is_hovered()
+        {
+            let tool_tip = ui_builder.tool_tip(tooltip_info.label).build().finish();
+            // Adjust the position of the tooltip depending on whether it is showing on the snackbar header
+            let (parent_anchor, child_anchor, offset) = if tooltip_info.tool_tip_below_button {
+                (
+                    ParentAnchor::BottomRight,
+                    ChildAnchor::TopRight,
+                    vec2f(0., 5.),
+                )
+            } else {
+                (
+                    ParentAnchor::TopRight,
+                    ChildAnchor::BottomRight,
+                    vec2f(0., -5.),
+                )
+            };
+            stack.add_positioned_overlay_child(
+                tool_tip,
+                OffsetPositioning::offset_from_parent(
+                    offset,
+                    ParentOffsetBounds::Unbounded,
+                    parent_anchor,
+                    child_anchor,
+                ),
+            );
         }
 
         stack.finish()

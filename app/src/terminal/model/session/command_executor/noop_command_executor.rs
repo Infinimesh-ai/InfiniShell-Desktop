@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 
-use crate::terminal::shell::Shell;
-
 use super::{CommandExecutor, CommandOutput, ExecuteCommandOptions};
+use crate::terminal::shell::Shell;
 
 ///  A "no-op" implementation of `CommandExecutor` to be used as a placeholder `CommandExecutor`
 ///  implementation for remote non-SSH subshell `Session`s when the user has disabled in-band

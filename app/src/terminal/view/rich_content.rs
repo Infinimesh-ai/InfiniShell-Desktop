@@ -1,27 +1,22 @@
-use warpui::{prelude::ChildView, Element, EntityId, View, ViewContext, ViewHandle};
+use warpui::prelude::ChildView;
+use warpui::{Element, EntityId, View, ViewContext, ViewHandle};
 
-use crate::{
-    ai::{
-        agent::{conversation::AIConversationId, AIAgentExchangeId},
-        blocklist::{agent_view::AgentViewEntryOrigin, AIBlock},
-    },
-    env_vars::env_var_collection_block::EnvVarCollectionBlock,
-    terminal::{
-        block_list_viewport::ScrollPositionUpdate,
-        model::{
-            blocks::RichContentItem, rich_content::RichContentType, terminal_model::BlockIndex,
-        },
-        ssh::{error::SshErrorBlock, install_tmux::SshInstallTmuxBlock, warpify::SshWarpifyBlock},
-        view::{
-            ambient_agent::AmbientAgentEntryBlock,
-            block_onboarding::onboarding_agentic_suggestions_block::OnboardingAgenticSuggestionsBlock,
-            ssh_remote_server_choice_view::SshRemoteServerChoiceView,
-            ssh_remote_server_failed_banner::SshRemoteServerFailedBanner,
-        },
-        warpify::success_block::WarpifySuccessBlock,
-        TerminalView,
-    },
-};
+use crate::ai::agent::AIAgentExchangeId;
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::blocklist::AIBlock;
+use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
+use crate::ai::blocklist::block::PendingUserQueryBlock;
+use crate::env_vars::env_var_collection_block::EnvVarCollectionBlock;
+use crate::terminal::TerminalView;
+use crate::terminal::block_list_viewport::ScrollPositionUpdate;
+use crate::terminal::model::blocks::{RemovableBlocklistItem, RichContentItem};
+use crate::terminal::model::rich_content::RichContentType;
+use crate::terminal::model::terminal_model::BlockIndex;
+use crate::terminal::view::ambient_agent::AmbientAgentEntryBlock;
+use crate::terminal::view::ssh_remote_server_choice_view::SshRemoteServerChoiceView;
+use crate::terminal::view::ssh_remote_server_failed_banner::SshRemoteServerFailedBanner;
+use crate::terminal::view::ssh_tmux_deprecation_banner::SshTmuxDeprecationBanner;
+use crate::terminal::warpify::success_block::WarpifySuccessBlock;
 
 /// Specifies where to insert rich content in the blocklist.
 #[derive(Clone, Copy, Debug)]
@@ -33,6 +28,9 @@ pub enum RichContentInsertionPosition {
     },
     /// Insert before the block at the given index.
     BeforeBlockIndex(BlockIndex),
+    /// Insert after the rich content item with the given view ID, falling back to appending if it
+    /// is no longer present.
+    AfterRichContent(EntityId),
     /// Pin to the bottom of the blocklist. The BlockList will automatically
     /// keep this item at the end by reordering it after any subsequent insertions.
     /// Only one item can be pinned at a time.
@@ -168,7 +166,10 @@ impl RichContent {
     }
 
     pub fn is_pending_user_query(&self) -> bool {
-        matches!(self.metadata, Some(RichContentMetadata::PendingUserQuery))
+        matches!(
+            self.metadata,
+            Some(RichContentMetadata::PendingUserQuery { .. })
+        )
     }
 
     pub fn ai_block_metadata(&self) -> Option<&AIBlockMetadata> {
@@ -201,26 +202,25 @@ pub enum RichContentMetadata {
         exchange_id: AIAgentExchangeId,
     },
     UsageFooter,
-    OnboardingAgenticSuggestions {
-        agentic_suggestions_block_handle: ViewHandle<OnboardingAgenticSuggestionsBlock>,
-    },
+    // Zap:上游的 `InitStep` / `InitEnvironment`(init_project / init_environment 子系统)
+    // 与我方的 `OnboardingAgenticSuggestions`(上游已删除对应 block 视图)都没有对应的
+    // 视图源码,故两侧变体在此一并去掉。
     EnvVarCollectionBlock {
         env_var_collection_block_handle: ViewHandle<EnvVarCollectionBlock>,
     },
-    SshWarpifyBlock {
-        ssh_warpify_block_handle: ViewHandle<SshWarpifyBlock>,
-    },
-    SshInstallTmuxBlock {
-        ssh_install_tmux_block_handle: ViewHandle<SshInstallTmuxBlock>,
-    },
-    SshErrorBlock {
-        ssh_error_block_handle: ViewHandle<SshErrorBlock>,
-    },
+    // Zap:SSH warpify / install-tmux / ssh-error 三个 block 变体随上游 #12478 一并下线。
+    // 支撑它们的整套基础设施都已不存在:`app/assets/bundled/ssh/*` 脚本资源被删,
+    // `terminal::model::ansi::{WarpificationUnavailableReason, SystemDetails}` 也被删,
+    // `terminal/ssh/mod.rs` 不再声明 `error` / `install_tmux` / `warpify` 子模块。
+    // 保留的是 `SshTmuxDeprecationBanner` 与 remote-server 相关的几个变体。
     SshRemoteServerChoiceBlock {
         handle: ViewHandle<SshRemoteServerChoiceView>,
     },
     SshRemoteServerFailedBanner {
         handle: ViewHandle<SshRemoteServerFailedBanner>,
+    },
+    SshTmuxDeprecationBanner {
+        handle: ViewHandle<SshTmuxDeprecationBanner>,
     },
     WarpifySuccessBlock {
         bootstrap_success_block_handle: ViewHandle<WarpifySuccessBlock>,
@@ -233,7 +233,10 @@ pub enum RichContentMetadata {
     AgentViewZeroState,
     TerminalViewZeroState,
     PluginInstructionsBlock,
-    PendingUserQuery,
+    PendingUserQuery {
+        pending_user_query_block_handle: ViewHandle<PendingUserQueryBlock>,
+    },
+    HarnessSessionHeader,
 }
 
 impl TerminalView {
@@ -286,11 +289,18 @@ impl TerminalView {
                 false,
             )
         };
-        let item = RichContentItem::new(
+        let is_agent_transcript_user_query = match &metadata {
+            Some(RichContentMetadata::AIBlock(AIBlockMetadata {
+                ai_block_handle, ..
+            })) => ai_block_handle.as_ref(ctx).has_user_input(ctx),
+            _ => false,
+        };
+        let item = RichContentItem::new_with_agent_transcript_user_query(
             content_type,
             handle.id(),
             agent_view_conversation_id,
             should_hide,
+            is_agent_transcript_user_query,
         );
 
         match position {
@@ -307,6 +317,16 @@ impl TerminalView {
                     .lock()
                     .block_list_mut()
                     .insert_rich_content_before_block_index(item, block_index);
+            }
+            RichContentInsertionPosition::AfterRichContent(view_id) => {
+                let mut model = self.model.lock();
+                let inserted = model.block_list_mut().insert_rich_content_after_item(
+                    RemovableBlocklistItem::RichContent(view_id),
+                    item,
+                );
+                if !inserted {
+                    model.block_list_mut().append_rich_content(item, true);
+                }
             }
             RichContentInsertionPosition::PinToBottom => {
                 self.model

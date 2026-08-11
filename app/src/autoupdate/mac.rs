@@ -1,37 +1,34 @@
 #![allow(deprecated)]
 
-use command::{blocking, r#async::Command};
+use std::ffi::CString;
+use std::os::unix::ffi::OsStrExt as _;
+use std::os::unix::fs::MetadataExt;
+use std::os::unix::io::AsRawFd as _;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+use std::{env, fs, str};
+
+use anyhow::{Context, Result, anyhow, bail, ensure};
+use channel_versions::VersionInfo;
+use command::r#async::Command;
+use command::blocking;
 use futures::StreamExt;
 use futures_lite::future;
 use instant::Instant;
-use std::{
-    env,
-    ffi::CString,
-    fs,
-    os::unix::{ffi::OsStrExt as _, fs::MetadataExt, io::AsRawFd as _},
-    path::{Path, PathBuf},
-    str,
-    time::Duration,
-};
-use warp_core::safe_error;
-
-use anyhow::{anyhow, bail, ensure, Context, Result};
-use channel_versions::VersionInfo;
-use nix::unistd::{fchown, getgid};
-use nix::{errno::Errno, unistd::getuid};
+use nix::errno::Errno;
+use nix::unistd::{fchown, getgid, getuid};
 use warp_core::macos::get_bundle_path;
+use warp_core::safe_error;
+use warp_errors::report_error;
 use warpui::{AppContext, ModelContext, SingletonEntity};
 
-use crate::{
-    appearance::AppearanceManager,
-    autoupdate::{AutoupdateStage, AutoupdateState},
-    channel::{Channel, ChannelState},
-    safe_info,
-};
-
 use super::{
-    github, release_assets_directory_url, DownloadProgress, DownloadReady, ProgressCallback,
+    DownloadProgress, DownloadReady, ProgressCallback, github, release_assets_directory_url,
 };
+use crate::appearance::AppearanceManager;
+use crate::autoupdate::{AutoupdateStage, AutoupdateState};
+use crate::channel::{Channel, ChannelState};
+use crate::safe_info;
 
 // Relative path to the directory containing old executables from before an autoupdate.
 //
@@ -59,18 +56,18 @@ pub(super) fn remove_old_executable() -> Result<()> {
     //      a couple releases.
     log::info!("Removing old executable dir...");
     let old_executable_path = PathBuf::from(get_bundle_path()?).join(OLD_EXECUTABLE_PATH);
-    if let Ok(metadata) = fs::metadata(&old_executable_path) {
-        if metadata.is_dir() {
-            fs::remove_dir_all(old_executable_path)?;
-        }
+    if let Ok(metadata) = fs::metadata(&old_executable_path)
+        && metadata.is_dir()
+    {
+        fs::remove_dir_all(old_executable_path)?;
     }
 
     log::info!("Removing old executable file...");
     let old_executable_file_path = old_executable_file_path();
-    if let Ok(metadata) = fs::metadata(&old_executable_file_path) {
-        if metadata.is_file() {
-            fs::remove_file(old_executable_file_path)?;
-        }
+    if let Ok(metadata) = fs::metadata(&old_executable_file_path)
+        && metadata.is_file()
+    {
+        fs::remove_file(old_executable_file_path)?;
     }
 
     Ok(())
@@ -296,11 +293,11 @@ pub async fn cleanup_all_except(preserve_update_id: Option<&str>) {
         };
 
         // Skip the directory we want to preserve
-        if let Some(preserve_id) = preserve_update_id {
-            if file_name == preserve_id {
-                log::debug!("Preserving autoupdate directory: {path:?}");
-                continue;
-            }
+        if let Some(preserve_id) = preserve_update_id
+            && file_name == preserve_id
+        {
+            log::debug!("Preserving autoupdate directory: {path:?}");
+            continue;
         }
 
         let metadata = match async_fs::metadata(&path).await {
@@ -621,7 +618,7 @@ impl Drop for StagedBundle {
         if self.in_app_directory {
             log::info!("Removing temporary app bundle");
             if let Err(err) = fs::remove_dir_all(&self.path) {
-                log::error!("Failed to remove temporary bundle: {err:#}");
+                report_error!(anyhow::Error::new(err).context("Failed to remove temporary bundle"));
             }
         }
     }
@@ -664,7 +661,7 @@ async fn download_and_extract_binary(
     // updates.
     if let Err(err) = unmount_dmg(mountpoint).await {
         let err = err.context("Error unmounting dmg for update");
-        crate::report_error!(&err);
+        warp_errors::report_error!(&err);
     }
 
     // Ensure that the new app we just downloaded has both integrity (e.g. no corrupted files)
@@ -893,14 +890,14 @@ fn dmg_name(channel: Channel) -> String {
         .output()
         .is_ok_and(|output| output.stdout.starts_with(b"arm64"));
 
-    // openWarp GitHub Release 资产名固定使用 `Zap-arm64.dmg` / `Zap-intel.dmg`
-    // (来自 .github/workflows 的命名约定),与 `app_name_prefix("zap-oss")` 不一致。
-    // 这里只对 OSS 写死,不会影响官方 channel 的 universal 命名。
+    // openWarp GitHub Release 资产名固定使用 `InfiniShell-arm64.dmg` /
+    // `InfiniShell-intel.dmg`(来自 .github/workflows 的命名约定):x86_64 上是
+    // `-intel` 而不是官方 channel 的 universal 命名。这里只对 OSS 写死。
     if matches!(channel, Channel::Oss) {
         return if is_arm64 {
-            "Zap-arm64.dmg".to_string()
+            "InfiniShell-arm64.dmg".to_string()
         } else {
-            "Zap-intel.dmg".to_string()
+            "InfiniShell-intel.dmg".to_string()
         };
     }
 
@@ -914,12 +911,12 @@ fn dmg_name(channel: Channel) -> String {
 
 fn app_name_prefix(channel: Channel) -> &'static str {
     match channel {
-        Channel::Stable => "Zap",
+        Channel::Stable => "InfiniShell",
         Channel::Preview => "WarpPreview",
         Channel::Local => "warp",
         Channel::Integration => "integration",
         Channel::Dev => "WarpDev",
-        Channel::Oss => "zap-oss",
+        Channel::Oss => "InfiniShell",
     }
 }
 
@@ -930,7 +927,7 @@ fn executable_name(channel: Channel) -> &'static str {
         Channel::Local => "warp",
         Channel::Integration => "integration",
         Channel::Dev => "dev",
-        Channel::Oss => "zap-oss",
+        Channel::Oss => "infinishell",
     }
 }
 

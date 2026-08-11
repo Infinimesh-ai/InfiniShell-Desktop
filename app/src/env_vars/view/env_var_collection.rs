@@ -1,67 +1,62 @@
-use pathfinder_geometry::vector::{vec2f, Vector2F};
-
+use pathfinder_geometry::vector::{Vector2F, vec2f};
 use warp_core::features::FeatureFlag;
+use warp_errors::report_error;
+use warpui::clipboard::ClipboardContent;
+use warpui::elements::{
+    Align, AnchorPair, ChildAnchor, Clipped, ClippedScrollStateHandle, ClippedScrollable,
+    ConstrainedBox, Container, CrossAxisAlignment, DispatchEventResult, EventHandler, Fill, Flex,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, OffsetType, ParentAnchor,
+    ParentElement, ParentOffsetBounds, PositioningAxis, SavePosition, ScrollbarWidth, Shrinkable,
+    Stack, XAxisAnchor, YAxisAnchor,
+};
+use warpui::keymap::EditableBinding;
+use warpui::platform::Cursor;
+use warpui::presenter::ChildView;
+use warpui::ui_components::components::UiComponent;
 use warpui::{
-    clipboard::ClipboardContent,
-    elements::{
-        Align, AnchorPair, ChildAnchor, Clipped, ClippedScrollStateHandle, ClippedScrollable,
-        ConstrainedBox, Container, CrossAxisAlignment, DispatchEventResult, EventHandler, Fill,
-        Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, OffsetType,
-        ParentAnchor, ParentElement, ParentOffsetBounds, PositioningAxis, SavePosition,
-        ScrollbarWidth, Shrinkable, Stack, XAxisAnchor, YAxisAnchor,
-    },
-    id,
-    keymap::EditableBinding,
-    platform::Cursor,
-    presenter::ChildView,
-    ui_components::components::UiComponent,
     AppContext, BlurContext, Element, Entity, FocusContext, ModelAsRef, ModelHandle,
-    SingletonEntity, TypedActionView, View, ViewContext, ViewHandle, WindowId,
+    SingletonEntity, TypedActionView, View, ViewContext, ViewHandle, WindowId, id,
 };
 
-use crate::{
-    ai::blocklist::block::secret_redaction::find_secrets_in_text_with_levels,
-    cloud_object::{
-        breadcrumbs::ContainingObject,
-        model::persistence::{ObjectStoreEvent, ObjectStoreModel},
-        update_manager::{FetchSingleObjectOption, UpdateManager},
-        Owner, StoredObjectEventEntrypoint,
-    },
-    drive::{items::WarpDriveItemId, sharing::ContentEditability},
-    editor::EditorView,
-    env_vars::{
-        active_env_var_collection_data::{
-            ActiveEnvVarCollection, ActiveEnvVarCollectionData, ActiveEnvVarCollectionDataEvent,
-            SavingStatus, TrashStatus,
-        },
-        EnvVar, EnvVarCollection, EnvVarCollectionObject, EnvVarCollectionObjectModel,
-        EnvVarCollectionType, EnvVarValue,
-    },
-    external_secrets::SecretManager,
-    menu::MenuItem,
-    network::{NetworkStatus, NetworkStatusEvent},
-    pane_group::{
-        focus_state::PaneFocusHandle, pane::view, BackingView, PaneConfiguration, PaneEvent,
-    },
-    search::external_secrets::view::ExternalSecretsMenu,
-    send_telemetry_from_ctx,
-    server::ids::{ServerId, SyncId},
-    terminal::{model::secrets::SecretLevel, safe_mode_settings::get_secret_obfuscation_mode},
-    ui_components::{
-        breadcrumb::{render_breadcrumbs, BreadcrumbState},
-        buttons::icon_button,
-        icons::Icon,
-        menu_button::{
-            highlight_icon_button_with_context_menu, icon_button_with_context_menu, MenuDirection,
-        },
-    },
-    util::bindings::CustomAction,
-    view_components::{alert::AlertConfig, Alert, DismissibleToast, ToastType},
-    workspace::ToastStack,
-    Appearance, ObjectTypeAndId, TelemetryEvent,
+use super::command_dialog::EnvVarCommandDialog;
+use super::menus::Menus;
+use crate::ai::blocklist::block::secret_redaction::find_secrets_in_text_with_levels;
+use crate::cloud_object::breadcrumbs::ContainingObject;
+use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
+use crate::cloud_object::update_manager::{FetchSingleObjectOption, UpdateManager};
+use crate::cloud_object::{Owner, StoredObjectEventEntrypoint};
+use crate::drive::items::WarpDriveItemId;
+use crate::drive::sharing::ContentEditability;
+use crate::editor::EditorView;
+use crate::env_vars::active_env_var_collection_data::{
+    ActiveEnvVarCollection, ActiveEnvVarCollectionData, ActiveEnvVarCollectionDataEvent,
+    SavingStatus, TrashStatus,
 };
-
-use super::{command_dialog::EnvVarCommandDialog, menus::Menus};
+use crate::env_vars::{
+    EnvVar, EnvVarCollection, EnvVarCollectionObject, EnvVarCollectionObjectModel,
+    EnvVarCollectionType, EnvVarValue,
+};
+use crate::external_secrets::SecretManager;
+use crate::menu::MenuItem;
+use crate::network::{NetworkStatus, NetworkStatusEvent};
+use crate::pane_group::focus_state::PaneFocusHandle;
+use crate::pane_group::pane::view;
+use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
+use crate::search::external_secrets::view::ExternalSecretsMenu;
+use crate::server::ids::{ServerId, SyncId};
+use crate::terminal::model::secrets::SecretLevel;
+use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
+use crate::ui_components::breadcrumb::{BreadcrumbState, render_breadcrumbs};
+use crate::ui_components::buttons::icon_button;
+use crate::ui_components::icons::Icon;
+use crate::ui_components::menu_button::{
+    MenuDirection, highlight_icon_button_with_context_menu, icon_button_with_context_menu,
+};
+use crate::util::bindings::CustomAction;
+use crate::view_components::alert::AlertConfig;
+use crate::view_components::{Alert, DismissibleToast, ToastType};
+use crate::workspace::ToastStack;
+use crate::{Appearance, ObjectTypeAndId, TelemetryEvent, send_telemetry_from_ctx};
 
 // Universal
 pub(super) const CORE_HORIZONATAL_MARGIN: f32 = 24.;
@@ -75,7 +70,7 @@ const SECTION_SPACING: f32 = 16.;
 
 // Variable rows
 pub(super) const ROW_SPACING: f32 = 8.;
-pub const EDUCATION_TEXT: &str = "Add secret or command. Zap never stores external secrets";
+pub const EDUCATION_TEXT: &str = "Add secret or command. InfiniShell never stores external secrets";
 const VARIABLE_FONT_SIZE: f32 = 13.;
 const DESCRIPTION_EDITOR_CUTOFF: f32 = 30.;
 const DESCRIPTION_BOTTOM_MARGIN: f32 = 12.;
@@ -750,7 +745,7 @@ impl EnvVarCollectionView {
                         Box::new(cloud_env_var.clone()),
                     )));
                 } else {
-                    log::error!("Env var not found and could not be invoked");
+                    report_error!("Env var not found and could not be invoked");
                     let window_id = ctx.window_id();
                     crate::workspace::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                         toast_stack.add_ephemeral_toast(
@@ -874,7 +869,7 @@ impl EnvVarCollectionView {
                 }
             }
             ActiveEnvVarCollection::None => {
-                log::error!("Tried to save EVC, but none were active")
+                report_error!("Tried to save EVC, but none were active")
             }
         }
     }

@@ -1,8 +1,8 @@
 use std::fs;
 
 use super::{
-    check_installed, compare_versions, installed_version, CliAgentPluginManager,
-    GeminiPluginManager, MINIMUM_PLUGIN_VERSION,
+    CliAgentPluginManager, GeminiPluginManager, MINIMUM_PLUGIN_VERSION, check_installed,
+    compare_versions, installed_version,
 };
 
 #[test]
@@ -41,7 +41,7 @@ fn installed_when_extension_present() {
     let json = serde_json::json!({
         "name": "warp",
         "version": "1.0.0",
-        "description": "Zap terminal integration for Gemini CLI"
+        "description": "InfiniShell terminal integration for Gemini CLI"
     });
     fs::write(
         ext_dir.join("gemini-extension.json"),

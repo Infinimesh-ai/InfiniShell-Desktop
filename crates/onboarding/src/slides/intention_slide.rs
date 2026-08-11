@@ -1,28 +1,31 @@
-use super::OnboardingSlide;
-use crate::localization::localized;
-use crate::model::OnboardingStateModel;
-use crate::slides::{bottom_nav, layout, slide_content};
-use crate::visuals::{intention_terminal_visual, intention_visual};
-use crate::OnboardingIntention;
-use ui_components::{button, Component as _, Options as _};
+use ui_components::{Component as _, Options as _, button};
 use warp_core::features::FeatureFlag;
+use warp_core::ui::Icon;
+use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::Fill;
-use warp_core::ui::{appearance::Appearance, theme::color::internal_colors, Icon};
-use warpui::prelude::Align;
-use warpui::{
-    elements::{
-        Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
-        CrossAxisAlignment, Flex, FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize,
-        MouseStateHandle, ParentElement, Radius,
-    },
-    fonts::Weight,
-    keymap::Keystroke,
-    platform::Cursor,
-    text_layout::TextAlignment,
-    ui_components::components::{UiComponent as _, UiComponentStyles},
+use warp_core::ui::theme::color::internal_colors;
+use warpui_core::elements::{
+    Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+    Flex, FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
+    ParentElement, Radius,
+};
+use warpui_core::fonts::Weight;
+use warpui_core::keymap::Keystroke;
+use warpui_core::platform::Cursor;
+use warpui_core::prelude::Align;
+use warpui_core::text_layout::TextAlignment;
+use warpui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use warpui_core::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext,
 };
+
+use super::OnboardingSlide;
+use crate::OnboardingIntention;
+use crate::localization::localized;
+use crate::model::{NoAiConfirmationSource, OnboardingStateModel};
+use crate::slides::{bottom_nav, layout, slide_content};
+use crate::visuals::{intention_terminal_visual, intention_visual};
 
 #[derive(Debug, Clone)]
 pub enum IntentionSlideAction {
@@ -81,7 +84,7 @@ impl IntentionSlide {
 
         let title = appearance
             .ui_builder()
-            .paragraph(localized("onboarding-intention-title", "Welcome to Zap"))
+            .paragraph(localized("onboarding-intention-title", "Welcome to InfiniShell"))
             .with_style(UiComponentStyles {
                 font_size: Some(36.),
                 font_weight: Some(Weight::Medium),
@@ -216,7 +219,7 @@ impl IntentionSlide {
             let mut icon_row = Flex::row()
                 .with_main_axis_size(MainAxisSize::Min)
                 .with_cross_axis_alignment(CrossAxisAlignment::Center);
-            for (i, icon) in [Icon::Oz, Icon::ClaudeLogo, Icon::OpenAILogo]
+            for (i, icon) in [Icon::Agent, Icon::ClaudeLogo, Icon::OpenAILogo]
                 .iter()
                 .enumerate()
             {
@@ -256,7 +259,7 @@ impl IntentionSlide {
 
         let checklist = {
             let items = [
-                localized("onboarding-ai-feature-warp-agents", "Zap agents"),
+                localized("onboarding-ai-feature-warp-agents", "InfiniShell agents"),
                 localized(
                     "onboarding-ai-feature-oz-cloud-agents-platform",
                     "Oz local agents platform",
@@ -455,11 +458,7 @@ impl IntentionSlide {
 
         let is_terminal = selected_index == 1;
         let (step_index, step_count) = if new_settings_modes {
-            if is_terminal {
-                (0, 4)
-            } else {
-                (0, 5)
-            }
+            if is_terminal { (0, 4) } else { (0, 5) }
         } else {
             (1, 4)
         };
@@ -555,8 +554,14 @@ impl IntentionSlide {
     fn next(&mut self, ctx: &mut ViewContext<Self>) {
         self.onboarding_state.update(ctx, |model, ctx| {
             if FeatureFlag::ZapNewSettingsModes.is_enabled() {
-                // Always advance to Customize slide; both intentions continue the flow.
-                model.next(ctx);
+                match model.intention() {
+                    // "Just use the terminal" confirms leaving AI behind before advancing.
+                    OnboardingIntention::Terminal => {
+                        model.request_no_ai_confirmation(NoAiConfirmationSource::Intention, ctx);
+                    }
+                    // Agent intention routes to the next step (the AI-setup fork).
+                    OnboardingIntention::AgentDrivenDevelopment => model.next(ctx),
+                }
             } else {
                 match model.intention() {
                     OnboardingIntention::Terminal => {

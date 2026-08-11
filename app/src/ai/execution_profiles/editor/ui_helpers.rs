@@ -99,7 +99,9 @@ pub fn render_section_label(label: &str, appearance: &Appearance) -> Box<dyn Ele
     .finish()
 }
 
-fn render_filterable_dropdown_row<T: Clone + 'static + std::fmt::Debug + Send + Sync>(
+// Zap:`DropdownItemAction` 的 blanket impl 要求 `PartialEq`(`eq_action` 用它比较选中项),
+// 因此这里的泛型参数必须补上 `PartialEq` 约束。
+fn render_filterable_dropdown_row<T: Clone + PartialEq + 'static + std::fmt::Debug + Send + Sync>(
     appearance: &Appearance,
     label: &str,
     desc: &str,
@@ -171,7 +173,7 @@ fn render_info_section(
     Container::new(description).with_margin_bottom(12.).finish()
 }
 
-fn render_permission_row<T: Clone + 'static + std::fmt::Debug + Send + Sync>(
+fn render_permission_row<T: Clone + PartialEq + 'static + std::fmt::Debug + Send + Sync>(
     appearance: &Appearance,
     icon: Icon,
     label: &str,
@@ -514,14 +516,19 @@ where
         .cloned()
         .zip(mouse_handles.iter().cloned())
         .rev()
+        // Zap:我方 `InputListItem` 把禁用态放在条目上(`is_disabled` +
+        // `tooltip_mouse_state`),`render_input_list` 因此只有 4 个参数,
+        // 不接收上游那个整体的 `disabled` 形参。
         .map(|(item, mouse_state_handle)| InputListItem {
             item: display_fn(&item),
             mouse_state_handle,
             on_remove_action: on_remove_action(item),
+            is_disabled: !is_editable,
+            tooltip_mouse_state: None,
         })
         .collect();
 
-    let list = render_input_list(None, input_items, editor, !is_editable, appearance);
+    let list = render_input_list(None, input_items, editor, appearance);
     let list_element = if !is_editable {
         wrap_disabled_with_workspace_override_tooltip(list, tooltip_mouse_state, appearance)
     } else {

@@ -1,16 +1,16 @@
 use warp_core::features::FeatureFlag;
 use warpui::{SingletonEntity, ViewContext};
 
-use crate::{
-    ai::{
-        agent::{conversation::AIConversationId, CancellationReason},
-        blocklist::block::{FinishReason, PendingUserQueryBlock, PendingUserQueryBlockEvent},
-    },
-    auth::AuthStateProvider,
-    terminal::TerminalView,
-};
-
 use super::rich_content::RichContentMetadata;
+use crate::ai::agent::CancellationReason;
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::blocklist::QueuedQueryModel;
+use crate::ai::blocklist::block::{
+    FinishReason, PendingUserQueryBlock, PendingUserQueryBlockEvent,
+};
+use crate::auth::AuthStateProvider;
+use crate::terminal::TerminalView;
+use crate::terminal::view::PendingUserQueryKind;
 
 impl TerminalView {
     pub(super) fn pending_user_query_conversation_id(&self) -> Option<AIConversationId> {
@@ -31,9 +31,11 @@ impl TerminalView {
         prompt: String,
         show_close_button: bool,
         show_send_now_button: bool,
+        kind: PendingUserQueryKind,
         ctx: &mut ViewContext<Self>,
     ) {
         self.remove_pending_user_query_block(ctx);
+        self.pending_user_query_kind = Some(kind);
         let auth_state = AuthStateProvider::as_ref(ctx).get().clone();
         let user_display_name = auth_state
             .username_for_display()
@@ -51,38 +53,83 @@ impl TerminalView {
                 ctx,
             )
         });
-        if show_close_button || show_send_now_button {
-            ctx.subscribe_to_view(&handle, move |me, _, event, ctx| match event {
-                PendingUserQueryBlockEvent::Dismissed => {
+        ctx.subscribe_to_view(&handle, move |me, block, event, ctx| match event {
+            PendingUserQueryBlockEvent::Dismissed => {
+                if show_close_button {
                     me.remove_pending_user_query_block(ctx);
                 }
-                PendingUserQueryBlockEvent::SendNow => {
+            }
+            PendingUserQueryBlockEvent::SendNow => {
+                if show_send_now_button {
                     me.send_queued_prompt_now(prompt_for_send_now.clone(), ctx);
                 }
-            });
-        }
+            }
+            PendingUserQueryBlockEvent::TextSelected => {
+                // Ensure only one active text selection across the entire terminal view.
+                me.clear_selected_text_except(Some(block.id()), ctx);
+            }
+        });
         let view_id = handle.id();
 
         self.insert_rich_content(
             None,
-            handle,
-            Some(RichContentMetadata::PendingUserQuery),
+            handle.clone(),
+            Some(RichContentMetadata::PendingUserQuery {
+                pending_user_query_block_handle: handle,
+            }),
             super::rich_content::RichContentInsertionPosition::PinToBottom,
             ctx,
         );
         self.pending_user_query_view_id = Some(view_id);
     }
 
-    /// 为本地 ambient agent run 插入一个 pending user query block,直到 harness CLI 启动。
-    /// 这个 block 只展示用户 prompt 和 queued 状态,不提供本地队列回调按钮。
-    pub(in crate::terminal::view) fn insert_ambient_agent_queued_user_query_block(
+    /// Inserts a pending user query block for a Cloud Mode run whose real user query has not yet
+    /// arrived in the shared-session transcript.
+    /// The block shows the user's prompt with a "Queued" badge and no buttons: the
+    /// queued state is owned by the run's lifecycle, not by a local `/queue`-style callback, so
+    /// the prompt is not re-submitted when the block is removed.
+    pub(in crate::terminal::view) fn insert_cloud_mode_queued_user_query_block(
         &mut self,
         prompt: String,
         ctx: &mut ViewContext<Self>,
     ) {
         self.insert_pending_user_query_block(
-            prompt, /* show_close_button */ false, /* show_send_now_button */ false, ctx,
+            prompt,
+            /* show_close_button */ false,
+            /* show_send_now_button */ false,
+            PendingUserQueryKind::CloudMode,
+            ctx,
         );
+    }
+
+    /// 为本地 ambient agent run 插入一个 pending user query block,直到 harness CLI 启动。
+    /// 这个 block 只展示用户 prompt 和 queued 状态,不提供本地队列回调按钮 —— 与 Cloud Mode
+    /// 的 queued block 生命周期一致(由 run 自身负责移除),所以直接复用同一实现。
+    pub(in crate::terminal::view) fn insert_ambient_agent_queued_user_query_block(
+        &mut self,
+        prompt: String,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.insert_cloud_mode_queued_user_query_block(prompt, ctx);
+    }
+
+    pub(in crate::terminal::view) fn remove_cloud_mode_queue_row(
+        &mut self,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if !FeatureFlag::QueuedPromptsV2.is_enabled() {
+            return;
+        }
+        let Some(conversation_id) = self
+            .ai_context_model
+            .as_ref(ctx)
+            .selected_conversation_id(ctx)
+        else {
+            return;
+        };
+        QueuedQueryModel::handle(ctx).update(ctx, |model, ctx| {
+            model.remove_initial_cloud_mode_row(conversation_id, ctx);
+        });
     }
 
     /// Removes the pending user query block, if one exists. No-op if none is present.
@@ -90,6 +137,7 @@ impl TerminalView {
     /// (Safe to call from within the callback itself — the caller `.take()`s it first.)
     pub(super) fn remove_pending_user_query_block(&mut self, ctx: &mut ViewContext<Self>) {
         self.queued_prompt_callback = None;
+        self.pending_user_query_kind = None;
         if let Some(view_id) = self.pending_user_query_view_id.take() {
             self.model
                 .lock()
@@ -130,7 +178,7 @@ impl TerminalView {
         }
 
         self.input.update(ctx, |input, ctx| {
-            input.submit_queued_prompt(prompt, ctx);
+            input.submit_user_query_now(prompt, ctx);
         });
     }
 
@@ -156,6 +204,7 @@ impl TerminalView {
                 prompt.clone(),
                 show_close_button,
                 show_send_now_button,
+                PendingUserQueryKind::QueuedPrompt,
                 ctx,
             );
         }
@@ -167,7 +216,7 @@ impl TerminalView {
             match reason {
                 FinishReason::Complete => {
                     terminal_view.input.update(ctx, |input, ctx| {
-                        input.submit_queued_prompt(prompt, ctx);
+                        input.submit_user_query_now(prompt, ctx);
                     });
                 }
                 FinishReason::Error

@@ -1,15 +1,13 @@
 mod v1;
 
 use serde::Deserialize;
+pub use warp_core::cli_agent_protocol::CLI_AGENT_NOTIFICATION_SENTINEL;
+use warp_errors::report_error;
 
 use crate::terminal::CLIAgent;
 
 #[cfg_attr(not(feature = "local_tty"), allow(dead_code))]
 type EventParser = fn(&str) -> Option<CLIAgentEvent>;
-
-/// Sentinel title that identifies structured CLI agent events sent via OSC 777.
-/// The `"agent"` field in the JSON body distinguishes which agent sent it.
-pub const CLI_AGENT_NOTIFICATION_SENTINEL: &str = "warp://cli-agent";
 
 /// The event type encoded in the `"event"` field of the JSON body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,11 +16,28 @@ pub enum CLIAgentEventType {
     PromptSubmit,
     ToolComplete,
     Stop,
+    StopFailure,
     PermissionRequest,
     PermissionReplied,
     QuestionAsked,
     IdlePrompt,
     Unknown(String),
+}
+
+/// How a CLI agent event reached Warp.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CLIAgentEventSource {
+    /// Structured OSC 777 notification from a rich plugin.
+    RichPlugin,
+    /// Native Codex OSC 9 fallback notification.
+    CodexOsc9Fallback,
+    /// Zap:富输入框在本地合成的事件(例如提交 prompt 时同步 session context)。
+    ///
+    /// 形状和 [`Self::RichPlugin`] 一样,但它**不是** agent 侧上报的,不能作为
+    /// "这个会话有 plugin 支撑的 rich status" 的证据 —— 否则
+    /// `CLIAgentSession::supports_rich_status` 会被误置,进而让提交后自动收起
+    /// 富输入框的设置失效。
+    LocalRichInput,
 }
 
 /// Event-specific fields that vary by event type.
@@ -36,6 +51,9 @@ pub struct CLIAgentEventPayload {
     pub tool_name: Option<String>,
     pub tool_input_preview: Option<String>,
     pub plugin_version: Option<String>,
+    /// On Claude Code, this comes from the `StopFailure` hook (e.g. `"rate_limit"`).
+    /// Not implemented for Codex.
+    pub error_type: Option<String>,
 }
 
 /// A parsed event from a CLI agent plugin.
@@ -49,6 +67,7 @@ pub struct CLIAgentEvent {
     pub cwd: Option<String>,
     pub project: Option<String>,
     pub payload: CLIAgentEventPayload,
+    pub source: CLIAgentEventSource,
 }
 
 /// Version-specific parsers, indexed by (version - 1).
@@ -80,9 +99,9 @@ pub fn parse_event(title: Option<&str>, body: &str) -> Option<CLIAgentEvent> {
     match VERSIONED_PARSERS.get(index) {
         Some(parser) => parser(body),
         None => {
-            log::error!(
-                "Received CLI agent event with unsupported schema version \
-                 {version}. The CLI agent plugin or Zap may need to be updated."
+            report_error!(
+                "Received CLI agent event with unsupported schema version. The CLI agent plugin or InfiniShell may need to be updated.",
+                extra: { "version" => %version }
             );
             None
         }

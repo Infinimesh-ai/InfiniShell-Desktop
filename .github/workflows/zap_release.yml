@@ -230,9 +230,9 @@ jobs:
 
       - name: Package CLI tarball
         run: |
-          cp "${{ steps.bundle_cli.outputs.binary_path }}" zap-oss
+          cp "${{ steps.bundle_cli.outputs.binary_path }}" infinishell
           tar czf zap-macos-${{ matrix.arch }}.tar.gz \
-            zap-oss \
+            infinishell \
             -C "$(dirname "${{ steps.bundle_cli.outputs.bundled_resources_dir }}")" resources
         shell: bash
 
@@ -349,7 +349,7 @@ jobs:
           # 让 linuxdeploy/appimagetool 不依赖 FUSE 内核模块,跨 runner 版本都稳。
           APPIMAGE_EXTRACT_AND_RUN: 1
 
-      # RPM 包:复用上一步 release-lto 已经 strip 过的 `target/release-lto/zap-oss`,
+      # RPM 包:复用上一步 release-lto 已经 strip 过的 `target/release-lto/infinishell`,
       # 不重新 `cargo build`。`--skip-build` 让 `script/bundle` 跳过编译与 strip,
       # 直接进入 staging(`bundle_install` → 复制二进制 + resources)+ rpmbuild。
       # 与 deb 同一台 ubuntu-22.04 runner 上跑,共享 host glibc 链接的产物;
@@ -362,7 +362,7 @@ jobs:
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
 
-      # Arch 包:复用上一步 release-lto 已经 strip 过的 `target/release-lto/zap-oss`,
+      # Arch 包:复用上一步 release-lto 已经 strip 过的 `target/release-lto/infinishell`,
       # 不重新 `cargo build` 主二进制 —— `--skip-build` 让 `script/bundle` 跳过编译与 strip,
       # 直接进入 staging(`bundle_install` → 复制二进制 + resources)+ makepkg。
       #
@@ -497,9 +497,9 @@ jobs:
 
       - name: Package CLI tarball
         run: |
-          cp "${{ steps.bundle_cli.outputs.executable_path }}" zap-oss
+          cp "${{ steps.bundle_cli.outputs.executable_path }}" infinishell
           tar czf zap-linux-x86_64.tar.gz \
-            zap-oss \
+            infinishell \
             -C "$(dirname "${{ steps.bundle_cli.outputs.bundled_resources_dir }}")" resources
         shell: bash
 

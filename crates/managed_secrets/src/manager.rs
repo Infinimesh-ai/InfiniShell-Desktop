@@ -1,6 +1,6 @@
 use std::{collections::HashMap, future::Future, sync::Arc};
 
-use warpui::{Entity, SingletonEntity};
+use warpui_core::{Entity, SingletonEntity};
 
 use crate::{
     ManagedSecret, ManagedSecretValue,
@@ -43,6 +43,8 @@ impl ManagedSecretManager {
         let client = self.client.clone();
         let actor_provider = self.actor_provider.clone();
         async move {
+            value.validate_field_sizes(&name)?;
+
             // We retrieve all upload keys on demand. These should potentially be fetched and stored
             // ahead of time instead.
             let configs = client.get_managed_secret_configs().await?;
@@ -97,6 +99,10 @@ impl ManagedSecretManager {
         let client = self.client.clone();
         let actor_provider = self.actor_provider.clone();
         async move {
+            if let Some(v) = &value {
+                v.validate_field_sizes(&name)?;
+            }
+
             let encrypted_value = if let Some(value) = value {
                 // We retrieve all upload keys on demand. These should potentially be fetched and stored
                 // ahead of time instead.
@@ -144,11 +150,17 @@ impl ManagedSecretManager {
         &self,
         task_id: String,
     ) -> impl Future<Output = anyhow::Result<HashMap<String, ManagedSecretValue>>> + use<> {
-        let client = self.client.clone();
-        async move {
+        // Define and invoke an inner async function to simplify tracing instrumentation.
+        #[tracing::instrument(name = "get_task_secrets", skip_all, err)]
+        async fn inner(
+            client: Arc<dyn ManagedSecretsClient>,
+            task_id: String,
+        ) -> anyhow::Result<HashMap<String, ManagedSecretValue>> {
             let secrets = client.get_task_secrets(task_id).await?;
             Ok(secrets)
         }
+
+        inner(self.client.clone(), task_id)
     }
 
     /// Issue a short-lived OIDC identity token for the current task.

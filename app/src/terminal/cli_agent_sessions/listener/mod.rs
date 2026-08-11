@@ -1,10 +1,12 @@
 use warpui::{EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::{CLIAgentEvent, CLIAgentSession, CLIAgentSessionsModel};
-use crate::terminal::cli_agent_sessions::event::parse_event;
-use crate::terminal::cli_agent_sessions::event::{CLIAgentEventPayload, CLIAgentEventType};
-use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
+use crate::features::FeatureFlag;
 use crate::terminal::CLIAgent;
+use crate::terminal::cli_agent_sessions::event::{
+    CLIAgentEventPayload, CLIAgentEventSource, CLIAgentEventType, parse_event,
+};
+use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
 
 /// Per-agent handler that filters and transforms parsed CLI agent events.
 /// Each CLI agent can have a different implementation depending on which events
@@ -14,7 +16,17 @@ trait CLIAgentSessionHandler {
     /// The default implementation delegates to the structured JSON parser
     /// (`parse_event`); agents with non-JSON notification formats (e.g. Codex
     /// OSC 9 plain text) should override this.
-    fn try_parse(&self, title: Option<&str>, body: &str) -> Option<CLIAgentEvent> {
+    ///
+    /// `plugin_already_active` is true when the session has already received a
+    /// structured OSC 777 notification; Codex uses it to drop OSC 9 fallback
+    /// once the rich plugin is active. Other handlers ignore it.
+    fn try_parse(
+        &mut self,
+        title: Option<&str>,
+        body: &str,
+        plugin_already_active: bool,
+    ) -> Option<CLIAgentEvent> {
+        let _ = plugin_already_active;
         parse_event(title, body)
     }
 
@@ -25,7 +37,7 @@ trait CLIAgentSessionHandler {
     /// Whether this handler provides meaningful, fine-grained status
     /// (e.g. in-progress / blocked / success) that should be shown in the UI.
     /// Handlers backed by the structured plugin protocol report rich status;
-    /// handlers that only forward opaque OS notifications (e.g. Codex) do not.
+    /// handlers that only forward opaque OS notifications do not.
     fn supports_rich_status(&self) -> bool {
         true
     }
@@ -65,9 +77,12 @@ pub fn is_agent_supported(agent: &CLIAgent) -> bool {
             | CLIAgent::Codex
             | CLIAgent::Gemini
             | CLIAgent::Auggie
+            | CLIAgent::Droid
             | CLIAgent::Pi
+            | CLIAgent::OhMyPi
             | CLIAgent::DeepSeek
             | CLIAgent::Antigravity
+            | CLIAgent::WarpTui
     )
 }
 
@@ -76,22 +91,28 @@ fn create_handler(agent: &CLIAgent) -> Option<Box<dyn CLIAgentSessionHandler>> {
     match agent {
         // Auggie and Pi are supported via community-maintained plugins
         // (https://github.com/augmentmoogi/auggie-warp,
-        // https://github.com/badlogic/pi-mono), which emit the same
-        // structured OSC 777 events as the first-party Claude/OpenCode/Gemini
-        // plugins. We don't ship install flows for them — we just listen.
+        // https://github.com/badlogic/pi-mono). OhMyPi emits these structured
+        // OSC 777 events natively. Droid can be supported by user-configured
+        // hooks or future integrations that emit the same events. We don't ship
+        // install flows for these agents here — we just listen.
+        // WarpTui emits OSC 777 events directly (no external plugin needed).
         CLIAgent::Claude
         | CLIAgent::OpenCode
         | CLIAgent::Gemini
         | CLIAgent::Auggie
+        | CLIAgent::Droid
         | CLIAgent::Pi
-        | CLIAgent::Antigravity => Some(Box::new(DefaultSessionListener)),
+        | CLIAgent::OhMyPi
+        | CLIAgent::Antigravity
+        | CLIAgent::WarpTui => Some(Box::new(DefaultSessionListener)),
         CLIAgent::Codex => Some(Box::new(CodexSessionHandler)),
         CLIAgent::DeepSeek => Some(Box::new(DeepSeekSessionHandler)),
-        CLIAgent::Amp
-        | CLIAgent::Droid
+        CLIAgent::Hermes
+        | CLIAgent::Amp
         | CLIAgent::Copilot
         | CLIAgent::CursorCli
         | CLIAgent::Goose
+        | CLIAgent::Vibe
         | CLIAgent::Omp
         | CLIAgent::Unknown => None,
     }
@@ -112,14 +133,11 @@ impl CLIAgentSessionHandler for DefaultSessionListener {
     }
 }
 
-/// Codex-specific handler that parses plain-text OSC 9 desktop notifications
-/// into CLI agent events.
+/// Codex-specific handler that supports both native OSC 9 fallback and structured plugin events.
 ///
 /// Codex sends notifications via OSC 9 (`\x1b]9;message\x07`) with
-/// human-readable text. Since there's no way to distinguish notification types
-/// from the raw text, all OSC 9 notifications are treated as `Stop` (success).
-/// The notification body becomes the event's `query` so it surfaces as the
-/// notification title in the UI.
+/// human-readable text. Since there's no way to distinguish notification types from the raw text,
+/// OSC 9 fallback notifications are treated as `Stop` (success).
 struct CodexSessionHandler;
 
 impl CodexSessionHandler {
@@ -142,22 +160,34 @@ impl CodexSessionHandler {
                 query: Some(body.to_owned()),
                 ..Default::default()
             },
+            source: CLIAgentEventSource::CodexOsc9Fallback,
         })
     }
 }
 
 impl CLIAgentSessionHandler for CodexSessionHandler {
-    /// Codex sends plain-text OSC 9 notifications (title = `None`) instead of
-    /// the structured OSC 777 JSON used by Claude Code / OpenCode.
-    fn try_parse(&self, title: Option<&str>, body: &str) -> Option<CLIAgentEvent> {
-        // If the notification carries the structured sentinel, try the normal
-        // JSON parser first (future-proofing in case Codex adds plugin
-        // support later).
-        if let Some(parsed) = parse_event(title, body) {
-            return Some(parsed);
+    /// Before Codex enabled support for hooks, we relied on OSC 9 to trigger notifications in Warp.
+    /// Here, we try to parse an OSC 777 event if we can, and remember when we've seen one.
+    /// This lets us ignore OSC 9 notifications if we are working with a client that is using
+    /// the new plugin, but keeps them intact for legacy clients.
+    fn try_parse(
+        &mut self,
+        title: Option<&str>,
+        body: &str,
+        plugin_already_active: bool,
+    ) -> Option<CLIAgentEvent> {
+        if let Some(event) = parse_event(title, body) {
+            if event.agent == CLIAgent::Codex {
+                if !FeatureFlag::CodexPlugin.is_enabled() {
+                    return None;
+                }
+                return Some(event);
+            }
+            return None;
         }
-        // OSC 9 notifications have no title.
-        if title.is_some() {
+        // OSC 9 notifications have no title. Skip OSC 9 once the rich plugin is
+        // active, otherwise we'd process both OSC 777 and OSC 9 notifications.
+        if title.is_some() || plugin_already_active {
             return None;
         }
         Self::parse_osc9_text(body)
@@ -167,8 +197,11 @@ impl CLIAgentSessionHandler for CodexSessionHandler {
         Some(event)
     }
 
+    /// Zap:我方原先对 Codex 一律返回 `false` —— 当时 Codex 只有 OSC 9 这种不带
+    /// 结构的通知。上游为 Codex 加了 OSC 777 插件通道后,富状态是否可信取决于
+    /// `CodexPlugin` 开关(见上面的 `try_parse`:开关关闭时 OSC 777 事件被整体丢弃)。
     fn supports_rich_status(&self) -> bool {
-        false
+        FeatureFlag::CodexPlugin.is_enabled()
     }
 }
 
@@ -200,7 +233,12 @@ impl DeepSeekSessionHandler {
 
 impl CLIAgentSessionHandler for DeepSeekSessionHandler {
     /// DeepSeek-TUI uses OSC 9 with no title (same channel as Codex).
-    fn try_parse(&self, title: Option<&str>, body: &str) -> Option<CLIAgentEvent> {
+    fn try_parse(
+        &mut self,
+        title: Option<&str>,
+        body: &str,
+        _plugin_already_active: bool,
+    ) -> Option<CLIAgentEvent> {
         // Future-proof: try structured JSON first in case a plugin is added later.
         if let Some(parsed) = parse_event(title, body) {
             return Some(parsed);
@@ -225,6 +263,8 @@ impl CLIAgentSessionHandler for DeepSeekSessionHandler {
                 response: Some(body.to_owned()),
                 ..Default::default()
             },
+            // DeepSeek-TUI 与 Codex 共用 OSC 9 无标题通道,归为同一个 fallback 来源。
+            source: CLIAgentEventSource::CodexOsc9Fallback,
         })
     }
 
@@ -262,14 +302,21 @@ impl CLIAgentSessionListener {
         // Subscribe to subsequent OSC events from this terminal's PTY.
         // Parsing is delegated to the handler's `try_parse`; the handler's
         // `handle_event` then filters/transforms the result.
-        ctx.subscribe_to_model(model_event_dispatcher, move |me, event, ctx| {
+        ctx.subscribe_to_model(model_event_dispatcher, move |me, _, event, ctx| {
             if let ModelEvent::PluggableNotification { title, body } = event {
-                let Some(parsed) = me.inner.try_parse(title.as_deref(), body) else {
+                let view_id = me.terminal_view_id;
+                let plugin_already_active = CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view_id)
+                    .is_some_and(|session| session.received_rich_notification);
+                let Some(parsed) =
+                    me.inner
+                        .try_parse(title.as_deref(), body, plugin_already_active)
+                else {
                     return;
                 };
                 if let Some(event) = me.inner.handle_event(parsed) {
                     CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions_model, ctx| {
-                        sessions_model.update_from_event(me.terminal_view_id, &event, ctx);
+                        sessions_model.update_from_event(view_id, &event, ctx);
                     });
                 }
             }
@@ -283,7 +330,11 @@ impl CLIAgentSessionListener {
 }
 
 #[cfg(test)]
-mod tests {
+#[path = "mod_tests.rs"]
+mod tests;
+
+#[cfg(test)]
+mod zap_tests {
     use super::*;
     use crate::terminal::cli_agent_sessions::event::CLIAgentEventType;
 
@@ -327,16 +378,16 @@ mod tests {
 
     #[test]
     fn codex_try_parse_ignores_titled_notifications() {
-        let handler = CodexSessionHandler;
+        let mut handler = CodexSessionHandler;
         assert!(handler
-            .try_parse(Some("some-title"), "Agent turn complete")
+            .try_parse(Some("some-title"), "Agent turn complete", false)
             .is_none());
     }
 
     #[test]
     fn codex_try_parse_handles_osc9() {
-        let handler = CodexSessionHandler;
-        let event = handler.try_parse(None, "Agent turn complete").unwrap();
+        let mut handler = CodexSessionHandler;
+        let event = handler.try_parse(None, "Agent turn complete", false).unwrap();
         assert_eq!(event.event, CLIAgentEventType::Stop);
     }
 
@@ -361,6 +412,7 @@ mod tests {
             cwd: None,
             project: None,
             payload: CLIAgentEventPayload::default(),
+            source: CLIAgentEventSource::RichPlugin,
         };
         assert!(handler.handle_event(event).is_none());
     }
@@ -376,6 +428,7 @@ mod tests {
             cwd: None,
             project: None,
             payload: CLIAgentEventPayload::default(),
+            source: CLIAgentEventSource::RichPlugin,
         };
         assert!(handler.handle_event(event).is_some());
     }
@@ -401,6 +454,7 @@ mod tests {
             cwd: None,
             project: None,
             payload: CLIAgentEventPayload::default(),
+            source: CLIAgentEventSource::RichPlugin,
         };
         assert!(handler.handle_event(event).is_none());
     }
@@ -416,6 +470,7 @@ mod tests {
             cwd: None,
             project: None,
             payload: CLIAgentEventPayload::default(),
+            source: CLIAgentEventSource::RichPlugin,
         };
         assert!(handler.handle_event(event).is_some());
     }
@@ -441,6 +496,7 @@ mod tests {
             cwd: None,
             project: None,
             payload: CLIAgentEventPayload::default(),
+            source: CLIAgentEventSource::RichPlugin,
         };
         assert!(handler.handle_event(event).is_none());
     }
@@ -456,6 +512,7 @@ mod tests {
             cwd: None,
             project: None,
             payload: CLIAgentEventPayload::default(),
+            source: CLIAgentEventSource::RichPlugin,
         };
         assert!(handler.handle_event(event).is_some());
     }
@@ -467,9 +524,9 @@ mod tests {
 
     #[test]
     fn deepseek_osc9_completion_does_not_claim_prompt_text() {
-        let handler = DeepSeekSessionHandler;
+        let mut handler = DeepSeekSessionHandler;
         let event = handler
-            .try_parse(None, "deepseek: turn complete")
+            .try_parse(None, "deepseek: turn complete", false)
             .expect("DeepSeek OSC 9 body should parse");
 
         assert_eq!(event.event, CLIAgentEventType::Stop);
@@ -482,11 +539,12 @@ mod tests {
 
     #[test]
     fn deepseek_osc9_response_text_becomes_notification_title() {
-        let handler = DeepSeekSessionHandler;
+        let mut handler = DeepSeekSessionHandler;
         let event = handler
             .try_parse(
                 None,
                 "最新回复内容\ndeepseek: turn complete (1m 15s, $0.01)",
+                false,
             )
             .expect("DeepSeek OSC 9 body should parse");
 
@@ -500,9 +558,9 @@ mod tests {
 
     #[test]
     fn deepseek_osc9_plain_response_text_becomes_notification_title() {
-        let handler = DeepSeekSessionHandler;
+        let mut handler = DeepSeekSessionHandler;
         let event = handler
-            .try_parse(None, "最新回复内容")
+            .try_parse(None, "最新回复内容", false)
             .expect("DeepSeek OSC 9 body should parse");
 
         assert_eq!(event.event, CLIAgentEventType::Stop);
@@ -523,6 +581,7 @@ mod tests {
             plugin_version: None,
             draft_text: None,
             custom_command_prefix: None,
+            received_rich_notification: false,
         };
 
         assert!(!session_supports_rich_status(&session));
@@ -544,6 +603,7 @@ mod tests {
             plugin_version: None,
             draft_text: None,
             custom_command_prefix: None,
+            received_rich_notification: false,
         };
 
         assert!(session_supports_rich_status(&session));

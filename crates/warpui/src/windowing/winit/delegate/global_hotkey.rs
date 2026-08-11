@@ -1,14 +1,17 @@
-use std::{collections::HashMap, rc::Rc, str::FromStr, sync::Arc, thread};
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::thread;
+
+use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
+use parking_lot::Mutex;
+use warp_errors::report_error;
+use winit::event_loop::EventLoopProxy;
 
 use crate::keymap;
 use crate::windowing::winit::app::CustomEvent;
-use parking_lot::Mutex;
-use winit::event_loop::EventLoopProxy;
-
-use global_hotkey::{
-    hotkey::{Code, HotKey, Modifiers},
-    GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState,
-};
 
 /// Responsible for registering system-wide (global) hotkeys with the platform.
 pub struct GlobalHotKeyHandler {
@@ -34,7 +37,7 @@ impl GlobalHotKeyHandler {
         let hotkey = match hotkey_for_keystroke(&shortcut) {
             Ok(hotkey) => hotkey,
             Err(e) => {
-                log::error!("invalid global hotkey: {e:?}");
+                report_error!(e.context("invalid global hotkey"));
                 return;
             }
         };
@@ -46,7 +49,7 @@ impl GlobalHotKeyHandler {
         let hotkey = match hotkey_for_keystroke(shortcut) {
             Ok(hotkey) => hotkey,
             Err(e) => {
-                log::error!("invalid global hotkey: {e:?}");
+                report_error!(e.context("invalid global hotkey"));
                 return;
             }
         };

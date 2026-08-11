@@ -1,21 +1,20 @@
+use std::cell::Cell;
+use std::collections::{HashMap, VecDeque};
+use std::rc::Rc;
+
 use anyhow::Result;
-use serde_yaml::{Mapping, Value};
-use std::{
-    cell::Cell,
-    collections::{HashMap, VecDeque},
-    rc::Rc,
-};
-
-use html5ever::{
-    Attribute, ParseOpts, parse_document, tendril::TendrilSink, tree_builder::TreeBuilderOpts,
-};
+use html5ever::tendril::TendrilSink;
+use html5ever::tree_builder::TreeBuilderOpts;
+use html5ever::{Attribute, ParseOpts, parse_document};
 use markup5ever_rcdom::{Node, NodeData, RcDom};
+use serde_yaml::{Mapping, Value};
 
+use crate::markdown_parser::RUNNABLE_BLOCK_MARKDOWN_LANG;
+use crate::weight::CustomWeight;
 use crate::{
     CodeBlockText, FormattedIndentTextInline, FormattedTaskList, FormattedText,
     FormattedTextFragment, FormattedTextHeader, FormattedTextInline, FormattedTextLine,
     FormattedTextStyles, Hyperlink, OrderedFormattedIndentTextInline,
-    markdown_parser::RUNNABLE_BLOCK_MARKDOWN_LANG, weight::CustomWeight,
 };
 
 // Top element element tags we are not parsing for right now.
@@ -45,7 +44,7 @@ enum ListType {
 
 #[derive(Clone, Default)]
 struct Styling {
-    bold: bool,
+    weight: Option<CustomWeight>,
     italic: bool,
     underline: bool,
     strikethrough: bool,
@@ -79,13 +78,15 @@ impl Styling {
 
                 if let Some(font_weight) = style_dict.get("font-weight") {
                     if *font_weight == "bold" || *font_weight == "bolder" {
-                        self.bold = true;
-                    } else {
-                        let maybe_integer = font_weight.parse::<i32>();
-
-                        if let Ok(weight_value) = maybe_integer {
-                            self.bold = weight_value > 400;
-                        }
+                        self.weight = Some(CustomWeight::Bold);
+                    } else if *font_weight == "normal" || *font_weight == "lighter" {
+                        // `lighter` is relative and we have no inherited weight to lighten from,
+                        // so treat it (and an explicit `normal`) as clearing any custom weight.
+                        self.weight = None;
+                    } else if let Ok(weight_value) = font_weight.parse::<i32>() {
+                        // Preserve the specific numeric weight (e.g. 300 -> Light, 900 -> Black)
+                        // instead of collapsing everything to bold-or-plain.
+                        self.weight = CustomWeight::from_css_numeric(weight_value);
                     }
                 }
 
@@ -440,7 +441,7 @@ fn parse_phrasing_content(nodes: &[Rc<Node>], text_styling: Styling) -> Formatte
                 let mut decorated_styling = text_styling.clone();
                 decorated_styling.update_with_attributes(&attrs.borrow());
                 match node_name.as_ref() {
-                    "b" | "strong" => decorated_styling.bold = true,
+                    "b" | "strong" => decorated_styling.weight = Some(CustomWeight::Bold),
                     "i" | "em" => decorated_styling.italic = true,
                     "s" => decorated_styling.strikethrough = true,
                     "u" | "ins" => decorated_styling.underline = true,
@@ -462,16 +463,10 @@ fn parse_phrasing_content(nodes: &[Rc<Node>], text_styling: Styling) -> Formatte
 
 /// Converts styled phrasing text to a fragment of formatted text.
 fn phrasing_to_formatted_text(text: impl Into<String>, styling: &Styling) -> FormattedTextFragment {
-    let weight = if styling.bold {
-        Some(CustomWeight::Bold)
-    } else {
-        None
-    };
-
     FormattedTextFragment {
         text: text.into(),
         styles: FormattedTextStyles {
-            weight,
+            weight: styling.weight,
             italic: styling.italic,
             underline: styling.underline,
             strikethrough: styling.strikethrough,
@@ -576,5 +571,5 @@ fn parse_style_into_dict(style: &str) -> HashMap<&str, &str> {
 }
 
 #[cfg(test)]
-#[path = "html_parser_test.rs"]
+#[path = "html_parser_tests.rs"]
 mod tests;

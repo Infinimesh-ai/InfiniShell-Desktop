@@ -46,13 +46,29 @@ pub struct SessionContext {
     #[cfg(feature = "completions_v2")]
     js_ctx: Option<js::SessionJsExecutionContext>,
 
-    cached_directory_entries: dashmap::DashMap<TypedPathBuf, Arc<Vec<EngineDirEntry>>>,
+    /// Directory listings keyed by absolute path. Callers that must reflect a directory's
+    /// current contents should use `refresh_directory_entries` to re-read from disk.
+    cached_directory_entries: Arc<dashmap::DashMap<TypedPathBuf, Arc<Vec<EngineDirEntry>>>>,
 
     /// Snapshot of all Zap workflow aliases.
     workflow_aliases: HashMap<String, String>,
 }
 
 impl SessionContext {
+    /// Lists `directory` fresh from disk and caches the results.
+    pub(crate) async fn refresh_directory_entries(
+        &self,
+        directory: TypedPathBuf,
+    ) -> Arc<Vec<EngineDirEntry>> {
+        let result = Arc::new(
+            self.list_directory_entries_internal(&directory.to_path())
+                .await,
+        );
+        self.cached_directory_entries
+            .insert(directory, result.clone());
+        result
+    }
+
     async fn list_directory_entries_internal(
         &self,
         directory: &TypedPath<'_>,
@@ -181,6 +197,10 @@ impl PathCompletionContext for SessionContext {
         self.session.home_dir()
     }
 
+    fn cdpath(&self) -> Option<&str> {
+        self.session.cdpath()
+    }
+
     fn pwd(&self) -> TypedPath<'_> {
         self.current_working_directory.to_path()
     }
@@ -199,9 +219,7 @@ impl PathCompletionContext for SessionContext {
         // sends escape sequences to a raw remote shell. Return empty without
         // caching so we retry after the remote server handshake finishes.
         if let SessionType::WarpifiedRemote { host_id: None } = self.session.session_type() {
-            if FeatureFlag::SshRemoteServer.is_enabled()
-                && !self.session.is_legacy_ssh_session()
-            {
+            if FeatureFlag::SshRemoteServer.is_enabled() && !self.session.is_ssh_wrapper_session() {
                 return Arc::new(vec![]);
             }
         }
@@ -368,7 +386,7 @@ impl SessionContext {
                     command_registry,
                     current_working_directory,
                     js_ctx: js_function_caller.map(js::SessionJsExecutionContext::new),
-                    cached_directory_entries: Default::default(),
+                    cached_directory_entries: Arc::new(Default::default()),
                     workflow_aliases,
                 }
             } else {
@@ -376,7 +394,7 @@ impl SessionContext {
                     session: session.into(),
                     command_registry,
                     current_working_directory,
-                    cached_directory_entries: Default::default(),
+                    cached_directory_entries: Arc::new(Default::default()),
                     workflow_aliases,
                 }
             }
@@ -478,17 +496,19 @@ fn ls_script_for_dir(directory: &TypedPath) -> Option<String> {
     // Separate the two lists with `\0`
     // Ex: `a\0b\0\c\0\0d.txt\0e.txt\0f.txt\0`
     // Then do the same for anything that is not a directory, and call it a 'File'.
+    //
+    // Follow symlinks when classifying entries, so a symlink to a directory completes as a
+    // directory (like a standard terminal).
     let command = format!(
         r#"
 cd {escaped_dir} && 
-find . -maxdepth 1 -type d -print0 &&
+find -L . -maxdepth 1 -type d -print0 &&
 printf '%b' '\0' &&
-find . -maxdepth 1 -not -type d -print0
+find -L . -maxdepth 1 -not -type d -print0
             "#
     )
-    // Ensure all newlines are escaped, and that the command is a single line.
-    // ls_script_for_dir should not contain newlines, as we need to run it as a
-    // single line for TMUX control mode at this time.
+    // Ensure all newlines are escaped, and that the command is a single line, since some
+    // in-band executors run commands a single line at a time.
     .replace("\n", " ");
 
     Some(command)

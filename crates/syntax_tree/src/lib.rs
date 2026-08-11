@@ -1,37 +1,33 @@
 mod queries;
-use languages::Language;
-pub use queries::highlight_query::{ColorMap, TextSlice};
-
-use std::{
-    cell::{Ref, RefCell},
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
-
-use parking_lot::Mutex;
+use std::cell::{Ref, RefCell};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use arborium::tree_sitter::{InputEdit, Parser, Tree};
 use futures::stream::AbortHandle;
-use queries::{
-    highlight_query::{HighlightQuery, InjectionHighlightQuery},
-    indent_query::{indentation_delta, IndentDelta},
-};
+use languages::Language;
+use parking_lot::Mutex;
+use queries::highlight_query::{HighlightQuery, InjectionHighlightQuery};
+pub use queries::highlight_query::{ColorMap, TextSlice};
+use queries::indent_query::{IndentDelta, indentation_delta};
 use rangemap::{RangeMap, RangeSet};
 use string_offset::{ByteOffset, CharOffset};
-use warpui::{color::ColorU, AppContext, Entity, ModelContext, WeakModelHandle};
-
-use warp_editor::{
-    content::{
-        buffer::{Buffer, BufferSnapshot},
-        edit::PreciseDelta,
-        text::IndentUnit,
-        version::BufferVersion,
-    },
-    decoration::DecorationLayer,
-};
-use warpui::text::point::Point;
+use warp_editor::content::buffer::{Buffer, BufferSnapshot};
+use warp_editor::content::edit::PreciseDelta;
+use warp_editor::content::text::IndentUnit;
+use warp_editor::content::version::BufferVersion;
+use warp_editor::decoration::DecorationLayer;
+use warpui_core::color::ColorU;
+use warpui_core::text::point::Point;
+use warpui_core::{AppContext, Entity, ModelContext, WeakModelHandle};
 
 const MAX_SYNTAX_TREES: usize = 3;
+
+/// Maximum buffer size in bytes for which we attempt to parse a syntax tree.
+/// Files larger than this are skipped to avoid tree-sitter's super-linear
+/// memory growth on large inputs. See this tree-sitter issue:
+/// https://github.com/tree-sitter/tree-sitter/issues/222#issuecomment-435987441
+const MAX_PARSE_BYTES: usize = 2 * 1024 * 1024; // 2 MB
 
 thread_local! {
     static PARSER: RefCell<Parser> = RefCell::new(Parser::new());
@@ -183,11 +179,11 @@ impl SyntaxTreeState {
             .map(|q| q.language.grammar.clone());
 
         // Check cache first
-        if let Ok(cache) = Ref::filter_map(self.highlight_cache.borrow(), |c| c.as_ref()) {
-            if cache.key.matches(buffer_version, &ranges, &language_id) {
-                // Return a borrowed reference to the cached highlights
-                return Some(Ref::map(cache, |c| &c.highlights));
-            }
+        if let Ok(cache) = Ref::filter_map(self.highlight_cache.borrow(), |c| c.as_ref())
+            && cache.key.matches(buffer_version, &ranges, &language_id)
+        {
+            // Return a borrowed reference to the cached highlights
+            return Some(Ref::map(cache, |c| &c.highlights));
         }
 
         // Cache miss - compute highlights
@@ -272,12 +268,17 @@ impl SyntaxTreeState {
     }
 
     /// Re-parse the tree based on the updated tree and source content.
+    ///
+    /// Returns `None` if the buffer exceeds [`MAX_PARSE_BYTES`].
     async fn parse_text(
         content: BufferSnapshot,
         old_tree: Option<Tree>,
         language: &Language,
-    ) -> Tree {
-        PARSER.with(|parser| {
+    ) -> Option<Tree> {
+        if content.byte_len() > MAX_PARSE_BYTES {
+            return None;
+        }
+        Some(PARSER.with(|parser| {
             let mut parser = parser.borrow_mut();
             parser
                 .set_language(&language.grammar)
@@ -291,7 +292,7 @@ impl SyntaxTreeState {
             parser
                 .parse_with_options(&mut callback, old_tree.as_ref(), None)
                 .expect("Should succeed")
-        })
+        }))
     }
 
     /// Translate an incoming edit delta into an InputEdit for incrementally updating the syntax
@@ -315,10 +316,10 @@ impl SyntaxTreeState {
     pub fn invalidate_highlight_cache_for_version(&self, version: BufferVersion) {
         // Check if the cache exists and if it matches the version being invalidated
         let mut cache = self.highlight_cache.borrow_mut();
-        if let Some(ref cached) = *cache {
-            if cached.key.version == version {
-                *cache = None;
-            }
+        if let Some(ref cached) = *cache
+            && cached.key.version == version
+        {
+            *cache = None;
         }
     }
 
@@ -402,6 +403,17 @@ impl DecorationLayer for SyntaxTreeState {
                     new_tree
                 },
                 move |model, new_tree, ctx| {
+                    let Some(new_tree) = new_tree else {
+                        // Buffer exceeded MAX_PARSE_BYTES; skip updating the syntax tree, but
+                        // still emit DecorationUpdated so any delayed rendering is flushed
+                        let mut syntax_tree_lock = model.syntax_tree.lock();
+                        syntax_tree_lock.remove(&version);
+                        drop(syntax_tree_lock);
+                        model.invalidate_highlight_cache_for_version(version);
+                        // (the editor delays showing content until this event fires).
+                        ctx.emit(DecorationStateEvent::DecorationUpdated { version });
+                        return;
+                    };
                     let mut syntax_tree_lock = model.syntax_tree.lock();
                     model.invalidate_highlight_cache_for_version(version);
                     if let Some(old_tree) = syntax_tree_lock.get_mut(&version) {

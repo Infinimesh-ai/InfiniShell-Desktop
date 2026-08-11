@@ -179,7 +179,8 @@ pub fn post_process_notebook(data: &str) -> String {
 /// * Includes extra context for embedded objects.
 #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
 pub fn export_notebook(data: &str, ctx: &AppContext) -> anyhow::Result<String> {
-    use warp_editor::content::{buffer::Buffer, markdown::MarkdownStyle};
+    use warp_editor::content::buffer::Buffer;
+    use warp_editor::content::markdown::MarkdownStyle;
 
     // Parse the Markdown directly rather than using [`Buffer::from_markdown`] so that we can
     // report errors to the exporter.

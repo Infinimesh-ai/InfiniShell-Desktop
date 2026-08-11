@@ -6,23 +6,21 @@
 //! Handles can be converted to owned_ttf_parser::OwnedFace objects
 //! by loading the fonts into memory.
 
-use std::ffi::c_int;
-use std::{collections::HashMap, ffi::CString};
-
-use super::{
-    font_handle::{Error as FontDataError, FontHandle},
-    FontFamily, ValidateFontSupportsEn,
-};
-use crate::fonts::{FontInfo, Properties, Style, Weight};
+use std::collections::HashMap;
+use std::ffi::{CString, c_int};
 
 use fontconfig::{
-    list_fonts, sort_fonts, FontSet, Fontconfig, ObjectSet, Pattern, FC_FAMILY, FC_FILE,
-    FC_FONTFORMAT, FC_FULLNAME, FC_INDEX, FC_LANG, FC_MONO, FC_SLANT, FC_SLANT_ITALIC,
-    FC_SLANT_ROMAN, FC_SPACING, FC_WEIGHT, FC_WEIGHT_BLACK, FC_WEIGHT_BOLD, FC_WEIGHT_EXTRABOLD,
-    FC_WEIGHT_EXTRALIGHT, FC_WEIGHT_LIGHT, FC_WEIGHT_MEDIUM, FC_WEIGHT_NORMAL, FC_WEIGHT_SEMIBOLD,
-    FC_WEIGHT_THIN,
+    FC_FAMILY, FC_FILE, FC_FONTFORMAT, FC_FULLNAME, FC_INDEX, FC_LANG, FC_MONO, FC_SLANT,
+    FC_SLANT_ITALIC, FC_SLANT_ROMAN, FC_SPACING, FC_WEIGHT, FC_WEIGHT_BLACK, FC_WEIGHT_BOLD,
+    FC_WEIGHT_EXTRABOLD, FC_WEIGHT_EXTRALIGHT, FC_WEIGHT_LIGHT, FC_WEIGHT_MEDIUM, FC_WEIGHT_NORMAL,
+    FC_WEIGHT_SEMIBOLD, FC_WEIGHT_THIN, FontSet, Fontconfig, ObjectSet, Pattern, list_fonts,
+    sort_fonts,
 };
 use itertools::Itertools;
+
+use super::font_handle::{Error as FontDataError, FontHandle};
+use super::{FontFamily, ValidateFontSupportsEn};
+use crate::fonts::{FontInfo, Properties, Style, Weight};
 
 /// Manages font detection and handle generation.
 ///

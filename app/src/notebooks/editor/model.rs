@@ -1,61 +1,57 @@
-use base64::{prelude::BASE64_STANDARD, Engine as _};
-use std::{any::Any, borrow::Cow, collections::HashMap, ops::Range, time::Duration};
+use std::any::Any;
+use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
+use std::ops::Range;
+use std::time::Duration;
 
+use base64::Engine as _;
+use base64::prelude::BASE64_STANDARD;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use markdown_parser::FormattedText;
 use mermaid_to_svg::MermaidTheme;
 use num_traits::SaturatingSub;
 use regex::Regex;
+use string_offset::CharOffset;
 use url::Url;
-use vec1::{vec1, Vec1};
+use vec1::{Vec1, vec1};
+use warp_core::r#async::debounce;
+use warp_core::features::FeatureFlag;
+use warp_core::semantic_selection::SemanticSelection;
+use warp_editor::content::buffer::{
+    AutoScrollBehavior, Buffer, BufferEditAction, BufferEvent, BufferSelectAction, EditOrigin,
+    SelectionOffsets, ShouldAutoscroll,
+};
+use warp_editor::content::selection_model::BufferSelectionModel;
+use warp_editor::content::text::{
+    BlockHeaderSize, BlockType, BufferBlockItem, BufferBlockStyle, BufferTextStyle, CodeBlockType,
+    IndentBehavior, IndentUnit, TextStyles, TextStylesWithMetadata,
+};
+use warp_editor::model::{BufferUpdateWrapper, CoreEditorModel, RichTextEditorModel};
+use warp_editor::render::model::{
+    AutoScrollMode, BlockItem, RenderEvent, RenderState, RichTextStyles, StyleUpdateAction,
+};
+use warp_editor::search::Searcher;
+use warp_editor::selection::{SelectionMode, SelectionModel, TextDirection, TextUnit};
+use warp_errors::report_error;
+use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
+use warpui::clipboard::ClipboardContent;
+use warpui::elements::ListIndentLevel;
 use warpui::{
-    accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole},
-    clipboard::ClipboardContent,
     AppContext, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity, WindowId,
 };
 
-use crate::{
-    cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel},
-    debounce::debounce,
-    editor::InteractionState,
-    notebooks::telemetry::BlockInfo,
-};
-use crate::{
-    notebooks::editor::interaction_state_model::InteractionStateModelEvent,
-    terminal::ShellLaunchData,
-};
-use string_offset::CharOffset;
-use warp_core::features::FeatureFlag;
-use warp_core::semantic_selection::SemanticSelection;
-use warp_editor::{
-    content::{buffer::ShouldAutoscroll, selection_model::BufferSelectionModel},
-    model::BufferUpdateWrapper,
-    render::model::{BlockItem, StyleUpdateAction},
-};
-use warp_editor::{
-    content::{
-        buffer::{
-            AutoScrollBehavior, Buffer, BufferEditAction, BufferEvent, BufferSelectAction,
-            EditOrigin, SelectionOffsets,
-        },
-        text::{
-            BlockHeaderSize, BlockType, BufferBlockItem, BufferBlockStyle, BufferTextStyle,
-            CodeBlockType, IndentBehavior, IndentUnit, TextStyles, TextStylesWithMetadata,
-        },
-    },
-    model::{CoreEditorModel, RichTextEditorModel},
-    render::model::{AutoScrollMode, RenderEvent, RenderState, RichTextStyles},
-    search::Searcher,
-    selection::{SelectionMode, SelectionModel, TextDirection, TextUnit},
-};
-use warpui::elements::ListIndentLevel;
-
-use super::{
-    super::telemetry::SelectionMode as TelemetrySelectionMode, embedding_model::NotebookEmbed,
-    interaction_state_model::InteractionStateModel, notebook_command::NotebookCommand,
-    NotebookWorkflow,
-};
+use super::super::telemetry::SelectionMode as TelemetrySelectionMode;
+use super::NotebookWorkflow;
+use super::embedding_model::NotebookEmbed;
+use super::interaction_state_model::InteractionStateModel;
+use super::notebook_command::NotebookCommand;
+use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
+use crate::editor::InteractionState;
+use crate::notebooks::editor::interaction_state_model::InteractionStateModelEvent;
+use crate::notebooks::file::MarkdownDisplayMode;
+use crate::notebooks::telemetry::BlockInfo;
+use crate::terminal::ShellLaunchData;
 
 const DEBOUNCED_RESIZE_PERIOD: Duration = Duration::from_millis(5);
 
@@ -111,6 +107,7 @@ pub struct NotebooksEditorModel {
     resize_tx: async_channel::Sender<()>,
     /// Context used to generate clickable file path links for notebooks.
     file_link_resolution_context: Option<FileLinkResolutionContext>,
+    default_mermaid_display_mode: MarkdownDisplayMode,
 }
 
 #[derive(Clone)]
@@ -158,15 +155,6 @@ impl NotebooksEditorModel {
             && FeatureFlag::EditableMarkdownMermaid.is_enabled()
     }
 
-    fn render_mermaid_diagrams_in_state(state: &InteractionState) -> bool {
-        FeatureFlag::MarkdownMermaid.is_enabled()
-            && (matches!(state, InteractionState::Selectable)
-                || (Self::editable_markdown_mermaid_enabled()
-                    && matches!(
-                        state,
-                        InteractionState::Editable | InteractionState::EditableWithInvalidSelection
-                    )))
-    }
     pub fn new(
         text_styles: RichTextStyles,
         rte_window_id: WindowId,
@@ -189,7 +177,7 @@ impl NotebooksEditorModel {
             Buffer::new(Box::new(notebook_tab_indentation))
                 .with_embedded_item_conversion(super::notebook_embedded_item_conversion)
         });
-        ctx.subscribe_to_model(&content, |me, event, ctx| {
+        ctx.subscribe_to_model(&content, |me, _, event, ctx| {
             me.handle_content_model_event(event, ctx);
         });
 
@@ -216,7 +204,7 @@ impl NotebooksEditorModel {
         );
 
         let object_store_model = ObjectStoreModel::handle(ctx);
-        ctx.subscribe_to_model(&object_store_model, |me, event, ctx| {
+        ctx.subscribe_to_model(&object_store_model, |me, _, event, ctx| {
             me.handle_object_store_event(event, ctx)
         });
 
@@ -239,6 +227,7 @@ impl NotebooksEditorModel {
             rte_window_id,
             resize_tx,
             file_link_resolution_context: None,
+            default_mermaid_display_mode: MarkdownDisplayMode::Raw,
         }
     }
 
@@ -285,6 +274,33 @@ impl NotebooksEditorModel {
         self.file_link_resolution_context = file_link_resolution_context;
     }
 
+    pub fn set_default_mermaid_display_mode(
+        &mut self,
+        mode: MarkdownDisplayMode,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if self.default_mermaid_display_mode == mode {
+            return;
+        }
+        self.default_mermaid_display_mode = mode;
+
+        for command in self
+            .child_models
+            .model_handles::<NotebookCommand>()
+            .collect_vec()
+        {
+            command.update(ctx, |command, _| {
+                command.mermaid_display_mode = mode;
+            });
+        }
+
+        if self.sync_mermaid_render_offsets(ctx) {
+            self.rebuild_layout(ctx);
+        } else {
+            ctx.notify();
+        }
+    }
+
     /// Create a new model for searching the editor.
     pub fn new_search(&self, ctx: &mut ModelContext<Self>) -> ModelHandle<Searcher> {
         let buffer = self.content.clone();
@@ -295,11 +311,20 @@ impl NotebooksEditorModel {
         <Self as RichTextEditorModel>::reset_with_markdown(self, markdown, ctx);
     }
 
+    pub fn reset_with_ipynb(&mut self, ipynb: &str, ctx: &mut ModelContext<Self>) {
+        <Self as RichTextEditorModel>::reset_with_ipynb(self, ipynb, ctx);
+    }
+
     pub fn update_to_new_markdown(&mut self, markdown: &str, ctx: &mut ModelContext<Self>) {
         <Self as RichTextEditorModel>::update_to_new_markdown(self, markdown, ctx);
     }
 
-    fn handle_render_model_event(&mut self, event: &RenderEvent, ctx: &mut ModelContext<Self>) {
+    fn handle_render_model_event(
+        &mut self,
+        _: ModelHandle<RenderState>,
+        event: &RenderEvent,
+        ctx: &mut ModelContext<Self>,
+    ) {
         // Ignore render events until bound to a real window, and when the window is closed.
         let Some(window_id) = self.rte_window_id else {
             return;
@@ -320,8 +345,12 @@ impl NotebooksEditorModel {
                     self.content.clone(),
                     self.selection_model.clone(),
                     window_id,
+                    self.default_mermaid_display_mode,
                     ctx,
                 );
+                if self.sync_mermaid_render_offsets(ctx) {
+                    self.rebuild_layout(ctx);
+                }
             }
             _ => (),
         }
@@ -329,6 +358,7 @@ impl NotebooksEditorModel {
 
     fn handle_interaction_state_model_event(
         &mut self,
+        _: ModelHandle<InteractionStateModel>,
         event: &InteractionStateModelEvent,
         ctx: &mut ModelContext<Self>,
     ) {
@@ -342,21 +372,57 @@ impl NotebooksEditorModel {
                 show_final_trailing_newline_when_non_empty,
             );
         });
-        let render_mermaid_diagrams = Self::render_mermaid_diagrams_in_state(new_state);
-        let relayout_needed = self.render_state.update(ctx, |render_state, _| {
-            render_state.set_render_mermaid_diagrams(render_mermaid_diagrams)
-        });
-        if relayout_needed {
+    }
+
+    /// Set the Mermaid display mode (Raw or Rendered) for the block at the given offset.
+    /// `block_offset` is the buffer's 0-indexed block marker position (i.e. `outline.start`).
+    /// Updates `mermaid_render_offsets` in the render state and triggers relayout if changed.
+    pub fn set_mermaid_render_mode(
+        &mut self,
+        block_offset: CharOffset,
+        mode: MarkdownDisplayMode,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if let Some(command) = self.child_models.model_at::<NotebookCommand>(block_offset) {
+            command.update(ctx, |cmd, _| {
+                cmd.mermaid_display_mode = mode;
+            });
+        }
+
+        if self.sync_mermaid_render_offsets(ctx) {
             self.rebuild_layout(ctx);
         }
     }
 
+    fn sync_mermaid_render_offsets(&mut self, ctx: &mut ModelContext<Self>) -> bool {
+        let new_offsets: HashSet<CharOffset> = self
+            .child_models
+            .model_handles::<NotebookCommand>()
+            .filter_map(|handle| {
+                if matches!(
+                    handle.as_ref(ctx).mermaid_display_mode,
+                    MarkdownDisplayMode::Rendered
+                ) {
+                    handle
+                        .as_ref(ctx)
+                        .start_offset(ctx)
+                        .map(|o| o + CharOffset::from(1))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        self.render_state
+            .update(ctx, |rs, _| rs.set_mermaid_render_offsets(new_offsets))
+    }
+
     fn handle_content_model_event(&mut self, event: &BufferEvent, ctx: &mut ModelContext<Self>) {
-        if let Some(window_id) = self.rte_window_id {
-            if !ctx.is_window_open(window_id) {
-                log::debug!("Ignoring content event for closed window");
-                return;
-            }
+        if let Some(window_id) = self.rte_window_id
+            && !ctx.is_window_open(window_id)
+        {
+            log::debug!("Ignoring content event for closed window");
+            return;
         }
 
         let can_edit = matches!(self.interaction_state(ctx), InteractionState::Editable);
@@ -1191,7 +1257,16 @@ impl NotebooksEditorModel {
             BlockType::Text(BufferBlockStyle::CodeBlock {
                 code_block_type: CodeBlockType::Mermaid,
             })
-        ) && Self::editable_markdown_mermaid_enabled()
+        ) && self
+            .child_models
+            .model_at::<NotebookCommand>(block_start)
+            .is_some_and(|command| {
+                matches!(
+                    command.as_ref(ctx).mermaid_display_mode,
+                    MarkdownDisplayMode::Rendered
+                )
+            })
+            && Self::editable_markdown_mermaid_enabled()
             && matches!(
                 self.interaction_state(ctx),
                 InteractionState::Selectable
@@ -1261,6 +1336,53 @@ impl NotebooksEditorModel {
         self.content.as_ref(app).link_url_at_offset(offset)
     }
 
+    pub fn scroll_to_matching_header(
+        &mut self,
+        fragment: &str,
+        ctx: &mut ModelContext<Self>,
+    ) -> bool {
+        let Some(range) = self.find_matching_header(fragment, ctx) else {
+            return false;
+        };
+
+        self.render_state.update(ctx, |render_state, _| {
+            render_state
+                .request_autoscroll_to(AutoScrollMode::PositionOffsetInViewportCenter(range.start));
+        });
+        true
+    }
+
+    fn find_matching_header(&self, fragment: &str, ctx: &AppContext) -> Option<Range<CharOffset>> {
+        let target = fragment.strip_prefix('#')?;
+        if target.is_empty() {
+            return None;
+        }
+        let target = urlencoding::decode(target).ok()?;
+        let target = target.trim().to_lowercase();
+        if target.is_empty() {
+            return None;
+        }
+
+        let content = self.content.as_ref(ctx);
+        for outline in content.outline_blocks() {
+            if !matches!(
+                &outline.block_type,
+                BlockType::Text(BufferBlockStyle::Header { .. })
+            ) {
+                continue;
+            }
+
+            let heading = content
+                .text_in_range(outline.start + 1..outline.end)
+                .into_string();
+            if heading.trim().to_lowercase() == target {
+                return Some(outline.start..outline.end);
+            }
+        }
+
+        None
+    }
+
     /// Whether or not there's an active command block selection.
     pub fn has_command_selection(&self, ctx: &AppContext) -> bool {
         self.child_models
@@ -1306,7 +1428,10 @@ impl NotebooksEditorModel {
                 });
             }
             None => {
-                log::error!("Child model at {block_start} has end offset with value None");
+                report_error!(
+                    "Child model has end offset with value None",
+                    extra: { "block_start" => %block_start }
+                );
             }
         };
 
@@ -2045,6 +2170,7 @@ impl ChildModels {
         content: ModelHandle<Buffer>,
         selection_model: ModelHandle<BufferSelectionModel>,
         rte_window_id: WindowId,
+        default_mermaid_display_mode: MarkdownDisplayMode,
         ctx: &mut ModelContext<T>,
     ) {
         // Resolve each existing model to its current offsets in the buffer, filtering out models
@@ -2128,7 +2254,7 @@ impl ChildModels {
                 outline.end
             );
             let new_model = ctx.add_model(|ctx| {
-                NotebookCommand::new(
+                let mut command = NotebookCommand::new(
                     outline.start,
                     outline.end,
                     interaction_state.clone(),
@@ -2136,7 +2262,9 @@ impl ChildModels {
                     selection_model.clone(),
                     rte_window_id,
                     ctx,
-                )
+                );
+                command.mermaid_display_mode = default_mermaid_display_mode;
+                command
             });
 
             self.models.insert(outline.start, Box::new(new_model));

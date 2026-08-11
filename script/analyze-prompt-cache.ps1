@@ -1,11 +1,11 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    解析 Zap BYOP prompt cache 命中率(基于 chat_stream.rs::generate_byop_output
+    解析 InfiniShell BYOP prompt cache 命中率(基于 chat_stream.rs::generate_byop_output
     在每次流末打印的 `[byop-cache]` 日志行)。
 
 .DESCRIPTION
-    1. 自动定位 Zap 日志文件:`%LOCALAPPDATA%\zap\Zap\data\logs\zap.log`
+    1. 自动定位 InfiniShell 日志文件:`%LOCALAPPDATA%\infinishell\InfiniShell\data\logs\infinishell.log`
     2. grep 形如下面格式的行:
        [byop-cache] prompt_tokens=N cache_read=R (X.X%) cache_create=W (Y.Y%) model=M compaction=L
        其中 compaction= 是 P2-16 添加的可选字段(none / inactive / active(hidden=N))
@@ -18,7 +18,7 @@
     4. 提供"对比模式"(-Tail N) 仅看最近 N 条记录,适合做 A/B
 
 .PARAMETER LogPath
-    自定义日志路径。默认从 Zap 标准位置查找。
+    自定义日志路径。默认从 InfiniShell 标准位置查找。
 
 .PARAMETER Tail
     只分析最近 N 条 [byop-cache] 行(默认全部)。
@@ -33,10 +33,10 @@
 .EXAMPLE
     .\analyze-prompt-cache.ps1 -Watch
 .EXAMPLE
-    .\analyze-prompt-cache.ps1 -LogPath "D:\backup\zap.log"
+    .\analyze-prompt-cache.ps1 -LogPath "D:\backup\infinishell.log"
 
 .NOTES
-    需要 Zap 启用 INFO 级日志(`[byop-cache]` 是 log::info!)。
+    需要 InfiniShell 启用 INFO 级日志(`[byop-cache]` 是 log::info!)。
     若没有任何 `[byop-cache]` 行:
       - 上游 provider 没返回 cache 字段(DeepSeek/Ollama 隐式缓存可能就是 0)
       - 或者 RUST_LOG 把 INFO 过滤了
@@ -51,7 +51,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # ---------- 1. 定位日志 ----------
-function Resolve-ZapLog {
+function Resolve-InfiniShellLog {
     param([string]$Override)
     if ($Override) {
         if (-not (Test-Path -LiteralPath $Override)) {
@@ -62,22 +62,22 @@ function Resolve-ZapLog {
     $candidates = @()
     if ($env:LOCALAPPDATA) {
         # 当前版本路径(`crates/simple_logger/src/manager.rs::log_directory_path` Windows 分支)
-        $candidates += (Join-Path -Path $env:LOCALAPPDATA -ChildPath 'zap\Zap\data\logs\zap.log')
+        $candidates += (Join-Path -Path $env:LOCALAPPDATA -ChildPath 'infinishell\InfiniShell\data\logs\infinishell.log')
         # 备选(以前版本的路径)
-        $candidates += (Join-Path -Path $env:LOCALAPPDATA -ChildPath 'zap\Zap\data\zap.log')
-        $candidates += (Join-Path -Path $env:LOCALAPPDATA -ChildPath 'zap\Zap\zap.log')
+        $candidates += (Join-Path -Path $env:LOCALAPPDATA -ChildPath 'infinishell\InfiniShell\data\infinishell.log')
+        $candidates += (Join-Path -Path $env:LOCALAPPDATA -ChildPath 'infinishell\InfiniShell\infinishell.log')
     }
     if ($env:APPDATA) {
-        $candidates += (Join-Path -Path $env:APPDATA -ChildPath 'zap\Zap\data\logs\zap.log')
-        $candidates += (Join-Path -Path $env:APPDATA -ChildPath 'zap\Zap\data\zap.log')
+        $candidates += (Join-Path -Path $env:APPDATA -ChildPath 'infinishell\InfiniShell\data\logs\infinishell.log')
+        $candidates += (Join-Path -Path $env:APPDATA -ChildPath 'infinishell\InfiniShell\data\infinishell.log')
     }
     foreach ($c in $candidates) {
         if ($c -and (Test-Path -LiteralPath $c)) { return (Resolve-Path -LiteralPath $c).Path }
     }
     throw @"
-未找到 Zap 日志文件。请检查以下位置或用 -LogPath 显式指定:
+未找到 InfiniShell 日志文件。请检查以下位置或用 -LogPath 显式指定:
   $($candidates -join "`n  ")
-若 Zap 还没运行过,先启动一次再来跑此脚本。
+若 InfiniShell 还没运行过,先启动一次再来跑此脚本。
 "@
 }
 
@@ -115,20 +115,20 @@ function Format-Summary {
         Write-Host @'
 
 可能原因:
-  1. 还没用 BYOP 路径发起过请求(Zap 启动后没和 AI 对话过)
+  1. 还没用 BYOP 路径发起过请求(InfiniShell 启动后没和 AI 对话过)
   2. 上游 provider 没返回 cache 字段(DeepSeek/Ollama 服务端隐式缓存)
   3. RUST_LOG 把 INFO 级日志过滤了 - 检查启动环境变量
 
 排查步骤:
-  $env:RUST_LOG = 'info'   # 启动 Zap 前设置
-  在 Zap 中向 AI 发 2 条消息(同一对话),让其调起 BYOP
+  $env:RUST_LOG = 'info'   # 启动 InfiniShell 前设置
+  在 InfiniShell 中向 AI 发 2 条消息(同一对话),让其调起 BYOP
   然后重跑本脚本
 '@ -ForegroundColor Yellow
         return
     }
 
     Write-Host ''
-    Write-Host '========== Zap BYOP Prompt Cache 命中率分析 ==========' -ForegroundColor Cyan
+    Write-Host '========== InfiniShell BYOP Prompt Cache 命中率分析 ==========' -ForegroundColor Cyan
     Write-Host ("总匹配行数: {0}" -f $Records.Count)
 
     # P2-16: 压缩相关汇总
@@ -199,7 +199,7 @@ function Format-Summary {
 }
 
 # ---------- 4. 主流程 ----------
-$logFile = Resolve-ZapLog -Override $LogPath
+$logFile = Resolve-InfiniShellLog -Override $LogPath
 Write-Host "日志路径: $logFile" -ForegroundColor DarkGray
 
 if ($Watch) {

@@ -1,28 +1,27 @@
 //! An adapter to make session-sharing work with the [`TerminalView`].
 
-use super::sharer::Sharer;
-use super::viewer::Viewer;
-
-use crate::auth::UserUid;
-use crate::banner::{Banner, BannerTextContent};
-use crate::terminal::shared_session::render_util::{
-    participant_avatar_for_selected_block, ParticipantAvatarParams,
-};
-use crate::terminal::shared_session::{
-    participant_avatar_view::ParticipantAvatarView, presence_manager::PresenceManager,
-};
-use crate::terminal::view::{TerminalAction, TerminalView};
-
-use crate::terminal::shared_session::protocol::SessionSourceType;
-use crate::terminal::shared_session::protocol::{ParticipantId, ParticipantList, Role, SessionId};
-use crate::terminal::view::throttle;
-use crate::ui_components::icons::Icon;
-use chrono::{DateTime, Local};
-use markdown_parser::FormattedTextFragment;
 use std::collections::HashMap;
 use std::time::Duration;
-use warpui::{elements::MouseStateHandle, ModelHandle, ViewContext, ViewHandle};
-use warpui::{AppContext, Element};
+
+use chrono::{DateTime, Local};
+use markdown_parser::FormattedTextFragment;
+use warpui::elements::MouseStateHandle;
+use warpui::{AppContext, Element, ModelHandle, ViewContext, ViewHandle};
+
+use super::sharer::Sharer;
+use super::viewer::Viewer;
+use crate::auth::UserUid;
+use crate::banner::{Banner, BannerTextContent};
+use crate::terminal::shared_session::participant_avatar_view::ParticipantAvatarView;
+use crate::terminal::shared_session::presence_manager::PresenceManager;
+use crate::terminal::shared_session::protocol::{
+    ParticipantId, ParticipantList, Role, SessionId, SessionSourceType,
+};
+use crate::terminal::shared_session::render_util::{
+    ParticipantAvatarParams, participant_avatar_for_selected_block,
+};
+use crate::terminal::view::{TerminalAction, TerminalView, throttle};
+use crate::ui_components::icons::Icon;
 
 /// The kind of shared session this is.
 pub enum Kind {
@@ -317,20 +316,19 @@ impl Adapter {
             );
         }
 
-        if let Some(sharer) = self.presence_manager.as_ref(app).get_sharer() {
-            if let Some(mouse_state_handle) = self
+        if let Some(sharer) = self.presence_manager.as_ref(app).get_sharer()
+            && let Some(mouse_state_handle) = self
                 .sharer()
                 .map(|s| s.block_selection_mouse_state_handle.clone())
-            {
-                avatars.insert(
-                    sharer.id().clone(),
-                    participant_avatar_for_selected_block(
-                        ParticipantAvatarParams::new(sharer, is_self_reconnecting),
-                        mouse_state_handle,
-                        app,
-                    ),
-                );
-            }
+        {
+            avatars.insert(
+                sharer.id().clone(),
+                participant_avatar_for_selected_block(
+                    ParticipantAvatarParams::new(sharer, is_self_reconnecting),
+                    mouse_state_handle,
+                    app,
+                ),
+            );
         }
 
         avatars

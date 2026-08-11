@@ -4,8 +4,9 @@ use warpui::elements::shimmering_text::{
 };
 use warpui::elements::{Align, ConstrainedBox, ParentElement, Rect, Stack};
 use warpui::fonts::FamilyId;
-use warpui::SingletonEntity as _;
-use warpui::{AppContext, Element, Entity, TypedActionView, View, ViewContext};
+use warpui::{
+    AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
+};
 
 pub struct RootView {
     text: String,
@@ -33,7 +34,7 @@ impl RootView {
         let end = ColorU::new(255, 255, 255, 255);
 
         Self {
-            text: "Zap shimmer: 👩‍💻with ligatures — fi fl 🇺🇸".to_string(),
+            text: "InfiniShell shimmer: 👩‍💻with ligatures — fi fl 🇺🇸".to_string(),
             font_family,
             font_size: 28.0,
             start,

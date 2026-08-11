@@ -1,11 +1,11 @@
-use crate::completer::{CommandExitStatus, CompletionContext, TopLevelCommandCaseSensitivity};
-use crate::parsers::SignatureAtTokenIndex;
+use std::collections::HashMap;
 
 use itertools::Itertools;
 use memo_map::MemoMap;
-
-use std::collections::HashMap;
 use warp_command_signatures::{Argument, DynamicCompletionData, IsArgumentOptional, Signature};
+
+use crate::completer::{CommandExitStatus, CompletionContext, TopLevelCommandCaseSensitivity};
+use crate::parsers::SignatureAtTokenIndex;
 
 pub enum SignatureResult<'a> {
     /// Successfully parsed the signature. We are returning the signature at the token to complete on.
@@ -227,12 +227,13 @@ impl CommandRegistry {
                 // Get the shell command to execute for getting the alias.
                 let command_to_run = alias.command(&tokens[..token_idx + 1]);
 
-                if let Some(generator_context) = context.generator_context() {
-                    if let Ok(output) = generator_context
+                if let Some(generator_context) = context.generator_context()
+                    && let Ok(output) = generator_context
                         .execute_command_at_pwd(&command_to_run, None)
                         .await
-                    {
-                        if let Ok(output_string) = output.to_string() {
+                {
+                    match output.to_string() {
+                        Ok(output_string) => {
                             // If the command output was successful, attempt to complete on the alias.
                             match output.status {
                                 CommandExitStatus::Success => {
@@ -256,7 +257,8 @@ impl CommandRegistry {
                                     )
                                 }
                             }
-                        } else {
+                        }
+                        _ => {
                             log::debug!(
                                 "Execution of `{command_to_run}` returned an unparseable output",
                             );
@@ -514,5 +516,5 @@ fn should_complete_on_subcmd(
 }
 
 #[cfg(test)]
-#[path = "registry_test.rs"]
+#[path = "registry_tests.rs"]
 mod tests;

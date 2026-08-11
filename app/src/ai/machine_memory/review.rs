@@ -45,7 +45,7 @@ pub(crate) fn prepare_session_review(
 
     let history_model = BlocklistAIHistoryModel::as_ref(ctx);
     let conversations = history_model
-        .all_live_conversations_for_terminal_view(terminal_view_id)
+        .all_live_conversations_for_terminal_surface(terminal_view_id)
         .collect::<Vec<_>>();
     let session_message_ids =
         collect_session_scoped_message_ids(&conversations, session_started_at)?;
@@ -199,7 +199,9 @@ fn build_session_digest<'a>(
                 | api::message::Message::MessagesReceivedFromAgents(_)
                 | api::message::Message::ModelUsed(_)
                 | api::message::Message::EventsFromAgents(_)
-                | api::message::Message::PassiveSuggestionResult(_) => {}
+                | api::message::Message::PassiveSuggestionResult(_)
+                // 编排配置快照是纯控制面消息,不进入机器记忆 digest。
+                | api::message::Message::OrchestrationConfigSnapshot(_) => {}
             }
         }
     }

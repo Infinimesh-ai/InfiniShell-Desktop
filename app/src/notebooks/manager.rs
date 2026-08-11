@@ -1,26 +1,24 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use futures_util::stream::AbortHandle;
 use markdown_parser::markdown_parser::parse_markdown_to_raw_text;
+use warp_errors::report_error;
+use warpui::r#async::SpawnedFutureHandle;
 use warpui::{
-    r#async::SpawnedFutureHandle, Entity, EntityId, ModelContext, SingletonEntity, WeakViewHandle,
-    WindowId,
+    Entity, EntityId, ModelContext, ModelHandle, SingletonEntity, WeakViewHandle, WindowId,
 };
 
-use crate::{
-    cloud_object::{
-        model::persistence::{ObjectStoreEvent, ObjectStoreModel},
-        Owner,
-    },
-    drive::ZapDriveObjectSettings,
-    pane_group::{NotebookPane, PaneContent},
-    safe_debug, safe_warn,
-    server::ids::SyncId,
-    workspace::PaneViewLocator,
-};
-
-use super::{notebook::NotebookView, NotebookObject};
+use super::NotebookObject;
+use super::notebook::NotebookView;
+use crate::cloud_object::Owner;
+use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
+use crate::drive::ZapDriveObjectSettings;
+use crate::pane_group::{NotebookPane, PaneContent};
+use crate::server::ids::SyncId;
+use crate::workspace::PaneViewLocator;
+use crate::{safe_debug, safe_warn};
 
 #[cfg(test)]
 #[path = "manager_tests.rs"]
@@ -116,7 +114,7 @@ impl NotebookManager {
                     manager
                         .raw_text_by_hashed_id
                         .insert(hashed_id, NotebookRawTextStatus::ParseError);
-                    log::error!("Cached Notebook raw text failed to parse: {err}.");
+                    report_error!(err.context("Cached Notebook raw text failed to parse"));
                 }
             },
         )
@@ -141,13 +139,14 @@ impl NotebookManager {
 
     fn handle_object_store_event(
         &mut self,
+        _: ModelHandle<ObjectStoreModel>,
         event: &ObjectStoreEvent,
         ctx: &mut ModelContext<Self>,
     ) {
-        if let ObjectStoreEvent::ObjectUpdated { type_and_id, .. } = event {
-            if let Some(notebook_id) = type_and_id.as_notebook_id() {
-                self.update_raw_text_for_notebook(notebook_id, ctx);
-            }
+        if let ObjectStoreEvent::ObjectUpdated { type_and_id, .. } = event
+            && let Some(notebook_id) = type_and_id.as_notebook_id()
+        {
+            self.update_raw_text_for_notebook(notebook_id, ctx);
         }
     }
 

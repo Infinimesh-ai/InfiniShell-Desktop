@@ -1,7 +1,9 @@
-use itertools::Itertools as _;
 use std::os::windows::ffi::OsStrExt as _;
 use winreg::enums::HKEY_CURRENT_USER;
 use winreg::RegKey;
+
+use itertools::Itertools as _;
+use warp_errors::report_error;
 
 // Re-export a couple winit types and modules as the concrete implementations
 // for Windows.
@@ -41,7 +43,7 @@ impl AppBuilderExt for super::AppBuilder {
 
         let set_id = unsafe { set_app_user_model_id(app_id) };
         if let Err(err) = set_id {
-            log::error!("Unable to set Windows AppUserModel ID: {err:?}");
+            report_error!(anyhow::Error::new(err).context("Unable to set Windows AppUserModel ID"));
         }
     }
 
@@ -53,13 +55,15 @@ impl AppBuilderExt for super::AppBuilder {
 }
 
 unsafe fn set_app_user_model_id(app_id: String) -> Result<(), windows::core::Error> {
-    let wide_string = std::ffi::OsStr::new(&app_id)
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect_vec();
-    windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(windows::core::PCWSTR(
-        wide_string.as_ptr(),
-    ))
+    unsafe {
+        let wide_string = std::ffi::OsStr::new(&app_id)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect_vec();
+        windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(windows::core::PCWSTR(
+            wide_string.as_ptr(),
+        ))
+    }
 }
 
 /// 把 AUMID 注册到 `HKCU\Software\Classes\AppUserModelId\<aumid>`,
@@ -73,7 +77,7 @@ fn register_aumid_in_registry(app_id: &str) -> std::io::Result<()> {
     let subkey = format!("Software\\Classes\\AppUserModelId\\{app_id}");
     let (key, _) = hkcu.create_subkey(&subkey)?;
 
-    // 从 AUMID 末段推导一个体面的展示名(e.g. dev.zap.Zap → Zap)。
+    // 从 AUMID 末段推导一个体面的展示名(e.g. dev.infinishell.InfiniShell → InfiniShell)。
     let display_name = app_id.rsplit('.').next().unwrap_or(app_id);
     key.set_value("DisplayName", &display_name.to_string())?;
     Ok(())

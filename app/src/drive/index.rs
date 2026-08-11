@@ -1,5 +1,8 @@
 #[cfg(target_family = "wasm")]
 use crate::uri::web_intent_parser::open_url_on_desktop;
+// Zap:`crate::util::sync` 已下沉到 `warp_util::sync`,与 `one_time_modal_model.rs` 保持一致。
+use warp_util::sync::Condition;
+
 use crate::{
     ai::{
         document::ai_document_model::AIDocumentId,
@@ -36,7 +39,7 @@ use crate::{
         icons::{Icon, ICON_DIMENSIONS},
         menu_button::{icon_button_with_context_menu, MenuDirection},
     },
-    util::{color::coloru_with_opacity, sync::Condition},
+    util::color::coloru_with_opacity,
     view_components::{Dropdown, DropdownItem},
     workflows::{WorkflowObject, WorkflowViewMode},
     workspace::active_terminal_in_window,
@@ -184,7 +187,8 @@ pub enum DriveIndexSection {
     Space(Space),
 }
 
-#[derive(Debug, Clone)]
+// Zap:跟随上游补 `PartialEq`——`Dropdown<A>` 的 `DropdownItemAction` blanket impl 要求它。
+#[derive(Debug, Clone, PartialEq)]
 pub enum DriveIndexAction {
     OpenObject(ObjectTypeAndId),
     OpenWorkflowInPane {
@@ -618,7 +622,7 @@ impl DriveIndex {
         }
     }
 
-    pub fn has_initialized_sections(&self) -> impl Future<Output = ()> {
+    pub fn has_initialized_sections(&self) -> impl Future<Output = ()> + use<> {
         // We're not using `async fn` here so that the returned Future doesn't borrow self.
         self.has_initialized_sections.wait()
     }
@@ -1941,7 +1945,7 @@ impl DriveIndex {
         appearance: &Appearance,
         object_store_model: &ObjectStoreModel,
         app: &AppContext,
-    ) -> Option<impl Iterator<Item = Box<dyn Element>>> {
+    ) -> Option<impl Iterator<Item = Box<dyn Element>> + use<>> {
         let mut rendered_space = vec![];
 
         if let Some(section_state) = self.section_states.get(&section) {
@@ -2068,7 +2072,10 @@ impl DriveIndex {
         .finish()
     }
 
-    fn render_all_sections(&self, app: &AppContext) -> impl Iterator<Item = Box<dyn Element>> {
+    fn render_all_sections(
+        &self,
+        app: &AppContext,
+    ) -> impl Iterator<Item = Box<dyn Element>> + use<> {
         let appearance = Appearance::as_ref(app);
         let object_store_model = ObjectStoreModel::as_ref(app);
 
@@ -4933,5 +4940,5 @@ impl TypedActionView for DriveIndex {
 }
 
 #[cfg(test)]
-#[path = "index_test.rs"]
+#[path = "index_tests.rs"]
 mod tests;

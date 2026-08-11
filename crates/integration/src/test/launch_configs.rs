@@ -1,32 +1,26 @@
-use std::{path::PathBuf, time::Duration};
+use std::path::PathBuf;
+use std::time::Duration;
 
-use warpui::{
-    async_assert,
-    integration::{AssertionOutcome, TestStep},
-    ModelHandle,
+use warp::features::FeatureFlag;
+use warp::integration_testing::pane_group::assert_focused_pane_index;
+use warp::integration_testing::settings::set_window_custom_size;
+use warp::integration_testing::step::new_step_with_default_assertions;
+use warp::integration_testing::terminal::{
+    validate_block_output, wait_until_bootstrapped_single_pane_for_tab,
 };
-
-use super::{assert_approx_eq, new_builder, TEST_ONLY_ASSETS};
-use crate::Builder;
-use warp::integration_testing::{
-    pane_group::assert_focused_pane_index,
-    window::assert_num_windows_open,
-    workspace::{assert_focused_tab_index, assert_tab_count},
-};
-use warp::integration_testing::{
-    step::new_step_with_default_assertions,
-    terminal::{validate_block_output, wait_until_bootstrapped_single_pane_for_tab},
-};
+use warp::integration_testing::type_getters::get_launch_config_ui_location;
+use warp::integration_testing::window::assert_num_windows_open;
+use warp::integration_testing::workspace::{assert_focused_tab_index, assert_tab_count};
+use warp::integration_testing::{self};
+use warp::search::SyncDataSource;
 use warp::search::command_palette::launch_config;
+use warp::search::data_source::Query;
 use warp::workspace::NEW_TAB_BUTTON_POSITION_ID;
-use warp::{features::FeatureFlag, integration_testing::settings::set_window_custom_size};
-use warp::{
-    integration_testing::type_getters::get_launch_config_ui_location, search::SyncDataSource,
-};
-use warp::{
-    integration_testing::{self},
-    search::data_source::Query,
-};
+use warpui_core::integration::{AssertionOutcome, TestStep};
+use warpui_core::{ModelHandle, async_assert};
+
+use super::{TEST_ONLY_ASSETS, assert_approx_eq, new_builder};
+use crate::Builder;
 
 /// Adds a launch config to the mocked out warp config directory and verifies that
 /// the launch config appears in the launch config palette.
@@ -167,7 +161,7 @@ pub fn test_launch_config_single_child_branch() -> Builder {
     use warp::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, SplitDirection, TabTemplate, WindowTemplate,
     };
-    use warpui::actions::StandardAction;
+    use warpui_core::actions::StandardAction;
 
     /// Create a launch config that has a branch with a single child
     fn create_launch_config() -> LaunchConfig {
@@ -188,6 +182,7 @@ pub fn test_launch_config_single_child_branch() -> Builder {
                             shell: None,
                         }],
                     },
+                    commands: Vec::new(),
                     color: None,
                 }],
             }],
@@ -317,6 +312,7 @@ pub fn test_with_launch_config_with_active_tab_index() -> Builder {
                                 shell: None,
                             }],
                         },
+                        commands: Vec::new(),
                         color: None,
                     };
                     3
@@ -396,6 +392,7 @@ pub fn test_with_launch_config_with_active_pane() -> Builder {
                             },
                         ],
                     },
+                    commands: Vec::new(),
                     color: None,
                 }],
             }],
@@ -474,6 +471,7 @@ pub fn test_with_launch_config_with_no_active_pane() -> Builder {
                             },
                         ],
                     },
+                    commands: Vec::new(),
                     color: None,
                 }],
             }],

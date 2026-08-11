@@ -1,13 +1,11 @@
+use std::ops::Not;
 use std::path::PathBuf;
 
 use anyhow::anyhow;
+use grep::printer::JSONBuilder;
 use grep::regex::RegexMatcherBuilder;
-use grep::{
-    printer::JSONBuilder,
-    searcher::{BinaryDetection, SearcherBuilder},
-};
+use grep::searcher::{BinaryDetection, SearcherBuilder};
 use ignore::{WalkBuilder, WalkState};
-use std::ops::Not;
 use string_offset::ByteOffset;
 
 /// Maximum line length (in bytes) the ripgrep searcher will tolerate.
@@ -141,9 +139,9 @@ mod process_impl {
     use std::path::PathBuf;
     use std::process::Stdio;
 
+    use futures::StreamExt as _;
     use futures::io::{AsyncBufReadExt as _, BufReader};
     use futures::stream::Stream;
-    use futures::StreamExt as _;
 
     use super::{Match, Submatch};
     use crate::types::RipgrepMessage;

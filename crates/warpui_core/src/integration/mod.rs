@@ -1,11 +1,8 @@
-use std::{
-    collections::HashSet,
-    env,
-    ffi::OsStr,
-    fs,
-    io::ErrorKind,
-    path::{Path, PathBuf},
-};
+use std::collections::HashSet;
+use std::ffi::OsStr;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 mod action_log;
 mod artifacts;
@@ -16,13 +13,14 @@ mod step;
 pub mod video_recorder;
 pub use action_log::ActionLog;
 pub use artifacts::ARTIFACTS_DIR_ENV_VAR;
-pub use driver::{Builder, SetupFn, TestDriver, RERUN_EXIT_CODE, RUNTIME_TAG_FAILURE_REASON};
+pub use driver::{Builder, RERUN_EXIT_CODE, RUNTIME_TAG_FAILURE_REASON, SetupFn, TestDriver};
 pub use overlay::OverlayLog;
 pub use step::{
     AssertionCallback, AssertionOutcome, AssertionWithDataCallback, IntegrationTestEvent,
     PersistedDataMap, StepData, StepDataMap, TestStep,
 };
-pub use video_recorder::{save_captured_frame_as_png, VideoRecorder};
+pub use video_recorder::{VideoRecorder, save_captured_frame_as_png};
+use warp_errors::report_error;
 
 #[macro_export]
 macro_rules! async_assert {
@@ -147,12 +145,16 @@ impl TestSetupUtils {
                     key,
                     v.as_ref().to_string_lossy()
                 );
-                env::set_var(&key, v);
+                unsafe {
+                    env::set_var(&key, v);
+                }
                 self.env_vars.insert(key);
             }
             None => {
                 println!("Clearing env var {key}");
-                env::remove_var(key);
+                unsafe {
+                    env::remove_var(&key);
+                }
             }
         };
     }
@@ -160,7 +162,9 @@ impl TestSetupUtils {
     pub fn cleanup_env(&mut self) {
         for key in &self.env_vars {
             println!("Clearing env var {key}");
-            env::remove_var(key);
+            unsafe {
+                env::remove_var(key);
+            }
         }
         self.env_vars = HashSet::new();
     }
@@ -189,10 +193,10 @@ impl TestSetupUtils {
         }
 
         let res = fs::create_dir_all(test_dir);
-        if let Err(err_code) = res {
-            if err_code.kind() != ErrorKind::AlreadyExists {
-                panic!("Failed to create directory {test_dir:?}");
-            }
+        if let Err(err_code) = res
+            && err_code.kind() != ErrorKind::AlreadyExists
+        {
+            panic!("Failed to create directory {test_dir:?}");
         }
     }
 
@@ -225,7 +229,7 @@ impl TestSetupUtils {
 
     pub fn cleanup_dir(&mut self) {
         if let Err(err) = fs::remove_dir_all(self.root_dir.as_path()) {
-            log::error!("Could not cleanup directory {err:?}");
+            report_error!("Could not cleanup directory", extra: { "error" => ?err });
         }
     }
 }

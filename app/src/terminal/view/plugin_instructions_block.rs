@@ -1,29 +1,27 @@
 use std::iter;
 
+use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_geometry::vector::vec2f;
 use warpui::clipboard::ClipboardContent;
 use warpui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    Empty, Expanded, Flex, HyperlinkLens, MainAxisAlignment, MainAxisSize, OffsetPositioning,
-    ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Stack, Text,
+    Empty, Expanded, Flex, FormattedTextElement, HyperlinkLens, MainAxisAlignment, MainAxisSize,
+    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Stack, Text,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
-use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use warpui::elements::FormattedTextElement;
-
 use crate::ai::blocklist::code_block::{
-    render_code_block_plain, CodeBlockOptions, CodeSnippetButtonHandles,
+    CodeBlockOptions, CodeSnippetButtonHandles, render_code_block_plain,
 };
 use crate::appearance::Appearance;
-use crate::terminal::cli_agent_sessions::plugin_manager::PluginInstructions;
 use crate::terminal::CLIAgent;
+use crate::terminal::cli_agent_sessions::plugin_manager::PluginInstructions;
 use crate::ui_components::icons::Icon;
-use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme};
 use crate::view_components::DismissibleToast;
+use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme};
 use crate::workspace::{ToastStack, WorkspaceAction};
 
 pub(crate) struct PluginInstructionsBlock {

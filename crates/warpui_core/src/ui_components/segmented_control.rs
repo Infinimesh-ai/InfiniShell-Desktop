@@ -1,25 +1,22 @@
-use itertools::Itertools;
-
-use crate::{
-    color::ColorU,
-    elements::{
-        Align, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Fill, Flex,
-        Icon, MainAxisAlignment, MouseStateHandle, ParentElement, Radius, Text,
-    },
-    fonts::FamilyId,
-    platform::Cursor,
-    ui_components::{
-        button::Button,
-        components::{Coords, UiComponent, UiComponentStyles},
-        tool_tip::{Tooltip, TooltipWithSublabel},
-    },
-    AppContext, Element, Entity, TypedActionView, View, ViewContext,
-};
-
 use core::fmt;
-use std::{borrow::Cow, boxed::Box};
+use std::borrow::Cow;
+use std::boxed::Box;
+
+use itertools::Itertools;
+use warp_errors::report_error;
 
 use super::button::ButtonTooltipPosition;
+use crate::color::ColorU;
+use crate::elements::{
+    Align, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Fill, Flex, Icon,
+    MainAxisAlignment, MouseStateHandle, ParentElement, Radius, Text,
+};
+use crate::fonts::FamilyId;
+use crate::platform::Cursor;
+use crate::ui_components::button::Button;
+use crate::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use crate::ui_components::tool_tip::{Tooltip, TooltipWithSublabel};
+use crate::{AppContext, Element, Entity, TypedActionView, View, ViewContext};
 const MAX_WIDTH: f32 = 300.0;
 
 /// A segmented control component with multiple selectable options
@@ -163,7 +160,7 @@ impl<T: SegmentedControlOption> SegmentedControl<T> {
             "Cannot pass empty options to SegmentedControl"
         );
         if updated_options.is_empty() {
-            log::error!("Attempted to update SegmentedControl with empty options");
+            report_error!("Attempted to update SegmentedControl with empty options");
             return;
         }
 
@@ -365,11 +362,11 @@ impl<T: SegmentedControlOption> View for SegmentedControl<T> {
         if let Some(background) = self.styles.background {
             container = container.with_background(background);
         }
-        if let Some(border_width) = self.styles.border_width {
-            if let Some(border_color) = self.styles.border_color {
-                container =
-                    container.with_border(Border::all(border_width).with_border_fill(border_color));
-            }
+        if let Some(border_width) = self.styles.border_width
+            && let Some(border_color) = self.styles.border_color
+        {
+            container =
+                container.with_border(Border::all(border_width).with_border_fill(border_color));
         }
         if let Some(border_radius) = self.styles.border_radius {
             container = container.with_corner_radius(border_radius);

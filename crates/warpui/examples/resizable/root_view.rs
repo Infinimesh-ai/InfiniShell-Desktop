@@ -1,13 +1,12 @@
+use warpui::color::ColorU;
+use warpui::elements::{
+    Container, CrossAxisAlignment, DragBarSide, Flex, MainAxisAlignment, MainAxisSize,
+    ParentElement, Rect, Resizable, ResizableStateHandle, Shrinkable, Stack, Text,
+    resizable_state_handle,
+};
 use warpui::fonts::FamilyId;
-use warpui::SingletonEntity as _;
 use warpui::{
-    color::ColorU,
-    elements::{
-        resizable_state_handle, Container, CrossAxisAlignment, DragBarSide, Flex,
-        MainAxisAlignment, MainAxisSize, ParentElement, Rect, Resizable, ResizableStateHandle,
-        Shrinkable, Stack, Text,
-    },
-    AppContext, Element, Entity, TypedActionView, View, ViewContext,
+    AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
 };
 
 pub struct RootView {

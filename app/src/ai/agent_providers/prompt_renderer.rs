@@ -305,9 +305,9 @@ fn collect_prompt_context(model_id: &str, ctx: &[AIAgentContext]) -> PromptConte
             AIAgentContext::Skills { skills } => {
                 for s in skills {
                     let path = match &s.reference {
-                        ai::skills::SkillReference::Path(p) => {
-                            Some(p.to_string_lossy().into_owned())
-                        }
+                        // 上游把技能引用路径统一成 `LocalOrRemotePath`,它没有
+                        // `to_string_lossy()`,用 `display_path()` 取可显示字符串。
+                        ai::skills::SkillReference::Path(p) => Some(p.display_path()),
                         // Bundled skills load via InvokeSkill, not read_skill.
                         // Omit skill_path to avoid guiding the model toward a
                         // value that will always fail BYOP's skill_by_reference.
@@ -339,6 +339,13 @@ fn collect_prompt_context(model_id: &str, ctx: &[AIAgentContext]) -> PromptConte
                     out.project_rules.push(ProjectRuleCtx { path, content });
                 }
             }
+            // 上游新增的 git 仓库元数据 context(Repository = remote 的 name/owner/host,
+            // PullRequest = 当前分支关联的 PR 编号/状态)。与 `Git { head, branch }` 同属
+            // 环境型 context,但 BYOP 的 system 模板没有对应字段 —— 我方 PromptContext
+            // 不承载仓库/PR 元数据,模板也不渲染它们,所以这里按 no-op 处理。
+            // (`user_context::collect_user_attachments` 同样把这两个变体归入
+            // “环境型、不作为用户附件渲染”的 no-op 分支,两处语义保持一致。)
+            AIAgentContext::Repository { .. } | AIAgentContext::PullRequest { .. } => {}
             // 用户附件类 context(File / Image / SelectedText / Block)不进 system prompt,
             // 由 `user_context::render_user_attachments` 在 chat_stream 的 UserQuery 分支
             // 注入到当前轮 user message。这跟 warp 自家路径分两类的语义对齐:
@@ -440,7 +447,7 @@ fn fallback_init_project_command(arguments: &str) -> String {
 /// 渲染兜底 system(只在模板加载/渲染失败时用,不应在正常路径触发)。
 fn fallback_system(model_id: &str) -> String {
     format!(
-        "You are the AI coding agent inside Zap, an AI Development Environment (ADE). \
+        "You are the AI coding agent inside InfiniShell, an AI Development Environment (ADE). \
          Model: {model_id}. \
          Use the registered tools (run_shell_command / read_files / apply_file_diffs / grep / file_glob / ...) \
          to take actions on the user's behalf. Be concise."
@@ -600,8 +607,8 @@ mod tests {
                 &[],
             );
             assert!(
-                out.contains("Zap"),
-                "id={id} should mention Zap, got: {out}"
+                out.contains("InfiniShell"),
+                "id={id} should mention InfiniShell, got: {out}"
             );
         }
     }
@@ -632,7 +639,8 @@ mod tests {
 
         let skill_path = "/home/user/.agents/skills/open-browser-use/SKILL.md";
         let skill = SkillDescriptor {
-            reference: SkillReference::Path(skill_path.into()),
+            // `LocalOrRemotePath` 只实现了 `From<PathBuf>`,没有 `From<&str>`。
+            reference: SkillReference::Path(std::path::PathBuf::from(skill_path).into()),
             name: "open-browser-use".into(),
             description: "Automates Chrome browser operations.".into(),
             scope: SkillScope::Project,

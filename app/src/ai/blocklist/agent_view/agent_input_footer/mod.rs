@@ -58,7 +58,12 @@ use crate::{
 use toolbar_item::AgentToolbarItemKind;
 // Zap Wave 7-3:`warp_cli::agent::Harness` import was removed with the hosted-mode footer.
 
+use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
+
+/// FTU(首次使用)model callout 是否已经在本次运行中展示过。
+/// 上游移除了对应的持久化设置项,这里用进程内标记代替。
+static FTU_MODEL_CALLOUT_SHOWN: AtomicBool = AtomicBool::new(false);
 
 #[cfg(not(target_family = "wasm"))]
 use crate::terminal::local_shell::LocalShellState;
@@ -70,7 +75,6 @@ use ai::document::{AIDocumentId, AIDocumentVersion};
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
-use settings::Setting;
 use settings::ToggleableSetting;
 #[cfg(not(target_family = "wasm"))]
 use std::env;
@@ -83,13 +87,12 @@ use tokio::fs;
 #[cfg(feature = "voice_input")]
 use voice_input::{StartListeningError, VoiceSessionResult};
 
-use warp_core::{
-    report_if_error,
-    ui::{
-        color::{blend::Blend, contrast::MinimumAllowedContrast, ContrastingColor},
-        theme::{color::internal_colors, Fill},
-    },
+// Zap:`report_if_error` 已从 warp_core 迁到 warp_errors crate。
+use warp_core::ui::{
+    color::{blend::Blend, contrast::MinimumAllowedContrast, ContrastingColor},
+    theme::{color::internal_colors, Fill},
 };
+use warp_errors::report_if_error;
 #[cfg(feature = "voice_input")]
 use warpui::r#async::SpawnedFutureHandle;
 use warpui::{
@@ -189,7 +192,10 @@ pub struct AgentInputFooter {
     // Zap Wave 7-3:`environment_selector` field was removed with the hosted-mode footer.
     reasoning_depth_selector: ViewHandle<ReasoningDepthSelector>,
     prompt_alert: ViewHandle<PromptAlertView>,
-    ambient_agent_view_model: ModelHandle<AmbientAgentViewModel>,
+    /// 构造时可能还没有 ambient agent view model(共享会话 link-join 是懒路径),
+    /// 由 `Input::attach_ambient_agent_view_model` 通过
+    /// [`Self::set_ambient_agent_view_model`] 后置注入。
+    ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
     left_display_chips: Vec<ViewHandle<DisplayChip>>,
     right_display_chips: Vec<ViewHandle<DisplayChip>>,
     // Separate set of display chips for the CLI agent footer.
@@ -234,7 +240,7 @@ impl AgentInputFooter {
         terminal_view_id: EntityId,
         ai_input_model: ModelHandle<BlocklistAIInputModel>,
         terminal_model: Arc<FairMutex<TerminalModel>>,
-        ambient_agent_view_model: ModelHandle<AmbientAgentViewModel>,
+        ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
         prompt: ModelHandle<PromptType>,
         display_chip_config: DisplayChipConfig,
         ctx: &mut ViewContext<Self>,
@@ -550,7 +556,7 @@ impl AgentInputFooter {
 
         let context_window_button = ctx.add_typed_action_view(|_ctx| {
             ActionButton::new("", AgentInputButtonTheme)
-                .with_icon(Icon::ConversationContext0)
+                .with_icon(Icon::ContextRemaining100)
                 .with_tooltip(crate::t!("ai-footer-context-window-usage-tooltip"))
                 .with_size(button_size)
                 .with_tooltip_alignment(TooltipAlignment::Left)
@@ -632,7 +638,7 @@ impl AgentInputFooter {
             &BlocklistAIHistoryModel::handle(ctx),
             |me, _, event, ctx| {
                 if event
-                    .terminal_view_id()
+                    .terminal_surface_id()
                     .is_some_and(|id| id != me.terminal_view_id)
                 {
                     return;
@@ -643,7 +649,7 @@ impl AgentInputFooter {
                     BlocklistAIHistoryEvent::StartedNewConversation { .. }
                     | BlocklistAIHistoryEvent::SetActiveConversation { .. }
                     | BlocklistAIHistoryEvent::ClearedActiveConversation { .. }
-                    | BlocklistAIHistoryEvent::ClearedConversationsInTerminalView { .. }
+                    | BlocklistAIHistoryEvent::ClearedConversationsForTerminalSurface { .. }
                     | BlocklistAIHistoryEvent::RemoveConversation { .. }
                     | BlocklistAIHistoryEvent::UpdatedAutoexecuteOverride { .. } => {
                         me.sync_fast_forward_button(ctx);
@@ -734,6 +740,27 @@ impl AgentInputFooter {
         self.display_chip_config.current_repo_path = repo_path;
         // Chips will be rebuilt on the next GitRepoStatusEvent::MetadataChanged.
         // Notify to ensure any existing chips reflect the change.
+        ctx.notify();
+    }
+
+    /// 后置注入 ambient agent view model。共享会话 link-join 时 footer 在构造阶段
+    /// 拿不到 model,由 `Input::attach_ambient_agent_view_model` 这个唯一接线点补上。
+    /// 幂等:已接线则直接返回。
+    ///
+    /// 注:上游还会在这里懒建 hosted-mode 的 environment selector,Zap Wave 7-3
+    /// 已移除该 UI,所以这里只需向下透传给 profile/model 选择器。
+    pub fn set_ambient_agent_view_model(
+        &mut self,
+        view_model: ModelHandle<AmbientAgentViewModel>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if self.ambient_agent_view_model.is_some() {
+            return;
+        }
+        self.ambient_agent_view_model = Some(view_model.clone());
+        self.model_selector.update(ctx, |selector, ctx| {
+            selector.set_ambient_agent_view_model(view_model, ctx);
+        });
         ctx.notify();
     }
 
@@ -1346,7 +1373,10 @@ impl AgentInputFooter {
     }
 
     fn update_ftu_callout_render_state(&mut self, ctx: &mut ViewContext<Self>) {
-        let ftu_dismissed = *AISettings::as_ref(ctx).ftu_model_callout_dismissed;
+        // 上游删除了 `AISettings::ftu_model_callout_dismissed` 这项持久化设置,
+        // 而 FTU model callout 这块 UI 我方保留。这里退化成进程内的一次性标记:
+        // 同一次运行里只提示一次,重启后会再提示一次(原来是永久记住)。
+        let ftu_dismissed = FTU_MODEL_CALLOUT_SHOWN.load(atomic::Ordering::Relaxed);
         if !self.render_ftu_callout && ftu_dismissed {
             return;
         }
@@ -1363,12 +1393,8 @@ impl AgentInputFooter {
                 self.render_ftu_callout = true;
                 ctx.notify();
             }
-            AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                // This setting actually indicates whether we've shown the ftu callout at all,
-                // but it originally tracked whether the user manually dismissed the callout and
-                // we don't want to resurface the callout to folks who have already dismissed.
-                let _ = settings.ftu_model_callout_dismissed.set_value(true, ctx);
-            });
+            // 该标记表示"本次运行已经展示过 callout",避免同一进程内反复弹出。
+            FTU_MODEL_CALLOUT_SHOWN.store(true, atomic::Ordering::Relaxed);
         } else if !showing_ftu_model_picker && self.render_ftu_callout {
             self.render_ftu_callout = false;
             ctx.notify();
@@ -1697,7 +1723,7 @@ impl AgentInputFooter {
             // — keep the button's initial neutral tooltip rather than show "100% remaining".
             if usage == 0.0 {
                 self.context_window_button.update(ctx, |button, ctx| {
-                    button.set_icon(Some(Icon::ConversationContext0), ctx);
+                    button.set_icon(Some(Icon::ContextRemaining100), ctx);
                     button.set_tooltip(
                         Some(crate::t!("ai-footer-context-window-usage-tooltip")),
                         ctx,
@@ -2242,7 +2268,7 @@ pub enum AgentInputFooterEvent {
     ToggledChipMenu {
         open: bool,
     },
-    TryExecuteChipCommand(String),
+    TryExecuteChipCommand(crate::context_chips::display_chip::PromptChipShellCommand),
     ModelSelectorOpened,
     ModelSelectorClosed,
     ToggleInlineModelSelector {
@@ -2357,7 +2383,7 @@ impl ActionButtonTheme for ActiveMicButtonTheme {
     }
 }
 
-/// Green-accented theme for the "Install Zap plugin" chip.
+/// Green-accented theme for the "Install InfiniShell plugin" chip.
 struct InstallPluginButtonTheme;
 
 impl ActionButtonTheme for InstallPluginButtonTheme {
@@ -2397,7 +2423,7 @@ async fn write_install_log(agent: CLIAgent, err: &PluginInstallError) -> Option<
     let log_path = env::temp_dir().join("warp-plugin-install.log");
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
     let contents = format!(
-        "Zap plugin installation — {agent:?}\n\
+        "InfiniShell plugin installation — {agent:?}\n\
          {now}\n\
          \n\
          {log}",

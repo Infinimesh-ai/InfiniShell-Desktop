@@ -6,7 +6,7 @@
 //!   3. `Display` + `to_locale_str` 加 case
 //!
 //! 切换在重启后完全生效(已渲染 UI 文本不会自动重排,需要 view 重建)。
-//! 设置页 dropdown 应附"重启 Zap 后完全生效"提示。
+//! 设置页 dropdown 应附"重启 InfiniShell 后完全生效"提示。
 
 use enum_iterator::Sequence;
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ use warp_core::settings::{macros::define_settings_group, SupportedPlatforms, Syn
     settings_value::SettingsValue,
 )]
 #[schemars(
-    description = "The language used in Zap's user interface.",
+    description = "The language used in InfiniShell's user interface.",
     rename_all = "snake_case"
 )]
 pub enum Language {
@@ -73,9 +73,10 @@ define_settings_group!(LanguageSettings, settings: [
         default: Language::System,
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Never,
+        surface: settings::SettingSurfaces::GUI,
         private: false,
         storage_key: "Language",
         toml_path: "appearance.language",
-        description: "The language used in Zap's user interface. Falls back to English when the chosen language is not fully translated.",
+        description: "The language used in InfiniShell's user interface. Falls back to English when the chosen language is not fully translated.",
     },
 ]);

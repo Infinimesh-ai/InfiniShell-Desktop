@@ -1,16 +1,21 @@
-use crate::terminal::{
-    bootstrap::init_shell_script_for_shell, event_listener::ChannelEventListener,
-    model::ansi::Processor, session_settings::SessionSettings, shell::ShellType,
-    writeable_pty::Message as EventLoopMessage, SizeInfo, TerminalModel,
-};
+use std::io;
+use std::sync::Arc;
+
 use async_channel::Receiver;
 use futures_util::SinkExt;
 use parking_lot::FairMutex;
 use serde::Serialize;
-use std::io;
-use std::sync::Arc;
+use warp_errors::report_error;
 use warpui::{Entity, ModelContext, SingletonEntity};
 use websocket::{Message, Sink, Stream, WebSocket, WebsocketMessage as _};
+
+use crate::terminal::bootstrap::init_shell_script_for_shell;
+use crate::terminal::event_listener::ChannelEventListener;
+use crate::terminal::model::ansi::Processor;
+use crate::terminal::session_settings::SessionSettings;
+use crate::terminal::shell::ShellType;
+use crate::terminal::writeable_pty::Message as EventLoopMessage;
+use crate::terminal::{SizeInfo, TerminalModel};
 
 const CREATE_SESSION_ENDPOINT: &str = "ws://127.0.0.1:3030/create";
 
@@ -88,13 +93,13 @@ impl EventLoop {
                 let message = match message {
                     Ok(message) => message,
                     Err(err) => {
-                        log::error!("Unable to receive item: {err:?}");
+                        report_error!(anyhow::Error::new(err).context("Unable to receive item"));
                         return;
                     }
                 };
 
                 let Some(bytes) = message.binary() else {
-                    log::error!("Received non binary message");
+                    report_error!("Received non binary message");
                     return;
                 };
 
@@ -105,21 +110,27 @@ impl EventLoop {
 
         let is_honor_ps1_enabled = *SessionSettings::as_ref(ctx).honor_ps1;
 
+        let terminal_model_for_init = self.terminal_model.clone();
         let receiver = self.event_loop_rx.clone();
         ctx.background_executor()
             .spawn(async move {
                 if let Err(e) = Self::write_env_vars(&mut sink, is_honor_ps1_enabled).await {
-                    log::error!("Failed to write env vars to pty {e:?}");
+                    report_error!(e.context("Failed to write env vars to pty"));
                 }
-                if let Err(e) = Self::write_zsh_init_shell_script(&mut sink).await {
-                    log::error!("Failed to write zsh bootstrap bytes to pty {e:?}");
+                if let Err(e) =
+                    Self::write_zsh_init_shell_script(&mut sink, &terminal_model_for_init).await
+                {
+                    report_error!(e.context("Failed to write zsh bootstrap bytes to pty"));
                 }
 
                 while let Ok(message) = receiver.recv().await {
                     match message {
                         EventLoopMessage::Input(bytes) => {
                             if let Err(e) = sink.send(Message::new_binary(bytes.to_vec())).await {
-                                log::error!("Failed to send message to network-backed PTY {e:?}");
+                                report_error!(
+                                    anyhow::Error::new(e)
+                                        .context("Failed to send message to network-backed PTY")
+                                );
                             };
                         }
                         EventLoopMessage::Resize(size_info) => {
@@ -131,7 +142,7 @@ impl EventLoop {
                             };
 
                             let Ok(serialized) = serde_json::to_string(&size_change) else {
-                                log::error!("Error serializing window size change info");
+                                report_error!("Error serializing window size change info");
                                 continue;
                             };
 
@@ -139,7 +150,10 @@ impl EventLoop {
                             // control channel message. The SSH proxy server should
                             // make this distinction.
                             if let Err(e) = sink.send(Message::new_text(serialized)).await {
-                                log::error!("Failed to send message to network-backed PTY {e:?}");
+                                report_error!(
+                                    anyhow::Error::new(e)
+                                        .context("Failed to send message to network-backed PTY")
+                                );
                             };
                         }
                         // TODO(alokedesai): Implement shutdown on the network backed PTY.
@@ -153,8 +167,14 @@ impl EventLoop {
     /// Writes the ZSH init shell script to the "PTY", mimicking how we send the init shell script
     /// when there is a local pty:
     /// <https://github.com/warpdotdev/warp-internal/blob/747da2df83f2caa97e781ce284ceb226fb97a66c/app/src/terminal/local_tty/unix.rs#L338-L347>.
-    async fn write_zsh_init_shell_script(sink: &mut impl Sink) -> anyhow::Result<()> {
-        let zsh_init_shell_script = init_shell_script_for_shell(ShellType::Zsh, &crate::ASSETS);
+    async fn write_zsh_init_shell_script(
+        sink: &mut impl Sink,
+        terminal_model: &parking_lot::FairMutex<crate::terminal::TerminalModel>,
+    ) -> anyhow::Result<()> {
+        let session_id = crate::terminal::bootstrap::generate_session_id();
+        terminal_model.lock().register_session_id(session_id);
+        let zsh_init_shell_script =
+            init_shell_script_for_shell(ShellType::Zsh, &crate::ASSETS, session_id);
         sink.send(Message::new_binary(
             zsh_init_shell_script.as_bytes().to_vec(),
         ))
@@ -191,7 +211,7 @@ impl EventLoop {
         let connection = match connection {
             Ok(connection) => connection,
             Err(e) => {
-                log::error!("Failed to construct websocket connection: {e:?}");
+                report_error!(e.context("Failed to construct websocket connection"));
                 return;
             }
         };

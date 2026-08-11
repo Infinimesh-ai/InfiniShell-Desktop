@@ -1,9 +1,24 @@
+use std::path::PathBuf;
+
+use uuid::Uuid;
+use warp_core::features::FeatureFlag;
+use warpui::elements::{
+    ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
+    ParentElement, Shrinkable, Text, Wrap,
+};
+use warpui::fonts::{Properties, Weight};
+use warpui::{
+    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
+
+use crate::TemplatableMCPServerManager;
 use crate::ai::blocklist::BlocklistAIPermissions;
 use crate::ai::execution_profiles::profiles::{
-    AIExecutionProfilesModel, AIExecutionProfilesModelEvent, ClientProfileId,
+    AIExecutionProfilesModel, AIExecutionProfilesModelEvent,
 };
 use crate::ai::execution_profiles::{
-    ActionPermission, AskUserQuestionPermission, WriteToPtyPermission,
+    ActionPermission, AskUserQuestionPermission, ExecutionProfileId, RunAgentsPermission,
+    WriteToPtyPermission,
 };
 use crate::ai::llms::LLMPreferences;
 use crate::appearance::Appearance;
@@ -11,20 +26,6 @@ use crate::cloud_object::model::generic_string_model::StringModel;
 use crate::settings::AISettings;
 use crate::ui_components::icons::Icon;
 use crate::view_components::action_button::{ActionButton, ButtonSize, SecondaryTheme};
-use crate::TemplatableMCPServerManager;
-use std::path::PathBuf;
-use uuid::Uuid;
-use warp_core::features::FeatureFlag;
-use warpui::elements::ParentElement;
-use warpui::SingletonEntity;
-use warpui::{
-    elements::{
-        ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
-        Shrinkable, Text, Wrap,
-    },
-    fonts::{Properties, Weight},
-    AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle,
-};
 
 #[derive(Debug, Clone)]
 pub enum ExecutionProfileViewAction {
@@ -36,14 +37,14 @@ pub enum ExecutionProfileViewEvent {
 }
 
 pub struct ExecutionProfileView {
-    profile_id: ClientProfileId,
+    profile_id: ExecutionProfileId,
     edit_button: ViewHandle<ActionButton>,
 }
 
 impl ExecutionProfileView {
-    pub fn new(profile_id: ClientProfileId, ctx: &mut ViewContext<Self>) -> Self {
+    pub fn new(profile_id: ExecutionProfileId, ctx: &mut ViewContext<Self>) -> Self {
         ctx.subscribe_to_model(&AIExecutionProfilesModel::handle(ctx), |me, _, event, ctx| {
-            if matches!(event, AIExecutionProfilesModelEvent::ProfileUpdated(profile_id) if *profile_id == me.profile_id) {
+            if matches!(event, AIExecutionProfilesModelEvent::ProfileUpdated(profile_id) if profile_id == &me.profile_id) {
                 ctx.notify();
             }
         });
@@ -100,7 +101,7 @@ impl View for ExecutionProfileView {
         let is_any_ai_enabled = AISettings::as_ref(app).is_any_ai_enabled(app);
 
         let permissions = BlocklistAIPermissions::as_ref(app);
-        let profile = permissions.permissions_profile_for_id(app, self.profile_id);
+        let profile = permissions.permissions_profile_for_id(app, &self.profile_id);
 
         let llm_preferences = LLMPreferences::as_ref(app);
 
@@ -111,7 +112,7 @@ impl View for ExecutionProfileView {
             .map(|info| info.display_name.clone())
             .unwrap_or_else(|| {
                 llm_preferences
-                    .get_default_base_model()
+                    .get_default_base_model(app)
                     .display_name
                     .clone()
             });
@@ -131,7 +132,7 @@ impl View for ExecutionProfileView {
             .map(|info| info.display_name.clone())
             .unwrap_or_else(|| {
                 llm_preferences
-                    .get_default_base_model()
+                    .get_default_base_model(app)
                     .display_name
                     .clone()
             });
@@ -144,7 +145,7 @@ impl View for ExecutionProfileView {
             .map(|info| info.display_name.clone())
             .unwrap_or_else(|| {
                 llm_preferences
-                    .get_default_base_model()
+                    .get_default_base_model(app)
                     .display_name
                     .clone()
             });
@@ -157,7 +158,7 @@ impl View for ExecutionProfileView {
             .map(|info| info.display_name.clone())
             .unwrap_or_else(|| {
                 llm_preferences
-                    .get_default_base_model()
+                    .get_default_base_model(app)
                     .display_name
                     .clone()
             });
@@ -376,6 +377,15 @@ impl View for ExecutionProfileView {
                                 Icon::MessageText,
                                 crate::t!("settings-exec-profile-ask-questions"),
                                 &profile.ask_user_question,
+                                appearance,
+                                is_any_ai_enabled,
+                            ),
+                        ));
+                        permissions_column.add_child(with_standard_vertical_margin(
+                            render_run_agents_permission_line_with_icon(
+                                Icon::Workflow,
+                                "Run agents:",
+                                &profile.run_agents,
                                 appearance,
                                 is_any_ai_enabled,
                             ),
@@ -817,6 +827,21 @@ fn render_ask_user_question_permission_line_with_icon(
             crate::t!("settings-exec-profile-perm-ask-unless-auto-approve")
         }
         AskUserQuestionPermission::AlwaysAsk => crate::t!("settings-exec-profile-perm-always-ask"),
+    };
+    render_permission_line_with_icon(icon, label, permission_text, appearance, is_ai_enabled)
+}
+
+fn render_run_agents_permission_line_with_icon(
+    icon: Icon,
+    label: impl Into<String>,
+    permission: &RunAgentsPermission,
+    appearance: &Appearance,
+    is_ai_enabled: bool,
+) -> Box<dyn Element> {
+    let permission_text = match permission {
+        RunAgentsPermission::NeverAllow | RunAgentsPermission::Unknown => "Never",
+        RunAgentsPermission::AlwaysAllow => "Always allow",
+        RunAgentsPermission::AlwaysAsk => "Always ask",
     };
     render_permission_line_with_icon(icon, label, permission_text, appearance, is_ai_enabled)
 }

@@ -1,4 +1,4 @@
-# Zap Desktop — English (source-of-truth locale)
+# InfiniShell — English (source-of-truth locale)
 # 本文件由多 agent 并行编辑,各自维护自己的 SECTION,key 以 surface 前缀隔离避免冲突。
 # 加 key 时 ctrl-F 找到对应 SECTION 头追加;新 surface 在文件末尾加新 SECTION。
 #
@@ -9,7 +9,7 @@
 # SECTION: common (Owner: foundation)
 # =============================================================================
 
-app-name = Zap
+app-name = InfiniShell
 app-tagline = The local-first agentic terminal for developers
 
 common-ok = OK
@@ -85,7 +85,7 @@ common-new = New
 common-no-results = No results
 common-learn-more = Learn more
 common-skip = Skip
-common-get-warping = Get Zapping
+common-get-warping = Get started
 common-try-again = Try again
 common-settings = Settings
 common-recommended = Recommended
@@ -123,8 +123,8 @@ agent-management-artifact-plan = Plan
 agent-management-artifact-screenshot = Screenshot
 agent-management-artifact-file = File
 agent-management-source-scheduled = Scheduled
-agent-management-source-local-agent = Zap (local agent)
-agent-management-source-cloud-agent = Zap agent
+agent-management-source-local-agent = InfiniShell (local agent)
+agent-management-source-cloud-agent = InfiniShell agent
 agent-management-source-oz-web = Oz
 agent-management-source-github-action = GitHub Action
 agent-management-no-session-available = No session available
@@ -142,13 +142,13 @@ agent-management-loading-cloud-runs = Loading agent runs
 # Files: app/src/workspace/view.rs
 # =============================================================================
 
-workspace-menu-update-warp-manually = Update Zap manually
+workspace-menu-update-warp-manually = Update InfiniShell manually
 workspace-menu-whats-new = What's new
 workspace-menu-settings = Settings
 workspace-menu-keyboard-shortcuts = Keyboard shortcuts
 workspace-menu-documentation = Documentation
 workspace-menu-feedback = Feedback
-workspace-menu-view-warp-logs = View Zap logs
+workspace-menu-view-warp-logs = View InfiniShell logs
 workspace-menu-slack = Slack
 workspace-toast-failed-load-conversation = Failed to load conversation.
 workspace-toast-failed-load-conversation-for-forking = Failed to load conversation for forking.
@@ -176,14 +176,14 @@ workspace-reopen-closed-session = Reopen closed session
 app-menu-new-window = New Window
 app-menu-save-new = Save New...
 app-menu-launch-configurations = Launch Configurations
-app-menu-warp = Zap
+app-menu-warp = InfiniShell
 app-menu-preferences = Preferences
 app-menu-privacy-policy = Privacy Policy...
 app-menu-debug = Debug
-app-menu-set-default-terminal = Set Zap as Default Terminal
+app-menu-set-default-terminal = Set InfiniShell as Default Terminal
 app-menu-file = File
 app-menu-edit = Edit
-app-menu-use-warp-prompt = Use Zap's Prompt
+app-menu-use-warp-prompt = Use InfiniShell's Prompt
 app-menu-copy-on-select-terminal = Copy on Select within the Terminal
 app-menu-synchronize-inputs = Synchronize Inputs
 app-menu-view = View
@@ -213,12 +213,12 @@ app-menu-export-default-settings-csv = Export Default Settings as CSV to home di
 app-menu-create-anonymous-user = Create anonymous user
 app-menu-send-feedback = Send Feedback...
 app-menu-help = Help
-app-menu-warp-documentation = Zap Documentation...
+app-menu-warp-documentation = InfiniShell Documentation...
 app-menu-github-issues = GitHub Issues...
-app-menu-warp-slack-community = Zap Slack Community...
-workspace-update-and-relaunch-warp = Update and relaunch Zap
+app-menu-warp-slack-community = InfiniShell Slack Community...
+workspace-update-and-relaunch-warp = Update and relaunch InfiniShell
 workspace-updating-to-version = Updating to ({ $version })
-workspace-update-warp-manually = Update Zap manually
+workspace-update-warp-manually = Update InfiniShell manually
 pane-get-started-title = Get started
 pane-new-tab-title = New tab
 
@@ -233,7 +233,7 @@ terminal-banner-more-info = More info
 terminal-banner-completions-not-working-middle = ). Enabling tmux warpification in {" "}
 terminal-banner-settings = settings
 terminal-banner-completions-not-working-suffix =  may resolve this issue.
-terminal-banner-shell-config-incompatible = Your shell configuration is incompatible with Zap...{"  "}
+terminal-banner-shell-config-incompatible = Your shell configuration is incompatible with InfiniShell...{"  "}
 terminal-banner-did-you-intend = Did you intend {" "}
 terminal-banner-move-cursor =  to move the cursor?
 terminal-toast-powershell-subshells-not-supported = PowerShell subshells not supported
@@ -244,15 +244,15 @@ terminal-free-credits = Free credits
 terminal-cloud-agent-run = Agent run
 terminal-agent-header-for-terminal = for terminal
 ssh-remote-choice-title = Choose your experience for this remote session:
-ssh-remote-choice-install-extension = Install Zap's SSH extension
-ssh-remote-choice-install-extension-desc = Install Zap's extension to enable agent features like file browsing, code review, and intelligent command completions in this session.
+ssh-remote-choice-install-extension = Install InfiniShell's SSH extension
+ssh-remote-choice-install-extension-desc = Install InfiniShell's extension to enable agent features like file browsing, code review, and intelligent command completions in this session.
 ssh-remote-choice-continue-without-installing = Continue without installing
 ssh-remote-choice-continue-without-installing-desc = You'll still get a Warpified experience just without the agent features.
 ssh-remote-choice-manage-warpify-settings = Manage Warpify settings
 ai-document-show-version-history = Show version history
 ai-document-update-agent = Update Agent
-ai-document-save-and-sync-tooltip = Save and auto-sync this plan to your Zap Drive
-ai-document-show-in-warp-drive = Show in Zap Drive
+ai-document-save-and-sync-tooltip = Save and auto-sync this plan to your InfiniShell Drive
+ai-document-show-in-warp-drive = Show in InfiniShell Drive
 ai-document-save-as-markdown-file = Save as markdown file
 ai-document-attach-to-active-session = Attach to active session
 ai-document-copy-plan-id = Copy plan ID
@@ -283,7 +283,7 @@ ai-rule-edit-rule = Edit rule
 ai-rule-delete-rule = Delete rule
 ai-aws-refresh-credentials = Refresh AWS Credentials
 ai-footer-enable-notifications = Enable notifications
-ai-footer-enable-notifications-tooltip = Install the Warp plugin to enable rich agent notifications within Zap
+ai-footer-enable-notifications-tooltip = Install the Warp plugin to enable rich agent notifications within InfiniShell
 ai-footer-notifications-setup-instructions = Notifications setup instructions
 ai-footer-install-plugin-instructions-tooltip = View instructions to install the Warp plugin
 ai-footer-update-warp-plugin = Update Warp plugin
@@ -334,18 +334,18 @@ editor-change-keybinding = Change keybinding
 autosuggestion-ignore-this-suggestion = Ignore this suggestion
 codex-use-latest-model = Use latest codex model
 zap-launch-visit-repo = Visit the repo
-zap-launch-title = Zap is now open-source
-zap-launch-description = You, our community, can participate in building Zap using an agent-first workflow.
+zap-launch-title = InfiniShell is now open-source
+zap-launch-description = You, our community, can participate in building InfiniShell using an agent-first workflow.
 zap-launch-contribute-title = Contribute
-zap-launch-contribute-description = Zap's client code is now open source. Get started by using the /feedback skill to open an issue, and follow the contribution guidelines here.
+zap-launch-contribute-description = InfiniShell's client code is now open source. Get started by using the /feedback skill to open an issue, and follow the contribution guidelines here.
 zap-launch-contribute-link-text = here
 zap-launch-oad-title = Open Automated Development
-zap-launch-oad-description = The Zap repo is managed by an agent-first local workflow powered by Oz.
+zap-launch-oad-description = The InfiniShell repo is managed by an agent-first local workflow powered by Oz.
 zap-launch-auto-model-title = Introducing 'auto (open-weights)'
 zap-launch-auto-model-description = We've added a new auto model that picks the best open weight model for a task, like Kimi or MiniMax.
 hoa-see-whats-new = See what's new
 hoa-finish = Finish
-session-config-get-warping = Get Zapping
+session-config-get-warping = Get started
 uri-custom-uri-invalid = Custom URI is invalid.
 context-node-install-nvm = Install nvm
 context-node-install-node = nvm install node
@@ -368,11 +368,11 @@ drive-sharing-anyone-with-link = Anyone with the link
 drive-sharing-only-invited-teammates = Local access only
 drive-sharing-teammates-with-link = Local access with link
 terminal-warpify-subshell = Warpify subshell
-terminal-warpify-subshell-tooltip = Enable Zap shell integration in this session
+terminal-warpify-subshell-tooltip = Enable InfiniShell shell integration in this session
 terminal-use-agent = Use agent
-terminal-use-agent-tooltip = Ask the Zap agent to assist
+terminal-use-agent-tooltip = Ask the InfiniShell agent to assist
 terminal-give-control-back-to-agent = Give control back to agent
-terminal-resume-agent-tooltip = Ask the Zap agent to resume
+terminal-resume-agent-tooltip = Ask the InfiniShell agent to resume
 terminal-voice-input-tooltip = Voice input
 terminal-attach-file-tooltip = Attach file
 terminal-slash-commands-tooltip = Slash commands
@@ -381,8 +381,8 @@ terminal-profiles = Profiles
 terminal-manage-profiles = Manage profiles
 terminal-continue-locally = Continue locally
 terminal-fork-conversation-locally-tooltip = Fork this conversation locally
-terminal-open-in-warp = Open in Zap
-terminal-open-conversation-in-warp-tooltip = Open this conversation in the Zap desktop app
+terminal-open-in-warp = Open in InfiniShell
+terminal-open-conversation-in-warp-tooltip = Open this conversation in the InfiniShell desktop app
 terminal-stop-sharing = Stop sharing
 terminal-copy-session-sharing-link = Copy session sharing link
 terminal-shared-session-make-editor = Make editor
@@ -397,26 +397,26 @@ terminal-input-a11y-label = Command Input.
 terminal-input-a11y-helper = Input your shell command, press enter to execute. Press cmd-up to navigate to output of previously executed commands. Press cmd-l to re-focus command input.
 terminal-input-ai-command-search-hint = Type '#' for AI command suggestions
 terminal-input-run-commands-hint = Run commands
-terminal-input-agent-hint-deploy-react-vercel = Zap anything e.g. Deploy my React app to Vercel and set up environment variables
-terminal-input-agent-hint-debug-python-ci = Zap anything e.g. Help me debug why my Python tests are failing in CI
-terminal-input-agent-hint-setup-microservice = Zap anything e.g. Set up a new microservice with Docker and create the deployment pipeline
-terminal-input-agent-hint-fix-node-memory-leak = Zap anything e.g. Find and fix the memory leak in my Node.js application
-terminal-input-agent-hint-backup-postgres = Zap anything e.g. Create a backup script for my PostgreSQL database and schedule it
-terminal-input-agent-hint-migrate-mysql-postgres = Zap anything e.g. Help me migrate my data from MySQL to PostgreSQL
-terminal-input-agent-hint-monitor-aws = Zap anything e.g. Set up monitoring and alerts for my AWS infrastructure
-terminal-input-agent-hint-build-fastapi = Zap anything e.g. Build a REST API for my mobile app using FastAPI
-terminal-input-agent-hint-optimize-sql = Zap anything e.g. Help me optimize my SQL queries that are running slowly
-terminal-input-agent-hint-github-actions = Zap anything e.g. Create a GitHub Actions workflow to automatically deploy on merge
-terminal-input-agent-hint-redis-cache = Zap anything e.g. Set up Redis caching for my web application
-terminal-input-agent-hint-kubernetes-pods = Zap anything e.g. Help me troubleshoot why my Kubernetes pods keep crashing
-terminal-input-agent-hint-bigquery-pipeline = Zap anything e.g. Build a data pipeline to process CSV files and load them into BigQuery
-terminal-input-agent-hint-ssl-https = Zap anything e.g. Set up SSL certificates and configure HTTPS for my domain
-terminal-input-agent-hint-refactor-legacy-code = Zap anything e.g. Help me refactor this legacy code to use modern design patterns
-terminal-input-agent-hint-unit-tests = Zap anything e.g. Create unit tests for my authentication service
-terminal-input-agent-hint-elk-logs = Zap anything e.g. Set up log aggregation with ELK stack for my distributed system
-terminal-input-agent-hint-oauth-express = Zap anything e.g. Help me implement OAuth2 authentication in my Express.js app
-terminal-input-agent-hint-optimize-docker = Zap anything e.g. Optimize my Docker images to reduce build times and size
-terminal-input-agent-hint-ab-testing = Zap anything e.g. Set up A/B testing infrastructure for my web application
+terminal-input-agent-hint-deploy-react-vercel = Ask anything e.g. Deploy my React app to Vercel and set up environment variables
+terminal-input-agent-hint-debug-python-ci = Ask anything e.g. Help me debug why my Python tests are failing in CI
+terminal-input-agent-hint-setup-microservice = Ask anything e.g. Set up a new microservice with Docker and create the deployment pipeline
+terminal-input-agent-hint-fix-node-memory-leak = Ask anything e.g. Find and fix the memory leak in my Node.js application
+terminal-input-agent-hint-backup-postgres = Ask anything e.g. Create a backup script for my PostgreSQL database and schedule it
+terminal-input-agent-hint-migrate-mysql-postgres = Ask anything e.g. Help me migrate my data from MySQL to PostgreSQL
+terminal-input-agent-hint-monitor-aws = Ask anything e.g. Set up monitoring and alerts for my AWS infrastructure
+terminal-input-agent-hint-build-fastapi = Ask anything e.g. Build a REST API for my mobile app using FastAPI
+terminal-input-agent-hint-optimize-sql = Ask anything e.g. Help me optimize my SQL queries that are running slowly
+terminal-input-agent-hint-github-actions = Ask anything e.g. Create a GitHub Actions workflow to automatically deploy on merge
+terminal-input-agent-hint-redis-cache = Ask anything e.g. Set up Redis caching for my web application
+terminal-input-agent-hint-kubernetes-pods = Ask anything e.g. Help me troubleshoot why my Kubernetes pods keep crashing
+terminal-input-agent-hint-bigquery-pipeline = Ask anything e.g. Build a data pipeline to process CSV files and load them into BigQuery
+terminal-input-agent-hint-ssl-https = Ask anything e.g. Set up SSL certificates and configure HTTPS for my domain
+terminal-input-agent-hint-refactor-legacy-code = Ask anything e.g. Help me refactor this legacy code to use modern design patterns
+terminal-input-agent-hint-unit-tests = Ask anything e.g. Create unit tests for my authentication service
+terminal-input-agent-hint-elk-logs = Ask anything e.g. Set up log aggregation with ELK stack for my distributed system
+terminal-input-agent-hint-oauth-express = Ask anything e.g. Help me implement OAuth2 authentication in my Express.js app
+terminal-input-agent-hint-optimize-docker = Ask anything e.g. Optimize my Docker images to reduce build times and size
+terminal-input-agent-hint-ab-testing = Ask anything e.g. Set up A/B testing infrastructure for my web application
 terminal-input-steer-agent-hint = Steer the running agent
 terminal-input-steer-agent-backspace-hint = Steer the running agent, or backspace to exit
 terminal-input-follow-up-hint = Ask a follow up
@@ -452,7 +452,7 @@ terminal-message-open-plan = {" "}open plan
 terminal-starting-shell = Starting shell...
 terminal-input-no-skills-found = No skills found
 terminal-model-specs-title = Model Specs
-terminal-model-specs-description = Zap's benchmarks for how well a model performs in our harness, the rate at which it consumes credits, and task speed.
+terminal-model-specs-description = InfiniShell's benchmarks for how well a model performs in our harness, the rate at which it consumes credits, and task speed.
 terminal-model-specs-reasoning-level-title = Reasoning level
 terminal-model-specs-reasoning-level-description = Increased reasoning levels consume more credits and have higher latency, but higher performance for complicated tasks.
 terminal-model-auto-mode-title = Auto mode
@@ -518,7 +518,7 @@ env-vars-variables-label = Variables
 # Files: crates/onboarding/src/callout/view.rs
 # =============================================================================
 
-onboarding-callout-meet-input-title = Meet the Zap input
+onboarding-callout-meet-input-title = Meet the InfiniShell input
 onboarding-callout-meet-input-text-prefix = Your terminal input accepts both terminal commands and agent prompts and automatically detects which you're using. Use
 onboarding-callout-meet-input-text-suffix = to lock the input to Agent mode (natural language) or Terminal mode (commands).
 onboarding-callout-talk-agent-title = Talk to the agent
@@ -533,9 +533,9 @@ onboarding-callout-meet-terminal-text-suffix = to start or send to the agent.
 onboarding-callout-nl-overrides-title = Natural language overrides
 onboarding-callout-nl-overrides-text-prefix = You can always override any auto-detection using
 onboarding-callout-nl-support-title = Natural language support
-onboarding-callout-nl-support-text-prefix = Natural language input is off by default. If enabled, you can type requests in plain English and Zap will autodetect queries for the agent. You can always override them using
+onboarding-callout-nl-support-text-prefix = Natural language input is off by default. If enabled, you can type requests in plain English and InfiniShell will autodetect queries for the agent. You can always override them using
 onboarding-callout-enable-nl-detection = Enable Natural Language Detection
-onboarding-callout-new-agent-title = Introducing Zap's new agent experience
+onboarding-callout-new-agent-title = Introducing InfiniShell's new agent experience
 onboarding-callout-new-agent-text = Agent conversations are now their own scoped view outside of your terminal. Simply hit ESC to return to the terminal at any point.
 onboarding-callout-updated-agent-input-title = Updated agent input
 onboarding-callout-updated-agent-input-project-text = Your agent input will detect natural language as well as commands by default. Use ! to lock the input in bash mode to write commands.\n\nSubmit the query below to have the agent initialize this project, or ⊗ to clear the input and start your own!
@@ -550,9 +550,9 @@ onboarding-callout-back-terminal = Back to terminal
 # =============================================================================
 
 language-widget-label = Language
-language-widget-secondary = Restart Zap for the change to fully take effect.
+language-widget-secondary = Restart InfiniShell for the change to fully take effect.
 language-restart-required-title = Language changed
-language-restart-required-body = Zap's UI language has been updated. Some text will switch immediately, but a full restart is required for the change to take effect everywhere.
+language-restart-required-body = InfiniShell's UI language has been updated. Some text will switch immediately, but a full restart is required for the change to take effect everywhere.
 
 # =============================================================================
 # SECTION: settings (Owner: agent-settings)
@@ -564,7 +564,7 @@ language-restart-required-body = Zap's UI language has been updated. Some text w
 
 # Sidebar / SettingsSection labels (Display impl)
 settings-section-about = About
-# Zap: settings-section-account removed alongside the Account settings page.
+# InfiniShell: settings-section-account removed alongside the Account settings page.
 settings-section-mcp-servers = MCP Servers
 settings-section-billing-and-usage = Billing and usage
 settings-section-appearance = Appearance
@@ -572,12 +572,12 @@ settings-section-features = Features
 settings-section-keybindings = Keyboard shortcuts
 settings-section-referrals = Referrals
 settings-section-shared-blocks = Shared blocks
-settings-section-warp-drive = Zap Drive
+settings-section-warp-drive = InfiniShell Drive
 settings-section-warpify = Warpify
 settings-section-network = Network
 settings-section-cloud-sync = Cloud Sync
 settings-section-ai = AI
-settings-section-warp-agent = Zap Agent
+settings-section-warp-agent = InfiniShell Agent
 settings-section-agent-profiles = Profiles
 settings-section-agent-mcp-servers = MCP servers
 settings-section-agent-providers = Providers
@@ -607,11 +607,11 @@ settings-debug-hide-inband-blocks = Hide in-band command blocks
 # 命名前缀:settings-about-* / settings-main-*
 
 # about_page.rs
-settings-about-copyright = Copyright 2026 Zap
+settings-about-copyright = Copyright 2026 InfiniShell
 settings-about-automatic-updates-label = Automatic updates
-settings-about-automatic-updates-description = When enabled, Zap checks for new versions in the background and downloads the installer to a local cache. The currently running Zap is not touched until you click "Install now" to launch the installer yourself.
+settings-about-automatic-updates-description = When enabled, InfiniShell checks for new versions in the background and downloads the installer to a local cache. The currently running InfiniShell is not touched until you click "Install now" to launch the installer yourself.
 settings-about-update-checking = Checking for updates…
-settings-about-update-up-to-date = Zap is up to date.
+settings-about-update-up-to-date = InfiniShell is up to date.
 settings-about-update-available = New version { $version } is available.
 settings-about-update-downloading = Downloading { $version }… { $progress }
 settings-about-update-downloading-init = Downloading { $version }…
@@ -619,15 +619,15 @@ settings-about-update-ready = { $version } is downloaded and ready to install.
 settings-about-update-check-now = Check for updates
 settings-about-update-open-release = Download from GitHub
 settings-about-update-install-now = Install now
-settings-about-update-install-hint-macos = The installer will open — drag Zap into your Applications folder to finish.
+settings-about-update-install-hint-macos = The installer will open — drag InfiniShell into your Applications folder to finish.
 settings-about-update-install-hint-windows = The setup wizard will launch — follow the prompts to finish the upgrade.
-settings-about-update-install-hint-linux = The AppImage will be replaced in place and Zap will restart.
+settings-about-update-install-hint-linux = The AppImage will be replaced in place and InfiniShell will restart.
 settings-about-export-logs = Export logs…
 settings-about-export-logs-description = Bundles recent app logs (and MCP / update logs when present) plus a diagnostic summary into a zip you choose where to save, so you can share it for troubleshooting.
 settings-about-export-logs-success = Logs exported to { $path }
 settings-about-export-logs-failure = Failed to export logs: { $error }
 
-# Zap: main_page.rs (Account / version / autoupdate) strings removed alongside
+# InfiniShell: main_page.rs (Account / version / autoupdate) strings removed alongside
 # the Account settings page. The About page now owns version / update CTAs.
 
 
@@ -675,7 +675,7 @@ settings-mcp-install-modal-install = Install
 settings-mcp-install-modal-no-server = No MCP server selected
 
 # ---- list_page.rs ----
-settings-mcp-list-description = Add MCP servers to extend the Zap Agent's capabilities. MCP servers expose data sources or tools to agents through a standardized interface, essentially acting like plugins. Add a custom server, or use the presets to get started with popular servers.
+settings-mcp-list-description = Add MCP servers to extend the InfiniShell Agent's capabilities. MCP servers expose data sources or tools to agents through a standardized interface, essentially acting like plugins. Add a custom server, or use the presets to get started with popular servers.
 settings-mcp-list-learn-more = Learn more.
 settings-mcp-list-empty-state = Once you add a MCP server, it will be shown here.
 settings-mcp-list-no-search-results = No search results found
@@ -688,9 +688,9 @@ settings-mcp-list-template-available-to-install = Available to install
 settings-mcp-list-file-based-detected = Detected from config file
 settings-mcp-list-toast-server-updated = MCP server updated
 settings-mcp-list-section-my-mcps = My MCPs
-settings-mcp-list-section-shared-by-warp-and-team = Available from Zap and { $name }
-settings-mcp-list-section-shared-by-warp-and-other-devices = Shared by Zap and from other devices
-settings-mcp-list-section-shared-from-warp = Shared from Zap
+settings-mcp-list-section-shared-by-warp-and-team = Available from InfiniShell and { $name }
+settings-mcp-list-section-shared-by-warp-and-other-devices = Shared by InfiniShell and from other devices
+settings-mcp-list-section-shared-from-warp = Shared from InfiniShell
 settings-mcp-list-section-detected-from = Detected from { $provider }
 settings-mcp-list-chip-global = global
 settings-mcp-list-chip-shared-by-creator = Shared by: { $creator }
@@ -729,7 +729,7 @@ settings-mcp-update-modal-no-updates = No updates available
 # 此锚点下放 settings_view/platform_page.rs 字符串
 # 命名前缀:settings-platform-*
 settings-platform-section-title = Agent API Keys
-settings-platform-description = Create and manage API keys to allow local agents to access your Zap account.
+settings-platform-description = Create and manage API keys to allow local agents to access your InfiniShell account.
     For more information, visit the
 settings-platform-documentation-link = Documentation.
 settings-platform-create-button = + Create API Key
@@ -746,10 +746,10 @@ settings-platform-value-never = Never
 settings-platform-scope-personal = Personal
 settings-platform-scope-team = Team
 settings-platform-zero-state-title = No API Keys
-settings-platform-zero-state-description = Create a key to manage external access to Zap
-settings-platform-create-api-key-description-personal = This API key is tied to your user and can make requests against your Zap account.
+settings-platform-zero-state-description = Create a key to manage external access to InfiniShell
+settings-platform-create-api-key-description-personal = This API key is tied to your user and can make requests against your InfiniShell account.
 settings-platform-create-api-key-description-team = This API key is tied to your team and can make requests on behalf of your team.
-settings-platform-create-api-key-name-placeholder = Zap API Key
+settings-platform-create-api-key-name-placeholder = InfiniShell API Key
 settings-platform-create-api-key-expiration-one-day = 1 day
 settings-platform-create-api-key-expiration-thirty-days = 30 days
 settings-platform-create-api-key-expiration-ninety-days = 90 days
@@ -780,8 +780,8 @@ settings-keybindings-subheader = Configure keyboard shortcuts
 settings-keybindings-command-column = Command
 
 # --- ANCHOR-SUB-REFERRALS (agent-settings-referrals) ---
-settings-referrals-page-title = Invite a friend to Zap
-settings-referrals-anonymous-header = Referral program is unavailable in local Zap builds
+settings-referrals-page-title = Invite a friend to InfiniShell
+settings-referrals-anonymous-header = Referral program is unavailable in local InfiniShell builds
 settings-referrals-sign-up = Unavailable locally
 settings-referrals-link-label = Link
 settings-referrals-email-label = Email
@@ -795,7 +795,7 @@ settings-referrals-email-success-toast = Successfully sent emails.
 settings-referrals-email-failure-toast = Failed to send emails. Please try again.
 settings-referrals-email-empty-error = Please enter an email.
 settings-referrals-email-invalid-error = Please ensure the following email is valid: { $email }
-settings-referrals-reward-intro = Get exclusive Zap goodies when you refer someone*
+settings-referrals-reward-intro = Get exclusive InfiniShell goodies when you refer someone*
 settings-referrals-claimed-count-singular = Current referral
 settings-referrals-claimed-count-plural = Current referrals
 settings-referrals-terms-link = Certain restrictions apply.
@@ -811,7 +811,7 @@ settings-referrals-reward-backpack = Backpack
 
 # --- ANCHOR-SUB-WARPIFY (agent-settings-warpify) ---
 settings-warpify-page-title = Warpify
-settings-warpify-description-prefix = Configure whether Zap attempts to "Warpify" (add support for blocks, input modes, etc) certain shells.
+settings-warpify-description-prefix = Configure whether InfiniShell attempts to "Warpify" (add support for blocks, input modes, etc) certain shells.
 settings-warpify-learn-more = Learn more
 settings-warpify-section-subshells = Subshells
 settings-warpify-section-subshells-subtitle = Subshells supported: bash, zsh, and fish.
@@ -824,7 +824,7 @@ settings-warpify-command-placeholder = command (supports regex)
 settings-warpify-host-placeholder = host (supports regex)
 settings-warpify-enable-ssh = Warpify SSH Sessions
 settings-warpify-install-ssh-extension = Install SSH extension
-settings-warpify-install-ssh-extension-description = Controls the installation behavior for Zap's SSH extension when a remote host doesn't have it installed.
+settings-warpify-install-ssh-extension-description = Controls the installation behavior for InfiniShell's SSH extension when a remote host doesn't have it installed.
 settings-warpify-use-tmux = Use Tmux Warpification
 settings-warpify-tmux-description = The tmux ssh wrapper works in many situations where the default one does not, but may require you to hit a button to warpify. Takes effect in new tabs.
 settings-warpify-ssh-tmux-toggle-binding-label = SSH session detection for Warpification
@@ -911,7 +911,7 @@ settings-cloud-sync-auto-sync-description = Automatically upload on config chang
 
 # --- ANCHOR-SUB-AI-PAGE (agent-settings-ai-page) ---
 # Section / sub-headers
-settings-ai-warp-agent-header = Zap Agent
+settings-ai-warp-agent-header = InfiniShell Agent
 settings-ai-active-ai-section = Active AI
 settings-ai-input-section = Input
 settings-ai-mcp-servers-section = MCP Servers
@@ -951,23 +951,23 @@ settings-ai-execute-commands = Execute commands
 settings-ai-interact-running-commands = Interact with running commands
 settings-ai-call-mcp-servers = Call MCP servers
 settings-ai-command-denylist = Command denylist
-settings-ai-command-denylist-description = Regular expressions to match commands that the Zap Agent should always ask permission to execute.
+settings-ai-command-denylist-description = Regular expressions to match commands that the InfiniShell Agent should always ask permission to execute.
 settings-ai-command-allowlist = Command allowlist
-settings-ai-command-allowlist-description = Regular expressions to match commands that can be automatically executed by the Zap Agent.
+settings-ai-command-allowlist-description = Regular expressions to match commands that can be automatically executed by the InfiniShell Agent.
 settings-ai-directory-allowlist = Directory allowlist
 settings-ai-directory-allowlist-description = Give the agent file access to certain directories.
 settings-ai-mcp-allowlist = MCP allowlist
-settings-ai-mcp-allowlist-description = Allow the Zap Agent to call these MCP servers.
+settings-ai-mcp-allowlist-description = Allow the InfiniShell Agent to call these MCP servers.
 settings-ai-mcp-denylist = MCP denylist
-settings-ai-mcp-denylist-description = The Zap Agent will always ask for permission before calling any MCP servers on this list.
+settings-ai-mcp-denylist-description = The InfiniShell Agent will always ask for permission before calling any MCP servers on this list.
 settings-ai-info-banner-managed-by-workspace = Some of your permissions are managed by your workspace.
 
 # Models / Profiles
 settings-ai-base-model = Base model
-settings-ai-base-model-description = This model serves as the primary engine behind the Zap Agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Zap may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.
+settings-ai-base-model-description = This model serves as the primary engine behind the InfiniShell Agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. InfiniShell may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.
 settings-ai-show-model-picker-in-prompt = Show model picker in prompt
 settings-ai-codebase-context = Codebase Context
-settings-ai-codebase-context-description = Allow the Zap Agent to generate an outline of your codebase that can be used for context. No code is ever stored on our servers.
+settings-ai-codebase-context-description = Allow the InfiniShell Agent to generate an outline of your codebase that can be used for context. No code is ever stored on our servers.
 settings-ai-add-profile = Add Profile
 settings-ai-agents-description = Set the boundaries for how your Agent operates. Choose what it can access, how much autonomy it has, and when it must ask for your approval. You can also fine-tune behavior around natural language input, codebase awareness, and more.
 settings-ai-profiles-description = Profiles let you define how your Agent operates — from the actions it can take and when it needs approval, to the models it uses for tasks like coding and planning. You can also scope them to individual projects.
@@ -1004,7 +1004,7 @@ settings-ai-rules-label = Rules
 settings-ai-suggested-rules-label = Suggested Rules
 settings-ai-suggested-rules-description = Let AI suggest rules to save based on your interactions.
 settings-ai-manage-rules = Manage rules
-settings-ai-rules-description = Rules help the Zap Agent follow your conventions, whether for codebases or specific workflows.
+settings-ai-rules-description = Rules help the InfiniShell Agent follow your conventions, whether for codebases or specific workflows.
 
 # Voice
 settings-ai-voice-input-label = Voice Input
@@ -1042,12 +1042,12 @@ settings-ai-coding-agent-select-header = Select coding agent
 
 # Experimental / Agent
 settings-ai-cloud-agent-computer-use = Computer use in agents
-settings-ai-cloud-agent-computer-use-description = Enable computer use in agent conversations started from the Zap app.
+settings-ai-cloud-agent-computer-use-description = Enable computer use in agent conversations started from the InfiniShell app.
 
 # AWS Bedrock
 settings-ai-aws-bedrock-toggle = Use AWS Bedrock credentials
-settings-ai-aws-bedrock-description = Zap loads and sends local AWS CLI credentials for Bedrock-supported models.
-settings-ai-aws-bedrock-description-managed = Zap loads and sends local AWS CLI credentials for Bedrock-supported models. This setting is managed by your organization.
+settings-ai-aws-bedrock-description = InfiniShell loads and sends local AWS CLI credentials for Bedrock-supported models.
+settings-ai-aws-bedrock-description-managed = InfiniShell loads and sends local AWS CLI credentials for Bedrock-supported models. This setting is managed by your organization.
 settings-ai-aws-login-command = Login Command
 settings-ai-aws-profile = AWS Profile
 settings-ai-aws-auto-login = Automatically run login command
@@ -1078,9 +1078,9 @@ settings-features-show-changelog-after-update = Show changelog toast after updat
 settings-features-mouse-scroll-multiplier = Lines scrolled by mouse wheel interval
 settings-features-auto-open-code-review = Auto open code review panel
 settings-features-max-rows-per-block = Maximum rows in a block
-settings-features-ssh-wrapper = Zap SSH Wrapper
+settings-features-ssh-wrapper = InfiniShell SSH Wrapper
 settings-features-ssh-auto-discovery = Auto-discover SSH hosts
-settings-features-receive-desktop-notifications = Receive desktop notifications from Zap
+settings-features-receive-desktop-notifications = Receive desktop notifications from InfiniShell
 settings-features-show-in-app-agent-notifications = Show in-app agent notifications
 settings-features-confirm-close-shared-session = Confirm before closing read-only session
 settings-features-global-hotkey-label = Global hotkey:
@@ -1133,7 +1133,7 @@ settings-features-working-dir-custom = Custom directory
 settings-features-undo-close-enable = Enable reopening of closed sessions
 settings-features-undo-close-grace-period = Grace period (seconds)
 settings-features-configure-global-hotkey = Configure Global Hotkey
-settings-features-make-default-terminal = Make Zap the default terminal
+settings-features-make-default-terminal = Make InfiniShell the default terminal
 settings-features-pin-top = Pin to top
 settings-features-pin-bottom = Pin to bottom
 settings-features-pin-left = Pin to left
@@ -1161,7 +1161,7 @@ settings-features-see-docs = See docs.
 settings-features-allowed-values-1-20 = Allowed Values: 1-20
 settings-features-supports-floating-1-20 = Supports floating point values between 1 and 20.
 settings-features-auto-open-code-review-description = When this setting is on, the code review panel will open on the first accepted diff of a conversation
-settings-features-default-terminal-current = Zap is the default terminal
+settings-features-default-terminal-current = InfiniShell is the default terminal
 settings-features-takes-effect-new-sessions = This change will take effect in new sessions
 settings-features-seconds = seconds
 settings-features-vim-system-clipboard = Set unnamed register as system clipboard
@@ -1177,7 +1177,7 @@ settings-features-new-tab-placement = New tab placement
 settings-features-linux-selection-clipboard-tooltip = Whether the Linux primary clipboard should be supported.
 settings-features-changes-apply-new-windows = Changes will apply to new windows.
 settings-features-wayland-description = Enabling this setting disables global hotkey support. When disabled, text may be blurry if your Wayland compositor is using fraction scaling (ex: 125%).
-settings-features-restart-warp-to-apply = Restart Zap for changes to take effect.
+settings-features-restart-warp-to-apply = Restart InfiniShell for changes to take effect.
 
 # --- ANCHOR-SUB-SETTINGS-PAGE-NAV (agent-settings-page-nav) ---
 # 此锚点下放 settings_view/{settings_page,nav,delete_environment_confirmation_dialog,directory_color_add_picker,pane_manager}.rs 字符串
@@ -1260,7 +1260,7 @@ settings-exec-profile-editor-workspace-override-tooltip = This option is enforce
 settings-exec-profile-editor-section-models = MODELS
 settings-exec-profile-editor-section-permissions = PERMISSIONS
 settings-exec-profile-editor-base-model = Base model
-settings-exec-profile-editor-base-model-desc = This model serves as the primary engine behind the agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. Zap may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.
+settings-exec-profile-editor-base-model-desc = This model serves as the primary engine behind the agent. It powers most interactions and invokes other models for tasks like planning or code generation when necessary. InfiniShell may automatically switch to alternate models based on model availability or for auxiliary tasks such as conversation summarization.
 settings-exec-profile-editor-full-terminal-use-model = Full terminal use model
 settings-exec-profile-editor-full-terminal-use-model-desc = The model used when the agent operates inside interactive terminal applications like database shells, debuggers, REPLs, or dev servers—reading live output and writing commands to the PTY.
 settings-exec-profile-editor-title-model = Title generation model
@@ -1324,7 +1324,7 @@ settings-show-blocks-unshare-failed = Failed to unshare block. Please try again.
 settings-show-blocks-confirm-dialog-title = Unshare block
 settings-show-blocks-confirm-dialog-text = Are you sure you want to unshare this block?
 
-    It will no longer be accessible by link and will be permanently deleted from Zap servers.
+    It will no longer be accessible by link and will be permanently deleted from InfiniShell servers.
 settings-show-blocks-confirm-cancel = Cancel
 settings-show-blocks-confirm-unshare = Unshare
 
@@ -1356,7 +1356,7 @@ settings-appearance-theme-sync-os-description = Automatically switch between lig
 # Custom App Icon widget
 settings-appearance-custom-icon-label = Customize your app icon
 settings-appearance-custom-icon-bundle-warning = Changing the app icon requires the app to be bundled.
-settings-appearance-custom-icon-restart-warning = You may need to restart Zap for MacOS to apply the preferred icon style.
+settings-appearance-custom-icon-restart-warning = You may need to restart InfiniShell for MacOS to apply the preferred icon style.
 
 # Window widgets
 settings-appearance-window-custom-size-label = Open new windows with custom size
@@ -1374,10 +1374,10 @@ settings-appearance-tools-panel-consistent-label = Tools panel visibility is con
 
 # Input
 settings-appearance-input-type-label = Input type
-settings-appearance-input-type-warp = Zap
+settings-appearance-input-type-warp = InfiniShell
 settings-appearance-input-type-shell = Shell (PS1)
 settings-appearance-input-position-label = Input position
-settings-appearance-input-mode-pinned-bottom = Pin to the bottom (Zap mode)
+settings-appearance-input-mode-pinned-bottom = Pin to the bottom (InfiniShell mode)
 settings-appearance-input-mode-pinned-top = Pin to the top (Reverse mode)
 settings-appearance-input-mode-waterfall = Start at the top (Classic mode)
 
@@ -1462,12 +1462,12 @@ settings-appearance-zoom-secondary = Adjusts the default zoom level across all w
 
 # --- ANCHOR-SUB-ENVIRONMENTS (agent-settings-environments) ---
 settings-environments-page-title = Environments
-settings-environments-page-description = Environments define where your ambient agents run. Set one up in minutes via GitHub (recommended), Zap-assisted setup, or manual configuration.
+settings-environments-page-description = Environments define where your ambient agents run. Set one up in minutes via GitHub (recommended), InfiniShell-assisted setup, or manual configuration.
 settings-environments-search-placeholder = Search environments...
 settings-environments-no-matches = No environments match your search.
 settings-environments-section-personal = Personal
-settings-environments-section-team-default = Provided by Zap and this device
-settings-environments-section-team-named = Shared by Zap and { $team }
+settings-environments-section-team-default = Provided by InfiniShell and this device
+settings-environments-section-team-named = Shared by InfiniShell and { $team }
 settings-environments-env-id-prefix = Env ID: { $id }
 settings-environments-detail-image = Image: { $image }
 settings-environments-detail-repos = Repos: { $repos }
@@ -1617,7 +1617,7 @@ quit-warning-title-pane = Close pane?
 quit-warning-title-tab-singular = Close tab?
 quit-warning-title-tab-plural = Close tabs?
 quit-warning-title-window = Close window?
-quit-warning-title-app = Quit Zap?
+quit-warning-title-app = Quit InfiniShell?
 quit-warning-title-editor-tab = Save changes?
 
 # ---- Buttons ----
@@ -1657,7 +1657,7 @@ quit-warning-unsaved-editor-tab = Do you want to save the changes you made to { 
 quit-warning-unsaved-editor-tab-fallback-name = this file
 
 # --- ANCHOR-SUB-RULES-PAGE (agent-rules-page) ---
-# Manage Rules 页面(Zap Drive 中的 AI Fact Collection)。
+# Manage Rules 页面(InfiniShell Drive 中的 AI Fact Collection)。
 rules-collection-name = Rules
 
 # --- ANCHOR-SUB-KEYBINDING-DESC (agent-keybinding-descriptions) ---
@@ -1744,13 +1744,13 @@ keybinding-desc-workspace-toggle-vertical-tabs-menu = Toggle Vertical Tabs Panel
 keybinding-desc-workspace-left-panel-agent-conversations = Left Panel: Agent conversations
 keybinding-desc-workspace-left-panel-project-explorer = Left Panel: Project explorer
 keybinding-desc-workspace-left-panel-global-search = Left Panel: Global search
-keybinding-desc-workspace-left-panel-warp-drive = Left Panel: Zap Drive
+keybinding-desc-workspace-left-panel-warp-drive = Left Panel: InfiniShell Drive
 keybinding-desc-workspace-left-panel-ssh-manager = Left Panel: SSH Manager
 keybinding-desc-workspace-left-panel-skill-manager = Left Panel: Skill Manager
 keybinding-desc-workspace-open-global-search = Open global search
 keybinding-desc-workspace-open-global-search-menu = Global Search
-keybinding-desc-workspace-toggle-warp-drive = Toggle Zap Drive
-keybinding-desc-workspace-toggle-warp-drive-menu = Zap Drive
+keybinding-desc-workspace-toggle-warp-drive = Toggle InfiniShell Drive
+keybinding-desc-workspace-toggle-warp-drive-menu = InfiniShell Drive
 keybinding-desc-workspace-toggle-conversation-list-view = Toggle Agent conversation list view
 keybinding-desc-workspace-toggle-conversation-list-view-menu = Agent conversation list view
 keybinding-desc-workspace-close-panel = Close focused panel
@@ -1762,7 +1762,7 @@ keybinding-desc-workspace-toggle-navigation-palette = Toggle navigation palette
 keybinding-desc-workspace-toggle-navigation-palette-menu = Navigation Palette
 keybinding-desc-workspace-toggle-launch-config-palette = Launch configuration palette
 keybinding-desc-workspace-toggle-files-palette = Toggle Files Palette
-keybinding-desc-workspace-search-drive = Search Zap Drive
+keybinding-desc-workspace-search-drive = Search InfiniShell Drive
 keybinding-desc-workspace-move-tab-left = Move tab left
 keybinding-desc-workspace-move-tab-up = move tab up
 keybinding-desc-workspace-move-tab-right = Move tab right
@@ -1775,7 +1775,7 @@ keybinding-desc-workspace-toggle-block-snackbar = Toggle sticky command header
 
 # Window / tab close
 keybinding-desc-workspace-rename-active-tab = Rename the current tab
-keybinding-desc-workspace-terminate-app = Quit Zap
+keybinding-desc-workspace-terminate-app = Quit InfiniShell
 keybinding-desc-workspace-close-window = Close Window
 keybinding-desc-workspace-close-active-tab = Close the current tab
 keybinding-desc-workspace-close-other-tabs = Close other tabs
@@ -1793,12 +1793,12 @@ keybinding-desc-workspace-view-changelog = View latest changelog
 
 # Resource center / Drive export / CLI
 keybinding-desc-workspace-toggle-resource-center = Toggle resource center
-keybinding-desc-workspace-export-all-warp-drive-objects = Export all Zap Drive objects
+keybinding-desc-workspace-export-all-warp-drive-objects = Export all InfiniShell Drive objects
 keybinding-desc-workspace-install-cli = Install Oz CLI command
 keybinding-desc-workspace-uninstall-cli = Uninstall Oz CLI command
 
 # AI assistant / agents
-keybinding-desc-workspace-toggle-ai-assistant = Toggle Zap AI
+keybinding-desc-workspace-toggle-ai-assistant = Toggle InfiniShell AI
 
 # Env vars / prompts
 keybinding-desc-workspace-create-personal-env-vars = Create new personal environment variables
@@ -1822,7 +1822,7 @@ keybinding-desc-workspace-toggle-notification-mailbox = Toggle notification mail
 # Settings pages
 keybinding-desc-workspace-show-settings = Open Settings
 keybinding-desc-workspace-show-settings-menu = Settings
-# Zap: keybinding-desc-workspace-show-settings-account removed alongside the
+# InfiniShell: keybinding-desc-workspace-show-settings-account removed alongside the
 # Account settings page.
 keybinding-desc-workspace-show-settings-appearance = Open Settings: Appearance
 keybinding-desc-workspace-show-settings-appearance-menu = Appearance...
@@ -1832,7 +1832,7 @@ keybinding-desc-workspace-show-settings-shared-blocks-menu = View Shared Blocks.
 keybinding-desc-workspace-show-settings-keyboard-shortcuts = Open Settings: Keyboard Shortcuts
 keybinding-desc-workspace-show-settings-keyboard-shortcuts-menu = Configure Keyboard Shortcuts...
 keybinding-desc-workspace-show-settings-about = Open Settings: About
-keybinding-desc-workspace-show-settings-about-menu = About Zap
+keybinding-desc-workspace-show-settings-about-menu = About InfiniShell
 keybinding-desc-workspace-show-settings-warpify = Open Settings: Warpify
 keybinding-desc-workspace-show-settings-warpify-menu = Configure Warpify...
 keybinding-desc-workspace-show-settings-ai = Open Settings: AI
@@ -1847,7 +1847,7 @@ keybinding-desc-workspace-link-to-slack = Join our Slack community (opens extern
 keybinding-desc-workspace-link-to-user-docs = View user docs (opens external link)
 keybinding-desc-workspace-send-feedback = Send feedback (opens external link)
 keybinding-desc-workspace-send-feedback-oz = Send feedback with Oz
-keybinding-desc-workspace-view-logs = View Zap logs
+keybinding-desc-workspace-view-logs = View InfiniShell logs
 keybinding-desc-workspace-link-to-privacy-policy = View privacy policy (opens external link)
 
 # Input / terminal / project bindings (registered outside workspace/mod.rs)
@@ -1868,8 +1868,8 @@ keybinding-desc-workspace-view-first-time-user-experience = [Debug] View first-t
 keybinding-desc-workspace-undismiss-aws-login-banner = [Debug] Un-dismiss AWS login banner
 keybinding-desc-workspace-open-oz-launch-modal = [Debug] Open Oz Launch Modal
 keybinding-desc-workspace-reset-oz-launch-modal-state = [Debug] Reset Oz Launch Modal State
-keybinding-desc-workspace-open-zap-launch-modal = [Debug] Open Zap Launch Modal
-keybinding-desc-workspace-reset-zap-launch-modal-state = [Debug] Reset Zap Launch Modal State
+keybinding-desc-workspace-open-zap-launch-modal = [Debug] Open InfiniShell Launch Modal
+keybinding-desc-workspace-reset-zap-launch-modal-state = [Debug] Reset InfiniShell Launch Modal State
 keybinding-desc-workspace-install-opencode-warp-plugin = [Debug] Install OpenCode Warp plugin
 keybinding-desc-workspace-use-local-opencode-warp-plugin = [Debug] Use local OpenCode Warp plugin (testing only)
 keybinding-desc-workspace-open-session-config-modal = [Debug] Open Session Config Modal
@@ -1878,7 +1878,7 @@ keybinding-desc-workspace-sample-process = Sample Process
 keybinding-desc-workspace-dump-heap-profile = Dump heap profile (can only be done once)
 
 # Terminal input bindings
-keybinding-desc-input-show-network-log = Show Zap network log
+keybinding-desc-input-show-network-log = Show InfiniShell network log
 keybinding-desc-input-clear-screen = Clear screen
 keybinding-desc-input-toggle-classic-completions = (Experimental) Toggle classic completions mode
 keybinding-desc-input-command-search = Command Search
@@ -2061,9 +2061,9 @@ keybinding-desc-welcome-terminal-session = Terminal session
 keybinding-desc-welcome-add-repository = Add repository
 
 # AI assistant panel binding desc
-keybinding-desc-ai-assistant-close = Close Zap AI
-keybinding-desc-ai-assistant-focus-terminal-input = Focus Terminal Input From Zap AI
-keybinding-desc-ai-assistant-restart = Restart Zap AI
+keybinding-desc-ai-assistant-close = Close InfiniShell AI
+keybinding-desc-ai-assistant-focus-terminal-input = Focus Terminal Input From InfiniShell AI
+keybinding-desc-ai-assistant-restart = Restart InfiniShell AI
 
 # Code review binding desc
 keybinding-desc-code-review-save-all = Save all unsaved files in code review
@@ -2132,9 +2132,9 @@ keybinding-desc-conversation-details-copy = Copy
 
 # Terminal extras binding desc
 keybinding-desc-terminal-show-history = Show History
-keybinding-desc-terminal-ask-ai-selection = Ask Zap AI about Selection
-keybinding-desc-terminal-ask-ai-last-block = Ask Zap AI about last block
-keybinding-desc-terminal-ask-ai = Ask Zap AI
+keybinding-desc-terminal-ask-ai-selection = Ask InfiniShell AI about Selection
+keybinding-desc-terminal-ask-ai-last-block = Ask InfiniShell AI about last block
+keybinding-desc-terminal-ask-ai = Ask InfiniShell AI
 keybinding-desc-terminal-load-agent-conversation = Load agent mode conversation (from debug link in clipboard)
 keybinding-desc-terminal-toggle-session-recording = Toggle PTY Recording for Session
 
@@ -2272,7 +2272,7 @@ toggle-suffix-syntax-highlighting = syntax highlighting
 toggle-suffix-audible-bell = audible terminal bell
 toggle-suffix-autosuggestions = autosuggestions
 toggle-suffix-autosuggestion-keybinding-hint = autosuggestion keybinding hint
-toggle-suffix-ssh-wrapper = Zap SSH wrapper
+toggle-suffix-ssh-wrapper = InfiniShell SSH wrapper
 toggle-suffix-ssh-auto-discovery = auto-discover SSH hosts
 toggle-suffix-link-tooltip = show tooltip on click on links
 toggle-suffix-quit-warning = quit warning modal
@@ -2305,10 +2305,10 @@ agent-thinking-display-never-show = Set agent thinking display: never show
 # --- ANCHOR-SUB-EXTERNAL-EDITOR (settings-external-editor) ---
 settings-external-editor-choose-default = Choose an editor to open file links
 settings-external-editor-choose-code-panels = Choose an editor to open files from the code review panel, project explorer, and global search
-settings-external-editor-choose-layout = Choose a layout to open files in Zap
+settings-external-editor-choose-layout = Choose a layout to open files in InfiniShell
 settings-external-editor-tabbed-header = Group files into single editor pane
 settings-external-editor-tabbed-desc = When this setting is on, any files opened in the same tab will be automatically grouped into a single editor pane.
-settings-external-editor-prefer-markdown = Open Markdown files in Zap's Markdown Viewer by default
+settings-external-editor-prefer-markdown = Open Markdown files in InfiniShell's Markdown Viewer by default
 settings-external-editor-layout-split-pane = Split Pane
 settings-external-editor-layout-new-tab = New Tab
 settings-external-editor-default-app = Default App
@@ -2324,7 +2324,7 @@ menu-block-copy-url = Copy URL
 menu-block-copy-path = Copy path
 menu-block-show-in-finder = Show in Finder
 menu-block-show-containing-folder = Show containing folder
-menu-block-open-in-warp = Open in Zap
+menu-block-open-in-warp = Open in InfiniShell
 menu-block-open-in-editor = Open in editor
 menu-block-insert-into-input = Insert into input
 menu-block-copy-command = Copy command
@@ -2336,7 +2336,7 @@ menu-block-scroll-to-top-of-blocks = Scroll to top of blocks
 menu-block-scroll-to-bottom-of-block = Scroll to bottom of block
 menu-block-scroll-to-bottom-of-blocks = Scroll to bottom of blocks
 menu-block-save-as-workflow = Save as workflow
-menu-block-ask-warp-ai = Ask Zap AI
+menu-block-ask-warp-ai = Ask InfiniShell AI
 menu-block-copy-output = Copy output
 menu-block-copy-filtered-output = Copy filtered output
 menu-block-toggle-block-filter = Toggle block filter
@@ -2361,7 +2361,7 @@ menu-input-paste = Paste
 menu-input-select-all = Select all
 menu-input-command-search = Command search
 menu-input-ai-command-search = AI command search
-menu-input-ask-warp-ai = Ask Zap AI
+menu-input-ask-warp-ai = Ask InfiniShell AI
 menu-input-save-as-workflow = Save as workflow
 menu-input-hide-hint-text = Hide input hint text
 menu-input-show-hint-text = Show input hint text
@@ -2436,11 +2436,11 @@ slash-cmd-create-environment-hint = <optional repo paths or GitHub URLs>
 slash-cmd-docker-sandbox-desc = Create a new docker sandbox terminal session
 slash-cmd-create-new-project-desc = Have Oz walk you through creating a new coding project
 slash-cmd-create-new-project-hint = <describe what you want to build>
-slash-cmd-open-skill-desc = Open a skill's markdown file in Zap's built-in editor
+slash-cmd-open-skill-desc = Open a skill's markdown file in InfiniShell's built-in editor
 slash-cmd-skills-desc = Invoke a skill
 slash-cmd-add-prompt-desc = Add new Agent prompt
 slash-cmd-add-rule-desc = Add a new global rule for the agent
-slash-cmd-open-file-desc = Open a file in Zap's code editor
+slash-cmd-open-file-desc = Open a file in InfiniShell's code editor
 slash-cmd-open-file-hint = <path/to/file[:line[:col]]> or "@" to search
 slash-cmd-rename-tab-desc = Rename the current tab
 slash-cmd-rename-tab-hint = <tab name>
@@ -2479,7 +2479,7 @@ slash-cmd-export-to-file-hint = <optional filename>
 # --- ANCHOR-SUB-PROMPT-TIPS ---
 # Prompt editor modal (app/src/prompt/editor_modal.rs)
 prompt-editor-title = Edit prompt
-prompt-editor-warp-prompt-section = Zap terminal prompt
+prompt-editor-warp-prompt-section = InfiniShell terminal prompt
 prompt-editor-shell-prompt-section = Shell prompt (PS1)
 prompt-editor-restore-default = Restore default
 prompt-editor-same-line-prompt = Same line prompt
@@ -2489,7 +2489,7 @@ prompt-editor-save-changes = Save changes
 
 # Welcome tips (app/src/tips/tip_view.rs)
 welcome-tips-command-palette-title = Command Palette
-welcome-tips-command-palette-description = Easily discover everything you can do in Zap without your hands leaving the keyboard.
+welcome-tips-command-palette-description = Easily discover everything you can do in InfiniShell without your hands leaving the keyboard.
 welcome-tips-split-pane-title = Split Pane
 welcome-tips-split-pane-description = Split tabs into multiple panes to make your ideal layout.
 welcome-tips-history-search-title = History Search
@@ -2497,7 +2497,7 @@ welcome-tips-history-search-description = Find, edit and re-run previously execu
 welcome-tips-ai-command-search-title = AI Command Search
 welcome-tips-ai-command-search-description = Generate shell commands with natural language.
 welcome-tips-theme-picker-title = Theme Picker
-welcome-tips-theme-picker-description = Make Zap your own by choosing a built-in theme. Or create your own.
+welcome-tips-theme-picker-description = Make InfiniShell your own by choosing a built-in theme. Or create your own.
 welcome-tips-shortcut-label = Shortcut
 welcome-tips-skip = Skip Welcome Tips
 welcome-tips-complete-title = Complete!
@@ -2558,7 +2558,7 @@ search-filter-display-actions = actions
 search-filter-display-sessions = sessions
 search-filter-display-conversations = conversations
 search-filter-display-launch-configurations = launch configurations
-search-filter-display-drive = Zap Drive
+search-filter-display-drive = InfiniShell Drive
 search-filter-display-environment-variables = environment variables
 search-filter-display-prompt-history = prompt history
 search-filter-display-files = files
@@ -2643,7 +2643,7 @@ drive-trash-title = Trash
 drive-trash-deletion-warning = Items in the trash will be deleted forever after 30 days.
 drive-team-space-zero-state = Team spaces are unavailable in local builds. Manage workflows and notebooks in Personal.
 drive-sign-up-storage-limit = Local storage limits are enforced on this device.
-drive-local-storage-limit-description = Local storage limits are enforced on this device. Remove unused items to create space for new Zap Drive objects.
+drive-local-storage-limit-description = Local storage limits are enforced on this device. Remove unused items to create space for new InfiniShell Drive objects.
 drive-sign-up = Manage locally
 drive-copy-link = Copy link
 drive-collapse-all = Collapse all
@@ -2707,7 +2707,7 @@ workflow-keep-editing = Keep editing
 workflow-discard-changes = Discard changes
 workflow-ai-assist-autofill = Autofill
 workflow-ai-assist-loading = Loading
-workflow-ai-assist-tooltip = Generate a title, descriptions, or parameters with Zap AI
+workflow-ai-assist-tooltip = Generate a title, descriptions, or parameters with InfiniShell AI
 workflow-tooltip-restore-from-trash = Restore workflow from trash
 workflow-ai-assist-error-byop-required = Autofill requires a BYOP model. Configure a provider and model in Settings → AI.
 workflow-ai-assist-error-bad-command = Failed to generate metadata. Please try again with a different command.
@@ -2749,7 +2749,7 @@ project-explorer-unavailable-disabled-description = The Project Explorer require
 project-explorer-unavailable-remote-description = The Project Explorer requires access to your local workspace, which isn’t supported in remote sessions.
 project-explorer-unavailable-wsl-description = The Project Explorer doesn't currently work in WSL.
 workspace-left-panel-global-search = Global search
-workspace-left-panel-warp-drive = Zap Drive
+workspace-left-panel-warp-drive = InfiniShell Drive
 workspace-left-panel-agent-conversations = Agent conversations
 workspace-left-panel-ssh-manager = SSH Manager
 workspace-left-panel-server-file-browser = Server files
@@ -2997,34 +2997,34 @@ global-search-unsupported-session-description = Global search doesn't currently 
 global-search-failed = Global search failed.
 
 # Wasm NUX dialog (app/src/wasm_nux_dialog.rs)
-wasm-nux-open-desktop-title = Open in Zap Desktop?
+wasm-nux-open-desktop-title = Open in InfiniShell Desktop?
 wasm-nux-open-desktop-detail = Future links will automatically open on desktop.
-wasm-nux-open-desktop-confirm = Open in Zap
-wasm-nux-download-title = Download Zap Desktop?
-wasm-nux-download-description = Zap is the intelligent terminal with AI and your dev team's knowledge built-in.
+wasm-nux-open-desktop-confirm = Open in InfiniShell
+wasm-nux-download-title = Download InfiniShell Desktop?
+wasm-nux-download-description = InfiniShell is the intelligent terminal with AI and your dev team's knowledge built-in.
 wasm-nux-learn-more = Learn more
 wasm-nux-download-confirm = Download
-wasm-nux-object-kind-drive-objects = Zap Drive objects
-wasm-nux-object-kind-warp-links = Zap links
+wasm-nux-object-kind-drive-objects = InfiniShell Drive objects
+wasm-nux-object-kind-warp-links = InfiniShell links
 wasm-nux-always-open-on-web-title = Always open { $object_kind } on the web?
 wasm-nux-always-open-on-web-detail = You can change this at any time in settings.
 wasm-nux-yes = Yes
 
 # Auth override warning (app/src/auth/auth_override_warning_body.rs)
 auth-override-warning-title = New login detected
-auth-override-warning-confirm-title = Delete personal Zap Drive objects and preferences?
-auth-override-warning-description = It looks like you logged into a Zap account through a web browser. If you continue, any personal Zap Drive objects and preferences from this anonymous session will be permanently deleted.
+auth-override-warning-confirm-title = Delete personal InfiniShell Drive objects and preferences?
+auth-override-warning-description = It looks like you logged into an InfiniShell account through a web browser. If you continue, any personal InfiniShell Drive objects and preferences from this anonymous session will be permanently deleted.
 auth-override-warning-cannot-undo = This cannot be undone.
 auth-override-warning-export = Export your data
 auth-override-warning-export-description =  to import later.
 auth-override-warning-cancel = Cancel
 auth-override-warning-continue = Continue
-auth-override-warning-accessibility-help = Zap has detected a new login from a web browser. Press escape to cancel and continue using Zap without login.
+auth-override-warning-accessibility-help = InfiniShell has detected a new login from a web browser. Press escape to cancel and continue using InfiniShell without login.
 
 # Auth SSO link/login failures/paste token/logout/offline/privacy
 auth-needs-sso-link-button = Link SSO
 auth-needs-sso-link-title = Your organization has enabled SSO for your account
-auth-needs-sso-link-detail = Click the button below to link your Zap account to your SSO provider.
+auth-needs-sso-link-detail = Click the button below to link your InfiniShell account to your SSO provider.
 auth-login-failure-troubleshooting-prefix =  Not the first time? See our
 auth-login-failure-troubleshooting-link =  troubleshooting docs
 auth-login-failure-troubleshooting-suffix = .
@@ -3038,20 +3038,20 @@ auth-paste-token-title = Paste your auth token below
 auth-paste-token-detail = Paste your auth token from the browser to get complete login.
 auth-paste-token-cancel = Cancel
 auth-paste-token-continue = Continue
-auth-offline-first-use-description = You are currently offline. An internet connection is required to use Zap for the first time.
+auth-offline-first-use-description = You are currently offline. An internet connection is required to use InfiniShell for the first time.
 auth-offline-first-use-learn-more = Learn more
-auth-offline-overlay-title = Using Zap Offline
-auth-offline-overlay-paragraph-1 = Zap can be used offline for local terminal and agent workflows.
+auth-offline-overlay-title = Using InfiniShell Offline
+auth-offline-overlay-paragraph-1 = InfiniShell can be used offline for local terminal and agent workflows.
 auth-offline-overlay-paragraph-2 = Some setup flows may still need an internet connection when they depend on external providers.
 auth-offline-overlay-paragraph-3 = Logged-out usage keeps local workflows on this machine.
 auth-offline-overlay-dismiss = Dismiss
 auth-privacy-settings-title = Privacy Settings
 auth-privacy-settings-done = Done
-auth-privacy-settings-help-improve = Help improve Zap
-auth-privacy-settings-help-improve-description = High-level feature usage data helps Zap's product team prioritize the roadmap.
+auth-privacy-settings-help-improve = Help improve InfiniShell
+auth-privacy-settings-help-improve-description = High-level feature usage data helps InfiniShell's product team prioritize the roadmap.
 auth-privacy-settings-learn-more = Learn more
 auth-privacy-settings-send-crash-reports = Send crash reports
-auth-privacy-settings-crash-reports-description = Crash reporting helps Zap's engineering team understand stability and improve performance.
+auth-privacy-settings-crash-reports-description = Crash reporting helps InfiniShell's engineering team understand stability and improve performance.
 auth-logout-confirm = Yes, log out
 auth-logout-show-running-processes = Show running processes
 auth-logout-cancel = Cancel
@@ -3064,7 +3064,7 @@ auth-logout-shared-sessions-warning = You have { $count } remote { $count ->
         [one] session
        *[other] sessions
     }.
-auth-logout-unsynced-drive-objects-warning = You have { $count } unsynced Zap Drive { $count ->
+auth-logout-unsynced-drive-objects-warning = You have { $count } unsynced InfiniShell Drive { $count ->
         [one] object
        *[other] objects
     }. Logging out will cause you to lose the { $count ->
@@ -3081,40 +3081,40 @@ auth-logout-unsaved-files-warning = You have { $count } unsaved { $count ->
 
 # CLI agent plugin instructions
 cli-agent-plugin-run-on-remote = Be sure to run these commands on your remote machine.
-cli-agent-plugin-codex-install-title = Enable Zap Notifications for Codex
-cli-agent-plugin-codex-install-subtitle = Update Codex to the latest version, then enable in-focus notifications so Zap can display them while you work.
+cli-agent-plugin-codex-install-title = Enable InfiniShell Notifications for Codex
+cli-agent-plugin-codex-install-subtitle = Update Codex to the latest version, then enable in-focus notifications so InfiniShell can display them while you work.
 cli-agent-plugin-codex-update-step = Update Codex to the latest version.
 cli-agent-plugin-codex-notification-step = Set the notification condition to "always" in your Codex config. Open or create ~/.codex/config.toml and add:
 cli-agent-plugin-codex-restart-note = Restart Codex to apply the changes.
-cli-agent-plugin-deepseek-install-title = Enable Zap Notifications for DeepSeek
+cli-agent-plugin-deepseek-install-title = Enable InfiniShell Notifications for DeepSeek
 cli-agent-plugin-deepseek-install-subtitle = Add the following to your DeepSeek config file (~/.deepseek/config.toml) to enable turn-completion notifications.
 cli-agent-plugin-deepseek-notification-step = Set the notification condition to "always" in ~/.deepseek/config.toml:
 cli-agent-plugin-deepseek-restart-note = Restart DeepSeek to apply the changes.
-cli-agent-plugin-claude-install-title = Install Zap Plugin for Claude Code
+cli-agent-plugin-claude-install-title = Install InfiniShell Plugin for Claude Code
 cli-agent-plugin-claude-install-subtitle = Ensure that jq is installed on your machine. Then, run these commands.
 cli-agent-plugin-claude-add-marketplace-step = Add the Warp plugin marketplace repository
 cli-agent-plugin-install-warp-plugin-step = Install the Warp plugin
 cli-agent-plugin-claude-restart-note = Restart Claude Code to activate the plugin.
 cli-agent-plugin-claude-known-issues-note = There are some known issues with Claude Code's plugin system. If the plugin is not found after step 1, you can try manually adding an "extraKnownMarketplaces" entry to ~/.claude/settings.json.
-cli-agent-plugin-claude-update-title = Update Zap Plugin for Claude Code
+cli-agent-plugin-claude-update-title = Update InfiniShell Plugin for Claude Code
 cli-agent-plugin-run-following-commands = Run the following commands.
 cli-agent-plugin-remove-existing-marketplace-step = Remove the existing marketplace (if present)
 cli-agent-plugin-readd-marketplace-step = Re-add the marketplace
 cli-agent-plugin-install-latest-version-step = Install the latest plugin version
 cli-agent-plugin-claude-restart-update-note = Restart Claude Code to activate the update.
-cli-agent-plugin-gemini-install-title = Install Zap Plugin for Gemini CLI
+cli-agent-plugin-gemini-install-title = Install InfiniShell Plugin for Gemini CLI
 cli-agent-plugin-gemini-run-command-restart = Run the following command, then restart Gemini CLI.
 cli-agent-plugin-install-warp-extension-step = Install the Warp extension
 cli-agent-plugin-gemini-restart-note = Restart Gemini CLI to activate the plugin.
-cli-agent-plugin-gemini-update-title = Update Zap Plugin for Gemini CLI
+cli-agent-plugin-gemini-update-title = Update InfiniShell Plugin for Gemini CLI
 cli-agent-plugin-update-warp-extension-step = Update the Warp extension
 cli-agent-plugin-gemini-restart-update-note = Restart Gemini CLI to activate the update.
-cli-agent-plugin-opencode-install-title = Install Zap Plugin for OpenCode
+cli-agent-plugin-opencode-install-title = Install InfiniShell Plugin for OpenCode
 cli-agent-plugin-opencode-install-subtitle = Add the Warp plugin to your OpenCode configuration, then restart OpenCode.
 cli-agent-plugin-opencode-open-config-step = Open or create your opencode.json. This can be in your project root, or the global config path:
 cli-agent-plugin-opencode-add-plugin-step = Add "@warp-dot-dev/opencode-warp" to the "plugin" array in the top-level JSON object:
 cli-agent-plugin-opencode-restart-note = Restart OpenCode to activate the plugin.
-cli-agent-plugin-opencode-update-title = Update Zap Plugin for OpenCode
+cli-agent-plugin-opencode-update-title = Update InfiniShell Plugin for OpenCode
 cli-agent-plugin-opencode-update-subtitle = Pin the plugin to the latest version in your opencode.json. OpenCode caches plugins per version spec, so changing the pin forces it to re-fetch on restart.
 cli-agent-plugin-opencode-replace-plugin-step = Replace the existing "@warp-dot-dev/opencode-warp" entry in the "plugin" array with the explicit version:
 cli-agent-plugin-opencode-restart-update-note = Restart OpenCode to load the updated plugin.
@@ -3127,18 +3127,18 @@ terminal-bootstrapping-installing-progress = Installing... ({ $p }%)
 terminal-bootstrapping-installing = Installing...
 terminal-bootstrapping-updating = Updating...
 terminal-bootstrapping-initializing = Initializing...
-terminal-bootstrapping-installing-warp-ssh-extension-progress = Installing Zap SSH Extension... ({ $p }%)
-terminal-bootstrapping-installing-warp-ssh-extension = Installing Zap SSH Extension...
-terminal-bootstrapping-updating-warp-ssh-extension = Updating Zap SSH Extension...
+terminal-bootstrapping-installing-warp-ssh-extension-progress = Installing InfiniShell SSH Extension... ({ $p }%)
+terminal-bootstrapping-installing-warp-ssh-extension = Installing InfiniShell SSH Extension...
+terminal-bootstrapping-updating-warp-ssh-extension = Updating InfiniShell SSH Extension...
 terminal-bootstrapping-starting-shell-name = Starting { $shell }...
 agent-tip-prefix = Tip:
 agent-tip-slash-menu = `/` to open the slash-command menu and access quick agent actions.
 agent-tip-toggle-input-mode = <keybinding> to toggle natural language detection and switch between agent and terminal input.
 agent-tip-plan = `/plan` <prompt> to create a plan for the agent before executing.
-agent-tip-command-palette = <keybinding> to open the Command Palette and access Zap actions and shortcuts.
+agent-tip-command-palette = <keybinding> to open the Command Palette and access InfiniShell actions and shortcuts.
 agent-tip-warp-drive = Store reusable workflows, notebooks, and prompts in your
 agent-tip-redirect-running-agent = Enter a new prompt to redirect the agent while it's running.
-agent-tip-add-context = `@` to add context from files, blocks, or Zap Drive objects to your prompt.
+agent-tip-add-context = `@` to add context from files, blocks, or InfiniShell Drive objects to your prompt.
 agent-tip-attach-prior-output = <keybinding> to attach the prior command output as agent context.
 agent-tip-init-index = `/init` to index the repo so the agent can understand your codebase.
 agent-tip-agent-profiles = Add agent profiles to customize permissions and models per session.
@@ -3167,10 +3167,10 @@ agent-tip-auto-approve = <keybinding> to auto-approve the agent's commands and d
 agent-tip-desktop-notifications = Enable desktop notifications to get an alert when an agent needs your attention.
 agent-tip-cancel-task = <keybinding> to cancel the current agent task.
 agent-tip-action-open-palette = Open palette
-agent-tip-action-warp-drive = Zap Drive.
+agent-tip-action-warp-drive = InfiniShell Drive.
 agent-tip-action-show-diff-view = Show diff view
 agent-tip-voice-input = Hold <keybinding> to speak your prompt directly to the agent.
-hoa-welcome-banner-title = Introducing universal agent support: level up any coding agent with Zap
+hoa-welcome-banner-title = Introducing universal agent support: level up any coding agent with InfiniShell
 hoa-feature-vertical-tabs-title = Vertical tabs
 hoa-feature-vertical-tabs-description = Rich tab titles and metadata like git branch, worktree, and PR. Fully customizable.
 hoa-feature-tab-configs-title = Tab configs
@@ -3178,10 +3178,10 @@ hoa-feature-tab-configs-description = Tab-level schema to set your directory, st
 hoa-feature-agent-inbox-title = Agent inbox
 hoa-feature-agent-inbox-description = Notifications when any agent needs your attention, also accessible in a central inbox
 hoa-feature-native-code-review-title = Native code review
-hoa-feature-native-code-review-description = Send inline comments from Zap's code review directly to Claude Code, Codex, or OpenCode
+hoa-feature-native-code-review-description = Send inline comments from InfiniShell's code review directly to Claude Code, Codex, or OpenCode
 resource-center-whats-new-section = What's New?
 resource-center-getting-started-section = Getting Started
-resource-center-maximize-warp-section = Maximize Zap
+resource-center-maximize-warp-section = Maximize InfiniShell
 resource-center-advanced-setup-section = Advanced Setup
 resource-center-create-first-block-title = Create your first block
 resource-center-create-first-block-description = Run a command to see your command and output grouped.
@@ -3190,16 +3190,16 @@ resource-center-navigate-blocks-description = Click to select a block and naviga
 resource-center-block-action-title = Take an action on block
 resource-center-block-action-description = Right click on a block to copy/paste, share, more.
 resource-center-command-palette-title = Open command palette
-resource-center-command-palette-description = Access all of Zap via the keyboard.
+resource-center-command-palette-description = Access all of InfiniShell via the keyboard.
 resource-center-set-theme-title = Set your theme
-resource-center-set-theme-description = Make Zap your own by choosing a theme.
+resource-center-set-theme-description = Make InfiniShell your own by choosing a theme.
 resource-center-custom-prompt-title = Use your custom prompt
-resource-center-custom-prompt-description = Set up Zap to honor your PS1 setting
+resource-center-custom-prompt-description = Set up InfiniShell to honor your PS1 setting
 resource-center-view-documentation = View documentation
-resource-center-integrate-ide-title = Integrate Zap with your IDE
-resource-center-integrate-ide-description = Configure Zap to launch from your most used development tools
-resource-center-how-warp-uses-warp-title = How Zap uses Zap
-resource-center-how-warp-uses-warp-description = Learn how Zap's engineering team uses their favorite features
+resource-center-integrate-ide-title = Integrate InfiniShell with your IDE
+resource-center-integrate-ide-description = Configure InfiniShell to launch from your most used development tools
+resource-center-how-warp-uses-warp-title = How InfiniShell uses InfiniShell
+resource-center-how-warp-uses-warp-description = Learn how InfiniShell's engineering team uses their favorite features
 resource-center-read-article = Read article
 resource-center-command-search-title = Command search
 resource-center-command-search-description = Find and run previously executed commands, workflows, and more.
@@ -3241,20 +3241,20 @@ agent-message-bar-again-send-to-agent = again to send to agent
 #        resource center, theme picker, terminal banners, AI footer/tool output
 # =============================================================================
 
-onboarding-intention-title = Welcome to Zap
+onboarding-intention-title = Welcome to InfiniShell
 onboarding-intention-subtitle = How do you want to work?
 onboarding-intention-agent-title = Build faster with AI agents
 onboarding-intention-agent-description = An agent-first experience with best in class terminal support. Get terminal and agent driven development AI features like:
 onboarding-intention-terminal-title = Just use the terminal
 onboarding-intention-terminal-badge = No AI features
 onboarding-intention-terminal-description = A modern terminal optimized for speed, context, and control without AI.
-onboarding-ai-feature-warp-agents = Zap agents
+onboarding-ai-feature-warp-agents = InfiniShell agents
 onboarding-ai-feature-oz-cloud-agents-platform = Oz local agents platform
 onboarding-ai-feature-next-command-predictions = Next command predictions
 onboarding-ai-feature-prompt-suggestions = Prompt suggestions
 onboarding-ai-feature-remote-control-agents = Remote control with Claude Code, Codex, and other agents
 onboarding-ai-feature-agents-over-ssh = Agents over SSH
-onboarding-agent-title = Customize your Zap Agent
+onboarding-agent-title = Customize your InfiniShell Agent
 onboarding-agent-subtitle = Select your in-app agent's defaults.
 onboarding-agent-default-model = Default model
 onboarding-agent-autonomy = Autonomy
@@ -3266,9 +3266,9 @@ onboarding-agent-autonomy-partial-title = Partial
 onboarding-agent-autonomy-partial-subtitle = Can plan, read files, and execute low-risk commands. Asks before making any changes or executing sensitive commands.
 onboarding-agent-autonomy-none-title = None
 onboarding-agent-autonomy-none-subtitle = Takes no actions without your approval.
-onboarding-agent-disable-warp-agent = Disable Zap Agent
+onboarding-agent-disable-warp-agent = Disable InfiniShell Agent
 onboarding-project-title = Open a project
-onboarding-project-subtitle = Set up a project to optimize it for coding in Zap.
+onboarding-project-subtitle = Set up a project to optimize it for coding in InfiniShell.
 onboarding-project-open-local-folder = Open local folder
 onboarding-project-initialize-automatically = Initialize project automatically
 onboarding-project-initialize-description = Prepares the project environment, builds an index of your code, and generates project rules—giving the agent deeper understanding and better performance.
@@ -3282,7 +3282,7 @@ onboarding-third-party-title = Customize third party agents
 onboarding-third-party-subtitle = Select defaults for using agents like Claude Code, Codex, and Gemini.
 onboarding-third-party-cli-toolbar = CLI agent toolbar
 onboarding-third-party-notifications = Notifications
-onboarding-customize-title = Customize your Zap
+onboarding-customize-title = Customize your InfiniShell
 onboarding-customize-subtitle = Tailor your features and UI to your working style.
 onboarding-customize-tab-styling = Tab styling
 onboarding-customize-vertical = Vertical
@@ -3290,35 +3290,35 @@ onboarding-customize-horizontal = Horizontal
 onboarding-customize-conversation-history = Conversation history
 onboarding-customize-file-explorer = File explorer
 onboarding-customize-global-file-search = Global file search
-onboarding-customize-warp-drive = Zap Drive
+onboarding-customize-warp-drive = InfiniShell Drive
 onboarding-customize-tools-panel = Tools panel
 onboarding-customize-code-review = Code review
 
-auth-opt-out-line-1 = Zap stores onboarding choices locally.
+auth-opt-out-line-1 = InfiniShell stores onboarding choices locally.
 auth-opt-out-line-2-prefix = You can adjust your{" "}
 auth-privacy-settings-prefix = You can adjust your{" "}
 auth-privacy-settings-ai-prefix = You can adjust your local AI preferences in{" "}
 auth-privacy-settings = Privacy Settings
-auth-local-privacy-note = Zap stores onboarding choices locally on this device.
+auth-local-privacy-note = InfiniShell stores onboarding choices locally on this device.
 auth-terms-prefix = Continuing keeps this setup on your device.{" "}
 auth-terms-of-service = Local setup
 auth-log-in = Log in
 auth-paste-token-from-browser = Click here to paste your token from the browser
-auth-login-slide-title-warp-drive = Get started with Zap Drive
+auth-login-slide-title-warp-drive = Get started with InfiniShell Drive
 auth-login-slide-title-ai = Get started with AI
 auth-login-slide-subtitle-warp-drive = Connect your account to save and share notebooks, workflows, and more across devices.
 auth-login-slide-subtitle-ai = Connect your account to enable AI-powered planning, coding, and automation.
-auth-disable-warp-drive = Disable Zap Drive
+auth-disable-warp-drive = Disable InfiniShell Drive
 auth-disable-ai-features = Disable AI features
-auth-enable-warp-drive = Enable Zap Drive
+auth-enable-warp-drive = Enable InfiniShell Drive
 auth-enable-ai-features = Enable AI features
 auth-browser-sign-in-one-line-title = Sign in on your browser to continue
 auth-open-page-manually-line-prefix = {" "}and open
 auth-open-page-manually-line-suffix = the page manually.
-auth-disable-warp-drive-confirm-title = Are you sure you want to disable Zap Drive?
+auth-disable-warp-drive-confirm-title = Are you sure you want to disable InfiniShell Drive?
 auth-disable-ai-features-confirm-title = Are you sure you want to disable AI features?
-auth-disable-warp-drive-confirm-body = Zap Drive lets you save workflows and knowledge across devices and share them with your team. By continuing, you won't have access to the following features:
-auth-disable-ai-features-confirm-body = Zap is better with AI. By continuing, you won't have access to any of the following features:
+auth-disable-warp-drive-confirm-body = InfiniShell Drive lets you save workflows and knowledge across devices and share them with your team. By continuing, you won't have access to the following features:
+auth-disable-ai-features-confirm-body = InfiniShell is better with AI. By continuing, you won't have access to any of the following features:
 auth-feature-session-sharing = Session Sharing
 auth-sign-up = Continue locally
 auth-sign-in = Sign in
@@ -3329,11 +3329,11 @@ auth-skip-login-confirm-title = Are you sure you want to skip login?
 auth-skip-login-confirm-line-1 = You can sign up later, but some features, such as AI,
 auth-skip-login-confirm-line-2-prefix = are only available to logged-in users.{" "}
 auth-yes-skip-login = Yes, skip login
-auth-require-login-ai-collaboration = Local AI features do not require a Zap account.
-auth-require-login-drive-limit = Zap Drive objects are stored locally in Zap.
-auth-require-login-share = Sharing is unavailable in local Zap builds.
-auth-welcome-title = Welcome to Zap!
-auth-sign-up-for-warp = Continue in Zap
+auth-require-login-ai-collaboration = Local AI features do not require an InfiniShell account.
+auth-require-login-drive-limit = InfiniShell Drive objects are stored locally in InfiniShell.
+auth-require-login-share = Sharing is unavailable in local InfiniShell builds.
+auth-welcome-title = Welcome to InfiniShell!
+auth-sign-up-for-warp = Continue in InfiniShell
 auth-browser-sign-in-title = Sign in on your browser\nto continue
 auth-open-page-manually-suffix = and open the page manually.
 
@@ -3344,7 +3344,7 @@ voice-transcription-disabled-microphone = Voice transcription is disabled becaus
 voice-transcription = Voice transcription
 voice-transcription-hold-key = Voice transcription (hold `{ $key }` key)
 
-get-started-welcome-title = Welcome to Zap
+get-started-welcome-title = Welcome to InfiniShell
 get-started-subtitle = The Agentic Development Environment
 theme-creator-theme-name = Theme name
 theme-creator-background-color = Background color
@@ -3382,11 +3382,11 @@ notebook-file-loading = Loading { $name }...
 notebook-file-missing-source = Missing source file
 
 terminal-shared-session-reconnecting = Offline, trying to reconnect...
-terminal-banner-p10k-supported = Powerlevel10k now supports Zap!{"  "}
+terminal-banner-p10k-supported = Powerlevel10k now supports InfiniShell!{"  "}
 terminal-banner-p10k-older-version-prefix = You seem to be running an older (unsupported) version, please follow{" "}
 terminal-banner-these-instructions = these instructions
 terminal-banner-update-latest-suffix = {" "}to update to the latest version.
-terminal-banner-pure-unsupported = Pure is not yet supported in Zap. You might consider one of the supported prompts as an alternative.{"  "}
+terminal-banner-pure-unsupported = Pure is not yet supported in InfiniShell. You might consider one of the supported prompts as an alternative.{"  "}
 terminal-loading-session = Loading session...
 
 ai-footer-hide-rich-input = Hide Rich Input
@@ -3453,7 +3453,7 @@ sharing-invite = Invite
 sharing-who-has-access = Who has access
 terminal-shared-session-cancel-request = Cancel request
 terminal-shared-session-continue-sharing = Continue sharing
-settings-import-reset-to-warp-defaults = Reset to Zap defaults
+settings-import-reset-to-warp-defaults = Reset to InfiniShell defaults
 settings-import-type-theme = Theme
 settings-import-type-theme-with-comma = Theme,
 settings-import-type-option-as-meta = Option as Meta
@@ -3552,19 +3552,19 @@ common-resource-not-found-or-access-denied = Resource not found or access denied
 workspace-close-session = Close session
 workspace-auto-reload = Auto-reload
 workspace-add-new-repo = {" "}+ Add new repo
-workspace-notification-permission-denied-toast = Zap doesn't have permission to send desktop notifications.
+workspace-notification-permission-denied-toast = InfiniShell doesn't have permission to send desktop notifications.
 workspace-troubleshoot-notifications-link = Troubleshoot notifications
-workspace-plan-synced-to-warp-drive-toast = Plan synced to your Zap Drive
+workspace-plan-synced-to-warp-drive-toast = Plan synced to your InfiniShell Drive
 workspace-remote-control-link-copied-toast = Remote control link copied.
 workspace-update-now = Update now
-workspace-update-warp = Update Zap
+workspace-update-warp = Update InfiniShell
 workspace-app-out-of-date-needs-update = Your app is out of date and needs to update.
 workspace-restart-app-and-update-now = Restart app and update now
 workspace-sampling-process-toast = Sampling process for 3 seconds...
 workspace-version-deprecation-banner = Your app is out of date and some features may not work as expected. Please update immediately.
-workspace-version-deprecation-without-permissions-banner = Some Zap features may not work as expected without updating immediately, but Zap is unable to perform the update.
-workspace-new-version-unable-to-update-banner = A new version is available but Zap is unable to perform the update.
-workspace-unable-to-launch-new-installed-version = Zap was unable to launch the new installed version.
+workspace-version-deprecation-without-permissions-banner = Some InfiniShell features may not work as expected without updating immediately, but InfiniShell is unable to perform the update.
+workspace-new-version-unable-to-update-banner = A new version is available but InfiniShell is unable to perform the update.
+workspace-unable-to-launch-new-installed-version = InfiniShell was unable to launch the new installed version.
 tab-config-session-type = Session type
 terminal-copy-error = Copy error
 terminal-authenticate-with-github = Authenticate with GitHub
@@ -3577,7 +3577,7 @@ terminal-warpify-without-tmux = Warpify without TMUX
 terminal-continue-without-warpification = Continue without Warpification
 terminal-always-install = Always install
 terminal-never-install = Never install
-terminal-ssh-report-issue-prefix = We are actively working on improving the stability of SSH in Zap. Please consider{" "}
+terminal-ssh-report-issue-prefix = We are actively working on improving the stability of SSH in InfiniShell. Please consider{" "}
 terminal-ssh-report-issue-link = filing an issue
 terminal-ssh-report-issue-suffix = {" "}on GitHub so we can better identify the problem.
 terminal-ssh-why-need-tmux = Why do I need tmux?
@@ -3589,7 +3589,7 @@ terminal-hide-secret = Hide secret
 terminal-copy-secret = Copy secret
 terminal-tag-agent-for-assistance = Tag agent for assistance
 terminal-save-as-workflow-secrets-tooltip = Blocks containing secrets cannot be saved.
-terminal-agent-mode-setup-title = Optimize Zap for this codebase?
+terminal-agent-mode-setup-title = Optimize InfiniShell for this codebase?
 terminal-agent-mode-setup-description = Unlock smarter, more consistent responses by letting the Agent understand your codebase and generate rules for it. You can also do this at any point by running /init
 terminal-agent-mode-setup-optimize = Optimize
 terminal-no-active-conversation-to-export = No active conversation to export
@@ -3606,7 +3606,7 @@ notifications-banner-dismissed-title = We won't show this banner again, but you 
 notifications-banner-disabled-title = Notifications were turned off, but you can always go to Settings to enable notifications.
 notifications-banner-enable = Enable
 notifications-banner-permissions-accepted-title = Success! You are now ready to receive desktop notifications.
-notifications-banner-permissions-denied-title = Zap was denied permissions to send you notifications.
+notifications-banner-permissions-denied-title = InfiniShell was denied permissions to send you notifications.
 notifications-banner-permissions-error-title = Something went wrong while requesting permissions.
 notifications-banner-allow-permissions-title = Don't forget to 'Allow' the permissions request to finish setting up notifications.
 notifications-banner-configure-notifications = Configure notifications
@@ -3650,7 +3650,7 @@ notebook-sync-conflict-resolution-message = This notebook could not be saved bec
 notebook-sync-feature-not-available-message = This notebook could not be saved to the server because the feature is temporarily unavailable. The changes are saved locally. Please retry later.
 notebook-link-copied-toast = Link copied
 settings-share-with-team = Save locally
-tooltip-secrets-not-sent-to-warp-server = *Secrets are not sent to Zap's server.
+tooltip-secrets-not-sent-to-warp-server = *Secrets are not sent to InfiniShell's server.
 editor-voice-limit-hit-toast = You have hit the limit for Voice requests. Your limit will be refreshed as a part of your next cycle.
 editor-voice-error-toast = An error occurred while processing your voice input.
 ai-copied-branch-name-toast = Copied branch name

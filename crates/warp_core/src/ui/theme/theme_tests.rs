@@ -187,7 +187,8 @@ fn test_deserialize_image() {
                 .join("warp.jpg")
                 .to_str()
                 .unwrap_or_default()
-                .to_owned()
+                .to_owned(),
+            content_version: None,
         }
     );
 
@@ -201,7 +202,8 @@ fn test_deserialize_image() {
     assert_eq!(
         image.source,
         AssetSource::LocalFile {
-            path: "/warp.jpg".to_owned()
+            path: "/warp.jpg".to_owned(),
+            content_version: None,
         }
     );
 
@@ -219,7 +221,8 @@ fn test_deserialize_image() {
                 .join("warp.jpg")
                 .to_str()
                 .unwrap_or_default()
-                .to_owned()
+                .to_owned(),
+            content_version: None,
         }
     );
 

@@ -1,16 +1,13 @@
-use warpui::{
-    elements::{MouseStateHandle, Text},
-    Element,
-};
+use warpui::Element;
+use warpui::elements::{MouseStateHandle, Text};
 
+use super::{
+    InlineBannerButtonState, InlineBannerCloseButton, InlineBannerContent, InlineBannerStyle,
+    InlineBannerTextButton, InlineBannerTextButtonVariant, render_inline_block_list_banner,
+};
 use crate::appearance::Appearance;
 use crate::terminal::alias::AliasedCommand;
 use crate::terminal::view::TerminalAction;
-
-use super::{
-    render_inline_block_list_banner, InlineBannerButtonState, InlineBannerCloseButton,
-    InlineBannerContent, InlineBannerStyle, InlineBannerTextButton, InlineBannerTextButtonVariant,
-};
 
 #[derive(Clone, Copy, Debug)]
 pub enum AliasExpansionBannerAction {
@@ -91,7 +88,7 @@ pub fn render_alias_expansion_banner(
         InlineBannerStyle::VeryLowPriority,
         appearance,
         InlineBannerContent {
-            title: "Zap can auto-expand aliases.".into(),
+            title: "InfiniShell can auto-expand aliases.".into(),
             buttons,
             content: Some(content),
             close_button: Some(close_button),

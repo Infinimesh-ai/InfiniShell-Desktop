@@ -1,9 +1,8 @@
 use futures_util::future::{AbortHandle, Abortable, Aborted};
 use warpui::App;
 
-use crate::terminal::model::session::ExecuteCommandOptions;
-
 use super::*;
+use crate::terminal::model::session::ExecuteCommandOptions;
 
 impl InBandCommandExecutor {
     /// Returns an `Option` containing the ID of the actively running command.
@@ -458,9 +457,11 @@ fn test_commands_are_not_cleared_if_controller_cancels_different_command() {
             executor.handle_cancelled_in_band_command_event(InBandCommandCancelledEvent {
                 command_id: a_different_id,
             });
-            assert!(executor
-                .running_command_id()
-                .is_some_and(|id| id == current_running_id));
+            assert!(
+                executor
+                    .running_command_id()
+                    .is_some_and(|id| id == current_running_id)
+            );
 
             // Resolving the command to unblock the test
             executor.handle_executed_command_event(ExecutedExecutorCommandEvent {
@@ -518,9 +519,11 @@ fn test_cancelling_command_queues_up_next_command_command() {
             executor.handle_cancelled_in_band_command_event(InBandCommandCancelledEvent {
                 command_id: current_running_id,
             });
-            assert!(executor
-                .running_command_id()
-                .is_some_and(|id| id == pending_command_id));
+            assert!(
+                executor
+                    .running_command_id()
+                    .is_some_and(|id| id == pending_command_id)
+            );
 
             // Resolving the command to unblock the test
             executor.handle_executed_command_event(ExecutedExecutorCommandEvent {

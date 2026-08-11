@@ -2,6 +2,7 @@
 //! Zap (including Agent Mode).
 //!
 //! The side panel Zap AI implementation lives in `super::ai_assistant`.
+pub(crate) mod active_agent_views_model;
 pub(crate) mod agent;
 pub(crate) mod agent_conversations_model;
 pub(crate) mod agent_events;
@@ -13,28 +14,54 @@ pub(crate) mod api_error;
 pub(crate) mod artifact_download;
 pub mod artifacts;
 pub(crate) mod attachment_utils;
+pub mod auth_secret_types;
 #[cfg(not(target_family = "wasm"))]
 pub mod aws_credentials;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) mod bedrock_credentials;
 pub(crate) mod block_context;
 pub(crate) mod blocklist;
 pub(crate) mod byop_compaction;
 pub(crate) mod byop_readiness;
+#[cfg(any(feature = "local_fs", not(target_family = "wasm")))]
+pub(crate) mod codebase_auto_indexing;
 pub mod control_code_parser;
+// Zap:`conversation_details_panel` 依赖云端会话详情面板,本次合并未引入,故不声明。
+#[cfg(feature = "local_fs")]
+pub(crate) mod conversation_export;
 pub(crate) mod conversation_navigation;
+pub(crate) mod conversation_rename;
 pub(crate) mod conversation_status_ui;
 pub(crate) mod conversation_utils;
+pub mod credit_availability;
+pub(crate) mod custom_model_router_editor;
+pub(crate) mod custom_model_routers;
 pub(crate) mod document;
+#[cfg(not(target_family = "wasm"))]
+pub mod geap_credentials;
+pub mod harness_availability;
 pub(crate) mod harness_display;
 pub(crate) mod llms;
+pub(crate) mod local_harness_setup;
 pub(crate) mod machine_memory;
+pub(crate) mod metadata_project_rules;
 pub mod onboarding;
+pub(crate) mod orchestration;
+// Zap:`persisted_workspace` 属云端 workspace 持久化,本次合并未引入,故不声明。
 pub(crate) mod predict;
+pub(crate) mod pricing_promotion;
 pub(crate) mod project_rules_persister;
+#[cfg(all(not(target_family = "wasm"), feature = "local_fs"))]
+pub(crate) mod remote_agent_context;
+pub(crate) mod remote_context_files;
 pub mod request_usage_model;
 pub(crate) mod restored_conversations;
 pub(crate) mod skills;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) mod tui_api_keys;
 pub(crate) mod voice;
 pub use agent_tips::*;
+pub use credit_availability::*;
 pub use request_usage_model::*;
 use warpui::AppContext;
 #[cfg(not(target_family = "wasm"))]
@@ -42,6 +69,9 @@ pub mod agent_sdk;
 // Zap Wave 7-3:`ambient_agent_settings` 随 ambient-agent UI 子系统物理删。
 // Zap Wave 7-2:Cloud environments 的 CLI / 表单 / 环境准备链路已删；
 // 本地对象数据类型仍暂存于此，供 ObjectStoreModel 反序列化与现有视图过滤使用。
+// Zap:上游新增的 `cloud_agent_config`/`cloud_agent_settings`/`cloud_environments`
+// 属云端 agent 链路,本次合并未引入对应文件,故不声明。
+pub mod connected_self_hosted_workers;
 pub mod execution_profiles;
 pub mod facts;
 // Zap Wave 6-8:`generate_block_title` 随 `BlockClient::generate_shared_block_title`

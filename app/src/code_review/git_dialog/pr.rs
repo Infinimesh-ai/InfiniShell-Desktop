@@ -4,26 +4,25 @@
 //! with expandable per-file stats. On confirm, spawns `create_pr` and shows
 //! a toast with a clickable "Open PR" link.
 
-use std::path::Path;
-
+use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::appearance::Appearance;
-use warpui::{
-    elements::{
-        ClippedScrollStateHandle, Container, Element, Flex, MouseStateHandle, ParentElement, Text,
-    },
-    SingletonEntity, ViewContext,
+use warp_errors::report_error;
+use warpui::elements::{
+    ClippedScrollStateHandle, Container, Element, Flex, MouseStateHandle, ParentElement, Text,
 };
+use warpui::{SingletonEntity, ViewContext};
 
-use crate::{
-    code_review::git_dialog::{
-        interactive_path_future, render_branch_section, render_file_changes_box, show_toast,
-        user_facing_git_error, GitDialog, GitDialogAction, GitDialogEvent, GitDialogMode,
-    },
-    ui_components::icons::Icon,
-    util::git::{create_pr, get_branch_diff_entries, FileChangeEntry, PrInfo},
-    view_components::{DismissibleToast, ToastLink},
-    workspace::ToastStack,
+use crate::code_review::git_dialog::{
+    GitDialog, GitDialogAction, GitDialogEvent, GitDialogMode, render_branch_section,
+    render_file_changes_box, should_send_git_ops_ai_request, show_toast, user_facing_git_error,
 };
+use crate::code_review::telemetry_event::{
+    CodeReviewTelemetryEvent, GitDialogStatus, GitOperationKind,
+};
+use crate::ui_components::icons::Icon;
+use crate::util::git::{FileChangeEntry, PrInfo};
+use crate::view_components::{DismissibleToast, ToastLink};
+use crate::workspace::ToastStack;
 
 /// PR-mode sub-actions, dispatched wrapped in `GitDialogAction::Pr`.
 #[derive(Clone, Debug, PartialEq)]
@@ -57,29 +56,7 @@ pub(super) fn is_ready_to_confirm(_state: &PrState) -> bool {
     true
 }
 
-pub(super) fn new_state(
-    repo_path: &Path,
-    base_branch_name: Option<String>,
-    ctx: &mut ViewContext<GitDialog>,
-) -> PrState {
-    let diff_repo_path = repo_path.to_path_buf();
-    ctx.spawn(
-        async move { get_branch_diff_entries(&diff_repo_path).await },
-        |me, result, ctx| {
-            if let GitDialogMode::CreatePr(state) = &mut me.mode {
-                match result {
-                    Ok(entries) => {
-                        state.file_changes = entries;
-                        ctx.notify();
-                    }
-                    Err(err) => {
-                        log::error!("Failed to load branch diff entries: {err}");
-                    }
-                }
-            }
-        },
-    );
-
+pub(super) fn new_state(base_branch_name: Option<String>) -> PrState {
     PrState {
         base_branch_name: base_branch_name.map(|name| {
             let name = name.trim();
@@ -90,6 +67,37 @@ pub(super) fn new_state(
         summary_mouse_state: MouseStateHandle::default(),
         changes_scroll_state: ClippedScrollStateHandle::default(),
     }
+}
+
+/// Kicks off an on-demand fetch of the committed branch diff
+/// (`merge_base(HEAD, main)..HEAD`) for the create-PR Changes box. The result
+/// arrives via `DiffStateModelEvent::BranchCommittedFilesReceived` and is
+/// applied by [`apply_committed_file_changes`]. Unlike the working-tree-based
+/// `against_base_branch` metadata, this is committed-only, so the box previews
+/// exactly what `gh pr create` will include — not uncommitted or untracked
+/// changes. Called on dialog open; local computes it off-thread, remote fetches
+/// it via RPC.
+pub(super) fn fetch_committed_file_changes(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>) {
+    me.diff_state_model().update(ctx, |model, ctx| {
+        model.fetch_committed_branch_files(ctx);
+    });
+}
+
+/// Applies the committed branch files delivered via
+/// `DiffStateModelEvent::BranchCommittedFilesReceived` to the create-PR
+/// Changes box. No-op when the dialog isn't in create-PR mode.
+pub(super) fn apply_committed_file_changes(
+    me: &mut GitDialog,
+    files: Vec<FileChangeEntry>,
+    ctx: &mut ViewContext<GitDialog>,
+) {
+    {
+        let GitDialogMode::CreatePr(state) = me.mode_mut() else {
+            return;
+        };
+        state.file_changes = files;
+    }
+    ctx.notify();
 }
 
 pub(super) fn handle_sub_action(
@@ -111,30 +119,46 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
     let GitDialogMode::CreatePr(_) = me.mode() else {
         return;
     };
-    let repo_path = me.repo_path().clone();
+    let branch_name = me.branch_name().to_string();
+    // AI-generate the PR title/body when the user has it enabled; falls back to
+    // `gh pr create --fill`.
+    let autogenerate_content = should_send_git_ops_ai_request(ctx);
 
     me.set_loading(loading_label_for(), ctx);
 
-    let path_future = interactive_path_future(ctx);
+    me.diff_state_model().update(ctx, |m, ctx| {
+        m.create_pr(branch_name, autogenerate_content, ctx);
+    });
+}
 
-    ctx.spawn(
-        async move {
-            let path_env = path_future.await;
-            create_pr(&repo_path, None, None, path_env.as_deref()).await
+/// Shared create-PR completion: toast (with Open PR link) + telemetry +
+/// close.
+pub(super) fn finish_create_pr(
+    me: &GitDialog,
+    result: anyhow::Result<PrInfo>,
+    ctx: &mut ViewContext<GitDialog>,
+) {
+    let (status, error) = match &result {
+        Ok(_) => (GitDialogStatus::Succeeded, None),
+        Err(err) => (GitDialogStatus::Failed, Some(err.to_string())),
+    };
+    match &result {
+        Ok(pr_info) => show_pr_created_toast(pr_info, ctx),
+        Err(err) => {
+            report_error!(err);
+            show_toast(user_facing_git_error(&err.to_string()), ctx);
+        }
+    }
+    send_telemetry_from_ctx!(
+        CodeReviewTelemetryEvent::GitDialogCompleted {
+            is_local: Some(!me.repo_location().is_remote()),
+            operation: GitOperationKind::CreatePr,
+            status,
+            error,
         },
-        move |_me, result, ctx| {
-            match result {
-                Ok(pr_info) => {
-                    show_pr_created_toast(&pr_info, ctx);
-                }
-                Err(err) => {
-                    log::error!("Failed to create PR: {err}");
-                    show_toast(user_facing_git_error(&err.to_string()), ctx);
-                }
-            }
-            ctx.emit(GitDialogEvent::Completed);
-        },
+        ctx
     );
+    ctx.emit(GitDialogEvent::Completed);
 }
 
 /// Shows a toast announcing PR creation with a clickable "Open PR" link.

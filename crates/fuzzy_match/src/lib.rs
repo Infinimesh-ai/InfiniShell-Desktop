@@ -52,8 +52,8 @@
 //! - `*` - Matches zero or more characters
 //! - `?` - Matches exactly one character
 
-use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct FuzzyMatchResult {
@@ -668,5 +668,5 @@ pub fn match_wildcard_pattern_case_insensitive(
 }
 
 #[cfg(test)]
-#[path = "fuzzy_test.rs"]
+#[path = "fuzzy_tests.rs"]
 mod tests;

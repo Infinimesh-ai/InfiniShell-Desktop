@@ -99,6 +99,14 @@ fn dispatch_command(
             }
             provider::run(ctx, global_options, provider_cmd)
         }
+        // Zap:`memory-store` / `memory` / `api-key` / `runner` 四个子命令的实现
+        // (`memory_store.rs`、`api_key.rs`、`runner.rs`)整体依赖已物理删除的
+        // `crate::server::server_api` 与 `warp_graphql`,因此模块未挂载到 mod 树上。
+        // 这里按 clap 未知子命令的口径直接报错,而不是给出半可用的入口。
+        CliCommand::MemoryStore(_) => Err(anyhow::anyhow!("invalid value 'memory-store'")),
+        CliCommand::Memory(_) => Err(anyhow::anyhow!("invalid value 'memory'")),
+        CliCommand::ApiKey(_) => Err(anyhow::anyhow!("invalid value 'api-key'")),
+        CliCommand::Runner(_) => Err(anyhow::anyhow!("invalid value 'runner'")),
     }
 }
 
@@ -178,7 +186,7 @@ fn run_agent(
         }
         AgentCommand::Profile(sub) => profiles::run(ctx, global_options, sub),
         AgentCommand::List(_) => Err(anyhow::anyhow!(
-            "Agent skill listing is disabled in Zap"
+            "Agent skill listing is disabled in InfiniShell"
         )),
     }
 }
@@ -209,12 +217,19 @@ fn build_merged_config_and_task(
 
     let harness_override = (args.harness != Harness::Oz).then_some(HarnessConfig {
         harness_type: args.harness,
+        // 上游新增字段:仅用于云端任务快照(服务端据此为 harness 选模型)。
+        // Zap 的本地 run 走 `Task.harness` + `model_override`,这里留空。
+        model_id: None,
+        reasoning_level: None,
     });
 
     let mut merged_config = AgentConfigSnapshot {
         // CLI name > skill name > file name
         name: args.name.clone().or(skill_name).or(file_merged.name),
         environment_id: None,
+        // 上游新增字段:`runner_id` 指向云端 JsonRunner GSO,
+        // `additional_source_repos` 由服务端按 webhook 来源仓库填充 —— 本地都不适用。
+        runner_id: None,
         model_id: args.model.model.clone().or(file_merged.model_id),
         // Skill base_prompt takes precedence over file base_prompt
         base_prompt: runtime_base_prompt.clone().or(file_merged.base_prompt),
@@ -228,6 +243,7 @@ fn build_merged_config_and_task(
             .or(file_merged.computer_use_enabled),
         harness: harness_override,
         harness_auth_secrets: None,
+        additional_source_repos: None,
     };
 
     let runtime_mcp_specs = match merged_config.mcp_servers.as_ref() {
@@ -310,8 +326,15 @@ impl AgentDriverRunner {
 
         // Wait for Zap Drive to sync before building the task config, since
         // prompt resolution (SavedPrompt -> workflow lookup) depends on it.
+        // edition 2024:`common::refresh_warp_drive` 的 RPIT 定义处没写 `+ use<>`,
+        // 会隐式捕获 `&AppContext` 的生命周期,于是闭包返回类型带上了生命周期参数,
+        // 无法满足 `ModelSpawner::spawn` 要求的 `R: 'static`。这里 box 成 trait object
+        // 把生命周期参数抹掉(hidden type 本身就是 'static 的)。
         if foreground
-            .spawn(|_, ctx| common::refresh_warp_drive(ctx))
+            .spawn(|_, ctx| {
+                Box::pin(common::refresh_warp_drive(ctx))
+                    as Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>>
+            })
             .await?
             .await
             .is_err()
@@ -322,6 +345,7 @@ impl AgentDriverRunner {
         let result: Result<(), AgentDriverError> = async {
             // Pull relevant variables out of args before moving it into the closure.
             let bedrock_inference_role = args.bedrock_inference_role.clone();
+            let bedrock_role_region = args.bedrock_role_region.clone();
 
             let (driver_options, task) =
                 Self::build_driver_options_and_task(&foreground, args).await?;
@@ -330,6 +354,16 @@ impl AgentDriverRunner {
 
             #[cfg(not(target_family = "wasm"))]
             if let Some(role_arn) = bedrock_inference_role {
+                // clap's `requires` constraint enforces this at parse time, so a missing
+                // region here means a caller is constructing `RunAgentArgs` directly
+                // without the flag. Fail loudly so callers don't silently fall back to a
+                // hard-coded STS region.
+                let role_region = bedrock_role_region.ok_or_else(|| {
+                    AgentDriverError::AwsBedrockCredentialsFailed(
+                        "--bedrock-role-region is required when --bedrock-inference-role is set"
+                            .to_string(),
+                    )
+                })?;
                 // Set the OIDC strategy on the UI thread and kick off the refresh; the
                 // returned future resolves when credentials are committed to the model.
                 let refresh_future = foreground
@@ -340,6 +374,7 @@ impl AgentDriverRunner {
                                 AwsCredentialsRefreshStrategy::OidcManaged {
                                     task_id: bedrock_task_id,
                                     role_arn,
+                                    region: role_region,
                                 },
                             );
                             refresh_aws_credentials(manager, ctx)
@@ -558,6 +593,12 @@ fn command_requires_auth(command: &CliCommand) -> bool {
         },
         CliCommand::Whoami => true,
         CliCommand::Provider(_) => true,
+        // 这四个子命令在 `dispatch_command` 里直接报错(实现依赖已删的云端模块),
+        // 不需要先做鉴权。
+        CliCommand::MemoryStore(_)
+        | CliCommand::Memory(_)
+        | CliCommand::ApiKey(_)
+        | CliCommand::Runner(_) => false,
     }
 }
 
@@ -579,7 +620,7 @@ fn launch_command(
     let auth_state = AuthStateProvider::handle(ctx).as_ref(ctx).get();
     if !auth_state.is_logged_in() {
         return Err(anyhow::anyhow!(
-            "No local user is available. Restart Zap and try again."
+            "No local user is available. Restart InfiniShell and try again."
         ));
     }
 
@@ -606,7 +647,7 @@ fn report_fatal_error(err: anyhow::Error, ctx: &mut AppContext) {
         if let Ok(path) = log_file_path() {
             let _ = write!(
                 message,
-                "\n\nFor more information, check Zap logs at {}",
+                "\n\nFor more information, check InfiniShell logs at {}",
                 path.display()
             );
         }

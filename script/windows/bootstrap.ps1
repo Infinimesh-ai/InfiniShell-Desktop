@@ -1,6 +1,155 @@
 #!/usr/bin/env powershell
+param(
+    [switch]$Help,
+    [switch]$InstallCommonSkills,
+    [string]$CommonSkillsTarget = $env:WARP_COMMON_SKILLS_INSTALL_TARGET
+)
 
 $ErrorActionPreference = 'Stop'
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+
+function Show-Usage {
+    Write-Output 'Usage: .\script\windows\bootstrap.ps1 [-Help] [-InstallCommonSkills] [-CommonSkillsTarget <project|global>]'
+    Write-Output ''
+    Write-Output 'Prepare this checkout for Warp development on Windows.'
+    Write-Output ''
+    Write-Output 'Options:'
+    Write-Output '  -Help                 Show this help message.'
+    Write-Output '  -InstallCommonSkills  Install or update common agent skills from skills-lock.json.'
+    Write-Output '  -CommonSkillsTarget   Install into project .agents/skills or global ~/.agents/skills.'
+    Write-Output ''
+    Write-Output 'Environment:'
+    Write-Output '  WARP_SKIP_COMMON_SKILLS_INSTALL=1'
+    Write-Output '      Skip installing common agent skills.'
+    Write-Output '  WARP_COMMON_SKILLS_INSTALL_TARGET=project|global'
+    Write-Output '      Choose the install target when -CommonSkillsTarget is omitted.'
+    Write-Output '      Target prompting and duplicate checks are delegated to warpdotdev/common-skills/scripts/install_common_skills.'
+    Write-Output '  WARP_COMMON_SKILLS_SCRIPTS_DIR=/path/to/common-skills/scripts'
+    Write-Output '      Override where common-skills management scripts are loaded from.'
+    Write-Output '  WARP_COMMON_SKILLS_REF=<git-ref>'
+    Write-Output '      Override the remote warpdotdev/common-skills ref used when fetching scripts.'
+}
+
+function ConvertTo-CommonSkillsTarget {
+    param([string]$Target)
+
+    switch ($Target.ToLowerInvariant()) {
+        { $_ -eq '' -or $_ -eq 'p' -or $_ -eq 'project' -or $_ -eq '1' } { return 'project' }
+        { $_ -eq 'g' -or $_ -eq 'global' -or $_ -eq '2' } { return 'global' }
+        default { throw "Invalid common skills install target: $Target" }
+    }
+}
+
+
+function Show-BootstrapPreview {
+    Write-Output 'Warp bootstrap is starting for Windows.'
+    Write-Output 'It will:'
+    Write-Output '  - Check for Git for Windows.'
+    Write-Output '  - Install Rust if cargo is unavailable.'
+    Write-Output '  - Install Visual Studio Build Tools, jq, CMake, Protobuf, LLVM, InnoSetup, and gcloud as needed.'
+    Write-Output '  - Install Cargo test dependencies.'
+
+    if (-not $InstallCommonSkills) {
+        Write-Output '  - Skip common agent skills unless -InstallCommonSkills is provided.'
+    } elseif ($env:WARP_SKIP_COMMON_SKILLS_INSTALL -eq '1') {
+        Write-Output '  - Skip common agent skills because WARP_SKIP_COMMON_SKILLS_INSTALL=1.'
+    } elseif ($script:ResolvedCommonSkillsTarget -eq 'global') {
+        Write-Output '  - Install or update common agent skills in ~/.agents/skills if needed.'
+    } elseif ($script:ResolvedCommonSkillsTarget -eq 'project') {
+        Write-Output '  - Install or update common agent skills in this checkout''s .agents/skills if needed.'
+    } else {
+        Write-Output '  - Prompt for where common agent skills should be installed before installing or updating them.'
+    }
+
+    Write-Output 'Run .\script\windows\bootstrap.ps1 -Help to see options and environment overrides.'
+    Write-Output ''
+}
+
+function Add-DirectoryToPathIfPresent {
+    param([string]$Path)
+
+    if (-not $Path -or -not (Test-Path -Path $Path -PathType Container)) {
+        return
+    }
+
+    $pathEntries = $env:PATH -split ';'
+    if ($pathEntries -notcontains $Path) {
+        $env:PATH = "$Path;$env:PATH"
+    }
+}
+
+function Add-WinGetPackageCommandToPath {
+    param(
+        [string]$CommandName,
+        [string]$PackageId
+    )
+
+    if (Get-Command -Name $CommandName -Type Application -ErrorAction SilentlyContinue) {
+        return
+    }
+
+    $winGetPackagesDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages'
+    if (-not (Test-Path -Path $winGetPackagesDir -PathType Container)) {
+        return
+    }
+
+    $escapedPackageId = [WildcardPattern]::Escape($PackageId)
+    $packageDirs = Get-ChildItem -Path $winGetPackagesDir -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "$escapedPackageId*" }
+
+    foreach ($packageDir in $packageDirs) {
+        $command = Get-ChildItem -Path $packageDir.FullName -Filter "$CommandName.exe" -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($command) {
+            Add-DirectoryToPathIfPresent $command.DirectoryName
+            return
+        }
+    }
+}
+
+function Use-LibclangIfInstalled {
+    $candidateDirs = @(
+        "$env:ProgramFiles\LLVM\bin",
+        "${env:ProgramFiles(x86)}\LLVM\bin"
+    )
+
+    foreach ($dir in $candidateDirs) {
+        if (Test-Path -Path (Join-Path $dir 'libclang.dll') -PathType Leaf) {
+            Add-DirectoryToPathIfPresent $dir
+            $env:LIBCLANG_PATH = $dir
+            return
+        }
+    }
+
+    $winGetPackagesDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages'
+    if (-not (Test-Path -Path $winGetPackagesDir -PathType Container)) {
+        return
+    }
+
+    $packageDirs = Get-ChildItem -Path $winGetPackagesDir -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like 'LLVM.LLVM*' }
+
+    foreach ($packageDir in $packageDirs) {
+        $libclang = Get-ChildItem -Path $packageDir.FullName -Filter 'libclang.dll' -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($libclang) {
+            Add-DirectoryToPathIfPresent $libclang.DirectoryName
+            $env:LIBCLANG_PATH = $libclang.DirectoryName
+            return
+        }
+    }
+}
+
+if ($Help) {
+    Show-Usage
+    exit 0
+}
+$script:ResolvedCommonSkillsTarget = ''
+if ($InstallCommonSkills -and $CommonSkillsTarget) {
+    $script:ResolvedCommonSkillsTarget = ConvertTo-CommonSkillsTarget $CommonSkillsTarget
+}
+
+Show-BootstrapPreview
 
 # Git for Windows can be installed system-wide (Program Files) or per-user (LOCALAPPDATA\Programs\Git).
 $gitBinCandidates = @(
@@ -12,6 +161,42 @@ if (-not $gitBinDir) {
     Write-Error 'Git for Windows is required. Please install it at:'
     Write-Error 'https://gitforwindows.org/'
     exit 1
+}
+Add-DirectoryToPathIfPresent $gitBinDir
+
+# Some Rust build scripts depend on Unix patch.exe, which ships with Git for Windows.
+$gitUsrBinDir = Join-Path (Split-Path -Parent $gitBinDir) 'usr\bin'
+Add-DirectoryToPathIfPresent $gitUsrBinDir
+
+function Resolve-CommonSkillsScript {
+    param([string]$ScriptName)
+
+    if ($env:WARP_COMMON_SKILLS_SCRIPTS_DIR) {
+        $scriptPath = Join-Path $env:WARP_COMMON_SKILLS_SCRIPTS_DIR $ScriptName
+        if (Test-Path -PathType Leaf $scriptPath) { return $scriptPath }
+        throw "Could not find $ScriptName in WARP_COMMON_SKILLS_SCRIPTS_DIR=$env:WARP_COMMON_SKILLS_SCRIPTS_DIR."
+    }
+
+    $commonSkillsRef = if ($env:WARP_COMMON_SKILLS_REF) { $env:WARP_COMMON_SKILLS_REF } else { 'main' }
+    $rawBaseUrl = if ($env:WARP_COMMON_SKILLS_RAW_BASE_URL) {
+        $env:WARP_COMMON_SKILLS_RAW_BASE_URL.TrimEnd('/')
+    } else {
+        "https://raw.githubusercontent.com/warpdotdev/common-skills/$commonSkillsRef/scripts"
+    }
+    $rawUrl = "$rawBaseUrl/$ScriptName"
+    $scriptPath = Join-Path $env:TEMP "warp-$ScriptName"
+
+    Invoke-WebRequest -Uri $rawUrl -OutFile $scriptPath
+    return $scriptPath
+}
+
+function Install-CommonSkill {
+    $installScript = Resolve-CommonSkillsScript 'install_common_skills'
+    if ($script:ResolvedCommonSkillsTarget) {
+        & "$gitBinDir\bash.exe" "$installScript" --repo-root "$RepoRoot" "--$script:ResolvedCommonSkillsTarget" --if-needed
+    } else {
+        & "$gitBinDir\bash.exe" "$installScript" --repo-root "$RepoRoot" --if-needed --prompt-for-target
+    }
 }
 
 if (-not (Get-Command -Name cargo -Type Application -ErrorAction SilentlyContinue)) {
@@ -70,6 +255,10 @@ if (-not (Test-Path $protocExe)) {
 # prost-build 优先读取 PROTOC 环境变量(见构建错误提示),指向固定版本二进制最稳妥。
 [Environment]::SetEnvironmentVariable('PROTOC', $protocExe, 'User')
 
+# LLVM provides libclang.dll, which is required by bindgen-based build scripts.
+winget install -e --id LLVM.LLVM
+Use-LibclangIfInstalled
+
 # We use InnoSetup to build our release bundle installer.
 winget install -e --id JRSoftware.InnoSetup
 
@@ -84,9 +273,15 @@ if (-not (Get-Command -Name gcloud -Type Application -ErrorAction SilentlyContin
     Start-Process "$env:Temp\GoogleCloudSDKInstaller.exe" -Wait
 }
 
-[string]$identityToken = gcloud auth print-identity-token
-if ($identityToken.Trim().Length -eq 0) {
-    Write-Output 'gcloud CLI authentication missing.  Press enter to continue...'
-    Read-Host
-    gcloud auth login
+if ($env:WARP_SKIP_GCLOUD_AUTH -ne '1') {
+    [string]$identityToken = gcloud auth print-identity-token
+    if ($identityToken.Trim().Length -eq 0) {
+        Write-Output 'gcloud CLI authentication missing.  Press enter to continue...'
+        Read-Host
+        gcloud auth login
+    }
+}
+
+if ($InstallCommonSkills) {
+    Install-CommonSkill
 }

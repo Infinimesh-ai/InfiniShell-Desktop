@@ -241,7 +241,7 @@ impl ModelSelector {
         let query = self.search_query.trim().to_lowercase();
 
         let mut items: Vec<MenuItem<ModelSelectorAction>> = llm_preferences
-            .get_base_llm_choices_for_agent_mode()
+            .get_base_llm_choices_for_agent_mode(ctx)
             .filter_map(|llm| {
                 let display_name = llm.menu_display_name();
                 if !query.is_empty() && !display_name.to_lowercase().contains(&query) {

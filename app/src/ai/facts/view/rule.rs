@@ -1,3 +1,27 @@
+use std::fmt::Debug;
+use std::path::PathBuf;
+
+use ai::project_context::model::{ProjectContextModel, ProjectContextModelEvent};
+use markdown_parser::weight::CustomWeight;
+use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
+use warp_core::ui::appearance::{Appearance, AppearanceEvent};
+use warp_core::ui::theme::color::internal_colors;
+use warp_util::local_or_remote_path::LocalOrRemotePath;
+use warpui::elements::{
+    Align, Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+    Expanded, Flex, FormattedTextElement, HighlightedHyperlink, Hoverable, MainAxisAlignment,
+    MainAxisSize, MouseStateHandle, ParentElement, Shrinkable,
+};
+use warpui::platform::{Cursor, FilePickerConfiguration};
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::{UiComponent, UiComponentStyles};
+use warpui::{
+    AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
+    ViewHandle,
+};
+
+use super::style;
+use crate::ai::facts::{AIFact, AIFactObject, AIFactObjectModel, AIMemory};
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
 use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
 use crate::cloud_object::update_manager::UpdateManager;
@@ -13,39 +37,11 @@ use crate::search_bar::SearchBar;
 use crate::server::ids::{ClientId, SyncId};
 use crate::settings::{AISettings, AISettingsChangedEvent};
 use crate::ui_components::icons::Icon;
-use crate::view_components::{
-    action_button::{ActionButton, NakedTheme},
-    DismissibleToast,
-};
+use crate::util::path::display_path_with_host;
+use crate::view_components::DismissibleToast;
+use crate::view_components::action_button::{ActionButton, NakedTheme};
 use crate::workspace::ToastStack;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use ai::project_context::model::{ProjectContextModel, ProjectContextModelEvent};
-use markdown_parser::{
-    weight::CustomWeight, FormattedText, FormattedTextFragment, FormattedTextLine,
-};
-use std::fmt::Debug;
-use std::path::PathBuf;
-use warp_core::ui::{
-    appearance::{Appearance, AppearanceEvent},
-    theme::color::internal_colors,
-};
-use warpui::elements::Shrinkable;
-use warpui::platform::FilePickerConfiguration;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::{
-    elements::{
-        Align, Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-        Expanded, Flex, FormattedTextElement, HighlightedHyperlink, Hoverable, MainAxisAlignment,
-        MainAxisSize, MouseStateHandle, ParentElement,
-    },
-    platform::Cursor,
-    ui_components::components::{UiComponent, UiComponentStyles},
-    AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
-    ViewHandle,
-};
-
-use super::style;
-use crate::ai::facts::{AIFact, AIFactObject, AIFactObjectModel, AIMemory};
 
 // 顶部标题保留英文 "Rules"(用户偏好,不译为知识库)。
 pub const HEADER_TEXT: &str = "Rules";
@@ -61,7 +57,7 @@ pub enum RuleViewEvent {
     AddRule,
     Edit(SyncId),
     OpenSettings,
-    OpenFile(PathBuf),
+    OpenFile(LocalOrRemotePath),
     InitializeProject(PathBuf),
 }
 
@@ -72,7 +68,7 @@ pub enum RuleViewAction {
     Edit(SyncId),
     OpenSettings,
     SelectScope(RuleScope),
-    OpenFile(PathBuf),
+    OpenFile(LocalOrRemotePath),
 }
 
 #[derive(Default, Debug, Clone)]
@@ -86,36 +82,40 @@ struct GlobalRuleRow {
     mouse_states: MouseStateHandles,
 }
 
+/// A rule row backed by a file on disk — used for both project-scoped rules
+/// (e.g. `<repo>/WARP.md`) and file-based global rules (e.g.
+/// `~/.agents/AGENTS.md`). The render path is identical for both: a path label
+/// plus an "Open file" button.
 #[derive(Debug, Clone)]
-struct ProjectScopedRow {
-    file_path: PathBuf,
+struct FileBackedRow {
+    file_path: LocalOrRemotePath,
     mouse_state: MouseStateHandle,
 }
 
 #[derive(Debug, Clone)]
 enum RuleRow {
     Global(Box<GlobalRuleRow>),
-    ProjectScoped(ProjectScopedRow),
+    FileBacked(FileBackedRow),
 }
 
 impl RuleRow {
     fn matches_search_term(&self, search_term: &str) -> bool {
+        let search_term = search_term.to_lowercase();
+        let search_term = search_term.as_str();
         match self {
             RuleRow::Global(row) => {
                 let AIFact::Memory(AIMemory { name, content, .. }) =
                     row.fact.model().string_model.clone();
                 name.unwrap_or_default()
                     .to_lowercase()
-                    .contains(search_term.to_lowercase().as_str())
-                    || content
-                        .to_lowercase()
-                        .contains(search_term.to_lowercase().as_str())
+                    .contains(search_term)
+                    || content.to_lowercase().contains(search_term)
             }
-            RuleRow::ProjectScoped(row) => row
+            RuleRow::FileBacked(row) => row
                 .file_path
-                .to_str()
-                .map(|s| s.to_lowercase().contains(search_term))
-                .unwrap_or(false),
+                .display_path()
+                .to_lowercase()
+                .contains(search_term),
         }
     }
 
@@ -124,7 +124,9 @@ impl RuleRow {
             (RuleRow::Global(a), RuleRow::Global(b)) => {
                 b.fact.metadata().revision.cmp(&a.fact.metadata().revision)
             }
-            (RuleRow::ProjectScoped(a), RuleRow::ProjectScoped(b)) => a.file_path.cmp(&b.file_path),
+            (RuleRow::FileBacked(a), RuleRow::FileBacked(b)) => {
+                a.file_path.display_path().cmp(&b.file_path.display_path())
+            }
             _ => std::cmp::Ordering::Equal,
         }
     }
@@ -132,8 +134,12 @@ impl RuleRow {
 
 pub struct RuleView {
     owner: Option<Owner>,
-    global_rules: Vec<GlobalRuleRow>,
-    project_rules: Vec<ProjectScopedRow>,
+    cloud_global_rules: Vec<GlobalRuleRow>,
+    /// File-based global rules (e.g. `~/.agents/AGENTS.md`). Surfaced in the
+    /// Global tab alongside cloud rules. Sourced from
+    /// `ProjectContextModel::global_rule_paths()`.
+    file_backed_global_rules: Vec<FileBackedRow>,
+    project_rules: Vec<FileBackedRow>,
     search_editor: ViewHandle<EditorView>,
     search_bar: ViewHandle<SearchBar>,
     add_button: ViewHandle<ActionButton>,
@@ -187,26 +193,52 @@ impl RuleView {
         let project_rules = project_context
             .as_ref(ctx)
             .indexed_rules()
-            .map(|p| ProjectScopedRow {
+            .map(|p| FileBackedRow {
+                file_path: p,
+                mouse_state: Default::default(),
+            })
+            .collect();
+        let file_backed_global_rules = project_context
+            .as_ref(ctx)
+            .global_rule_paths()
+            .map(|p| FileBackedRow {
                 file_path: p,
                 mouse_state: Default::default(),
             })
             .collect();
 
-        ctx.subscribe_to_model(&project_context, |me, context_model, event, ctx| {
-            if matches!(event, ProjectContextModelEvent::PathIndexed) {
-                me.project_rules = context_model
-                    .as_ref(ctx)
-                    .indexed_rules()
-                    .map(|p| ProjectScopedRow {
-                        file_path: p,
-                        mouse_state: Default::default(),
-                    })
-                    .collect();
-
-                ctx.notify();
-            }
-        });
+        ctx.subscribe_to_model(
+            &project_context,
+            |me, context_model, event, ctx| match event {
+                // Upon indexing a new path, update project rules.
+                ProjectContextModelEvent::PathIndexed => {
+                    me.project_rules = context_model
+                        .as_ref(ctx)
+                        .indexed_rules()
+                        .map(|p| FileBackedRow {
+                            file_path: p,
+                            mouse_state: Default::default(),
+                        })
+                        .collect();
+                    ctx.notify();
+                }
+                // On detecting a change to global rule files, update file-backed global rules.
+                ProjectContextModelEvent::GlobalRulesChanged(_) => {
+                    me.file_backed_global_rules = context_model
+                        .as_ref(ctx)
+                        .global_rule_paths()
+                        .map(|p| FileBackedRow {
+                            file_path: p,
+                            mouse_state: Default::default(),
+                        })
+                        .collect();
+                    ctx.notify();
+                }
+                // No action needed for other ProjectContextModelEvent variants.
+                // PathIndexed is emitted last and indicates it's time to refresh the UI.
+                ProjectContextModelEvent::KnownRulesChanged(_) => {}
+            },
+        );
 
         let appearance = Appearance::handle(ctx);
         ctx.subscribe_to_model(&appearance, move |me, _, event, ctx| {
@@ -253,7 +285,8 @@ impl RuleView {
 
         Self {
             owner,
-            global_rules: ai_rules,
+            cloud_global_rules: ai_rules,
+            file_backed_global_rules,
             project_rules,
             search_editor,
             search_bar,
@@ -292,7 +325,7 @@ impl RuleView {
                 .cloned()
                 .collect()
         };
-        self.global_rules = ai_rules
+        self.cloud_global_rules = ai_rules
             .into_iter()
             .map(|ai_fact| GlobalRuleRow {
                 fact: ai_fact,
@@ -310,16 +343,22 @@ impl RuleView {
     fn get_filtered_rules(&self) -> Vec<RuleRow> {
         match self.current_scope {
             RuleScope::Global => self
-                .global_rules
+                .cloud_global_rules
                 .iter()
                 .cloned()
                 .map(|rule| RuleRow::Global(Box::new(rule)))
+                .chain(
+                    self.file_backed_global_rules
+                        .iter()
+                        .cloned()
+                        .map(RuleRow::FileBacked),
+                )
                 .collect(),
             RuleScope::ProjectBased => self
                 .project_rules
                 .iter()
                 .cloned()
-                .map(RuleRow::ProjectScoped)
+                .map(RuleRow::FileBacked)
                 .collect(),
         }
     }
@@ -607,12 +646,13 @@ impl RuleView {
     // Zap(本地化,Phase 2d-1):原 `render_sync_status_icon` 依赖 `SyncQueue::is_dequeueing()`
     // 与 `is_syncing` 谓词,本地化后永不会出现 "同步中" 状态,整体移除。
 
-    fn render_project_based_row(
+    fn render_file_backed_row(
         &self,
-        project_row: ProjectScopedRow,
+        project_row: FileBackedRow,
         appearance: &Appearance,
+        app: &AppContext,
     ) -> Option<Box<dyn Element>> {
-        let row_name = project_row.file_path.to_str().map(|s| s.to_string())?;
+        let row_name = display_path_with_host(&project_row.file_path, false, app);
         let mut row = Flex::row()
             .with_main_axis_size(MainAxisSize::Max)
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
@@ -767,8 +807,8 @@ impl RuleView {
                 RuleRow::Global(global_row) => {
                     Some(self.render_global_rule_row(*global_row, appearance, app))
                 }
-                RuleRow::ProjectScoped(project_row) => {
-                    self.render_project_based_row(project_row, appearance)
+                RuleRow::FileBacked(file_row) => {
+                    self.render_file_backed_row(file_row, appearance, app)
                 }
             };
 
@@ -785,6 +825,13 @@ impl RuleView {
             RuleScope::ProjectBased => crate::t!("rules-zero-state-project"),
         };
 
+        let centered_text = appearance
+            .ui_builder()
+            .wrappable_text(text, true)
+            .with_style(style::description_text(appearance))
+            .build()
+            .finish();
+
         Container::new(
             ConstrainedBox::new(
                 Align::new(
@@ -793,11 +840,8 @@ impl RuleView {
                         .with_main_axis_alignment(MainAxisAlignment::Center)
                         .with_cross_axis_alignment(CrossAxisAlignment::Center)
                         .with_child(
-                            appearance
-                                .ui_builder()
-                                .wrappable_text(text, true)
-                                .with_style(style::description_text(appearance))
-                                .build()
+                            Container::new(Align::new(centered_text).top_center().finish())
+                                .with_horizontal_padding(style::ROW_HORIZONTAL_PADDING)
                                 .finish(),
                         )
                         .with_child(self.render_add_button())
@@ -808,6 +852,7 @@ impl RuleView {
             .with_height(style::ZERO_STATE_HEIGHT)
             .finish(),
         )
+        .with_horizontal_padding(style::ROW_HORIZONTAL_PADDING)
         .with_border(
             Border::all(1.).with_border_color(internal_colors::neutral_2(appearance.theme())),
         )

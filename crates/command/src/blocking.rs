@@ -8,6 +8,10 @@ use std::path::Path;
 use std::process::{Child, CommandArgs, CommandEnvs, ExitStatus, Output, Stdio};
 
 #[cfg(windows)]
+use anyhow::Context as _;
+#[cfg(windows)]
+use warp_errors::report_error;
+#[cfg(windows)]
 use {super::windows::JobObject, std::os::windows::io::AsRawHandle};
 
 /// Wrapper around a [`std::process::Command`] that ensures any new Command is set with the windows
@@ -66,6 +70,7 @@ impl Command {
     ///     .expect("sh command failed to start");
     /// ```
     pub fn new<S: AsRef<OsStr>>(program: S) -> Command {
+        let program = crate::wsl::translate_program_for_spawn(program.as_ref());
         #[cfg_attr(not(windows), expect(unused_mut))]
         let mut inner = std::process::Command::new(program);
 
@@ -509,12 +514,12 @@ impl Command {
             && let Ok(child) = child.as_ref()
         {
             let proc_handle = child.as_raw_handle() as isize;
-            if let Err(e) = JobObject::new().assign_process(proc_handle).create() {
-                log::error!(
-                    "Failed to create job object for command {:?}: {:#}",
-                    self.inner.get_program(),
-                    e
-                );
+            if let Err(e) = JobObject::new()
+                .assign_process(proc_handle)
+                .create()
+                .context("Failed to create job object for command")
+            {
+                report_error!(e, extra: { "program" => ?self.inner.get_program() });
             }
         }
 

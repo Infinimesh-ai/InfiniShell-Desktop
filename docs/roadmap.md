@@ -1,10 +1,10 @@
 # Roadmap
 
-Zap's agent stack will be built as a standalone open-source service, independent of the Warp client. The terminal becomes one client among many — a TUI, an IDE plugin or a cloud worker can all drive the same engine.
+InfiniShell's agent stack will be built as a standalone open-source service, independent of the Warp client. The terminal becomes one client among many — a TUI, an IDE plugin or a cloud worker can all drive the same engine.
 
 ## Phase 1 — Build the agent harness core
 
-- Design and build a standalone open-source agent service from scratch — agent loop, tool runtime, conversation/session state, prompt templating, provider routing — not tied to Warp's existing client code. Zap becomes its first consumer.
+- Design and build a standalone open-source agent service from scratch — agent loop, tool runtime, conversation/session state, prompt templating, provider routing — not tied to Warp's existing client code. InfiniShell becomes its first consumer.
 - Define a stable IPC / JSON-RPC protocol: prompts, streaming tokens, tool calls, file diffs, status, attachments.
 - Ship the harness as a reusable open-source service — a headless daemon, a standalone TUI, IDE plugins and other terminals can all talk to it.
 - Local-only by default; credentials, history, skills and MCP servers stay on disk.
@@ -25,7 +25,7 @@ Zap's agent stack will be built as a standalone open-source service, independent
 
 ## Phase 3 — Multi-surface collaboration
 
-- Single account / identity shared across Zap terminal, headless TUI, IDE plugins and web UI.
+- Single account / identity shared across InfiniShell terminal, headless TUI, IDE plugins and web UI.
 - Session handoff: start on web, continue in the terminal; or hand a terminal session off to a desktop reviewer.
 - Background agents and multi-agent teams: a lead agent decomposes work and dispatches subtasks to peer agents.
 - Routines: run a task on a schedule, via API call, or in response to repository / CI / issue-tracker events.

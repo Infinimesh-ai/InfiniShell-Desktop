@@ -1,13 +1,13 @@
-use std::{collections::HashMap, fmt, sync::Arc};
+use std::collections::HashMap;
+use std::fmt;
+use std::sync::Arc;
 
 use channel_versions::{Changelog, MarkdownSection};
 use itertools::Itertools;
-use markdown_parser::{parse_markdown, FormattedText};
-use warpui::{
-    assets::asset_cache::{AssetCache, AssetSource},
-    image_cache::ImageType,
-    Entity, ModelContext, SingletonEntity,
-};
+use markdown_parser::{FormattedText, parse_markdown};
+use warpui::assets::asset_cache::{AssetCache, AssetSource};
+use warpui::image_cache::ImageType;
+use warpui::{Entity, ModelContext, SingletonEntity};
 
 use crate::{
     autoupdate::{self},
@@ -176,12 +176,11 @@ impl ChangelogModel {
     fn parse_changelog_markdown(&mut self) {
         if let ChangelogState::Some(changelog) = &self.changelog {
             for markdown_section in &changelog.markdown_sections {
-                if !markdown_section.markdown.is_empty() {
-                    if let Ok(parsed_markdown) = parse_markdown(markdown_section.markdown.as_str())
-                    {
-                        self.parsed_changelog
-                            .insert(markdown_section.title.clone(), parsed_markdown);
-                    }
+                if !markdown_section.markdown.is_empty()
+                    && let Ok(parsed_markdown) = parse_markdown(markdown_section.markdown.as_str())
+                {
+                    self.parsed_changelog
+                        .insert(markdown_section.title.clone(), parsed_markdown);
                 }
             }
         }

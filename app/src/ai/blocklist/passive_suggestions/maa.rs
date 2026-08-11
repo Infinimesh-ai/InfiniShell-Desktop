@@ -1,16 +1,24 @@
 use std::sync::Arc;
 
+use ai::agent::action::{AIAgentActionType, FileEdit};
+use ai::diff_validation::ParsedDiff;
+use chrono::{DateTime, Utc};
+use parking_lot::FairMutex;
+use warp_core::features::FeatureFlag;
+use warpui::r#async::SpawnedFutureHandle;
+use warpui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+
 use super::super::controller::{BlocklistAIController, BlocklistAIControllerEvent};
-use crate::ai::agent::AIIdentifiers;
-use crate::ai::agent::FileContext;
-use crate::ai::agent::PassiveCodeDiffEntry;
-use crate::ai::agent::PassiveSuggestionTrigger;
-use crate::ai::agent::{conversation::AIConversationId, ShellCommandCompletedTrigger};
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::{
+    AIIdentifiers, FileContext, PassiveCodeDiffEntry, PassiveSuggestionTrigger,
+    ShellCommandCompletedTrigger,
+};
 use crate::ai::block_context::BlockContext;
-use crate::ai::blocklist::inline_action::code_diff_view::FileDiff;
+use crate::ai::blocklist::diff_types::FileDiff;
 use crate::ai::blocklist::{
-    apply_edits, BlocklistAIHistoryModel, FileReadResult, RequestFileEditsFormatKind,
-    SessionContext,
+    BlocklistAIHistoryModel, FileReadResult, RequestFileEditsFormatKind, SessionContext,
+    apply_edits,
 };
 use crate::ai::paths::host_native_absolute_path;
 use crate::auth::AuthStateProvider;
@@ -21,13 +29,6 @@ use crate::terminal::model::terminal_model::TerminalModel;
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
 use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use ai::agent::action::{AIAgentActionType, FileEdit};
-use ai::diff_validation::ParsedDiff;
-use chrono::{DateTime, Utc};
-use parking_lot::FairMutex;
-use warp_core::features::FeatureFlag;
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {
@@ -92,7 +93,7 @@ pub struct PassiveSuggestionsModel {
     latest_request: Option<Request>,
     pending_file_read_handle: Option<SpawnedFutureHandle>,
     terminal_model: Arc<FairMutex<TerminalModel>>,
-    ambient_agent_view_model: ModelHandle<AmbientAgentViewModel>,
+    ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
 
     #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
     terminal_view_id: EntityId,
@@ -106,14 +107,14 @@ impl PassiveSuggestionsModel {
         terminal_model: Arc<FairMutex<TerminalModel>>,
         ai_controller: ModelHandle<BlocklistAIController>,
         model_event_dispatcher: &ModelHandle<ModelEventDispatcher>,
-        ambient_agent_view_model: ModelHandle<AmbientAgentViewModel>,
+        ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
         terminal_view_id: EntityId,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
-        ctx.subscribe_to_model(model_event_dispatcher, |me, event, ctx| {
+        ctx.subscribe_to_model(model_event_dispatcher, |me, _, event, ctx| {
             me.handle_model_event(event, ctx);
         });
-        ctx.subscribe_to_model(&ai_controller, |me, event, ctx| {
+        ctx.subscribe_to_model(&ai_controller, |me, _, event, ctx| {
             me.handle_controller_event(event, ctx);
         });
 
@@ -134,6 +135,30 @@ impl PassiveSuggestionsModel {
         }
         // Dropping the [`Request`] aborts the spawned stream handle.
         self.latest_request.take();
+    }
+
+    fn is_ambient_agent_session(&self, ctx: &ModelContext<Self>) -> bool {
+        if self
+            .ambient_agent_view_model
+            .as_ref()
+            .is_some_and(|model| model.as_ref(ctx).is_ambient_agent())
+        {
+            return true;
+        }
+
+        // `ambient_agent_view_model` is captured at construction and may be `None`
+        // if we joined a session and lazily set the ambient agent config.
+        // Consult live terminal state as well.
+        let terminal_model = self.terminal_model.lock();
+        terminal_model.is_shared_ambient_agent_session()
+            || terminal_model.is_conversation_transcript_viewer()
+    }
+
+    /// Test-only accessor for the private ambient-session guard so shared-session
+    /// view tests can assert passive suggestions are suppressed for viewers.
+    #[cfg(test)]
+    pub(crate) fn is_ambient_agent_session_for_test(&self, ctx: &ModelContext<Self>) -> bool {
+        self.is_ambient_agent_session(ctx)
     }
 
     /// Sends a MAA request to generate passive suggestions.
@@ -167,7 +192,7 @@ impl PassiveSuggestionsModel {
         };
 
         log::debug!(
-            "[passive-suggestions] skipped MAA request because the multi-agent endpoint is disabled in Zap"
+            "[passive-suggestions] skipped MAA request because the multi-agent endpoint is disabled in InfiniShell"
         );
         let (cancellation_tx, cancellation_rx) = futures::channel::oneshot::channel();
 
@@ -348,10 +373,10 @@ impl PassiveSuggestionsModel {
                     self.abort_pending_requests(ctx);
                     return;
                 }
-                if let BlockType::User(block_completed) = &after_block_completed_event.block_type {
-                    if !block_completed.was_part_of_agent_interaction {
-                        self.handle_user_block_completed(block_completed, ctx);
-                    }
+                if let BlockType::User(block_completed) = &after_block_completed_event.block_type
+                    && !block_completed.was_part_of_agent_interaction
+                {
+                    self.handle_user_block_completed(block_completed, ctx);
                 }
             }
             _ => {}
@@ -402,7 +427,7 @@ impl PassiveSuggestionsModel {
         }
 
         // Suppress passive suggestions in ambient-agent sessions.
-        if self.ambient_agent_view_model.as_ref(ctx).is_ambient_agent() {
+        if self.is_ambient_agent_session(ctx) {
             return;
         }
 
@@ -451,7 +476,7 @@ impl PassiveSuggestionsModel {
     ) {
         self.abort_pending_requests(ctx);
         // Suppress passive suggestions in ambient-agent sessions.
-        if self.ambient_agent_view_model.as_ref(ctx).is_ambient_agent() {
+        if self.is_ambient_agent_session(ctx) {
             return;
         }
 
@@ -479,69 +504,70 @@ impl PassiveSuggestionsModel {
 
         // If passive code diffs are enabled, check for any files that were read.
         #[cfg(feature = "local_fs")]
-        if is_passive_code_diffs_enabled {
-            if let Some(current_working_directory) = block_completed.serialized_block.pwd.clone() {
-                let block_contents =
-                    format!("{}\n{}", &block_context.command, &block_context.output);
-                let shell = self.active_session.as_ref(ctx).shell_launch_data(ctx);
-                let shell_for_detection = shell.clone();
-                let current_working_directory_for_detection = current_working_directory.clone();
-                let terminal_view_id = self.terminal_view_id;
+        if is_passive_code_diffs_enabled
+            && let Some(current_working_directory) = block_completed.serialized_block.pwd.clone()
+        {
+            let block_contents = format!("{}\n{}", &block_context.command, &block_context.output);
+            let shell = self.active_session.as_ref(ctx).shell_launch_data(ctx);
+            let shell_for_detection = shell.clone();
+            let current_working_directory_for_detection = current_working_directory.clone();
+            let terminal_view_id = self.terminal_view_id;
 
-                self.pending_file_read_handle = Some(ctx.spawn(
-                    async move {
-                        match tokio::task::spawn_blocking(move || {
-                            detect_relevant_file_paths_for_block(
-                                &block_contents,
-                                &current_working_directory_for_detection,
-                                shell_for_detection.as_ref(),
-                            )
-                        })
-                        .await
-                        {
-                            Ok(paths) => paths,
-                            Err(err) => {
-                                log::warn!(
-                                    "[passive-suggestions] failed to detect relevant file paths: {err}"
-                                );
-                                vec![]
-                            }
+            self.pending_file_read_handle = Some(ctx.spawn(
+                async move {
+                    match tokio::task::spawn_blocking(move || {
+                        detect_relevant_file_paths_for_block(
+                            &block_contents,
+                            &current_working_directory_for_detection,
+                            shell_for_detection.as_ref(),
+                        )
+                    })
+                    .await
+                    {
+                        Ok(paths) => paths,
+                        Err(err) => {
+                            log::warn!(
+                                "[passive-suggestions] failed to detect relevant file paths: {err}"
+                            );
+                            vec![]
                         }
-                    },
-                    move |me, candidate_paths, ctx| {
-                        let Some(file_locations) = get_allowed_file_locations_for_paths(
-                            candidate_paths,
-                            conversation_id.as_ref(),
-                            terminal_view_id,
+                    }
+                },
+                move |me, candidate_paths, ctx| {
+                    let Some(file_locations) = get_allowed_file_locations_for_paths(
+                        candidate_paths,
+                        conversation_id.as_ref(),
+                        terminal_view_id,
+                        ctx,
+                    ) else {
+                        me.pending_file_read_handle = None;
+                        me.send_shell_command_completed_request(
+                            conversation_id,
+                            block_context,
+                            vec![],
+                            supported_tools,
                             ctx,
-                        ) else {
+                        );
+                        return;
+                    };
+
+                    me.pending_file_read_handle = Some(ctx.spawn(
+                        read_files(file_locations, current_working_directory, shell),
+                        move |me, relevant_files, ctx| {
                             me.pending_file_read_handle = None;
+                            supported_tools.push(warp_multi_agent_api::ToolType::ApplyFileDiffs);
                             me.send_shell_command_completed_request(
                                 conversation_id,
                                 block_context,
-                                vec![],
+                                relevant_files,
                                 supported_tools,
                                 ctx,
                             );
-                            return;
-                        };
-
-                        me.pending_file_read_handle =
-                            Some(ctx.spawn(read_files(file_locations, current_working_directory, shell), move |me, relevant_files, ctx| {
-                                me.pending_file_read_handle = None;
-                                supported_tools.push(warp_multi_agent_api::ToolType::ApplyFileDiffs);
-                                me.send_shell_command_completed_request(
-                                    conversation_id,
-                                    block_context,
-                                    relevant_files,
-                                    supported_tools,
-                                    ctx,
-                                );
-                            }));
-                    },
-                ));
-                return;
-            }
+                        },
+                    ));
+                },
+            ));
+            return;
         }
 
         if !supported_tools.is_empty() {
@@ -588,9 +614,10 @@ async fn extract_suggestion_from_stream(
         ai::agent::convert::ConvertToAPITypeError,
     >,
 ) -> Option<StreamExtractionResult> {
-    use crate::ai::agent::task::helper::MessageExt;
     use futures_util::StreamExt;
     use warp_multi_agent_api as api;
+
+    use crate::ai::agent::task::helper::MessageExt;
 
     let Ok(mut stream) = stream_result else {
         return None;
@@ -670,8 +697,9 @@ async fn extract_suggestion_from_stream(
 fn coalesce_messages_from_client_actions(
     client_actions: &[warp_multi_agent_api::ClientAction],
 ) -> Vec<warp_multi_agent_api::Message> {
-    use field_mask::FieldMaskOperation;
     use std::collections::HashMap;
+
+    use field_mask::FieldMaskOperation;
     use warp_multi_agent_api as api;
     use warp_multi_agent_api::client_action::Action;
 
@@ -821,15 +849,55 @@ fn is_prompt_suggestions_enabled(ctx: &ModelContext<PassiveSuggestionsModel>) ->
         && UserWorkspaces::as_ref(ctx).is_prompt_suggestions_toggleable()
 }
 
+/// Maximum total byte length of block text to scan for file paths when building passive
+/// code-diff context. Caps CPU and memory usage for large shell outputs (e.g. a Rails
+/// console session that emits thousands of lines) by bounding the per-block token scan +
+/// filesystem-stat loop to a fixed amount of work regardless of output size.
+///
+/// The budget is split between the start and end of the text: relevant paths cluster both
+/// near the beginning of output (the command itself, early compiler/build errors) and near
+/// the end (stack traces and test failures printed right before the prompt returns).
+#[cfg(feature = "local_fs")]
+const MAX_BLOCK_CONTENTS_BYTES_FOR_PATH_DETECTION: usize = 100_000;
+
+/// Splits `text` into a head slice and an optional tail slice whose combined length is at
+/// most `max_bytes`, cutting at UTF-8 char boundaries. The tail is `None` when `text`
+/// already fits within the budget.
+#[cfg(feature = "local_fs")]
+fn head_and_tail_within_budget(text: &str, max_bytes: usize) -> (&str, Option<&str>) {
+    if text.len() <= max_bytes {
+        return (text, None);
+    }
+    let mut head_end = max_bytes / 2;
+    while !text.is_char_boundary(head_end) {
+        head_end -= 1;
+    }
+    let mut tail_start = text.len() - max_bytes / 2;
+    while !text.is_char_boundary(tail_start) {
+        tail_start += 1;
+    }
+    (&text[..head_end], Some(&text[tail_start..]))
+}
+
 #[cfg(feature = "local_fs")]
 fn detect_relevant_file_paths_for_block(
     block_contents: &str,
     current_working_directory: &str,
     shell: Option<&ShellLaunchData>,
 ) -> Vec<PathBuf> {
+    // Cap how much text is scanned so huge outputs can't pin a CPU core; the middle of the
+    // output is the least likely place for paths relevant to code suggestions.
+    let (head, tail) =
+        head_and_tail_within_budget(block_contents, MAX_BLOCK_CONTENTS_BYTES_FOR_PATH_DETECTION);
     // TODO (suraj): use line num hint to limit the line range to read.
-    detect_file_paths(current_working_directory, block_contents, shell)
+    let mut links: Vec<_> = detect_file_paths(current_working_directory, head, shell)
         .into_values()
+        .collect();
+    if let Some(tail) = tail {
+        links.extend(detect_file_paths(current_working_directory, tail, shell).into_values());
+    }
+    links
+        .into_iter()
         .filter_map(|link| match link {
             DetectedLinkType::FilePath { absolute_path, .. } => Some(absolute_path),
             DetectedLinkType::Url(_) => None,
@@ -895,3 +963,7 @@ async fn read_files(
         }
     }
 }
+
+#[cfg(all(test, feature = "local_fs"))]
+#[path = "maa_tests.rs"]
+mod tests;

@@ -15,14 +15,15 @@ pub struct UserProfileWithUID {
     pub photo_url: String,
 }
 
-impl From<crate::persistence::model::UserProfile> for UserProfileWithUID {
-    fn from(user_profile: crate::persistence::model::UserProfile) -> Self {
-        UserProfileWithUID {
-            local_user_uid: UserUid::new(&user_profile.firebase_uid),
-            display_name: user_profile.display_name,
-            email: user_profile.email,
-            photo_url: user_profile.photo_url,
-        }
+#[cfg(not(target_family = "wasm"))]
+pub fn user_profile_from_persistence(
+    user_profile: crate::persistence::model::UserProfile,
+) -> UserProfileWithUID {
+    UserProfileWithUID {
+        local_user_uid: UserUid::new(&user_profile.firebase_uid),
+        display_name: user_profile.display_name,
+        email: user_profile.email,
+        photo_url: user_profile.photo_url,
     }
 }
 

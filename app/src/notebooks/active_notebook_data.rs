@@ -1,21 +1,14 @@
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
-use crate::{
-    ai::document::ai_document_model::AIDocumentId,
-    cloud_object::{
-        breadcrumbs::ContainingObject,
-        model::{
-            persistence::{ObjectStoreEvent, ObjectStoreModel},
-            view::{Editor, EditorState, ObjectStoreViewModel},
-        },
-        Owner, Space, StoredObject,
-    },
-    drive::sharing::{ContentEditability, SharingAccessLevel},
-    notebooks::NotebookObject,
-    server::ids::{ClientId, SyncId},
-};
-
 use super::NotebookObjectModel;
+use crate::ai::document::ai_document_model::AIDocumentId;
+use crate::cloud_object::breadcrumbs::ContainingObject;
+use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
+use crate::cloud_object::model::view::{Editor, EditorState, ObjectStoreViewModel};
+use crate::cloud_object::{Owner, Space, StoredObject};
+use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
+use crate::notebooks::NotebookObject;
+use crate::server::ids::{ClientId, SyncId};
 
 #[derive(Default, Clone)]
 pub enum ActiveNotebook {
@@ -62,7 +55,7 @@ pub struct ActiveNotebookData {
 impl ActiveNotebookData {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
         let object_store_model = ObjectStoreModel::handle(ctx);
-        ctx.subscribe_to_model(&object_store_model, |me, event, ctx| {
+        ctx.subscribe_to_model(&object_store_model, |me, _, event, ctx| {
             me.handle_object_store_event(event, ctx);
         });
 
@@ -81,13 +74,11 @@ impl ActiveNotebookData {
                 if self.is_active_notebook(*notebook_id) {
                     if let Some(new_editor) = ObjectStoreViewModel::as_ref(ctx)
                         .object_current_editor(&notebook_id.uid(), ctx)
+                        && self.mode == Mode::Editing
+                        && matches!(new_editor.state, EditorState::OtherUserActive)
                     {
-                        if self.mode == Mode::Editing
-                            && matches!(new_editor.state, EditorState::OtherUserActive)
-                        {
-                            self.mode = Mode::View;
-                            ctx.emit(ActiveNotebookDataEvent::ModeChangedFromServer);
-                        }
+                        self.mode = Mode::View;
+                        ctx.emit(ActiveNotebookDataEvent::ModeChangedFromServer);
                     }
                     ctx.notify();
                 }

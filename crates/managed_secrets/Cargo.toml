@@ -18,8 +18,11 @@ thiserror.workspace = true
 tink-core = "0.3"
 tink-proto = "0.3"
 tink-hybrid = "0.3"
+tracing.workspace = true
 zeroize = "1.8"
+warp_core.workspace = true
 warpui.workspace = true
+warpui_core.workspace = true
 vec1.workspace = true
 
 # Pure-Rust HPKE implementation (RFC 9180).

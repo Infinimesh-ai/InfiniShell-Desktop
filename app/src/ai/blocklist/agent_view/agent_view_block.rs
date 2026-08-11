@@ -223,7 +223,11 @@ impl View for AgentViewEntryBlock {
 
         let status_icon = conversation.status().render_icon(appearance);
         let status_icon_bg = match conversation.status() {
-            ConversationStatus::InProgress => {
+            // TransientError(等待自动重试)与 WaitingForEvents(yield 等待输入)都是非终止态,
+            // 与 `ConversationStatus::render_icon` 一致,沿用 InProgress 的品红底色。
+            ConversationStatus::InProgress
+            | ConversationStatus::TransientError
+            | ConversationStatus::WaitingForEvents => {
                 with_opacity(appearance.theme().ansi_fg_magenta(), 25)
             }
             ConversationStatus::Success => with_opacity(appearance.theme().ansi_fg_green(), 25),

@@ -1,28 +1,27 @@
+use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
+use settings::Setting as _;
+use warp_errors::report_if_error;
+use warpui::elements::{
+    Align, Border, Clipped, ConstrainedBox, Container, CornerRadius, Flex, FormattedTextElement,
+    HighlightedHyperlink, Hoverable, HyperlinkUrl, MainAxisAlignment, MainAxisSize,
+    MouseStateHandle, ParentElement, Radius, Shrinkable, Text, Wrap,
+};
+use warpui::fonts::Weight;
+use warpui::platform::Cursor;
+use warpui::ui_components::components::{UiComponent, UiComponentStyles};
+use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+
 use crate::appearance::Appearance;
 use crate::context_chips::prompt::Prompt;
-use crate::report_if_error;
 use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::{PromptChoice, TelemetryEvent};
 use crate::settings::EnforceMinimumContrast;
+use crate::terminal::SizeInfo;
 use crate::terminal::blockgrid_element::BlockGridElement;
-use crate::terminal::model::blockgrid::BlockGrid;
 use crate::terminal::model::ObfuscateSecrets;
+use crate::terminal::model::blockgrid::BlockGrid;
 use crate::terminal::session_settings::SessionSettings;
 use crate::terminal::view::block_onboarding::util;
-use crate::terminal::SizeInfo;
-use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use settings::Setting as _;
-use warpui::{
-    elements::{
-        Align, Border, Clipped, ConstrainedBox, Container, CornerRadius, Flex,
-        FormattedTextElement, HighlightedHyperlink, Hoverable, HyperlinkUrl, MainAxisAlignment,
-        MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable, Text, Wrap,
-    },
-    fonts::Weight,
-    platform::Cursor,
-    ui_components::components::{UiComponent, UiComponentStyles},
-    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
-};
 
 const CONFIRM_MARGIN_TOP: f32 = 16.;
 
@@ -63,9 +62,9 @@ impl OnboardingPromptBlock {
         let font_color = current_theme.main_text_color(current_theme.background());
 
         // Copy - https://docs.google.com/document/d/1zttBLI5Mw07kUupvrMQoC5aTwTXSHIUOIFFnxZ8GQEU/edit
-        const LINE_ONE: &str = "Next, let’s set up your prompt. Zap has a custom prompt builder or you can select PS1 to honor your pre-existing prompt configuration.";
+        const LINE_ONE: &str = "Next, let’s set up your prompt. InfiniShell has a custom prompt builder or you can select PS1 to honor your pre-existing prompt configuration.";
         const LINE_TWO: &str =
-            "Zap works with many custom prompts like oh-my-zsh, Starship, Powerlevel10K. ";
+            "InfiniShell works with many custom prompts like oh-my-zsh, Starship, Powerlevel10K. ";
         const LINK_DESTINATION: &str =
             "";
 
@@ -329,7 +328,7 @@ impl OnboardingPromptBlock {
     fn render_warp_prompt_button_interior(&self, appearance: &Appearance) -> Box<dyn Element> {
         // Pixel values pulled from Figma mocks
         // https://www.figma.com/file/y888viqzWBoMpFTxQqkQEN/Activation?node-id=568:1595&mode=dev
-        const HEADER_TEXT: &str = "Zap prompt";
+        const HEADER_TEXT: &str = "InfiniShell prompt";
         const HEADER_MARGIN_LEFT: f32 = 4.;
         const SECTION_MARGIN_TOP: f32 = 8.;
         const OUTER_CORNER_RADIUS: f32 = 4.;

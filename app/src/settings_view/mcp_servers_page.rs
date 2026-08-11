@@ -1,33 +1,37 @@
 use std::collections::HashMap;
+
 use uuid::Uuid;
+use warp_errors::report_error;
+use warpui::elements::{ChildView, Container};
+use warpui::ui_components::components::{Coords, UiComponentStyles};
 use warpui::{
-    elements::{ChildView, Container},
-    ui_components::components::{Coords, UiComponentStyles},
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
-use crate::{
-    ai::mcp::{
-        gallery::MCPGalleryManager, templatable_installation::VariableValue, FileBasedMCPManager,
-        TemplatableMCPServer, TemplatableMCPServerInstallation, TemplatableMCPServerManager,
-    },
-    appearance::Appearance,
-    cloud_object::update_manager::InitiatedBy,
-    cloud_object::Space,
-    modal::{Modal, ModalViewState},
-    settings_view::{
-        mcp_servers::{
-            edit_page::{MCPServersEditPageView, MCPServersEditPageViewEvent},
-            installation_modal::{InstallationModalBody, InstallationModalBodyEvent},
-            list_page::{MCPServersListPageView, MCPServersListPageViewEvent},
-            style, ServerCardItemId,
-        },
-        settings_page::{MatchData, PageType, SettingsPageMeta, SettingsWidget},
-        SettingsSection,
-    },
-    view_components::DismissibleToast,
-    workspace::ToastStack,
+use crate::ai::mcp::gallery::MCPGalleryManager;
+use crate::ai::mcp::templatable_installation::VariableValue;
+use crate::ai::mcp::{
+    FileBasedMCPManager, TemplatableMCPServer, TemplatableMCPServerInstallation,
+    TemplatableMCPServerManager,
 };
+use crate::appearance::Appearance;
+use crate::cloud_object::Space;
+use crate::cloud_object::update_manager::InitiatedBy;
+use crate::modal::{Modal, ModalViewState};
+use crate::settings_view::SettingsSection;
+use crate::settings_view::mcp_servers::edit_page::{
+    MCPServersEditPageView, MCPServersEditPageViewEvent,
+};
+use crate::settings_view::mcp_servers::installation_modal::{
+    InstallationModalBody, InstallationModalBodyEvent,
+};
+use crate::settings_view::mcp_servers::list_page::{
+    MCPServersListPageView, MCPServersListPageViewEvent,
+};
+use crate::settings_view::mcp_servers::{ServerCardItemId, style};
+use crate::settings_view::settings_page::{MatchData, PageType, SettingsPageMeta, SettingsWidget};
+use crate::view_components::DismissibleToast;
+use crate::workspace::ToastStack;
 
 /// Describes where an MCP install request originated.
 ///
@@ -82,8 +86,7 @@ impl MCPServersSettingsPageView {
             me.handle_edit_view_event(event, ctx);
         });
 
-        let installation_modal_body =
-            ctx.add_typed_action_view(|_ctx| InstallationModalBody::new());
+        let installation_modal_body = ctx.add_typed_action_view(InstallationModalBody::new);
         ctx.subscribe_to_view(&installation_modal_body, |me, _, event, ctx| {
             me.handle_installation_modal_body_event(event, ctx);
         });
@@ -152,7 +155,7 @@ impl MCPServersSettingsPageView {
         };
         match item_id {
             ServerCardItemId::TemplatableMCP(_) => {
-                log::error!("Logging out is not supported for template MCP servers.");
+                report_error!("Logging out is not supported for template MCP servers.");
             }
             ServerCardItemId::TemplatableMCPInstallation(uuid) => {
                 TemplatableMCPServerManager::handle(ctx).update(ctx, |manager, ctx| {
@@ -162,18 +165,17 @@ impl MCPServersSettingsPageView {
                 self.add_toast(&message, ctx);
             }
             ServerCardItemId::GalleryMCP(_) => {
-                log::error!("Logging out is not supported for gallery MCP servers.");
+                report_error!("Logging out is not supported for gallery MCP servers.");
             }
             ServerCardItemId::FileBasedMCP(uuid) => {
                 if let Some(installation) =
                     FileBasedMCPManager::as_ref(ctx).get_installation_by_uuid(uuid)
+                    && let Some(hash) = installation.hash()
                 {
-                    if let Some(hash) = installation.hash() {
-                        TemplatableMCPServerManager::handle(ctx).update(ctx, |manager, ctx| {
-                            manager.shutdown_server(uuid, ctx);
-                            manager.purge_file_based_server_credentials(&vec![hash], ctx);
-                        });
-                    }
+                    TemplatableMCPServerManager::handle(ctx).update(ctx, |manager, ctx| {
+                        manager.shutdown_server(uuid, ctx);
+                        manager.purge_file_based_server_credentials(&vec![hash], ctx);
+                    });
                 }
                 self.add_toast(&message, ctx);
             }

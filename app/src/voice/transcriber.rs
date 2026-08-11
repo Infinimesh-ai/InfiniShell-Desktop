@@ -8,7 +8,7 @@ pub enum TranscribeError {
     #[error("Request failed due to lack of Voice quota.")]
     QuotaLimit,
 
-    #[error("Zap is currently overloaded. Please try again later.")]
+    #[error("InfiniShell is currently overloaded. Please try again later.")]
     ServerOverloaded,
 
     #[error("Internal error occurred at transport layer.")]
@@ -18,7 +18,7 @@ pub enum TranscribeError {
     Deserialization,
 
     /// Zap 已禁用语音转写(BYOP genai 协议无法承载音频)。
-    #[error("Voice transcription is unavailable in Zap.")]
+    #[error("Voice transcription is unavailable in InfiniShell.")]
     Disabled,
 
     #[error(transparent)]
@@ -30,8 +30,15 @@ pub enum TranscribeError {
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 pub trait Transcriber: Send + Sync {
     /// Transcribe the given base64 encoded wav file into text.
+    ///
+    /// `language` is an optional ISO-639-1 code (e.g. `"en"`). When `None`, the
+    /// transcription provider auto-detects the spoken language.
     /// This is expected to be async and called off the main thread.
-    async fn transcribe(&self, wav_base64: String) -> Result<String, TranscribeError>;
+    async fn transcribe(
+        &self,
+        wav_base64: String,
+        language: Option<String>,
+    ) -> Result<String, TranscribeError>;
 }
 
 /// A voice transcriber that is enabled or disabled.

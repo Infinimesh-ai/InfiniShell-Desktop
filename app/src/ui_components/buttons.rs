@@ -1,12 +1,11 @@
-use super::icons::{Icon, ICON_DIMENSIONS};
-use super::{blended_colors, BORDER_RADIUS};
-use crate::appearance::Appearance;
-use crate::themes::theme::Fill;
-use crate::themes::theme::WarpTheme;
-use warpui::elements::Radius;
-use warpui::elements::{CornerRadius, MouseStateHandle};
+use warpui::elements::{CornerRadius, MouseStateHandle, Radius};
 use warpui::ui_components::button::Button;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+
+use super::icons::{ICON_DIMENSIONS, Icon};
+use super::{BORDER_RADIUS, blended_colors};
+use crate::appearance::Appearance;
+use crate::themes::theme::{Fill, WarpTheme};
 
 const ICON_BUTTON_PADDING: f32 = 4.;
 

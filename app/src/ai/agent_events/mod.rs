@@ -6,14 +6,16 @@ use async_trait::async_trait;
 mod driver;
 mod message_hydrator;
 
+pub(crate) use driver::{
+    AgentEventConsumer, AgentEventConsumerControlFlow, AgentEventDriverConfig, AgentEventFilter,
+    AgentEventStreamClientEventSource, AgentMessageEventMetadata, run_agent_event_driver,
+};
 #[cfg(test)]
 pub(crate) use driver::{
-    agent_event_backoff, agent_event_failures_exceeded_threshold, AgentEventDriverState,
+    AgentEventDriverState, AgentEventSource, AgentEventSourceItem,
     DEFAULT_AGENT_EVENT_FAILURES_BEFORE_ERROR_LOG, DEFAULT_AGENT_EVENT_RECONNECT_BACKOFF_STEPS,
-};
-pub(crate) use driver::{
-    run_agent_event_driver, AgentEventConsumer, AgentEventConsumerControlFlow,
-    AgentEventDriverConfig, AgentEventSource, AgentEventSourceItem,
+    DEFAULT_PERMANENT_ERROR_BACKOFF_STEPS, agent_event_backoff,
+    agent_event_failures_exceeded_threshold,
 };
 pub(crate) use message_hydrator::MessageHydrator;
 
@@ -39,7 +41,7 @@ impl AgentEventStreamClient for DisabledAgentEventStreamClient {
         _since_sequence: i64,
     ) -> Result<http_client::EventSourceStream> {
         Err(anyhow!(
-            "Agent event stream disabled in Zap - RTC endpoint is removed"
+            "Agent event stream disabled in InfiniShell - RTC endpoint is removed"
         ))
     }
 }

@@ -1,17 +1,13 @@
-use super::{new_builder, Builder};
 use regex::Regex;
+use warp::integration_testing::step::new_step_with_default_assertions;
+use warp::integration_testing::tab::assert_pane_title;
+use warp::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use warp::integration_testing::view_getters::{pane_group_view, workspace_view};
+use warp::workspace::WorkspaceAction;
+use warpui_core::integration::TestStep;
+use warpui_core::{App, async_assert, async_assert_eq};
 
-use warp::{
-    integration_testing::{
-        step::new_step_with_default_assertions,
-        tab::assert_pane_title,
-        terminal::wait_until_bootstrapped_single_pane_for_tab,
-        view_getters::{pane_group_view, workspace_view},
-    },
-    workspace::WorkspaceAction,
-};
-use warpui::{async_assert, async_assert_eq, integration::TestStep, App};
-
+use super::{Builder, new_builder};
 use crate::util::write_all_rc_files_for_test;
 
 fn open_file_tree_panel(app: &mut App) {
@@ -79,7 +75,7 @@ pub fn test_file_tree_opens_files_in_warp() -> Builder {
                 }),
         )
         .with_step(
-            new_step_with_default_assertions("Verify file opened in Zap editor").add_assertion(
+            new_step_with_default_assertions("Verify file opened in InfiniShell editor").add_assertion(
                 assert_pane_title(0, 1, Regex::new(r"test_file\.txt$").unwrap()),
             ),
         )
@@ -173,11 +169,11 @@ pub fn test_file_tree_open_in_new_tab() -> Builder {
                             })
                         });
 
-                        if let Some(title) = title {
-                            if config_regex.is_match(&title) {
-                                found = true;
-                                break;
-                            }
+                        if let Some(title) = title
+                            && config_regex.is_match(&title)
+                        {
+                            found = true;
+                            break;
                         }
                     }
 
@@ -258,7 +254,7 @@ pub fn test_file_tree_non_openable_files() -> Builder {
                         async_assert_eq!(
                             pane_group.pane_count(),
                             1,
-                            "Binary file should not open in Zap, should stay at 1 pane"
+                            "Binary file should not open in InfiniShell, should stay at 1 pane"
                         )
                     })
                 }),

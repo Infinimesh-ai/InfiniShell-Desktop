@@ -1,24 +1,17 @@
 use std::collections::HashMap;
 
+use warp_errors::report_error;
 use warpui::{AppContext, SingletonEntity, ViewHandle};
 
-use crate::{
-    cloud_object::{
-        model::persistence::ObjectStoreModel, update_manager::UpdateManager, Owner,
-        StoredObjectEventEntrypoint,
-    },
-    editor::EditorView,
-    server::ids::SyncId,
-    workflows::{
-        workflow::{Argument, ArgumentType},
-        workflow_enum::WorkflowEnum,
-    },
-};
-
-use super::{
-    enum_creation_dialog::{EnumCreationDialog, WorkflowEnumData},
-    workflow_arg_selector::WorkflowArgSelector,
-};
+use super::enum_creation_dialog::{EnumCreationDialog, WorkflowEnumData};
+use super::workflow_arg_selector::WorkflowArgSelector;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::update_manager::{app_sync_id_to_model, model_sync_id_to_app, UpdateManager};
+use crate::cloud_object::{Owner, StoredObjectEventEntrypoint};
+use crate::editor::EditorView;
+use crate::server::ids::SyncId;
+use crate::workflows::workflow::{Argument, ArgumentType};
+use crate::workflows::workflow_enum::WorkflowEnum;
 
 #[derive(Debug, Clone)]
 pub struct ArgumentEditorRowIndex(pub usize);
@@ -74,6 +67,9 @@ pub fn load_argument_into_selector(
     selector.set_selected_type(selected_type, ctx);
 
     if let ArgumentType::Enum { enum_id } = argument.arg_type {
+        // 上游把 workflow 模型迁到了 `cloud_object_models`(用 `cloud_objects::ids::SyncId`),
+        // 而 app 侧对象存储 / 选择器沿用 `crate::server::ids::SyncId`,此处按 uid 显式转换。
+        let enum_id = model_sync_id_to_app(&enum_id);
         // If we have the enum in the global list, add it to the menu
         // Otherwise, get the enum data from memory and make a new entry in the list for it
         if let Some(enum_data) = all_workflow_enums.get(&enum_id) {
@@ -132,7 +128,10 @@ pub fn extract_typed_argument_from_selector(
     // If we have arg type data with an enum ID, use that as our type, otherwise text.
     let (arg_type, default_value) = match id {
         Some(enum_id) => (
-            ArgumentType::Enum { enum_id },
+            // 选择器返回的是 app 侧 `SyncId`,写回模型前转成 `cloud_objects::ids::SyncId`。
+            ArgumentType::Enum {
+                enum_id: app_sync_id_to_model(enum_id),
+            },
             None, // we haven't implemented default value for enums
         ),
         None => (
@@ -320,7 +319,7 @@ where
             true
         }
         _ => {
-            log::error!("Attempting to select an enum that cannot be found");
+            report_error!("Attempting to select an enum that cannot be found");
             false
         }
     }

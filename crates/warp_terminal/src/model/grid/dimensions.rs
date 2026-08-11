@@ -1,3 +1,6 @@
+// The code in this file is adapted from the alacritty_terminal crate under the
+// Apache license; see: crates/warp_terminal/src/model/LICENSE-ALACRITTY.
+
 /// Grid dimensions.
 pub trait Dimensions {
     /// Total number of lines in the buffer, this includes scrollback and visible lines.
@@ -35,11 +38,11 @@ impl Dimensions for (usize, usize) {
 #[cfg(test)]
 impl Dimensions for (crate::model::VisibleRow, usize) {
     fn total_rows(&self) -> usize {
-        self.0 .0
+        self.0.0
     }
 
     fn visible_rows(&self) -> usize {
-        self.0 .0
+        self.0.0
     }
 
     fn columns(&self) -> usize {

@@ -8,6 +8,9 @@ pub(crate) fn sanitized_basename(path_or_filename: &str) -> Option<String> {
     Some(file_name.to_string())
 }
 
+// Zap 无云端 artifact 存储:上游的签名 URL 下载工具(extension_for_content_type /
+// default_download_filename / download_destination / download_artifact_bytes)依赖已剥离的
+// `crate::server::server_api::ai::ArtifactDownloadResponse`,因此不移植。
 #[cfg(test)]
 mod tests {
     use super::*;

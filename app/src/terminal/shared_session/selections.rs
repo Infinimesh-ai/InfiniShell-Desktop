@@ -1,4 +1,4 @@
-use crate::terminal::model::{blocks::BlockList, index::Point, terminal_model::WithinBlock};
+// Zap:session-sharing-protocol crate 已剥离,改用本地 protocol 模块
 use crate::terminal::shared_session::protocol::{BlockPoint, Point as SessionSharingPoint};
 
 fn point_from_session_sharing(point: SessionSharingPoint) -> Point {
@@ -14,6 +14,10 @@ pub(crate) fn point_to_session_sharing(point: Point) -> SessionSharingPoint {
         col: point.col,
     }
 }
+
+use crate::terminal::model::blocks::BlockList;
+use crate::terminal::model::index::Point;
+use crate::terminal::model::terminal_model::WithinBlock;
 
 impl WithinBlock<Point> {
     /// Converts an un-transformed block point
@@ -67,5 +71,5 @@ impl WithinBlock<Point> {
 }
 
 #[cfg(test)]
-#[path = "selections_test.rs"]
+#[path = "selections_tests.rs"]
 mod tests;

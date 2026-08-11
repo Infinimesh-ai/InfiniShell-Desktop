@@ -1,28 +1,22 @@
-use warpui::{
-    platform::WindowStyle, presenter::ChildView, App, Element, Entity, TypedActionView, View,
-    ViewHandle, WindowId,
-};
+use repo_metadata::RepoMetadataModel;
+use repo_metadata::repositories::DetectedRepositories;
+use warpui::platform::WindowStyle;
+use warpui::presenter::ChildView;
+use warpui::{App, Element, Entity, TypedActionView, View, ViewHandle, WindowId};
 
 use super::{create_editable_comment_markdown_editor, create_readonly_comment_markdown_editor};
+use crate::appearance::Appearance;
+use crate::auth::AuthStateProvider;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::notebooks::editor::keys::NotebookKeybindings;
 use crate::notebooks::editor::view::RichTextEditorView;
-use repo_metadata::repositories::DetectedRepositories;
-use repo_metadata::RepoMetadataModel;
-
-use crate::{
-    appearance::Appearance,
-    auth::AuthStateProvider,
-    cloud_object::model::persistence::ObjectStoreModel,
-    notebooks::{
-        editor::keys::NotebookKeybindings,
-        link::{NotebookLinks, SessionSource},
-    },
-    search::files::model::FileSearchModel,
-    settings_view::keybindings::KeybindingChangedNotifier,
-    terminal::keys::TerminalKeybindings,
-    test_util::settings::initialize_settings_for_tests,
-    workspace::ActiveSession,
-    GlobalResourceHandles, GlobalResourceHandlesProvider, UserWorkspaces,
-};
+use crate::notebooks::link::{NotebookLinks, SessionSource};
+use crate::search::files::model::FileSearchModel;
+use crate::settings_view::keybindings::KeybindingChangedNotifier;
+use crate::terminal::keys::TerminalKeybindings;
+use crate::test_util::settings::initialize_settings_for_tests;
+use crate::workspace::ActiveSession;
+use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider, UserWorkspaces};
 
 struct TestView {
     editor: ViewHandle<RichTextEditorView>,

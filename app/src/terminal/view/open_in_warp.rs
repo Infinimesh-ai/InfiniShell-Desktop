@@ -1,41 +1,30 @@
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use warp_util::path::EscapeChar;
-use warpui::{
-    accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole},
-    SingletonEntity, ViewContext,
-};
-
-#[cfg(feature = "local_fs")]
-use crate::code::editor_management::CodeSource;
-use crate::{
-    report_if_error,
-    terminal::{
-        event::UserBlockCompleted,
-        general_settings::GeneralSettings,
-        model::session::Session,
-        view::inline_banner::{OpenInWarpBannerAction, OpenInWarpBannerState},
-    },
-    util::openable_file_type::{is_file_openable_in_warp, OpenableFileType},
-};
 use settings::Setting as _;
-use warp_completer::{
-    completer::TopLevelCommandCaseSensitivity,
-    parsers::{
-        classify_command,
-        hir::{Command, Expression},
-        simple::all_parsed_commands,
-    },
-    signatures::CommandRegistry,
-};
+use warp_completer::completer::TopLevelCommandCaseSensitivity;
+use warp_completer::parsers::classify_command;
+use warp_completer::parsers::hir::{Command, Expression};
+use warp_completer::parsers::simple::all_parsed_commands;
+use warp_completer::signatures::CommandRegistry;
+use warp_errors::report_if_error;
+use warp_util::path::EscapeChar;
+use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
+use warpui::{SingletonEntity, ViewContext};
 
 use super::{Event, InlineBannerItem, InlineBannerType, TerminalView};
+#[cfg(feature = "local_fs")]
+use crate::code::editor_management::CodeSource;
+use crate::terminal::event::UserBlockCompleted;
+use crate::terminal::general_settings::GeneralSettings;
+use crate::terminal::model::session::Session;
+use crate::terminal::view::inline_banner::{OpenInWarpBannerAction, OpenInWarpBannerState};
+use crate::util::openable_file_type::{
+    OpenableFileType, is_file_openable_in_warp, renders_in_warp_notebook_viewer,
+};
 
 #[cfg(test)]
 #[path = "open_in_warp_tests.rs"]
@@ -86,20 +75,18 @@ impl TerminalView {
                     .await
                 },
                 move |view, maybe_match, ctx| {
-                    if let Some(openable_path) = maybe_match {
-                        if matches!(
-                            openable_path.file_type,
-                            OpenableFileType::Markdown | OpenableFileType::Code
-                        ) {
-                            view.suggest_open_in_warp(openable_path, session, ctx);
-                        }
+                    if let Some(openable_path) = maybe_match
+                        && (renders_in_warp_notebook_viewer(&openable_path.path)
+                            || matches!(openable_path.file_type, OpenableFileType::Code))
+                    {
+                        view.suggest_open_in_warp(openable_path, session, ctx);
                     }
                 },
             );
         }
     }
 
-    /// Whether or not the "Open in Zap" banner is open.
+    /// Whether or not the "Open in InfiniShell" banner is open.
     #[cfg(feature = "integration_tests")]
     pub fn is_open_in_warp_banner_open(&self) -> bool {
         self.inline_banners_state.open_in_warp_banner.is_some()
@@ -114,17 +101,14 @@ impl TerminalView {
 
     fn open_in_warp_banner_type_dismissed(
         &self,
-        file_type: OpenableFileType,
+        openable_path: &OpenablePath,
         ctx: &ViewContext<Self>,
     ) -> bool {
         let general_settings = GeneralSettings::as_ref(ctx);
-        match file_type {
-            OpenableFileType::Markdown => {
-                *general_settings.open_in_warp_banner_dismissed_for_markdown
-            }
-            OpenableFileType::Code | OpenableFileType::Text => {
-                *general_settings.open_in_warp_banner_dismissed_for_code_and_text
-            }
+        if renders_in_warp_notebook_viewer(&openable_path.path) {
+            *general_settings.open_in_warp_banner_dismissed_for_markdown
+        } else {
+            *general_settings.open_in_warp_banner_dismissed_for_code_and_text
         }
     }
 
@@ -136,7 +120,7 @@ impl TerminalView {
         session: Arc<Session>,
         ctx: &mut ViewContext<Self>,
     ) {
-        if self.open_in_warp_banner_type_dismissed(openable_path.file_type, ctx) {
+        if self.open_in_warp_banner_type_dismissed(&openable_path, ctx) {
             return;
         }
 
@@ -169,26 +153,25 @@ impl TerminalView {
         match action {
             OpenInWarpBannerAction::OpenFile => {
                 if let Some(banner_state) = self.inline_banners_state.open_in_warp_banner.take() {
-                    match banner_state.target.file_type {
-                        OpenableFileType::Markdown => {
-                            ctx.emit(Event::OpenFileInWarp {
+                    if renders_in_warp_notebook_viewer(&banner_state.target.path) {
+                        // Markdown and Jupyter notebooks open in the notebook viewer.
+                        ctx.emit(Event::OpenFileInWarp {
+                            path: banner_state.target.path,
+                            session: banner_state.session,
+                        });
+                    } else {
+                        // Code and other text files open in the code editor.
+                        #[cfg(feature = "local_fs")]
+                        ctx.emit(Event::OpenCodeInWarp {
+                            source: CodeSource::Link {
                                 path: banner_state.target.path,
-                                session: banner_state.session,
-                            });
-                        }
-                        OpenableFileType::Code | OpenableFileType::Text => {
-                            #[cfg(feature = "local_fs")]
-                            ctx.emit(Event::OpenCodeInWarp {
-                                source: CodeSource::Link {
-                                    path: banner_state.target.path,
-                                    range_start: None,
-                                    range_end: None,
-                                },
-                                layout: *crate::terminal::view::EditorSettings::as_ref(ctx)
-                                    .open_file_layout
-                                    .value(),
-                            });
-                        }
+                                range_start: None,
+                                range_end: None,
+                            },
+                            layout: *crate::terminal::view::EditorSettings::as_ref(ctx)
+                                .open_file_layout
+                                .value(),
+                        });
                     }
                     self.close_open_in_warp_banner(banner_state.id);
                     ctx.notify();
@@ -196,9 +179,10 @@ impl TerminalView {
             }
             OpenInWarpBannerAction::LearnMore => {
                 if let Some(banner_state) = &self.inline_banners_state.open_in_warp_banner {
-                    let url = match banner_state.target.file_type {
-                        OpenableFileType::Markdown => LEARN_MORE_MARKDOWN_URL,
-                        OpenableFileType::Code | OpenableFileType::Text => LEARN_MORE_CODE_URL,
+                    let url = if renders_in_warp_notebook_viewer(&banner_state.target.path) {
+                        LEARN_MORE_MARKDOWN_URL
+                    } else {
+                        LEARN_MORE_CODE_URL
                     };
                     ctx.open_url(url);
                 }
@@ -206,21 +190,22 @@ impl TerminalView {
             OpenInWarpBannerAction::Close => {
                 if let Some(banner_state) = self.inline_banners_state.open_in_warp_banner.take() {
                     self.close_open_in_warp_banner(banner_state.id);
-                    match banner_state.target.file_type {
-                        OpenableFileType::Markdown => {
-                            GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
-                                report_if_error!(settings
+                    if renders_in_warp_notebook_viewer(&banner_state.target.path) {
+                        GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
+                            report_if_error!(
+                                settings
                                     .open_in_warp_banner_dismissed_for_markdown
-                                    .set_value(true, ctx));
-                            });
-                        }
-                        OpenableFileType::Code | OpenableFileType::Text => {
-                            GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
-                                report_if_error!(settings
+                                    .set_value(true, ctx)
+                            );
+                        });
+                    } else {
+                        GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
+                            report_if_error!(
+                                settings
                                     .open_in_warp_banner_dismissed_for_code_and_text
-                                    .set_value(true, ctx));
-                            });
-                        }
+                                    .set_value(true, ctx)
+                            );
+                        });
                     }
                     ctx.notify();
                 }
@@ -237,7 +222,7 @@ impl TerminalView {
                 match &self.inline_banners_state.open_in_warp_banner {
                     Some(banner_state) => {
                         ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
-                            format!("Open {} in Zap", banner_state.target.path.display()),
+                            format!("Open {} in InfiniShell", banner_state.target.path.display()),
                             WarpA11yRole::UserAction,
                         ))
                     }
@@ -246,14 +231,14 @@ impl TerminalView {
             }
             OpenInWarpBannerAction::Close => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
-                    "Close View in Zap banner",
+                    "Close View in InfiniShell banner",
                     WarpA11yRole::UserAction,
                 ))
             }
             OpenInWarpBannerAction::LearnMore => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new(
                     crate::t!("common-learn-more"),
-                    "Learn more about opening Markdown files in Zap",
+                    "Learn more about opening Markdown files in InfiniShell",
                     WarpA11yRole::UserAction,
                 ))
             }

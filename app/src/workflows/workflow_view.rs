@@ -1,113 +1,97 @@
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+
 use alias_bar::{AliasBar, AliasBarEvent};
 use argument_editor::{ArgumentEditorRow, DEFAULT_ARGUMENT_PREFIX};
 use env_var_selector::{EnvVarSelector, EnvVarSelectorEvent};
 use itertools::Itertools;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
 use string_offset::CharOffset;
 use syntax_highlightable::SyntaxHighlightable;
 use url::Url;
-
-use crate::{
-    ai::blocklist::secret_redaction::find_secrets_in_text,
-    appearance::Appearance,
-    auth::{AuthState, AuthStateProvider},
-    cloud_object::{
-        breadcrumbs::ContainingObject,
-        model::{
-            persistence::{ObjectStoreEvent, ObjectStoreModel},
-            view::ObjectStoreViewModel,
-        },
-        update_manager::{
-            FetchSingleObjectOption, ObjectOperation, OperationSuccessType, UpdateManager,
-            UpdateManagerEvent,
-        },
-        ObjectType, Owner, Revision, Space, StoredObject, StoredObjectEventEntrypoint,
-    },
-    drive::{
-        cloud_object_styling::warp_drive_icon_color,
-        drive_helpers::has_feature_gated_anonymous_user_reached_workflow_limit,
-        items::WarpDriveItemId,
-        sharing::{ContentEditability, SharingAccessLevel},
-        workflows::{
-            ai_assist::GeneratedCommandMetadataError,
-            arguments::ArgumentsState,
-            enum_creation_dialog::{EnumCreationDialog, EnumCreationDialogEvent, WorkflowEnumData},
-            workflow_arg_selector::{WorkflowArgSelector, WorkflowArgSelectorEvent},
-            workflow_arg_type_helpers::{self, ArgumentEditorRowIndex},
-        },
-        DriveObjectType, ObjectTypeAndId, ZapDriveObjectSettings,
-    },
-    editor::{
-        EditorOptions, EditorView, EnterAction, EnterSettings, Event as EditorEvent,
-        InteractionState, PlainTextEditorViewAction as EditorAction,
-        PropagateAndNoOpNavigationKeys, SingleLineEditorOptions, TextOptions, TextStyleOperation,
-    },
-    menu::{MenuItem, MenuItemFields},
-    network::NetworkStatus,
-    pane_group::{
-        focus_state::PaneFocusHandle, pane::view, BackingView, PaneConfiguration, PaneEvent,
-    },
-    send_telemetry_from_ctx,
-    server::{
-        ids::{ClientId, ServerId, SyncId},
-        telemetry::{ObjectTelemetryMetadata, TelemetryEvent, TelemetryObjectType},
-    },
-    settings::{
-        app_installation_detection::{UserAppInstallDetectionSettings, UserAppInstallStatus},
-        AISettings,
-    },
-    terminal::safe_mode_settings::get_secret_obfuscation_mode,
-    ui_components::{
-        breadcrumb::{render_breadcrumbs, BreadcrumbState},
-        buttons::{accent_icon_button, icon_button},
-        dialog::{dialog_styles, Dialog},
-        icons::Icon,
-    },
-    util::bindings::CustomAction,
-    view_components::{DismissibleToast, ToastType},
-    workflows::{
-        workflow::{Argument, Workflow},
-        WorkflowObject,
-    },
-    workspace::ToastStack,
-    FeatureFlag,
-};
-
-use warp_core::{context_flag::ContextFlag, settings::Setting, ui::theme::AnsiColorIdentifier};
+use warp_core::context_flag::ContextFlag;
+use warp_core::settings::Setting;
+use warp_core::ui::theme::AnsiColorIdentifier;
 use warp_editor::editor::NavigationKey;
+use warp_errors::report_error;
+use warpui::clipboard::ClipboardContent;
+use warpui::elements::{
+    Align, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable,
+    ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Flex, Hoverable,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    ParentElement, ParentOffsetBounds, Radius, Rect, ScrollbarWidth, Shrinkable, Stack,
+};
+use warpui::fonts::{FamilyId, Weight};
+use warpui::keymap::EditableBinding;
+use warpui::platform::Cursor;
+use warpui::text_layout::TextStyle;
+use warpui::ui_components::button::{Button, ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{
-    clipboard::ClipboardContent,
-    elements::{
-        Align, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle,
-        ClippedScrollable, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
-        Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
-        ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Rect, ScrollbarWidth, Shrinkable,
-        Stack,
-    },
-    fonts::{FamilyId, Weight},
-    keymap::EditableBinding,
-    platform::Cursor,
-    text_layout::TextStyle,
-    ui_components::{
-        button::{Button, ButtonVariant, TextAndIcon, TextAndIconAlignment},
-        components::{Coords, UiComponent, UiComponentStyles},
-    },
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WindowId,
 };
 
-use super::{
-    aliases::WorkflowAliases, command_parser::WorkflowCommandDisplayData, WorkflowObjectModel,
-    WorkflowSource, WorkflowType, WorkflowViewMode,
+use super::aliases::WorkflowAliases;
+use super::command_parser::WorkflowCommandDisplayData;
+use super::{WorkflowObjectModel, WorkflowSource, WorkflowType, WorkflowViewMode};
+use crate::ai::blocklist::secret_redaction::find_secrets_in_text;
+use crate::appearance::Appearance;
+use crate::auth::{AuthState, AuthStateProvider};
+use crate::cloud_object::breadcrumbs::ContainingObject;
+use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
+use crate::cloud_object::model::view::ObjectStoreViewModel;
+use crate::cloud_object::update_manager::{
+    FetchSingleObjectOption, ObjectOperation, OperationSuccessType, UpdateManager,
+    UpdateManagerEvent,
 };
-
+use crate::cloud_object::{
+    ObjectType, Owner, Revision, Space, StoredObject, StoredObjectEventEntrypoint,
+};
+use crate::drive::cloud_object_styling::warp_drive_icon_color;
+use crate::drive::drive_helpers::has_feature_gated_anonymous_user_reached_workflow_limit;
+use crate::drive::items::WarpDriveItemId;
+use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
+use crate::drive::workflows::ai_assist::GeneratedCommandMetadataError;
+use crate::drive::workflows::arguments::ArgumentsState;
+use crate::drive::workflows::enum_creation_dialog::{
+    EnumCreationDialog, EnumCreationDialogEvent, WorkflowEnumData,
+};
+use crate::drive::workflows::workflow_arg_selector::{
+    WorkflowArgSelector, WorkflowArgSelectorEvent,
+};
+use crate::drive::workflows::workflow_arg_type_helpers::{self, ArgumentEditorRowIndex};
+use crate::drive::{DriveObjectType, ObjectTypeAndId, ZapDriveObjectSettings};
+use crate::editor::{
+    EditorOptions, EditorView, EnterAction, EnterSettings, Event as EditorEvent, InteractionState,
+    PlainTextEditorViewAction as EditorAction, PropagateAndNoOpNavigationKeys,
+    SingleLineEditorOptions, TextOptions, TextStyleOperation,
+};
+use crate::menu::{MenuItem, MenuItemFields};
+use crate::network::NetworkStatus;
+use crate::pane_group::focus_state::PaneFocusHandle;
+use crate::pane_group::pane::view;
+use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
+use crate::server::ids::{ClientId, ServerId, SyncId};
+use crate::server::telemetry::{ObjectTelemetryMetadata, TelemetryEvent, TelemetryObjectType};
+use crate::settings::AISettings;
+use crate::settings::app_installation_detection::{
+    UserAppInstallDetectionSettings, UserAppInstallStatus,
+};
+use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
+use crate::ui_components::breadcrumb::{BreadcrumbState, render_breadcrumbs};
+use crate::ui_components::buttons::{accent_icon_button, icon_button};
+use crate::ui_components::dialog::{Dialog, dialog_styles};
+use crate::ui_components::icons::Icon;
 #[cfg(target_family = "wasm")]
 use crate::uri::web_intent_parser::open_url_on_desktop;
+use crate::util::bindings::CustomAction;
+use crate::view_components::{DismissibleToast, ToastType};
+use crate::workflows::WorkflowObject;
+use crate::workflows::workflow::{Argument, Workflow};
+use crate::workspace::ToastStack;
+use crate::{FeatureFlag, send_telemetry_from_ctx};
 
 mod alias_argument_selector;
 mod alias_bar;
@@ -172,7 +156,7 @@ const AI_ASSIST_LOADING_TEXT: &str = "Loading";
 
 const ALIAS_HELP_TEXT: &str = "Aliases allow you to create short strings to execute workflows. Each alias can have different argument values and environment variables, and aliases are personal to you.";
 
-const RUN_ON_DESKTOP_BUTTON_TEXT: &str = "Run in Zap";
+const RUN_ON_DESKTOP_BUTTON_TEXT: &str = "Run in InfiniShell";
 const RUN_ON_DESKTOP_BUTTON_WIDTH: f32 = 108.;
 
 const UNSAVED_CHANGES_TEXT: &str = "You have unsaved changes.";
@@ -556,51 +540,49 @@ impl WorkflowView {
 
         if let (ObjectOperation::Create { .. }, OperationSuccessType::Success) =
             (&result.operation, &result.success_type)
+            && self.workflow_id.into_client() == result.client_id
         {
-            if self.workflow_id.into_client() == result.client_id {
-                let server_id = result
-                    .server_id
-                    .expect("Expect server id on success creation");
+            let server_id = result
+                .server_id
+                .expect("Expect server id on success creation");
 
-                // The aliases were created with the old client sync id.  Update them to the new server id.
-                WorkflowAliases::handle(ctx).update(ctx, |aliases, ctx| {
-                    if let Result::Err(e) =
-                        aliases.update_workflow_id(self.workflow_id, server_id.into(), ctx)
-                    {
-                        log::error!("Failed to update aliases after workflow creation: {e:?}");
-                    }
-                });
-
-                if let Some(workflow) =
-                    ObjectStoreModel::as_ref(ctx).get_workflow_by_uid(&server_id.uid())
+            // The aliases were created with the old client sync id.  Update them to the new server id.
+            WorkflowAliases::handle(ctx).update(ctx, |aliases, ctx| {
+                if let Result::Err(e) =
+                    aliases.update_workflow_id(self.workflow_id, server_id.into(), ctx)
                 {
-                    self.load(
-                        workflow.clone(),
-                        &ZapDriveObjectSettings::default(),
-                        self.workflow_view_mode,
-                        ctx,
-                    );
+                    report_error!(e.context("Failed to update aliases after workflow creation"));
                 }
-                ctx.notify();
+            });
+
+            if let Some(workflow) =
+                ObjectStoreModel::as_ref(ctx).get_workflow_by_uid(&server_id.uid())
+            {
+                self.load(
+                    workflow.clone(),
+                    &ZapDriveObjectSettings::default(),
+                    self.workflow_view_mode,
+                    ctx,
+                );
             }
+            ctx.notify();
         }
 
         if let (ObjectOperation::Update, OperationSuccessType::Success) =
             (&result.operation, &result.success_type)
+            && let Some(workflow) = self.get_cloud_workflow(ctx)
         {
-            if let Some(workflow) = self.get_cloud_workflow(ctx) {
-                // This makes sure we get the correct updated revision_ts. So our subsequent
-                // updates don't fail
-                if self.workflow_id.into_client() == result.client_id
-                    || self.workflow_id.uid() == result.server_id.unwrap_or_default().uid()
-                {
-                    self.load(
-                        workflow,
-                        &ZapDriveObjectSettings::default(),
-                        self.workflow_view_mode,
-                        ctx,
-                    );
-                }
+            // This makes sure we get the correct updated revision_ts. So our subsequent
+            // updates don't fail
+            if self.workflow_id.into_client() == result.client_id
+                || self.workflow_id.uid() == result.server_id.unwrap_or_default().uid()
+            {
+                self.load(
+                    workflow,
+                    &ZapDriveObjectSettings::default(),
+                    self.workflow_view_mode,
+                    ctx,
+                );
             }
         }
     }
@@ -1284,16 +1266,15 @@ impl WorkflowView {
 
             // Check to see if we have enum data for this id, then create a request for it
             for enum_id in type_selector.get_created_enums() {
-                if !sent_requests.contains(&enum_id) {
-                    if let Some(enum_data) = self.all_workflow_enums.get(&enum_id) {
-                        if enum_data.new_data.is_some() {
-                            workflow_arg_type_helpers::save_enum(enum_data, owner, ctx);
+                if !sent_requests.contains(&enum_id)
+                    && let Some(enum_data) = self.all_workflow_enums.get(&enum_id)
+                    && enum_data.new_data.is_some()
+                {
+                    workflow_arg_type_helpers::save_enum(enum_data, owner, ctx);
 
-                            // Make sure we aren't sending duplicate requests.
-                            // If an enum is used in multiple arguments, we'll only save it once
-                            sent_requests.insert(enum_id);
-                        }
-                    }
+                    // Make sure we aren't sending duplicate requests.
+                    // If an enum is used in multiple arguments, we'll only save it once
+                    sent_requests.insert(enum_id);
                 }
             }
 
@@ -1577,7 +1558,7 @@ impl WorkflowView {
 
     fn save_aliases(&mut self, ctx: &mut ViewContext<Self>) {
         if let Err(e) = self.alias_bar.update(ctx, |bar, ctx| bar.save(ctx)) {
-            log::error!("Error saving aliases: {e:?}");
+            report_error!(e.context("Error saving aliases"));
             self.display_error_toast("Error saving aliases".to_string(), ctx);
         }
     }
@@ -1621,7 +1602,7 @@ impl WorkflowView {
                 let client_id = if let Some(id) = self.workflow_id.into_client() {
                     id
                 } else {
-                    log::error!("No client_id obtained for creating workflow");
+                    report_error!("No client_id obtained for creating workflow");
                     self.display_error_toast(String::from("Could not create workflow"), ctx);
                     return;
                 };
@@ -1651,10 +1632,10 @@ impl WorkflowView {
                     self.try_set_view_mode(ctx);
                     ctx.emit(WorkflowViewEvent::CreatedWorkflow(self.workflow_id));
                 } else {
-                    log::error!("Attempting to create workflow but now space found");
+                    report_error!("Attempting to create workflow but now space found");
                 }
             }
-            _ => log::error!("Did not match conditions to either create or save the workflow"),
+            _ => report_error!("Did not match conditions to either create or save the workflow"),
         }
     }
 
@@ -2465,7 +2446,7 @@ impl WorkflowView {
                     .finish();
 
                 let button_with_tool_tip = appearance.ui_builder().tool_tip_on_element(
-                    "Generate a title, descriptions, or parameters with Zap AI".to_string(),
+                    "Generate a title, descriptions, or parameters with InfiniShell AI".to_string(),
                     self.ui_state_handles.ai_assist_tool_tip.clone(),
                     rendered_button,
                     ParentAnchor::TopMiddle,
@@ -2497,37 +2478,37 @@ impl WorkflowView {
         }
 
         // If on the web, then show a button to run this workflow on the desktop.
-        if !ContextFlag::RunWorkflow.is_enabled() && self.can_open_on_desktop(app) {
-            if let Some(url) = self
+        if !ContextFlag::RunWorkflow.is_enabled()
+            && self.can_open_on_desktop(app)
+            && let Some(url) = self
                 .workflow_link(app)
                 .and_then(|link| Url::parse(&link).ok())
-            {
-                let run_on_desktop_button = self
-                    .build_footer_button(
-                        ButtonVariant::Accent,
-                        RUN_ON_DESKTOP_BUTTON_TEXT.to_string(),
-                        Some((Icon::Laptop, TextAndIconAlignment::IconFirst)),
-                        // Reuse the execute button's handle since it's only shown if running workflows is
-                        // supported.
-                        self.ui_state_handles.execute_command_mouse_state.clone(),
-                        appearance,
-                    )
-                    .with_style(UiComponentStyles {
-                        width: Some(RUN_ON_DESKTOP_BUTTON_WIDTH),
-                        ..Default::default()
-                    })
-                    .build()
-                    .with_cursor(Cursor::PointingHand)
-                    .on_click(move |ctx, _, _| {
-                        ctx.dispatch_typed_action(WorkflowAction::OpenLinkOnDesktop(url.clone()))
-                    })
-                    .finish();
-                button_row.add_child(
-                    Container::new(run_on_desktop_button)
-                        .with_margin_left(8.)
-                        .finish(),
-                );
-            }
+        {
+            let run_on_desktop_button = self
+                .build_footer_button(
+                    ButtonVariant::Accent,
+                    RUN_ON_DESKTOP_BUTTON_TEXT.to_string(),
+                    Some((Icon::Laptop, TextAndIconAlignment::IconFirst)),
+                    // Reuse the execute button's handle since it's only shown if running workflows is
+                    // supported.
+                    self.ui_state_handles.execute_command_mouse_state.clone(),
+                    appearance,
+                )
+                .with_style(UiComponentStyles {
+                    width: Some(RUN_ON_DESKTOP_BUTTON_WIDTH),
+                    ..Default::default()
+                })
+                .build()
+                .with_cursor(Cursor::PointingHand)
+                .on_click(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(WorkflowAction::OpenLinkOnDesktop(url.clone()))
+                })
+                .finish();
+            button_row.add_child(
+                Container::new(run_on_desktop_button)
+                    .with_margin_left(8.)
+                    .finish(),
+            );
         }
 
         Flex::column()
@@ -3158,17 +3139,16 @@ impl BackingView for WorkflowView {
             );
         }
 
-        if self.can_open_on_desktop(ctx) {
-            if let Some(link) = self.workflow_link(ctx) {
-                if let Ok(url) = Url::parse(&link) {
-                    menu_items.push(
-                        MenuItemFields::new(crate::t!("object-menu-open-on-desktop"))
-                            .with_on_select_action(WorkflowAction::OpenLinkOnDesktop(url))
-                            .with_icon(Icon::Laptop)
-                            .into_item(),
-                    );
-                }
-            }
+        if self.can_open_on_desktop(ctx)
+            && let Some(link) = self.workflow_link(ctx)
+            && let Ok(url) = Url::parse(&link)
+        {
+            menu_items.push(
+                MenuItemFields::new(crate::t!("object-menu-open-on-desktop"))
+                    .with_on_select_action(WorkflowAction::OpenLinkOnDesktop(url))
+                    .with_icon(Icon::Laptop)
+                    .into_item(),
+            );
         }
 
         let space = ObjectStoreViewModel::as_ref(ctx).object_space(&self.workflow_id.uid(), ctx);
@@ -3220,7 +3200,12 @@ impl BackingView for WorkflowView {
         _ctx: &view::HeaderRenderContext<'_>,
         app: &AppContext,
     ) -> view::HeaderContent {
-        view::HeaderContent::simple(self.pane_configuration().as_ref(app).title())
+        let mut content =
+            view::HeaderContent::simple(self.pane_configuration().as_ref(app).title());
+        if let view::HeaderContent::Standard(header) = &mut content {
+            header.options.always_show_icons = true;
+        }
+        content
     }
 
     fn set_focus_handle(&mut self, focus_handle: PaneFocusHandle, _ctx: &mut ViewContext<Self>) {

@@ -60,7 +60,7 @@ impl GistClient {
     /// 也不要静默回退到无 user-agent 的 Client::default() — GitHub 强制要求 UA。
     pub fn new() -> Self {
         let client = Client::builder()
-            .user_agent("Zap-Terminal")
+            .user_agent("InfiniShell-Terminal")
             .timeout(REQUEST_TIMEOUT)
             .connect_timeout(CONNECT_TIMEOUT)
             .build()

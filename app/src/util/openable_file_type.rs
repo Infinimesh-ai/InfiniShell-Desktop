@@ -1,10 +1,15 @@
 //! File type detection utilities for determining if files can be opened in Zap.
 
-#[cfg(feature = "local_fs")]
-use crate::util::file::external_editor::{settings::EditorChoice, Editor, EditorSettings};
-use serde::{Deserialize, Serialize};
 use std::path::Path;
-pub use warp_util::file_type::{is_binary_file, is_file_content_binary, is_markdown_file};
+
+use serde::{Deserialize, Serialize};
+use warp_core::features::FeatureFlag;
+pub use warp_util::file_type::{
+    is_binary_file, is_file_content_binary, is_jupyter_notebook_file, is_markdown_file,
+};
+
+#[cfg(feature = "local_fs")]
+use crate::util::file::external_editor::{Editor, EditorSettings, settings::EditorChoice};
 
 #[derive(
     Debug,
@@ -61,13 +66,21 @@ pub enum FileTarget {
 /// Checks if a file is a code file with language support.
 #[cfg(feature = "local_fs")]
 pub fn is_supported_code_file(path: impl AsRef<Path>) -> bool {
-    let path = path.as_ref();
-    languages::language_by_filename(path).is_some()
+    languages::language_by_local_filename(path.as_ref()).is_some()
 }
 
 #[cfg(not(feature = "local_fs"))]
 pub fn is_supported_code_file(_path: impl AsRef<Path>) -> bool {
     false
+}
+
+/// Whether `path` renders in Warp's notebook viewer (with a Rendered/Raw
+/// toggle): Markdown files always, Jupyter notebooks when the feature flag is
+/// enabled.
+pub fn renders_in_warp_notebook_viewer(path: impl AsRef<Path>) -> bool {
+    let path = path.as_ref();
+    is_markdown_file(path)
+        || (FeatureFlag::JupyterNotebookRendering.is_enabled() && is_jupyter_notebook_file(path))
 }
 
 pub fn is_supported_image_file(path: impl AsRef<Path>) -> bool {
@@ -84,7 +97,7 @@ pub fn is_supported_image_file(path: impl AsRef<Path>) -> bool {
 }
 
 /// Returns true if `path` looks like a shell script the user intends to run when
-/// "Open with Zap" is invoked from Finder/another app via a `file://` URL.
+/// "Open with InfiniShell" is invoked from Finder/another app via a `file://` URL.
 ///
 /// Policy: extension in {sh, bash, zsh, fish, ksh} with the user-execute bit set on Unix,
 /// or extension in {ps1, bat, cmd} on Windows (no x-bit concept). On Unix, files with no
@@ -121,7 +134,7 @@ pub fn is_runnable_shell_script(path: &Path) -> bool {
         .and_then(|e| e.to_str())
         .map(|e| e.to_ascii_lowercase());
     if let Some(ext) = ext.as_deref() {
-        return matches!(ext, "sh" | "bash" | "zsh" | "fish" | "ksh");
+        return matches!(ext, "sh" | "bash" | "zsh" | "fish" | "ksh" | "command");
     }
     starts_with_shebang(path)
 }
@@ -171,6 +184,14 @@ pub fn resolve_file_target_to_open_in_warp(
     let is_markdown = matches!(openable_file_type, Some(OpenableFileType::Markdown));
     let layout = layout.unwrap_or(*settings.open_file_layout);
 
+    // Jupyter notebooks render in Warp's notebook viewer unconditionally when
+    // the feature flag is enabled (the whole point is to avoid raw JSON).
+    if openable_file_type.is_some()
+        && FeatureFlag::JupyterNotebookRendering.is_enabled()
+        && is_jupyter_notebook_file(path)
+    {
+        return FileTarget::MarkdownViewer(layout);
+    }
     if is_markdown && *settings.prefer_markdown_viewer {
         return FileTarget::MarkdownViewer(layout);
     }
@@ -205,6 +226,16 @@ pub fn resolve_file_target_with_editor_choice(
     let is_markdown = matches!(is_openable_in_warp, Some(OpenableFileType::Markdown));
     let layout = layout.unwrap_or(default_layout);
     let is_openable_in_warp = is_openable_in_warp.is_some();
+
+    // 0. Jupyter notebooks render in Warp's notebook viewer unconditionally
+    // when the feature flag is enabled (not gated on `prefer_markdown_viewer`
+    // or `editor_choice`, since rendering-instead-of-JSON is the whole point).
+    if is_openable_in_warp
+        && FeatureFlag::JupyterNotebookRendering.is_enabled()
+        && is_jupyter_notebook_file(path)
+    {
+        return FileTarget::MarkdownViewer(layout);
+    }
 
     // 1. Markdown Viewer (only if user preference specified)
     if is_markdown && prefer_markdown_viewer {

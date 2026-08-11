@@ -1,34 +1,31 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::cell::RefCell;
+use std::collections::HashMap;
 
 use settings::{Setting, ToggleableSetting};
 use warp_core::features::FeatureFlag;
-use warpui::{
-    elements::{Flex, MouseStateHandle, ParentElement},
-    ui_components::{components::UiComponent, switch::SwitchStateHandle},
-    Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
-};
+use warp_errors::report_if_error;
+use warpui::elements::{Flex, MouseStateHandle, ParentElement};
+use warpui::ui_components::components::UiComponent;
+use warpui::ui_components::switch::SwitchStateHandle;
+use warpui::{Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
 
-use crate::{
-    appearance::Appearance,
-    report_if_error, send_telemetry_from_ctx,
-    server::telemetry::TelemetryEvent,
-    settings_view::settings_page::{
-        render_body_item, render_dropdown_item, AdditionalInfo, LocalOnlyIconState, ToggleState,
-    },
-    util::file::external_editor::{
-        settings::{
-            EditorChoice, EditorLayout, OpenCodePanelsFileEditor, OpenFileEditor, OpenFileLayout,
-            PreferMarkdownViewer, PreferTabbedEditorView,
-        },
-        EditorSettings, SUPPORTED_EDITORS,
-    },
-    view_components::{Dropdown, DropdownItem},
+use crate::appearance::Appearance;
+use crate::send_telemetry_from_ctx;
+use crate::server::telemetry::TelemetryEvent;
+use crate::settings_view::settings_page::{
+    AdditionalInfo, LocalOnlyIconState, ToggleState, render_body_item, render_dropdown_item,
 };
+use crate::util::file::external_editor::settings::{
+    EditorChoice, EditorLayout, OpenCodePanelsFileEditor, OpenFileEditor, OpenFileLayout,
+    PreferMarkdownViewer, PreferTabbedEditorView,
+};
+use crate::util::file::external_editor::{EditorSettings, SUPPORTED_EDITORS};
+use crate::view_components::{Dropdown, DropdownItem};
 
 // 字面量已迁移到 Fluent:`settings-external-editor-tabbed-header` /
 // `settings-external-editor-tabbed-desc`。
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExternalEditorAction {
     SetEditor(EditorChoice),
     SetCodePanelsEditor(EditorChoice),
@@ -155,7 +152,7 @@ impl ExternalEditorView {
 
         let mut items = vec![default_app];
 
-        items.push(DropdownItem::new("Zap", make_action(EditorChoice::Zap)));
+        items.push(DropdownItem::new("InfiniShell", make_action(EditorChoice::Zap)));
         if FeatureFlag::AllowOpeningFileLinksUsingEditorEnv.is_enabled() {
             items.push(DropdownItem::new(
                 "$EDITOR",
@@ -177,7 +174,7 @@ impl ExternalEditorView {
             EditorChoice::ExternalEditor(editor) => {
                 dropdown.set_selected_by_name(format!("{editor}"), ctx)
             }
-            EditorChoice::Zap => dropdown.set_selected_by_name("Zap", ctx),
+            EditorChoice::Zap => dropdown.set_selected_by_name("InfiniShell", ctx),
             EditorChoice::EnvEditor => dropdown.set_selected_by_name("$EDITOR", ctx),
             EditorChoice::SystemDefault => dropdown.set_selected_by_name(default_option_text, ctx),
         };
@@ -200,9 +197,11 @@ impl ExternalEditorView {
 
     fn set_code_panels_editor(&mut self, editor: &EditorChoice, ctx: &mut ViewContext<Self>) {
         EditorSettings::handle(ctx).update(ctx, |settings, ctx| {
-            report_if_error!(settings
-                .open_code_panels_file_editor
-                .set_value(*editor, ctx));
+            report_if_error!(
+                settings
+                    .open_code_panels_file_editor
+                    .set_value(*editor, ctx)
+            );
         });
 
         send_telemetry_from_ctx!(

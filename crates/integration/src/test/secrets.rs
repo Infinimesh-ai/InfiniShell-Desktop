@@ -1,26 +1,25 @@
+use warp::integration_testing::clipboard::assert_clipboard_contains_string;
+use warp::integration_testing::secret_redaction::{
+    assert_secret_tooltip_open, assert_secrets_redacted_for_ai,
+};
+use warp::integration_testing::settings::{
+    toggle_hide_secrets_in_block_list_setting, toggle_safe_mode_setting,
+};
+use warp::integration_testing::step::new_step_with_default_assertions;
+use warp::integration_testing::terminal::util::ExpectedExitStatus;
 use warp::integration_testing::terminal::{
-    initialize_secret_regexes, open_context_menu_for_selected_block,
+    assert_selected_block_index_is_last_renderable, execute_command_for_single_terminal_in_tab,
+    initialize_secret_regexes, open_context_menu_for_selected_block, run_alt_grid_program,
+    wait_until_bootstrapped_single_pane_for_tab,
 };
-use warp::{
-    integration_testing::{
-        clipboard::assert_clipboard_contains_string,
-        secret_redaction::{assert_secret_tooltip_open, assert_secrets_redacted_for_ai},
-        settings::{toggle_hide_secrets_in_block_list_setting, toggle_safe_mode_setting},
-        step::new_step_with_default_assertions,
-        terminal::{
-            assert_selected_block_index_is_last_renderable,
-            execute_command_for_single_terminal_in_tab, run_alt_grid_program,
-            util::ExpectedExitStatus, wait_until_bootstrapped_single_pane_for_tab,
-        },
-        view_getters::single_terminal_view,
-    },
-    terminal::model::{index::Point, terminal_model::WithinModel},
-};
-use warpui::{async_assert, integration::TestStep};
+use warp::integration_testing::view_getters::single_terminal_view;
+use warp::terminal::model::index::Point;
+use warp::terminal::model::terminal_model::WithinModel;
+use warpui_core::async_assert;
+use warpui_core::integration::TestStep;
 
+use super::{Builder, new_builder};
 use crate::util::skip_if_powershell_core_2303;
-
-use super::{new_builder, Builder};
 
 pub fn test_secret_is_obfuscated_on_copy() -> Builder {
     let phone_number = "123-456-7890";

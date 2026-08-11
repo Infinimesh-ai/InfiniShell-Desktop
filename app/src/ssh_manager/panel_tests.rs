@@ -9,7 +9,7 @@ use warp_core::ui::appearance::Appearance;
 use warp_ssh_manager::{NodeKind, SshNode};
 use warpui::platform::WindowStyle;
 use warpui::units::IntoPixels;
-use warpui::{App, Presenter, WindowInvalidation};
+use warpui::{App, EntityIdSet, Presenter, WindowInvalidation};
 
 use crate::test_util::settings::initialize_settings_for_tests;
 
@@ -83,7 +83,8 @@ fn panel_with_nodes(
 }
 
 fn render_panel_scene(app: &mut App, presenter: &mut Presenter, window_id: warpui::WindowId) {
-    let mut updated = std::collections::HashSet::new();
+    // `WindowInvalidation::updated` 是 `EntityIdSet`(FxHasher),不是标准库默认 hasher 的 HashSet。
+    let mut updated = EntityIdSet::default();
     updated.insert(app.root_view_id(window_id).unwrap());
     let invalidation = WindowInvalidation {
         updated,

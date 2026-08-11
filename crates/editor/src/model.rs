@@ -2,27 +2,24 @@ use std::ops::Range;
 
 use itertools::{Either, Itertools};
 use line_ending::LineEnding;
-use vec1::{Vec1, vec1};
-use warpui::{
-    AppContext, Entity, ModelAsRef, ModelContext, ModelHandle, clipboard::ClipboardContent,
-};
-
-use crate::{
-    content::{
-        anchor::Anchor,
-        buffer::{
-            AutoScrollBehavior, Buffer, BufferEditAction, BufferSelectAction, EditOrigin,
-            InitialBufferState, SelectionOffsets, ShouldAutoscroll, ToBufferCharOffset,
-        },
-        selection_model::BufferSelectionModel,
-        text::{BlockType, BufferBlockItem, BufferBlockStyle, CodeBlockType, TextStyles},
-        version::BufferVersion,
-    },
-    render::model::RenderState,
-    selection::{SelectionMode, SelectionModel, TextDirection, TextUnit},
-};
 use string_offset::{ByteOffset, CharOffset};
-use warpui::elements::ListIndentLevel;
+use vec1::{Vec1, vec1};
+use warpui_core::clipboard::ClipboardContent;
+use warpui_core::elements::ListIndentLevel;
+use warpui_core::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle};
+
+use crate::content::anchor::Anchor;
+use crate::content::buffer::{
+    AutoScrollBehavior, Buffer, BufferEditAction, BufferSelectAction, EditOrigin,
+    InitialBufferState, SelectionOffsets, ShouldAutoscroll, ToBufferCharOffset,
+};
+use crate::content::selection_model::BufferSelectionModel;
+use crate::content::text::{
+    BlockType, BufferBlockItem, BufferBlockStyle, CodeBlockType, TextStyles,
+};
+use crate::content::version::BufferVersion;
+use crate::render::model::RenderState;
+use crate::selection::{SelectionMode, SelectionModel, TextDirection, TextUnit};
 
 /// A wrapper for a buffer that provides access to its internal update_content method.
 /// It's important this is only returned from `CoreEditorModel::update_content` method
@@ -160,6 +157,31 @@ pub trait CoreEditorModel: Entity {
                     EditOrigin::SystemEdit,
                     ShouldAutoscroll::VerticalOnly,
                     self.buffer_selection_model().clone(),
+                    ctx,
+                );
+            },
+            ctx,
+        );
+        self.validate(ctx);
+    }
+
+    fn replace_first_n_characters(
+        &mut self,
+        n: CharOffset,
+        text: &str,
+        ctx: &mut ModelContext<Self::T>,
+    ) {
+        let selection_model = self.buffer_selection_model().clone();
+        self.update_content(
+            |mut content, ctx| {
+                let start = CharOffset::from(1);
+                let end = std::cmp::min(start + n.as_usize(), content.buffer().max_charoffset());
+                content.apply_edit(
+                    BufferEditAction::InsertAtCharOffsetRanges {
+                        edits: &vec1![(text.to_owned(), start..end)],
+                    },
+                    EditOrigin::UserInitiated,
+                    selection_model,
                     ctx,
                 );
             },
@@ -917,9 +939,28 @@ pub trait RichTextEditorModel: CoreEditorModel {
         self.validate(ctx);
     }
 
+    fn reset_with_ipynb(&mut self, ipynb: &str, ctx: &mut ModelContext<Self::T>) {
+        let state = InitialBufferState::ipynb(ipynb);
+
+        self.update_content(
+            |mut content, ctx| {
+                content.buffer().reset_undo_stack();
+                content.apply_edit(
+                    BufferEditAction::ReplaceWith(state),
+                    EditOrigin::SystemEdit,
+                    self.buffer_selection_model().clone(),
+                    ctx,
+                );
+            },
+            ctx,
+        );
+        self.validate(ctx);
+    }
+
     fn update_to_new_markdown(&mut self, markdown: &str, ctx: &mut ModelContext<Self::T>) {
-        use crate::content::buffer::StyledBlockBoundaryBehavior;
         use markdown_parser::{compute_formatted_text_delta, parse_markdown};
+
+        use crate::content::buffer::StyledBlockBoundaryBehavior;
 
         // Try to obtain the current formatted-text view from the buffer and
         // compute both the `FormattedText` delta and the common prefix length in

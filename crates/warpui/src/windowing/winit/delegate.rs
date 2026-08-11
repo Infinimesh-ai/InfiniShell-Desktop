@@ -3,51 +3,42 @@
 #[cfg(not(target_family = "wasm"))]
 mod global_hotkey;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::mem::ManuallyDrop;
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    path::{Path, PathBuf},
-    sync::{Arc, OnceLock},
-    thread::{self, panicking},
-};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, OnceLock};
+use std::thread::{self, panicking};
 
 use anyhow::Result;
 use geometry::rect::RectF;
 use itertools::Itertools;
 use parking_lot::Mutex;
 use serde::de::IntoDeserializer;
+use warp_errors::report_error;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
-
-use crate::platform::MicrophoneAccessState;
-use crate::platform::{
-    file_picker::{
-        FilePickerCallback, FilePickerError, SaveFilePickerCallback, SaveFilePickerConfiguration,
-    },
-    Cursor, RequestNotificationPermissionsCallback, SendNotificationErrorCallback,
-};
-use crate::windowing::winit::app::CustomEvent::UpdateUIApp;
-use crate::windowing::WindowManager;
-use crate::Effect::Event;
-use crate::{
-    accessibility,
-    clipboard::{self, ClipboardContent, InMemoryClipboard},
-    geometry, keymap,
-    modals::{AlertDialog, ModalId},
-    notification, platform,
-    platform::file_picker::{FilePickerConfiguration, FileType},
-    windowing::{self, WindowCallbacks},
-    AppContext, ApplicationBundleInfo, Clipboard, DisplayId, DisplayIdx, WindowId,
-};
-use crate::{
-    notification::{NotificationSendError, RequestPermissionsOutcome},
-    platform::TerminationMode,
-};
-
-use super::{notifications, CustomEvent};
 
 #[cfg(not(target_family = "wasm"))]
 use self::global_hotkey::GlobalHotKeyHandler;
+use super::{CustomEvent, notifications};
+use crate::Effect::Event;
+use crate::clipboard::{self, ClipboardContent, InMemoryClipboard};
+use crate::modals::{AlertDialog, ModalId};
+use crate::notification::{NotificationSendError, RequestPermissionsOutcome};
+use crate::platform::file_picker::{
+    FilePickerCallback, FilePickerConfiguration, FilePickerError, FileType, SaveFilePickerCallback,
+    SaveFilePickerConfiguration,
+};
+use crate::platform::{
+    Cursor, MicrophoneAccessState, RequestNotificationPermissionsCallback,
+    SendNotificationErrorCallback, TerminationMode,
+};
+use crate::windowing::winit::app::CustomEvent::UpdateUIApp;
+use crate::windowing::{self, WindowCallbacks, WindowManager};
+use crate::{
+    AppContext, ApplicationBundleInfo, Clipboard, DisplayId, DisplayIdx, WindowId, accessibility,
+    geometry, keymap, notification, platform,
+};
 
 // No-op on WASM since the browser cannot provide this functionality.
 #[cfg(target_family = "wasm")]
@@ -64,11 +55,19 @@ impl GlobalHotKeyHandler {
 static MAIN_THREAD_ID: OnceLock<thread::ThreadId> = OnceLock::new();
 
 /// Open a URL using the platform's default handler.
-pub fn open_url_in_system(url: &str) {
+pub fn open_url_in_system(url: &str) -> bool {
     #[cfg(target_family = "wasm")]
-    if let Some(window) = web_sys::window() {
-        // Try to open the URL in a new tab.
-        let _ = window.open_with_url_and_target(url, "_blank");
+    {
+        let Some(window) = web_sys::window() else {
+            return false;
+        };
+        let Some(safe_url) = crate::browser::safe_browser_open_url(url) else {
+            log::warn!("Skipping browser URL open for invalid or unsafe URL");
+            return false;
+        };
+        window
+            .open_with_url_and_target_and_features(&safe_url, "_blank", "noopener,noreferrer")
+            .is_ok_and(|window| window.is_some())
     }
 
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
@@ -80,49 +79,81 @@ pub fn open_url_in_system(url: &str) {
         //    "native" opening of files is not necessarily going to work.
         // We choose to do the following:
         // 1. First attempt to open with `wslview`, since that is basically made to open stuff in wsl
-        // 2. Use `cmd.exe /c start {url}` to open in the user's default windows browser
+        // 2. Use `rundll32.exe url.dll,FileProtocolHandler {url}` to open in the user's default windows browser
         //    - If a user does not want this behavior, and wants all opening to go through
         //      WSL, they can set the env variable WARP_FORCE_WSL_BROWSER.
         // 3. Fall back to default linux url opening behavior.
         if platform::linux::is_wsl() {
             match open::with_detached(url, "wslview") {
-                Ok(_) => return,
+                Ok(_) => return true,
                 Err(e) => log::info!(
                     "Failed to open url with wslview {e:?}, falling back to another method"
                 ),
             };
 
-            // Attempt to open by
             if !use_wsl_browser() {
-                let mut cmd = command::blocking::Command::new("cmd.exe");
-                cmd.args(["/c", "start", url]);
+                // Validate the URL scheme before passing to Windows to prevent injection
+                // via unrecognized or file-system-targeting schemes (e.g. file:, ms-msdt:,
+                // search-ms:, javascript:). We use the re-serialized URL from the parser
+                // rather than the raw input so that characters like `"` are percent-encoded
+                // (e.g. %22) before they reach explorer.exe's command line.
+                let safe_url = url::Url::parse(url)
+                    .ok()
+                    .and_then(|u| matches!(u.scheme(), "http" | "https").then(|| u.to_string()));
 
-                // Note: Ideally, we would be calling detached like open::that_detached does.
-                // However, it is probably fine.
-                match cmd
-                    .stdin(std::process::Stdio::null())
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .status()
-                {
-                    Ok(_) => return,
-                    Err(e) => log::info!(
-                        "Failed to open url with cmd.exe {e:?}, falling back to another method"
-                    ),
+                if let Some(safe_url) = safe_url {
+                    let mut cmd = command::blocking::Command::new("rundll32.exe");
+                    cmd.args(["url.dll,FileProtocolHandler", &safe_url]);
+
+                    // Note: Ideally, we would be calling detached like open::that_detached does.
+                    // However, it is probably fine.
+                    match cmd
+                        .stdin(std::process::Stdio::null())
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
+                        .status()
+                    {
+                        Ok(status) if status.success() => return true,
+                        Ok(status) => log::info!(
+                            "Failed to open url with rundll32.exe: process exited with {status}, \
+                             falling back to another method"
+                        ),
+                        Err(e) => log::info!(
+                            "Failed to open url with rundll32.exe {e:?}, falling back to another method"
+                        ),
+                    }
+                } else {
+                    log::warn!("Skipping Windows URL open for unrecognized or unsafe URL scheme");
                 }
             }
         }
-        if let Err(e) = open::that_detached(url) {
-            log::warn!("Unable to open url {e:?}");
+        match open::that_detached(url) {
+            Ok(_) => true,
+            Err(e) => {
+                log::warn!("Unable to open url {e:?}");
+                false
+            }
         }
     }
 
     #[cfg(windows)]
     {
-        if let Err(e) = open::that_detached(url) {
-            log::warn!("Unable to open url {e:?}");
+        match open::that_detached(url) {
+            Ok(_) => true,
+            Err(e) => {
+                log::warn!("Unable to open url {e:?}");
+                false
+            }
         }
     }
+
+    #[cfg(not(any(
+        target_family = "wasm",
+        target_os = "linux",
+        target_os = "freebsd",
+        windows
+    )))]
+    false
 }
 
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
@@ -192,7 +223,8 @@ impl AppDelegate {
                 let global_hotkey_handler = match GlobalHotKeyHandler::new(event_loop_proxy.clone()) {
                     Ok(handler) => Some(handler),
                     Err(err) => {
-                        log::error!("Error creating global hotkey handler: {err:?}");
+                        report_error!(anyhow::Error::new(err)
+                            .context("Error creating global hotkey handler"));
                         None
                     }
                 };
@@ -218,14 +250,14 @@ impl AppDelegate {
                 match super::linux::LinuxClipboard::new() {
                     Ok(clipboard) => self.clipboard = Box::new(clipboard),
                     Err(err) => {
-                        log::error!("Error creating Linux clipboard: {err:?}");
+                        report_error!(anyhow::Error::new(err).context("Error creating Linux clipboard"));
                     }
                 }
             } else if #[cfg(target_os = "windows")] {
                 match super::windows::WindowsClipboard::new() {
                     Ok(clipboard) => self.clipboard = Box::new(clipboard),
                     Err(err) => {
-                        log::error!("Error creating Windows clipboard: {err:?}");
+                        report_error!(anyhow::Error::new(err).context("Error creating Windows clipboard"));
                     }
                 }
             }
@@ -281,16 +313,15 @@ impl platform::Delegate for AppDelegate {
         // See https://stackoverflow.com/questions/56393880/how-do-i-detect-dark-mode-using-javascript.
         if let Ok(Some(media_query_list)) =
             gloo::utils::window().match_media("(prefers-color-scheme: dark)")
+            && media_query_list.matches()
         {
-            if media_query_list.matches() {
-                return platform::SystemTheme::Dark;
-            }
+            return platform::SystemTheme::Dark;
         }
         platform::SystemTheme::Light
     }
 
-    fn open_url(&self, url: &str) {
-        open_url_in_system(url);
+    fn open_url(&self, url: &str) -> bool {
+        open_url_in_system(url)
     }
 
     fn open_file_path(&self, path: &Path) {
@@ -300,13 +331,16 @@ impl platform::Delegate for AppDelegate {
                     .arg(path)
                     .spawn();
             } else if #[cfg(target_family = "wasm")] {
-                if let Some(window) = web_sys::window() {
-                    if let Some(path) = path.to_str() {
+                if let Some(window) = web_sys::window()
+                    && let Some(path) = path.to_str() {
                         // Try to open the path via a file:// URL.
                         let url = format!("file://{path}");
-                        let _ = window.open_with_url(&url);
+                        let _ = window.open_with_url_and_target_and_features(
+                            &url,
+                            "_blank",
+                            "noopener,noreferrer",
+                        );
                     }
-                }
             } else if #[cfg(windows)] {
                 if let Err(e) = open::that_detached(path) {
                     log::warn!("Unable to open path {e:?}");
@@ -434,7 +468,9 @@ impl platform::Delegate for AppDelegate {
                     }
 
                     let file_result = file_dialog.show_save_single_file().unwrap_or_else(|err| {
-                        log::error!("unable to show save file dialog: {err:?}");
+                        report_error!(
+                            anyhow::Error::new(err).context("unable to show save file dialog")
+                        );
                         None
                     });
 
@@ -589,8 +625,8 @@ impl platform::Delegate for IntegrationTestDelegate {
         self.app_delegate.system_theme()
     }
 
-    fn open_url(&self, _: &str) {
-        // no-op
+    fn open_url(&self, _: &str) -> bool {
+        true
     }
 
     fn open_file_path(&self, _: &Path) {

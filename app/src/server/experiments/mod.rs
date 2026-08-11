@@ -11,17 +11,19 @@
 //! See [here](https://www.notion.so/warpdev/Server-side-experiments-dynamic-feature-enablement-c0fb9aed695d4178a19b8830e3269094)
 //! for a full guide on the server-side experiment framework.
 
-use crate::features::FeatureFlag;
 use warpui::AppContext;
 #[cfg(test)]
 use warpui::SingletonEntity;
 
+use crate::features::FeatureFlag;
+
 mod convert;
 mod model;
 
-pub use model::ServerExperiments;
+pub use model::{Event as ServerExperimentsEvent, ServerExperiments};
 
 /// The known server-side experiments.
+#[allow(clippy::enum_variant_names)]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum ServerExperiment {
     DisableAgentModeExperiment,
@@ -37,6 +39,10 @@ pub enum ServerExperiment {
     PromptSuggestionsViaMaaOutOfBandExperiment,
     OzMultiHarnessControl,
     OzMultiHarnessExperiment,
+    MacosRunnersControl,
+    MacosRunnersExperiment,
+    OnboardingChooseHowToStartControl,
+    OnboardingChooseHowToStartExperiment,
     /// A test-only experiment.
     /// Does not correspond to a real server-side experiment.
     #[cfg(test)]
@@ -96,6 +102,14 @@ impl ServerExperiment {
             }
             Self::OzMultiHarnessExperiment => {
                 FeatureFlag::AgentHarness.set_enabled(true);
+            }
+            Self::MacosRunnersControl | Self::MacosRunnersExperiment => {
+                // Runner availability is gated directly by the experiment arm.
+            }
+            Self::OnboardingChooseHowToStartControl
+            | Self::OnboardingChooseHowToStartExperiment => {
+                // The onboarding offer arm is queried directly at offer entry, so
+                // there is no global flag to flip here.
             }
             #[cfg(test)]
             Self::TestExperiment => {

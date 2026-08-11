@@ -38,12 +38,12 @@ pub fn render_inline_ssh_wrapper_banner(
     let (style, title) = if state.wrapper_enabled {
         (
             InlineBannerStyle::LowPriority,
-            "Zap SSH wrapper enabled".to_string(),
+            "InfiniShell SSH wrapper enabled".to_string(),
         )
     } else {
         (
             InlineBannerStyle::VeryLowPriority,
-            "Zap SSH wrapper disabled".to_string(),
+            "InfiniShell SSH wrapper disabled".to_string(),
         )
     };
     let buttons = vec![

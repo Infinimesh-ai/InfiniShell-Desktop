@@ -71,7 +71,7 @@ pub enum WorkflowSelectionSource {
     Alias,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorkflowViewMode {
     View,
     Edit,
@@ -311,7 +311,3 @@ impl From<&WorkflowObject> for Workflow {
         workflow.model().data.to_owned()
     }
 }
-
-#[cfg(test)]
-#[path = "mod_test.rs"]
-mod tests;

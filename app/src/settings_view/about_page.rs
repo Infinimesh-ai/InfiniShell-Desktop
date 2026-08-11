@@ -1,30 +1,26 @@
-use super::{
-    settings_page::{
-        render_body_item, MatchData, PageType, SettingsPageEvent, SettingsPageMeta,
-        SettingsPageViewHandle, SettingsWidget,
-    },
-    LocalOnlyIconState, SettingsSection, ToggleState,
-};
-use crate::{
-    appearance::Appearance,
-    autoupdate::{self, github, AutoupdateStage, AutoupdateState},
-    channel::ChannelState,
-    report_if_error,
-    settings::AutoupdateSettings,
-    workspace::WorkspaceAction,
-};
 use settings::Setting as _;
-use warp_core::{execution_mode::AppExecutionMode, settings::ToggleableSetting as _};
-use warpui::ui_components::switch::SwitchStateHandle;
-use warpui::{
-    assets::asset_cache::AssetSource,
-    elements::{
-        Align, CacheOption, ConstrainedBox, Container, CrossAxisAlignment, Element, Flex, Image,
-        MainAxisAlignment, MouseStateHandle, ParentElement, Wrap,
-    },
-    ui_components::components::UiComponent,
-    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+use warp_core::execution_mode::AppExecutionMode;
+use warp_core::settings::ToggleableSetting as _;
+use warp_errors::report_if_error;
+use warpui::assets::asset_cache::AssetSource;
+use warpui::elements::{
+    Align, CacheOption, ConstrainedBox, Container, CrossAxisAlignment, Element, Flex, Image,
+    MainAxisAlignment, MouseStateHandle, ParentElement, Wrap,
 };
+use warpui::ui_components::components::UiComponent;
+use warpui::ui_components::switch::SwitchStateHandle;
+use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+
+use super::settings_page::{
+    MatchData, PageType, SettingsPageEvent, SettingsPageMeta, SettingsPageViewHandle,
+    SettingsWidget, render_body_item,
+};
+use super::{LocalOnlyIconState, SettingsSection, ToggleState};
+use crate::appearance::Appearance;
+use crate::autoupdate::{self, AutoupdateStage, AutoupdateState, github};
+use crate::channel::ChannelState;
+use crate::settings::AutoupdateSettings;
+use crate::workspace::WorkspaceAction;
 
 #[derive(Debug, Clone)]
 pub enum AboutPageAction {
@@ -140,7 +136,7 @@ impl SettingsWidget for AboutPageWidget {
     ) -> Box<dyn Element> {
         let ui_builder = appearance.ui_builder();
 
-        // 始终用纯图标 logo,品牌名以独立文本 "Zap" 呈现,不再依赖带 "warp" 字样的 svg
+        // 始终用纯图标 logo,品牌名以独立文本 "InfiniShell" 呈现,不再依赖带 "warp" 字样的 svg
         let image_path = "bundled/svg/warp-logo-light.svg";
 
         // GIT_RELEASE_TAG 注入 → 显示 tag;否则进入 Dev 开发模式
@@ -188,7 +184,7 @@ impl SettingsWidget for AboutPageWidget {
             )
             .with_child(
                 ui_builder
-                    .span("Zap")
+                    .span("InfiniShell")
                     .build()
                     .with_margin_top(12.)
                     .finish(),

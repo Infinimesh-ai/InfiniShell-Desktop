@@ -6,15 +6,48 @@
 //! 唤出但永远没有候选项。这样可以避免大改上层 view / suggestions mode
 //! 的接线,等未来若要接入「当前 pane group 实时 cwd」再补回数据来源。
 
+#[cfg(feature = "local_fs")]
+use std::collections::HashMap;
+#[cfg(feature = "local_fs")]
+use std::path::PathBuf;
+#[cfg(feature = "local_fs")]
+use std::sync::{Arc, Mutex};
+
 use warpui::{AppContext, Entity};
 
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::{AsyncDataSource, BoxFuture, DataSourceRunErrorWrapper};
 use crate::terminal::input::repos::AcceptRepo;
+#[cfg(feature = "local_fs")]
+use crate::util::git::RepoGitSummary;
 
-pub struct RepoMenuDataSource;
+/// Cache of per-repo git summaries (branch + diff stats) keyed by repo path.
+///
+/// Shared between the data source, which reads it to render results immediately,
+/// and the view, which populates it in the background. This lets the menu show
+/// the repo list synchronously while the (relatively expensive) git data is
+/// lazily loaded and filled in as it arrives.
+#[cfg(feature = "local_fs")]
+pub type GitSummaryCache = Arc<Mutex<HashMap<PathBuf, RepoGitSummary>>>;
+
+pub struct RepoMenuDataSource {
+    /// Git summaries populated in the background by the view. Reads never block
+    /// on git; missing entries simply render without branch/diff-stat suffixes.
+    ///
+    /// Zap:候选源(`PersistedWorkspace`)已下线,`run_query` 永远返回空结果,
+    /// 因此这份缓存暂时无人读取;保留字段是为了不改动 view 侧的接线。
+    #[cfg(feature = "local_fs")]
+    #[allow(dead_code)]
+    git_summaries: GitSummaryCache,
+}
 
 impl RepoMenuDataSource {
+    #[cfg(feature = "local_fs")]
+    pub fn new(git_summaries: GitSummaryCache) -> Self {
+        Self { git_summaries }
+    }
+
+    #[cfg(not(feature = "local_fs"))]
     pub fn new() -> Self {
         Self
     }

@@ -1,4 +1,6 @@
-use std::{env, path::PathBuf};
+use std::env;
+use std::path::PathBuf;
+
 use tini::Ini;
 
 static CURSOR_DIR_NAME: &'static &str = &"cursors";
@@ -26,7 +28,9 @@ pub fn ensure_cursor_theme() {
         // the default theme, so we do not need to mess with the
         // env var here.
         if theme != *DEFAULT_THEME {
-            env::set_var(ENV_CURSOR_THEME, theme);
+            unsafe {
+                env::set_var(ENV_CURSOR_THEME, theme);
+            }
         }
     }
 }

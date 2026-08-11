@@ -1,6 +1,5 @@
+use fuzzy_match::{FuzzyMatchResult, match_indices_case_insensitive};
 use serde::{Deserialize, Serialize};
-
-use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
 
 /// Determine if `from` starts with `partial` in a case insensitive manner.
 /// Returns None if `partial` does not start with `from`, otherwise specifying
@@ -110,5 +109,5 @@ impl From<Match> for MatchType {
 }
 
 #[cfg(test)]
-#[path = "matchers_test.rs"]
+#[path = "matchers_tests.rs"]
 mod tests;

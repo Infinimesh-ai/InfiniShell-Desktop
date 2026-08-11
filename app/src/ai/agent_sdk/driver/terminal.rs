@@ -11,7 +11,10 @@ use std::{
 use futures::channel::oneshot;
 use warp_completer::completer::CommandOutput;
 use warp_core::command::ExitCode;
+use warp_terminal::model::grid::Dimensions;
 use warp_util::path::ShellFamily;
+// Zap:`Condition` 位于 warp_util crate,app 侧的 `crate::util` 没有 `sync` 子模块。
+use warp_util::sync::Condition;
 use warpui::{r#async::FutureExt, AppContext, Entity, ModelContext, ModelHandle, ViewHandle};
 
 use crate::terminal::model::session::ExecuteCommandOptions;
@@ -22,11 +25,14 @@ use crate::{
     root_view::{open_new_with_workspace_source, NewWorkspaceSource},
     terminal::{
         model::block::{BlockId, SerializedBlock},
+        model::find::RegexDFAs,
+        model::grid::RespectDisplayedOutput,
+        model::index::Point,
+        model::RespectObfuscatedSecrets,
         shared_session::IsSharedSessionCreator,
         shell::ShellType,
         TerminalView,
     },
-    util::sync::Condition,
 };
 
 use crate::ai::attachment_utils::attachments_download_dir;
@@ -148,7 +154,8 @@ impl TerminalDriver {
             });
         }
 
-        ctx.subscribe_to_view(&terminal_view, move |me, event, ctx| {
+        // `ModelContext::subscribe_to_view` 的回调是 4 参 `|me, handle, event, ctx|`。
+        ctx.subscribe_to_view(&terminal_view, move |me, _handle, event, ctx| {
             me.handle_terminal_view_event(event, ctx);
         });
 
@@ -208,14 +215,76 @@ impl TerminalDriver {
             .map(SerializedBlock::from)
     }
 
+    /// Full visible plaintext of `block_id`'s output grid (no ANSI escape
+    /// sequences; secrets obfuscated). Used by the harness output monitor
+    /// to detect whether the block has stalled — two byte-identical
+    /// snapshots taken N seconds apart imply the harness has produced no
+    /// new output and no spinner activity.
+    ///
+    /// We intentionally pass `None` for `max_rows` so we compare the entire
+    /// visible output; capping the row count could falsely report "stalled"
+    /// when content scrolled below the cap actually changed.
+    pub fn block_output_plaintext(&self, block_id: &BlockId, ctx: &AppContext) -> Option<String> {
+        let terminal = self.terminal_view.as_ref(ctx);
+        let model = terminal.model.lock();
+        let block = model.block_list().block_with_id(block_id)?;
+        Some(block.output_grid().contents_to_string(
+            false, // include_escape_sequences
+            None,  // max_rows: full visible output
+        ))
+    }
+
+    /// Find the first match of `dfas` in `block_id`'s output grid, returning the
+    /// matched text alongside the full row(s) that contain it.
+    pub fn find_first_match_in_block_output(
+        &self,
+        block_id: &BlockId,
+        dfas: &RegexDFAs,
+        ctx: &AppContext,
+    ) -> Option<BlockOutputMatch> {
+        let terminal = self.terminal_view.as_ref(ctx);
+        let model = terminal.model.lock();
+        let block = model.block_list().block_with_id(block_id)?;
+        let grid = block.output_grid();
+        let m = grid.find(dfas).next()?;
+        let handler = grid.grid_handler();
+        let matched_text = handler.bounds_to_string(
+            *m.start(),
+            *m.end(),
+            false, // include_esc_sequences
+            RespectObfuscatedSecrets::Yes,
+            false, // force_secrets_obfuscated
+            RespectDisplayedOutput::Yes,
+        );
+        let cols = handler.columns();
+        let row_start = Point::new(m.start().row, 0);
+        let row_end = Point::new(m.end().row, cols.saturating_sub(1));
+        let excerpt = handler.bounds_to_string(
+            row_start,
+            row_end,
+            false,
+            RespectObfuscatedSecrets::Yes,
+            false,
+            RespectDisplayedOutput::Yes,
+        );
+        Some(BlockOutputMatch {
+            matched_text: matched_text.trim().to_owned(),
+            excerpt: excerpt.trim().to_owned(),
+        })
+    }
+
     /// Execute a command in the terminal and return a future that resolves to a
     /// [`CommandHandle`] once the command starts executing.
+    // edition 2024:RPIT 默认捕获所有入参生命周期,而返回的 future 只持有 owned
+    // channel,补 `+ use<>` 以免调用点(如 `cd`)的临时 `String` 被误判为借用。
     pub fn execute_command(
         &mut self,
         command: &str,
         ctx: &mut ModelContext<Self>,
-    ) -> Result<impl Future<Output = Result<CommandHandle, AgentDriverError>>, AgentDriverError>
-    {
+    ) -> Result<
+        impl Future<Output = Result<CommandHandle, AgentDriverError>> + use<>,
+        AgentDriverError,
+    > {
         let (exit_tx, exit_rx) = oneshot::channel::<ExitCode>();
         let (start_tx, start_rx) = oneshot::channel::<BlockId>();
 
@@ -299,8 +368,10 @@ impl TerminalDriver {
         &mut self,
         target: &str,
         ctx: &mut ModelContext<Self>,
-    ) -> Result<impl Future<Output = Result<CommandHandle, AgentDriverError>>, AgentDriverError>
-    {
+    ) -> Result<
+        impl Future<Output = Result<CommandHandle, AgentDriverError>> + use<>,
+        AgentDriverError,
+    > {
         let cd_command = self.build_cd_command(target, ctx);
         self.execute_command(&cd_command, ctx)
     }
@@ -336,7 +407,10 @@ impl TerminalDriver {
     /// This only waits for the `SessionBootstrapped` terminal view event.
     pub fn wait_for_session_bootstrapped(
         &self,
-    ) -> impl Future<Output = Result<(), AgentDriverError>> {
+        // Zap:edition 2024 RPIT 默认捕获 `&self`,会让 `driver.rs::run_internal` 里
+        // `foreground.spawn(|me, ctx| ...)` 的返回值被判成借用逃逸;future 只持有
+        // clone 出来的 `session_bootstrapped`,故显式 `use<>`。
+    ) -> impl Future<Output = Result<(), AgentDriverError>> + use<> {
         let session_bootstrapped = self.session_bootstrapped.clone();
 
         async move {
@@ -350,6 +424,19 @@ impl TerminalDriver {
                 })
         }
     }
+}
+
+/// The first DFA match returned by
+/// [`TerminalDriver::find_first_match_in_block_output`].
+///
+/// `matched_text` is the exact substring from the grid (no ANSI escapes),
+/// used by the harness output monitor to map the hit back to the originating
+/// pattern. `excerpt` is the full row(s) containing the match, also as
+/// plaintext, suitable for surfacing in user-visible error messages.
+#[derive(Debug, Clone)]
+pub(crate) struct BlockOutputMatch {
+    pub matched_text: String,
+    pub excerpt: String,
 }
 
 /// A handle to a running terminal command.

@@ -45,12 +45,13 @@ fn should_autoexecute_returns_false_when_autoapprove_is_enabled_and_profile_alwa
         let executor = app.add_model(|_| AskUserQuestionExecutor::new(terminal_view_id));
         let action = build_action("ask-user-question");
         let conversation_id = history.update(&mut app, |history, ctx| {
-            history.start_new_conversation(terminal_view_id, true, false, ctx)
+            // 上游新增 `is_cli_agent_transcript` 形参,普通会话传 false。
+            history.start_new_conversation(terminal_view_id, true, false, false, ctx)
         });
 
         profiles.update(&mut app, |profiles, ctx| {
-            let profile_id = *profiles.active_profile(Some(terminal_view_id), ctx).id();
-            profiles.set_ask_user_question(profile_id, AskUserQuestionPermission::AlwaysAsk, ctx);
+            let profile_id = profiles.active_profile(Some(terminal_view_id), ctx).id().clone();
+            profiles.set_ask_user_question(&profile_id, AskUserQuestionPermission::AlwaysAsk, ctx);
         });
 
         let result = executor.update(&mut app, |executor, ctx| {
@@ -89,7 +90,7 @@ fn initialize_ask_user_question_test(
     profiles.update(app, |profiles, ctx| {
         if let Some(profile_id) = profiles.create_profile(ctx) {
             profiles.set_ask_user_question(
-                profile_id,
+                &profile_id,
                 AskUserQuestionPermission::AskExceptInAutoApprove,
                 ctx,
             );
@@ -128,7 +129,8 @@ fn should_autoexecute_returns_false_when_autoapprove_is_enabled_with_default_pro
         let executor = app.add_model(|_| AskUserQuestionExecutor::new(terminal_view_id));
         let action = build_action("ask-user-question");
         let conversation_id = history.update(&mut app, |history, ctx| {
-            history.start_new_conversation(terminal_view_id, true, false, ctx)
+            // 上游新增 `is_cli_agent_transcript` 形参,普通会话传 false。
+            history.start_new_conversation(terminal_view_id, true, false, false, ctx)
         });
         let result = executor.update(&mut app, |executor, ctx| {
             let input = ExecuteActionInput {
@@ -150,7 +152,8 @@ fn execute_returns_async_when_autoapprove_is_enabled_with_default_profile() {
         let executor = app.add_model(|_| AskUserQuestionExecutor::new(terminal_view_id));
         let action = build_action("ask-user-question");
         let conversation_id = history.update(&mut app, |history, ctx| {
-            history.start_new_conversation(terminal_view_id, true, false, ctx)
+            // 上游新增 `is_cli_agent_transcript` 形参,普通会话传 false。
+            history.start_new_conversation(terminal_view_id, true, false, false, ctx)
         });
 
         let execution = executor.update(&mut app, |executor, ctx| {
@@ -256,14 +259,14 @@ fn should_autoexecute_uses_active_terminal_profile_permission() {
         let executor = app.add_model(|_| AskUserQuestionExecutor::new(terminal_view_id));
         let action = build_action("ask-user-question");
         let conversation_id = history.update(&mut app, |history, ctx| {
-            history.start_new_conversation(terminal_view_id, false, false, ctx)
+            history.start_new_conversation(terminal_view_id, false, false, false, ctx)
         });
 
         profiles.update(&mut app, |profiles, ctx| {
             let profile_id = profiles
                 .create_profile(ctx)
                 .expect("test profile should be created");
-            profiles.set_ask_user_question(profile_id, AskUserQuestionPermission::Never, ctx);
+            profiles.set_ask_user_question(&profile_id, AskUserQuestionPermission::Never, ctx);
             profiles.set_active_profile(terminal_view_id, profile_id, ctx);
         });
 

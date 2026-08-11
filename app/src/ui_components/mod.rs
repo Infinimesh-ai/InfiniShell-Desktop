@@ -2,6 +2,7 @@
 //! used for the apps design (our buttons with styling, headers and panels etc.) as well definition
 //! of colors (aka blended colors from the figma designs derived from Zap theme) and icons used
 //! within the app.
+pub(crate) mod agent_icon;
 pub(crate) mod avatar;
 pub(crate) mod blended_colors;
 pub(crate) mod breadcrumb;
@@ -10,6 +11,7 @@ pub(crate) mod color_dot;
 pub(crate) mod dialog;
 pub(crate) mod icon_with_status;
 pub(crate) mod item_highlight;
+pub mod json_tree;
 pub(crate) mod menu_button;
 pub(crate) mod red_notification_dot;
 pub(crate) mod render_file_search_row;

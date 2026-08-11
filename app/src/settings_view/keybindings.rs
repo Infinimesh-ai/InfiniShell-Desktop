@@ -1,54 +1,42 @@
 use std::collections::HashMap;
 
-use super::{
-    settings_page::{
-        render_sub_header, LocalOnlyIconState, MatchData, PageType, SettingsPageMeta,
-        SettingsPageViewHandle, SettingsWidget,
-    },
-    SettingsSection,
-};
-use crate::send_telemetry_from_ctx;
-use crate::{appearance::Appearance, themes};
-use crate::{
-    editor::EditorView, keyboard::write_custom_keybinding, util::bindings::CommandBinding,
-};
-use crate::{
-    editor::{
-        Event as EditorEvent, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions, TextOptions,
-    },
-    keyboard::UserDefinedKeybinding,
-};
-use crate::{search_bar::SearchBar, settings::PreferencesSettings};
-use crate::{
-    util::bindings::{
-        filter_bindings_including_keystroke, reset_keybinding_to_default, set_custom_keybinding,
-    },
-    TelemetryEvent,
-};
 use itertools::Itertools;
-
-use warp_core::ui::color::blend::Blend;
+use warp_core::ui::color::blend::Blend as _;
 use warp_core::ui::theme::color::internal_colors;
-use warpui::{elements::Wrap, units::Pixels};
+use warp_errors::report_error;
+use warpui::elements::{
+    Align, Border, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
+    CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty, EventHandler, Fill, Flex,
+    Hoverable, MouseState, MouseStateHandle, ParentElement, Radius, SavePosition, ScrollbarWidth,
+    Shrinkable, Text, Wrap,
+};
+use warpui::fonts::Weight;
+use warpui::keymap::{DescriptionContext, Keystroke, Trigger};
+use warpui::presenter::ChildView;
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use warpui::units::Pixels;
 use warpui::{
-    elements::{
-        Align, Border, ClippedScrollStateHandle, ClippedScrollable, Container, CornerRadius, Empty,
-        EventHandler, Fill, Flex, Hoverable, MouseState, MouseStateHandle, ParentElement, Radius,
-        SavePosition, ScrollbarWidth, Shrinkable,
-    },
-    fonts::Weight,
-    keymap::{Keystroke, Trigger},
-    ui_components::components::{Coords, UiComponent, UiComponentStyles},
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
-use warpui::{
-    elements::{ConstrainedBox, DispatchEventResult},
-    presenter::ChildView,
+
+use super::SettingsSection;
+use super::settings_page::{
+    LocalOnlyIconState, MatchData, PageType, SettingsPageMeta, SettingsPageViewHandle,
+    SettingsWidget, render_sub_header,
 };
-use warpui::{
-    elements::{CrossAxisAlignment, Text},
-    keymap::DescriptionContext,
+use crate::appearance::Appearance;
+use crate::editor::{
+    EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
+    TextOptions,
 };
+use crate::keyboard::{UserDefinedKeybinding, write_custom_keybinding};
+use crate::search_bar::SearchBar;
+use crate::settings::PreferencesSettings;
+use crate::util::bindings::{
+    CommandBinding, filter_bindings_including_keystroke, reset_keybinding_to_default,
+    set_custom_keybinding,
+};
+use crate::{TelemetryEvent, send_telemetry_from_ctx, themes};
 
 const FONT_DELTA: f32 = 2.;
 const CANCEL_SAVE_BUTTONS_SPACING: f32 = 4.0;
@@ -122,10 +110,10 @@ struct ConflictMap {
 
 impl ConflictMap {
     fn update(&mut self, old: &Option<Keystroke>, new: Option<Keystroke>) {
-        if let Some(old) = old {
-            if let Some(old_conflict_count) = self.map.get_mut(old) {
-                *old_conflict_count = old_conflict_count.saturating_sub(1);
-            }
+        if let Some(old) = old
+            && let Some(old_conflict_count) = self.map.get_mut(old)
+        {
+            *old_conflict_count = old_conflict_count.saturating_sub(1);
         }
 
         if let Some(new) = new {
@@ -713,7 +701,7 @@ impl KeybindingsView {
                     ctx.notify();
                 }
                 None => {
-                    log::error!("Modifying row should exist");
+                    report_error!("Modifying row should exist");
                 }
             }
         }
@@ -745,7 +733,7 @@ impl KeybindingsView {
                     ctx.notify();
                 }
                 None => {
-                    log::error!("Modifying row should exist");
+                    report_error!("Modifying row should exist");
                 }
             }
         }
@@ -763,7 +751,7 @@ impl KeybindingsView {
                     keybinding_state.unsaved_binding = Some(key.clone());
                 }
                 None => {
-                    log::error!("Modifying row does not exist when it should");
+                    report_error!("Modifying row does not exist when it should");
                 }
             }
 

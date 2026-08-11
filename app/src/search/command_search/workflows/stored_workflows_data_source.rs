@@ -1,21 +1,20 @@
 use std::sync::Arc;
 
 use futures_lite::future::yield_now;
-use warpui::{AppContext, SingletonEntity};
+use warpui::{AppContext, SingletonEntity, WindowId};
 
+use super::WorkflowSearchItem;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::search::QueryFilter;
 use crate::search::async_snapshot_data_source::AsyncSnapshotDataSource;
 use crate::search::command_search::searcher::CommandSearchItemAction;
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::{BoxFuture, DataSourceRunErrorWrapper};
 use crate::search::workflows::fuzzy_match::FuzzyMatchWorkflowResult;
-use crate::search::QueryFilter;
 use crate::server::ids::SyncId;
 use crate::settings::AISettings;
 use crate::workflows::{WorkflowObjectModel, WorkflowSource};
 use crate::workspaces::user_workspaces::UserWorkspaces;
-
-use super::WorkflowSearchItem;
 
 pub(crate) struct WorkflowMatchCandidate {
     pub id: SyncId,
@@ -32,9 +31,10 @@ pub(crate) struct StoredWorkflowsSnapshot {
 
 /// Creates an async data source for cloud workflows (i.e. those that exist in Zap Drive).
 pub fn stored_workflows_data_source(
+    window_id: WindowId,
 ) -> AsyncSnapshotDataSource<StoredWorkflowsSnapshot, CommandSearchItemAction> {
     AsyncSnapshotDataSource::new(
-        |query: &Query, app: &AppContext| {
+        move |query: &Query, app: &AppContext| {
             let is_ai_enabled = AISettings::as_ref(app).is_any_ai_enabled(app);
             let filter_to_agent_mode = query.filters.contains(&QueryFilter::AgentModeWorkflows);
             let filter_to_command_workflows =
@@ -44,7 +44,7 @@ pub fn stored_workflows_data_source(
             let user_workspaces = UserWorkspaces::as_ref(app);
 
             let candidates: Vec<WorkflowMatchCandidate> = user_workspaces
-                .all_user_spaces(app)
+                .spaces_for_window(window_id, app)
                 .into_iter()
                 .flat_map(|space| {
                     let source: WorkflowSource = space.into();

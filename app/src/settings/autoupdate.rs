@@ -6,9 +6,10 @@ define_settings_group!(AutoupdateSettings, settings: [
         default: true,
         supported_platforms: SupportedPlatforms::DESKTOP,
         sync_to_cloud: SyncToCloud::Never,
+        surface: settings::SettingSurfaces::GUI,
         private: false,
         storage_key: "AutomaticUpdatesEnabled",
         toml_path: "updates.automatic_updates_enabled",
-        description: "Whether Zap automatically checks for and downloads updates in the background.",
+        description: "Whether InfiniShell automatically checks for and downloads updates in the background.",
     },
 ]);

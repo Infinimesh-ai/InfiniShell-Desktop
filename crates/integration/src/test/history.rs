@@ -1,25 +1,27 @@
 use std::collections::HashMap;
 
-use crate::Builder;
 use settings::Setting as _;
-use warp::{
-    integration_testing::{
-        self,
-        command_search::{assert_command_search_is_open, assert_history_filter_is_active},
-        input::assert_workflow_info_box_is_open,
-        step::new_step_with_default_assertions,
-        terminal::{assert_input_editor_contents, wait_until_bootstrapped_single_pane_for_tab},
-        view_getters::single_input_view,
-    },
-    search::command_search::settings::ShowGlobalWorkflowsInUniversalSearch,
-    sqlite_testing::set_user_and_hostname_for_commands,
-    terminal::{input::Input, model::session::get_local_hostname, shell::ShellType},
+use warp::integration_testing::command_search::{
+    assert_command_search_has_results, assert_command_search_is_open,
+    assert_history_filter_is_active,
 };
-use warpui::{async_assert, ViewHandle};
+use warp::integration_testing::input::assert_workflow_info_box_is_open;
+use warp::integration_testing::step::new_step_with_default_assertions;
+use warp::integration_testing::terminal::{
+    assert_input_editor_contents, wait_until_bootstrapped_single_pane_for_tab,
+};
+use warp::integration_testing::view_getters::single_input_view;
+use warp::integration_testing::{self};
+use warp::search::command_search::settings::ShowGlobalWorkflowsInUniversalSearch;
+use warp::sqlite_testing::set_user_and_hostname_for_commands;
+use warp::terminal::input::Input;
+use warp::terminal::model::session::get_local_hostname;
+use warp::terminal::shell::ShellType;
+use warpui_core::{ViewHandle, async_assert};
 
+use super::{TEST_ONLY_ASSETS, new_builder};
+use crate::Builder;
 use crate::util::{get_local_user, write_histfiles_for_test};
-
-use super::{new_builder, TEST_ONLY_ASSETS};
 
 /// The `history_with_metadata.sqlite` table looks like the following:
 ///
@@ -72,11 +74,12 @@ pub fn test_up_arrow_history() -> Builder {
                 let input_view: &ViewHandle<Input> = views.first().unwrap();
                 input_view.read(app, |view, ctx| {
                     // The history menu should be visible.
-                    assert!(view
-                        .suggestions_mode_model()
-                        .as_ref(ctx)
-                        .mode()
-                        .is_visible());
+                    assert!(
+                        view.suggestions_mode_model()
+                            .as_ref(ctx)
+                            .mode()
+                            .is_visible()
+                    );
 
                     // The cursor should be on the last row.
                     assert!(view.editor().as_ref(ctx).single_cursor_on_last_row(ctx));
@@ -99,11 +102,12 @@ pub fn test_up_arrow_history() -> Builder {
                 let input_view: &ViewHandle<Input> = views.first().unwrap();
                 input_view.read(app, |view, ctx| {
                     // The history menu should be visible.
-                    assert!(view
-                        .suggestions_mode_model()
-                        .as_ref(ctx)
-                        .mode()
-                        .is_visible());
+                    assert!(
+                        view.suggestions_mode_model()
+                            .as_ref(ctx)
+                            .mode()
+                            .is_visible()
+                    );
 
                     // The cursor should be on the first row.
                     assert!(view.editor().as_ref(ctx).single_cursor_on_first_row(ctx));
@@ -122,7 +126,9 @@ pub fn test_up_arrow_history_enters_shift_tab_for_workflow() -> Builder {
             integration_testing::create_file_from_assets(
                 TEST_ONLY_ASSETS,
                 FAKE_HISTORY_SQLITE_FILE,
-                &integration_testing::persistence::database_file_path(),
+                &integration_testing::persistence::database_file_path_for_scope(
+                    &integration_testing::persistence::PersistenceScope::App,
+                ),
             );
 
             let local_user = get_local_user();
@@ -157,11 +163,12 @@ pub fn test_up_arrow_history_enters_shift_tab_for_workflow() -> Builder {
                 let input_view = single_input_view(app, window_id);
                 input_view.read(app, |view, ctx| {
                     // The history menu should be visible.
-                    async_assert!(view
-                        .suggestions_mode_model()
-                        .as_ref(ctx)
-                        .mode()
-                        .is_visible())
+                    async_assert!(
+                        view.suggestions_mode_model()
+                            .as_ref(ctx)
+                            .mode()
+                            .is_visible()
+                    )
                 })
             })
             .add_named_assertion(
@@ -200,7 +207,9 @@ pub fn test_command_search_loads_history() -> Builder {
             integration_testing::create_file_from_assets(
                 TEST_ONLY_ASSETS,
                 FAKE_HISTORY_SQLITE_FILE,
-                &integration_testing::persistence::database_file_path(),
+                &integration_testing::persistence::database_file_path_for_scope(
+                    &integration_testing::persistence::PersistenceScope::App,
+                ),
             );
 
             let local_user = get_local_user();
@@ -235,6 +244,12 @@ pub fn test_command_search_loads_history() -> Builder {
                 ),
         )
         .with_step(
+            new_step_with_default_assertions("Wait for history results").add_named_assertion(
+                "Command search has history results",
+                assert_command_search_has_results(),
+            ),
+        )
+        .with_step(
             new_step_with_default_assertions("Loads history from sqlite")
                 .with_keystrokes(&["up", "up", "enter"])
                 .add_named_assertion(
@@ -251,7 +266,9 @@ pub fn test_command_search_loads_history_from_nondefault_histfile_path() -> Buil
             integration_testing::create_file_from_assets(
                 TEST_ONLY_ASSETS,
                 FAKE_HISTORY_SQLITE_FILE,
-                &integration_testing::persistence::database_file_path(),
+                &integration_testing::persistence::database_file_path_for_scope(
+                    &integration_testing::persistence::PersistenceScope::App,
+                ),
             );
 
             let local_user = get_local_user();
@@ -283,6 +300,12 @@ pub fn test_command_search_loads_history_from_nondefault_histfile_path() -> Buil
                 ),
         )
         .with_step(
+            new_step_with_default_assertions("Wait for history results").add_named_assertion(
+                "Command search has history results",
+                assert_command_search_has_results(),
+            ),
+        )
+        .with_step(
             new_step_with_default_assertions("Loads history from sqlite")
                 .with_keystrokes(&["up", "up", "enter"])
                 .add_named_assertion(
@@ -305,7 +328,9 @@ pub fn test_histfile_left_joined_with_persisted_history() -> Builder {
             integration_testing::create_file_from_assets(
                 TEST_ONLY_ASSETS,
                 FAKE_HISTORY_SQLITE_FILE,
-                &integration_testing::persistence::database_file_path(),
+                &integration_testing::persistence::database_file_path_for_scope(
+                    &integration_testing::persistence::PersistenceScope::App,
+                ),
             );
 
             let local_user = get_local_user();
@@ -340,6 +365,12 @@ pub fn test_histfile_left_joined_with_persisted_history() -> Builder {
                 ),
         )
         .with_step(
+            new_step_with_default_assertions("Wait for history results").add_named_assertion(
+                "Command search has history results",
+                assert_command_search_has_results(),
+            ),
+        )
+        .with_step(
             new_step_with_default_assertions("Loads history from sqlite")
                 .with_keystrokes(&["up", "enter"])
                 .add_named_assertion(
@@ -355,7 +386,9 @@ pub fn test_history_command_is_linked_to_local_workflow() -> Builder {
             integration_testing::create_file_from_assets(
                 TEST_ONLY_ASSETS,
                 FAKE_HISTORY_SQLITE_FILE,
-                &integration_testing::persistence::database_file_path(),
+                &integration_testing::persistence::database_file_path_for_scope(
+                    &integration_testing::persistence::PersistenceScope::App,
+                ),
             );
 
             let local_user = get_local_user();
@@ -392,6 +425,12 @@ pub fn test_history_command_is_linked_to_local_workflow() -> Builder {
                     "History filter is active",
                     assert_history_filter_is_active(),
                 ),
+        )
+        .with_step(
+            new_step_with_default_assertions("Wait for history results").add_named_assertion(
+                "Command search has history results",
+                assert_command_search_has_results(),
+            ),
         )
         .with_step(
             new_step_with_default_assertions("Loads history from sqlite")

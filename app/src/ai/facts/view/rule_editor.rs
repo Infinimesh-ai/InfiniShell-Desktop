@@ -1,3 +1,20 @@
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::theme::color::internal_colors;
+use warp_editor::editor::NavigationKey;
+use warpui::elements::{
+    Border, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
+    Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
+    MouseStateHandle, ParentElement, Radius, ScrollbarWidth,
+};
+use warpui::platform::Cursor;
+use warpui::ui_components::components::UiComponent;
+use warpui::{
+    AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
+    ViewHandle,
+};
+
+use super::style;
+use crate::ai::facts::{AIFact, AIFactObject, AIFactObjectModel, AIMemory};
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::cloud_object::{Revision, StoredObject};
@@ -7,25 +24,8 @@ use crate::editor::{
 };
 use crate::server::ids::SyncId;
 use crate::ui_components::buttons::icon_button;
-use crate::view_components::action_button::{ActionButton, DangerSecondaryTheme, PrimaryTheme};
-use warp_core::ui::{appearance::Appearance, theme::color::internal_colors};
-use warp_editor::editor::NavigationKey;
-use warpui::elements::{Clipped, ConstrainedBox};
-use warpui::{
-    elements::{
-        Border, ChildView, ClippedScrollStateHandle, ClippedScrollable, Container, CornerRadius,
-        CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
-        Radius, ScrollbarWidth,
-    },
-    platform::Cursor,
-    ui_components::components::UiComponent,
-    AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
-    ViewHandle,
-};
-
-use super::style;
-use crate::ai::facts::{AIFact, AIFactObject, AIFactObjectModel, AIMemory};
 use crate::ui_components::icons::Icon;
+use crate::view_components::action_button::{ActionButton, DangerSecondaryTheme, PrimaryTheme};
 
 #[derive(Debug, Clone, Copy)]
 enum EditorType {

@@ -1,10 +1,10 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
-use std::{env, fmt, path::Path};
+use std::path::Path;
+use std::{env, fmt};
 
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use url::Url;
-
 use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
 
@@ -15,15 +15,24 @@ mod process_handle;
 
 pub mod scope;
 pub mod skill;
+mod sort_order;
+pub use sort_order::SortOrderArg;
 
 pub mod agent;
+pub mod api_key;
 pub mod completions;
 pub mod config_file;
 // Zap Wave 7-2:`environment` CLI 随 cloud ambient agent 主体子系统物理删。
+// 上游的 `federate` / `harness_support` / `integration` 同属云端身份与集成子系统,本 fork 不引入。
+mod date_time;
 pub mod json_filter;
+pub mod local_control;
 pub mod mcp;
+pub mod memory_store;
 pub mod model;
 pub mod provider;
+pub mod runner;
+// 上游的 `schedule` / `secret` 依赖云端调度与托管密钥,本 fork 不引入。
 pub mod share;
 pub const OZ_RUN_ID_ENV: &str = "OZ_RUN_ID";
 pub const OZ_PARENT_RUN_ID_ENV: &str = "OZ_PARENT_RUN_ID";
@@ -51,6 +60,17 @@ pub struct ParentOpts {
     pub handle: Option<process_handle::ProcessHandle>,
 }
 
+/// Returns whether an argument requests one of Zap's hidden worker modes.
+pub fn is_worker_invocation(arg: &str) -> bool {
+    let command = WorkerCommand::augment_subcommands(clap::Command::new("worker"));
+    command.find_subcommand(arg).is_some()
+        || arg.strip_prefix("--").is_some_and(|long_flag| {
+            command
+                .get_subcommands()
+                .any(|subcommand| subcommand.get_long_flag() == Some(long_flag))
+        })
+}
+
 /// Hidden worker args used to scope remote-server proxy/daemon sockets by
 /// Zap identity without exposing credentials.
 #[derive(Debug, Clone, Default, clap::Args)]
@@ -64,7 +84,12 @@ pub struct RemoteServerIdentityArgs {
 #[derive(Debug, Default, Clone, clap::Args)]
 pub struct GlobalOptions {
     /// API key for server authentication.
-    #[arg(long = "api-key", global = true, env = "WARP_API_KEY")]
+    #[arg(
+        long = "api-key",
+        global = true,
+        env = "WARP_API_KEY",
+        hide_env_values = true
+    )]
     pub api_key: Option<String>,
 
     /// Set the output format.
@@ -78,12 +103,16 @@ pub struct GlobalOptions {
     pub output_format: OutputFormat,
 }
 
-/// Command-line argument parser for the main Zap binary. This is used across all channels.
+/// Normal argument parser for the shared Zap executable across all channels.
+///
+/// Oz commands are subcommands of this parser, so invoking an `oz` symlink does
+/// not require a mode flag. Zap Control uses its separate [`local_control::ControlArgs`]
+/// parser, selected before this parser sees the arguments.
 #[derive(Debug, Default, Parser, Clone)]
 #[command(
     name = "oz",
     display_name = "Oz",
-    about = r#"Zap local agent CLI
+    about = r#"InfiniShell local agent CLI
 
 The Oz CLI is a tool for running and managing local coding agents.
 Use the CLI to:
@@ -91,7 +120,7 @@ Use the CLI to:
 * Manage local runs
 * Configure local providers and MCP servers"#
 )]
-#[clap(args_conflicts_with_subcommands = true)]
+#[clap(subcommand_precedence_over_arg = true)]
 pub struct Args {
     #[clap(flatten)]
     global_options: GlobalOptions,
@@ -167,6 +196,24 @@ impl Args {
                     std::process::exit(2);
                 }
 
+                if !FeatureFlag::APIKeyManagement.is_enabled() {
+                    let args: Vec<String> = env::args().collect();
+                    if args.len() > 1 && args[1] == "api-key" {
+                        eprintln!("error: unrecognized subcommand 'api-key'\n");
+                        eprintln!("For more information, try '--help'");
+                        std::process::exit(2);
+                    }
+                }
+
+                if !FeatureFlag::CloudAgentRunners.is_enabled() {
+                    let args: Vec<String> = env::args().collect();
+                    if args.len() > 1 && args[1] == "runner" {
+                        eprintln!("error: unrecognized subcommand 'runner'\n");
+                        eprintln!("For more information, try '--help'");
+                        std::process::exit(2);
+                    }
+                }
+
                 let command = Self::clap_command();
 
                 command.try_get_matches()
@@ -191,9 +238,27 @@ impl Args {
         // Zap Wave 7-2:`environment` 子命令与 `--environment` 参数随 cloud ambient agent
         // 主体物理删 —— enum variant 已从 `CliCommand` 和 `RunAgentArgs` 移除。
 
+        // Zap:上游在这里隐藏 `agent run-cloud` 的第三方 harness 参数,但 `run-cloud`
+        // 子命令随 cloud ambient agent 主体一起物理删了。`mut_subcommand` 对不存在的
+        // 子命令会 panic,所以这段门控一并删除。
+
         // Hide the provider subcommand from help text
         if !FeatureFlag::ProviderCommand.is_enabled() {
             command = command.mut_subcommand("provider", |c| c.hide(true));
+        }
+
+        // Zap:上游在此处隐藏的 integration / schedule / secret / federate /
+        // harness-support / run conversation / artifact 子命令在本 fork 中都不存在,
+        // 对不存在的子命令调用 `mut_subcommand` 会 panic,所以这些分支一并删除。
+
+        // Hide the api-key subcommand from help text.
+        if !FeatureFlag::APIKeyManagement.is_enabled() {
+            command = command.mut_subcommand("api-key", |c| c.hide(true));
+        }
+
+        // Hide the runner subcommand from help text.
+        if !FeatureFlag::CloudAgentRunners.is_enabled() {
+            command = command.mut_subcommand("runner", |c| c.hide(true));
         }
 
         // Wire up `--version` / `-V` using the same version metadata used elsewhere in the
@@ -326,6 +391,12 @@ pub enum CliCommand {
     /// Manage available models.
     #[command(subcommand)]
     Model(crate::model::ModelCommand),
+    /// Manage memory stores.
+    #[command(subcommand, alias = "memory-stores")]
+    MemoryStore(crate::memory_store::MemoryStoreCommand),
+    /// Manage memories.
+    #[command(subcommand)]
+    Memory(crate::memory_store::MemoryCommand),
 
     /// Print information about the logged-in user.
     Whoami,
@@ -333,6 +404,33 @@ pub enum CliCommand {
     /// Manage providers.
     #[command(subcommand)]
     Provider(crate::provider::ProviderCommand),
+
+    // Zap:上游的 integration / schedule / secret / federate / harness-support /
+    // artifact 子命令依赖云端身份、调度与托管密钥,本 fork 不引入。
+    /// Manage API keys.
+    #[command(subcommand)]
+    ApiKey(crate::api_key::ApiKeyCommand),
+
+    /// Manage cloud agent runners.
+    #[command(subcommand)]
+    Runner(crate::runner::RunnerCommand),
+}
+
+impl CliCommand {
+    /// Returns the command path used to identify this invocation in tracing.
+    pub fn as_str_for_tracing(&self) -> &'static str {
+        match self {
+            CliCommand::Agent(command) => command.as_str_for_tracing(),
+            CliCommand::MCP(command) => command.as_str_for_tracing(),
+            CliCommand::Model(command) => command.as_str_for_tracing(),
+            CliCommand::Whoami => "whoami",
+            CliCommand::Provider(command) => command.as_str_for_tracing(),
+            CliCommand::ApiKey(command) => command.as_str_for_tracing(),
+            CliCommand::MemoryStore(command) => command.as_str_for_tracing(),
+            CliCommand::Memory(command) => command.as_str_for_tracing(),
+            CliCommand::Runner(command) => command.as_str_for_tracing(),
+        }
+    }
 }
 
 /// A subcommand of the main Zap application. This includes all [`WorkerCommand`]s as well as app-specific debugging tools.

@@ -1,12 +1,11 @@
 //! ContextFlag flags are for behaviors that need to be conditionally enabled or disabled based
 //! on where the app is being run and are a permanent part of the app.
 
-use std::{
-    str::FromStr,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use enum_iterator::{cardinality, Sequence};
+use enum_iterator::{Sequence, cardinality};
+use warp_errors::report_error;
 
 use crate::channel::ChannelState;
 
@@ -48,8 +47,9 @@ impl ContextFlag {
     /// Sets a ContextFlag flag. FOR DEBUG USE ONLY.
     pub fn set(&self, value: bool) {
         if !ChannelState::enable_debug_features() {
-            log::error!(
-                "Tried to set value of `ContextFlag` flag `{self:?}` in non-dogfood context."
+            report_error!(
+                "Tried to set value of ContextFlag in non-dogfood context",
+                extra: { "flag" => ?self }
             );
         }
 

@@ -1,16 +1,21 @@
-use crate::ai::llms::{is_using_api_key_for_provider, DisableReason, LLMId, LLMInfo};
-use crate::menu::{MenuItem, MenuItemFields, MenuTooltipPosition};
-use itertools::Itertools;
 use std::sync::Arc;
+
+use itertools::Itertools;
 use warp_core::ui::Icon;
-use warpui::{
-    elements::{
-        ConstrainedBox, Container, CrossAxisAlignment, Empty, Flex, ParentElement, SavePosition,
-        Shrinkable, Text,
-    },
-    fonts::{Properties, Style},
-    Action, AppContext, Element,
+use warpui::elements::{
+    ConstrainedBox, Container, CrossAxisAlignment, Flex, ParentElement, SavePosition, Shrinkable,
+    Text,
 };
+use warpui::fonts::{Properties, Style};
+use warpui::{Action, AppContext, Element};
+
+use crate::ai::custom_model_routers::is_custom_router_id;
+use crate::ai::llms::{
+    DisableReason, LLMId, LLMInfo, ModelIconFlags, model_leading_icon,
+    should_show_bedrock_icon_for_model,
+    should_show_gemini_enterprise_agent_platform_icon_for_model, should_show_key_icon_for_model,
+};
+use crate::menu::{MenuItem, MenuItemFields, MenuTooltipPosition};
 
 pub fn is_auto(llm: &LLMInfo) -> bool {
     llm.display_name.to_lowercase().contains("auto")
@@ -72,14 +77,30 @@ fn make_item_fields<A: Action + Clone>(
     collapse_reasoning_variants: bool,
     app: &AppContext,
 ) -> MenuItem<A> {
-    let label = if collapse_auto && is_auto(llm) {
+    let is_auto_model = is_auto(llm);
+    let label = if collapse_auto && is_auto_model {
         "auto".to_string()
     } else if collapse_reasoning_variants && llm.has_reasoning_level() {
         llm.base_model_name().to_string()
     } else {
         llm.menu_display_name()
     };
-    let is_using_api_key = is_using_api_key_for_provider(&llm.provider, app);
+    let is_using_bedrock = should_show_bedrock_icon_for_model(llm, app);
+    let is_using_gemini_enterprise_agent_platform =
+        should_show_gemini_enterprise_agent_platform_icon_for_model(llm, app);
+    let is_using_api_key = should_show_key_icon_for_model(llm, app);
+    let is_custom_router = is_custom_router_id(llm.id.as_str());
+    let leading_icon = model_leading_icon(
+        llm,
+        ModelIconFlags {
+            is_custom_router,
+            is_auto: is_auto_model,
+            is_using_bedrock,
+            is_using_gemini_enterprise: is_using_gemini_enterprise_agent_platform,
+        },
+    );
+    let is_using_cloud_host = is_using_bedrock || is_using_gemini_enterprise_agent_platform;
+    let trailing_credential_icon = (!is_using_cloud_host && is_using_api_key).then_some(Icon::Key);
 
     let mut item = if let Some(position_id_fn) = position_id_fn {
         let position_id = position_id_fn(&llm.id);
@@ -89,13 +110,11 @@ fn make_item_fields<A: Action + Clone>(
                     Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
 
                 let icon_container = Container::new(
-                    ConstrainedBox::new(if is_using_api_key {
-                        Icon::Key
+                    ConstrainedBox::new(
+                        leading_icon
                             .to_warpui_icon(appearance.theme().foreground())
-                            .finish()
-                    } else {
-                        Empty::new().finish()
-                    })
+                            .finish(),
+                    )
                     .with_height(appearance.ui_font_size())
                     .with_width(appearance.ui_font_size())
                     .finish(),
@@ -117,13 +136,26 @@ fn make_item_fields<A: Action + Clone>(
                 )
                 .finish();
                 item_row.add_child(Shrinkable::new(4., text).finish());
+                if let Some(icon) = trailing_credential_icon {
+                    let credential_icon = Container::new(
+                        ConstrainedBox::new(
+                            icon.to_warpui_icon(appearance.theme().disabled_ui_text_color())
+                                .finish(),
+                        )
+                        .with_height(appearance.ui_font_size())
+                        .with_width(appearance.ui_font_size())
+                        .finish(),
+                    )
+                    .with_margin_left(6.)
+                    .finish();
+                    item_row.add_child(credential_icon);
+                }
                 SavePosition::new(item_row.finish(), &position_id).finish()
             }),
             None,
         )
     } else {
-        let provider_icon = llm.provider.icon().unwrap_or(Icon::Oz);
-        MenuItemFields::new(label).with_icon(provider_icon)
+        MenuItemFields::new(label).with_icon(leading_icon)
     };
 
     item = item

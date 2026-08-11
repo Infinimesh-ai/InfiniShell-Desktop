@@ -1,38 +1,31 @@
 use settings::Setting as _;
+use warpui::fonts::FamilyId;
 use warpui::{
-    fonts::FamilyId, AddSingletonModel, AppContext, AssetProvider, Entity, ModelContext,
-    SingletonEntity, WindowId,
+    AddSingletonModel, AppContext, AssetProvider, Entity, ModelContext, SingletonEntity, WindowId,
 };
 
 #[cfg(target_os = "macos")]
 mod macos_app_icon {
-    #[allow(deprecated)]
-    pub use cocoa::{
-        appkit::NSApp,
-        base::{id, nil},
-    };
-    pub use objc::{class, msg_send, sel, sel_impl};
+    pub use objc2::rc::autoreleasepool;
+    pub use objc2::{AnyThread, MainThreadMarker};
+    pub use objc2_app_kit::{NSApplication, NSImage, NSWorkspace, NSWorkspaceIconCreationOptions};
+    pub use objc2_foundation::{NSBundle, NSString, ns_string};
     pub use warp_core::channel::{Channel, ChannelState};
-    pub use warpui::platform::mac::{make_nsstring, AutoreleasePoolGuard};
 
     pub use crate::settings::app_icon::{AppIcon, AppIconSettings, AppIconSettingsChangedEvent};
 }
+use anyhow::anyhow;
 #[cfg(target_os = "macos")]
 use macos_app_icon::*;
-
-use crate::{
-    settings::{
-        active_theme_kind, font::heading_font_size_multipliers_from_settings, FontSettings,
-        FontSettingsChangedEvent, MonospaceFontSize, Settings, ThemeSettings, UI_FONT_SIZE_MIN,
-        UI_FONT_SIZE_MAX,
-    },
-    themes::theme::{ThemeKind, WarpTheme},
-    ASSETS,
-};
-
-use anyhow::anyhow;
-
 pub use warp_core::ui::appearance::{Appearance, AppearanceEvent};
+
+use crate::ASSETS;
+use crate::settings::{
+    FontSettings, FontSettingsChangedEvent, MonospaceFontSize, Settings, ThemeSettings,
+    UI_FONT_SIZE_MAX, UI_FONT_SIZE_MIN, active_theme_kind,
+    font::heading_font_size_multipliers_from_settings,
+};
+use crate::themes::theme::{ThemeKind, WarpTheme};
 
 /// Manages the state of the app-wide Appearance settings, it is responsible
 /// for 1) listening to settings changes and update the underlying Appearance
@@ -49,25 +42,27 @@ pub struct AppearanceManager {
 
 impl AppearanceManager {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        ctx.subscribe_to_model(&ThemeSettings::handle(ctx), move |me, _event, ctx| {
+        ctx.subscribe_to_model(&ThemeSettings::handle(ctx), move |me, _, _event, ctx| {
             me.refresh_theme_state(ctx);
         });
 
         #[cfg(target_os = "macos")]
         {
-            ctx.subscribe_to_model(
-                &AppIconSettings::handle(ctx),
-                move |me, event, ctx| match event {
+            ctx.subscribe_to_model(&AppIconSettings::handle(ctx), move |me, _, event, ctx| {
+                match event {
                     AppIconSettingsChangedEvent::AppIconState { .. } => {
                         me.set_app_icon(ctx);
                     }
-                },
-            );
+                    AppIconSettingsChangedEvent::ShowDockIconState { .. } => {
+                        me.apply_dock_icon_visibility(ctx);
+                    }
+                }
+            });
         }
 
         ctx.subscribe_to_model(
             &FontSettings::handle(ctx),
-            move |_, event, ctx| match event {
+            move |_, _, event, ctx| match event {
                 FontSettingsChangedEvent::MonospaceFontName { .. } => {
                     let (font_name, match_fonts) = {
                         let settings = FontSettings::as_ref(ctx);
@@ -230,6 +225,11 @@ impl AppearanceManager {
         self.app_icon_at_startup
     }
 
+    #[cfg(target_os = "macos")]
+    pub fn apply_dock_icon_visibility(&self, app: &AppContext) {
+        app.set_dock_icon_visible(*AppIconSettings::as_ref(app).show_dock_icon.value());
+    }
+
     pub fn clear_transient_theme(&mut self, ctx: &mut ModelContext<Self>) {
         self.transient_theme = None;
         self.refresh_theme_state(ctx);
@@ -244,7 +244,6 @@ impl AppearanceManager {
     /// Also see the README.md file in app/DockTilePlugin for more information on how best to test
     /// changes to the dock tile plugin.
     #[cfg(target_os = "macos")]
-    #[allow(deprecated)]
     pub fn set_app_icon(&self, app: &AppContext) {
         let icon = *AppIconSettings::as_ref(app).app_icon.value();
 
@@ -253,14 +252,16 @@ impl AppearanceManager {
         // settings/autoupdate callbacks whose thread of origin varies. Wrap
         // the body in a local pool so the autoreleased NSStrings (and any
         // other temporaries Cocoa hands back) are released when this returns.
-        // `AutoreleasePoolGuard` drains on `Drop`, covering every exit path.
-        unsafe {
-            let _pool = AutoreleasePoolGuard::new();
-
-            let app: id = NSApp();
-            let bundle: id = msg_send![class!(NSBundle), mainBundle];
-            let bundle_path: id = msg_send![bundle, bundlePath];
-            let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
+        // `autoreleasepool` drains when the closure returns, covering every
+        // exit path (including early returns and panics).
+        autoreleasepool(|_| {
+            // SAFETY: `set_app_icon` only runs on the main thread, since it
+            // requires a `&AppContext`, which is only accessible there.
+            let mtm = unsafe { MainThreadMarker::new_unchecked() };
+            let ns_app = NSApplication::sharedApplication(mtm);
+            let bundle = NSBundle::mainBundle();
+            let bundle_path = bundle.bundlePath();
+            let workspace = NSWorkspace::sharedWorkspace();
 
             // If the user has selected the default icon, reset to the icon that is statically
             // bundled in the app bundle. The bundled icon gets automatically "filtered" according
@@ -279,10 +280,15 @@ impl AppearanceManager {
                 && self.app_icon_at_startup == AppIcon::Default
             {
                 log::debug!("User has default icon selected, resetting to bundle default");
-                // Reset to nil to use the bundle's default icon
-                let _: () = msg_send![app, setApplicationIconImage:nil];
-                let _: () = msg_send![workspace, setIcon:nil forFile:bundle_path options:0];
-                let _: () = msg_send![workspace, noteFileSystemChanged:bundle_path];
+                // Reset to nil to use the bundle's default icon.
+                // SAFETY: `setApplicationIconImage:` accepts `nil` to restore the bundled icon.
+                unsafe { ns_app.setApplicationIconImage(None) };
+                workspace.setIcon_forFile_options(
+                    None,
+                    &bundle_path,
+                    NSWorkspaceIconCreationOptions::empty(),
+                );
+                workspace.noteFileSystemChanged_(&bundle_path);
                 return;
             }
 
@@ -290,47 +296,48 @@ impl AppearanceManager {
 
             log::debug!("Setting app icon in memory to: {icon_name}");
             // Locate the plugin bundle.
-            let plugins_path: id = msg_send![bundle, builtInPlugInsPath];
-            let plugin_name = make_nsstring("ZapDockTilePlugin.docktileplugin");
-            let plugin_path: id =
-                msg_send![plugins_path, stringByAppendingPathComponent: plugin_name];
-            let plugin_bundle: id = msg_send![class!(NSBundle), bundleWithPath: plugin_path];
-
-            if plugin_bundle == nil {
+            let Some(plugins_path) = bundle.builtInPlugInsPath() else {
                 log::warn!("Failed to get dock tile plugin bundle");
                 return;
-            }
+            };
+            let plugin_name = ns_string!("InfiniShellDockTilePlugin.docktileplugin");
+            let plugin_path = plugins_path.stringByAppendingPathComponent(plugin_name);
+            let Some(plugin_bundle) = NSBundle::bundleWithPath(&plugin_path) else {
+                log::warn!("Failed to get dock tile plugin bundle");
+                return;
+            };
 
             // Read the images from the plugin bundle.
-            let image_name = make_nsstring(icon_name);
-            let extension = make_nsstring("png");
-            let image_path: id =
-                msg_send![plugin_bundle, pathForResource:image_name ofType:extension];
-
-            if image_path == nil {
+            let image_name = NSString::from_str(icon_name);
+            let extension = ns_string!("png");
+            let Some(image_path) =
+                plugin_bundle.pathForResource_ofType(Some(&image_name), Some(extension))
+            else {
                 log::warn!("Failed to get image path for icon: {icon_name}");
                 return;
-            }
+            };
 
             // Create the image from the file.
-            let image: id = msg_send![class!(NSImage), alloc];
-            let image: id = msg_send![image, initWithContentsOfFile:image_path];
-
-            if image == nil {
+            let Some(image) = NSImage::initWithContentsOfFile(NSImage::alloc(), &image_path) else {
                 log::warn!("Failed to create image for icon: {icon_name}");
                 return;
-            }
+            };
 
             // Override the bundled icon with this new image.
-            let _: () = msg_send![app, setApplicationIconImage:image];
-            let _: () = msg_send![workspace, setIcon:image forFile:bundle_path options:0];
-            let _: () = msg_send![workspace, noteFileSystemChanged:bundle_path];
+            // SAFETY: `setApplicationIconImage:` accepts a non-nil image.
+            unsafe { ns_app.setApplicationIconImage(Some(&image)) };
+            workspace.setIcon_forFile_options(
+                Some(&image),
+                &bundle_path,
+                NSWorkspaceIconCreationOptions::empty(),
+            );
+            workspace.noteFileSystemChanged_(&bundle_path);
 
-            // Balance the +1 retain from `[NSImage alloc]`. `setApplicationIconImage:` and
-            // `setIcon:forFile:options:` both retain the image, so it remains alive as the
-            // active app/dock icon after we release our own reference.
-            let _: () = msg_send![image, release];
-        }
+            // `image` is a `Retained<NSImage>` that releases the `+1` retain from
+            // `[NSImage alloc]` when it drops at the end of this scope.
+            // `setApplicationIconImage:` and `setIcon:forFile:options:` both retain the
+            // image, so it remains alive as the active app/dock icon.
+        });
     }
 }
 

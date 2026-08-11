@@ -1,10 +1,10 @@
-use crate::platform::WindowManager as _;
-use crate::windowing::winit::window::WindowManager;
-use crate::{DisplayId, DisplayIdx};
+use std::sync::Arc;
+
 use anyhow::Result;
 use itertools::Itertools as _;
 use pathfinder_geometry::rect::RectF;
-use std::sync::Arc;
+use windows::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromWindow};
+use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
 use winit::monitor::MonitorHandle;
 use winit::platform::windows::MonitorHandleExtWindows;
 use winit::window::Window as WinitWindow;
@@ -13,6 +13,9 @@ use windows::Win32::Graphics::Gdi::{MonitorFromWindow, MONITOR_DEFAULTTONEAREST}
 use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
 
 use super::get_monitor_logical_bounds;
+use crate::platform::WindowManager as _;
+use crate::windowing::winit::window::WindowManager;
+use crate::{DisplayId, DisplayIdx};
 
 impl WindowManager {
     /// Returns the active Zap window. This will return an error if a different app's window is

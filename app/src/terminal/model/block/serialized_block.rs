@@ -1,23 +1,23 @@
 use std::collections::HashSet;
 
-use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::agent::task::TaskId;
-use crate::ai::agent::AIAgentActionId;
-use crate::ai::blocklist::block::cli_controller::LongRunningCommandControlState;
-use crate::terminal::model::block::{
-    has_block_failed, AgentViewVisibility, Block, BlockState, PromptInfo,
-    MAX_SERIALIZED_STYLIZED_OUTPUT_LINES,
-};
-use crate::terminal::model::session::SessionId;
-use crate::terminal::model::BlockId;
-use crate::terminal::ShellHost;
-use crate::util::extensions::TrimStringExt;
 use chrono::{DateTime, Local, TimeZone as _};
 use serde::{Deserialize, Serialize};
 use serde_bytes_repr::{ByteFmtDeserializer, ByteFmtSerializer};
 use warp_core::command::ExitCode;
 
 use super::AgentInteractionMetadata;
+use crate::ai::agent::AIAgentActionId;
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::task::TaskId;
+use crate::ai::blocklist::block::cli_controller::LongRunningCommandControlState;
+use crate::terminal::ShellHost;
+use crate::terminal::model::BlockId;
+use crate::terminal::model::block::{
+    AgentViewVisibility, Block, BlockState, MAX_SERIALIZED_STYLIZED_OUTPUT_LINES, PromptInfo,
+    has_block_failed,
+};
+use crate::terminal::model::session::SessionId;
+use crate::util::extensions::TrimStringExt;
 
 /// Serialization-stable representation of [`AgentViewVisibility`].
 ///
@@ -220,7 +220,7 @@ pub struct SerializedBlock {
 impl SerializedBlock {
     /// Sets the command & output and `did_execute` to true.
     /// Everything else is a default value.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-util"))]
     pub fn new_for_test(stylized_command: Vec<u8>, stylized_output: Vec<u8>) -> SerializedBlock {
         SerializedBlock {
             stylized_command,

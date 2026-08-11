@@ -1,18 +1,13 @@
 use warp_util::path::LineAndColumnArg;
 use warpui::{AppContext, ModelHandle, SingletonEntity, View, ViewContext, ViewHandle};
 
-use crate::{
-    app_state::{CodePaneSnapShot, CodePaneTabSnapshot, LeafContents},
-    code::{
-        editor_management::{CodeEditorStatus, CodeManager, CodeSource},
-        view::{CodeView, CodeViewEvent},
-    },
-    pane_group::PaneGroup,
-};
-
 use super::{
     DetachType, PaneConfiguration, PaneContent, PaneId, PaneView, ShareableLink, ShareableLinkError,
 };
+use crate::app_state::{CodePaneSnapShot, CodePaneTabSnapshot, LeafContents};
+use crate::code::editor_management::{CodeEditorStatus, CodeManager, CodeSource};
+use crate::code::view::{CodeView, CodeViewEvent};
+use crate::pane_group::PaneGroup;
 
 pub struct CodePane {
     view: ViewHandle<PaneView<CodeView>>,
@@ -99,7 +94,7 @@ impl PaneContent for CodePane {
                 CodeSource::Link { range_start, .. } => *range_start,
                 _ => None,
             };
-            code_view.open_or_focus_existing(Some(location), line_col, ctx);
+            code_view.open_or_focus_existing(Some(location.clone()), line_col, ctx);
         });
         #[cfg(not(any(feature = "local_fs", feature = "local_tty")))]
         let _ = location;
@@ -124,29 +119,30 @@ impl PaneContent for CodePane {
                 CodeViewEvent::Pane(pane_event) => {
                     pane_group.handle_pane_event(pane_id, pane_event, ctx)
                 }
-                CodeViewEvent::TabChanged { file_path, .. } => {
-                    if let Some(path) = file_path {
+                CodeViewEvent::TabChanged { location, .. } => {
+                    if let Some(loc) = location {
                         pane_group.active_file_model().update(ctx, |model, ctx| {
-                            model.active_file_changed(path.clone(), ctx);
+                            model.active_file_changed(loc.clone(), ctx);
                         });
                     }
                 }
-                CodeViewEvent::FileOpened { file_path, .. } => {
+                CodeViewEvent::FileOpened { location, .. } => {
                     pane_group.active_file_model().update(ctx, |model, ctx| {
-                        model.active_file_changed(file_path.clone(), ctx);
+                        model.active_file_changed(location.clone(), ctx);
                     });
 
                     // Track the opened file in the OpenedFilesModel
                     #[cfg(feature = "local_fs")]
                     {
-                        use crate::code::opened_files::OpenedFilesModel;
                         use repo_metadata::repositories::DetectedRepositories;
 
-                        if let Some(repo_path) =
-                            DetectedRepositories::as_ref(ctx).get_root_for_path(file_path)
+                        use crate::code::opened_files::OpenedFilesModel;
+
+                        if let Some(repo_root) =
+                            DetectedRepositories::as_ref(ctx).get_root_for_path(location)
                         {
                             OpenedFilesModel::handle(ctx).update(ctx, |opened_files, ctx| {
-                                opened_files.file_opened(repo_path, file_path.clone(), ctx);
+                                opened_files.file_opened(repo_root, location, ctx);
                             });
                         }
                     }
@@ -204,7 +200,9 @@ impl PaneContent for CodePane {
 
         let tabs: Vec<CodePaneTabSnapshot> = (0..code_view_ref.tab_count())
             .filter_map(|i| code_view_ref.tab_at(i))
-            .map(|tab| CodePaneTabSnapshot { path: tab.path() })
+            .map(|tab| CodePaneTabSnapshot {
+                path: tab.local_path(),
+            })
             .collect();
 
         let active_tab_index = code_view_ref.active_tab_index();

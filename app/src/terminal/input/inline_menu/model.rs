@@ -1,5 +1,6 @@
 //! Generic model for tracking the selected item in an inline menu.
 use std::collections::HashSet;
+
 use warpui::elements::MouseStateHandle;
 use warpui::{Entity, ModelContext};
 
@@ -129,8 +130,8 @@ impl<A: InlineMenuAction, T: Send + Sync + 'static> InlineMenuModel<A, T> {
         }
     }
 
-    pub(super) fn update_selected_item(&mut self, item: A, ctx: &mut ModelContext<Self>) {
-        self.selected_item = Some(item);
+    pub(super) fn update_selected_item(&mut self, item: Option<A>, ctx: &mut ModelContext<Self>) {
+        self.selected_item = item;
         ctx.emit(InlineMenuModelEvent::UpdatedSelectedItem);
     }
 
@@ -151,3 +152,7 @@ pub enum InlineMenuModelEvent {
 impl<A: InlineMenuAction, T: 'static + Send + Sync> Entity for InlineMenuModel<A, T> {
     type Event = InlineMenuModelEvent;
 }
+
+#[cfg(test)]
+#[path = "model_tests.rs"]
+mod tests;

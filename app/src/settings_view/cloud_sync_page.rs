@@ -120,6 +120,18 @@ pub enum CloudSyncPageAction {
     ToggleAutoSync,
 }
 
+// `DropdownItemAction` 的 blanket impl 现在要求 `PartialEq`(用于 `eq_action` 选中态比较)。
+// `CloudSyncPageAction` 的部分负载(如 `SyncResult`)没有 `PartialEq`,而 Dropdown 里
+// 只会出现 `SetPlatform`,所以这里手写实现:`SetPlatform` 比较平台,其余变体按判别式比较。
+impl PartialEq for CloudSyncPageAction {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SetPlatform(a), Self::SetPlatform(b)) => a == b,
+            _ => std::mem::discriminant(self) == std::mem::discriminant(other),
+        }
+    }
+}
+
 /// 云同步设置页面视图
 pub struct CloudSyncPageView {
     page: PageType<Self>,

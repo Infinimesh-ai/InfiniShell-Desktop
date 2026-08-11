@@ -1,24 +1,21 @@
-use std::{borrow::Cow, rc::Rc, sync::Arc};
+use std::borrow::Cow;
+use std::rc::Rc;
+use std::sync::Arc;
 
-use crate::{
-    elements::{
-        Container, CrossAxisAlignment, Empty, Flex, Hoverable, MainAxisSize, MouseStateHandle,
-        ParentElement, Shrinkable,
-    },
-    platform::Cursor,
-    scene::{CornerRadius, Radius},
-    AppContext, Element, EventContext,
-};
-
+use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
 
-use super::{
-    components::{UiComponent, UiComponentStyles},
-    text::Span,
+use super::components::{UiComponent, UiComponentStyles};
+use super::text::Span;
+use crate::elements::{
+    Container, CrossAxisAlignment, Empty, Flex, Hoverable, MainAxisSize, MouseStateHandle,
+    ParentElement, Shrinkable,
 };
-use lazy_static::lazy_static;
+use crate::platform::Cursor;
+use crate::scene::{CornerRadius, Radius};
+use crate::{AppContext, Element, EventContext};
 
 const BORDER_RADIUS: f32 = 4.;
 const BUTTON_VERTICAL_PADDING: f32 = 2.;
@@ -269,11 +266,11 @@ impl ToggleMenu {
         on_toggle_change: Rc<ToggleMenuCallback>,
     ) -> Self {
         let mut selected_idx = toggle_menu_state_handle.get_selected_idx();
-        if let Some(id) = selected_idx {
-            if items.get(id).is_none() {
-                // Previously selected option is out of range, reset to default.
-                selected_idx = None
-            }
+        if let Some(id) = selected_idx
+            && items.get(id).is_none()
+        {
+            // Previously selected option is out of range, reset to default.
+            selected_idx = None
         }
 
         toggle_menu_state_handle.set(ToggleMenuState {

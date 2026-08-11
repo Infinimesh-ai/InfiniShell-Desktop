@@ -2,24 +2,26 @@ use std::borrow::Cow;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use warp_core::{
-    features::FeatureFlag,
-    ui::{appearance::Appearance, color::blend::Blend as _, theme::color::internal_colors, Icon},
+use warp_core::features::FeatureFlag;
+use warp_core::ui::Icon;
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::color::blend::Blend as _;
+use warp_core::ui::theme::color::internal_colors;
+use warpui::elements::{
+    ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DropShadow, Expanded,
+    Flex, Hoverable, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement as _,
+    ParentOffsetBounds, Radius, Stack,
 };
+use warpui::fonts::Weight;
+use warpui::keymap::EditableBinding;
+use warpui::platform::file_picker::FilePickerError;
+use warpui::platform::{Cursor, FilePickerConfiguration};
+use warpui::ui_components::components::{UiComponent as _, UiComponentStyles};
 use warpui::{
-    elements::{
-        ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DropShadow,
-        Expanded, Flex, Hoverable, MouseStateHandle, OffsetPositioning, ParentAnchor,
-        ParentElement as _, ParentOffsetBounds, Radius, Stack,
-    },
-    fonts::Weight,
-    keymap::EditableBinding,
-    platform::{file_picker::FilePickerError, Cursor, FilePickerConfiguration},
-    ui_components::components::{UiComponent as _, UiComponentStyles},
     AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
 };
 
-use crate::util::bindings::{keybinding_name_to_display_string, BindingGroup, CustomAction};
+use crate::util::bindings::{BindingGroup, CustomAction, keybinding_name_to_display_string};
 
 const BUTTON_MIN_WIDTH: f32 = 149.;
 

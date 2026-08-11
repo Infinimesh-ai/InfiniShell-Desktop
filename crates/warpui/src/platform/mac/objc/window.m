@@ -21,6 +21,8 @@ NSWindowStyleMask warpWindowMask = NSWindowStyleMaskClosable | NSWindowStyleMask
 
 // The default macOS titlebar height (in points).
 static const CGFloat DEFAULT_TITLEBAR_HEIGHT = 28.0;
+static const NSSize MIN_WINDOW_SIZE = {480.0, 192.0};
+static const NSSize TEST_MIN_WINDOW_SIZE = {124.0, 34.0};
 
 // A back-to-front ordered array of windows, identified by their `windowNumber`
 // property.
@@ -112,6 +114,32 @@ NSNumber *previouslyActiveAppPID;
 }
 @end
 
+// Activates the application and makes |window| key once that activation lands.
+//
+// `activateIgnoringOtherApps:` completes asynchronously, and AppKit picks the key window itself
+// when it does. In a multi-screen setup it prefers an ordinary window on another display over the
+// hotkey panel we just ordered front, so the panel loses focus moments after being shown. Re-keying
+// from NSApplicationDidBecomeActiveNotification is what makes the requested window win that race.
+static void activate_app_and_focus_window(NSWindow *window) {
+    NSApplication *app = [NSApplication sharedApplication];
+    if ([app isActive]) {
+        return;
+    }
+
+    // Declared __block so the block can reference the observer it is registering.
+    __block id observer;
+    observer = [[NSNotificationCenter defaultCenter]
+        addObserverForName:NSApplicationDidBecomeActiveNotification
+                    object:nil
+                     queue:NULL
+                usingBlock:^(NSNotification *note __unused) {
+                  [window makeKeyAndOrderFront:nil];
+                  [[NSNotificationCenter defaultCenter] removeObserver:observer];
+                }];
+
+    [app activateIgnoringOtherApps:YES];
+}
+
 @interface WarpWindow : NSWindow <WarpWindowProtocol>
 @end
 
@@ -141,12 +169,20 @@ NSNumber *previouslyActiveAppPID;
     // we explicitly force callbacks to be synchronous if it's caused by the user instead
     // of another system call (such as the active screen changing)
     [warp_view setAsyncCallback:NO];
+
+    // While the user is dragging to resize the window, we want to present frames
+    // within transactions to ensure the resize is visually smooth and there is no
+    // stuttering resulting from asynchronous presentation.
+    [warp_view setPresentsWithTransaction:YES];
 }
 
 - (void)windowDidEndLiveResize:(NSNotification *)notification {
     WarpWindow *warp_window = notification.object;
     WarpHostView *warp_view = warp_window.contentView;
+
+    // Reset state changed in `windowWillStartLiveResize`.
     [warp_view setAsyncCallback:YES];
+    [warp_view setPresentsWithTransaction:NO];
 }
 
 - (void)setForceTermination {
@@ -285,6 +321,7 @@ static NSLayoutConstraint *configure_titlebar_height(NSWindow *window, CGFloat h
 void init_warp_nswindow(NSWindow<WarpWindowProtocol> *window, bool testMode, bool hideTitleBar) {
     window.testMode = testMode;
     window.hideTitleBar = hideTitleBar;
+    NSSize minWindowSize = testMode ? TEST_MIN_WINDOW_SIZE : MIN_WINDOW_SIZE;
 
     // Set the background color to clear to support window background transparency. When this is set
     // to NSColor.clearColor with alpha = 0 and window drop shadows are enabled, MacOS renders a
@@ -298,6 +335,11 @@ void init_warp_nswindow(NSWindow<WarpWindowProtocol> *window, bool testMode, boo
     window.acceptsMouseMovedEvents = YES;
     window.titlebarAppearsTransparent = hideTitleBar;
     window.titleVisibility = hideTitleBar ? NSWindowTitleHidden : NSWindowTitleVisible;
+    window.minSize = minWindowSize;
+    window.contentMinSize = minWindowSize;
+    if ([window respondsToSelector:@selector(setMinFullScreenContentSize:)]) {
+        window.minFullScreenContentSize = minWindowSize;
+    }
 }
 
 @interface NSWindow (PrivateAPI)
@@ -430,14 +472,15 @@ void init_warp_nswindow(NSWindow<WarpWindowProtocol> *window, bool testMode, boo
         case NSEventTypeLeftMouseDown: {
             NSButton *windowButton = [self standardWindowButtonAtEvent:event];
             if (windowButton) {
-                _leftMouseDownStartedInNativeWindowChrome = NO;
-                [windowButton mouseDown:event];
+                _leftMouseDownStartedInNativeWindowChrome = YES;
+                [super sendEvent:event];
                 break;
             }
             _leftMouseDownStartedInNativeWindowChrome = [self eventIsOverResizeEdge:event];
             [super sendEvent:event];
             break;
         }
+
         // In some cases, NSWindow's default sendEvent: implementation will dispatch a MouseDown
         // event and subsequent MouseDragged events to the content view, but then dispatch the
         // remaining MouseDragged events and MouseUp event elsewhere.
@@ -447,16 +490,24 @@ void init_warp_nswindow(NSWindow<WarpWindowProtocol> *window, bool testMode, boo
         // This breaks drag-and-drop for panes and tabs (see CLD-2581), so we work around it with
         // custom dispatching.
         case NSEventTypeLeftMouseUp:
-            if (_leftMouseDownStartedInNativeWindowChrome && @available(macOS 27, *)) {
-                [super sendEvent:event];
+            if (@available(macOS 27, *)) {
+                if (_leftMouseDownStartedInNativeWindowChrome) {
+                    [super sendEvent:event];
+                } else {
+                    [self.contentView mouseUp:event];
+                }
             } else {
                 [self.contentView mouseUp:event];
             }
             _leftMouseDownStartedInNativeWindowChrome = NO;
             break;
         case NSEventTypeLeftMouseDragged:
-            if (_leftMouseDownStartedInNativeWindowChrome && @available(macOS 27, *)) {
-                [super sendEvent:event];
+            if (@available(macOS 27, *)) {
+                if (_leftMouseDownStartedInNativeWindowChrome) {
+                    [super sendEvent:event];
+                } else {
+                    [self.contentView mouseDragged:event];
+                }
             } else {
                 [self.contentView mouseDragged:event];
             }
@@ -721,8 +772,8 @@ void init_warp_nswindow(NSWindow<WarpWindowProtocol> *window, bool testMode, boo
          NSWindowCollectionBehaviorFullScreenAuxiliary);
 
     [self setMovable:NO];
-    [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
     [self makeKeyAndOrderFront:nil];
+    activate_app_and_focus_window(self);
 }
 
 // Note this returns a retained object ("create" rule).
@@ -998,9 +1049,12 @@ void open_save_file_picker(void *callback, NSString *defaultFilename, NSString *
 }
 
 // Open a given url.
-void open_url(NSString *urlString) {
+BOOL open_url(NSString *urlString) {
     NSURL *url = [NSURL URLWithString:urlString];
-    [[NSWorkspace sharedWorkspace] openURL:url];
+    if (url == nil) {
+        return NO;
+    }
+    return [[NSWorkspace sharedWorkspace] openURL:url];
 }
 
 void hide_app() {
@@ -1037,22 +1091,7 @@ void show_window_and_focus_app(WarpWindow<WarpWindowProtocol> *window, bool brin
     // There are some edge cases with the hot key window in a multi-screen setup that toggling
     // the hotkey will activate the app and only bring forward a normal window. This code makes
     // sure that we are bringing forward the hotkey window
-    if (![[NSApplication sharedApplication] isActive]) {
-        // Creates a static observer so it can be referenced in the observer callback.
-        __block id observer;
-        observer = [[NSNotificationCenter defaultCenter]
-            addObserverForName:NSApplicationDidBecomeActiveNotification
-                        object:nil
-                         queue:NULL
-                    usingBlock:^(NSNotification *note __unused) {
-                      // Make key and order front again after the app has activated to make
-                      // sure the toggled window is focused after initializing.
-                      [window makeKeyAndOrderFront:nil];
-                      [[NSNotificationCenter defaultCenter] removeObserver:observer];
-                    }];
-
-        [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
-    }
+    activate_app_and_focus_window(window);
 }
 
 void hide_window(WarpWindow<WarpWindowProtocol> *window) {

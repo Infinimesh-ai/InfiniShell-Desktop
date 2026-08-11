@@ -22,10 +22,12 @@ async fn hydrator_does_not_fetch_cloud_message_for_matching_run() {
     let hydrator = MessageHydrator::new();
     let event = make_run_event(7, "new_message", "child-run", Some("msg-123"));
 
-    assert!(hydrator
-        .hydrate_event_for_recipient(&event, "child-run")
-        .await
-        .is_none());
+    assert!(
+        hydrator
+            .hydrate_event_for_recipient(&event, "child-run")
+            .await
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -33,8 +35,10 @@ async fn hydrator_ignores_events_for_other_runs() {
     let hydrator = MessageHydrator::new();
     let event = make_run_event(7, "new_message", "other-run", Some("msg-123"));
 
-    assert!(hydrator
-        .hydrate_event_for_recipient(&event, "child-run")
-        .await
-        .is_none());
+    assert!(
+        hydrator
+            .hydrate_event_for_recipient(&event, "child-run")
+            .await
+            .is_none()
+    );
 }

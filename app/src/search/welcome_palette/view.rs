@@ -173,7 +173,7 @@ impl warpui::View for WelcomePalette {
         let mut palette = Flex::column();
         palette.add_child(self.render_search_bar());
 
-        if self.search_bar_state.as_ref(app).should_show_zero_state() {
+        if self.search_bar.as_ref(app).should_show_zero_state(app) {
             palette.add_child(
                 Shrinkable::new(
                     1.,
@@ -238,7 +238,11 @@ impl WelcomePalette {
             NewSessionDataSource::new(binding_source.clone(), ctx)
                 .with_allowed_kinds(AllowedSessionKinds::tabs_only())
         });
-        let warp_drive_data_source = ctx.add_model(warp_drive::DataSource::new);
+        // Zap:`warp_drive::DataSource::new` 现在需要 `WindowId`(上游把 drive 搜索索引
+        // 按窗口分片),与 `command_palette::DataSourceStore` 的取法保持一致。
+        let window_id = ctx.window_id();
+        let warp_drive_data_source =
+            ctx.add_model(|ctx| warp_drive::DataSource::new(window_id, ctx));
 
         let mixer = ctx.add_model(|ctx| {
             let mut mixer = CommandPaletteMixer::new();
@@ -391,29 +395,29 @@ impl WelcomePalette {
     /// Set the active query filter in the search bar to be `filter`.
     pub fn set_active_query_filter(&mut self, filter: QueryFilter, ctx: &mut ViewContext<Self>) {
         self.search_bar.update(ctx, |view, ctx| {
-            view.set_visible_query_filter(Some((filter, filter.filter_atom().primary_text)), ctx)
+            view.set_query_filter(Some((filter, filter.filter_atom().primary_text)), ctx)
         });
         ctx.notify();
     }
 
     pub fn select_next_item(&mut self, ctx: &mut ViewContext<Self>) {
-        self.search_bar_state.update(ctx, |state, ctx| {
-            state.handle_selection_update(SelectionUpdate::Down, ctx);
+        // Zap:`SearchBarState::handle_selection_update` 现在还要 `should_show_zero_state`,
+        // 该判定已上移到 `SearchBar` 视图,所以改为经由视图转发。
+        self.search_bar.update(ctx, |view, ctx| {
+            view.handle_selection_update(SelectionUpdate::Down, ctx);
         });
         ctx.notify();
     }
 
     pub fn select_prev_item(&mut self, ctx: &mut ViewContext<Self>) {
-        self.search_bar_state.update(ctx, |state, ctx| {
-            state.handle_selection_update(SelectionUpdate::Up, ctx);
+        self.search_bar.update(ctx, |view, ctx| {
+            view.handle_selection_update(SelectionUpdate::Up, ctx);
         });
         ctx.notify();
     }
 
     pub fn active_query_filter(&self, app: &AppContext) -> Option<QueryFilter> {
-        self.search_bar_state
-            .as_ref(app)
-            .active_visible_query_filter()
+        self.search_bar_state.as_ref(app).active_query_filter()
     }
 
     pub fn is_mode_enabled(&self, mode: PaletteMode, app: &AppContext) -> bool {

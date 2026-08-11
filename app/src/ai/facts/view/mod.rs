@@ -2,10 +2,12 @@
 // 在云端腿(SyncQueue / NetworkStatus 在线门控)被完全下线后这些代码全部失去意义,
 // 整体移除并精简 imports。Pane 容器视图本身保留,负责在 Rules / RuleEditor 两页之间切换。
 use crate::pane_group::focus_state::PaneFocusHandle;
-use crate::pane_group::{pane::view, BackingView, PaneConfiguration, PaneEvent};
+use crate::pane_group::pane::view;
+use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
 use crate::server::ids::SyncId;
 use std::path::PathBuf;
 use warp_core::ui::appearance::Appearance;
+use warp_util::local_or_remote_path::LocalOrRemotePath;
 use warpui::{
     elements::{
         Align, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, Flex,
@@ -45,7 +47,7 @@ impl std::fmt::Display for AIFactPage {
 pub enum AIFactViewEvent {
     Pane(PaneEvent),
     OpenSettings,
-    OpenFile(PathBuf),
+    OpenFile(LocalOrRemotePath),
     InitializeProject(PathBuf),
 }
 

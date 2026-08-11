@@ -55,7 +55,14 @@ pub(super) fn input_context_for_request(
     additional_context: Vec<AIAgentContext>,
     app: &AppContext,
 ) -> Arc<[AIAgentContext]> {
-    let mut context = context_model.pending_context(app, is_user_query);
+    // 上游把 pwd 的"位置"(保留远端 host 身份)单独传进 `pending_context`,
+    // 供 project rules 查找区分本地 / 远程仓库。
+    let current_working_directory_location = active_session.current_working_directory_location(app);
+    let mut context = context_model.pending_context(
+        app,
+        is_user_query,
+        current_working_directory_location.as_ref(),
+    );
 
     context.push(AIAgentContext::CurrentTime {
         current_time: Local::now(),
@@ -346,6 +353,16 @@ fn generic_string_object_format_name(format: GenericStringObjectFormat) -> Strin
         GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer) => {
             "JsonTemplatableMCPServer"
         }
+        // Zap:这三个是 `cloud_objects` crate 里上游云端侧的对象类型
+        // (云端环境 / 定时 ambient agent / 云端 agent 配置)。我方已剥离全部
+        // 云端功能,本地 ObjectStore 不会产生这类对象,而且本函数唯一的调用点
+        // 只在 `AIFactObjectModel` downcast 成功后才走到,所以该分支实际不可达。
+        // 这里显式列出而不是用 `_ =>` 兜底,是为了上游枚举再扩展时能继续报编译错。
+        GenericStringObjectFormat::Json(
+            JsonObjectType::CloudEnvironment
+            | JsonObjectType::ScheduledAmbientAgent
+            | JsonObjectType::CloudAgentConfig,
+        ) => "JsonUnsupportedCloudObject",
     }
     .to_string()
 }

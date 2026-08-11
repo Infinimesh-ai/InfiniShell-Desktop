@@ -1,28 +1,27 @@
-use pathfinder_geometry::rect::RectF;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use warpui::platform::FullscreenState;
 
-use warpui::AppContext;
+use pathfinder_geometry::rect::RectF;
+use serde::{Deserialize, Serialize};
+use warpui::platform::FullscreenState;
+use warpui::{AppContext, SingletonEntity as _};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_conversations_model::AgentManagementFilters;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
-use crate::ai::blocklist::InputConfig;
-use crate::ai::blocklist::SerializedBlockListItem;
+use crate::ai::blocklist::{InputConfig, SerializedBlockListItem};
 use crate::code::editor_management::CodeSource;
 use crate::drive::ZapDriveObjectSettings;
 use crate::root_view::quake_mode_window_id;
-use crate::server::ids::SyncId;
+use crate::server::ids::{ServerId, SyncId};
 use crate::settings_view::SettingsSection;
 use crate::tab::SelectedTabColor;
 use crate::terminal::ShellLaunchData;
 use crate::themes::theme::{AnsiColorIdentifier, ThemeKind};
-use crate::workspace::view::left_panel::ToolPanelView;
 use crate::workspace::WorkspaceRegistry;
-use warpui::SingletonEntity as _;
+use crate::workspace::tab_group::TabGroupId;
+use crate::workspace::view::left_panel::ToolPanelView;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppState {
@@ -45,6 +44,7 @@ pub struct PersistedAgentManagementFilters {
 pub struct WindowSnapshot {
     pub tabs: Vec<TabSnapshot>,
     pub active_tab_index: usize,
+    pub team_uid: Option<ServerId>,
     pub bounds: Option<RectF>,
     pub fullscreen_state: FullscreenState,
     pub quake_mode: bool,
@@ -60,6 +60,18 @@ pub struct WindowSnapshot {
     /// The per-window theme override for this window, if the user set one via the
     /// theme chooser's "This window" scope. Re-applied on restore.
     pub theme_override: Option<ThemeKind>,
+    /// Tab groups defined in this window. Group order is implicit from
+    /// member tabs' positions, so no explicit ordering is persisted.
+    pub tab_groups: Vec<TabGroupSnapshot>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TabGroupSnapshot {
+    pub id: TabGroupId,
+    pub name: Option<String>,
+    pub color: SelectedTabColor,
+    pub collapsed: bool,
+    pub pinned: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -70,6 +82,10 @@ pub struct TabSnapshot {
     pub selected_color: SelectedTabColor,
     pub left_panel: Option<LeftPanelSnapshot>,
     pub right_panel: Option<RightPanelSnapshot>,
+    /// Tab group this tab belongs to, if any.
+    pub group_id: Option<TabGroupId>,
+    /// True when this tab is pinned to the front of the tab list.
+    pub pinned: bool,
 }
 
 impl TabSnapshot {
@@ -135,6 +151,7 @@ pub enum LeafContents {
     Workflow(WorkflowPaneSnapshot),
     Settings(SettingsPaneSnapshot),
     AIFact(AIFactPaneSnapshot),
+    CustomRouterEditor,
     ExecutionProfileEditor,
     CodeReview(CodeReviewPaneSnapshot),
     AmbientAgent(AmbientAgentPaneSnapshot),
@@ -143,6 +160,9 @@ pub enum LeafContents {
     Welcome {
         startup_directory: Option<PathBuf>,
     },
+    /// The in-app network log pane. Not persisted across restarts because the
+    /// backing log is an in-memory ring buffer that starts empty on launch.
+    NetworkLog,
     /// A new first-time user experience which prioritizes choosing a coding repository.
     GetStarted,
     /// SSH 服务器编辑器 pane(openWarp 独有)。引用 `ssh_servers.node_id` 主键
@@ -176,6 +196,10 @@ impl LeafContents {
             LeafContents::SshServer { .. } => false,
             // SFTP 浏览器:远端文件系统依赖活跃 SSH 连接,pane 不可恢复。
             LeafContents::Sftp { .. } => false,
+            // Network log: the backing log is an in-memory ring buffer that
+            // starts empty on launch; persisting would also regress back to
+            // an on-disk log via the app-state database.
+            LeafContents::NetworkLog => false,
             // Image viewer panes are intentionally not persisted: they render in-session but
             // are not restored after restart.
             LeafContents::Image { .. } => false,
@@ -193,6 +217,7 @@ impl LeafContents {
             | LeafContents::Workflow(_)
             | LeafContents::Settings(_)
             | LeafContents::AIFact(_)
+            | LeafContents::CustomRouterEditor
             | LeafContents::ExecutionProfileEditor
             | LeafContents::CodeReview(_)
             | LeafContents::AmbientAgent(_)
@@ -374,10 +399,10 @@ pub fn get_app_state(app: &AppContext) -> AppState {
 
     for (index, window_id) in app.window_ids().enumerate() {
         // Determine index of active window
-        if let Some(active_window_id) = active_window_id {
-            if active_window_id == window_id {
-                active_window_index = Some(index);
-            }
+        if let Some(active_window_id) = active_window_id
+            && active_window_id == window_id
+        {
+            active_window_index = Some(index);
         }
 
         if let Some(workspace) = WorkspaceRegistry::as_ref(app).get(window_id, app) {

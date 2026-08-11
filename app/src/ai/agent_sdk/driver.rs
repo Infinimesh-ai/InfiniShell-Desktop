@@ -59,7 +59,9 @@ use oneshot::{Canceled, Receiver, Sender};
 use uuid::Uuid;
 use warp_cli::agent::{Harness, OutputFormat};
 use warp_cli::mcp::MCPSpec;
-use warp_core::{features::FeatureFlag, report_if_error, safe_debug, safe_info};
+use warp_core::{features::FeatureFlag, safe_debug, safe_info};
+// Zap:`report_if_error` 已从 warp_core 迁到 warp_errors crate。
+use warp_errors::report_if_error;
 use warp_managed_secrets::ManagedSecretValue;
 use warpui::{
     r#async::{FutureExt, TimeoutError},
@@ -67,6 +69,7 @@ use warpui::{
 };
 
 pub(crate) mod harness;
+mod harness_output_monitor;
 pub(super) mod output;
 pub(crate) mod terminal;
 
@@ -277,13 +280,13 @@ pub enum AgentDriverError {
     MCPMissingVariables,
     #[error("Agent profile \"{0}\" not found")]
     ProfileError(String),
-    #[error("Local user state is unavailable. Restart Zap and try again.")]
+    #[error("Local user state is unavailable. Restart InfiniShell and try again.")]
     NotLoggedIn,
     #[error("Saved prompt not found for id {0}")]
     AIWorkflowNotFound(String),
     #[error("Terminal bootstrap failed")]
     BootstrapFailed,
-    #[error("Error syncing Zap Drive")]
+    #[error("Error syncing InfiniShell Drive")]
     WarpDriveSyncFailed,
     #[error("Requested environment not found: {0}")]
     EnvironmentNotFound(String),
@@ -312,6 +315,14 @@ pub enum AgentDriverError {
     AwsBedrockCredentialsFailed(String),
     #[error("Harness command exited with code {exit_code}")]
     HarnessCommandFailed { exit_code: i32 },
+    #[error("Harness '{harness}' reported a runtime failure matching '{pattern}'")]
+    HarnessRuntimeFailureDetected {
+        harness: String,
+        /// The originating needle from `runtime_error_patterns` that hit.
+        pattern: String,
+        /// Matching row(s) from the harness block, trimmed and capped.
+        excerpt: String,
+    },
     #[error("Harness '{harness}' setup failed: {reason}")]
     HarnessSetupFailed { harness: String, reason: String },
     #[error("Harness '{harness}' config setup failed")]
@@ -367,6 +378,10 @@ impl AgentDriver {
                 ManagedSecretValue::RawValue { value } => (name.as_str(), value.as_str()),
                 ManagedSecretValue::AnthropicApiKey { api_key } => {
                     ("ANTHROPIC_API_KEY", api_key.as_str())
+                }
+                // 与上游一致:只注入 API key,`base_url` 由 harness 自行决定端点。
+                ManagedSecretValue::OpenaiApiKey { api_key, .. } => {
+                    ("OPENAI_API_KEY", api_key.as_str())
                 }
                 ManagedSecretValue::AnthropicBedrockAccessKey {
                     aws_access_key_id,
@@ -452,7 +467,7 @@ impl AgentDriver {
         )?;
 
         // Subscribe to TerminalDriver events for task-specific handling.
-        ctx.subscribe_to_model(&terminal_driver, |me, event, _| {
+        ctx.subscribe_to_model(&terminal_driver, |me, _handle, event, _| {
             me.handle_terminal_driver_event(event);
         });
 
@@ -471,11 +486,15 @@ impl AgentDriver {
         self.output_format = output_format;
     }
 
+    // Zap:edition 2024 RPIT 默认捕获 `&mut self` 与 `&mut ModelContext`,调用点
+    // (`agent_sdk::mod` 的 `driver.update(...)` 闭包)会被判成借用逃逸 / 重复可变借用。
+    // 返回的 async block 只移动 `rx`、`task_id`、`idle_on_complete` 三个 owned 值,
+    // 不借用任何入参,故显式 `use<>`。
     pub fn run(
         &mut self,
         task: Task,
         ctx: &mut ModelContext<Self>,
-    ) -> impl Future<Output = Result<(), AgentDriverError>> {
+    ) -> impl Future<Output = Result<(), AgentDriverError>> + use<> {
         let (tx, rx) = oneshot::channel();
         let foreground = ctx.spawner();
         let idle_on_complete = self.idle_on_complete;
@@ -525,7 +544,9 @@ impl AgentDriver {
 
     /// Check that the working directory exists. Since it's user-specified, we don't automatically
     /// create the directory (in case they made a typo).
-    fn check_working_dir(&self) -> impl Future<Output = Result<(), AgentDriverError>> {
+    // Zap:edition 2024 RPIT 默认捕获 `&self`,`ModelSpawner::spawn` 的回调返回它时
+    // 会被判成借用逃逸;future 只持有 clone 出来的 working_dir,故显式 `use<>`。
+    fn check_working_dir(&self) -> impl Future<Output = Result<(), AgentDriverError>> + use<> {
         let working_dir = self.working_dir.clone();
         async move {
             match async_fs::metadata(&working_dir).await {
@@ -561,6 +582,13 @@ impl AgentDriver {
                 MCPSpec::Uuid(uuid) => {
                     existing_uuids.push(*uuid);
                 }
+                // well-known MCP id(如 "linear")的解析由 Warp 云端负责,Zap 没有
+                // 对应的 managed MCP client,只能跳过而不是让整个 run 失败。
+                MCPSpec::WellKnown(id) => {
+                    log::warn!(
+                        "Skipping well-known MCP server '{id}': InfiniShell 没有云端 managed MCP 解析服务"
+                    );
+                }
                 MCPSpec::Json(json_str) => {
                     // Normalize the JSON - if it's a single server definition (has command or url
                     // at top level), wrap it with a generated name.
@@ -589,7 +617,8 @@ impl AgentDriver {
     fn start_profile_mcp_servers(
         &self,
         ctx: &mut ModelContext<Self>,
-    ) -> impl Future<Output = Result<(), AgentDriverError>> {
+        // Zap:同 `start_mcp_servers`,edition 2024 下显式声明不捕获任何入参生命周期。
+    ) -> impl Future<Output = Result<(), AgentDriverError>> + use<> {
         let terminal_id = self.terminal_driver.as_ref(ctx).terminal_view().id();
         let permissions = BlocklistAIPermissions::as_ref(ctx);
         let profile_allowlist = permissions.get_mcp_allowlist(ctx, Some(terminal_id));
@@ -647,7 +676,7 @@ impl AgentDriver {
         let mut tx = Some(tx);
         ctx.subscribe_to_model(
             &templatable_mcp_manager,
-            move |_me, event, ctx| match event {
+            move |_me, _handle, event, ctx| match event {
                 TemplatableMCPServerManagerEvent::StateChanged { uuid, state } => {
                     let mut pending_ids = mcp_to_start.borrow_mut();
                     if !pending_ids.contains(uuid) {
@@ -674,7 +703,10 @@ impl AgentDriver {
                         _ => {}
                     }
                 }
-                TemplatableMCPServerManagerEvent::ServerInstallationAdded(_)
+                // OAuth 交互 / 凭据变更由前端(GUI、TUI)处理;driver 只等待启动完成。
+                TemplatableMCPServerManagerEvent::AuthenticationRequired { .. }
+                | TemplatableMCPServerManagerEvent::CredentialsChanged { .. }
+                | TemplatableMCPServerManagerEvent::ServerInstallationAdded(_)
                 | TemplatableMCPServerManagerEvent::ServerInstallationDeleted(_)
                 | TemplatableMCPServerManagerEvent::TemplatableMCPServersUpdated
                 | TemplatableMCPServerManagerEvent::LegacyServerConverted => {}
@@ -699,7 +731,10 @@ impl AgentDriver {
         &self,
         uuids: &[uuid::Uuid],
         ctx: &mut ModelContext<Self>,
-    ) -> impl Future<Output = Result<(), AgentDriverError>> {
+        // Zap:edition 2024 下 RPIT 默认捕获全部入参生命周期,会让调用方(如
+        // `start_profile_mcp_servers` 里的局部 allowlist)被误判为借用不够长。
+        // 返回的 future 实际只持有 oneshot receiver,不借任何入参,故显式 `use<>`。
+    ) -> impl Future<Output = Result<(), AgentDriverError>> + use<> {
         let (tx, rx) = oneshot::channel();
         let servers_to_start = match self.get_mcp_servers_to_start(uuids, ctx) {
             Ok(val) => val,
@@ -740,7 +775,8 @@ impl AgentDriver {
         &self,
         mut installations: Vec<TemplatableMCPServerInstallation>,
         ctx: &mut ModelContext<Self>,
-    ) -> impl Future<Output = Result<(), AgentDriverError>> {
+        // Zap:同上,edition 2024 下显式声明不捕获任何入参生命周期。
+    ) -> impl Future<Output = Result<(), AgentDriverError>> + use<> {
         if installations.is_empty() {
             return Either::Right(future::ready(Ok(())));
         }
@@ -760,7 +796,9 @@ impl AgentDriver {
         let templatable_mcp_manager = TemplatableMCPServerManager::handle(ctx);
         let manager_clone = templatable_mcp_manager.clone();
 
-        ctx.subscribe_to_model(&templatable_mcp_manager, move |_me, event, ctx| {
+        // Zap:`ModelContext::subscribe_to_model` 的回调是 4 参
+        // `|me, handle, event, ctx|`,这里补回被上游漏掉的 handle 形参。
+        ctx.subscribe_to_model(&templatable_mcp_manager, move |_me, _handle, event, ctx| {
             if let TemplatableMCPServerManagerEvent::StateChanged { uuid, state } = event {
                 if !uuids_to_start.contains(uuid) {
                     return;
@@ -847,28 +885,34 @@ impl AgentDriver {
         let templatable_manager_handle = TemplatableMCPServerManager::handle(ctx);
         let manager_clone = templatable_manager_handle.clone();
 
-        ctx.subscribe_to_model(&templatable_manager_handle, move |_me, event, ctx| {
-            if let TemplatableMCPServerManagerEvent::StateChanged { uuid, state } = event {
-                if !pending_uuids.contains(uuid) {
-                    return;
-                }
-                match state {
-                    MCPServerState::Running | MCPServerState::FailedToStart => {
-                        pending_uuids.remove(uuid);
-                    }
-                    _ => {
+        // Zap:同上,`ModelContext::subscribe_to_model` 回调为 4 参,补回 handle 形参。
+        ctx.subscribe_to_model(
+            &templatable_manager_handle,
+            move |_me, _handle, event, ctx| {
+                if let TemplatableMCPServerManagerEvent::StateChanged { uuid, state } = event {
+                    if !pending_uuids.contains(uuid) {
                         return;
                     }
-                }
-                if pending_uuids.is_empty() {
-                    log::info!("All file-based MCP servers reached a terminal state; proceeding");
-                    if let Some(sender) = tx.take() {
-                        let _ = sender.send(());
+                    match state {
+                        MCPServerState::Running | MCPServerState::FailedToStart => {
+                            pending_uuids.remove(uuid);
+                        }
+                        _ => {
+                            return;
+                        }
                     }
-                    ctx.unsubscribe_from_model(&manager_clone);
+                    if pending_uuids.is_empty() {
+                        log::info!(
+                            "All file-based MCP servers reached a terminal state; proceeding"
+                        );
+                        if let Some(sender) = tx.take() {
+                            let _ = sender.send(());
+                        }
+                        ctx.unsubscribe_from_model(&manager_clone);
+                    }
                 }
-            }
-        });
+            },
+        );
 
         Either::Left(async move {
             match rx.with_timeout(MCP_SERVER_STARTUP_TIMEOUT).await {
@@ -993,10 +1037,19 @@ impl AgentDriver {
                 conversation_status.into_result()
             }
             HarnessKind::ThirdParty(harness) => {
+                let harness_name = harness.harness().to_string();
+                let runtime_error_patterns = harness.runtime_error_patterns();
                 let harness_exit_rx = Self::setup_harness(harness.as_ref(), &foreground).await?;
                 let runner =
                     Self::prepare_harness(&task.prompt, harness.as_ref(), &foreground).await?;
-                Self::run_harness(runner, &foreground, harness_exit_rx).await
+                Self::run_harness(
+                    runner,
+                    harness_name,
+                    runtime_error_patterns,
+                    &foreground,
+                    harness_exit_rx,
+                )
+                .await
             }
             HarnessKind::Unsupported(harness) => Err(AgentDriverError::HarnessSetupFailed {
                 harness: harness.to_string(),
@@ -1099,14 +1152,38 @@ impl AgentDriver {
     ///
     /// The `harness_exit_rx` oneshot fires when the subscription determines it's
     /// time to exit (either immediately on completion or after the idle timeout).
+    ///
+    /// While the harness runs, a background scanner watches its block for known
+    /// runtime failure substrings (e.g. invalid API key, exhausted credits). If
+    /// one is confirmed we ask the harness to exit and synthesize a
+    /// [`AgentDriverError::HarnessRuntimeFailureDetected`] failure so the run
+    /// surfaces the actionable detail instead of hanging or reporting a bare
+    /// exit code.
     async fn run_harness(
         runner: Arc<dyn harness::HarnessRunner>,
+        harness_name: String,
+        runtime_error_patterns: &'static [&'static str],
         foreground: &ModelSpawner<Self>,
         harness_exit_rx: oneshot::Receiver<()>,
     ) -> Result<(), AgentDriverError> {
         // Start the third-party harness.
-        let mut command_handle = runner.start(foreground).await?.fuse();
+        let command_handle = runner.start(foreground).await?;
+        let block_id = command_handle.block_id().clone();
+        let mut command_handle = command_handle.fuse();
         let mut harness_exit_rx = harness_exit_rx.fuse();
+
+        let scanner_fut = harness_output_monitor::watch_block_for_errors(
+            block_id,
+            runtime_error_patterns,
+            foreground,
+        )
+        .fuse();
+        futures::pin_mut!(scanner_fut);
+
+        // Detected runtime error, if any. Promoted to the final return value
+        // below after final-save + cleanup run.
+        let mut detected_runtime_failure: Option<harness_output_monitor::DetectedHarnessError> =
+            None;
 
         // Periodically save the conversation while the command is running and handle
         // exiting gracefully once the idle timeout elapses.
@@ -1127,6 +1204,49 @@ impl AgentDriver {
                         .await
                         .context("Failed to exit harness"));
                 }
+                detected = scanner_fut => {
+                    if let Some(error) = detected {
+                        log::warn!(
+                            "Runtime failure detected for {harness_name}: pattern={}, excerpt={}",
+                            error.pattern,
+                            error.excerpt,
+                        );
+                        let session_status = foreground
+                            .spawn(|me, ctx| {
+                                let view_id =
+                                    me.terminal_driver.as_ref(ctx).terminal_view().id();
+                                CLIAgentSessionsModel::handle(ctx)
+                                    .as_ref(ctx)
+                                    .session(view_id)
+                                    .map(|session| session.status.clone())
+                            })
+                            .await
+                            .ok()
+                            .flatten();
+                        if harness_output_monitor::should_suppress_runtime_failure(
+                            session_status.as_ref(),
+                        ) {
+                            log::info!(
+                                "Ignoring runtime failure for {harness_name}: \
+                                 session already marked Success or Failed via plugin \
+                                 (pattern={}, excerpt={})",
+                                error.pattern,
+                                error.excerpt,
+                            );
+                        } else {
+                            report_if_error!(runner
+                                .exit(foreground)
+                                .await
+                                .context(
+                                    "Failed to exit harness after runtime failure detection",
+                                ));
+                            detected_runtime_failure = Some(error);
+                        }
+                    }
+                    // When the schedule exhausts without a hit, the `Fuse`
+                    // wrapper makes this branch stay Pending forever, so
+                    // we don't busy-loop.
+                }
             }
         };
 
@@ -1140,6 +1260,17 @@ impl AgentDriver {
             .cleanup(foreground)
             .await
             .context("Failed to clean up harness runtime state"));
+
+        // A runtime failure detected mid-run takes precedence over the harness's
+        // own exit code: surface the actionable detail rather than a generic
+        // "exit code N".
+        if let Some(error) = detected_runtime_failure {
+            return Err(AgentDriverError::HarnessRuntimeFailureDetected {
+                harness: harness_name,
+                pattern: error.pattern,
+                excerpt: error.excerpt,
+            });
+        }
 
         let exit_code = command_result?;
         log::debug!("Agent harness exited with status {exit_code}");
@@ -1166,7 +1297,7 @@ impl AgentDriver {
                 .map_err(|_| AgentDriverError::ProfileError(profile.clone()))?;
             let sync_id = SyncId::ServerId(server_id);
             AIExecutionProfilesModel::handle(ctx).update(ctx, |model, ctx| {
-                if let Some(profile_id) = model.get_profile_id_by_sync_id(&sync_id) {
+                if let Some(profile_id) = model.get_profile_id_by_sync_id(&sync_id, ctx) {
                     model.set_active_profile(terminal_id, profile_id, ctx);
                 } else {
                     return Err(AgentDriverError::ProfileError(profile.clone()));
@@ -1213,8 +1344,9 @@ impl AgentDriver {
         let conversation_id_cell = Arc::new(Mutex::new(Option::<String>::None));
         let conversation_id_cell_for_handler = Arc::clone(&conversation_id_cell);
 
-        ctx.subscribe_to_model(&history_model_handle, move |me, event, ctx| {
-            if event.terminal_view_id().is_some_and(|id| id != terminal_id) {
+        ctx.subscribe_to_model(&history_model_handle, move |me, _handle, event, ctx| {
+            // 上游把 `terminal_view_id` 统一改名为 `terminal_surface_id`。
+            if event.terminal_surface_id().is_some_and(|id| id != terminal_id) {
                 return;
             }
 
@@ -1290,7 +1422,7 @@ impl AgentDriver {
 
                 }
 
-                BlocklistAIHistoryEvent::UpdatedConversationStatus { terminal_view_id: conversation_terminal_id, conversation_id, .. } => {
+                BlocklistAIHistoryEvent::UpdatedConversationStatus { terminal_surface_id: conversation_terminal_id, conversation_id, .. } => {
                     if *conversation_terminal_id != terminal_id {
                         return;
                     }
@@ -1361,7 +1493,8 @@ impl AgentDriver {
                 }
                 BlocklistAIHistoryEvent::StartedNewConversation { .. }
                 | BlocklistAIHistoryEvent::ReassignedExchange { .. }
-                | BlocklistAIHistoryEvent::ClearedConversationsInTerminalView { .. }
+                // 上游改名:`ClearedConversationsInTerminalView` → `...ForTerminalSurface`。
+                | BlocklistAIHistoryEvent::ClearedConversationsForTerminalSurface { .. }
                 | BlocklistAIHistoryEvent::UpdatedAutoexecuteOverride { .. }
                 | BlocklistAIHistoryEvent::SplitConversation { .. }
                 | BlocklistAIHistoryEvent::RemoveConversation { .. }
@@ -1372,7 +1505,14 @@ impl AgentDriver {
                 | BlocklistAIHistoryEvent::UpdatedConversationMetadata { .. }
                 | BlocklistAIHistoryEvent::ClearedActiveConversation { .. }
                 | BlocklistAIHistoryEvent::UpdatedConversationArtifacts { .. }
-                | BlocklistAIHistoryEvent::ConversationAgentIdAssigned { .. } => (),
+                | BlocklistAIHistoryEvent::ConversationServerTokenAssigned { .. }
+                // 上游新增的事件,CLI driver 不关心(纯 UI / 会话簿记)。
+                | BlocklistAIHistoryEvent::UpdatedConversationTitle { .. }
+                | BlocklistAIHistoryEvent::ConversationTransferredBetweenTerminalSurfaces { .. }
+                | BlocklistAIHistoryEvent::NewConversationRequestComplete { .. }
+                | BlocklistAIHistoryEvent::OrchestrationConfigUpdated { .. }
+                | BlocklistAIHistoryEvent::ConversationUsageMetadataUpdated { .. }
+                | BlocklistAIHistoryEvent::LocalSharedSessionEstablished { .. } => (),
             }
         });
 
@@ -1453,7 +1593,7 @@ impl AgentDriver {
 
         ctx.subscribe_to_model(
             &CLIAgentSessionsModel::handle(ctx),
-            move |me, event, ctx| match event {
+            move |me, _handle, event, ctx| match event {
                 CLIAgentSessionsModelEvent::StatusChanged {
                     terminal_view_id: event_tid,
                     status,
@@ -1471,6 +1611,11 @@ impl AgentDriver {
                             } else {
                                 harness_exit.end_run_now(());
                             }
+                        }
+                        // harness 报错即刻结束 run:我方没有上游的 `idle_on_fail` 宽限窗口,
+                        // 等价于上游 `idle_on_fail = None` 的默认行为。
+                        CLIAgentSessionStatus::Failed { .. } => {
+                            harness_exit.end_run_now(());
                         }
                         CLIAgentSessionStatus::InProgress => {
                             harness_exit.cancel_idle_timeout();

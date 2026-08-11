@@ -1,15 +1,12 @@
 use std::path::PathBuf;
 
-use crate::{
-    app_state::{
-        AppState, BranchSnapshot, LeafContents, LeafSnapshot, NotebookPaneSnapshot, PaneFlex,
-        PaneNodeSnapshot, SplitDirection, TabSnapshot, TerminalPaneSnapshot, WindowSnapshot,
-    },
-    drive::ZapDriveObjectSettings,
-    tab::SelectedTabColor,
+use super::{CommandTemplate, LaunchConfig, PaneMode, PaneTemplateType};
+use crate::app_state::{
+    AppState, BranchSnapshot, LeafContents, LeafSnapshot, NotebookPaneSnapshot, PaneFlex,
+    PaneNodeSnapshot, SplitDirection, TabSnapshot, TerminalPaneSnapshot, WindowSnapshot,
 };
-
-use super::{LaunchConfig, PaneMode, PaneTemplateType};
+use crate::drive::ZapDriveObjectSettings;
+use crate::tab::SelectedTabColor;
 
 fn single_tab_snapshot(root: PaneNodeSnapshot) -> AppState {
     AppState {
@@ -21,8 +18,11 @@ fn single_tab_snapshot(root: PaneNodeSnapshot) -> AppState {
                 root,
                 left_panel: None,
                 right_panel: None,
+                group_id: None,
+                pinned: false,
             }],
             active_tab_index: 0,
+            team_uid: None,
             bounds: None,
             quake_mode: false,
             universal_search_width: None,
@@ -36,6 +36,7 @@ fn single_tab_snapshot(root: PaneNodeSnapshot) -> AppState {
             right_panel_width: None,
             agent_management_filters: None,
             theme_override: None,
+            tab_groups: vec![],
         }],
         active_window_index: Some(0),
         block_lists: Default::default(),
@@ -48,6 +49,7 @@ fn multi_tab_snapshot(active_tab_index: usize, tabs: Vec<TabSnapshot>) -> AppSta
         windows: vec![WindowSnapshot {
             tabs,
             active_tab_index,
+            team_uid: None,
             bounds: None,
             quake_mode: false,
             universal_search_width: None,
@@ -61,6 +63,7 @@ fn multi_tab_snapshot(active_tab_index: usize, tabs: Vec<TabSnapshot>) -> AppSta
             right_panel_width: None,
             agent_management_filters: None,
             theme_override: None,
+            tab_groups: vec![],
         }],
         active_window_index: Some(0),
         block_lists: Default::default(),
@@ -228,6 +231,131 @@ fn test_config_from_snapshot_filters_tabs() {
 }
 
 #[test]
+fn test_tab_level_commands_are_applied_to_leaf_layout() {
+    let config: LaunchConfig = serde_yaml::from_str(
+        r#"
+name: Legacy Commands
+windows:
+  - tabs:
+      - layout:
+          cwd: /tmp
+        commands:
+          - exec: echo hello
+"#,
+    )
+    .expect("launch config should parse");
+
+    let layout = config.windows[0].tabs[0].layout_with_tab_commands();
+
+    assert_eq!(
+        layout,
+        PaneTemplateType::PaneTemplate {
+            cwd: PathBuf::from("/tmp"),
+            commands: vec![CommandTemplate {
+                exec: "echo hello".to_string()
+            }],
+            is_focused: None,
+            pane_mode: PaneMode::Terminal,
+            shell: None,
+        }
+    );
+}
+
+#[test]
+fn test_tab_level_commands_are_applied_to_focused_pane_in_branch_layout() {
+    let config: LaunchConfig = serde_yaml::from_str(
+        r#"
+name: Legacy Commands
+windows:
+  - tabs:
+      - layout:
+          split_direction: horizontal
+          panes:
+            - cwd: /tmp/left
+              is_focused: false
+            - cwd: /tmp/right
+              is_focused: true
+        commands:
+          - exec: echo focused
+"#,
+    )
+    .expect("launch config should parse");
+
+    let layout = config.windows[0].tabs[0].layout_with_tab_commands();
+
+    assert_eq!(
+        layout,
+        PaneTemplateType::PaneBranchTemplate {
+            split_direction: SplitDirection::Horizontal.into(),
+            panes: vec![
+                PaneTemplateType::PaneTemplate {
+                    cwd: PathBuf::from("/tmp/left"),
+                    commands: vec![],
+                    is_focused: Some(false),
+                    pane_mode: PaneMode::Terminal,
+                    shell: None,
+                },
+                PaneTemplateType::PaneTemplate {
+                    cwd: PathBuf::from("/tmp/right"),
+                    commands: vec![CommandTemplate {
+                        exec: "echo focused".to_string()
+                    }],
+                    is_focused: Some(true),
+                    pane_mode: PaneMode::Terminal,
+                    shell: None,
+                },
+            ],
+        }
+    );
+}
+
+#[test]
+fn test_tab_level_commands_are_applied_to_first_pane_without_focused_pane() {
+    let config: LaunchConfig = serde_yaml::from_str(
+        r#"
+name: Legacy Commands
+windows:
+  - tabs:
+      - layout:
+          split_direction: horizontal
+          panes:
+            - cwd: /tmp/left
+            - cwd: /tmp/right
+        commands:
+          - exec: echo first
+"#,
+    )
+    .expect("launch config should parse");
+
+    let layout = config.windows[0].tabs[0].layout_with_tab_commands();
+
+    assert_eq!(
+        layout,
+        PaneTemplateType::PaneBranchTemplate {
+            split_direction: SplitDirection::Horizontal.into(),
+            panes: vec![
+                PaneTemplateType::PaneTemplate {
+                    cwd: PathBuf::from("/tmp/left"),
+                    commands: vec![CommandTemplate {
+                        exec: "echo first".to_string()
+                    }],
+                    is_focused: None,
+                    pane_mode: PaneMode::Terminal,
+                    shell: None,
+                },
+                PaneTemplateType::PaneTemplate {
+                    cwd: PathBuf::from("/tmp/right"),
+                    commands: vec![],
+                    is_focused: None,
+                    pane_mode: PaneMode::Terminal,
+                    shell: None,
+                },
+            ],
+        }
+    );
+}
+
+#[test]
 fn test_config_with_active_tab_index() {
     let state = multi_tab_snapshot(
         1,
@@ -259,7 +387,9 @@ fn test_config_with_active_tab_index() {
                     )],
                 }),
                 left_panel: None,
-                right_panel: None
+                right_panel: None,
+                group_id: None,
+                pinned: false,
             };
             3
         ],
@@ -296,6 +426,8 @@ fn test_config_with_active_tab_index_and_filtered_tabs() {
                 }),
                 left_panel: None,
                 right_panel: None,
+                group_id: None,
+                pinned: false,
             },
             TabSnapshot {
                 custom_title: None,
@@ -325,6 +457,8 @@ fn test_config_with_active_tab_index_and_filtered_tabs() {
                 }),
                 left_panel: None,
                 right_panel: None,
+                group_id: None,
+                pinned: false,
             },
         ],
     );
@@ -366,6 +500,8 @@ fn test_config_with_active_tab_being_filtered() {
                 }),
                 left_panel: None,
                 right_panel: None,
+                group_id: None,
+                pinned: false,
             },
             TabSnapshot {
                 custom_title: None,
@@ -389,6 +525,8 @@ fn test_config_with_active_tab_being_filtered() {
                 }),
                 left_panel: None,
                 right_panel: None,
+                group_id: None,
+                pinned: false,
             },
         ],
     );

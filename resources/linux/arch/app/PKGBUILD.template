@@ -1,7 +1,7 @@
 pkgname=@@PACKAGE_NAME@@
 pkgver=@@PKGVER@@
 pkgrel=@@RELEASE@@
-pkgdesc="Zap, a community fork of the Rust-based Warp terminal"
+pkgdesc="InfiniShell, a community fork of the Rust-based Warp terminal"
 arch=('@@ARCH@@')
 url="https://github.com/zerx-lab/warp"
 license=('custom')

@@ -1,19 +1,8 @@
-use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
-use crate::appearance::Appearance;
-use crate::search::command_palette::conversations::search::MatchedConversation;
-use crate::search::command_palette::mixer::CommandPaletteItemAction;
-use crate::search::command_palette::render_util::render_search_item_icon;
-use crate::search::command_palette::view::Action;
-use crate::search::item::IconLocation;
-use crate::search::result_renderer::ItemHighlightState;
-use crate::search::SearchItem;
-use crate::ui_components::buttons::icon_button;
-use crate::util::time_format::format_approx_duration_from_now;
 use ordered_float::OrderedFloat;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::color::{blend::Blend, coloru_with_opacity};
+use warp_core::ui::color::blend::Blend;
+use warp_core::ui::color::coloru_with_opacity;
 use warp_core::ui::icons::Icon;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{
@@ -25,6 +14,19 @@ use warpui::fonts::{Properties, Weight};
 use warpui::ui_components::button::ButtonTooltipPosition;
 use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{AppContext, Element, Gradient, SingletonEntity};
+
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
+use crate::appearance::Appearance;
+use crate::search::SearchItem;
+use crate::search::command_palette::conversations::search::MatchedConversation;
+use crate::search::command_palette::mixer::CommandPaletteItemAction;
+use crate::search::command_palette::render_util::render_search_item_icon;
+use crate::search::command_palette::view::Action;
+use crate::search::item::IconLocation;
+use crate::search::result_renderer::ItemHighlightState;
+use crate::ui_components::buttons::icon_button;
+use crate::util::time_format::format_approx_duration_from_now;
 
 /// Information about which action to take once the conversation item is accepted.
 #[derive(Debug)]
@@ -202,7 +204,8 @@ impl ConversationSearchItem {
             .finish();
 
         // We only want to show the fork button if the conversation is completed
-        // (i.e. the agent has finished responding and there are no blocked commands).
+        // (i.e. the agent has finished responding and there are no blocked commands
+        // and is not yielded waiting for events).
         let conversation_is_done = BlocklistAIHistoryModel::as_ref(app)
             .conversation(&conversation.id())
             .map(|c| c.status().is_done())

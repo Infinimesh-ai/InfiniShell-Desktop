@@ -4,15 +4,13 @@ pub const DEFAULT_SYNC_REQUESTS_PER_MIN: u32 = 600;
 
 #[cfg(feature = "local_fs")]
 pub use file_outline::build_outline;
-
 pub use file_outline::{Outline, Symbol};
 pub use repo_metadata::{BuildTreeError, DirectoryEntry, Entry, FileId, FileMetadata};
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {
-        pub use repo_metadata::{
-            matches_gitignores, path_passes_filters,
-        };
+        pub use repo_metadata::entry::{is_git_internal_path, should_watch_directory_in_git_path};
+        pub use repo_metadata::matches_gitignores;
     }
 }
 

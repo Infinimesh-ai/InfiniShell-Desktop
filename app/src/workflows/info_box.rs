@@ -1,50 +1,50 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
-use warp_core::{features::FeatureFlag, settings::Setting};
+use string_offset::CharOffset;
+use warp_core::features::FeatureFlag;
+use warp_core::settings::Setting;
+use warp_errors::report_error;
+use warpui::color::ColorU;
+use warpui::elements::{
+    self, Align, Border, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
+    Container, CornerRadius, CrossAxisAlignment, DropShadow, Flex, Highlight, Icon,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect, Shrinkable,
+    Stack, Text,
+};
+use warpui::fonts::{Properties, Weight};
+use warpui::geometry::vector::Vector2F;
+use warpui::keymap::Keystroke;
+use warpui::presenter::ChildView;
+use warpui::text_layout::{ClipConfig, TextStyle};
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{
-    elements::{
-        self, Align, Border, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
-        Container, CornerRadius, CrossAxisAlignment, DropShadow, Flex, Highlight, Icon,
-        MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect, Shrinkable,
-        Stack, Text,
-    },
-    fonts::{Properties, Weight},
-    geometry::vector::Vector2F,
-    presenter::ChildView,
-    text_layout::ClipConfig,
-    ui_components::button::ButtonVariant,
     AppContext, Element, Entity, EventContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
 
-use string_offset::CharOffset;
-
+use super::command_parser::{
+    WorkflowArgumentIndex, WorkflowDisplayData, compute_workflow_display_data,
+};
+use super::workflow::Argument;
+use super::workflow_view::env_var_selector::{EnvVarSelector, EnvVarSelectorEvent};
+use super::{AIWorkflowOrigin, WorkflowObject};
+use crate::ai::blocklist::ai_brand_color;
+use crate::appearance::Appearance;
+use crate::cloud_object::StoredObjectMetadataExt;
+use crate::cloud_object::model::actions::{ObjectActionType, ObjectActions};
+use crate::server::ids::SyncId;
+use crate::settings::InputModeSettings;
+use crate::terminal::block_list_viewport::InputMode;
+use crate::terminal::input::InputAction;
+use crate::terminal::view::TerminalAction;
+use crate::ui_components::buttons::icon_button;
+use crate::ui_components::icons;
 use crate::util::color::coloru_with_opacity;
+use crate::view_components::FilterableDropdownOrientation;
 use crate::workflows::WorkflowType;
-use crate::{
-    ai::blocklist::ai_brand_color, server::ids::SyncId, settings::InputModeSettings,
-    terminal::block_list_viewport::InputMode, ui_components::icons,
-    view_components::FilterableDropdownOrientation, workspace::WorkspaceAction,
-};
-use crate::{
-    appearance::Appearance,
-    cloud_object::{model::actions::ObjectActions, StoredObjectMetadataExt},
-};
-use crate::{cloud_object::model::actions::ObjectActionType, terminal::view::TerminalAction};
-use crate::{terminal::input::InputAction, ui_components::buttons::icon_button};
-
-use warpui::color::ColorU;
-use warpui::keymap::Keystroke;
-use warpui::text_layout::TextStyle;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-
-use super::{
-    command_parser::{compute_workflow_display_data, WorkflowArgumentIndex, WorkflowDisplayData},
-    workflow::Argument,
-    workflow_view::env_var_selector::{EnvVarSelector, EnvVarSelectorEvent},
-    AIWorkflowOrigin, WorkflowObject,
-};
+use crate::workspace::WorkspaceAction;
 
 const INFO_BOX_PADDING: f32 = 20.;
 const ARGUMENT_PADDING: f32 = 10.;
@@ -92,10 +92,9 @@ impl SelectedWorkflowState {
         if *index < *self.num_arguments {
             self.currently_selected_argument = index;
         } else {
-            log::error!(
-                "Tried to set the argument index to {:?} but the len is {:?}",
-                *index,
-                *self.num_arguments
+            report_error!(
+                "Tried to set the argument index beyond the number of arguments",
+                extra: { "index" => ?*index, "len" => ?*self.num_arguments }
             );
         }
     }
@@ -656,14 +655,14 @@ impl WorkflowsMoreInfoView {
             appearance,
         )];
 
-        if let Some(workflow_source) = workflow.source_url() {
-            if !workflow_source.is_empty() {
-                title_line.push(WorkflowsMoreInfoView::render_workflow_source(
-                    self,
-                    workflow_source.to_string(),
-                    appearance,
-                ));
-            }
+        if let Some(workflow_source) = workflow.source_url()
+            && !workflow_source.is_empty()
+        {
+            title_line.push(WorkflowsMoreInfoView::render_workflow_source(
+                self,
+                workflow_source.to_string(),
+                appearance,
+            ));
         }
 
         let collapse_button = self.render_collapse_button(appearance);
@@ -770,12 +769,11 @@ impl WorkflowsMoreInfoView {
 
         let mut children = vec![workflow_container];
 
-        if self.workflow.should_show_env_var_selection() {
-            if let Some(environment_variables_selection) =
+        if self.workflow.should_show_env_var_selection()
+            && let Some(environment_variables_selection) =
                 self.render_environment_variables_selection(appearance, app)
-            {
-                children.push(Clipped::new(environment_variables_selection).finish());
-            }
+        {
+            children.push(Clipped::new(environment_variables_selection).finish());
         }
 
         if !self.show_shift_tab_treatment {

@@ -1,12 +1,20 @@
-use warp_multi_agent_api::{
-    self as api,
-    apply_file_diffs_result::success::UpdatedFileContent,
-    ask_user_question_result::answer_item::{self, Answer as AskUserQuestionAnswer},
+use chrono::{DateTime, Local};
+use warp_multi_agent_api::apply_file_diffs_result::success::UpdatedFileContent;
+use warp_multi_agent_api::ask_user_question_result::answer_item::{
+    self, Answer as AskUserQuestionAnswer,
 };
-
-use crate::agent::{action_result::ShellCommandError, convert::ConvertToAPITypeError};
+use warp_multi_agent_api::{self as api};
 
 use super::*;
+use crate::agent::action_result::ShellCommandError;
+use crate::agent::convert::ConvertToAPITypeError;
+
+fn local_datetime_to_timestamp(timestamp: DateTime<Local>) -> prost_types::Timestamp {
+    prost_types::Timestamp {
+        seconds: timestamp.timestamp(),
+        nanos: timestamp.timestamp_subsec_nanos() as i32,
+    }
+}
 
 impl TryFrom<RequestCommandOutputResult> for api::request::input::tool_call_result::Result {
     type Error = ConvertToAPITypeError;
@@ -18,7 +26,8 @@ impl TryFrom<RequestCommandOutputResult> for api::request::input::tool_call_resu
                 block_id,
                 output,
                 exit_code,
-                ..
+                start_ts,
+                completed_ts,
             } => Ok(
                 api::request::input::tool_call_result::Result::RunShellCommand(
                     #[allow(deprecated)]
@@ -31,6 +40,8 @@ impl TryFrom<RequestCommandOutputResult> for api::request::input::tool_call_resu
                                 command_id: block_id.to_string(),
                                 output,
                                 exit_code: exit_code.value(),
+                                start_ts: start_ts.map(local_datetime_to_timestamp),
+                                finish_ts: completed_ts.map(local_datetime_to_timestamp),
                             },
                         )),
                     },
@@ -112,7 +123,7 @@ impl TryFrom<WriteToLongRunningShellCommandResult>
                     },
                 ),
             ),
-            WriteToLongRunningShellCommandResult::CommandFinished { block_id, output, exit_code, .. } => Ok(
+            WriteToLongRunningShellCommandResult::CommandFinished { block_id, output, exit_code, start_ts, completed_ts } => Ok(
                 api::request::input::tool_call_result::Result::WriteToLongRunningShellCommand(
                     api::WriteToLongRunningShellCommandResult {
                         result: Some(api::write_to_long_running_shell_command_result::Result::CommandFinished(
@@ -120,6 +131,8 @@ impl TryFrom<WriteToLongRunningShellCommandResult>
                                 command_id: block_id.to_string(),
                                 output,
                                 exit_code: exit_code.value(),
+                                start_ts: start_ts.map(local_datetime_to_timestamp),
+                                finish_ts: completed_ts.map(local_datetime_to_timestamp),
                             }
                         ))
                     },
@@ -150,18 +163,28 @@ impl TryFrom<ReadFilesResult> for api::request::input::tool_call_result::Result 
 
     fn try_from(result: ReadFilesResult) -> Result<Self, Self::Error> {
         match result {
-            ReadFilesResult::Success { files } => Ok(
-                api::request::input::tool_call_result::Result::ReadFiles(api::ReadFilesResult {
+            ReadFilesResult::Success {
+                files,
+                failed_files,
+            } => Ok(api::request::input::tool_call_result::Result::ReadFiles(
+                api::ReadFilesResult {
                     result: Some(api::read_files_result::Result::AnyFilesSuccess(
                         api::read_files_result::AnyFilesSuccess {
                             files: files
                                 .into_iter()
                                 .flat_map(Into::<Vec<api::AnyFileContent>>::into)
                                 .collect(),
+                            failed_reads: failed_files
+                                .into_iter()
+                                .map(|failed_file| api::read_files_result::FailedRead {
+                                    path: failed_file.path,
+                                    message: failed_file.message,
+                                })
+                                .collect(),
                         },
                     )),
-                }),
-            ),
+                },
+            )),
             ReadFilesResult::Error(error) => Ok(
                 api::request::input::tool_call_result::Result::ReadFiles(api::ReadFilesResult {
                     result: Some(api::read_files_result::Result::Error(
@@ -581,7 +604,8 @@ impl TryFrom<ReadShellCommandOutputResult> for api::request::input::tool_call_re
                 block_id,
                 output,
                 exit_code,
-                ..
+                start_ts,
+                completed_ts,
             } => Ok(
                 api::request::input::tool_call_result::Result::ReadShellCommandOutput(
                     api::ReadShellCommandOutputResult {
@@ -591,6 +615,8 @@ impl TryFrom<ReadShellCommandOutputResult> for api::request::input::tool_call_re
                                 command_id: block_id.to_string(),
                                 output,
                                 exit_code: exit_code.value(),
+                                start_ts: start_ts.map(local_datetime_to_timestamp),
+                                finish_ts: completed_ts.map(local_datetime_to_timestamp),
                             },
                         )),
                     },
@@ -675,6 +701,8 @@ impl TryFrom<TransferShellCommandControlToUserResult>
                 block_id,
                 output,
                 exit_code,
+                start_ts,
+                completed_ts,
             } => Ok(
                 api::request::input::tool_call_result::Result::TransferShellCommandControlToUser(
                     api::TransferShellCommandControlToUserResult {
@@ -684,6 +712,8 @@ impl TryFrom<TransferShellCommandControlToUserResult>
                                     command_id: block_id.to_string(),
                                     output,
                                     exit_code: exit_code.value(),
+                                    start_ts: start_ts.map(local_datetime_to_timestamp),
+                                    finish_ts: completed_ts.map(local_datetime_to_timestamp),
                                 },
                             ),
                         ),
@@ -990,6 +1020,75 @@ impl From<AskUserQuestionResult> for api::request::input::tool_call_result::Resu
     }
 }
 
+impl From<RunAgentsAgentOutcome> for api::run_agents_result::AgentOutcome {
+    fn from(outcome: RunAgentsAgentOutcome) -> Self {
+        let result = match outcome.kind {
+            RunAgentsAgentOutcomeKind::Launched { agent_id } => {
+                api::run_agents_result::agent_outcome::Result::Launched(
+                    api::run_agents_result::LaunchedAgent { agent_id },
+                )
+            }
+            RunAgentsAgentOutcomeKind::Failed { error } => {
+                api::run_agents_result::agent_outcome::Result::Failed(
+                    api::run_agents_result::FailedAgent { error },
+                )
+            }
+        };
+        api::run_agents_result::AgentOutcome {
+            name: outcome.name,
+            result: Some(result),
+            // Map our resolved_model_id to the proto's model_id field.
+            model_id: outcome.resolved_model_id,
+            // harness and execution_mode are not tracked per-agent on the client side.
+            harness: None,
+            execution_mode: None,
+        }
+    }
+}
+
+impl TryFrom<RunAgentsResult> for api::request::input::tool_call_result::Result {
+    type Error = ConvertToAPITypeError;
+
+    fn try_from(result: RunAgentsResult) -> Result<Self, Self::Error> {
+        match result {
+            RunAgentsResult::Launched { agents, .. } => Ok(
+                api::request::input::tool_call_result::Result::RunAgentsResult(
+                    api::RunAgentsResult {
+                        outcome: Some(api::run_agents_result::Outcome::Launched(
+                            api::run_agents_result::Launched {
+                                agents: agents.into_iter().map(Into::into).collect(),
+                                ..Default::default()
+                            },
+                        )),
+                    },
+                ),
+            ),
+            RunAgentsResult::Denied { reason } => Ok(
+                api::request::input::tool_call_result::Result::RunAgentsResult(
+                    api::RunAgentsResult {
+                        outcome: Some(api::run_agents_result::Outcome::Denied(
+                            api::run_agents_result::Denied { reason },
+                        )),
+                    },
+                ),
+            ),
+            RunAgentsResult::Failure { error } => Ok(
+                api::request::input::tool_call_result::Result::RunAgentsResult(
+                    api::RunAgentsResult {
+                        outcome: Some(api::run_agents_result::Outcome::Failure(
+                            api::run_agents_result::Failure { error },
+                        )),
+                    },
+                ),
+            ),
+            // Reject is conveyed by the generic ToolCallResult.Cancel marker
+            // synthesized server-side on the next user input; nothing for the
+            // client to send on the wire here.
+            RunAgentsResult::Cancelled => Err(ConvertToAPITypeError::Ignore),
+        }
+    }
+}
+
 impl TryFrom<InsertReviewCommentsResult> for api::request::input::tool_call_result::Result {
     type Error = ConvertToAPITypeError;
 
@@ -1016,6 +1115,22 @@ impl TryFrom<InsertReviewCommentsResult> for api::request::input::tool_call_resu
                 ),
             ),
             InsertReviewCommentsResult::Cancelled => Err(ConvertToAPITypeError::Ignore),
+        }
+    }
+}
+
+impl TryFrom<WaitForEventsResult> for api::request::input::tool_call_result::Result {
+    type Error = ConvertToAPITypeError;
+
+    /// Completed → wire form; Cancelled → drop (mirrors RunAgents).
+    fn try_from(result: WaitForEventsResult) -> Result<Self, Self::Error> {
+        match result {
+            WaitForEventsResult::Completed => Ok(
+                api::request::input::tool_call_result::Result::WaitForEvents(
+                    api::WaitForEventsResult {},
+                ),
+            ),
+            WaitForEventsResult::Cancelled => Err(ConvertToAPITypeError::Ignore),
         }
     }
 }

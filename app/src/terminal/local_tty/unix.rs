@@ -1,51 +1,49 @@
-//! TTY related functionality.
-use crate::terminal::bootstrap::raw_init_shell_script_for_shell;
-use crate::terminal::cli_agent_sessions::event::current_protocol_version;
-use crate::terminal::local_tty::docker_sandbox::{
-    DockerSandboxShellStarter, DOCKER_SANDBOX_HOME_DIR,
-};
-use crate::terminal::local_tty::shell::{
-    extra_path_entries, ssh_socket_dir, DirectShellStarter, ShellStarter,
-};
-use crate::terminal::model::session::command_executor::shell_escape_single_quotes;
-use crate::terminal::shell::ShellType;
-use crate::ASSETS;
-use warp_core::features::FeatureFlag;
+// The code in this file is adapted from the alacritty_terminal crate under the
+// Apache license; see: crates/warp_terminal/src/model/LICENSE-ALACRITTY.
 
-use crate::report_if_error;
+//! TTY related functionality.
+use std::collections::HashMap;
+use std::ffi::OsString;
+use std::fs::{DirBuilder, File};
+use std::mem::MaybeUninit;
+use std::os::unix::fs::DirBuilderExt;
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::path::{Path, PathBuf};
+use std::{io, ptr};
+
+use anyhow::{Context as _, Error, Result};
+use command::blocking::Command;
 use itertools::Itertools;
+use libc::{self, TIOCSCTTY, c_int, winsize};
+use mio::Interest;
+use mio::unix::SourceFd;
+use nix::pty::openpty;
+use nix::sys::termios::{self, InputFlags, SetArg};
+use serde::{Deserialize, Serialize};
+use signal_hook_mio::v1_0::Signals;
+use warp_core::channel::ChannelState;
+use warp_core::cli_agent_protocol::{WARP_CLI_AGENT_PROTOCOL_VERSION_ENV, WARP_CLIENT_VERSION_ENV};
+use warp_core::features::FeatureFlag;
+use warp_core::safe_error;
+use warp_errors::report_if_error;
+use warpui::{AppContext, SingletonEntity};
 
 use super::event_loop::{PTY_TOKEN, SIGNALS_TOKEN};
 use super::spawner::{PtyHandle, PtySpawnInfo, PtySpawner};
 use super::{ChildEvent, EventedPty, EventedReadWrite, PtyOptions, SizeInfo};
-use anyhow::{Context as _, Error, Result};
-use libc::{self, c_int, winsize, TIOCSCTTY};
-
-use mio::unix::SourceFd;
-use mio::Interest;
-use nix::{
-    pty::openpty,
-    sys::termios::{self, InputFlags, SetArg},
+use crate::ASSETS;
+use crate::terminal::bootstrap::raw_init_shell_script_for_shell;
+use crate::terminal::cli_agent_sessions::event::current_protocol_version;
+use crate::terminal::local_tty::docker_sandbox::{
+    DOCKER_SANDBOX_HOME_DIR, DockerSandboxShellStarter,
 };
-use serde::{Deserialize, Serialize};
-use signal_hook_mio::v1_0::Signals;
-
-use command::blocking::Command;
-use std::{
-    collections::HashMap,
-    ffi::{CStr, OsString},
-    fs::{DirBuilder, File},
-    io,
-    mem::MaybeUninit,
-    os::unix::{
-        fs::DirBuilderExt,
-        io::{AsRawFd, FromRawFd, RawFd},
-    },
-    path::{Path, PathBuf},
-    ptr,
+use crate::terminal::local_tty::shell::{
+    DirectShellStarter, ShellStarter, extra_path_entries, ssh_socket_dir,
 };
-use warp_core::channel::ChannelState;
-use warpui::{AppContext, SingletonEntity};
+use crate::terminal::model::session::command_executor::shell_escape_single_quotes;
+use crate::terminal::shell::ShellType;
+
+const BASH_HISTORY_SIZE_SENTINEL: &str = "57265949261";
 
 /// Get raw fds for leader/follower ends of a new PTY.
 fn make_pty(size: winsize) -> Result<(RawFd, RawFd)> {
@@ -102,60 +100,110 @@ fn docker_sandbox_run_args(starter: &DockerSandboxShellStarter) -> Vec<std::ffi:
     args
 }
 
-#[derive(Debug)]
-struct Passwd<'a> {
-    name: &'a str,
-    dir: &'a str,
-    shell: &'a str,
+/// The current user's password-database record, resolved for shell/session
+/// setup. Fields are owned so the record outlives any transient lookup buffer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct CurrentUser {
+    pub(super) name: String,
+    pub(super) dir: String,
+    pub(super) shell: String,
 }
 
-pub fn get_pw_shell() -> String {
-    let mut buf = [0; 1024];
-    let pw = get_pw_entry(&mut buf);
-    pw.shell.to_string()
+/// Resolves the current uid's passwd record for shell/session setup.
+///
+/// Resolution order, stopping at the first hit:
+/// 1. In-process passwd lookup (`getpwuid_r`, via nix) — fast, and correct
+///    wherever the process can resolve users itself (local `/etc/passwd`, or a
+///    glibc-dynamic build that can load NSS plugins).
+/// 2. `getent passwd <uid>` — delegates to the host's own NSS stack, so
+///    centrally-managed users (SSSD/LDAP/AD) still resolve even from a
+///    static/musl binary that can't `dlopen` glibc NSS plugins in-process.
+/// 3. `/etc/passwd` — last resort for minimal hosts that lack `getent`.
+///
+/// Returns `None` only if all three fail; callers then fall back to the ambient
+/// environment (`$HOME`/`$USER`) or built-in shell defaults.
+pub(super) fn resolve_current_user() -> Option<CurrentUser> {
+    let uid = nix::unistd::getuid();
+    current_user_via_getpwuid(uid)
+        .or_else(|| current_user_via_getent(uid.as_raw()))
+        .or_else(|| current_user_from_passwd_file(uid.as_raw()))
 }
 
-/// Return a Passwd struct with pointers into the provided buf.
-///
-/// # Unsafety
-///
-/// If `buf` is changed while `Passwd` is alive, bad things will almost certainly happen.
-fn get_pw_entry(buf: &mut [i8; 1024]) -> Passwd<'_> {
-    // Create zeroed passwd struct.
-    let mut entry: MaybeUninit<libc::passwd> = MaybeUninit::uninit();
+/// Resolve the current user with an in-process passwd lookup via nix's
+/// safe [`nix::unistd::User::from_uid`] wrapper (backed by `getpwuid_r`).
+fn current_user_via_getpwuid(uid: nix::unistd::Uid) -> Option<CurrentUser> {
+    match nix::unistd::User::from_uid(uid) {
+        Ok(Some(user)) => Some(CurrentUser {
+            name: user.name,
+            dir: user.dir.to_string_lossy().into_owned(),
+            shell: user.shell.to_string_lossy().into_owned(),
+        }),
+        // No passwd entry for this uid — e.g. a static/musl binary that can't
+        // resolve directory-service users in-process. Fall through to the
+        // host-delegated lookups.
+        Ok(None) => None,
+        Err(err) => {
+            safe_error!(
+                safe: ("passwd entry lookup failed for uid {uid}: {err}"),
+                full: ("passwd entry lookup failed")
+            );
+            None
+        }
+    }
+}
 
-    let mut res: *mut libc::passwd = ptr::null_mut();
+/// `getent` is the host's own (typically glibc-dynamic) binary, so it consults
+/// the host's full NSS configuration — including SSSD/LDAP/AD — which a
+/// static/musl Warp binary cannot do in-process.
+fn current_user_via_getent(uid: u32) -> Option<CurrentUser> {
+    let output = Command::new("getent")
+        .arg("passwd")
+        .arg(uid.to_string())
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    stdout.lines().find_map(|line| parse_passwd_line(line, uid))
+}
 
-    // Try and read the pw file.
-    let uid = unsafe { libc::getuid() };
-    let status = unsafe {
-        libc::getpwuid_r(
-            uid,
-            entry.as_mut_ptr(),
-            buf.as_mut_ptr() as *mut _,
-            buf.len(),
-            &mut res,
-        )
-    };
-    let entry = unsafe { entry.assume_init() };
+fn current_user_from_passwd_file(uid: u32) -> Option<CurrentUser> {
+    let contents = std::fs::read_to_string("/etc/passwd").ok()?;
+    contents
+        .lines()
+        .find_map(|line| parse_passwd_line(line, uid))
+}
 
-    if status < 0 {
-        panic!("getpwuid_r failed");
+/// Parse a single `passwd(5)`-format line
+/// (`name:passwd:uid:gid:gecos:dir:shell`) and return it as a [`CurrentUser`]
+/// iff its uid field equals `uid`.
+fn parse_passwd_line(line: &str, uid: u32) -> Option<CurrentUser> {
+    // Strip leading blanks and ignore blank / comment lines, as glibc's passwd
+    // reader does before parsing fields.
+    let line = line.trim_start();
+    if line.is_empty() || line.starts_with('#') {
+        return None;
     }
 
-    if res.is_null() {
-        panic!("pw not found");
+    // `splitn(7, ':')` leaves the shell field (the 7th) as the rest of the
+    // line, including any embedded colons — matching glibc's `pw_shell = line`.
+    let mut fields = line.splitn(7, ':');
+    let name = fields.next()?;
+    let _passwd = fields.next()?;
+    let line_uid: u32 = fields.next()?.parse().ok()?;
+    let _gid = fields.next()?;
+    let _gecos = fields.next()?;
+    let dir = fields.next()?;
+    let shell = fields.next()?;
+    if line_uid != uid {
+        return None;
     }
-
-    // Sanity check.
-    assert_eq!(entry.pw_uid, uid);
-
-    // Build a borrowed Passwd struct.
-    Passwd {
-        name: unsafe { CStr::from_ptr(entry.pw_name).to_str().unwrap() },
-        dir: unsafe { CStr::from_ptr(entry.pw_dir).to_str().unwrap() },
-        shell: unsafe { CStr::from_ptr(entry.pw_shell).to_str().unwrap() },
-    }
+    Some(CurrentUser {
+        name: name.to_owned(),
+        dir: dir.to_owned(),
+        shell: shell.to_owned(),
+    })
 }
 
 pub struct Pty {
@@ -190,8 +238,10 @@ pub(super) fn spawn(options: PtyOptions) -> Result<PtySpawnInfo> {
         start_dir,
         env_vars,
         enable_ssh_wrapper,
+        reuse_ssh_control_master,
         shell_debug_mode,
         honor_ps1,
+        node_version_chip_enabled,
         close_fds,
     } = options;
     let shell_starter = match shell_starter {
@@ -209,8 +259,10 @@ pub(super) fn spawn(options: PtyOptions) -> Result<PtySpawnInfo> {
         env_vars,
         start_dir,
         enable_ssh_wrapper,
+        reuse_ssh_control_master,
         shell_debug_mode,
         honor_ps1,
+        node_version_chip_enabled,
     );
 
     spawn_command_in_pty(command, &size, close_fds)
@@ -221,17 +273,19 @@ pub(super) fn spawn(options: PtyOptions) -> Result<PtySpawnInfo> {
 ///
 /// Does not perform any PTY-level setup; hand the returned `Command`
 /// to [`spawn_command_in_pty`].
+#[allow(clippy::too_many_arguments)]
 fn build_host_shell_command(
     shell_starter: DirectShellStarter,
     window_id: Option<usize>,
     env_vars: HashMap<OsString, OsString>,
     start_dir: Option<PathBuf>,
     enable_ssh_wrapper: bool,
+    reuse_ssh_control_master: bool,
     shell_debug_mode: bool,
     honor_ps1: bool,
+    node_version_chip_enabled: bool,
 ) -> Command {
-    let mut buf = [0; 1024];
-    let pw = get_pw_entry(&mut buf);
+    let pw = resolve_current_user();
 
     log::info!(
         "Starting shell {}",
@@ -246,7 +300,10 @@ fn build_host_shell_command(
     // Support an overridden home directory for integration tests, which
     // should execute in a more hermetic environment than one where the home
     // directory contains whatever happens to already exist there.
-    let home_dir = std::env::var("HOME").unwrap_or_else(|_| pw.dir.to_owned());
+    let home_dir = std::env::var("HOME")
+        .ok()
+        .or_else(|| pw.as_ref().map(|pw| pw.dir.to_owned()))
+        .unwrap_or_else(|| "/".to_owned());
 
     // Unfortunately process::Command has no facility for using the same fd for in/out/err.
     // The issue is that Stdio wants to close its fd. Previously we tried Stdio::from_raw_fd(follower)
@@ -256,8 +313,15 @@ fn build_host_shell_command(
     // in the tests. Therefore we do NOT set stdin, stdout, stderr here; instead we
     // do it in the pre_exec hook.
     // Setup shell environment.
-    builder.env("LOGNAME", pw.name);
-    builder.env("USER", pw.name);
+    if let Some(user_name) = pw
+        .as_ref()
+        .map(|pw| pw.name.to_owned())
+        .or_else(|| std::env::var("USER").ok())
+        .or_else(|| std::env::var("LOGNAME").ok())
+    {
+        builder.env("LOGNAME", &user_name);
+        builder.env("USER", &user_name);
+    }
     builder.env("HOME", &home_dir);
 
     // Specify terminal name and capabilities.
@@ -277,11 +341,11 @@ fn build_host_shell_command(
         // plugins can do warp-specific version checks without worrying
         // that the version env var might be coming from a different terminal
         // (for ex., in the ssh case).
-        builder.env("WARP_CLIENT_VERSION", version);
+        builder.env(WARP_CLIENT_VERSION_ENV, version);
     } else {
         // Local builds don't have GIT_RELEASE_TAG, so app_version() is None.
         // Use "local" so plugins can still distinguish this from a missing value.
-        builder.env("WARP_CLIENT_VERSION", "local");
+        builder.env(WARP_CLIENT_VERSION_ENV, "local");
     }
 
     // Set the `SHELL` environment variable to match the path of the shell we are using.
@@ -301,6 +365,13 @@ fn build_host_shell_command(
         builder.env("WARP_USE_SSH_WRAPPER", "0");
     }
 
+    // Whether the SSH wrapper should attach to an existing ControlMaster
+    // for the destination host instead of always creating its own.
+    builder.env(
+        "WARP_SSH_REUSE_CONTROL_MASTER",
+        if reuse_ssh_control_master { "1" } else { "0" },
+    );
+
     // For integration tests, put SSH control master sockets under the actual
     // home directory, as the length of the path to sockets placed in the
     // integration test home directory can exceed length limits.
@@ -316,7 +387,7 @@ fn build_host_shell_command(
     // so the plugin should fall back to legacy notifications.
     if FeatureFlag::HOANotifications.is_enabled() {
         builder.env(
-            "WARP_CLI_AGENT_PROTOCOL_VERSION",
+            WARP_CLI_AGENT_PROTOCOL_VERSION_ENV,
             current_protocol_version().to_string(),
         );
     }
@@ -330,6 +401,14 @@ fn build_host_shell_command(
         builder.env("WARP_HONOR_PS1", "0");
     }
 
+    // Gate the shell's per-prompt `node --version` detection on whether the
+    // Node.js Version chip is enabled. The bootstrap treats any value other than
+    // "0" as enabled, so we only ever set "0" to disable it.
+    builder.env(
+        "WARP_PROMPT_NODE_VERSION_ENABLED",
+        if node_version_chip_enabled { "1" } else { "0" },
+    );
+
     // Pass through any additional entries to add to PATH.
     let path_append = extra_path_entries()
         .map(|p| p.to_string_lossy().into_owned())
@@ -337,13 +416,14 @@ fn build_host_shell_command(
     builder.env("WARP_PATH_APPEND", path_append);
 
     if matches!(shell_starter.shell_type(), ShellType::Bash) {
-        // Set an initial very large value for HISTFILESIZE so that it
-        // doesn't get truncated on startup.
-        let sentinel_value = "57265949261";
-        builder.env("HISTFILESIZE", sentinel_value);
-        // Set a second environment variable that we can use to know whether
-        // the user rcfiles set HISTFILESIZE or not.
-        builder.env("WARP_INITIAL_HISTFILESIZE", sentinel_value);
+        // Set initial very large values so bash imports the user's existing
+        // history without truncating the file or in-memory list on startup.
+        builder.env("HISTFILESIZE", BASH_HISTORY_SIZE_SENTINEL);
+        builder.env("HISTSIZE", BASH_HISTORY_SIZE_SENTINEL);
+        // Set second environment variables that we can use to know whether
+        // the user rcfiles set these variables or not.
+        builder.env("WARP_INITIAL_HISTFILESIZE", BASH_HISTORY_SIZE_SENTINEL);
+        builder.env("WARP_INITIAL_HISTSIZE", BASH_HISTORY_SIZE_SENTINEL);
     }
 
     // Pass the desired initial working directory as an environment variable
@@ -624,7 +704,7 @@ impl EventedPty for Pty {
                 Ok(true) => Some(ChildEvent::Exited),
                 Ok(false) => None,
                 Err(e) => {
-                    log::error!("Error checking child process termination: {e}");
+                    log::warn!("Error checking child process termination: {e:#}");
                     None
                 }
             }
@@ -676,10 +756,12 @@ impl ToWinsize for &SizeInfo {
 }
 
 unsafe fn set_nonblocking(fd: c_int) {
-    use libc::{fcntl, F_GETFL, F_SETFL, O_NONBLOCK};
+    unsafe {
+        use libc::{F_GETFL, F_SETFL, O_NONBLOCK, fcntl};
 
-    let res = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
-    assert_eq!(res, 0);
+        let res = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
+        assert_eq!(res, 0);
+    }
 }
 
 /// Spawn the PTY for a Docker sandbox session.
@@ -697,7 +779,7 @@ fn spawn_docker_sandbox(
     // itself is created + attached in a single step via `sbx run` when
     // the PTY process spawns below.
     if let Err(e) = prepare_docker_sandbox(&docker_starter) {
-        log::error!("Failed to prepare Docker sandbox: {e}");
+        log::error!("Docker sandbox setup failed: {e:#}");
         return Err(Error::msg(format!("Docker sandbox setup failed: {e}")));
     }
 
@@ -708,8 +790,10 @@ fn spawn_docker_sandbox(
         start_dir: _,
         env_vars,
         enable_ssh_wrapper,
+        reuse_ssh_control_master,
         shell_debug_mode,
         honor_ps1,
+        node_version_chip_enabled,
         close_fds,
     } = options;
 
@@ -718,8 +802,10 @@ fn spawn_docker_sandbox(
         window_id,
         env_vars,
         enable_ssh_wrapper,
+        reuse_ssh_control_master,
         shell_debug_mode,
         honor_ps1,
+        node_version_chip_enabled,
     );
 
     spawn_command_in_pty(command, &size, close_fds)
@@ -731,16 +817,18 @@ fn spawn_docker_sandbox(
 ///
 /// Does not perform any PTY-level setup; hand the returned `Command`
 /// to [`spawn_command_in_pty`].
+#[allow(clippy::too_many_arguments)]
 fn build_docker_sandbox_command(
     docker_starter: &DockerSandboxShellStarter,
     window_id: Option<usize>,
     env_vars: HashMap<OsString, OsString>,
     enable_ssh_wrapper: bool,
+    reuse_ssh_control_master: bool,
     shell_debug_mode: bool,
     honor_ps1: bool,
+    node_version_chip_enabled: bool,
 ) -> Command {
-    let mut buf = [0; 1024];
-    let pw = get_pw_entry(&mut buf);
+    let pw = resolve_current_user();
 
     log::info!(
         "Starting Docker sandbox via {}",
@@ -752,7 +840,10 @@ fn build_docker_sandbox_command(
         builder.arg(arg);
     }
 
-    let home_dir = std::env::var("HOME").unwrap_or_else(|_| pw.dir.to_owned());
+    let home_dir = std::env::var("HOME")
+        .ok()
+        .or_else(|| pw.as_ref().map(|pw| pw.dir.to_owned()))
+        .unwrap_or_else(|| "/".to_owned());
 
     // Environment variables set on the host-side `sbx` process.
     //
@@ -766,8 +857,15 @@ fn build_docker_sandbox_command(
     // Once we've validated what the container bootstrap actually needs,
     // we can trim this list down to the variables the in-container bash
     // session actually consumes.
-    builder.env("LOGNAME", pw.name);
-    builder.env("USER", pw.name);
+    if let Some(user_name) = pw
+        .as_ref()
+        .map(|pw| pw.name.to_owned())
+        .or_else(|| std::env::var("USER").ok())
+        .or_else(|| std::env::var("LOGNAME").ok())
+    {
+        builder.env("LOGNAME", &user_name);
+        builder.env("USER", &user_name);
+    }
     builder.env("HOME", &home_dir);
     builder.env("TERM", "xterm-256color");
     builder.env("TERM_PROGRAM", "WarpTerminal");
@@ -775,9 +873,9 @@ fn build_docker_sandbox_command(
     builder.env_remove("DESKTOP_STARTUP_ID");
     if let Some(version) = ChannelState::app_version() {
         builder.env("TERM_PROGRAM_VERSION", version);
-        builder.env("WARP_CLIENT_VERSION", version);
+        builder.env(WARP_CLIENT_VERSION_ENV, version);
     } else {
-        builder.env("WARP_CLIENT_VERSION", "local");
+        builder.env(WARP_CLIENT_VERSION_ENV, "local");
     }
     builder.env("SHELL", docker_starter.logical_shell_path());
     if let Some(window_id) = window_id {
@@ -787,11 +885,15 @@ fn build_docker_sandbox_command(
         "WARP_USE_SSH_WRAPPER",
         if enable_ssh_wrapper { "1" } else { "0" },
     );
+    builder.env(
+        "WARP_SSH_REUSE_CONTROL_MASTER",
+        if reuse_ssh_control_master { "1" } else { "0" },
+    );
     builder.env("SSH_SOCKET_DIR", ssh_socket_dir());
     builder.env("WARP_IS_LOCAL_SHELL_SESSION", "1");
     if FeatureFlag::HOANotifications.is_enabled() {
         builder.env(
-            "WARP_CLI_AGENT_PROTOCOL_VERSION",
+            WARP_CLI_AGENT_PROTOCOL_VERSION_ENV,
             current_protocol_version().to_string(),
         );
     }
@@ -799,15 +901,20 @@ fn build_docker_sandbox_command(
         builder.env("WARP_SHELL_DEBUG_MODE", "1");
     }
     builder.env("WARP_HONOR_PS1", if honor_ps1 { "1" } else { "0" });
+    builder.env(
+        "WARP_PROMPT_NODE_VERSION_ENABLED",
+        if node_version_chip_enabled { "1" } else { "0" },
+    );
     let path_append = extra_path_entries()
         .map(|p| p.to_string_lossy().into_owned())
         .join(":");
     builder.env("WARP_PATH_APPEND", path_append);
     // Sandbox shell is always bash (per the container image convention),
     // matching the host-shell path's behavior for bash shells.
-    let sentinel_value = "57265949261";
-    builder.env("HISTFILESIZE", sentinel_value);
-    builder.env("WARP_INITIAL_HISTFILESIZE", sentinel_value);
+    builder.env("HISTFILESIZE", BASH_HISTORY_SIZE_SENTINEL);
+    builder.env("HISTSIZE", BASH_HISTORY_SIZE_SENTINEL);
+    builder.env("WARP_INITIAL_HISTFILESIZE", BASH_HISTORY_SIZE_SENTINEL);
+    builder.env("WARP_INITIAL_HISTSIZE", BASH_HISTORY_SIZE_SENTINEL);
     // Intentionally do NOT set `WARP_INITIAL_WORKING_DIR` for sandboxes:
     // the container's init script cds into the sandbox home dir, not
     // the host's startup dir.
@@ -862,7 +969,8 @@ fn prepare_docker_sandbox(starter: &DockerSandboxShellStarter) -> Result<()> {
     };
 
     // 1. Write the init script to this sandbox's dedicated host init dir.
-    let init_script = raw_init_shell_script_for_shell(ShellType::Bash, &ASSETS);
+    let init_script =
+        raw_init_shell_script_for_shell(ShellType::Bash, &ASSETS, starter.session_id());
     let init_dir = starter.init_dir();
     mk_owner_only_dir(&init_dir)?;
     std::fs::write(starter.init_path(), init_script).context("write sandbox init script")?;
@@ -873,6 +981,10 @@ fn prepare_docker_sandbox(starter: &DockerSandboxShellStarter) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "unix_tests.rs"]
+mod tests;
 
 /// A set of platform helper utilities copied directly from std::sys.
 ///
@@ -905,7 +1017,82 @@ mod utils {
 }
 
 #[test]
-fn test_get_pw_entry() {
-    let mut buf: [i8; 1024] = [0; 1024];
-    let _pw = get_pw_entry(&mut buf);
+fn parse_passwd_line_extracts_matching_uid() {
+    let line = "alice:x:1000:1000:Alice:/home/alice:/bin/zsh";
+    assert_eq!(
+        parse_passwd_line(line, 1000),
+        Some(CurrentUser {
+            name: "alice".to_owned(),
+            dir: "/home/alice".to_owned(),
+            shell: "/bin/zsh".to_owned(),
+        })
+    );
+    // A non-matching uid or a malformed line yields None.
+    assert_eq!(parse_passwd_line(line, 1001), None);
+    assert_eq!(parse_passwd_line("not a passwd line", 1000), None);
+}
+
+#[test]
+fn parse_passwd_line_matches_glibc_edge_cases() {
+    // An empty shell field (trailing colon) is valid and yields an empty shell,
+    // just as glibc allows `pw_shell` to be empty.
+    assert_eq!(
+        parse_passwd_line("root:x:0:0:root:/root:", 0),
+        Some(CurrentUser {
+            name: "root".to_owned(),
+            dir: "/root".to_owned(),
+            shell: String::new(),
+        })
+    );
+
+    // Blank lines and `#` comment lines (even with leading blanks) are skipped.
+    assert_eq!(parse_passwd_line("", 0), None);
+    assert_eq!(parse_passwd_line("   ", 0), None);
+    assert_eq!(
+        parse_passwd_line("# alice:x:1000:1000:Alice:/home/alice:/bin/zsh", 1000),
+        None
+    );
+
+    // Leading blanks before a real entry are stripped, not treated as part of
+    // the name.
+    assert_eq!(
+        parse_passwd_line("  bob:x:1001:1001:Bob:/home/bob:/bin/bash", 1001),
+        Some(CurrentUser {
+            name: "bob".to_owned(),
+            dir: "/home/bob".to_owned(),
+            shell: "/bin/bash".to_owned(),
+        })
+    );
+
+    // The shell field keeps everything after the sixth colon, so a shell value
+    // containing a `:` is not truncated (matches glibc's `pw_shell = line`).
+    assert_eq!(
+        parse_passwd_line("carol:x:1002:1002:Carol:/home/carol:/weird/shell:arg", 1002),
+        Some(CurrentUser {
+            name: "carol".to_owned(),
+            dir: "/home/carol".to_owned(),
+            shell: "/weird/shell:arg".to_owned(),
+        })
+    );
+
+    // A line missing the shell field (only six fields) is malformed → skipped.
+    assert_eq!(
+        parse_passwd_line("dave:x:1003:1003:Dave:/home/dave", 1003),
+        None
+    );
+
+    // A non-numeric uid field is malformed → skipped.
+    assert_eq!(
+        parse_passwd_line("eve:x:notanumber:1004:Eve:/home/eve:/bin/sh", 1004),
+        None
+    );
+}
+
+#[test]
+fn resolve_current_user_returns_running_user() {
+    // On the test host the current uid resolves via getpwuid_r, so this should
+    // succeed and report a non-empty name.
+    if let Some(user) = resolve_current_user() {
+        assert!(!user.name.is_empty());
+    }
 }

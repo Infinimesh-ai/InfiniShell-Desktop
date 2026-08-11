@@ -1,91 +1,85 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code, unused_imports))]
 // Adding this file level gate as some of the code around editability is not used in WASM yet.
+use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
+use std::ops::Range;
+use std::path::Path;
 
-use crate::code::editor::{
-    comment_editor::{CommentEditor, CommentEditorEvent},
-    comments::PendingComment,
-    diff::DiffStatus,
-    element::{
-        AddAsContextButton, CommentButton, EditorWrapper, EditorWrapperStateHandle,
-        GutterHoverTarget, GutterRange, InnerEditor, LineNumberConfig, RevertHunkButton,
-    },
-    find::view::{CodeEditorFind as Find, Event as FindViewEvent},
-    goto_line::view::{Event as GoToLineEvent, GoToLineView},
-    line::EditorLineLocation,
-    model::{CodeEditorModel, CodeEditorModelEvent, HoverableLink, LineBound, StableEditorLine},
-    nav_bar::{NavBar, NavBarBehavior, NavBarEvent},
-    scroll::{ScrollPosition, ScrollTrigger, ScrollWheelBehavior},
-};
-use crate::code::{
-    editor::EditorReviewComment, DiffResult, NoopCommentEditorProvider, ShowCommentEditorProvider,
-};
-use crate::{
-    appearance::Appearance,
-    code_review::comments::{CommentId, CommentOrigin},
-    editor::InteractionState,
-    features::FeatureFlag,
-    notebooks::editor::rich_text_styles,
-    settings::{AppEditorSettings, FontSettings},
-    view_components::find::FindDirection,
-};
 use ai::diff_validation::DiffDelta;
 use lazy_static::lazy_static;
 use num_traits::SaturatingSub;
 use pathfinder_geometry::vector::vec2f;
-use std::fmt::Debug;
-use std::rc::Rc;
-use std::{collections::HashMap, ops::Range};
-use std::{collections::HashSet, path::Path};
+use settings::Setting as _;
 use string_offset::CharOffset;
-use vec1::{vec1, Vec1};
+use vec1::{Vec1, vec1};
 use vim::vim::{Direction, InsertPosition, VimMode, VimModel, VimState, VimSubscriber};
 use warp_core::platform::SessionPlatform;
-use warp_editor::{
-    content::{
-        buffer::{
-            Buffer, BufferEditAction, EditOrigin, InitialBufferState, ToBufferCharOffset as _,
-            ToBufferPoint,
-        },
-        text::IndentUnit,
-        version::BufferVersion,
-    },
-    model::{CoreEditorModel, PlainTextEditorModel},
-    multiline::AnyMultilineString,
-    render::{
-        element::{
-            lens_element::RichTextElementLens, DisplayOptions, DisplayStateHandle, RichTextElement,
-            VerticalExpansionBehavior,
-        },
-        model::{
-            AutoScrollMode, BlockSpacing, Decoration, ExpansionType, LineCount, ParagraphStyles,
-            RichTextStyles, CODE_EDITOR_HIDDEN_SECTION_EXPANSION_LINES,
-        },
-    },
-    search::{SearchEvent, Searcher, MATCH_FILL, SELECTED_MATCH_FILL},
+use warp_editor::content::buffer::{
+    Buffer, BufferEditAction, EditOrigin, InitialBufferState, ToBufferCharOffset as _,
+    ToBufferPoint,
 };
+use warp_editor::content::text::IndentUnit;
+use warp_editor::content::version::BufferVersion;
+use warp_editor::model::{CoreEditorModel, PlainTextEditorModel};
+use warp_editor::multiline::AnyMultilineString;
+use warp_editor::render::element::lens_element::RichTextElementLens;
+use warp_editor::render::element::{
+    DisplayOptions, DisplayStateHandle, RichTextElement, VerticalExpansionBehavior,
+};
+use warp_editor::render::model::{
+    AutoScrollMode, BlockSpacing, CODE_EDITOR_HIDDEN_SECTION_EXPANSION_LINES, Decoration,
+    ExpansionType, LineCount, ParagraphStyles, RichTextStyles,
+};
+use warp_editor::search::{MATCH_FILL, SELECTED_MATCH_FILL, SearchEvent, Searcher};
 use warp_util::content_version::ContentVersion;
+use warp_util::standardized_path::StandardizedPath;
+use warpui::elements::new_scrollable::{
+    AxisConfiguration, DualAxisConfig, NewScrollableElement, ScrollableAppearance,
+};
+use warpui::elements::{
+    ChildAnchor, ChildView, Dismiss, Fill, Flex, Margin, MouseStateHandle, NewScrollable,
+    OffsetPositioning, Padding, ParentAnchor, ParentElement, ParentOffsetBounds, ScrollStateHandle,
+    Shrinkable, Stack,
+};
+use warpui::event::ModifiersState;
+use warpui::keymap::Keystroke;
+use warpui::platform::Cursor;
+use warpui::prelude::RectF;
+use warpui::text::point::Point;
+use warpui::units::Pixels;
 use warpui::{
-    elements::{
-        new_scrollable::{
-            AxisConfiguration, DualAxisConfig, NewScrollableElement, ScrollableAppearance,
-        },
-        ChildAnchor, ChildView, Dismiss, Fill, Flex, Margin, MouseStateHandle, NewScrollable,
-        OffsetPositioning, Padding, ParentAnchor, ParentElement, ParentOffsetBounds,
-        ScrollStateHandle, Shrinkable, Stack,
-    },
-    event::ModifiersState,
-    keymap::Keystroke,
-    platform::Cursor,
-    prelude::RectF,
-    text::point::Point,
-    units::Pixels,
     AppContext, BlurContext, CursorInfo, Element, Entity, FocusContext, ModelHandle,
     SingletonEntity, View, ViewContext, ViewHandle, WeakViewHandle, WindowId,
 };
 
+use crate::appearance::Appearance;
+use crate::code::editor::EditorReviewComment;
+use crate::code::editor::comment_editor::{CommentEditor, CommentEditorEvent};
+use crate::code::editor::comments::PendingComment;
+use crate::code::editor::diff::DiffStatus;
+use crate::code::editor::element::{
+    AddAsContextButton, CommentButton, EditorWrapper, EditorWrapperStateHandle, GutterHoverTarget,
+    GutterRange, InnerEditor, LineNumberConfig, RevertHunkButton,
+};
+use crate::code::editor::find::view::{CodeEditorFind as Find, Event as FindViewEvent};
+use crate::code::editor::goto_line::view::{Event as GoToLineEvent, GoToLineView};
+use crate::code::editor::line::EditorLineLocation;
+use crate::code::editor::model::{
+    CodeEditorModel, CodeEditorModelEvent, HoverableLink, LineBound, StableEditorLine,
+};
+use crate::code::editor::nav_bar::{NavBar, NavBarBehavior, NavBarEvent};
+use crate::code::editor::scroll::{ScrollPosition, ScrollTrigger, ScrollWheelBehavior};
+use crate::code::{NoopCommentEditorProvider, ShowCommentEditorProvider};
+use crate::code_review::comments::{CommentId, CommentOrigin};
+use crate::editor::InteractionState;
+use crate::features::FeatureFlag;
+use crate::notebooks::editor::rich_text_styles;
+use crate::settings::{AppEditorSettings, CodeEditorLineNumberMode, FontSettings};
+use crate::view_components::find::FindDirection;
+
 mod actions;
-pub use actions::init;
 pub(super) use actions::CodeEditorViewAction;
+pub use actions::init;
 
 mod vim_handler;
 
@@ -103,7 +97,8 @@ pub enum CodeEditorEvent {
     ContentChanged {
         origin: EditOrigin,
     },
-    UnifiedDiffComputed(Rc<DiffResult>),
+    /// Emitted when a unified diff computation completes.
+    UnifiedDiffComputed,
     SelectionChanged,
     SelectionStart,
     SelectionEnd,
@@ -122,6 +117,8 @@ pub enum CodeEditorEvent {
     },
     /// Emitted when a diff hunk is reverted
     DiffReverted,
+    /// Emitted when the inline comment editor is opened.
+    CommentEditorOpened,
     HiddenSectionExpanded,
     /// Emitted when a comment is saved. This gets propagated up so that it
     /// can be augmented with the file and repo paths and saved to the comment model.
@@ -289,6 +286,10 @@ impl CodeEditorView {
         });
         ctx.subscribe_to_model(&font_settings_handle, |me, _, _, ctx| {
             me.handle_appearance_or_font_change(ctx);
+        });
+        let app_editor_settings_handle = AppEditorSettings::handle(ctx);
+        ctx.subscribe_to_model(&app_editor_settings_handle, |_, _, _, ctx| {
+            ctx.notify();
         });
 
         let model = ctx.add_model(|ctx| {
@@ -855,6 +856,36 @@ impl CodeEditorView {
         ctx.emit(CodeEditorEvent::HiddenSectionExpanded);
     }
 
+    /// The number of collapsed hidden sections currently in this editor. Fully
+    /// expanding a section removes its range (count drops by one); a chunked
+    /// reveal only shrinks a range (count unchanged).
+    #[cfg(feature = "integration_tests")]
+    pub fn hidden_section_count_for_test(&self, ctx: &AppContext) -> usize {
+        self.model.as_ref(ctx).hidden_ranges(ctx).iter().count()
+    }
+
+    /// Fully expand the first hidden section the same way a bar double-click
+    /// does: resolve the section's full line range from its offset and expand
+    /// with [`ExpansionType::Both`]. Returns whether a section was expanded.
+    #[cfg(feature = "integration_tests")]
+    pub fn fully_expand_first_hidden_section_for_test(
+        &mut self,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let Some(line_range) = self
+            .model
+            .as_ref(ctx)
+            .render_state()
+            .as_ref(ctx)
+            .content()
+            .first_hidden_section_line_range()
+        else {
+            return false;
+        };
+        self.expand_hidden_section(line_range, &ExpansionType::Both, ctx);
+        true
+    }
+
     pub(crate) fn with_can_show_diff_ui(mut self, can_show_diff_ui: bool) -> Self {
         self.display_options.can_show_diff_ui = can_show_diff_ui;
         self
@@ -949,24 +980,25 @@ impl CodeEditorView {
             }
             FindViewEvent::SelectAll => {
                 // Get all search results from the find model
-                if let Some(results) = self.searcher.as_ref(ctx).results() {
-                    if !results.matches.is_empty() {
-                        // Convert all match ranges to selection offsets
-                        let selection_offsets: Vec<warp_editor::content::buffer::SelectionOffsets> =
-                            results
-                                .matches
-                                .iter()
-                                .map(|match_result| {
-                                    warp_editor::content::buffer::SelectionOffsets {
-                                        head: match_result.end,
-                                        tail: match_result.start,
-                                    }
-                                })
-                                .collect();
+                if let Some(results) = self.searcher.as_ref(ctx).results()
+                    && !results.matches.is_empty()
+                {
+                    // Convert all match ranges to selection offsets
+                    let selection_offsets: Vec<warp_editor::content::buffer::SelectionOffsets> =
+                        results
+                            .matches
+                            .iter()
+                            .map(
+                                |match_result| warp_editor::content::buffer::SelectionOffsets {
+                                    head: match_result.end,
+                                    tail: match_result.start,
+                                },
+                            )
+                            .collect();
 
-                        // Set multiple selections on the editor to highlight all matches
-                        if let Ok(selections) = vec1::Vec1::try_from_vec(selection_offsets) {
-                            self.model.update(ctx, |model, ctx| {
+                    // Set multiple selections on the editor to highlight all matches
+                    if let Ok(selections) = vec1::Vec1::try_from_vec(selection_offsets) {
+                        self.model.update(ctx, |model, ctx| {
                                 model.selection().update(ctx, |selection_model, ctx| {
                                     selection_model.update_selection(
                                         warp_editor::content::buffer::BufferSelectAction::SetSelectionOffsets { selections },
@@ -975,7 +1007,6 @@ impl CodeEditorView {
                                     );
                                 });
                             });
-                        }
                     }
                 }
                 self.close_find_bar(true, ctx);
@@ -1019,33 +1050,34 @@ impl CodeEditorView {
                     });
                 if !replace_query.is_empty() {
                     // Get all search results from the find model
-                    if let Some(results) = self.searcher.as_ref(ctx).results() {
-                        if !results.matches.is_empty() {
-                            // Convert all match ranges to selection offsets with case preservation
-                            let edits: Vec<(String, Range<CharOffset>)> = results
-                                .matches
-                                .iter()
-                                .map(|match_result| {
-                                    let match_range = Range {
-                                        start: match_result.start,
-                                        end: match_result.end,
-                                    };
+                    if let Some(results) = self.searcher.as_ref(ctx).results()
+                        && !results.matches.is_empty()
+                    {
+                        // Convert all match ranges to selection offsets with case preservation
+                        let edits: Vec<(String, Range<CharOffset>)> = results
+                            .matches
+                            .iter()
+                            .map(|match_result| {
+                                let match_range = Range {
+                                    start: match_result.start,
+                                    end: match_result.end,
+                                };
 
-                                    let final_replace_text = if preserve_case_enabled {
-                                        self.preserve_case(match_range.clone(), &replace_query, ctx)
-                                    } else {
-                                        replace_query.clone()
-                                    };
+                                let final_replace_text = if preserve_case_enabled {
+                                    self.preserve_case(match_range.clone(), &replace_query, ctx)
+                                } else {
+                                    replace_query.clone()
+                                };
 
-                                    (final_replace_text, match_range)
-                                })
-                                .collect();
+                                (final_replace_text, match_range)
+                            })
+                            .collect();
 
-                            if let Ok(edits) = vec1::Vec1::try_from_vec(edits) {
-                                let selection_model =
-                                    self.model.as_ref(ctx).buffer_selection_model().clone();
-                                // Replace selections in the editor with replace query
-                                self.model.update(ctx, |model, ctx| {
+                        if let Ok(edits) = vec1::Vec1::try_from_vec(edits) {
+                            let selection_model =
+                                self.model.as_ref(ctx).buffer_selection_model().clone();
+                            // Replace selections in the editor with replace query
+                            self.model.update(ctx, |model, ctx| {
                                     model.update_content(|mut content_model, ctx| {
                                         content_model.apply_edit(
                                             warp_editor::content::buffer::BufferEditAction::InsertAtCharOffsetRanges { edits: &edits },
@@ -1055,7 +1087,6 @@ impl CodeEditorView {
                                         )
                                     }, ctx);
                                 });
-                            }
                         }
                     }
                 }
@@ -1159,16 +1190,30 @@ impl CodeEditorView {
         let appearance = Appearance::as_ref(ctx);
         let theme = appearance.theme();
         if self.display_options.show_line_numbers {
+            let editor_settings = AppEditorSettings::as_ref(ctx);
             Some(LineNumberConfig {
                 font_family: appearance.monospace_font_family(),
                 font_size: appearance.monospace_font_size(),
                 text_color: theme.sub_text_color(theme.background()).into(),
                 highlight_text_color: theme.main_text_color(theme.background()).into(),
                 starting_line_number: self.display_options.starting_line_number,
+                mode: *editor_settings.code_editor_line_number_mode.value(),
+                active_line_number: self.active_cursor_line_for_line_numbers(ctx),
+                active_cursor_is_visible: self.is_focused(ctx) && self.is_editable(ctx),
             })
         } else {
             None
         }
+    }
+
+    fn active_cursor_line_for_line_numbers(&self, ctx: &AppContext) -> Option<LineCount> {
+        let model = self.model.as_ref(ctx);
+        let selection = *model.selections(ctx).first();
+        let buffer = model.content().as_ref(ctx);
+        let point = selection.head.to_buffer_point(buffer);
+        // `LineCount`s used by render blocks are zero-based, while buffer points report rows using
+        // the editor's one-based convention.
+        Some(LineCount::from(point.row.saturating_sub(1) as usize))
     }
 
     fn run_find(&mut self, query: &str, ctx: &mut ViewContext<Self>) {
@@ -1196,6 +1241,14 @@ impl CodeEditorView {
                 self.reset_for_editing_change();
                 self.vim_maybe_enforce_cursor_line_cap(ctx);
                 ctx.emit(CodeEditorEvent::SelectionChanged);
+                if *AppEditorSettings::as_ref(ctx)
+                    .code_editor_line_number_mode
+                    .value()
+                    == CodeEditorLineNumberMode::Relative
+                {
+                    // Repaint relative line-number gutters when the cursor origin changes.
+                    ctx.notify();
+                }
             }
             CodeEditorModelEvent::ContentChanged { origin } => {
                 if origin.from_user() {
@@ -1204,8 +1257,8 @@ impl CodeEditorView {
                 }
                 ctx.emit(CodeEditorEvent::ContentChanged { origin: *origin });
             }
-            CodeEditorModelEvent::UnifiedDiffComputed(diff) => {
-                ctx.emit(CodeEditorEvent::UnifiedDiffComputed(diff.clone()));
+            CodeEditorModelEvent::UnifiedDiffComputed(_) => {
+                ctx.emit(CodeEditorEvent::UnifiedDiffComputed);
             }
             CodeEditorModelEvent::ViewportUpdated(version) => {
                 if let Some(trigger) = self
@@ -1325,12 +1378,11 @@ impl CodeEditorView {
         self.focus(ctx);
 
         // If there is a hovered symbol range, don't handle the cmd-click.
-        if modifiers.cmd {
-            if let Some(range) = self.model.as_ref(ctx).hovered_symbol_range() {
-                if range.range().contains(&offset) {
-                    return;
-                }
-            }
+        if modifiers.cmd
+            && let Some(range) = self.model.as_ref(ctx).hovered_symbol_range()
+            && range.range().contains(&offset)
+        {
+            return;
         }
 
         let multiselect = modifiers.alt && FeatureFlag::RichTextMultiselect.is_enabled();
@@ -1370,9 +1422,15 @@ impl CodeEditorView {
         });
     }
 
-    pub fn set_language_with_path(&mut self, path: &Path, ctx: &mut ViewContext<Self>) {
+    pub fn set_language_with_path(&mut self, path: &StandardizedPath, ctx: &mut ViewContext<Self>) {
         self.model.update(ctx, |model, ctx| {
             model.set_language_with_path(path, ctx);
+        });
+    }
+
+    pub fn set_language_with_local_path(&mut self, path: &Path, ctx: &mut ViewContext<Self>) {
+        self.model.update(ctx, |model, ctx| {
+            model.set_language_with_local_path(path, ctx);
         });
     }
 
@@ -1720,9 +1778,7 @@ impl CodeEditorView {
                     first_replace = if first_replace.is_uppercase() {
                         first_replace
                     } else {
-                        {
-                            first_replace.to_uppercase().next().unwrap_or(first_replace)
-                        }
+                        first_replace.to_uppercase().next().unwrap_or(first_replace)
                     };
                     result.push(first_replace);
                     result.push_str(&replace_chars.collect::<String>().to_lowercase());
@@ -1894,58 +1950,57 @@ impl CodeEditorView {
     /// character on the line as the beam cursor can. We call this "line capping." This helper
     /// method determines if line capping needs to be enforced, and if so, enforces it.
     fn vim_maybe_enforce_cursor_line_cap(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(VimMode::Normal) = self.vim_mode(ctx) {
-            if self.model.as_ref(ctx).vim_needs_line_capping(ctx) {
-                self.model.update(ctx, |model, ctx| {
-                    model.vim_enforce_cursor_line_cap(ctx);
-                });
-            }
+        if let Some(VimMode::Normal) = self.vim_mode(ctx)
+            && self.model.as_ref(ctx).vim_needs_line_capping(ctx)
+        {
+            self.model.update(ctx, |model, ctx| {
+                model.vim_enforce_cursor_line_cap(ctx);
+            });
         }
     }
 
     fn user_insert(&mut self, typed: &str, ctx: &mut ViewContext<Self>) {
         if ctx.is_self_focused() {
-            if let Some(first_char) = typed.chars().next() {
-                if typed.chars().count() == 1 {
-                    let all_cursors_next_character_matches_char =
-                        self.model.update(ctx, |model, ctx| {
-                            model.all_cursors_next_character_matches_char(first_char, ctx)
-                        });
+            if let Some(first_char) = typed.chars().next()
+                && typed.chars().count() == 1
+            {
+                let all_cursors_next_character_matches_char =
+                    self.model.update(ctx, |model, ctx| {
+                        model.all_cursors_next_character_matches_char(first_char, ctx)
+                    });
 
-                    // If the character is a closing symbol, we want to potentially step over it incase it's already a closing symbol.
-                    if CLOSING_SYMBOLS.contains(&first_char)
-                        && all_cursors_next_character_matches_char
-                    {
-                        let buffer = self.model.as_ref(ctx).buffer().as_ref(ctx);
-                        let selection_model =
-                            self.model.as_ref(ctx).buffer_selection_model().as_ref(ctx);
-                        if selection_model.all_single_cursors() {
-                            let selections = selection_model.selection_offsets();
-                            let should_step_over = selections.iter().all(|sel| {
-                                buffer.char_at(sel.head).is_some_and(|c| c == first_char)
-                            });
-                            if should_step_over {
-                                self.model.update(ctx, |model, ctx| {
-                                    model.selection_model().update(ctx, |selection, ctx| {
-                                        selection.update_selection(
-                                            warp_editor::content::buffer::BufferSelectAction::MoveRight,
-                                            warp_editor::content::buffer::AutoScrollBehavior::Selection,
-                                            ctx,
-                                        );
-                                    });
+                // If the character is a closing symbol, we want to potentially step over it incase it's already a closing symbol.
+                if CLOSING_SYMBOLS.contains(&first_char) && all_cursors_next_character_matches_char
+                {
+                    let buffer = self.model.as_ref(ctx).buffer().as_ref(ctx);
+                    let selection_model =
+                        self.model.as_ref(ctx).buffer_selection_model().as_ref(ctx);
+                    if selection_model.all_single_cursors() {
+                        let selections = selection_model.selection_offsets();
+                        let should_step_over = selections
+                            .iter()
+                            .all(|sel| buffer.char_at(sel.head).is_some_and(|c| c == first_char));
+                        if should_step_over {
+                            self.model.update(ctx, |model, ctx| {
+                                model.selection_model().update(ctx, |selection, ctx| {
+                                    selection.update_selection(
+                                        warp_editor::content::buffer::BufferSelectAction::MoveRight,
+                                        warp_editor::content::buffer::AutoScrollBehavior::Selection,
+                                        ctx,
+                                    );
                                 });
-                                return;
-                            }
+                            });
+                            return;
                         }
                     }
+                }
 
-                    // If the character is opening autocomplete symbol, we want to autocomplete it with a closing symbol.
-                    if let Some(close) = AUTOCOMPLETE_SYMBOLS.get(&first_char) {
-                        self.model.update(ctx, |model, ctx| {
-                            model.autocomplete_symbol(first_char, *close, ctx);
-                        });
-                        return;
-                    }
+                // If the character is opening autocomplete symbol, we want to autocomplete it with a closing symbol.
+                if let Some(close) = AUTOCOMPLETE_SYMBOLS.get(&first_char) {
+                    self.model.update(ctx, |model, ctx| {
+                        model.autocomplete_symbol(first_char, *close, ctx);
+                    });
+                    return;
                 }
             }
 
@@ -2025,6 +2080,7 @@ impl CodeEditorView {
         self.model.update(ctx, |editor_model, ctx| {
             editor_model.reopen_comment_line(id, location, comment_text, origin, ctx);
         });
+        ctx.emit(CodeEditorEvent::CommentEditorOpened);
 
         ctx.notify();
     }
@@ -2183,10 +2239,10 @@ impl View for CodeEditorView {
         let mut stack = Stack::new()
             .with_constrain_absolute_children()
             .with_child(col.finish());
-        if let Some(find_bar) = &self.find_bar {
-            if find_bar.as_ref(app).is_open() {
-                stack.add_overlay_child(ChildView::new(find_bar).finish());
-            }
+        if let Some(find_bar) = &self.find_bar
+            && find_bar.as_ref(app).is_open()
+        {
+            stack.add_overlay_child(ChildView::new(find_bar).finish());
         }
         if self.goto_line_dialog.as_ref(app).is_open() {
             let dialog = Dismiss::new(ChildView::new(&self.goto_line_dialog).finish())
@@ -2266,8 +2322,14 @@ impl View for CodeEditorView {
         }
         if let Some(vim_mode) = self.vim_mode(app) {
             context.set.insert("Vim");
-            if vim_mode == VimMode::Normal {
-                context.set.insert("VimNormalMode");
+            match vim_mode {
+                VimMode::Normal => {
+                    context.set.insert("VimNormalMode");
+                }
+                VimMode::Visual(_) => {
+                    context.set.insert("VimVisualMode");
+                }
+                _ => {}
             }
         }
         if self.find_bar.is_some() {
@@ -2317,6 +2379,17 @@ impl CodeEditorView {
             input: input.to_string(),
         };
         self.handle_goto_line_event(&event, ctx);
+    }
+
+    pub fn displayed_line_number_for_test(
+        &self,
+        one_based_line_number: usize,
+        ctx: &AppContext,
+    ) -> Option<usize> {
+        let line_number_config = self.line_number_config(ctx)?;
+        let line_count = LineCount::from(one_based_line_number.checked_sub(1)?);
+
+        Some(line_number_config.display_line_number(line_count))
     }
 }
 

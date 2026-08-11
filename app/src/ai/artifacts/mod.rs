@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::anyhow;
-use warp_core::report_error;
+use warp_errors::report_error;
 use warp_multi_agent_api as api;
 
 use crate::notebooks::NotebookId;
@@ -27,6 +27,15 @@ pub enum Artifact {
         repo: Option<String>,
         #[serde(skip_serializing)] // We derive this field from the url on deserialize
         number: Option<u32>,
+    },
+    #[serde(rename = "EXTERNAL_REFERENCE")]
+    ExternalReference {
+        reference_type: String,
+        url: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        metadata: Option<serde_json::Value>,
     },
     #[serde(rename = "SCREENSHOT")]
     Screenshot {
@@ -56,6 +65,13 @@ enum ArtifactHelper {
     },
     #[serde(rename = "PULL_REQUEST")]
     PullRequest { url: String, branch: String },
+    #[serde(rename = "EXTERNAL_REFERENCE")]
+    ExternalReference {
+        reference_type: String,
+        url: String,
+        title: Option<String>,
+        metadata: Option<serde_json::Value>,
+    },
     #[serde(rename = "SCREENSHOT")]
     Screenshot {
         artifact_uid: String,
@@ -98,6 +114,17 @@ impl<'de> serde::Deserialize<'de> for Artifact {
                     number,
                 }
             }
+            ArtifactHelper::ExternalReference {
+                reference_type,
+                url,
+                title,
+                metadata,
+            } => Artifact::ExternalReference {
+                reference_type,
+                url,
+                title,
+                metadata,
+            },
             ArtifactHelper::Screenshot {
                 artifact_uid,
                 mime_type,

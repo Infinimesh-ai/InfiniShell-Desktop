@@ -1,7 +1,7 @@
 pkgname=@@PACKAGE_NAME@@
 pkgver=@@PKGVER@@
 pkgrel=@@RELEASE@@
-pkgdesc="Zap CLI — community fork of Warp's local orchestration platform"
+pkgdesc="InfiniShell CLI — community fork of Warp's local orchestration platform"
 arch=('@@ARCH@@')
 url="https://github.com/zerx-lab/warp"
 license=('custom')

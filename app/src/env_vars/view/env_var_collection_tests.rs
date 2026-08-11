@@ -1,23 +1,21 @@
 use warp_core::ui::appearance::Appearance;
-use warpui::{platform::WindowStyle, App, ViewHandle};
+use warpui::platform::WindowStyle;
+use warpui::{App, ViewHandle};
 
 use crate::auth::AuthStateProvider;
-use crate::{
-    cloud_object::model::{
-        actions::ObjectActions, persistence::ObjectStoreModel, view::ObjectStoreViewModel,
-    },
-    cloud_object::update_manager::UpdateManager,
-    env_vars::{
-        active_env_var_collection_data::SavingStatus,
-        view::env_var_collection::EnvVarCollectionView,
-    },
-    network::NetworkStatus,
-    settings_view::keybindings::KeybindingChangedNotifier,
-    test_util::settings::initialize_settings_for_tests,
-    workspace::ActiveSession,
-    workspaces::{user_profiles::UserProfiles, user_workspaces::UserWorkspaces},
-    GlobalResourceHandles, GlobalResourceHandlesProvider,
-};
+use crate::cloud_object::model::actions::ObjectActions;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::model::view::ObjectStoreViewModel;
+use crate::cloud_object::update_manager::UpdateManager;
+use crate::env_vars::active_env_var_collection_data::SavingStatus;
+use crate::env_vars::view::env_var_collection::EnvVarCollectionView;
+use crate::network::NetworkStatus;
+use crate::settings_view::keybindings::KeybindingChangedNotifier;
+use crate::test_util::settings::initialize_settings_for_tests;
+use crate::workspace::ActiveSession;
+use crate::workspaces::user_profiles::UserProfiles;
+use crate::workspaces::user_workspaces::UserWorkspaces;
+use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 fn initialize_app(app: &mut App) {
     initialize_settings_for_tests(app);

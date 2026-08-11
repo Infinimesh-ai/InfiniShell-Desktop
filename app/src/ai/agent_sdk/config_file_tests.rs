@@ -94,6 +94,9 @@ fn merge_precedence_cli_over_file_and_merges_mcp() {
     let cli = AgentConfigSnapshot {
         name: Some("cli-name".to_string()),
         environment_id: None,
+        // 上游新增的 runner / 额外源仓库字段,只服务于云端 worker 调度,本地合并测试不涉及。
+        runner_id: None,
+        additional_source_repos: None,
         model_id: Some("cli-model".to_string()),
         base_prompt: None,
         mcp_servers: Some(serde_json::Map::from_iter([(

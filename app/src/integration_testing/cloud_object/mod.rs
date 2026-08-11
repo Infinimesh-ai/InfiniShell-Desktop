@@ -1,16 +1,17 @@
 mod assertion;
 
-pub use assertion::*;
-use futures::{future::join_all, FutureExt};
-use itertools::Itertools;
 use std::future::Future;
 use std::pin::Pin;
+
+pub use assertion::*;
+use futures::FutureExt;
+use futures::future::join_all;
+use itertools::Itertools;
 use warpui::{App, SingletonEntity};
 
-use crate::{
-    cloud_object::update_manager::UpdateManager,
-    cloud_object::{model::persistence::ObjectStoreModel, Space},
-};
+use crate::cloud_object::Space;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::update_manager::UpdateManager;
 
 /// Clears the object store of all non-welcome objects in the user's personal space.
 /// Returns a future that resolves when the object store is cleared.

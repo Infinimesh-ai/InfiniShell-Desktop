@@ -721,16 +721,25 @@ fn should_fork_from_last_known_good_state(
     };
 
     match error {
-        RenderableAIError::QuotaLimit
+        RenderableAIError::QuotaLimit { .. }
         | RenderableAIError::ServerOverloaded
         | RenderableAIError::ContextWindowExceeded(_)
         | RenderableAIError::InvalidApiKey { .. }
-        | RenderableAIError::AwsBedrockCredentialsExpiredOrInvalid { .. } => false,
-        RenderableAIError::InternalWarpError => true,
+        | RenderableAIError::AwsBedrockCredentialsExpiredOrInvalid { .. }
+        | RenderableAIError::GeminiEnterpriseCredentialsExpiredOrInvalid => false,
+        // shell 退出导致的失败无法在这个(已经死掉的)pane 里恢复,但用户可以从
+        // 上一个已知良好状态 fork 出新会话继续。
+        RenderableAIError::InternalWarpError | RenderableAIError::AgentExitedShell { .. } => true,
         RenderableAIError::Other {
             will_attempt_resume,
             ..
+        }
+        | RenderableAIError::TransientNetworkError {
+            will_attempt_resume,
+            ..
         } => !will_attempt_resume,
+        // 云端启动失败意味着 agent 从未启动,没有可 fork 的成功状态。
+        RenderableAIError::CloudStartupFailed(_) => false,
     }
 }
 

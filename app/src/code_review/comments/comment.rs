@@ -1,12 +1,13 @@
-use crate::{
-    ai::agent::{CurrentHead, DiffBase},
-    code::editor::{line::EditorLineLocation, EditorReviewComment},
-};
-use chrono::{DateTime, Local};
 use std::fmt::{Display, Formatter};
-use std::path::PathBuf;
+
+use chrono::{DateTime, Local};
 use warp_editor::render::model::LineCount;
 use warp_multi_agent_api::{self as api};
+
+use crate::ai::agent::{CurrentHead, DiffBase};
+use crate::code::buffer_location::LocalOrRemotePath;
+use crate::code::editor::EditorReviewComment;
+use crate::code::editor::line::EditorLineLocation;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum CommentOrigin {
@@ -53,6 +54,19 @@ impl LineDiffContent {
             .or_else(|| s.strip_prefix('-'))
             .unwrap_or(s)
             .to_string()
+    }
+
+    /// The source-line text for a comment imported from a provider diff hunk.
+    ///
+    /// Unlike [`Self::original_text`], this strips exactly one leading
+    /// unified-diff marker — `+`, `-`, or the space that context (unchanged)
+    /// lines carry — recovering the raw file line. It must only be used for
+    /// imported comments, whose `content` is always a diff line with exactly one
+    /// such prefix char; native comments store raw text (real leading
+    /// indentation is significant) and must use [`Self::original_text`] instead.
+    pub(crate) fn imported_original_text(&self) -> String {
+        let s = self.content.trim_end_matches('\n');
+        s.strip_prefix(['+', '-', ' ']).unwrap_or(s).to_string()
     }
 
     pub(crate) fn from_content(diff_line: &str) -> Self {
@@ -123,7 +137,9 @@ impl From<AttachedReviewComment> for api::ReviewComment {
                 });
 
                 api::review_comment::CommentTarget::CommentedLine(api::DiffHunk {
-                    file_path: absolute_file_path.to_string_lossy().to_string(),
+                    // For the agent/GitHub API we send the path bytes only;
+                    // the comment's owning batch is already host-scoped.
+                    file_path: absolute_file_path.display_path(),
                     line_range,
                     diff_content: content.content,
                     lines_added: content.lines_added.as_u32(),
@@ -135,7 +151,7 @@ impl From<AttachedReviewComment> for api::ReviewComment {
             AttachedReviewCommentTarget::File { absolute_file_path } => {
                 api::review_comment::CommentTarget::CommentedFile(
                     api::review_comment::CommentedFile {
-                        file_path: absolute_file_path.to_string_lossy().to_string(),
+                        file_path: absolute_file_path.display_path(),
                         current: val.head.to_owned().map(Into::into),
                         base: val.base.map(Into::into),
                     },
@@ -163,18 +179,18 @@ impl From<AttachedReviewComment> for api::ReviewComment {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AttachedReviewCommentTarget {
     Line {
-        absolute_file_path: PathBuf,
+        absolute_file_path: LocalOrRemotePath,
         line: EditorLineLocation,
         content: LineDiffContent,
     },
     File {
-        absolute_file_path: PathBuf,
+        absolute_file_path: LocalOrRemotePath,
     },
     General,
 }
 
 impl AttachedReviewCommentTarget {
-    pub(crate) fn absolute_file_path(&self) -> Option<&PathBuf> {
+    pub(crate) fn absolute_file_path(&self) -> Option<&LocalOrRemotePath> {
         match self {
             AttachedReviewCommentTarget::Line {
                 absolute_file_path, ..
@@ -195,7 +211,7 @@ impl AttachedReviewCommentTarget {
 impl AttachedReviewComment {
     pub(crate) fn from_editor_review_comment(
         comment: EditorReviewComment,
-        absolute_file_path: PathBuf,
+        absolute_file_path: LocalOrRemotePath,
         base: Option<DiffBase>,
         head: Option<CurrentHead>,
     ) -> AttachedReviewComment {

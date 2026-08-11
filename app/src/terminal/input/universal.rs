@@ -1,34 +1,26 @@
-use crate::{
-    ai::blocklist::InputType,
-    appearance::Appearance,
-    context_chips::spacing,
-    features::FeatureFlag,
-    settings::{AppEditorSettings, InputModeSettings},
-    terminal::{
-        block_list_viewport::InputMode,
-        input::{InputAction, InputDropTargetData},
-        settings::TerminalSettings,
-        view::TerminalAction,
-    },
-    themes::theme::color::internal_colors,
-};
 use settings::Setting;
-use warpui::{
-    elements::{
-        Border, ChildView, Container, CornerRadius, DropTarget, Element, Flex, Hoverable,
-        ParentElement, Radius, SavePosition, Stack,
-    },
-    AppContext, SingletonEntity,
+use warpui::elements::{
+    Border, ChildView, Container, CornerRadius, DropTarget, Element, Flex, Hoverable,
+    ParentElement, Radius, SavePosition, Stack,
 };
+use warpui::{AppContext, SingletonEntity};
 
-use super::{
-    common::{
-        add_command_xray_overlay, add_input_suggestions_overlays, add_vim_status_to_stack,
-        add_voltron_overlay, add_workflow_info_overlay,
-        wrap_input_with_terminal_padding_and_focus_handler,
-    },
-    Input,
+use super::Input;
+use super::common::{
+    add_command_xray_overlay, add_input_suggestions_overlays, add_vim_status_to_stack,
+    add_voltron_overlay, add_workflow_info_overlay,
+    wrap_input_with_terminal_padding_and_focus_handler,
 };
+use crate::ai::blocklist::InputType;
+use crate::appearance::Appearance;
+use crate::context_chips::spacing;
+use crate::features::FeatureFlag;
+use crate::settings::{AppEditorSettings, InputModeSettings};
+use crate::terminal::block_list_viewport::InputMode;
+use crate::terminal::input::{InputAction, InputDropTargetData};
+use crate::terminal::settings::TerminalSettings;
+use crate::terminal::view::TerminalAction;
+use crate::themes::theme::color::internal_colors;
 
 impl Input {
     /// Renders the universal input. This is used when `FeatureFlag::AgentView` is disabled and the
@@ -60,16 +52,15 @@ impl Input {
         let is_compact_mode = false;
         let mut column = Flex::column();
 
-        if matches!(input_mode, InputMode::PinnedToBottom | InputMode::Waterfall) {
-            if let Some(banner) =
+        if matches!(input_mode, InputMode::PinnedToBottom | InputMode::Waterfall)
+            && let Some(banner) =
                 self.render_input_banner(appearance, app, input_mode, is_compact_mode)
-            {
-                column.add_child(
-                    Container::new(banner)
-                        .with_margin_top(spacing::UDI_CHIP_MARGIN)
-                        .finish(),
-                );
-            }
+        {
+            column.add_child(
+                Container::new(banner)
+                    .with_margin_top(spacing::UDI_CHIP_MARGIN)
+                    .finish(),
+            );
         }
 
         column.add_child(prompt_row.finish());
@@ -78,14 +69,13 @@ impl Input {
 
         if FeatureFlag::ImageAsContext.is_enabled()
             && matches!(ai_input_model.input_type(), InputType::AI)
+            && let Some(images) = self.render_attachment_chips(appearance)
         {
-            if let Some(images) = self.render_attachment_chips(appearance) {
-                column.add_child(
-                    Container::new(images)
-                        .with_margin_top(spacing::UDI_CHIP_MARGIN)
-                        .finish(),
-                );
-            }
+            column.add_child(
+                Container::new(images)
+                    .with_margin_top(spacing::UDI_CHIP_MARGIN)
+                    .finish(),
+            );
         }
 
         let terminal_spacing = TerminalSettings::as_ref(app)
@@ -100,24 +90,23 @@ impl Input {
         );
         column.add_child(ChildView::new(&self.universal_developer_input_button_bar).finish());
 
-        if matches!(input_mode, InputMode::PinnedToTop) {
-            if let Some(banner) =
+        if matches!(input_mode, InputMode::PinnedToTop)
+            && let Some(banner) =
                 self.render_input_banner(appearance, app, input_mode, is_compact_mode)
-            {
-                column.add_child(
-                    Container::new(banner)
-                        .with_margin_bottom(spacing::UDI_CHIP_MARGIN)
-                        .finish(),
-                );
-            }
+        {
+            column.add_child(
+                Container::new(banner)
+                    .with_margin_bottom(spacing::UDI_CHIP_MARGIN)
+                    .finish(),
+            );
         }
 
-        if let Some(vim_state) = vim_state.as_ref() {
-            if show_vim_status {
-                add_vim_status_to_stack(
-                    &mut stack, vim_state, appearance, true, // use adjusted padding for UDI
-                );
-            }
+        if let Some(vim_state) = vim_state.as_ref()
+            && show_vim_status
+        {
+            add_vim_status_to_stack(
+                &mut stack, vim_state, appearance, true, // use adjusted padding for UDI
+            );
         }
 
         stack.add_child(wrap_input_with_terminal_padding_and_focus_handler(
@@ -127,15 +116,14 @@ impl Input {
         ));
 
         if let Some(selected_workflow_state) = self.workflows_state.selected_workflow_state.as_ref()
+            && selected_workflow_state.should_show_more_info_view
         {
-            if selected_workflow_state.should_show_more_info_view {
-                add_workflow_info_overlay(
-                    &mut stack,
-                    selected_workflow_state,
-                    self.size_info(app).pane_height_px().as_f32(),
-                    menu_positioning,
-                );
-            }
+            add_workflow_info_overlay(
+                &mut stack,
+                selected_workflow_state,
+                self.size_info(app).pane_height_px().as_f32(),
+                menu_positioning,
+            );
         }
 
         if self.is_voltron_open && self.is_pane_focused(app) {
@@ -157,6 +145,7 @@ impl Input {
             );
         }
 
+        // Zap:购买 AI credits 的横幅属托管账单链路,已剥离,这里不再插入。
         // If the file tree is enabled, don't include the top margin for UDI so that the UDI is flush with the
         // file tree.
         let margin_top = if FeatureFlag::FileTree.is_enabled() && self.is_input_at_top(&model, app)

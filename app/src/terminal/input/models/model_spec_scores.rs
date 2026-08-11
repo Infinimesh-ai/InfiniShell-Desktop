@@ -15,9 +15,17 @@ use crate::terminal::input::inline_menu::styles as inline_styles;
 const CORNER_RADIUS: f32 = 4.0;
 const ROW_SPACING: f32 = 12.0;
 
+pub const CUSTOM_MODEL_ROUTER_TITLE: &str = "Custom Model Router";
+pub const CUSTOM_MODEL_ROUTER_DESCRIPTION: &str = "Routes each request to a concrete model based on your routing rules, rather than using a single fixed model.";
+
 pub enum CostRow {
-    Bar { value: Option<f32> },
-    BilledToApi { manage_button: Box<dyn Element> },
+    Bar {
+        value: Option<f32>,
+    },
+    BilledToProvider {
+        label: &'static str,
+        manage_button: Box<dyn Element>,
+    },
 }
 
 pub struct ModelSpecScoresLayout {
@@ -30,7 +38,7 @@ pub struct ModelSpecScoresLayout {
 /// 只是行的语义不同:
 /// - Context — 上下文窗口,bar 用 log2 归一化映射到 4K..2M
 /// - Output  — 单次最大输出,bar 用 log2 归一化映射到 1K..128K
-/// - Cost    — 强制走 `BilledToApi` 分支(BYOP 用户用自己的 key,不走 Zap 计费)
+/// - Cost    — 强制走 `BilledToProvider` 分支(BYOP 用户用自己的 key,不走 Zap 计费)
 ///
 /// `context_window` / `max_output_tokens` 为 0(未填) 时传 None,显示默认 "?" 占位,
 /// 与 Zap 默认面板缺失数据时的视觉行为一致。
@@ -60,7 +68,12 @@ pub fn render_byop_spec_scores(
         ),
         render_score_row(
             "Cost",
-            ScoreRowKind::BilledToApi { manage_button },
+            // 上游把 `BilledToApi` 换成带 label 的 `BilledToProvider`;
+            // BYOP 走用户自己的 API key,沿用 "Inference via API key" 文案。
+            ScoreRowKind::BilledToProvider {
+                label: "Inference via API key",
+                manage_button,
+            },
             layout.bg_bar_color,
             app,
         ),
@@ -127,10 +140,16 @@ pub fn render_model_spec_scores(
                 app,
             ));
         }
-        CostRow::BilledToApi { manage_button } => {
+        CostRow::BilledToProvider {
+            label,
+            manage_button,
+        } => {
             rows.push(render_score_row(
                 "Cost",
-                ScoreRowKind::BilledToApi { manage_button },
+                ScoreRowKind::BilledToProvider {
+                    label,
+                    manage_button,
+                },
                 layout.bg_bar_color,
                 app,
             ));
@@ -144,8 +163,13 @@ pub fn render_model_spec_scores(
 }
 
 enum ScoreRowKind {
-    Bar { value: Option<f32> },
-    BilledToApi { manage_button: Box<dyn Element> },
+    Bar {
+        value: Option<f32>,
+    },
+    BilledToProvider {
+        label: &'static str,
+        manage_button: Box<dyn Element>,
+    },
 }
 
 fn render_score_row(
@@ -165,23 +189,9 @@ fn render_score_row(
         appearance.ui_font_family(),
         appearance.monospace_font_size(),
     ) * 8.;
-    let label = ConstrainedBox::new(
-        Text::new(
-            name.to_string(),
-            appearance.ui_font_family(),
-            appearance.monospace_font_size(),
-        )
-        .with_color(
-            inline_styles::primary_text_color(
-                theme,
-                inline_styles::menu_background_color(app).into(),
-            )
-            .into_solid(),
-        )
-        .finish(),
-    )
-    .with_width(label_width)
-    .finish();
+    let label = ConstrainedBox::new(render_row_label(name, appearance, app))
+        .with_width(label_width)
+        .finish();
 
     let bar_height = app.font_cache().line_height(
         appearance.monospace_font_size(),
@@ -248,25 +258,17 @@ fn render_score_row(
             )
             .finish()
         }
-        ScoreRowKind::BilledToApi { manage_button } => Expanded::new(
+        ScoreRowKind::BilledToProvider {
+            label,
+            manage_button,
+        } => Expanded::new(
             1.,
             Flex::row()
                 .with_main_axis_size(MainAxisSize::Max)
                 .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(
-                    Container::new(
-                        Text::new(
-                            "Billed to API".to_string(),
-                            appearance.ui_font_family(),
-                            14.,
-                        )
-                        .with_color(theme.disabled_ui_text_color().into())
-                        .finish(),
-                    )
-                    .finish(),
-                )
-                .with_child(manage_button)
+                .with_child(render_provider_label(label, appearance))
+                .with_child(Container::new(manage_button).with_margin_left(8.).finish())
                 .finish(),
         )
         .finish(),
@@ -278,6 +280,31 @@ fn render_score_row(
         .with_child(label)
         .with_child(Expanded::new(1., row_content).finish())
         .finish()
+}
+
+fn render_row_label(label: &str, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
+    Text::new(
+        label.to_string(),
+        appearance.ui_font_family(),
+        appearance.monospace_font_size(),
+    )
+    .with_color(
+        inline_styles::primary_text_color(
+            appearance.theme(),
+            inline_styles::menu_background_color(app).into(),
+        )
+        .into_solid(),
+    )
+    .finish()
+}
+
+fn render_provider_label(label: &'static str, appearance: &Appearance) -> Box<dyn Element> {
+    Container::new(
+        Text::new(label.to_string(), appearance.ui_font_family(), 14.)
+            .with_color(appearance.theme().disabled_ui_text_color().into())
+            .finish(),
+    )
+    .finish()
 }
 
 pub fn render_model_spec_header(

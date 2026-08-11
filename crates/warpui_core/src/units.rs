@@ -1,8 +1,9 @@
+use std::fmt::{Display, Formatter};
+use std::ops::Neg;
+
 use derive_more::{AddAssign, SubAssign};
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
-use std::ops::Neg;
 
 /// Newtype representing a position in line coordinates. See `to_pixel` to convert to pixel
 /// coordinates.
@@ -50,7 +51,7 @@ impl Lines {
     }
 
     pub fn as_f64(&self) -> f64 {
-        self.0 .0
+        self.0.0
     }
 
     pub fn max(self, other: Self) -> Self {

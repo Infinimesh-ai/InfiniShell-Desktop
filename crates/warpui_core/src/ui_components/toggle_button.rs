@@ -1,18 +1,13 @@
 use pathfinder_geometry::vector::vec2f;
 
-use crate::{
-    elements::{
-        ChildAnchor, ConstrainedBox, Container, Empty, Hoverable, MouseState, MouseStateHandle,
-        OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
-    },
-    scene::Border,
-    Element,
+use super::components::{UiComponent, UiComponentStyles};
+use super::text::Span;
+use crate::Element;
+use crate::elements::{
+    ChildAnchor, ConstrainedBox, Container, Empty, Hoverable, MouseState, MouseStateHandle,
+    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
 };
-
-use super::{
-    components::{UiComponent, UiComponentStyles},
-    text::Span,
-};
+use crate::scene::Border;
 
 /// A button element used to toggle a single value on or off.
 pub struct ToggleButton {
@@ -79,16 +74,16 @@ impl ToggleButton {
 
     fn styles(&self, state: &MouseState) -> UiComponentStyles {
         let mut styles = self.styles;
-        if self.toggled_on {
-            if let Some(overlay) = self.toggled_on_styles {
-                styles = styles.merge(overlay);
-            }
+        if self.toggled_on
+            && let Some(overlay) = self.toggled_on_styles
+        {
+            styles = styles.merge(overlay);
         }
 
-        if state.is_mouse_over_element() {
-            if let Some(overlay) = self.hovered_styles {
-                styles = styles.merge(overlay);
-            }
+        if state.is_mouse_over_element()
+            && let Some(overlay) = self.hovered_styles
+        {
+            styles = styles.merge(overlay);
         }
         styles
     }
@@ -144,18 +139,18 @@ impl UiComponent for ToggleButton {
             let button = self.render_button(&styles);
             let mut stack = Stack::new().with_child(button);
 
-            if state.is_hovered() {
-                if let Some(tooltip) = self.tooltip.take() {
-                    stack.add_positioned_overlay_child(
-                        tooltip,
-                        OffsetPositioning::offset_from_parent(
-                            vec2f(0., 10.),
-                            ParentOffsetBounds::Unbounded,
-                            ParentAnchor::BottomRight,
-                            ChildAnchor::TopRight,
-                        ),
-                    )
-                }
+            if state.is_hovered()
+                && let Some(tooltip) = self.tooltip.take()
+            {
+                stack.add_positioned_overlay_child(
+                    tooltip,
+                    OffsetPositioning::offset_from_parent(
+                        vec2f(0., 10.),
+                        ParentOffsetBounds::Unbounded,
+                        ParentAnchor::BottomRight,
+                        ChildAnchor::TopRight,
+                    ),
+                )
             }
 
             stack.finish()

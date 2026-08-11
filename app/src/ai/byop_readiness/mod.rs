@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 pub const REPAIR_STATE_VERSION: u32 = 1;
 pub const BLOCKED_BYOP_REQUEST_MESSAGE: &str =
-    "Can't continue this conversation: an earlier tool result is missing or corrupted in this conversation's history, so Zap can't safely send the request to your provider. Start a new conversation or fork from an earlier point to continue.";
+    "Can't continue this conversation: an earlier tool result is missing or corrupted in this conversation's history, so InfiniShell can't safely send the request to your provider. Start a new conversation or fork from an earlier point to continue.";
 pub const PENDING_BYOP_TOOL_RESULTS_MESSAGE: &str =
     "Waiting for a running tool to finish before sending your next request.";
 

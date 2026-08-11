@@ -40,7 +40,8 @@ const FILTER_BUTTON_CORNER_RADIUS: f32 = 4.0;
 // 无法按实测像素宽度自适应折叠,故以来源数量作为折叠阈值。
 const FILTER_TABS_INLINE_MAX: usize = 4;
 
-#[derive(Clone, Debug)]
+// Zap:`Dropdown<A>` 现在要求 `A: DropdownItemAction`(blanket impl 需要 `PartialEq`)。
+#[derive(Clone, Debug, PartialEq)]
 pub enum SkillManagerPanelAction {
     SelectProviderFilter(Option<SkillProvider>),
     EditSkill(PathBuf),
@@ -112,6 +113,8 @@ impl SkillManagerPanel {
                 me.rebuild_source_dropdown(ctx);
                 ctx.notify();
             }
+            // 上游的 SkillsChanged 与 InventoryChanged 成对派发,这里只处理后者。
+            SkillManagerEvent::SkillsChanged { .. } => {}
         });
 
         // 折叠态使用的「来源」下拉。由本面板的 ViewContext 创建,其派发的

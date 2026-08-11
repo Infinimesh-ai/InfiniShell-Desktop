@@ -2,44 +2,45 @@ pub(crate) mod convert_conversation;
 mod convert_from;
 mod convert_to;
 
-pub use ai::agent::convert::ConvertToAPITypeError;
-use ai::api_keys::ApiKeyManager;
-pub use convert_from::{
-    user_inputs_from_messages, ConversionParams, ConvertAPIMessageToClientOutputMessage,
-    MaybeAIAgentOutputMessage, MessageToAIAgentOutputMessageError,
-};
-
-use futures_lite::Stream;
-use serde::Serialize;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
-use warp_core::channel::ChannelState;
+
+pub use ai::agent::convert::ConvertToAPITypeError;
+use ai::api_keys::ApiKeyManager;
+pub use convert_from::{
+    ConversionParams, ConvertAPIMessageToClientOutputMessage, MaybeAIAgentOutputMessage,
+    MessageToAIAgentOutputMessageError, user_inputs_from_messages,
+};
+use futures_lite::Stream;
+use mcp::TemplatableMCPServerInfo;
+use serde::Serialize;
+use warp_core::channel::{Channel, ChannelState};
 use warp_core::execution_mode::AppExecutionMode;
 use warp_core::features::FeatureFlag;
+use warp_core::user_preferences::GetUserPreferences;
+use warpui::{AppContext, EntityId, SingletonEntity as _};
 
+use super::{
+    AIAgentInput, MCPContext, MCPServer, RequestMetadata, RunningCommand, ServerOutputId,
+    Suggestions,
+};
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
-use crate::{
-    ai::api_error::AIApiError,
-    ai::{blocklist::SessionContext, llms::LLMId},
-};
-
-use super::{AIAgentInput, MCPContext, MCPServer, RequestMetadata, RunningCommand, Suggestions};
-use crate::ai::blocklist::{BlocklistAIPermissions, RequestInput};
+use crate::ai::api_error::AIApiError;
+use crate::ai::blocklist::{BlocklistAIPermissions, RequestInput, SessionContext};
+use crate::ai::execution_profiles::AIExecutionProfileAppExt;
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::facts::{AIFact, AIFactObjectModel};
+use crate::ai::llms::{LLMId, LLMPreferences};
 use crate::ai::machine_memory::{self, MachineMemoryContext};
-use crate::ai::mcp::templatable_manager::TemplatableMCPServerInfo;
 use crate::ai::mcp::TemplatableMCPServerManager;
+use crate::cloud_object::StoredObject;
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
-use crate::cloud_object::StoredObject;
 use crate::settings::AISettings;
 use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use warp_core::user_preferences::GetUserPreferences;
-use warpui::{AppContext, EntityId, SingletonEntity as _};
 
 /// Unique, server-generated conversation-scoped token to be roundtripped to the API when sending
 /// requests that follow-up within a given conversation.
@@ -57,6 +58,31 @@ impl ServerConversationToken {
 
     pub fn debug_link(&self) -> String {
         format!("{}://debug/maa/{}", ChannelState::url_scheme(), self.as_str())
+    }
+
+    pub fn debugging_payload(&self, request_id: Option<&ServerOutputId>) -> String {
+        self.debugging_payload_for_channel(request_id, ChannelState::channel())
+    }
+
+    fn debugging_payload_for_channel(
+        &self,
+        request_id: Option<&ServerOutputId>,
+        channel: Channel,
+    ) -> String {
+        if channel.is_dogfood() {
+            match request_id {
+                Some(request_id) => format!("{}?request={request_id}", self.debug_link()),
+                None => self.debug_link(),
+            }
+        } else {
+            match request_id {
+                Some(request_id) => format!(
+                    "{{\"request_id\":\"{request_id}\",\"conversation_id\":\"{}\"}}",
+                    self.as_str()
+                ),
+                None => format!("{{\"conversation_id\":\"{}\"}}", self.as_str()),
+            }
+        }
     }
 
     pub fn conversation_link(&self) -> String {
@@ -107,7 +133,14 @@ pub struct RequestParams {
 
     /// User-provided API keys for AI providers (BYO API Key).
     pub api_keys: Option<warp_multi_agent_api::request::settings::ApiKeys>,
-    pub allow_use_of_warp_credits_with_byok: bool,
+    /// User-provided custom model providers (BYOK endpoints).
+    pub custom_model_providers:
+        Option<warp_multi_agent_api::request::settings::CustomModelProviders>,
+    /// User-defined custom model routers referenced by the current selection. Mirrors
+    /// `custom_model_providers`: the selected model's `config_key` indexes into this
+    /// registry. `None` when no custom router is selected.
+    pub custom_model_routers: Option<warp_multi_agent_api::request::settings::CustomModelRouters>,
+    pub allow_use_of_warp_credits: bool,
     pub autonomy_level: warp_multi_agent_api::AutonomyLevel,
     pub isolation_level: warp_multi_agent_api::IsolationLevel,
     pub web_search_enabled: bool,
@@ -223,7 +256,9 @@ impl RequestParams {
             planning_enabled: true,
             should_redact_secrets: false,
             api_keys: None,
-            allow_use_of_warp_credits_with_byok: false,
+            custom_model_providers: None,
+            custom_model_routers: None,
+            allow_use_of_warp_credits: false,
             autonomy_level: warp_multi_agent_api::AutonomyLevel::Supervised,
             isolation_level: warp_multi_agent_api::IsolationLevel::None,
             web_search_enabled: false,
@@ -294,6 +329,9 @@ impl RequestParams {
                     .values(),
             );
 
+            // Include built-in Warp-hosted servers (e.g. the Factory MCP).
+            active_servers.extend(templatable_manager.get_active_builtin_servers().values());
+
             let servers: Vec<MCPServer> = active_servers
                 .into_iter()
                 .map(|server| MCPServer {
@@ -335,12 +373,27 @@ impl RequestParams {
         let should_redact_secrets = get_secret_obfuscation_mode(app).should_redact_secret();
 
         let user_workspaces = UserWorkspaces::as_ref(app);
-        let api_keys = ApiKeyManager::as_ref(app).api_keys_for_request(
-            user_workspaces.is_byo_api_key_enabled(),
+        let api_key_manager = ApiKeyManager::as_ref(app);
+        let is_byo_enabled = user_workspaces.is_byo_api_key_enabled(app);
+        #[cfg(not(target_family = "wasm"))]
+        let geap_binding = crate::ai::geap_credentials::current_geap_policy(app).mint_binding();
+        #[cfg(target_family = "wasm")]
+        let geap_binding: Option<::ai::api_keys::GeapMintBinding> = None;
+        let api_keys = api_key_manager.api_keys_for_request(
+            is_byo_enabled,
             user_workspaces.is_aws_bedrock_credentials_enabled(app),
+            geap_binding,
         );
-        let allow_use_of_warp_credits_with_byok =
-            *AISettings::as_ref(app).can_use_warp_credits_with_byok;
+        let is_custom_inference_enabled = user_workspaces.is_custom_inference_enabled(app);
+        let custom_model_providers =
+            api_key_manager.custom_model_providers_for_request(is_custom_inference_enabled);
+        let custom_model_routers = FeatureFlag::CustomModelRouters.is_enabled().then(|| {
+            LLMPreferences::as_ref(app).custom_model_routers_for_request(
+                &request_input.model_id,
+                &request_input.coding_model_id,
+            )
+        });
+        let allow_use_of_warp_credits = *AISettings::as_ref(app).can_use_warp_credits_for_fallback;
 
         let app_execution_mode = AppExecutionMode::as_ref(app);
         let autonomy_level = if app_execution_mode.is_autonomous() {
@@ -389,20 +442,12 @@ impl RequestParams {
         // current `LLMContextWindow` instead of trusting whatever was stored
         // last. If the active model isn't configurable or has been removed
         // server-side, drop the override; otherwise clamp it to the model's
-        // current `[min, max]` range.
-        let context_window_limit = {
-            let profile_data = AIExecutionProfilesModel::as_ref(app)
-                .active_profile(terminal_view_id, app)
-                .data()
-                .clone();
-            profile_data
-                .configurable_context_window(app)
-                .and_then(|cw| {
-                    profile_data
-                        .context_window_limit
-                        .map(|v| v.clamp(cw.min, cw.max))
-                })
-        };
+        // current `[min, max]` range. This closes the window between an
+        // in-flight model metadata refresh and the next request.
+        let context_window_limit = AIExecutionProfilesModel::as_ref(app)
+            .active_profile(terminal_view_id, app)
+            .data()
+            .context_window_limit_for_request(app);
 
         Self {
             input: request_input.all_inputs().cloned().collect(),
@@ -427,7 +472,9 @@ impl RequestParams {
             planning_enabled: true,
             should_redact_secrets,
             api_keys,
-            allow_use_of_warp_credits_with_byok,
+            custom_model_providers,
+            custom_model_routers,
+            allow_use_of_warp_credits,
             autonomy_level,
             isolation_level,
             web_search_enabled,

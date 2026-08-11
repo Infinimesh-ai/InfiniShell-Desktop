@@ -1,31 +1,31 @@
-use crate::auth::AuthStateProvider;
-use crate::cloud_object::model::persistence::ObjectStoreModel;
-use crate::code::editor::view::CodeEditorRenderOptions;
-use crate::notebooks::editor::keys::NotebookKeybindings;
-use crate::workspace::ActiveSession;
-use crate::{
-    code::editor::view::{CodeEditorView, CodeEditorViewAction},
-    settings::AppEditorSettings,
-    settings_view::keybindings::KeybindingChangedNotifier,
-    test_util::settings::initialize_settings_for_tests,
-    vim_registers::VimRegisters,
-    workspace::sync_inputs::SyncedInputState,
-    workspaces::user_workspaces::UserWorkspaces,
-};
+use pathfinder_geometry::vector::Vector2F;
 use unindent::Unindent;
 use vim::vim::{MotionType, VimMode};
-use warp_core::{features::FeatureFlag, settings::Setting, ui::appearance::Appearance};
+use warp_core::features::FeatureFlag;
+use warp_core::settings::Setting;
+use warp_core::ui::appearance::Appearance;
+use warp_editor::content::buffer::{InitialBufferState, ToBufferCharOffset, ToBufferPoint};
 use warp_editor::model::CoreEditorModel;
-use warp_editor::{
-    content::buffer::{InitialBufferState, ToBufferCharOffset, ToBufferPoint},
-    render::element::VerticalExpansionBehavior,
-};
+use warp_editor::render::element::VerticalExpansionBehavior;
+use warp_editor::render::model::viewport::SizeInfo;
 use warp_util::user_input::UserInput;
+use warpui::keymap::Keystroke;
+use warpui::platform::WindowStyle;
 use warpui::text::point::Point;
-use warpui::{
-    keymap::Keystroke, platform::WindowStyle, App, SingletonEntity, TypedActionView, UpdateModel,
-    ViewHandle,
-};
+use warpui::units::IntoPixels;
+use warpui::{App, SingletonEntity, TypedActionView, UpdateModel, ViewHandle};
+
+use crate::auth::AuthStateProvider;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::code::editor::view::{CodeEditorRenderOptions, CodeEditorView, CodeEditorViewAction};
+use crate::notebooks::editor::keys::NotebookKeybindings;
+use crate::settings::AppEditorSettings;
+use crate::settings_view::keybindings::KeybindingChangedNotifier;
+use crate::test_util::settings::initialize_settings_for_tests;
+use crate::vim_registers::VimRegisters;
+use crate::workspace::ActiveSession;
+use crate::workspace::sync_inputs::SyncedInputState;
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 // Await render/layout completion for a CodeEditorView in tests.
 async fn layout_editor_view(app: &mut App, editor: &ViewHandle<CodeEditorView>) {
@@ -130,6 +130,37 @@ fn set_cursor_position(editor: &ViewHandle<CodeEditorView>, row: usize, col: usi
                 .update(ctx, |sel, ctx| sel.set_cursor(offset, ctx));
         });
     });
+}
+
+/// Set the viewport to exactly `lines` rows tall. Returns the line height in pixels.
+fn set_viewport_lines(editor: &ViewHandle<CodeEditorView>, lines: usize, app: &mut App) -> f32 {
+    let (line_height, render_state) = editor.read(app, |view, ctx| {
+        let model = view.model.as_ref(ctx);
+        (model.line_height(ctx), model.render_state().clone())
+    });
+    render_state.update(app, |render_state, ctx| {
+        render_state.set_viewport_size(
+            SizeInfo {
+                viewport_size: Vector2F::new(800.0, line_height * lines as f32),
+                needs_layout: false,
+            },
+            ctx,
+        );
+    });
+    line_height
+}
+
+/// Read the current vertical scroll position.
+fn scroll_top(editor: &ViewHandle<CodeEditorView>, app: &App) -> f32 {
+    editor.read(app, |view, ctx| {
+        view.model
+            .as_ref(ctx)
+            .render_state()
+            .as_ref(ctx)
+            .viewport()
+            .scroll_top()
+            .as_f32()
+    })
 }
 
 #[test]
@@ -618,6 +649,115 @@ fn test_vim_number_repeat_yank_paste_linewise() {
     });
 }
 
+#[test]
+fn test_vim_uppercase_r_extends_at_eol_and_dot_replays_the_session() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+
+        let editor = add_code_editor("abc\nabcdef", &mut app);
+        set_cursor_position(&editor, 1, 2, &mut app);
+        vim_user_insert(&editor, "Rxy", &mut app);
+        editor.update(&mut app, |view, ctx| {
+            view.vim_keystroke(&Keystroke::parse("escape").unwrap(), ctx);
+        });
+
+        assert_eq!(buffer_text(&editor, &app), "abxy\nabcdef");
+        assert_eq!(cursor_position(&editor, &app), (1, 3));
+
+        set_cursor_position(&editor, 2, 0, &mut app);
+        vim_user_insert(&editor, ".", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "abxy\nxycdef");
+        assert_eq!(cursor_position(&editor, &app), (2, 1));
+
+        let counted_editor = add_code_editor("abcdefgh", &mut app);
+        set_cursor_position(&counted_editor, 1, 0, &mut app);
+        vim_user_insert(&counted_editor, "2Rxy", &mut app);
+        counted_editor.update(&mut app, |view, ctx| {
+            view.vim_keystroke(&Keystroke::parse("escape").unwrap(), ctx);
+        });
+        assert_eq!(buffer_text(&counted_editor, &app), "xyxyefgh");
+        assert_eq!(cursor_position(&counted_editor, &app), (1, 3));
+    });
+}
+
+#[test]
+fn test_vim_linewise_operations_at_eof() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+
+        let last_line_delete = add_code_editor("one\ntwo", &mut app);
+        set_cursor_position(&last_line_delete, 2, 0, &mut app);
+        vim_user_insert(&last_line_delete, "dd", &mut app);
+        assert_eq!(buffer_text(&last_line_delete, &app), "one");
+
+        let delete_to_eof = add_code_editor("one\ntwo\nthree", &mut app);
+        set_cursor_position(&delete_to_eof, 2, 0, &mut app);
+        vim_user_insert(&delete_to_eof, "dG", &mut app);
+        assert_eq!(buffer_text(&delete_to_eof, &app), "one");
+
+        let yank_to_eof = add_code_editor("one\ntwo\nthree", &mut app);
+        set_cursor_position(&yank_to_eof, 2, 0, &mut app);
+        vim_user_insert(&yank_to_eof, "yGggP", &mut app);
+        assert_eq!(
+            buffer_text(&yank_to_eof, &app),
+            "two\nthree\none\ntwo\nthree"
+        );
+        let blank_final_line_delete = add_code_editor("", &mut app);
+        blank_final_line_delete.update(&mut app, |view, ctx| {
+            view.reset(InitialBufferState::plain_text("one\n"), ctx);
+            view.handle_action(&CodeEditorViewAction::CursorAtBufferStart, ctx);
+        });
+        vim_user_insert(&blank_final_line_delete, "G", &mut app);
+        vim_user_insert(&blank_final_line_delete, "dd", &mut app);
+        assert_eq!(buffer_text(&blank_final_line_delete, &app), "one");
+        let blank_final_line = add_code_editor("", &mut app);
+        blank_final_line.update(&mut app, |view, ctx| {
+            view.reset(InitialBufferState::plain_text("one\n"), ctx);
+            view.handle_action(&CodeEditorViewAction::CursorAtBufferStart, ctx);
+        });
+        vim_user_insert(&blank_final_line, "Gyy", &mut app);
+        let blank_line_register = app
+            .update(|ctx| {
+                VimRegisters::handle(ctx)
+                    .update(ctx, |registers, ctx| registers.read_from_register('"', ctx))
+            })
+            .expect("blank line yank should populate the unnamed register");
+        assert_eq!(blank_line_register.text, "\n");
+        assert_eq!(blank_line_register.motion_type, MotionType::Linewise);
+        vim_user_insert(&blank_final_line, "P", &mut app);
+        assert_eq!(buffer_text(&blank_final_line, &app), "one\n\n");
+
+        let one_line_delete = add_code_editor("one", &mut app);
+        vim_user_insert(&one_line_delete, "dd", &mut app);
+        assert_eq!(buffer_text(&one_line_delete, &app), "");
+        let default_line_ending = if cfg!(windows) { "\r\n" } else { "\n" };
+
+        let one_line_yank = add_code_editor("one", &mut app);
+        vim_user_insert(&one_line_yank, "yyP", &mut app);
+        assert_eq!(
+            buffer_text(&one_line_yank, &app),
+            format!("one{default_line_ending}one")
+        );
+
+        let empty_line_yank = add_code_editor("", &mut app);
+        assert_eq!(buffer_text(&empty_line_yank, &app), "");
+        vim_user_insert(&empty_line_yank, "yy", &mut app);
+        let empty_line_register = app
+            .update(|ctx| {
+                VimRegisters::handle(ctx)
+                    .update(ctx, |registers, ctx| registers.read_from_register('"', ctx))
+            })
+            .expect("empty line yank should populate the unnamed register");
+        assert_eq!(empty_line_register.text, "\n");
+        assert_eq!(empty_line_register.motion_type, MotionType::Linewise);
+        vim_user_insert(&empty_line_yank, "P", &mut app);
+        assert_eq!(buffer_text(&empty_line_yank, &app), default_line_ending);
+    });
+}
 #[test]
 fn test_vim_number_repeat_yank_paste_charwise() {
     let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
@@ -1423,5 +1563,552 @@ fn test_vim_visual_linewise_delete_first_line_does_not_panic() {
         vim_user_insert(&editor, "V", &mut app);
         vim_user_insert(&editor, "d", &mut app);
         assert_eq!(buffer_text(&editor, &app), "bbb\nccc");
+    });
+}
+
+#[test]
+fn test_vim_zz_in_normal_mode_preserves_cursor_and_mode() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor(
+            "line 1
+            line 2
+            line 3
+            line 4
+            line 5",
+            &mut app,
+        );
+
+        layout_editor_view(&mut app, &editor).await;
+
+        // Place cursor on line 3, then center it. zz scrolls but should not move
+        // the cursor or change the mode.
+        set_cursor_position(&editor, 3, 0, &mut app);
+        assert_eq!(cursor_position(&editor, &app), (3, 0));
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+
+        vim_user_insert(&editor, "zz", &mut app);
+
+        assert_eq!(cursor_position(&editor, &app), (3, 0));
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_zz_in_visual_mode_preserves_cursor_and_mode() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor(
+            "line 1
+            line 2
+            line 3
+            line 4
+            line 5",
+            &mut app,
+        );
+
+        layout_editor_view(&mut app, &editor).await;
+
+        set_cursor_position(&editor, 3, 0, &mut app);
+        vim_user_insert(&editor, "v", &mut app);
+        assert_eq!(
+            vim_mode(&editor, &app),
+            Some(VimMode::Visual(MotionType::Charwise))
+        );
+
+        vim_user_insert(&editor, "zz", &mut app);
+
+        assert_eq!(cursor_position(&editor, &app), (3, 0));
+        assert_eq!(
+            vim_mode(&editor, &app),
+            Some(VimMode::Visual(MotionType::Charwise))
+        );
+    });
+}
+
+#[test]
+fn test_vim_z_followed_by_non_z_clears_pending() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor(
+            "line 1
+            line 2
+            line 3",
+            &mut app,
+        );
+
+        layout_editor_view(&mut app, &editor).await;
+
+        // `z` followed by an unrecognized char should clear the pending action.
+        // After that, a subsequent `j` should move the cursor down one line as normal.
+        set_cursor_position(&editor, 1, 0, &mut app);
+        vim_user_insert(&editor, "z", &mut app);
+        vim_user_insert(&editor, "x", &mut app);
+        assert_eq!(cursor_position(&editor, &app), (1, 0));
+
+        vim_user_insert(&editor, "j", &mut app);
+        assert_eq!(cursor_position(&editor, &app), (2, 0));
+    });
+}
+
+#[test]
+fn test_vim_ctrl_d_scrolls_half_page_down() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let buffer: String = (1..=200).map(|i| format!("line {}\n", i)).collect();
+        let editor = add_code_editor(buffer.as_str(), &mut app);
+
+        layout_editor_view(&mut app, &editor).await;
+
+        // 20 visible lines → half page = 10 lines.
+        let line_height = set_viewport_lines(&editor, 20, &mut app);
+        let half_page = 10;
+
+        set_cursor_position(&editor, 1, 0, &mut app);
+        let (start_row, _) = cursor_position(&editor, &app);
+        let start_scroll = scroll_top(&editor, &app);
+
+        editor.update(&mut app, |view, ctx| {
+            view.vim_keystroke(&Keystroke::parse("ctrl-d").unwrap(), ctx);
+        });
+
+        let (after_row, _) = cursor_position(&editor, &app);
+        let after_scroll = scroll_top(&editor, &app);
+        assert_eq!(after_row, start_row + half_page);
+        assert!(
+            (after_scroll - start_scroll - half_page as f32 * line_height).abs() < 0.5,
+            "scroll_top should advance by half_page * line_height \
+             (start={start_scroll}, after={after_scroll}, line_height={line_height})",
+        );
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_ctrl_u_scrolls_half_page_up() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let buffer: String = (1..=200).map(|i| format!("line {}\n", i)).collect();
+        let editor = add_code_editor(buffer.as_str(), &mut app);
+
+        layout_editor_view(&mut app, &editor).await;
+
+        // 20 visible lines → half page = 10 lines.
+        let line_height = set_viewport_lines(&editor, 20, &mut app);
+        let half_page = 10;
+
+        // Start near the bottom and scroll down so we have room to scroll up.
+        set_cursor_position(&editor, 100, 0, &mut app);
+        let render_state = editor.read(&app, |view, ctx| {
+            view.model.as_ref(ctx).render_state().clone()
+        });
+        render_state.update(&mut app, |render_state, ctx| {
+            render_state.scroll(-(50.0 * line_height).into_pixels(), ctx);
+        });
+
+        let (start_row, _) = cursor_position(&editor, &app);
+        let start_scroll = scroll_top(&editor, &app);
+
+        editor.update(&mut app, |view, ctx| {
+            view.vim_keystroke(&Keystroke::parse("ctrl-u").unwrap(), ctx);
+        });
+
+        let (after_row, _) = cursor_position(&editor, &app);
+        let after_scroll = scroll_top(&editor, &app);
+        assert_eq!(after_row, start_row - half_page);
+        assert!(
+            (start_scroll - after_scroll - half_page as f32 * line_height).abs() < 0.5,
+            "scroll_top should retreat by half_page * line_height \
+             (start={start_scroll}, after={after_scroll}, line_height={line_height})",
+        );
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_ctrl_d_with_count_scrolls_n_lines() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let buffer: String = (1..=200).map(|i| format!("line {}\n", i)).collect();
+        let editor = add_code_editor(buffer.as_str(), &mut app);
+
+        layout_editor_view(&mut app, &editor).await;
+
+        // Viewport half page would be 10, but `5<C-d>` should scroll by 5 lines,
+        // not 5 * half_page.
+        set_viewport_lines(&editor, 20, &mut app);
+
+        set_cursor_position(&editor, 1, 0, &mut app);
+        let (start_row, _) = cursor_position(&editor, &app);
+
+        vim_user_insert(&editor, "5", &mut app);
+        editor.update(&mut app, |view, ctx| {
+            view.vim_keystroke(&Keystroke::parse("ctrl-d").unwrap(), ctx);
+        });
+
+        let (after_row, _) = cursor_position(&editor, &app);
+        assert_eq!(after_row, start_row + 5);
+    });
+}
+
+#[test]
+fn test_vim_ctrl_d_consumes_pending_count() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        // Use a buffer big enough that scrolling won't max the cursor at the bottom.
+        let buffer: String = (1..=200)
+            .map(|i| format!("line {}\n", i))
+            .collect::<String>();
+        let editor = add_code_editor(buffer.as_str(), &mut app);
+
+        layout_editor_view(&mut app, &editor).await;
+
+        // After `2<C-d>`, the pending count of 2 must be consumed by ctrl-d. A
+        // following `j` should move the cursor down exactly 1 line, not 2.
+        set_cursor_position(&editor, 1, 0, &mut app);
+        vim_user_insert(&editor, "2", &mut app);
+        editor.update(&mut app, |view, ctx| {
+            view.vim_keystroke(&Keystroke::parse("ctrl-d").unwrap(), ctx);
+        });
+        let (after_scroll_row, _) = cursor_position(&editor, &app);
+        vim_user_insert(&editor, "j", &mut app);
+        let (after_j_row, _) = cursor_position(&editor, &app);
+        assert_eq!(
+            after_j_row,
+            after_scroll_row + 1,
+            "j after `2<C-d>` should move down 1, not 2 (after_scroll_row={}, after_j_row={})",
+            after_scroll_row,
+            after_j_row
+        );
+    });
+}
+
+#[test]
+fn test_vim_ctrl_d_clears_pending_operator() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor(
+            "alpha bravo charlie
+            delta echo foxtrot
+            golf hotel india",
+            &mut app,
+        );
+
+        layout_editor_view(&mut app, &editor).await;
+
+        // After `d<C-d>`, the pending `d` operator must be cleared. A following
+        // `w` should move forward by word, not delete a word.
+        set_cursor_position(&editor, 1, 0, &mut app);
+        let original = buffer_text(&editor, &app);
+        vim_user_insert(&editor, "d", &mut app);
+        editor.update(&mut app, |view, ctx| {
+            view.vim_keystroke(&Keystroke::parse("ctrl-d").unwrap(), ctx);
+        });
+        vim_user_insert(&editor, "w", &mut app);
+        assert_eq!(
+            buffer_text(&editor, &app),
+            original,
+            "w after `d<C-d>` should not delete (pending d should be cleared)"
+        );
+    });
+}
+
+#[test]
+fn test_vim_d_percent_deletes_to_matching_bracket() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+
+        // Forward: cursor on the opening bracket deletes the whole bracket pair.
+        let editor = add_code_editor("foo(bar)baz", &mut app);
+        set_cursor_position(&editor, 1, 3, &mut app);
+        vim_user_insert(&editor, "d%", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "foobaz");
+        assert_eq!(cursor_position(&editor, &app), (1, 3));
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+
+        // Backward: cursor on the closing bracket deletes the same range.
+        let editor = add_code_editor("foo(bar)baz", &mut app);
+        set_cursor_position(&editor, 1, 7, &mut app);
+        vim_user_insert(&editor, "d%", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "foobaz");
+        assert_eq!(cursor_position(&editor, &app), (1, 3));
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_c_percent_changes_to_matching_bracket() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+
+        let editor = add_code_editor("foo(bar)baz", &mut app);
+        set_cursor_position(&editor, 1, 3, &mut app);
+        vim_user_insert(&editor, "c%", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "foobaz");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Insert));
+        assert_eq!(cursor_position(&editor, &app), (1, 3));
+
+        // Type replacement text and return to Normal mode.
+        vim_user_insert(&editor, "[]", &mut app);
+        editor.update(&mut app, |view, ctx| {
+            view.vim_keystroke(&Keystroke::parse("escape").unwrap(), ctx);
+        });
+        assert_eq!(buffer_text(&editor, &app), "foo[]baz");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_y_percent_yanks_to_matching_bracket() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+
+        let editor = add_code_editor("foo(bar)baz", &mut app);
+        set_cursor_position(&editor, 1, 3, &mut app);
+        // y% yanks the bracket pair without modifying the buffer.
+        vim_user_insert(&editor, "y%", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "foo(bar)baz");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+
+        // Paste the yanked text before the start of the line to prove the register captured `(bar)`.
+        vim_user_insert(&editor, "0P", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "(bar)foo(bar)baz");
+    });
+}
+
+#[test]
+fn test_vim_double_greater_indents_current_line() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("line 1\nline 2", &mut app);
+
+        set_cursor_position(&editor, 2, 0, &mut app);
+        vim_user_insert(&editor, ">>", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "line 1\n    line 2");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+        assert_eq!(cursor_position(&editor, &app), (2, 4));
+    });
+}
+
+#[test]
+fn test_vim_double_less_dedents_current_line() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("    line 1\nline 2", &mut app);
+
+        set_cursor_position(&editor, 1, 0, &mut app);
+        vim_user_insert(&editor, "<<", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "line 1\nline 2");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+        assert_eq!(cursor_position(&editor, &app), (1, 0));
+    });
+}
+
+#[test]
+fn test_vim_double_less_at_column_zero_is_noop() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("line 1\nline 2", &mut app);
+
+        set_cursor_position(&editor, 1, 0, &mut app);
+        vim_user_insert(&editor, "<<", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "line 1\nline 2");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_double_less_removes_only_one_indent_unit() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("        line 1\nline 2", &mut app);
+
+        set_cursor_position(&editor, 1, 0, &mut app);
+        vim_user_insert(&editor, "<<", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "    line 1\nline 2");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_double_greater_preserves_non_leading_text() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("  line 1\nline 2", &mut app);
+
+        set_cursor_position(&editor, 1, 0, &mut app);
+        vim_user_insert(&editor, ">>", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "    line 1\nline 2");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_greater_with_down_motion_indents_two_lines() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("line 1\nline 2\nline 3", &mut app);
+
+        set_cursor_position(&editor, 1, 0, &mut app);
+        vim_user_insert(&editor, ">j", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "    line 1\n    line 2\nline 3");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_counted_double_greater_indents_two_lines() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("line 1\nline 2\nline 3", &mut app);
+
+        set_cursor_position(&editor, 1, 0, &mut app);
+        vim_user_insert(&editor, "2>>", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "    line 1\n    line 2\nline 3");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_greater_to_last_line_indents_all_lines() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("line 1\nline 2\nline 3", &mut app);
+
+        set_cursor_position(&editor, 1, 0, &mut app);
+        vim_user_insert(&editor, ">G", &mut app);
+        assert_eq!(
+            buffer_text(&editor, &app),
+            "    line 1\n    line 2\n    line 3"
+        );
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_visual_linewise_greater_indents_selection() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("line 1\nline 2\nline 3", &mut app);
+
+        set_cursor_position(&editor, 2, 0, &mut app);
+        vim_user_insert(&editor, "V", &mut app);
+        assert_eq!(
+            vim_mode(&editor, &app),
+            Some(VimMode::Visual(MotionType::Linewise))
+        );
+        vim_user_insert(&editor, ">", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "line 1\n    line 2\nline 3");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_visual_linewise_less_dedents_selection() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("line 1\n    line 2\nline 3", &mut app);
+
+        set_cursor_position(&editor, 2, 0, &mut app);
+        vim_user_insert(&editor, "V", &mut app);
+        vim_user_insert(&editor, "<", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "line 1\nline 2\nline 3");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_visual_greater_across_multiple_lines() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("line 1\nline 2\nline 3", &mut app);
+
+        set_cursor_position(&editor, 1, 0, &mut app);
+        vim_user_insert(&editor, "V", &mut app);
+        vim_user_insert(&editor, "j", &mut app);
+        vim_user_insert(&editor, ">", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "    line 1\n    line 2\nline 3");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_indent_then_undo_restores_buffer() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("line 1\nline 2", &mut app);
+
+        set_cursor_position(&editor, 2, 0, &mut app);
+        vim_user_insert(&editor, ">>", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "line 1\n    line 2");
+
+        vim_user_insert(&editor, "u", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "line 1\nline 2");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
+    });
+}
+
+#[test]
+fn test_vim_indent_dot_repeat_repeats_last_indent() {
+    let _feature_flag_guard = FeatureFlag::VimCodeEditor.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_code_editor_app(&mut app);
+        let editor = add_code_editor("line 1\nline 2\nline 3", &mut app);
+
+        set_cursor_position(&editor, 1, 0, &mut app);
+        vim_user_insert(&editor, ">>", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "    line 1\nline 2\nline 3");
+
+        set_cursor_position(&editor, 3, 0, &mut app);
+        vim_user_insert(&editor, ".", &mut app);
+        assert_eq!(buffer_text(&editor, &app), "    line 1\nline 2\n    line 3");
+        assert_eq!(vim_mode(&editor, &app), Some(VimMode::Normal));
     });
 }

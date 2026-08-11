@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use warp_core::ui::appearance::Appearance;
 use warpui::platform::WindowStyle;
-use warpui::{App, WindowInvalidation};
+use warpui::{App, EntityIdSet, WindowInvalidation};
 
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::view_components::dropdown::DropdownAction;
@@ -290,6 +290,10 @@ fn selecting_onekey_dropdown_item_does_not_rebuild_dropdown_while_it_is_borrowed
         initialize_settings_for_tests(&mut app);
         app.add_singleton_model(|_| Appearance::mock());
         app.add_singleton_model(|_| SshTreeChangedNotifier::new());
+        // 下拉/输入框构造期会订阅键位变更通知。
+        app.add_singleton_model(|_| {
+            crate::settings_view::keybindings::KeybindingChangedNotifier::new()
+        });
 
         let (window_id, view) = app.add_window(WindowStyle::NotStealFocus, |ctx| {
             let mut view = SshServerView::new("server-1".to_string(), ctx);
@@ -314,7 +318,9 @@ fn selecting_onekey_dropdown_item_does_not_rebuild_dropdown_while_it_is_borrowed
             view
         });
         let presenter = app.presenter(window_id).unwrap();
-        let mut updated = std::collections::HashSet::new();
+        // `WindowInvalidation::updated` 是 `EntityIdSet`(FxHashSet),
+        // 用默认 hasher 的 `HashSet::new()` 类型对不上。
+        let mut updated = EntityIdSet::default();
         updated.insert(app.root_view_id(window_id).unwrap());
         app.update(|ctx| {
             let mut presenter = presenter.borrow_mut();
@@ -331,9 +337,9 @@ fn selecting_onekey_dropdown_item_does_not_rebuild_dropdown_while_it_is_borrowed
         let dropdown = view.read(&app, |view, _| view.onekey_credential_dropdown.clone());
         dropdown.update(&mut app, |dropdown, ctx| {
             dropdown.handle_action(
-                &DropdownAction::SelectActionAndClose(SshServerAction::SelectOneKeyCredential(
-                    Some(0),
-                )),
+                &DropdownAction::select_action_and_close(
+                    SshServerAction::SelectOneKeyCredential(Some(0)),
+                ),
                 ctx,
             );
         });

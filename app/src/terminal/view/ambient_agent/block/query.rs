@@ -83,6 +83,8 @@ fn render_user_query(
             &[],
             &[],
             None,
+            // is_agent_transcript_navigation_target:该 query 不是 Cmd-Up/Down 导航目标
+            false,
             app,
         )
         .with_content_item_spacing()

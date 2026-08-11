@@ -1,20 +1,29 @@
-use warpui::{App, SingletonEntity};
+use settings::Setting as _;
+use warp_core::features::FeatureFlag;
+use warp_util::path::EscapeChar;
+use warpui::{App, EntityId, SingletonEntity};
 
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::blocklist::{BlocklistAIHistoryModel, BlocklistAIPermissions};
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::execution_profiles::{
     AIExecutionProfile, AIExecutionProfileObject, AIExecutionProfileObjectModel, ActionPermission,
+    ExecutionProfileId, create_default_for_tui_from_legacy_settings,
+    create_default_from_legacy_settings,
 };
 use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::auth::AuthStateProvider;
+use crate::cloud_object::model::actions::ObjectActions;
 use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
 use crate::cloud_object::update_manager::UpdateManager;
 use crate::cloud_object::{StoredObjectMetadata, StoredObjectPermissions};
 use crate::network::NetworkStatus;
 use crate::server::ids::{ServerId, SyncId};
-use crate::settings::PrivacySettings;
+use crate::settings::{AISettings, AgentModeCommandExecutionPredicate, PrivacySettings};
 use crate::test_util::settings::initialize_settings_for_tests;
+use crate::workspaces::user_profiles::UserProfiles;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::LaunchMode;
+use crate::{LaunchMode, TuiEntryPoint};
 
 /// Install the minimal singleton graph needed to construct an
 /// `AIExecutionProfilesModel` and exercise its ObjectStoreModel interactions.
@@ -24,9 +33,167 @@ fn install_singletons(app: &mut App, auth_state: AuthStateProvider) {
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(UpdateManager::mock);
     app.add_singleton_model(ObjectStoreModel::mock);
+    app.add_singleton_model(|_| ObjectActions::new(Vec::new()));
     app.add_singleton_model(|_| TemplatableMCPServerManager::default());
     app.add_singleton_model(PrivacySettings::mock);
+    app.add_singleton_model(|_| UserProfiles::new(Vec::new()));
     app.add_singleton_model(UserWorkspaces::default_mock);
+}
+
+#[test]
+fn tui_missing_collection_seeds_agent_decides_for_execute_commands() {
+    App::test((), |mut app| async move {
+        install_singletons(&mut app, AuthStateProvider::new_for_test());
+
+        let expected_legacy_seed = app.read(create_default_from_legacy_settings);
+        let expected_tui_seed = app.read(create_default_for_tui_from_legacy_settings);
+        let profile_model = app.add_singleton_model(|ctx| {
+            AIExecutionProfilesModel::new(
+                &LaunchMode::Tui {
+                    entrypoint: TuiEntryPoint::Interactive {
+                        mount: Box::new(|_| {}),
+                        api_key: None,
+                    },
+                },
+                ctx,
+            )
+        });
+
+        profile_model.read(&app, |model, ctx| {
+            let profile_info = model.default_profile(ctx);
+            let profile = profile_info.data();
+            assert_eq!(profile, &expected_tui_seed);
+            assert_eq!(
+                profile.execute_commands,
+                ActionPermission::AgentDecides,
+                "a fresh TUI profile should let the agent decide whether to execute commands"
+            );
+            assert_eq!(
+                expected_tui_seed,
+                AIExecutionProfile {
+                    execute_commands: ActionPermission::AgentDecides,
+                    ..expected_legacy_seed
+                },
+                "the TUI default should change no other legacy-seeded fields"
+            );
+        });
+    })
+}
+
+#[test]
+fn tui_default_denylist_overrides_agent_decides_command_execution() {
+    App::test((), |mut app| async move {
+        install_singletons(&mut app, AuthStateProvider::new_for_test());
+        let profile_model = app.add_singleton_model(|ctx| {
+            AIExecutionProfilesModel::new(
+                &LaunchMode::Tui {
+                    entrypoint: TuiEntryPoint::Interactive {
+                        mount: Box::new(|_| {}),
+                        api_key: None,
+                    },
+                },
+                ctx,
+            )
+        });
+        app.add_singleton_model(|_| BlocklistAIHistoryModel::default());
+        let permissions = app.add_singleton_model(BlocklistAIPermissions::new);
+        let terminal_view_id = EntityId::new();
+        let conversation_id = AIConversationId::new();
+
+        profile_model.update(&mut app, |model, ctx| {
+            let profile_id = model.default_profile_id();
+            model.add_to_command_denylist(
+                &profile_id,
+                &AgentModeCommandExecutionPredicate::new_regex("rm .*").unwrap(),
+                ctx,
+            );
+        });
+
+        profile_model.read(&app, |model, ctx| {
+            assert_eq!(
+                model.default_profile(ctx).data().execute_commands,
+                ActionPermission::AgentDecides
+            );
+        });
+
+        permissions.read(&app, |model, ctx| {
+            let result = model.can_autoexecute_command(
+                &conversation_id,
+                "rm important.txt",
+                EscapeChar::Backslash,
+                false,
+                Some(false),
+                Some(terminal_view_id),
+                ctx,
+            );
+            assert!(!result.is_allowed());
+            assert!(
+                format!("{result:?}").contains("ExplicitlyDenylisted"),
+                "TUI denylist should take precedence over AgentDecides: {result:?}"
+            );
+        });
+    })
+}
+
+#[test]
+fn tui_explicit_collection_preserves_execute_commands() {
+    App::test((), |mut app| async move {
+        install_singletons(&mut app, AuthStateProvider::new_for_test());
+        let explicit_profile = AIExecutionProfile {
+            name: "Explicit TUI profile".to_string(),
+            is_default_profile: true,
+            execute_commands: ActionPermission::AlwaysAsk,
+            ..Default::default()
+        };
+        app.update(|ctx| {
+            let mut profiles = crate::ai::execution_profiles::ExecutionProfilesConfig::default();
+            profiles.insert(ExecutionProfileId::default_profile(), explicit_profile);
+            AISettings::handle(ctx)
+                .update(ctx, |settings, ctx| {
+                    settings.execution_profiles.set_value(profiles, ctx)
+                })
+                .unwrap();
+        });
+
+        let profile_model = app.add_singleton_model(|ctx| {
+            AIExecutionProfilesModel::new(
+                &LaunchMode::Tui {
+                    entrypoint: TuiEntryPoint::Interactive {
+                        mount: Box::new(|_| {}),
+                        api_key: None,
+                    },
+                },
+                ctx,
+            )
+        });
+
+        profile_model.read(&app, |model, ctx| {
+            assert_eq!(
+                model.default_profile(ctx).data().execute_commands,
+                ActionPermission::AlwaysAsk
+            );
+        });
+    })
+}
+
+#[test]
+fn gui_default_execute_commands_remains_always_ask() {
+    let _guard = FeatureFlag::FileBackedExecutionProfiles.override_enabled(false);
+
+    App::test((), |mut app| async move {
+        install_singletons(&mut app, AuthStateProvider::new_for_test());
+        let profile_model = app.add_singleton_model(|ctx| {
+            AIExecutionProfilesModel::new(&LaunchMode::new_for_unit_test(), ctx)
+        });
+
+        profile_model.read(&app, |model, ctx| {
+            assert_eq!(
+                model.default_profile(ctx).data().execute_commands,
+                ActionPermission::AlwaysAsk,
+                "the GUI/legacy default must remain conservative"
+            );
+        });
+    })
 }
 
 /// Regression test for the onboarding autonomy bug where
@@ -64,7 +231,7 @@ fn edits_persist_on_unsynced_default_profile_when_logged_out() {
         // `set_apply_code_diffs` value was cloned, mutated, then dropped
         // without being written back to `default_profile_state`.
         profile_model.update(&mut app, |model, ctx| {
-            model.set_apply_code_diffs(default_profile_id, &ActionPermission::AlwaysAllow, ctx);
+            model.set_apply_code_diffs(&default_profile_id, &ActionPermission::AlwaysAllow, ctx);
         });
 
         profile_model.read(&app, |model, ctx| {
@@ -153,7 +320,7 @@ fn reconciles_unsynced_default_profile_with_cloud_after_initial_load() {
         // creating a duplicate.
         let default_profile_id = profile_model.read(&app, |model, _ctx| model.default_profile_id());
         profile_model.update(&mut app, |model, ctx| {
-            model.set_apply_code_diffs(default_profile_id, &ActionPermission::AlwaysAsk, ctx);
+            model.set_apply_code_diffs(&default_profile_id, &ActionPermission::AlwaysAsk, ctx);
         });
         profile_model.read(&app, |model, ctx| {
             let info = model.default_profile(ctx);

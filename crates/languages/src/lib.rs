@@ -1,15 +1,14 @@
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 use arborium::tree_sitter::{Language as ParserGrammar, Query};
 use lazy_static::lazy_static;
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use warp_editor::content::text::IndentUnit;
+use warp_util::standardized_path::StandardizedPath;
 
 #[derive(RustEmbed)]
 #[folder = "grammars"]
@@ -19,7 +18,7 @@ lazy_static! {
     static ref LANGUAGE_REGISTRY: LanguageRegistry = LanguageRegistry::new();
 }
 
-pub const SUPPORTED_LANGUAGES: [&str; 47] = [
+pub const SUPPORTED_LANGUAGES: [&str; 49] = [
     "rust",
     "golang",
     "yaml",
@@ -36,6 +35,7 @@ pub const SUPPORTED_LANGUAGES: [&str; 47] = [
     "css",
     "c",
     "json",
+    "jq",
     "hcl",
     "lua",
     "ruby",
@@ -67,6 +67,7 @@ pub const SUPPORTED_LANGUAGES: [&str; 47] = [
     "clojure",
     "elm",
     "cmake",
+    "markdown",
 ];
 
 /// Registry that holds all of the supported languages.
@@ -100,8 +101,21 @@ impl LanguageRegistry {
     }
 }
 
-/// Normalizes common markdown language aliases to their internal names.
-/// For example, "go" -> "golang", "bash" -> "shell", etc.
+/// Find the corresponding language entry by a standardized filename.
+pub fn language_by_filename(path: &StandardizedPath) -> Option<Arc<Language>> {
+    language_by_filename_parts(path.file_name(), path.extension())
+}
+
+/// Find the corresponding language entry by a local filesystem filename.
+pub fn language_by_local_filename(path: &Path) -> Option<Arc<Language>> {
+    language_by_filename_parts(
+        path.file_name().and_then(|file_name| file_name.to_str()),
+        path.extension().and_then(|extension| extension.to_str()),
+    )
+}
+
+/// Normalizes common language-name aliases to their canonical internal names.
+/// For example, "go" -> "golang", "bash" -> "shell", "md" -> "markdown".
 fn normalize_language_name(name: &str) -> &str {
     match name {
         "go" => "golang",
@@ -125,6 +139,7 @@ fn normalize_language_name(name: &str) -> &str {
         "gql" => "graphql",
         "protobuf" => "proto",
         "clj" | "cljs" | "cljc" => "clojure",
+        "md" => "markdown",
         other => other,
     }
 }
@@ -134,10 +149,12 @@ pub fn language_by_name(name: &str) -> Option<Arc<Language>> {
     LANGUAGE_REGISTRY.language_by_name(normalized)
 }
 
-/// Find the corresponding language entry by the filename.
-pub fn language_by_filename(path: &Path) -> Option<Arc<Language>> {
+fn language_by_filename_parts(
+    filename: Option<&str>,
+    extension: Option<&str>,
+) -> Option<Arc<Language>> {
     // First check for specific filenames that don't use extensions.
-    if let Some(filename) = path.file_name().and_then(|name| name.to_str()) {
+    if let Some(filename) = filename {
         match filename {
             // Bash config files
             ".bashrc" | ".bash_profile" => {
@@ -168,7 +185,7 @@ pub fn language_by_filename(path: &Path) -> Option<Arc<Language>> {
         }
     }
 
-    let extension = path.extension()?.to_str()?;
+    let extension = extension?;
     match extension {
         "rs" => language_by_name("rust"),
         "go" => language_by_name("golang"),
@@ -187,8 +204,10 @@ pub fn language_by_filename(path: &Path) -> Option<Arc<Language>> {
         "css" => language_by_name("css"),
         "c" => language_by_name("c"),
         "json" => language_by_name("json"),
+        "jq" => language_by_name("jq"),
         "tf" | "hcl" | "tfvars" => language_by_name("hcl"),
         "lua" => language_by_name("lua"),
+        "nix" => language_by_name("nix"),
         "rb" => language_by_name("ruby"),
         "php" | "phtml" => language_by_name("php"),
         "toml" => language_by_name("toml"),
@@ -210,13 +229,13 @@ pub fn language_by_filename(path: &Path) -> Option<Arc<Language>> {
         "jl" => language_by_name("julia"),
         "ml" | "mli" => language_by_name("ocaml"),
         "erl" | "hrl" => language_by_name("erlang"),
-        "nix" => language_by_name("nix"),
         "sol" => language_by_name("solidity"),
         "graphql" | "gql" => language_by_name("graphql"),
         "proto" => language_by_name("proto"),
         "clj" | "cljs" | "cljc" | "edn" => language_by_name("clojure"),
         "elm" => language_by_name("elm"),
         "cmake" => language_by_name("cmake"),
+        "md" | "markdown" => language_by_name("markdown"),
         _ => None,
     }
 }
@@ -298,8 +317,10 @@ fn get_arborium_highlight_query(lang: &str) -> Option<&str> {
         "css" => Some(arborium::lang_css::HIGHLIGHTS_QUERY),
         "c" => Some(arborium::lang_c::HIGHLIGHTS_QUERY),
         "json" => Some(arborium::lang_json::HIGHLIGHTS_QUERY),
+        "jq" => Some(arborium::lang_jq::HIGHLIGHTS_QUERY),
         "hcl" => Some(arborium::lang_hcl::HIGHLIGHTS_QUERY),
         "lua" => Some(arborium::lang_lua::HIGHLIGHTS_QUERY),
+        "nix" => Some(arborium::lang_nix::HIGHLIGHTS_QUERY),
         "ruby" => Some(arborium::lang_ruby::HIGHLIGHTS_QUERY),
         "php" => Some(arborium::lang_php::HIGHLIGHTS_QUERY),
         "toml" => Some(arborium::lang_toml::HIGHLIGHTS_QUERY),
@@ -321,7 +342,6 @@ fn get_arborium_highlight_query(lang: &str) -> Option<&str> {
         "julia" => Some(arborium::lang_julia::HIGHLIGHTS_QUERY),
         "ocaml" => Some(arborium::lang_ocaml::HIGHLIGHTS_QUERY),
         "erlang" => Some(arborium::lang_erlang::HIGHLIGHTS_QUERY),
-        "nix" => Some(arborium::lang_nix::HIGHLIGHTS_QUERY),
         "groovy" => Some(arborium::lang_groovy::HIGHLIGHTS_QUERY),
         "solidity" => Some(arborium::lang_solidity::HIGHLIGHTS_QUERY),
         "graphql" => Some(arborium::lang_graphql::HIGHLIGHTS_QUERY),
@@ -329,6 +349,7 @@ fn get_arborium_highlight_query(lang: &str) -> Option<&str> {
         "clojure" => Some(arborium::lang_clojure::HIGHLIGHTS_QUERY),
         "elm" => Some(arborium::lang_elm::HIGHLIGHTS_QUERY),
         "cmake" => Some(arborium::lang_cmake::HIGHLIGHTS_QUERY),
+        "markdown" => Some(arborium::lang_markdown::HIGHLIGHTS_QUERY),
         _ => None,
     }
 }
@@ -361,7 +382,6 @@ fn load_language(lang: &str) -> Option<Language> {
         })
         .collect();
 
-    // Use arborium's bundled highlight query instead of loading from custom .scm files
     let highlight_query_str = get_arborium_highlight_query(lang)?;
     let highlight_query = Query::new(&grammar, highlight_query_str)
         .expect("arborium highlight query should be valid");

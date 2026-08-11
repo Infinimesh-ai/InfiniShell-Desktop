@@ -1,22 +1,21 @@
-use itertools::Itertools;
 use std::collections::HashMap;
-use warpui::AppContext;
 
+use itertools::Itertools;
+use warpui::{AppContext, SingletonEntity};
+
+use super::{WorkflowIdentity, WorkflowSearchItem};
 use crate::completer::SessionContext;
+use crate::search::command_search::searcher::CommandSearchItemAction;
 use crate::search::command_search::settings::CommandSearchSettings;
+use crate::search::data_source::{Query, QueryResult};
+use crate::search::mixer::{DataSourceRunErrorWrapper, SyncDataSource};
+use crate::search::workflows::fuzzy_match::FuzzyMatchWorkflowResult;
 use crate::user_config::WarpConfig;
 use crate::workflows::local_workflows::LocalWorkflows;
 #[cfg(feature = "local_fs")]
 use crate::workflows::local_workflows::UseCache;
 use crate::workflows::workflow::Workflow;
 use crate::workflows::{WorkflowSource, WorkflowType};
-use warpui::SingletonEntity;
-
-use super::{WorkflowIdentity, WorkflowSearchItem};
-use crate::search::command_search::searcher::CommandSearchItemAction;
-use crate::search::data_source::{Query, QueryResult};
-use crate::search::mixer::{DataSourceRunErrorWrapper, SyncDataSource};
-use crate::search::workflows::fuzzy_match::FuzzyMatchWorkflowResult;
 
 pub struct WorkflowsDataSource {
     /// Contains workflows keyed by WorkflowSource.
@@ -39,26 +38,26 @@ impl WorkflowsDataSource {
         workflows_by_source.insert(WorkflowSource::Local, user_workflows);
 
         #[cfg(feature = "local_fs")]
-        if let Some(session_context) = session_context {
-            if session_context.session.is_local() {
-                let project_workflows =
-                    LocalWorkflows::handle(app).update(app, move |local_workflows, _| {
-                        if let Ok(working_directory) = std::path::PathBuf::try_from(
-                            session_context.current_working_directory.clone(),
-                        ) {
-                            local_workflows
-                                .project_workflows(&working_directory, UseCache::No)
-                                .cloned()
-                                .collect_vec()
-                        } else {
-                            log::warn!(
-                                "Unable to convert session working directory into OS-native path"
-                            );
-                            Vec::new()
-                        }
-                    });
-                workflows_by_source.insert(WorkflowSource::Project, project_workflows);
-            }
+        if let Some(session_context) = session_context
+            && session_context.session.is_local()
+        {
+            let project_workflows =
+                LocalWorkflows::handle(app).update(app, move |local_workflows, _| {
+                    if let Ok(working_directory) = std::path::PathBuf::try_from(
+                        session_context.current_working_directory.clone(),
+                    ) {
+                        local_workflows
+                            .project_workflows(&working_directory, UseCache::No)
+                            .cloned()
+                            .collect_vec()
+                    } else {
+                        log::warn!(
+                            "Unable to convert session working directory into OS-native path"
+                        );
+                        Vec::new()
+                    }
+                });
+            workflows_by_source.insert(WorkflowSource::Project, project_workflows);
         }
 
         workflows_by_source.insert(

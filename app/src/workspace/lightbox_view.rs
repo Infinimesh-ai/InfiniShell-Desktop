@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+pub use lightbox::LightboxImage;
 use pathfinder_geometry::vector::Vector2F;
-use ui_components::{lightbox, Component as _};
+use ui_components::{Component as _, lightbox};
 use warpui::assets::asset_cache::{AssetCache, AssetSource, AssetState};
 use warpui::image_cache::ImageType;
 use warpui::keymap::{FixedBinding, Keystroke};
@@ -9,8 +10,6 @@ use warpui::prelude::*;
 use warpui::{AppContext, BlurContext, Element, Entity, SingletonEntity, View, ViewContext};
 
 use crate::appearance::Appearance;
-
-pub use lightbox::LightboxImage;
 
 pub fn init(app: &mut AppContext) {
     use warpui::keymap::macros::*;
@@ -119,12 +118,11 @@ impl LightboxView {
         let asset_cache = AssetCache::as_ref(ctx);
         if let AssetState::Loading { handle } =
             asset_cache.load_asset::<ImageType>(asset_source.clone())
+            && let Some(future) = handle.when_loaded(asset_cache)
         {
-            if let Some(future) = handle.when_loaded(asset_cache) {
-                ctx.spawn(future, |_me, (), ctx| {
-                    ctx.notify();
-                });
-            }
+            ctx.spawn(future, |_me, (), ctx| {
+                ctx.notify();
+            });
         }
     }
 }

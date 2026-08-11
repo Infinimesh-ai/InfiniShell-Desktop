@@ -32,15 +32,23 @@ impl TerminalView {
         restored_blocks: Option<&[SerializedBlockListItem]>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
+        Self::new_for_test_with_cloud_mode(tips_model, restored_blocks, false, ctx)
+    }
+
+    #[cfg(test)]
+    pub fn new_for_test_with_cloud_mode(
+        tips_model: ModelHandle<TipsCompleted>,
+        restored_blocks: Option<&[SerializedBlockListItem]>,
+        is_cloud_mode: bool,
+        ctx: &mut ViewContext<Self>,
+    ) -> Self {
         use pathfinder_geometry::vector::vec2f;
         use warpui::units::{IntoPixels as _, Pixels};
 
-        use crate::{
-            terminal::{
-                event_listener::ChannelEventListener, model::block::BlockSize, BlockPadding,
-            },
-            themes::default_themes::dark_theme,
-        };
+        use crate::terminal::BlockPadding;
+        use crate::terminal::event_listener::ChannelEventListener;
+        use crate::terminal::model::block::BlockSize;
+        use crate::themes::default_themes::dark_theme;
         let size_info = SizeInfo::new(
             vec2f(7., 10.5),
             1.0.into_pixels(),
@@ -107,6 +115,7 @@ impl TerminalView {
             None,
             None, // conversation_restoration - not used for test
             None, // inactive_pty_reads_rx - not used for test
+            is_cloud_mode,
             ctx,
         )
     }

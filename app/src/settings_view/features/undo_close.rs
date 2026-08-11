@@ -1,28 +1,24 @@
-use std::{cell::RefCell, collections::HashMap, time::Duration};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::time::Duration;
 
 use settings::{Setting, ToggleableSetting};
+use warp_errors::report_if_error;
+use warpui::elements::{
+    Container, CrossAxisAlignment, Flex, MainAxisAlignment, MouseStateHandle, ParentElement, Text,
+};
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use warpui::ui_components::switch::SwitchStateHandle;
 use warpui::{
-    elements::{
-        Container, CrossAxisAlignment, Flex, MainAxisAlignment, MouseStateHandle, ParentElement,
-        Text,
-    },
-    ui_components::{
-        components::{Coords, UiComponent, UiComponentStyles},
-        switch::SwitchStateHandle,
-    },
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
-use crate::{
-    appearance::Appearance,
-    editor::{self, EditorView, SingleLineEditorOptions, TextOptions},
-    report_if_error,
-    settings_view::{
-        features_page::render_group,
-        settings_page::{render_body_item, LocalOnlyIconState, ToggleState},
-    },
-    undo_close::{settings::UndoCloseEnabled, UndoCloseSettings},
-};
+use crate::appearance::Appearance;
+use crate::editor::{self, EditorView, SingleLineEditorOptions, TextOptions};
+use crate::settings_view::features_page::render_group;
+use crate::settings_view::settings_page::{LocalOnlyIconState, ToggleState, render_body_item};
+use crate::undo_close::UndoCloseSettings;
+use crate::undo_close::settings::UndoCloseEnabled;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Action {

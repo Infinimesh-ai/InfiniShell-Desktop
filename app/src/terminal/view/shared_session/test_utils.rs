@@ -5,12 +5,12 @@ use crate::terminal::shared_session::protocol::{ParticipantId, ParticipantList, 
 use warpui::platform::WindowStyle;
 use warpui::{App, ViewHandle};
 
+use crate::GlobalResourceHandles;
 use crate::auth::UserUid;
 use crate::editor::ReplicaId;
 use crate::pane_group::{NewTerminalOptions, PaneGroup, PanesLayout};
 use crate::terminal::TerminalView;
 use crate::test_util::terminal::initialize_app_for_terminal_view;
-use crate::GlobalResourceHandles;
 
 /// Creates a terminal view that is created via the terminal manager
 /// for shared session viewers. That is, it has all of the relevant models
@@ -52,7 +52,7 @@ pub fn terminal_view_for_viewer(app: &mut App) -> ViewHandle<TerminalView> {
             ReplicaId::random(),
             Box::new(ParticipantList::default()),
             SessionId::new(),
-            SessionSourceType::default(),
+            SessionSourceType::User,
             ctx,
         );
     });

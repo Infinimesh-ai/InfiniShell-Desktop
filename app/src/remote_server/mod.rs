@@ -5,6 +5,18 @@ pub use remote_server::*;
 #[cfg(not(target_family = "wasm"))]
 pub mod auth_context;
 #[cfg(not(target_family = "wasm"))]
+pub mod codebase_index_model;
+#[cfg(not(target_family = "wasm"))]
+mod codebase_index_status;
+pub mod diff_state_proto;
+#[cfg(not(target_family = "wasm"))]
+pub mod diff_state_tracker;
+pub mod git_status_proto;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) mod handoff_snapshot;
+#[cfg(not(target_family = "wasm"))]
+mod ripgrep_search;
+#[cfg(not(target_family = "wasm"))]
 pub mod server_buffer_tracker;
 #[cfg(not(target_family = "wasm"))]
 pub mod server_model;
@@ -35,55 +47,17 @@ pub fn run_daemon(_identity_key: String) -> anyhow::Result<()> {
     anyhow::bail!("remote-server-daemon is not supported on this platform")
 }
 
-/// Start the WarpUI headless app with all daemon singleton models.
-///
-/// This is the platform-agnostic core of every `run_daemon` implementation.
-/// Platform-specific code (Unix sockets, Windows named pipes, …) binds a
-/// listener and calls this function with the appropriate `ServerModel`
-/// constructor — everything else (DirectoryWatcher, DetectedRepositories,
-/// RepoMetadataModel, FileModel) is shared.
-///
-/// # Example
-/// ```ignore
-/// // In unix/mod.rs:
-/// super::run_daemon_app(move |ctx| ServerModel::new(unix_listener, ctx))
-/// ```
-#[cfg(not(target_family = "wasm"))]
-pub(super) fn run_daemon_app(
-    server_model_init: impl FnOnce(&mut warpui::ModelContext<server_model::ServerModel>) -> server_model::ServerModel
-        + 'static,
-) -> anyhow::Result<()> {
-    use warpui::platform::app::AppCallbacks;
-    use warpui::platform::AppBuilder;
-
-    AppBuilder::new_headless(AppCallbacks::default(), Box::new(()), None).run(|ctx| {
-        // Rotate log files from the previous daemon invocation in the background.
-        ctx.background_executor()
-            .spawn(warp_logging::rotate_log_files())
-            .detach();
-        use repo_metadata::repositories::DetectedRepositories;
-        use repo_metadata::watcher::DirectoryWatcher;
-        use repo_metadata::RepoMetadataModel;
-
-        // Order matters: DetectedRepositories must be registered before
-        // RepoMetadataModel because LocalRepoMetadataModel::new()
-        // subscribes to DetectedRepositories::handle(ctx).
-        ctx.add_singleton_model(DirectoryWatcher::new);
-        ctx.add_singleton_model(|_ctx| DetectedRepositories::default());
-        ctx.add_singleton_model(RepoMetadataModel::new_with_incremental_updates);
-        ctx.add_singleton_model(warp_files::FileModel::new);
-        // GlobalBufferModel 必须在 ServerModel 之前注册:buffer-sync 的服务端
-        // 处理(server_model.rs / server_buffer_tracker.rs)通过
-        // `GlobalBufferModel::handle(ctx)` 访问它,未注册会在 daemon 启动时
-        // panic「Cannot get singleton model ... never registered」。它自身
-        // 在 `new()` 里订阅 FileModel,所以排在 FileModel 之后。
-        ctx.add_singleton_model(crate::code::global_buffer_model::GlobalBufferModel::new);
-        ctx.add_singleton_model(server_model_init);
-    })?;
-    Ok(())
-}
+// 上游把 daemon 启动改成走统一的 `run_internal` / `launch()` 路径
+// (`unix::launch_daemon`,见 `lib.rs` 的 `LaunchMode::RemoteServerDaemon` 分支),
+// 我方原先的 `run_daemon_app` headless AppBuilder 封装随之删除:
+// DirectoryWatcher / DetectedRepositories / RepoMetadataModel / FileModel /
+// GlobalBufferModel 的注册与顺序约束现在由 `initialize_app` 统一负责。
 
 // Zap Wave 6-1:`wire_auth_token_rotation` 函数物理删 — 原订阅 server API
 // token rotation 事件并转发到 `RemoteServerManager::rotate_auth_token`。Wave 3-1
 // 删 auth 子系统后该事件 0 emit 点,Wave 6-1 同步删事件 + 本订阅函数 + `lib.rs`
 // 中的调用点。`RemoteServerManager::rotate_auth_token` 函数本体暂保留。
+//
+// 上游在本次合并里给该函数追加了 crash-reporting 偏好 / codebase-index limits
+// 的转发(`current_codebase_index_limits`),依赖 `warp_server_client::auth` 与
+// `crate::server::server_api::ServerApiProvider`,两者均已从本 fork 剥离,故一并不引入。

@@ -1,10 +1,9 @@
-#[allow(unused_imports)]
-use crate::clipboard::{Clipboard, ClipboardContent};
-
+use itertools::Itertools;
 #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows"))]
 use {arboard, image::ImageEncoder};
 
-use itertools::Itertools;
+#[allow(unused_imports)]
+use crate::clipboard::{Clipboard, ClipboardContent};
 
 /// Supported image file extensions for clipboard operations.
 pub const IMAGE_EXTENSIONS: &[&str] = &[".png", ".jpg", ".jpeg", ".gif", ".webp"];
@@ -113,17 +112,19 @@ fn extract_filename_from_html_tags(html: &str) -> Option<String> {
     }
 
     // 2. Check title attribute
-    if let Some(title_content) = extract_quoted_value(html, "title=\"") {
-        if title_content.contains('.') && has_image_extension(&title_content) {
-            return Some(title_content);
-        }
+    if let Some(title_content) = extract_quoted_value(html, "title=\"")
+        && title_content.contains('.')
+        && has_image_extension(&title_content)
+    {
+        return Some(title_content);
     }
 
     // 3. Check alt attribute
-    if let Some(alt_content) = extract_quoted_value(html, "alt=\"") {
-        if alt_content.contains('.') && has_image_extension(&alt_content) {
-            return Some(alt_content);
-        }
+    if let Some(alt_content) = extract_quoted_value(html, "alt=\"")
+        && alt_content.contains('.')
+        && has_image_extension(&alt_content)
+    {
+        return Some(alt_content);
     }
 
     // 4. Look for any filename-like strings with image extensions in the entire HTML
@@ -314,7 +315,9 @@ pub fn read_images_from_clipboard(
             match process_clipboard_image(&arboard_image, filename) {
                 Some(image_data) => Some(vec![image_data]),
                 None => {
-                    log::warn!("Failed to process clipboard image: format detection and conversion both failed");
+                    log::warn!(
+                        "Failed to process clipboard image: format detection and conversion both failed"
+                    );
                     // Fall through to Windows custom-format fallback below.
                     #[cfg(target_os = "windows")]
                     {

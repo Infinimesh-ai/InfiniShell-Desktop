@@ -1,16 +1,17 @@
 use std::sync::Arc;
 
-use warpui::{
-    async_assert, integration::TestStep, windowing::WindowManager, SingletonEntity, WindowId,
-};
+use warpui::integration::TestStep;
+use warpui::windowing::WindowManager;
+use warpui::{SingletonEntity, WindowId, async_assert};
 
-use crate::{
-    ai::facts::{view::AIFactPage, AIMemory},
-    cloud_object::{model::persistence::ObjectStoreModel, update_manager::UpdateManager, Space},
-    integration_testing::view_getters::workspace_view,
-    server::ids::{ClientId, SyncId},
-    workspaces::user_workspaces::UserWorkspaces,
-};
+use crate::ai::facts::AIMemory;
+use crate::ai::facts::view::AIFactPage;
+use crate::cloud_object::Space;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::update_manager::UpdateManager;
+use crate::integration_testing::view_getters::workspace_view;
+use crate::server::ids::{ClientId, SyncId};
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// Create a personal rule and save its sync ID into the step data.
 pub fn create_a_personal_rule(

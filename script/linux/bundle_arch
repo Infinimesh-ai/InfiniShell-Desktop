@@ -19,9 +19,9 @@ set -e
 if [ "$RELEASE_CHANNEL" = "oss" ]; then
   CHANNEL_SUFFIX=""
   if [ "$ARTIFACT" = "app" ]; then
-    PACKAGE_NAME="zap"
+    PACKAGE_NAME="infinishell"
   else
-    PACKAGE_NAME="zap-cli"
+    PACKAGE_NAME="infinishell-cli"
   fi
 elif [ "$ARTIFACT" = "cli" ]; then
   CHANNEL_SUFFIX="${BINARY_NAME#oz}"

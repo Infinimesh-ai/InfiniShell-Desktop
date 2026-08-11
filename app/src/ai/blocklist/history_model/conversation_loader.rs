@@ -324,6 +324,15 @@ impl BlocklistAIHistoryModel {
                     .and_then(|data| data.artifacts_json.as_ref())
                     .and_then(|json| serde_json::from_str(json).ok())
                     .unwrap_or_default();
+                // 父子链接信息要在 conversation_data 被移动前取出,
+                // 未加载的会话靠它判断是否为子 agent 会话。
+                let parent_conversation_id = conversation_data
+                    .as_ref()
+                    .and_then(|data| data.parent_conversation_id.as_deref())
+                    .and_then(|id| AIConversationId::try_from(id.to_owned()).ok());
+                let parent_agent_id = conversation_data
+                    .as_ref()
+                    .and_then(|data| data.parent_agent_id.clone());
                 let server_conversation_token = conversation_data
                     .and_then(|data| data.server_conversation_token)
                     .map(ServerConversationToken::new);
@@ -339,6 +348,8 @@ impl BlocklistAIHistoryModel {
                     is_restorable_locally: true,
                     artifacts,
                     ambient_agent_task_id: None,
+                    parent_conversation_id,
+                    parent_agent_id,
                 }))
             })
             .collect();

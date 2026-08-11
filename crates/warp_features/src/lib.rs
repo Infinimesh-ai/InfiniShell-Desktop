@@ -1,7 +1,6 @@
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
-use enum_iterator::{cardinality, Sequence};
-
+use enum_iterator::{Sequence, cardinality};
 #[cfg(feature = "test-util")]
 pub use overrides::{get_overrides, set_overrides};
 
@@ -96,9 +95,10 @@ pub enum FeatureFlag {
     /// Enables the settings file feature.
     SettingsFile,
 
-    /// Enables the settings import onboarding block and pre-parsing
-    /// configs on app startup.
-    SettingsImport,
+    /// Stores GUI execution profiles in the shared settings collection.
+    ///
+    /// TUI builds use the collection on every channel independently of this flag.
+    FileBackedExecutionProfiles,
 
     /// Enables rect selection.
     RectSelection,
@@ -124,16 +124,20 @@ pub enum FeatureFlag {
     /// Routes SSH sessions through the tmux-backed SSH wrapper.
     SSHTmuxWrapper,
 
-    /// Reduces the amount of horizontal padding in the blocklist
-    /// from 20px to 16px.
-    LessHorizontalTerminalPadding,
-
     /// Enables the shell selector, allowing us to open a new tab in
     /// a shell other than the default shell.
     ShellSelector,
 
     /// Replaces the bookmark button with a "save as workflow" button.
     BlockToolbeltSaveAsWorkflow,
+
+    /// 门控"创建共享会话"(session sharing 的创建侧,不含加入 / 观看)。
+    /// 上游默认走 DOGFOOD_FLAGS 开启,Zap 作为本地优先 fork 不启用任何云端
+    /// 会话共享,因此这里只保留变体定义、不加入任何启用列表(默认关闭)。
+    CreatingSharedSessions,
+
+    /// Enables writing to long-running commands in shared sessions.
+    SharedSessionWriteToLongRunningCommands,
 
     /// Lazily builds scenes at render time instead of eagerly when a view
     /// changes.
@@ -144,6 +148,11 @@ pub enum FeatureFlag {
     ///
     /// See plan here: https://docs.google.com/document/d/1TBPSWNfh4KylkEgL5o5xyYgK_KQzUQk1oxjuIx2ipXw
     RemoveAltScreenPadding,
+
+    /// Enables support for ACLs in Session Sharing. Should be disabled if the
+    /// corresponding `use_acls` flag in the session sharing server is disabled.
+    /// https://github.com/warpdotdev/session-sharing-server/blob/b6590ebd0b0e7f6847d6b2228b4e77d63939ce22/server/Cargo.toml#L13
+    SessionSharingAcls,
 
     /// Enables the full-screen "zen mode" setting, where we hide the tab bar if there's only one
     /// tab.
@@ -176,6 +185,10 @@ pub enum FeatureFlag {
 
     /// Maximizes data in flat storage to reduce memory usage.
     MaximizeFlatStorage,
+
+    /// Recognizes the OSC 8 hyperlink escape sequence and makes the
+    /// linked text Cmd+click-able.
+    OscHyperlinks,
 
     ImeMarkedText,
 
@@ -232,6 +245,12 @@ pub enum FeatureFlag {
     /// Enables prediction of Agent Mode queries.
     PredictAMQueries,
 
+    /// Enables full source code embedding of repos when using codebase context.
+    FullSourceCodeEmbedding,
+
+    /// Enables codebase indexing inside remote server daemon processes.
+    RemoteCodebaseIndexing,
+
     /// If enabled, command palette searches will use Tantivy search instead of the default fuzzy search.
     UseTantivySearch,
 
@@ -274,9 +293,6 @@ pub enum FeatureFlag {
     /// Enables inline review comments on specific lines of code.
     ContextLineReviewComments,
 
-    /// Enables the natural language classification model.
-    NLDClassifierModelEnabled,
-
     /// Enables the fast-forward autoexecute button
     FastForwardAutoexecuteButton,
 
@@ -318,6 +334,9 @@ pub enum FeatureFlag {
 
     /// Enables return changed lines on apply diff result
     ChangedLinesOnlyApplyDiffResult,
+
+    /// Enables new Search Codebase UI
+    SearchCodebaseUI,
 
     /// Enables us to render linked code blocks
     LinkedCodeBlocks,
@@ -365,9 +384,6 @@ pub enum FeatureFlag {
     /// Allows opening file links using the $EDITOR environment variable.
     AllowOpeningFileLinksUsingEditorEnv,
 
-    /// Enables improvements to our natural language detection functionality.
-    NldImprovements,
-
     /// Enables the ability to undo closed panes.
     UndoClosedPanes,
 
@@ -388,9 +404,6 @@ pub enum FeatureFlag {
 
     /// Enables the one-time modal on app startup for existing users for the Code launch.
     CodeLaunchModal,
-
-    /// Enables API key authentication for Agent SDK
-    APIKeyAuthentication,
 
     /// Enables API key management UI in settings
     APIKeyManagement,
@@ -416,8 +429,19 @@ pub enum FeatureFlag {
     /// Enables find/search in code review pane
     CodeReviewFind,
 
+    /// Enables asynchronous find in terminal, running search on a background thread.
+    AsyncFind,
+
+    /// Enables using Agent Mode in shared sessions.
+    AgentSharedSessions,
+
     /// Enables auto-opening code review pane on first agent change and its setting UI.
     AutoOpenCodeReviewPane,
+
+    /// Feature flags for the Build Plan Auto Reload experiment.
+    /// 涉及云端计费 / 购买流程,Zap 默认关闭(不加入任何启用列表)。
+    BuildPlanAutoReloadBannerToggle,
+    BuildPlanAutoReloadPostPurchaseModal,
 
     /// Enables inline code review functionality
     InlineCodeReview,
@@ -453,6 +477,10 @@ pub enum FeatureFlag {
     /// Enables rendering markdown tables in notebooks.
     MarkdownTables,
 
+    /// Renders `.ipynb` (Jupyter) files as a formatted, read-only notebook in
+    /// Warp's notebook viewer instead of showing the raw JSON in the code editor.
+    JupyterNotebookRendering,
+
     /// Enables rendering markdown tables inline in AI block list responses.
     BlocklistMarkdownTableRendering,
     /// Enables rendering markdown images inline in AI block list responses.
@@ -463,6 +491,10 @@ pub enum FeatureFlag {
 
     /// Enables v2 of the context window usage UI.
     ContextWindowUsageV2,
+
+    /// Enables the expandable per-segment context window usage breakdown in
+    /// the conversation usage card.
+    ContextWindowUsageBreakdown,
 
     /// Enables global search
     GlobalSearch,
@@ -476,6 +508,10 @@ pub enum FeatureFlag {
     /// Enables the /rewind slash command.
     RewindSlashCommand,
 
+    /// Agent Management View.
+    /// 依赖云端 agent 运行历史,Zap 默认关闭(不加入任何启用列表)。
+    AgentManagementView,
+
     AgentView,
 
     /// Enables block context functionality in Agent View.
@@ -486,6 +522,11 @@ pub enum FeatureFlag {
 
     /// Enables the inline repo switcher menu for switching between indexed repos.
     InlineRepoMenu,
+
+    /// Enables cloud mode functionality for ambient agents.
+    /// Zap 为本地优先 fork,云端功能默认关闭:仅保留变体定义供已有代码路径
+    /// 编译,不加入 DOGFOOD / PREVIEW / RELEASE 任何启用列表。
+    CloudMode,
 
     /// Enables support for AM file diffs backed by the V4A patch format.
     V4AFileDiffs,
@@ -501,6 +542,19 @@ pub enum FeatureFlag {
 
     /// Enables computer use functionality in local clients.
     LocalComputerUse,
+
+    /// Enables background, per-window computer use: driving a specific window directly without
+    /// raising it or moving the cursor.  Currently only supported on macOS.
+    BackgroundComputerUse,
+
+    /// Enables video recording of computer-use sessions for cloud agents.
+    VideoRecording,
+
+    /// Enables team API key creation in the API key management UI.
+    TeamApiKeys,
+
+    /// Enables cloud conversation loading via the CLI --conversation flag.
+    CloudConversations,
 
     /// Enables the "New agent" prompt chip in terminal mode when AgentView is enabled.
     ///
@@ -548,12 +602,23 @@ pub enum FeatureFlag {
     /// Skills are loaded from `.agents/skills/`, `.warp/skills/`, `.claude/skills/`, and `.codex/skills/`
     /// directories to provide base prompts for agent runs.
     OzPlatformSkills,
+
+    /// Enables image attachment support for cloud mode conversations.
+    /// 云端功能,默认关闭(不加入任何启用列表)。
+    CloudModeImageContext,
+
     /// Enables loading and returning bundled skills in the SkillManager.
     BundledSkills,
 
     /// Enables the Zap launch modal announcing Zap going open-source.
     /// When enabled, the HOA onboarding flow is suppressed.
     ZapLaunchModal,
+
+    /// Enables the orchestration launch modal announcing multi-agent orchestration features.
+    OrchestrationLaunchModal,
+
+    /// Enables the launch modal announcing the Warp Agent CLI.
+    AgentCliLaunchModal,
 
     /// Updated tab styling (background colors, border, close button positioning, margins).
     NewTabStyling,
@@ -582,6 +647,22 @@ pub enum FeatureFlag {
     /// content changes via auto-reload.
     CodeReviewScrollPreservation,
 
+    /// Re-enables local Claude Code and Codex child harnesses in orchestration
+    /// flows while the default behavior temporarily keeps them disabled.
+    LocalClaudeCodexChildHarnesses,
+
+    /// On `wait_for_events`, confirms parent status against the server and
+    /// registers an orchestrator for the owner-side ancestor stream so it
+    /// receives events for children created out-of-band (Oz CLI / web API).
+    WaitForEventsParentRegistration,
+
+    /// Gates the client-side multi-level orchestration surfaces: child
+    /// conversations auto-executing their own `run_agents` calls and the
+    /// confirmation-card disclosure that launched agents may start
+    /// children of their own. When disabled, a child's `run_agents` call
+    /// fails gracefully instead of presenting a card in a hidden pane.
+    MultiLevelOrchestration,
+
     /// Shows a pending user query indicator during summarization when a follow-up
     /// prompt is queued via `/fork-and-compact` or `/compact-and`.
     PendingUserQueryIndicator,
@@ -589,6 +670,8 @@ pub enum FeatureFlag {
     /// Gates the `/queue` slash command, which lets users queue a follow-up prompt
     /// while the agent is mid-response.
     QueueSlashCommand,
+    /// Extends queued prompts to Cloud Mode setup and follow-up draining.
+    QueuedPromptsV2,
 
     /// Enables an agent tool for the CLI subagent to explicitly transfer command control to the
     /// user.
@@ -603,6 +686,9 @@ pub enum FeatureFlag {
 
     /// Enables header rows on all inline menus (label, tabs, resize handle).
     InlineMenuHeaders,
+    /// Clears the current prompt when opening the inline model selector from the
+    /// model chip, then restores that prompt when the selector closes.
+    RestorePromptOnInlineModelSelectorSearch,
 
     /// Enables associating a tab color with a directory so tabs automatically
     /// adopt the configured color when their working directory matches.
@@ -623,6 +709,15 @@ pub enum FeatureFlag {
     /// CLIs (e.g. `claude`) to execute prompts instead of Zap's agent harness.
     AgentHarness,
 
+    /// 云端 agent 运行之间的工作区快照交接(handoff):
+    /// - `AgentDriver` 在每次云端运行结束时上传工作区快照(repo diff + 文件);
+    /// - 后续执行下载上一次执行的 handoff 快照附件;
+    /// - 第三方 harness 会话从服务端拉取 block 快照来还原终端输出。
+    ///
+    /// 全部依赖云端存储,Zap 默认关闭(不加入任何启用列表)。
+    /// `HandoffLocalCloud` / `HandoffCloudCloud` 也都要求本 flag 同时开启。
+    OzHandoff,
+
     /// Enables the upgraded CLI agent session tracking and notifications infrastructure.
     HOANotifications,
 
@@ -634,12 +729,19 @@ pub enum FeatureFlag {
     /// Requires HOANotifications to also be enabled.
     CodexNotifications,
 
+    /// Enables the Codex Warp plugin marketplace integration.
+    /// When disabled, Codex uses native OSC9 notifications.
+    CodexPlugin,
+
     /// Enables the install/update chip for the Gemini CLI Zap extension.
     /// Requires HOANotifications to also be enabled.
     GeminiNotifications,
 
     /// Enables tab configs — user-definable TOML templates for launching custom tab layouts.
     TabConfigs,
+
+    /// Enables Warp local control through the standalone warpctrl CLI.
+    WarpControlCli,
 
     /// Enables the ask_user_question tool allowing the agent to ask clarifying questions.
     AskUserQuestion,
@@ -672,6 +774,11 @@ pub enum FeatureFlag {
     /// 本地 PTY 输出密码提示时展示已保存的 SSH 凭据候选。
     OneKeyPrompt,
 
+    /// Redux of the setup/initial user query UI for cloud mode.
+    /// 云端功能,默认关闭(不加入任何启用列表);关闭时相关 UI 路径不执行,
+    /// 行为等价于未引入该改版。
+    CloudModeSetupV2,
+
     /// Enables summary mode in vertical tabs, showing condensed tab summaries
     /// instead of individual pane rows.
     VerticalTabsSummaryMode,
@@ -686,6 +793,114 @@ pub enum FeatureFlag {
     /// 关闭时,UI 入口隐藏,`Client::new()` 退回 reqwest 默认(读环境变量)。
     /// 见 Issue #72。
     HttpProxySettings,
+
+    CloudModeInputV2,
+
+    /// Enables continuing cloud mode conversations in the cloud after an execution ends.
+    HandoffCloudCloud,
+
+    /// Enables the local-to-cloud Oz handoff entry points (footer chip and
+    /// `/move-to-cloud` slash command) that fork the active local Oz
+    /// conversation into a fresh cloud agent run with the current workspace
+    /// snapshot attached. Requires `OzHandoff` to also be enabled.
+    HandoffLocalCloud,
+
+    /// Enables creating API keys scoped to named agents in the API key
+    /// management UI. When enabled the "Team" option in the key-type
+    /// selector is replaced with "Agent" and users can pick which agent
+    /// identity the key authenticates as.
+    NamedAgents,
+    /// Gates the driver behavior that writes GitHub credentials to disk
+    /// (`~/.git-credentials`, `~/.config/gh/hosts.yaml`) and runs the
+    /// background refresh loop that keeps them fresh during a task run.
+    GitCredentialRefresh,
+
+    /// Gates the v2 billing and usage page redesign.
+    BillingAndUsagePageV2,
+    /// Enables configurable expanded context windows for eligible GPT models.
+    GPTConfigurableContextWindow,
+
+    /// Replaces the raw harness CLI command with a styled header showing CLI name + status icon.
+    HarnessSessionHeader,
+
+    /// Enables the code review view for remote sessions.
+    RemoteCodeReview,
+
+    /// Gates the Grouped Tabs feature.
+    GroupedTabs,
+
+    /// Gates the Pinned Tabs feature, which lets users pin individual tabs
+    /// and whole tab groups so they stay at the front of the tab list and
+    /// are protected from reordering.
+    PinnedTabs,
+
+    /// Gates the SuperGrok feature, which lets users
+    /// connect a Grok subscription instead of pasting an API key.
+    SuperGrok,
+
+    /// Gates Gemini Enterprise (GEAP) BYOLLM, which lets users
+    /// route eliglible models to GEAP instead of Warp-managed inference.
+    GeminiEnterprise,
+
+    /// Gates NLD input classification matching the buffer against agent
+    /// prompt history (in addition to shell command history). Still in
+    /// development; currently disabled on all channels as a mitigation for
+    /// misclassification bug reports (see PR #12586). Re-enable via
+    /// `DOGFOOD_FLAGS` once the underlying issues are resolved.
+    NldPromptHistoryMatch,
+
+    /// Gates the custom model router feature, which allows users to define
+    /// their own model routers.
+    CustomModelRouters,
+
+    /// Enables state-mutating recovery for abnormal terminal lifecycle sequences.
+    TerminalLifecycleRecovery,
+
+    /// Shows a warning in the agent view when the active conversation's
+    /// provider-side prompt cache has expired.
+    PromptCacheExpiryWarning,
+
+    /// Enables the `--runner` flag on `run-cloud`, which overrides an agent's
+    /// compute (docker image, instance shape, setup commands) by runner ID.
+    CloudRunners,
+
+    /// Renders MCP tool-call request and response JSON as an interactive
+    /// collapsible tree with typed colors and per-row Copy JSON, instead of
+    /// a flat pretty-printed blob.
+    McpJsonTreeView,
+
+    /// Renders supported solid box-drawing characters (`U+2500..=U+257F`)
+    /// procedurally as cell-filling rectangles instead of from the font,
+    /// eliminating seams between adjacent box-drawing cells in the terminal.
+    BoxDrawingGlyphs,
+
+    /// Enables cloud agent runner selection: the `oz runner` CRUD commands
+    /// for managing runners via the CLI, and the Runner dropdown in the
+    /// orchestration (`run_agents`) confirmation card and plan-card config
+    /// block for choosing a runner when starting remote child agents.
+    CloudAgentRunners,
+
+    /// Gates the account-first onboarding flow, including the reordered
+    /// pre-auth slides and post-auth account offer.
+    AccountFirstOnboarding,
+
+    /// Accepts well-known non-UUID managed MCP ids (e.g. `"linear"`) as
+    /// `warp_id` values in MCP configs and as bare identifiers in CLI
+    /// `--mcp` arguments, resolved server-side at run setup.
+    WellKnownMcpIds,
+
+    /// Automatically attaches the Warp-hosted Factory MCP server
+    /// (`/api/v1/mcp/factory`) to agents as a built-in MCP server,
+    /// authenticated with the logged-in user's session token. No manual MCP
+    /// setup or API key required.
+    FactoryMcp,
+
+    /// Gates the TUI cost footer's credits⇄dollars toggle. When enabled (dogfood
+    /// / staging and local/dev builds), the footer usage entry follows the
+    /// persisted `agents.usage_display_mode` setting and is click-to-toggleable
+    /// between credits and dollars. When disabled (prod/stable), the footer
+    /// falls back to a static, non-interactive credits total.
+    TuiCostTransparency,
 }
 
 static FLAG_STATES: [AtomicBool; cardinality::<FeatureFlag>()] =
@@ -704,6 +919,8 @@ static FEATURES_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 /// Features used in debugging.
 pub const DEBUG_FLAGS: &[FeatureFlag] = &[FeatureFlag::DebugMode, FeatureFlag::RuntimeFeatureFlags];
+/// Features enabled only for the WarpLocal developer build.
+pub const LOCAL_FLAGS: &[FeatureFlag] = &[FeatureFlag::LocalClaudeCodexChildHarnesses];
 
 /// Features enabled for the development team.  The expectation is that, over
 /// time, these will move on to PREVIEW_FLAGS before being launched.
@@ -723,7 +940,6 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::RetryTruncatedCodeResponses,
     FeatureFlag::ContextLineReviewComments,
     FeatureFlag::RunGeneratorsWithCmdExe,
-    FeatureFlag::NLDClassifierModelEnabled,
     FeatureFlag::Projects,
     FeatureFlag::ProviderCommand,
     FeatureFlag::MarkdownImages,
@@ -736,7 +952,6 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::PendingUserQueryIndicator,
     FeatureFlag::QueueSlashCommand,
     // End manually enabled Code features.
-    FeatureFlag::DirectoryTabColors,
     FeatureFlag::EditableMarkdownMermaid,
     FeatureFlag::CodeReviewScrollPreservation,
     FeatureFlag::AgentHarness,
@@ -748,6 +963,21 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::ConfigurableContextWindow,
     FeatureFlag::DragTabsToWindows,
     FeatureFlag::ServerFileBrowser,
+    #[cfg(not(windows))]
+    FeatureFlag::SshRemoteServer,
+    FeatureFlag::RemoteCodebaseIndexing,
+    FeatureFlag::GPTConfigurableContextWindow,
+    FeatureFlag::RestorePromptOnInlineModelSelectorSearch,
+    FeatureFlag::WarpControlCli,
+    FeatureFlag::TerminalLifecycleRecovery,
+    FeatureFlag::PromptCacheExpiryWarning,
+    FeatureFlag::JupyterNotebookRendering,
+    FeatureFlag::WaitForEventsParentRegistration,
+    FeatureFlag::MultiLevelOrchestration,
+    FeatureFlag::McpJsonTreeView,
+    FeatureFlag::BoxDrawingGlyphs,
+    FeatureFlag::WellKnownMcpIds,
+    FeatureFlag::TuiCostTransparency,
 ];
 
 /// Features enabled for feature preview build users (e.g.: Friends of Zap).
@@ -773,10 +1003,12 @@ pub const RELEASE_FLAGS: &[FeatureFlag] = &[
     // Remote server binary is not yet supported on Windows.
     #[cfg(not(windows))]
     FeatureFlag::SshRemoteServer,
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    FeatureFlag::DragTabsToWindows,
 ];
 
 /// Flags that we want to allow to switch at runtime (assuming RuntimeFeatureFlags is set)
-pub const RUNTIME_FEATURE_FLAGS: &[FeatureFlag] = &[];
+pub const RUNTIME_FEATURE_FLAGS: &[FeatureFlag] = &[FeatureFlag::LocalClaudeCodexChildHarnesses];
 
 impl FeatureFlag {
     pub fn is_enabled(&self) -> bool {
@@ -812,7 +1044,9 @@ impl FeatureFlag {
         // Allow calling this in integration tests because we sometimes use it in the app
         // during flows that integration tests cover.
         if cfg!(test) && cfg!(not(feature = "integration_tests")) {
-            panic!("Tried to globally enable {self:?} in a test. Use FeatureFlag::{self:?}.override_enabled instead");
+            panic!(
+                "Tried to globally enable {self:?} in a test. Use FeatureFlag::{self:?}.override_enabled instead"
+            );
         }
         FLAG_STATES[self as usize].store(enabled, Ordering::Relaxed);
     }
@@ -856,9 +1090,15 @@ impl FeatureFlag {
             BlocklistMarkdownTableRendering => {
                 Some("Enables rendering markdown tables inline in AI block list responses.")
             }
-            MarkdownTables => Some("Enables rendering and interaction support for markdown tables in notebooks."),
-            SettingsFile => Some("Enables configuring Zap via a user-editable `settings.toml` file, with hot reload and error reporting for invalid values."),
-            GitOperationsInCodeReview => Some("Enables commit, push, and create-PR actions directly from the code review panel."),
+            MarkdownTables => {
+                Some("Enables rendering and interaction support for markdown tables in notebooks.")
+            }
+            SettingsFile => Some(
+                "Enables configuring InfiniShell via a user-editable `settings.toml` file, with hot reload and error reporting for invalid values.",
+            ),
+            GitOperationsInCodeReview => Some(
+                "Enables commit, push, and create-PR actions directly from the code review panel.",
+            ),
             _ => None,
         }
     }
@@ -882,7 +1122,8 @@ mod overrides {
 /// should use overrides instead of globally modifying flags with [`super::FeatureFlag::set_enabled`].
 #[cfg(feature = "test-util")]
 mod overrides {
-    use std::{cell::RefCell, collections::HashMap};
+    use std::cell::RefCell;
+    use std::collections::HashMap;
 
     use super::FeatureFlag;
 
@@ -1013,5 +1254,5 @@ impl From<TriState> for Option<bool> {
 }
 
 #[cfg(test)]
-#[path = "features_test.rs"]
+#[path = "features_tests.rs"]
 mod tests;

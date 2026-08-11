@@ -1,6 +1,7 @@
-use crate::integration_testing::view_getters::workspace_view;
 use warpui::async_assert;
 use warpui::integration::AssertionCallback;
+
+use crate::integration_testing::view_getters::workspace_view;
 
 pub fn assert_workflow_modal_is_open() -> AssertionCallback {
     Box::new(move |app, window_id| {
@@ -35,7 +36,7 @@ pub fn assert_warp_drive_is_open() -> AssertionCallback {
         workspace.read(app, |workspace, _| {
             async_assert!(
                 workspace.is_warp_drive_open(),
-                "Expected Zap Drive to be open, but it was closed"
+                "Expected InfiniShell Drive to be open, but it was closed"
             )
         })
     })
@@ -48,7 +49,7 @@ pub fn assert_warp_drive_is_closed() -> AssertionCallback {
         workspace.read(app, |workspace, _| {
             async_assert!(
                 !workspace.is_warp_drive_open(),
-                "Expected Zap Drive to be closed, but it was open"
+                "Expected InfiniShell Drive to be closed, but it was open"
             )
         })
     })

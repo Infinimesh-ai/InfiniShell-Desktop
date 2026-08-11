@@ -1,6 +1,7 @@
+use std::ops::Range;
+
 use ai::diff_validation::DiffDelta;
 use chrono::Local;
-use std::ops::Range;
 use warpui::App;
 
 use super::*;
@@ -41,14 +42,13 @@ fn test_create_document() {
             let content = model
                 .get_document_content(&doc_id, ctx)
                 .expect("Should have content");
-            assert_eq!(content, "# Hello World\nThis is a test.");
+            assert_eq!(content, "# Hello World\n\nThis is a test.");
 
             // Should have no versions initially
             assert!(model.get_earlier_document_versions(&doc_id).is_none());
         });
     });
 }
-
 #[test]
 fn test_apply_diffs_creates_version() {
     App::test((), |mut app| async move {
@@ -93,7 +93,7 @@ fn test_apply_diffs_creates_version() {
                 .expect("Should have current content");
             assert_eq!(
                 current_content,
-                "# Hello Universe\n# Hello World\nThis is a test."
+                "# Hello Universe\n# Hello World\n\nThis is a test."
             );
 
             // Should have one version saved
@@ -107,7 +107,7 @@ fn test_apply_diffs_creates_version() {
             assert_eq!(first_version.title, "Test Document");
             assert_eq!(
                 first_version.get_content(ctx),
-                "# Hello World\nThis is a test."
+                "# Hello World\n\nThis is a test."
             );
         });
     });
@@ -354,8 +354,7 @@ fn test_create_document_removes_extra_newlines() {
             let content = model
                 .get_document_content(&doc_id, ctx)
                 .expect("Should have content");
-            // Extra newlines should be removed, leaving only single newlines between content
-            assert_eq!(content, "# Hello World\nThis is a test.\nEnd.");
+            assert_eq!(content, "# Hello World\n\n\nThis is a test.\n\n\nEnd.");
         });
     });
 }
@@ -679,5 +678,35 @@ fn test_streamed_agent_update_matches_reset_with_markdown_for_code_block() {
 
             assert_eq!(streamed_markdown.trim(), reset_markdown.trim());
         }
+    });
+}
+
+#[test]
+fn test_plan_markdown_content_preserves_copyable_structure() {
+    App::test((), |mut app| async move {
+        initialize_app_for_ai_document_tests(&mut app);
+        let model_handle = app.add_model(|_ctx| AIDocumentModel::new_for_test());
+
+        let plan_markdown = "# Migration Plan\n\n## Steps\n\n1. Audit the call sites\n   - Inventory each module\n   - Note breaking changes\n2. Land the refactor\n3. Verify with `cargo test`\n\n```rust path=null start=null\nfn migrate() {\n    println!(\"done\");\n}\n```";
+
+        let doc_id = model_handle.update(&mut app, |model, ctx| {
+            model.create_document(
+                "Migration Plan",
+                plan_markdown,
+                AIConversationId::new(),
+                None,
+                ctx,
+            )
+        });
+
+        let expected_markdown = "# Migration Plan\n\n## Steps\n\n1. Audit the call sites\n    * Inventory each module\n    * Note breaking changes\n2. Land the refactor\n3. Verify with `cargo test`\n\n```rust\nfn migrate() {\n    println!(\"done\");\n}\n```\n";
+
+        model_handle.update(&mut app, |model, ctx| {
+            let content = model
+                .get_document_content(&doc_id, ctx)
+                .expect("plan should expose its markdown content");
+
+            assert_eq!(content, expected_markdown);
+        });
     });
 }

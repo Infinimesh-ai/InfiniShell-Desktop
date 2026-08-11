@@ -5,27 +5,24 @@
 //! how many panes are in each tab.
 //! See https://github.com/warpdotdev/warp-internal/pull/4785#issue-1634862270
 
-use crate::view_components::find::FindEvent;
-use crate::view_components::find::FindModel;
-use crate::{
-    ai_assistant::panel::AIAssistantPanelView,
-    input_suggestions::InputSuggestions,
-    notebooks::notebook::NotebookView,
-    pane_group::{PaneGroup, PaneView},
-    root_view::RootView,
-    search::{
-        command_palette::{self},
-        command_search::view::CommandSearchView,
-    },
-    settings_view::keybindings::KeybindingsView,
-    terminal::{input::Input, TerminalView},
-    themes::theme_chooser::ThemeChooser,
-    view_components::find::Find,
-    workflows::{workflow_view::WorkflowView, CategoriesView},
-    workspace::Workspace,
-};
-use warpui::Entity;
-use warpui::{async_assert, integration::AssertionCallback, App, View, ViewHandle, WindowId};
+use warpui::integration::AssertionCallback;
+use warpui::{App, Entity, View, ViewHandle, WindowId, async_assert};
+
+use crate::ai_assistant::panel::AIAssistantPanelView;
+use crate::input_suggestions::InputSuggestions;
+use crate::notebooks::notebook::NotebookView;
+use crate::pane_group::{PaneGroup, PaneView};
+use crate::root_view::RootView;
+use crate::search::command_palette::{self};
+use crate::search::command_search::view::CommandSearchView;
+use crate::settings_view::keybindings::KeybindingsView;
+use crate::terminal::TerminalView;
+use crate::terminal::input::Input;
+use crate::themes::theme_chooser::ThemeChooser;
+use crate::view_components::find::{Find, FindEvent, FindModel};
+use crate::workflows::CategoriesView;
+use crate::workflows::workflow_view::WorkflowView;
+use crate::workspace::Workspace;
 
 /// This identifier is useful when you'd like to weakly identify a terminal view
 /// without actually grabbing a handle to it. Often useful when writing reusable assertions.
@@ -110,9 +107,10 @@ pub fn single_terminal_view_for_tab(
     tab_index: usize,
 ) -> ViewHandle<TerminalView> {
     pane_group_view(app, window_id, tab_index).read(app, |pane_group, ctx| {
-        let num_terminal_views = pane_group.terminal_pane_ids().count();
+        let mut terminal_views = pane_group.visible_terminal_views(ctx);
+        let num_terminal_views = terminal_views.len();
         assert_eq!(num_terminal_views, 1, "window_id={window_id}, tab_index={tab_index} doesn't have a single terminal view. Has {num_terminal_views} terminal views instead");
-        pane_group.terminal_view_at_pane_index(0, ctx).unwrap().to_owned()
+        terminal_views.pop().unwrap()
     })
 }
 
@@ -123,9 +121,20 @@ pub fn single_terminal_pane_view_for_tab(
     tab_index: usize,
 ) -> ViewHandle<PaneView<TerminalView>> {
     pane_group_view(app, window_id, tab_index).read(app, |pane_group, _ctx| {
-        let num_terminal_views = pane_group.terminal_pane_ids().count();
+        let terminal_pane_indices = pane_group
+            .visible_pane_ids()
+            .into_iter()
+            .enumerate()
+            .filter_map(|(pane_index, pane_id)| {
+                pane_id.is_terminal_pane().then_some(pane_index)
+            })
+            .collect::<Vec<_>>();
+        let num_terminal_views = terminal_pane_indices.len();
         assert_eq!(num_terminal_views, 1, "window_id={window_id}, tab_index={tab_index} doesn't have a single terminal pane view. Has {num_terminal_views} pane views instead");
-        pane_group.terminal_pane_view_at_pane_index(0).unwrap().to_owned()
+        pane_group
+            .terminal_pane_view_at_pane_index(terminal_pane_indices[0])
+            .unwrap()
+            .to_owned()
     })
 }
 
@@ -260,6 +269,9 @@ fn singleton_view_of_type<T: View>(app: &App, window_id: WindowId) -> ViewHandle
         .views_of_type(window_id)
         .expect("there's at least one view of type");
     let num_views_of_type = views_of_type.len();
-    assert_eq!(num_views_of_type, 1, "window_id={window_id} doesn't have a single view of type T. Has {num_views_of_type} views instead");
+    assert_eq!(
+        num_views_of_type, 1,
+        "window_id={window_id} doesn't have a single view of type T. Has {num_views_of_type} views instead"
+    );
     views_of_type.first().unwrap().clone()
 }

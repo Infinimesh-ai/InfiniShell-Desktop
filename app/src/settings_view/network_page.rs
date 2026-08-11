@@ -58,7 +58,9 @@ fn read_system_proxy_env() -> (String, String, String) {
     (read("HTTPS_PROXY"), read("HTTP_PROXY"), read("NO_PROXY"))
 }
 
-#[derive(Debug, Clone)]
+// 上游把 `DropdownItemAction` 的 blanket impl 收紧为 `Action + Clone + PartialEq`,
+// 所以下拉用的 action(及其内嵌类型)必须实现 PartialEq。
+#[derive(Debug, Clone, PartialEq)]
 pub enum NetworkPageAction {
     /// dropdown 选择了某个 ProxyMode 项,持久化到 settings。
     SetProxyMode(ProxyMode),
@@ -79,7 +81,7 @@ pub enum NetworkPageAction {
 }
 
 /// 本次测试选择的探测方式。供结果文案选择合适的描述。
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TestKind {
     /// TCP 探测代理 host:port(验证代理本身可达,适合企业内网 / VPN 代理)。
     /// 用于 Custom 模式与能从环境变量探测到系统代理的 System 模式。
@@ -90,7 +92,7 @@ enum TestKind {
 }
 
 /// 测试结果(从 async 任务返回给 main 线程的 handle_action)。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestOutcome {
     kind: TestKind,
     result: Result<u128, String>,

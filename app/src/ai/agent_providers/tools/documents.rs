@@ -124,7 +124,7 @@ fn read_result_to_json(result: &api::message::tool_call_result::Result) -> Optio
 
 pub static READ_DOCUMENTS: OpenAiTool = OpenAiTool {
     name: "read_documents",
-    description: "读取 Zap Drive 本地文档(由 document_id 引用,不是文件系统中的文件)。\
+    description: "读取 InfiniShell Drive 本地文档(由 document_id 引用,不是文件系统中的文件)。\
                   返回 JSON: { documents: [{document_id, content, line_range?}] }。\
                   当用户提到具体 document_id 或 Drive 中的特定文档时使用。",
     parameters: read_parameters,
@@ -213,7 +213,7 @@ fn edit_result_to_json(result: &api::message::tool_call_result::Result) -> Optio
 
 pub static EDIT_DOCUMENTS: OpenAiTool = OpenAiTool {
     name: "edit_documents",
-    description: "对 Zap Drive 中已存在的 document 做字符串搜索-替换。\
+    description: "对 InfiniShell Drive 中已存在的 document 做字符串搜索-替换。\
                   和 apply_file_diffs::edit 相似,但目标是 Drive document(通过 document_id 引用)。\
                   search 必须与文档现有内容**完全一致**(含空白和换行),否则失败。",
     parameters: edit_parameters,
@@ -299,7 +299,7 @@ fn create_result_to_json(result: &api::message::tool_call_result::Result) -> Opt
 
 pub static CREATE_DOCUMENTS: OpenAiTool = OpenAiTool {
     name: "create_documents",
-    description: "在 Zap Drive 中创建一个或多个新 document(各带 title + 完整内容)。\
+    description: "在 InfiniShell Drive 中创建一个或多个新 document(各带 title + 完整内容)。\
                   适合把分析结果、笔记、todo 等沉淀为可复用的 Drive 文档。",
     parameters: create_parameters,
     from_args: create_from_args,

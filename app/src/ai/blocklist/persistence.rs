@@ -1,26 +1,28 @@
 //! Manages how we serialize blocklist AI data for persistence.
 #![cfg_attr(not(feature = "local_fs"), allow(dead_code))]
 
-use std::{collections::HashMap, sync::Arc};
-use uuid::Uuid;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use anyhow::anyhow;
 use chrono::{DateTime, Local};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use uuid::Uuid;
+use warpui::{AppContext, EntityId, SingletonEntity};
 
-use crate::{
-    ai::{
-        agent::{
-            conversation::AIConversationId, AIAgentActionType, AIAgentAttachment, AIAgentContext,
-            AIAgentExchangeId, AIAgentInput, AIAgentPtyWriteMode, AskUserQuestionItem,
-            FileLocations, PassiveSuggestionResultType, ReadFilesRequest, UserQueryMode,
-        },
-        llms::LLMId,
-    },
-    terminal::model::block::{BlockId, SerializedBlock},
+use super::history_model::{
+    AIQueryHistoryOutputStatus, BlocklistAIHistoryEvent, BlocklistAIHistoryModel,
 };
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::{
+    AIAgentActionType, AIAgentAttachment, AIAgentContext, AIAgentExchangeId, AIAgentInput,
+    AIAgentPtyWriteMode, AskUserQuestionItem, FileLocations, PassiveSuggestionResultType,
+    ReadFilesRequest, UserQueryMode,
+};
+use crate::ai::llms::LLMId;
+use crate::persistence::ModelEvent;
+use crate::terminal::model::block::{BlockId, SerializedBlock};
 
-use super::AIQueryHistoryOutputStatus;
 /// Data we persist for each [`AIAgentExchange`] for use in history. Does not contain output data.
 #[derive(Debug, Deserialize, Clone)]
 pub struct PersistedAIInput {
@@ -71,12 +73,19 @@ impl TryFrom<&AIAgentInput> for PersistedAIInputType {
                 context: context.clone(),
                 referenced_attachments: Default::default(),
             }),
-            AIAgentInput::PassiveSuggestionResult { suggestion: PassiveSuggestionResultType::Prompt { prompt }, context, .. } => Ok(Self::Query {
+            AIAgentInput::PassiveSuggestionResult {
+                suggestion: PassiveSuggestionResultType::Prompt { prompt },
+                context,
+                ..
+            } => Ok(Self::Query {
                 text: prompt.clone(),
                 context: context.clone(),
                 referenced_attachments: Default::default(),
             }),
-            AIAgentInput::PassiveSuggestionResult { suggestion: PassiveSuggestionResultType::CodeDiff { .. }, .. } => Err(anyhow!(
+            AIAgentInput::PassiveSuggestionResult {
+                suggestion: PassiveSuggestionResultType::CodeDiff { .. },
+                ..
+            } => Err(anyhow!(
                 "PassiveSuggestionResult::CodeDiff is not persisted as a query."
             )),
             AIAgentInput::ActionResult { .. }
@@ -86,12 +95,12 @@ impl TryFrom<&AIAgentInput> for PersistedAIInputType {
             | AIAgentInput::CreateNewProject { .. }
             | AIAgentInput::CloneRepository { .. }
             | AIAgentInput::CodeReview { .. }
-            | AIAgentInput::FetchReviewComments { .. }
             | AIAgentInput::SummarizeConversation { .. }
             | AIAgentInput::InvokeSkill { .. }
             | AIAgentInput::StartFromAmbientRunPrompt { .. }
             | AIAgentInput::MessagesReceivedFromAgents { .. }
-            | AIAgentInput::EventsFromAgents { .. } => Err(anyhow::anyhow!(
+            | AIAgentInput::EventsFromAgents { .. }
+            | AIAgentInput::OrchestrationConfigUpdate { .. } => Err(anyhow::anyhow!(
                 "This input type is not persisted. Only Query inputs are persisted for up-arrow history."
             )),
         }
@@ -118,6 +127,80 @@ impl TryFrom<PersistedAIInputType> for AIAgentInput {
             }),
         }
     }
+}
+
+/// Builds the persistence-writer event for a query-bearing exchange update.
+///
+/// GUI panes and TUI sessions both consume the global history model, so the
+/// serialization and filtering rules must stay shared even though each
+/// frontend writes to its own persistence scope.
+///
+/// Returns `None` when the event is irrelevant to this terminal surface or the
+/// exchange should not be persisted.
+pub fn maybe_build_ai_query_upsert_event(
+    event: &BlocklistAIHistoryEvent,
+    terminal_surface_id: EntityId,
+    is_shared_ambient_agent_session: bool,
+    app: &AppContext,
+) -> Option<ModelEvent> {
+    if event
+        .terminal_surface_id()
+        .is_some_and(|id| id != terminal_surface_id)
+    {
+        return None;
+    }
+
+    let (exchange_id, conversation_id, is_hidden) = match event {
+        BlocklistAIHistoryEvent::AppendedExchange {
+            exchange_id,
+            conversation_id,
+            is_hidden,
+            ..
+        }
+        | BlocklistAIHistoryEvent::UpdatedStreamingExchange {
+            exchange_id,
+            conversation_id,
+            is_hidden,
+            ..
+        } => (*exchange_id, *conversation_id, *is_hidden),
+        _ => return None,
+    };
+
+    let history_model = BlocklistAIHistoryModel::as_ref(app);
+    let Some(conversation) = history_model.conversation(&conversation_id) else {
+        log::warn!("Received event with invalid conversation ID: {conversation_id:?}");
+        return None;
+    };
+    let Some(exchange) = conversation.exchange_with_id(exchange_id) else {
+        log::warn!("Received event with invalid exchange ID: {exchange_id:?}");
+        return None;
+    };
+
+    if is_hidden || conversation.is_entirely_passive() || is_shared_ambient_agent_session {
+        return None;
+    }
+
+    let inputs: Vec<_> = exchange
+        .input
+        .iter()
+        .filter_map(|input| PersistedAIInputType::try_from(input).ok())
+        .collect();
+    if inputs.is_empty() {
+        return None;
+    }
+
+    Some(ModelEvent::UpsertAIQuery {
+        query: Arc::new(PersistedAIInput {
+            start_ts: exchange.start_time,
+            inputs,
+            exchange_id: exchange.id,
+            conversation_id,
+            output_status: AIQueryHistoryOutputStatus::from(&exchange.output_status),
+            working_directory: exchange.working_directory.clone(),
+            model_id: exchange.model_id.clone(),
+            coding_model_id: exchange.coding_model_id.clone(),
+        }),
+    })
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -273,6 +356,12 @@ impl From<&AIAgentActionType> for PersistedAIAgentActionType {
             AIAgentActionType::AskUserQuestion { questions } => Self::AskUserQuestion {
                 questions: questions.clone(),
             },
+            // RunAgents 由历史里的 tool call message 渲染,没有需要本地持久化的
+            // per-action 状态。
+            AIAgentActionType::RunAgents(_) => Self::NotPersisted,
+            // 重启后等待被丢弃;未决的 tool call 会以孤儿形式留在 transcript 里,
+            // 直到下一次出站请求触发服务端 supersede。
+            AIAgentActionType::WaitForEvents { .. } => Self::NotPersisted,
         }
     }
 }
@@ -402,3 +491,7 @@ impl From<SerializedBlock> for SerializedBlockListItem {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "persistence_tests.rs"]
+mod tests;

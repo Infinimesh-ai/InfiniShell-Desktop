@@ -1,21 +1,17 @@
 use std::path::PathBuf;
 
-use warpui::{
-    elements::{
-        Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Element,
-        Fill as ElementFill, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, Padding,
-        ParentElement, Radius, Shrinkable, Text,
-    },
-    fonts::{Properties, Weight},
-    keymap::FixedBinding,
-    platform::Cursor,
-    ui_components::{
-        button::ButtonVariant,
-        checkbox::Checkbox,
-        components::{Coords, UiComponent, UiComponentStyles},
-    },
-    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+use warpui::elements::{
+    Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Element,
+    Fill as ElementFill, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, Padding,
+    ParentElement, Radius, Shrinkable, Text,
 };
+use warpui::fonts::{Properties, Weight};
+use warpui::keymap::FixedBinding;
+use warpui::platform::Cursor;
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::checkbox::Checkbox;
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
 
 /// Registers keybindings for the new-worktree modal (ESC to close).
 pub fn init(app: &mut AppContext) {

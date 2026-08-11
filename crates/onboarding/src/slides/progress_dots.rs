@@ -1,9 +1,8 @@
-use warp_core::ui::{appearance::Appearance, theme::color::internal_colors};
-use warpui::{
-    elements::{
-        ConstrainedBox, Container, CornerRadius, Empty, Flex, MainAxisSize, ParentElement, Radius,
-    },
-    Element,
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::theme::color::internal_colors;
+use warpui_core::Element;
+use warpui_core::elements::{
+    ConstrainedBox, Container, CornerRadius, Empty, Flex, MainAxisSize, ParentElement, Radius,
 };
 
 /// Render `n` dots with 4px radius and 8px spacing. `k` is the 0-based active dot index.

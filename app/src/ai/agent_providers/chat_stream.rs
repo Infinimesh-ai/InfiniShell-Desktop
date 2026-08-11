@@ -841,7 +841,9 @@ fn build_serializer_readiness_projection(
             | api::message::Message::MessagesReceivedFromAgents(_)
             | api::message::Message::ModelUsed(_)
             | api::message::Message::EventsFromAgents(_)
-            | api::message::Message::PassiveSuggestionResult(_) => {}
+            | api::message::Message::PassiveSuggestionResult(_)
+            // 编排计划配置快照不构成 user/assistant 边界,投影时忽略。
+            | api::message::Message::OrchestrationConfigSnapshot(_) => {}
         }
     }
 
@@ -875,11 +877,12 @@ fn build_serializer_readiness_projection(
             | AIAgentInput::CreateNewProject { .. }
             | AIAgentInput::CloneRepository { .. }
             | AIAgentInput::CodeReview { .. }
-            | AIAgentInput::FetchReviewComments { .. }
             | AIAgentInput::StartFromAmbientRunPrompt { .. }
             | AIAgentInput::MessagesReceivedFromAgents { .. }
             | AIAgentInput::EventsFromAgents { .. }
-            | AIAgentInput::PassiveSuggestionResult { .. } => {}
+            | AIAgentInput::PassiveSuggestionResult { .. }
+            // 编排计划配置更新不构成 user/assistant 边界,投影时忽略。
+            | AIAgentInput::OrchestrationConfigUpdate { .. } => {}
         }
     }
 
@@ -1005,7 +1008,9 @@ fn build_controller_readiness_projection(
             | api::message::Message::MessagesReceivedFromAgents(_)
             | api::message::Message::ModelUsed(_)
             | api::message::Message::EventsFromAgents(_)
-            | api::message::Message::PassiveSuggestionResult(_) => {}
+            | api::message::Message::PassiveSuggestionResult(_)
+            // 编排计划配置快照不构成 user/assistant 边界,投影时忽略。
+            | api::message::Message::OrchestrationConfigSnapshot(_) => {}
         }
     }
 
@@ -1044,11 +1049,12 @@ fn build_controller_readiness_projection(
             | AIAgentInput::CreateNewProject { .. }
             | AIAgentInput::CloneRepository { .. }
             | AIAgentInput::CodeReview { .. }
-            | AIAgentInput::FetchReviewComments { .. }
             | AIAgentInput::StartFromAmbientRunPrompt { .. }
             | AIAgentInput::MessagesReceivedFromAgents { .. }
             | AIAgentInput::EventsFromAgents { .. }
-            | AIAgentInput::PassiveSuggestionResult { .. } => {}
+            | AIAgentInput::PassiveSuggestionResult { .. }
+            // 编排计划配置更新不构成 user/assistant 边界,投影时忽略。
+            | AIAgentInput::OrchestrationConfigUpdate { .. } => {}
         }
     }
 
@@ -1675,6 +1681,7 @@ fn build_chat_request(
             AIAgentInput::SummarizeConversation {
                 prompt,
                 overflow: _,
+                context: _,
             } => {
                 // Zap BYOP 本地会话压缩入口 — 1:1 对齐 opencode `compaction.ts processCompaction`。
                 //
@@ -3032,7 +3039,7 @@ pub(super) fn build_client(
     // 这里显式构造 `WebConfig` 即使 genai default 已经 `gzip=false`(fork 修改)。
     //
     // User-Agent 动态绑定当前应用名(取自 `ChannelState::app_id().application_name()`,
-    // 由入口 bin 注册:`bin/oss.rs` → "Zap";其它 channel 自带各自名称)。
+    // 由入口 bin 注册:`bin/oss.rs` → "InfiniShell";其它 channel 自带各自名称)。
     // 这样上游服务能识别请求来自哪个分支构建,后续若改名也会自动跟随。
     let mut headers = reqwest::header::HeaderMap::new();
     if let Ok(value) = build_user_agent_header() {
@@ -3078,11 +3085,11 @@ pub(super) fn build_client(
 }
 
 /// 构造 BYOP 出站请求的 `User-Agent` 头,值形如:
-/// - `Zap/<git-tag>` —— release 构建有 `GIT_RELEASE_TAG` 注入时
-/// - `Zap` —— Dev / 本地构建无版本时
+/// - `InfiniShell/<git-tag>` —— release 构建有 `GIT_RELEASE_TAG` 注入时
+/// - `InfiniShell` —— Dev / 本地构建无版本时
 ///
 /// 应用名一律从 `ChannelState::app_id().application_name()` 取,确保与入口 bin
-/// 注册的 `AppId` 一致(`bin/oss.rs` 注册 "Zap")。
+/// 注册的 `AppId` 一致(`bin/oss.rs` 注册 "InfiniShell")。
 fn build_user_agent_header(
 ) -> Result<reqwest::header::HeaderValue, reqwest::header::InvalidHeaderValue> {
     let app_name = warp_core::channel::ChannelState::app_id()
@@ -4603,6 +4610,14 @@ pub async fn generate_byop_output(
                 tool_usage_metadata: None,
                 warp_token_usage: std::collections::HashMap::new(),
                 byok_token_usage: std::collections::HashMap::new(),
+                // 上游 proto b0886a95 新增的字段。BYOP 本地直连没有 Zap 平台积分、
+                // 自定义 endpoint 计费,也拿不到服务端的上下文分段拆解,统统留空;
+                // `total_input_tokens` 由服务端按 "最近一次主 agent 调用" 口径下发,
+                // 本地不复刻该口径,按 proto 注释的 "0 otherwise" 置 0。
+                total_input_tokens: 0,
+                platform_credits_spent: 0.0,
+                custom_endpoint_token_usage: std::collections::HashMap::new(),
+                context_window_segments: Vec::new(),
             })
         });
         yield Ok(make_finished_done(usage_metadata));
@@ -4827,6 +4842,7 @@ fn make_append_event(task_id: &str, message_id: &str, kind: AppendKind) -> api::
         task_id: task_id.to_owned(),
         server_message_data: String::new(),
         citations: vec![],
+        fetched_memories: vec![],
         message: Some(msg_inner),
         request_id: String::new(),
         timestamp: None,
@@ -5006,6 +5022,7 @@ fn make_reasoning_message(task_id: &str, request_id: &str, reasoning: String) ->
         task_id: task_id.to_owned(),
         server_message_data: String::new(),
         citations: vec![],
+        fetched_memories: vec![],
         message: Some(api::message::Message::AgentReasoning(
             api::message::AgentReasoning {
                 reasoning,
@@ -5023,6 +5040,7 @@ fn make_agent_output_message(task_id: &str, request_id: &str, text: String) -> a
         task_id: task_id.to_owned(),
         server_message_data: String::new(),
         citations: vec![],
+        fetched_memories: vec![],
         message: Some(api::message::Message::AgentOutput(
             api::message::AgentOutput { text },
         )),
@@ -5068,6 +5086,7 @@ fn make_user_query_message(
         task_id: task_id.to_owned(),
         server_message_data: String::new(),
         citations: vec![],
+        fetched_memories: vec![],
         message: Some(api::message::Message::UserQuery(api::message::UserQuery {
             query,
             context,
@@ -5090,6 +5109,7 @@ fn make_web_search_searching_message(
         task_id: task_id.to_owned(),
         server_message_data: String::new(),
         citations: vec![],
+        fetched_memories: vec![],
         message: Some(api::message::Message::WebSearch(api::message::WebSearch {
             status: Some(api::message::web_search::Status {
                 r#type: Some(api::message::web_search::status::Type::Searching(
@@ -5202,6 +5222,7 @@ fn make_web_search_status_from_result(
         task_id: task_id.to_owned(),
         server_message_data: String::new(),
         citations: vec![],
+        fetched_memories: vec![],
         message: Some(api::message::Message::WebSearch(api::message::WebSearch {
             status: Some(api::message::web_search::Status {
                 r#type: Some(r#type),
@@ -5224,6 +5245,7 @@ fn make_web_fetch_fetching_message(
         task_id: task_id.to_owned(),
         server_message_data: String::new(),
         citations: vec![],
+        fetched_memories: vec![],
         message: Some(api::message::Message::WebFetch(api::message::WebFetch {
             status: Some(api::message::web_fetch::Status {
                 r#type: Some(api::message::web_fetch::status::Type::Fetching(
@@ -5272,6 +5294,7 @@ fn make_web_fetch_status_from_result(
         task_id: task_id.to_owned(),
         server_message_data: String::new(),
         citations: vec![],
+        fetched_memories: vec![],
         message: Some(api::message::Message::WebFetch(api::message::WebFetch {
             status: Some(api::message::web_fetch::Status {
                 r#type: Some(r#type),
@@ -5300,6 +5323,7 @@ fn make_tool_call_result_message(
         task_id: task_id.to_owned(),
         server_message_data: content,
         citations: vec![],
+        fetched_memories: vec![],
         message: Some(api::message::Message::ToolCallResult(
             api::message::ToolCallResult {
                 tool_call_id,
@@ -5331,6 +5355,7 @@ fn make_tool_call_carrier_message(
         task_id: task_id.to_owned(),
         server_message_data: carrier,
         citations: vec![],
+        fetched_memories: vec![],
         message: Some(api::message::Message::ToolCall(api::message::ToolCall {
             tool_call_id: tool_call_id.to_owned(),
             tool: None,
@@ -5351,6 +5376,7 @@ fn make_tool_call_message(
         task_id: task_id.to_owned(),
         server_message_data: String::new(),
         citations: vec![],
+        fetched_memories: vec![],
         message: Some(api::message::Message::ToolCall(api::message::ToolCall {
             tool_call_id: tool_call_id.to_owned(),
             tool: Some(tool),
@@ -5950,7 +5976,7 @@ mod cache_boundary_stability_tests {
     fn build_three_turn_conversation() -> Vec<ChatMessage> {
         vec![
             ChatMessage::system(
-                "You are a helpful coding assistant for Zap BYOP.\n\
+                "You are a helpful coding assistant for InfiniShell BYOP.\n\
                  Guidelines: be concise, prefer code over prose.",
             ),
             ChatMessage::user("What is rust borrow checker?"),
@@ -7752,6 +7778,8 @@ mod issue_94_task_linearization_tests {
             task_id: task_id.to_string(),
             server_message_data: String::new(),
             citations: vec![],
+            // proto b0886a95 新增:服务端检索到的记忆,本地测试不涉及。
+            fetched_memories: vec![],
             message: Some(api::message::Message::UserQuery(api::message::UserQuery {
                 query: query.to_string(),
                 ..Default::default()

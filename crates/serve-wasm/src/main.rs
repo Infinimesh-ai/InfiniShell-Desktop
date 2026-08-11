@@ -1,18 +1,18 @@
-use axum::body::Body;
-use axum::http::Response;
-use axum::{extract::Request, Router};
-use std::path::Path;
-use std::{net::SocketAddr, path::PathBuf};
-use tower_http::{
-    services::{ServeDir, ServeFile},
-    trace::TraceLayer,
-};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-use clap::Parser;
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
+
+use axum::Router;
+use axum::body::Body;
+use axum::extract::Request;
+use axum::http::Response;
+use clap::Parser;
 use tower::ServiceBuilder;
+use tower_http::services::{ServeDir, ServeFile};
+use tower_http::trace::TraceLayer;
 use tracing::Span;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 /// A small webserver to serve the Zap wasm bundle and assets for local development.
 #[derive(Parser, Debug)]
@@ -38,7 +38,7 @@ async fn main() {
 
     let args = Args::parse();
 
-    println!("Serving Zap on http://localhost:{}", args.port);
+    println!("Serving InfiniShell on http://localhost:{}", args.port);
     serve(make_router(&args.directory), args.port).await
 }
 

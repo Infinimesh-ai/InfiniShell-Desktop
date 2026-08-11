@@ -109,7 +109,7 @@ impl SlashCommandRequest {
             if FeatureFlag::AgentView.is_enabled() {
                 controller.context_model.update(ctx, |context_model, ctx| {
                     context_model
-                        .try_enter_agent_view_for_new_conversation(
+                        .try_start_new_conversation(
                             AgentViewEntryOrigin::SlashCommand {
                                 trigger: SlashCommandTrigger::input(),
                             },
@@ -223,10 +223,20 @@ impl SlashCommandRequest {
                 intended_agent: None,
             }],
             SlashCommandRequest::Summarize { prompt, overflow } => {
-                vec![AIAgentInput::SummarizeConversation { prompt, overflow }]
+                vec![AIAgentInput::SummarizeConversation {
+                    prompt,
+                    overflow,
+                    context,
+                }]
             }
+            // Zap:`/pr-comments` 依赖云端拉取 code review 评论,上游已连同
+            // `AIAgentInput::FetchReviewComments` 一起删除。这里保留请求变体只是
+            // 为了不破坏 `terminal/input/slash_commands` 的调用点,实际不产生任何
+            // agent 输入 —— 空 vec 会让 `send_slash_command_request` 直接返回。
             SlashCommandRequest::FetchReviewComments { repo_path } => {
-                vec![AIAgentInput::FetchReviewComments { repo_path, context }]
+                let _ = repo_path;
+                log::warn!("/pr-comments 已随云端 code review 评论拉取一并下线,忽略该请求");
+                vec![]
             }
             SlashCommandRequest::InvokeSkill { skill, user_query } => {
                 let user_query = if FeatureFlag::SkillArguments.is_enabled() {

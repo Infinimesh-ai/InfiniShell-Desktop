@@ -1,39 +1,35 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::cmp::Ordering;
+use std::collections::HashMap;
 
 use anyhow::Error;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::{
-    features::FeatureFlag,
-    ui::{
-        appearance::Appearance,
-        theme::{color::internal_colors::neutral_4, Fill},
-    },
+use warp_core::features::FeatureFlag;
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::theme::Fill;
+use warp_core::ui::theme::color::internal_colors::neutral_4;
+use warpui::elements::{
+    ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Flex, Hoverable,
+    MainAxisAlignment, MainAxisSize, MouseState, MouseStateHandle, ParentElement, Radius,
 };
+use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{
-    elements::{
-        ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Flex, Hoverable,
-        MainAxisAlignment, MainAxisSize, MouseState, MouseStateHandle, ParentElement, Radius,
-    },
-    ui_components::{
-        button::{ButtonVariant, TextAndIcon, TextAndIconAlignment},
-        components::{Coords, UiComponent, UiComponentStyles},
-    },
     AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
     ViewHandle,
 };
 
-use crate::{
-    cloud_object::{model::persistence::ObjectStoreModel, StoredObject},
-    editor::{
-        EditOrigin, EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys,
-        SingleLineEditorOptions, TextOptions, ValidInputType,
-    },
-    send_telemetry_from_ctx,
-    server::{ids::SyncId, telemetry::TelemetrySpace},
-    ui_components::{buttons::icon_button, icons::Icon},
-    workflows::aliases::{WorkflowAlias, WorkflowAliases},
-    TelemetryEvent,
+use crate::cloud_object::StoredObject;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::editor::{
+    EditOrigin, EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys,
+    SingleLineEditorOptions, TextOptions, ValidInputType,
 };
+use crate::server::ids::SyncId;
+use crate::server::telemetry::TelemetrySpace;
+use crate::ui_components::buttons::icon_button;
+use crate::ui_components::icons::Icon;
+use crate::workflows::aliases::{WorkflowAlias, WorkflowAliases};
+use crate::{TelemetryEvent, send_telemetry_from_ctx};
 
 /// Width of the alias name editor.
 const ALIAS_EDITOR_WIDTH: f32 = 100.;
@@ -205,26 +201,25 @@ impl AliasBar {
         if let Some(alias) = self
             .selected_alias
             .and_then(|index| self.aliases.get_mut(index))
+            && alias.env_vars != sync_id
         {
-            if alias.env_vars != sync_id {
-                alias.env_vars = sync_id;
-                self.mark_dirty(true, ctx);
+            alias.env_vars = sync_id;
+            self.mark_dirty(true, ctx);
 
-                let env_vars_space: Option<TelemetrySpace> = sync_id
-                    .and_then(|id| ObjectStoreModel::as_ref(ctx).get_env_var_collection(&id))
-                    .map(|env_vars| env_vars.space(ctx))
-                    .map(Into::into);
+            let env_vars_space: Option<TelemetrySpace> = sync_id
+                .and_then(|id| ObjectStoreModel::as_ref(ctx).get_env_var_collection(&id))
+                .map(|env_vars| env_vars.space(ctx))
+                .map(Into::into);
 
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::WorkflowAliasEnvVarsAttached {
-                        workflow_id: self.workflow_id.into_server().map(Into::into),
-                        workflow_space: self.workflow_space(ctx),
-                        env_vars_id: sync_id.and_then(|id| id.into_server()).map(Into::into),
-                        env_vars_space,
-                    },
-                    ctx
-                );
-            }
+            send_telemetry_from_ctx!(
+                TelemetryEvent::WorkflowAliasEnvVarsAttached {
+                    workflow_id: self.workflow_id.into_server().map(Into::into),
+                    workflow_space: self.workflow_space(ctx),
+                    env_vars_id: sync_id.and_then(|id| id.into_server()).map(Into::into),
+                    env_vars_space,
+                },
+                ctx
+            );
         }
     }
 

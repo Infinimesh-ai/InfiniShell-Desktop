@@ -1,5 +1,6 @@
-use anyhow::{anyhow, Result};
 use std::borrow::Cow;
+
+use anyhow::{Result, anyhow};
 pub mod asset_cache;
 
 impl AssetProvider for () {

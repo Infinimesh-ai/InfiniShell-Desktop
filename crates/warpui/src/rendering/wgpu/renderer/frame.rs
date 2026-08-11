@@ -1,12 +1,11 @@
-use crate::rendering::wgpu::renderer::{glyph, image, rect, WGPUContext};
-
-use crate::rendering::wgpu::Resources;
-use crate::scene::Layer;
-use crate::Scene;
-
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
 use wgpu::{CommandEncoder, RenderPass, SurfaceTexture};
+
+use crate::Scene;
+use crate::rendering::wgpu::Resources;
+use crate::rendering::wgpu::renderer::{WGPUContext, glyph, image, rect};
+use crate::scene::Layer;
 
 #[derive(Default)]
 struct PerFrameState {

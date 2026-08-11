@@ -8,9 +8,11 @@ use warpui::{
     AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
-use crate::ai::agent::conversation::{AIConversation, AIConversationId, ConversationStatus};
+use crate::ai::agent::conversation::{
+    AIConversation, AIConversationId, ConversationStatus, StatusColorStyle,
+};
 use crate::ai::agent::AIAgentOutputMessageType;
-use crate::ai::blocklist::agent_view::conversation_navigation_links::conversation_navigation_card_with_icon;
+use crate::ai::blocklist::agent_view::orchestration_conversation_links::conversation_navigation_card_with_icon;
 use crate::ai::blocklist::agent_view::{AgentViewController, AgentViewControllerEvent};
 use crate::ai::blocklist::BlocklistAIHistoryEvent;
 use crate::appearance::Appearance;
@@ -200,7 +202,10 @@ impl View for ChildAgentStatusCard {
             let raw_title = child
                 .title()
                 .unwrap_or_else(|| crate::t!("common-untitled"));
-            let status_icon = child.status().status_icon_and_color(appearance.theme());
+            // 子代理状态卡走常规前景色徽标(Cloud 变体是云端 overlay 专用)。
+            let status_icon = child
+                .status()
+                .status_icon_and_color(appearance.theme(), StatusColorStyle::Standard);
 
             // T3-7:in_progress 子代理在 title 里 surface 当前 action,
             // "Untitled · ↳ Searching codebase..." / "Refactor X · ↳ Reading files..."。

@@ -3,50 +3,44 @@ use std::sync::Arc;
 use chrono::{Duration, Utc};
 use futures_util::future::BoxFuture;
 use warp_core::ui::appearance::Appearance;
-use warp_editor::editor::EditorView;
+// `runnable_command_at` 现在挂在 `EditorView` trait 上,需把 trait 引入作用域。
+use warp_editor::editor::EditorView as _;
+use warpui::r#async::Timer;
+use warpui::platform::WindowStyle;
+use warpui::presenter::ChildView;
 use warpui::{
-    platform::WindowStyle, presenter::ChildView, r#async::Timer, AddSingletonModel, App,
-    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewHandle, WindowId,
-};
-
-use crate::{
-    auth::{AuthManager, AuthStateProvider, UserUid, TEST_USER_EMAIL, TEST_USER_UID},
-    cloud_object::{
-        model::{
-            actions::ObjectActions,
-            persistence::ObjectStoreModel,
-            view::{Editor, EditorState, ObjectStoreViewModel},
-        },
-        update_manager::UpdateManager,
-        Owner, StoredObjectMetadata, StoredObjectPermissions,
-    },
-    drive::ZapDriveObjectSettings,
-    editor::{DisplayPoint, EditorAction, SelectAction},
-    network::NetworkStatus,
-    notebooks::{
-        active_notebook_data::Mode,
-        editor::{
-            keys::NotebookKeybindings, notebook_command::NotebookCommand, view::EditorViewAction,
-        },
-        notebook::FocusedComponent,
-        NotebookLocation, NotebookObject, NotebookObjectModel,
-    },
-    pane_group::PaneEvent,
-    search::files::model::FileSearchModel,
-    server::ids::{ClientId, ServerId, SyncId},
-    settings_view::keybindings::KeybindingChangedNotifier,
-    terminal::keys::TerminalKeybindings,
-    test_util::settings::initialize_settings_for_tests,
-    workflows::{workflow::Workflow, WorkflowSource, WorkflowType},
-    workspace::ActiveSession,
-    workspaces::{
-        user_profiles::{UserProfileWithUID, UserProfiles},
-        user_workspaces::UserWorkspaces,
-    },
-    GlobalResourceHandles, GlobalResourceHandlesProvider, PrivacySettings,
+    AddSingletonModel, App, AppContext, Element, Entity, SingletonEntity, TypedActionView, View,
+    ViewHandle, WindowId,
 };
 
 use super::{NotebookEvent, NotebookView, SAVE_PERIOD};
+use crate::auth::{AuthManager, AuthStateProvider, TEST_USER_EMAIL, TEST_USER_UID, UserUid};
+use crate::cloud_object::model::actions::ObjectActions;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::model::view::{Editor, EditorState, ObjectStoreViewModel};
+use crate::cloud_object::update_manager::UpdateManager;
+use crate::cloud_object::{Owner, StoredObjectMetadata, StoredObjectPermissions};
+use crate::drive::ZapDriveObjectSettings;
+use crate::editor::{DisplayPoint, EditorAction, SelectAction};
+use crate::network::NetworkStatus;
+use crate::notebooks::active_notebook_data::Mode;
+use crate::notebooks::editor::keys::NotebookKeybindings;
+use crate::notebooks::editor::notebook_command::NotebookCommand;
+use crate::notebooks::editor::view::EditorViewAction;
+use crate::notebooks::notebook::FocusedComponent;
+use crate::notebooks::{NotebookLocation, NotebookObject, NotebookObjectModel};
+use crate::pane_group::PaneEvent;
+use crate::search::files::model::FileSearchModel;
+use crate::server::ids::{ClientId, ServerId, SyncId};
+use crate::settings_view::keybindings::KeybindingChangedNotifier;
+use crate::terminal::keys::TerminalKeybindings;
+use crate::test_util::settings::initialize_settings_for_tests;
+use crate::workflows::workflow::Workflow;
+use crate::workflows::{WorkflowSource, WorkflowType};
+use crate::workspace::ActiveSession;
+use crate::workspaces::user_profiles::{UserProfileWithUID, UserProfiles};
+use crate::workspaces::user_workspaces::UserWorkspaces;
+use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider, PrivacySettings};
 
 fn initialize_app(app: &mut App) {
     initialize_settings_for_tests(app);

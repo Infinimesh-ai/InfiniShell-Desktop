@@ -1,16 +1,16 @@
-# Zap への設定の移行
+# InfiniShell への設定の移行
 
 [English](./migrate-from-warp.md) · [简体中文](./migrate-from-warp.zh-CN.md)
 
 このガイドは、**設定系の構成**(カスタムキーバインド・テーマ・ワークフロー・
-MCP 設定など)を以前のインストールから Zap へ引き継ぎたい方向けです。
+MCP 設定など)を以前のインストールから InfiniShell へ引き継ぎたい方向けです。
 
 移行元として想定されるのは 2 つあり、**両者では安全性プロファイルが異なる**ため、
 本書では別々のセクションで扱います。両方該当する場合は、**まず OpenWarp から
 移行してから** Warp の移行を検討してください。
 
-1. **OpenWarp** —— Zap の以前の名称。
-2. **上流の [Warp](https://github.com/warpdotdev/warp)** —— Zap が fork して
+1. **OpenWarp** —— InfiniShell の以前の名称。
+2. **上流の [Warp](https://github.com/warpdotdev/warp)** —— InfiniShell が fork して
    いるプロジェクト。
 
 本書は コマンド履歴・SQLite データベース・Drive オブジェクト・認証情報の
@@ -18,11 +18,17 @@ MCP 設定など)を以前のインストールから Zap へ引き継ぎたい�
 (Keychain / DPAPI / libsecret)、または schema が結合したストアに格納されて
 いるため、コピーは安全ではありません。
 
+> **Zap から上がってきた場合。** Zap は InfiniShell の直前の名称です。
+> InfiniShell は旧来の `.zap` / `dev.zap.Zap` ディレクトリを自動的には移行
+> **しません**。新しい `.infinishell` / `dev.infinishell.InfiniShell` を
+> まっさらな状態から使います。設定を引き継ぎたい場合は、本書の "OpenWarp" を
+> "Zap" と読み替えて手動で実施してください。
+
 ---
 
 ## ディスク上のレイアウト
 
-Zap(および OpenWarp / 上流 Warp も同様)はディスク上の状態を **3 種類の
+InfiniShell(および OpenWarp / 上流 Warp も同様)はディスク上の状態を **3 種類の
 ディレクトリ**に分けて格納します:
 
 - **config** —— `settings.toml`、`keybindings.yaml`
@@ -30,18 +36,18 @@ Zap(および OpenWarp / 上流 Warp も同様)はディスク上の状態を **
 - **home dotfile** —— `.mcp.json`、`skills/`
 
 macOS では 3 カテゴリーがいずれも単一の home dotfile ディレクトリ
-(`~/.warp/`、`~/.openwarp/`、または `~/.zap/`)に集約されます。Linux では
+(`~/.warp/`、`~/.openwarp/`、または `~/.infinishell/`)に集約されます。Linux では
 XDG 規約に従って **3 つの異なる場所** に分かれ、Windows では `directories`
 クレートの同等レイアウトで分かれます。下記の移行スクリプトはプラットフォーム
 ごとに各ファイルを正しい保存先に配置します。
 
-### Zap の保存先
+### InfiniShell の保存先
 
 | カテゴリー | macOS | Linux | Windows |
 |---|---|---|---|
-| config | `~/.zap/` | `${XDG_CONFIG_HOME:-~/.config}/zap/` | `%LOCALAPPDATA%\zap\Zap\config\` |
-| data | `~/.zap/` | `${XDG_DATA_HOME:-~/.local/share}/zap/` | `%APPDATA%\zap\Zap\data\` |
-| home dotfile | `~/.zap/` | `~/.zap/` | `%USERPROFILE%\.zap\` |
+| config | `~/.infinishell/` | `${XDG_CONFIG_HOME:-~/.config}/infinishell/` | `%LOCALAPPDATA%\infinishell\InfiniShell\config\` |
+| data | `~/.infinishell/` | `${XDG_DATA_HOME:-~/.local/share}/infinishell/` | `%APPDATA%\infinishell\InfiniShell\data\` |
+| home dotfile | `~/.infinishell/` | `~/.infinishell/` | `%USERPROFILE%\.infinishell\` |
 
 ### OpenWarp のソースパス
 
@@ -70,9 +76,9 @@ XDG 規約に従って **3 つの異なる場所** に分かれ、Windows では
 
 ## 1. OpenWarp からの移行(既存ユーザーの推奨経路)
 
-OpenWarp は改名前の Zap そのものです。改名コミット
-(`feat: rename project Warp/OpenWarp → Zap`)は識別子とディスク上のパス名を
-変更しただけで、**設定ファイルのフォーマットと schema は一切変わっていません**。
+OpenWarp は改名前の InfiniShell そのものです。2 回の改名コミット
+(`feat: rename project Warp/OpenWarp → Zap`、およびその後の Zap → InfiniShell)は
+識別子とディスク上のパス名を変更しただけで、**設定ファイルのフォーマットと schema は一切変わっていません**。
 下記のファイルはそのままコピーできます。
 
 ### コピー対象
@@ -90,16 +96,16 @@ OpenWarp は改名前の Zap そのものです。改名コミット
 
 ### 手順
 
-> コピー前に **Zap を終了**してください。プロセスがファイルを掴んでいると
+> コピー前に **InfiniShell を終了**してください。プロセスがファイルを掴んでいると
 > 失敗します。
 
 **macOS**
 
 ```sh
-mkdir -p "$HOME/.zap"
+mkdir -p "$HOME/.infinishell"
 for f in settings.toml keybindings.yaml themes workflows launch_configurations tab_configs skills .mcp.json; do
-  if [ -e "$HOME/.openwarp/$f" ] && [ ! -e "$HOME/.zap/$f" ]; then
-    cp -R "$HOME/.openwarp/$f" "$HOME/.zap/$f"
+  if [ -e "$HOME/.openwarp/$f" ] && [ ! -e "$HOME/.infinishell/$f" ]; then
+    cp -R "$HOME/.openwarp/$f" "$HOME/.infinishell/$f"
   fi
 done
 ```
@@ -111,9 +117,9 @@ src_config="${XDG_CONFIG_HOME:-$HOME/.config}/openwarp"
 src_data="${XDG_DATA_HOME:-$HOME/.local/share}/openwarp"
 src_home="$HOME/.openwarp"
 
-dst_config="${XDG_CONFIG_HOME:-$HOME/.config}/zap"
-dst_data="${XDG_DATA_HOME:-$HOME/.local/share}/zap"
-dst_home="$HOME/.zap"
+dst_config="${XDG_CONFIG_HOME:-$HOME/.config}/infinishell"
+dst_data="${XDG_DATA_HOME:-$HOME/.local/share}/infinishell"
+dst_home="$HOME/.infinishell"
 mkdir -p "$dst_config" "$dst_data" "$dst_home"
 
 copy() {
@@ -139,9 +145,9 @@ $src_config = "$env:LOCALAPPDATA\openwarp\OpenWarp\config"
 $src_data   = "$env:APPDATA\openwarp\OpenWarp\data"
 $src_home   = "$env:USERPROFILE\.openwarp"
 
-$dst_config = "$env:LOCALAPPDATA\zap\Zap\config"
-$dst_data   = "$env:APPDATA\zap\Zap\data"
-$dst_home   = "$env:USERPROFILE\.zap"
+$dst_config = "$env:LOCALAPPDATA\infinishell\InfiniShell\config"
+$dst_data   = "$env:APPDATA\infinishell\InfiniShell\data"
+$dst_home   = "$env:USERPROFILE\.infinishell"
 New-Item -ItemType Directory -Force -Path $dst_config, $dst_data, $dst_home | Out-Null
 
 function Copy-IfMissing($srcDir, $dstDir, $name) {
@@ -162,11 +168,11 @@ Copy-IfMissing $src_home   $dst_home   .mcp.json
 Copy-IfMissing $src_home   $dst_home   skills
 ```
 
-`[ ! -e ... ]` / `-not (Test-Path $to)` のガードは、Zap 側で既にカスタマイズ
+`[ ! -e ... ]` / `-not (Test-Path $to)` のガードは、InfiniShell 側で既にカスタマイズ
 した内容を上書きしないためのものです。OpenWarp の値で上書きしたい場合は外して
 ください。
 
-Zap が問題なく動くことを確認したら、上記の OpenWarp ディレクトリを削除して
+InfiniShell が問題なく動くことを確認したら、上記の OpenWarp ディレクトリを削除して
 ディスク領域を回収できます。もう誰も使っていません。
 
 ---
@@ -174,14 +180,14 @@ Zap が問題なく動くことを確認したら、上記の OpenWarp ディレ
 ## 2. 上流 Warp からの移行
 
 上流 Warp は独立した別プロダクトで、独自のディスク上アイデンティティを持ち
-ます(上の「上流 Warp のソースパス」表を参照)。Zap はビルド時の channel が
-`Oss` で、独自の app id(`dev.zap.Zap`)と、プラットフォームごとに分かれた
+ます(上の「上流 Warp のソースパス」表を参照)。InfiniShell はビルド時の channel が
+`Oss` で、独自の app id(`dev.infinishell.InfiniShell`)と、プラットフォームごとに分かれた
 レイアウトを持ちます。両者のインストールは互いに相手のファイルを見ることが
-できません —— これは Warp のアカウントやクラウド状態を Zap に持ち込まない
+できません —— これは Warp のアカウントやクラウド状態を InfiniShell に持ち込まない
 ための仕様でもあります。
 
 下記のテキスト形式ファイルは schema が安定しており、コピーしても安全です。
-**それ以外はそうではありません** —— Warp は Zap とは独立に進化しており、
+**それ以外はそうではありません** —— Warp は InfiniShell とは独立に進化しており、
 バイナリ / プライベートストアは Warp の認証や bundle 識別子に紐付いている
 場合があります。
 
@@ -206,24 +212,24 @@ Zap が問題なく動くことを確認したら、上記の OpenWarp ディレ
   `~/Library/Application Support/dev.warp.Warp/`(Linux / Windows ではそれに
   相当する state ディレクトリ)にあるプライベートストアで、ユーザー設定・
   認証トークン・マシン依存 ID・クラウドキャッシュが混在しています。ファイル
-  ごとコピーすると ID 情報が漏れたり、Zap の認証状態が壊れたりします。
-  Zap のデフォルトはもともとプライバシー優先なので、**触らないでください**。
+  ごとコピーすると ID 情報が漏れたり、InfiniShell の認証状態が壊れたりします。
+  InfiniShell のデフォルトはもともとプライバシー優先なので、**触らないでください**。
 - **`warp.sqlite`**(および `-wal` / `-shm` のサイドカー)—— schema が上流
-  Warp に結合しており、Zap の migration が通る保証はありません。
+  Warp に結合しており、InfiniShell の migration が通る保証はありません。
 - **Keychain / DPAPI / libsecret のエントリ** —— Warp の bundle / service 名に
-  紐付いており、Zap からは利用できません。
+  紐付いており、InfiniShell からは利用できません。
 
 ### 手順
 
-> コピー前に **Warp と Zap を終了**してください。
+> コピー前に **Warp と InfiniShell を終了**してください。
 
 **macOS**
 
 ```sh
-mkdir -p "$HOME/.zap"
+mkdir -p "$HOME/.infinishell"
 for f in settings.toml keybindings.yaml themes workflows launch_configurations tab_configs skills .mcp.json; do
-  if [ -e "$HOME/.warp/$f" ] && [ ! -e "$HOME/.zap/$f" ]; then
-    cp -R "$HOME/.warp/$f" "$HOME/.zap/$f"
+  if [ -e "$HOME/.warp/$f" ] && [ ! -e "$HOME/.infinishell/$f" ]; then
+    cp -R "$HOME/.warp/$f" "$HOME/.infinishell/$f"
   fi
 done
 ```
@@ -235,9 +241,9 @@ src_config="${XDG_CONFIG_HOME:-$HOME/.config}/warp-terminal"
 src_data="${XDG_DATA_HOME:-$HOME/.local/share}/warp-terminal"
 src_home="$HOME/.warp"
 
-dst_config="${XDG_CONFIG_HOME:-$HOME/.config}/zap"
-dst_data="${XDG_DATA_HOME:-$HOME/.local/share}/zap"
-dst_home="$HOME/.zap"
+dst_config="${XDG_CONFIG_HOME:-$HOME/.config}/infinishell"
+dst_data="${XDG_DATA_HOME:-$HOME/.local/share}/infinishell"
+dst_home="$HOME/.infinishell"
 mkdir -p "$dst_config" "$dst_data" "$dst_home"
 
 copy() {
@@ -263,9 +269,9 @@ $src_config = "$env:LOCALAPPDATA\warp\Warp-Terminal\config"
 $src_data   = "$env:APPDATA\warp\Warp-Terminal\data"
 $src_home   = "$env:USERPROFILE\.warp"
 
-$dst_config = "$env:LOCALAPPDATA\zap\Zap\config"
-$dst_data   = "$env:APPDATA\zap\Zap\data"
-$dst_home   = "$env:USERPROFILE\.zap"
+$dst_config = "$env:LOCALAPPDATA\infinishell\InfiniShell\config"
+$dst_data   = "$env:APPDATA\infinishell\InfiniShell\data"
+$dst_home   = "$env:USERPROFILE\.infinishell"
 New-Item -ItemType Directory -Force -Path $dst_config, $dst_data, $dst_home | Out-Null
 
 function Copy-IfMissing($srcDir, $dstDir, $name) {
@@ -292,37 +298,37 @@ Warp 自体のデータは一切手を加えません —— Warp 本体はそ�
 
 ## 確認方法
 
-Zap を起動すると、テーマピッカーにカスタムテーマ、キーバインドエディタに
+InfiniShell を起動すると、テーマピッカーにカスタムテーマ、キーバインドエディタに
 カスタムキーバインド、ワークフローランチャーにカスタムワークフローが見える
 はずです。`settings.toml` に存在するキーは、設定 UI 上でも移行元の値が反映
 されます。
 
 うまく反映されない場合、原因は上記 8 ファイルのいずれかに含まれています ——
-テキストエディタで開いて確認するか、削除して Zap のデフォルトに戻して
+テキストエディタで開いて確認するか、削除して InfiniShell のデフォルトに戻して
 ください。
 
 ## ロールバック
 
-本書の操作はいずれも破壊的ではありません。コピーしたファイルはどれも Zap が
+本書の操作はいずれも破壊的ではありません。コピーしたファイルはどれも InfiniShell が
 起動時にデフォルトから再生成できるものです。すべてを元に戻すには:
 
 ```sh
 # macOS
-rm -rf ~/.zap
+rm -rf ~/.infinishell
 ```
 
 ```sh
 # Linux
-rm -rf "${XDG_CONFIG_HOME:-$HOME/.config}/zap"
-rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/zap"
-rm -rf "$HOME/.zap"
+rm -rf "${XDG_CONFIG_HOME:-$HOME/.config}/infinishell"
+rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/infinishell"
+rm -rf "$HOME/.infinishell"
 ```
 
 ```powershell
 # Windows
-Remove-Item -Recurse -Force "$env:APPDATA\zap"
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\zap"
-Remove-Item -Recurse -Force "$env:USERPROFILE\.zap"
+Remove-Item -Recurse -Force "$env:APPDATA\infinishell"
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\infinishell"
+Remove-Item -Recurse -Force "$env:USERPROFILE\.infinishell"
 ```
 
 OpenWarp および Warp のソースディレクトリは、いずれも本ガイドからは変更されません。

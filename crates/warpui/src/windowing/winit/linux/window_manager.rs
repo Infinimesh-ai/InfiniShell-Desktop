@@ -1,7 +1,8 @@
-use command::blocking::Command;
 use std::os::unix::fs::{FileTypeExt, MetadataExt};
 use std::process::Stdio;
 use std::{env, fs, path};
+
+use command::blocking::Command;
 
 /// Attempt to find a running process that we believe is the window compositor.
 ///
@@ -43,12 +44,11 @@ pub(crate) fn look_for_wayland_compositor() -> Option<String> {
             .ok()
             .filter(|out| out.status.success());
 
-        if let Some(wm_name_raw) = wm_match_cmd {
-            if let Ok(wm_name) = String::from_utf8(wm_name_raw.stdout) {
-                if !wm_name.is_empty() {
-                    return Some(wm_name);
-                }
-            }
+        if let Some(wm_name_raw) = wm_match_cmd
+            && let Ok(wm_name) = String::from_utf8(wm_name_raw.stdout)
+            && !wm_name.is_empty()
+        {
+            return Some(wm_name);
         }
     }
     None
@@ -114,10 +114,9 @@ fn get_wayland_compositor_from_socket() -> Option<String> {
         if let Ok(wm_name_raw) = Command::new("ps")
             .args(["-p", pid.as_str(), "-o", "comm="])
             .output()
+            && let Ok(wm_name) = String::from_utf8(wm_name_raw.stdout)
         {
-            if let Ok(wm_name) = String::from_utf8(wm_name_raw.stdout) {
-                return Some(wm_name);
-            }
+            return Some(wm_name);
         }
     }
 

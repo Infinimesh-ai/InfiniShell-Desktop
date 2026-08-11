@@ -12,6 +12,7 @@ use input_context::{input_context_for_request, parse_context_attachments};
 pub use slash_command::*;
 
 use self::response_stream::{PendingTitleGeneration, ResponseStream, ResponseStreamEvent};
+use ai::skills::SkillPathOrigin;
 use super::agent_view::AgentViewEntryOrigin;
 use super::ResponseStreamId;
 use super::{
@@ -26,8 +27,8 @@ use crate::ai::agent::api::{self, ServerConversationToken};
 use crate::ai::agent::conversation::{AIConversation, ConversationStatus};
 use crate::ai::agent::task::TaskId;
 use crate::ai::agent::{
-    AIAgentActionResult, CancellationReason, PassiveSuggestionResultType, PassiveSuggestionTrigger,
-    PassiveSuggestionTriggerType, RunningCommand,
+    AIAgentActionResult, CancellationOutcome, CancellationReason, PassiveSuggestionResultType,
+    PassiveSuggestionTrigger, PassiveSuggestionTriggerType, RunningCommand,
 };
 use crate::ai::agent::{DocumentContentAttachmentSource, FileContext};
 use crate::ai::ambient_agents::AmbientAgentTaskId;
@@ -106,7 +107,7 @@ impl SessionContext {
             .and_then(|info| info.ssh_connection_info.clone());
         let is_legacy_ssh = session_arc
             .as_ref()
-            .map(|s| s.is_legacy_ssh_session())
+            .map(|s| s.is_ssh_wrapper_session())
             .unwrap_or(false);
         SessionContext {
             session_type: session.session_type(app),
@@ -135,6 +136,19 @@ impl SessionContext {
         match &self.session_type {
             Some(SessionType::WarpifiedRemote { host_id }) => host_id.as_ref(),
             Some(SessionType::Local) | None => None,
+        }
+    }
+
+    /// 该会话对应的 skill 目录来源(本地 / 远端 host / 不可用)。
+    pub fn skill_path_origin(&self) -> SkillPathOrigin {
+        match &self.session_type {
+            Some(SessionType::WarpifiedRemote {
+                host_id: Some(host_id),
+            }) => SkillPathOrigin::Remote {
+                host_id: host_id.clone(),
+            },
+            Some(SessionType::WarpifiedRemote { host_id: None }) => SkillPathOrigin::Unavailable,
+            Some(SessionType::Local) | None => SkillPathOrigin::Local,
         }
     }
 
@@ -443,6 +457,11 @@ impl InputQuery {
 }
 
 impl BlocklistAIController {
+    /// 当前 controller 所属会话的 skill 目录来源(本地 / 远端 host)。
+    pub fn skill_path_origin(&self, ctx: &AppContext) -> SkillPathOrigin {
+        SessionContext::from_session(self.active_session.as_ref(ctx), ctx).skill_path_origin()
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         input_model: ModelHandle<BlocklistAIInputModel>,
@@ -454,7 +473,7 @@ impl BlocklistAIController {
         terminal_view_id: EntityId,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
-        ctx.subscribe_to_model(&action_model, move |me, event, ctx| {
+        ctx.subscribe_to_model(&action_model, move |me, _, event, ctx| {
             let BlocklistAIActionEvent::FinishedAction {
                 conversation_id,
                 cancellation_reason,
@@ -463,6 +482,16 @@ impl BlocklistAIController {
             else {
                 return;
             };
+            // `FinalizedExternally`(如 shell 退出)意味着会话状态与消息由专门路径写入,
+            // 这里既不触发 follow-up 也不改会话状态。
+            let cancellation_outcome =
+                cancellation_reason.map(|reason| reason.conversation_outcome());
+            if matches!(
+                cancellation_outcome,
+                Some(CancellationOutcome::FinalizedExternally)
+            ) {
+                return;
+            }
             let action_model = me.action_model.as_ref(ctx);
             if action_model.has_unfinished_actions_for_conversation(*conversation_id) {
                 return;
@@ -499,15 +528,23 @@ impl BlocklistAIController {
                 });
             let has_manual_follow_up = me.pending_passive_follow_ups.contains(conversation_id);
 
-            let is_lrc_command_completed =
-                cancellation_reason.is_some_and(|reason| reason.is_lrc_command_completed());
+            // `Succeeded` 类取消(长命令乐观完成、revert 等)本身就是终态结果,
+            // 既不触发 follow-up,也不算作取消。
+            let treat_as_success =
+                matches!(cancellation_outcome, Some(CancellationOutcome::Succeeded));
             let should_trigger_follow_up_request = (!is_passive_code_diff
-                && !is_lrc_command_completed
+                && !treat_as_success
                 && finished_action_results
                     .iter()
                     .any(|result| result.result.should_trigger_request_upon_completion()))
                 || has_manual_follow_up;
             if !should_trigger_follow_up_request {
+                if matches!(
+                    cancellation_outcome,
+                    Some(CancellationOutcome::KeepInProgress)
+                ) {
+                    return;
+                }
                 // We also check if there's an in-flight req, because it's possible that this
                 // subscription callback was queued in response to auto-cancelling pending actions
                 // in the process of constructing a request. In such cases, we don't want to update
@@ -535,7 +572,7 @@ impl BlocklistAIController {
                     let updated_conversation_status = if finished_action_results
                         .iter()
                         .all(|result| result.result.is_successful())
-                        || is_lrc_command_completed
+                        || treat_as_success
                     {
                         ConversationStatus::Success
                     } else {
@@ -572,7 +609,7 @@ impl BlocklistAIController {
             me.send_follow_up_for_conversation(*conversation_id, trigger, ctx);
         });
 
-        ctx.subscribe_to_model(&agent_view_controller, |me, event, ctx| {
+        ctx.subscribe_to_model(&agent_view_controller, |me, _, event, ctx| {
             let AgentViewControllerEvent::ExitedAgentView {
                 conversation_id,
                 final_exchange_count,
@@ -852,7 +889,7 @@ impl BlocklistAIController {
             AIDocumentModel::handle(ctx).update(ctx, |model, model_ctx| {
                 model.create_document_with_id(
                     document_id,
-                    crate::ai::ai_document_view::DEFAULT_PLANNING_DOCUMENT_TITLE,
+                    ai::document::DEFAULT_PLANNING_DOCUMENT_TITLE,
                     content.clone(),
                     conversation_id,
                     file_link_resolution_context.clone(),
@@ -1888,6 +1925,8 @@ impl BlocklistAIController {
                 self.terminal_view_id,
                 is_autoexecute_override,
                 false,
+                // 不是 CLI agent transcript 会话。
+                false,
                 ctx,
             )
         });
@@ -2660,6 +2699,7 @@ impl BlocklistAIController {
             })),
             request_id: request_id.to_owned(),
             timestamp: None,
+            fetched_memories: vec![],
         }
     }
 
@@ -2726,6 +2766,7 @@ impl BlocklistAIController {
             })),
             request_id: request_id.to_owned(),
             timestamp: None,
+            fetched_memories: vec![],
         }
     }
 
@@ -2782,7 +2823,9 @@ impl BlocklistAIController {
                     error_message,
                     will_attempt_resume: false,
                     waiting_for_network: false,
+                    is_user_error: false,
                 },
+                /* recovery_pending */ false,
                 &response_stream_id,
                 conversation_id,
                 self.terminal_view_id,
@@ -2983,7 +3026,7 @@ impl BlocklistAIController {
                         conversation_data.id,
                         request_params.model.clone(),
                         is_queued_prompt,
-                        "Zap couldn't save the BYOP conversation state needed to send this \
+                        "InfiniShell couldn't save the BYOP conversation state needed to send this \
                          request. Check that conversation persistence is enabled and that there \
                          is enough disk space, then try again."
                             .to_owned(),
@@ -3018,7 +3061,7 @@ impl BlocklistAIController {
         let input_contains_user_query = request_input
             .all_inputs()
             .any(|input| input.is_user_query());
-        ctx.subscribe_to_model(&response_stream, move |me, event, ctx| {
+        ctx.subscribe_to_model(&response_stream, move |me, _, event, ctx| {
             me.handle_response_stream_event(
                 input_contains_user_query,
                 event,
@@ -3153,6 +3196,39 @@ impl BlocklistAIController {
             .try_cancel_stream(stream_id, reason, ctx)
     }
 
+    /// Zap:该访问器与下面的测试桩在合并时随上游 `#[cfg(test)]` 块丢失,
+    /// 而 `in_flight_response_streams` 字段私有、`PendingResponseStreams` 是 `pub(super)`,
+    /// 测试无法绕过,故按上游原样取回。
+    pub fn has_active_stream_for_conversation(
+        &self,
+        conversation_id: AIConversationId,
+        app: &AppContext,
+    ) -> bool {
+        self.in_flight_response_streams
+            .has_active_stream_for_conversation(conversation_id, app)
+    }
+
+    #[cfg(test)]
+    pub fn register_mock_stream_for_test(
+        &mut self,
+        stream_id: ResponseStreamId,
+        conversation_id: AIConversationId,
+        stream: ModelHandle<ResponseStream>,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let stream_clone = stream.clone();
+        ctx.subscribe_to_model(&stream, move |me, _, event, ctx| {
+            me.handle_response_stream_event(false, event, &stream_clone, ctx);
+        });
+        self.in_flight_response_streams.register_new_stream(
+            stream_id,
+            conversation_id,
+            stream,
+            CancellationReason::ManuallyCancelled,
+            ctx,
+        );
+    }
+
     /// Cancels 'progress' for the active conversation if there is one:
     ///  * If there is an in-flight request, cancels it.
     ///  * Else, if the request finished, but actions from the response are pending or mid-execution, cancels all of them.
@@ -3180,6 +3256,92 @@ impl BlocklistAIController {
                 action_model.cancel_all_pending_actions(conversation_id, Some(reason), ctx);
             });
             self.set_input_mode_for_cancellation(ctx);
+        }
+    }
+
+    /// Finalizes a conversation as a terminal failure because an agent-issued
+    /// command caused the shell process to exit (e.g. it ran `exit`, or ran a
+    /// failing command after enabling `set -e`).
+    ///
+    /// Invoked from the terminal view's shell-exit handler before the pane is
+    /// torn down. The conversation is moved into a terminal `Error` state with a
+    /// shell-exit message (naming the secret-redacted `command` that exited the
+    /// shell), so the subsequent pane-close cancellation — which is guarded by
+    /// `is_in_progress` — becomes a no-op and cannot overwrite the failure.
+    pub fn fail_conversation_due_to_shell_exit(
+        &mut self,
+        conversation_id: AIConversationId,
+        command: String,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let terminal_view_id = self.terminal_view_id;
+        let history_model = BlocklistAIHistoryModel::handle(ctx);
+        let shell_exit_error = RenderableAIError::AgentExitedShell { command };
+
+        // Only act on conversations that are still running. A finished
+        // conversation (e.g. the agent already completed) must not be
+        // retroactively marked as failed.
+        let is_in_progress = history_model
+            .as_ref(ctx)
+            .conversation(&conversation_id)
+            .is_some_and(|conversation| conversation.status().is_in_progress());
+        if !is_in_progress {
+            return;
+        }
+
+        // Finish any in-flight response stream(s) with the shell-exit error. This
+        // marks the streaming exchange(s) as errored, sets the conversation to
+        // `Error` (with a message), and renders the failure inline. We then cancel
+        // the underlying request so it stops streaming; the cancellation does not
+        // overwrite the status because `AgentExitedShell` maps to
+        // `CancellationOutcome::FinalizedExternally`.
+        let stream_ids = self
+            .in_flight_response_streams
+            .stream_ids_for_conversation(conversation_id, ctx);
+        let had_in_flight_stream = !stream_ids.is_empty();
+        for stream_id in &stream_ids {
+            let error = shell_exit_error.clone();
+            history_model.update(ctx, |history_model, ctx| {
+                history_model.mark_response_stream_completed_with_error(
+                    error,
+                    /* recovery_pending */ false,
+                    stream_id,
+                    conversation_id,
+                    terminal_view_id,
+                    ctx,
+                );
+            });
+            self.try_cancel_pending_response_stream(
+                stream_id,
+                CancellationReason::AgentExitedShell,
+                ctx,
+            );
+        }
+
+        // Stop any pending or mid-execution actions so a queued action result
+        // can't subsequently move the conversation back to Success/Cancelled.
+        self.action_model.update(ctx, |action_model, ctx| {
+            action_model.cancel_all_pending_actions(
+                conversation_id,
+                Some(CancellationReason::AgentExitedShell),
+                ctx,
+            );
+        });
+
+        // If there was no in-flight stream to attach the error to (e.g. the agent
+        // ran `exit` and no follow-up request was in flight), set the terminal
+        // `Error` status directly, recording the structured shell-exit error so
+        // status consumers classify it as FAILED rather than a generic ERROR.
+        if !had_in_flight_stream {
+            history_model.update(ctx, |history_model, ctx| {
+                history_model.update_conversation_status_with_error(
+                    terminal_view_id,
+                    conversation_id,
+                    ConversationStatus::Error,
+                    Some(shell_exit_error),
+                    ctx,
+                );
+            });
         }
     }
 
@@ -3215,6 +3377,7 @@ impl BlocklistAIController {
         ctx: &mut ModelContext<Self>,
     ) {
         let terminal_view_id = self.terminal_view_id;
+        let skill_path_origin = self.skill_path_origin(ctx);
         let _ = ctx.spawn(
             async move {
                 let result = crate::ai::agent_providers::chat_stream::generate_title_via_byop(
@@ -3239,11 +3402,12 @@ impl BlocklistAIController {
                             client_actions,
                             conversation_id,
                             terminal_view_id,
+                            &skill_path_origin,
                             ctx,
                         ) {
                             Ok(()) => {
                                 ctx.emit(BlocklistAIHistoryEvent::UpdatedConversationMetadata {
-                                    terminal_view_id: Some(terminal_view_id),
+                                    terminal_surface_id: Some(terminal_view_id),
                                     conversation_id,
                                 });
                             }
@@ -3353,6 +3517,7 @@ impl BlocklistAIController {
                             }
                             warp_multi_agent_api::response_event::Type::ClientActions(actions) => {
                                 let client_actions = actions.actions;
+                                let skill_path_origin = self.skill_path_origin(ctx);
                                 let apply_result =
                                     history_model.update(ctx, |history_model, ctx| {
                                         history_model.apply_client_actions(
@@ -3360,6 +3525,7 @@ impl BlocklistAIController {
                                             client_actions,
                                             conversation_id,
                                             self.terminal_view_id,
+                                            &skill_path_origin,
                                             ctx,
                                         )
                                     });
@@ -3378,18 +3544,25 @@ impl BlocklistAIController {
                             // 本地化后 BYOP 场景下不存在"购买额外 credits"业务。
                         }
 
-                        let mut renderable_error: RenderableAIError = e.as_ref().into();
+                        // 为本次失败安排了 resume 时,会话保持在非终态的 TransientError
+                        // 状态而不是 Error。
+                        let recovery_pending = response_stream
+                            .as_ref(ctx)
+                            .should_resume_conversation_after_stream_finished();
+                        let mut renderable_error: RenderableAIError = (&e).into();
                         if let RenderableAIError::Other {
+                            will_attempt_resume,
+                            waiting_for_network,
+                            ..
+                        }
+                        | RenderableAIError::TransientNetworkError {
                             will_attempt_resume,
                             waiting_for_network,
                             ..
                         } = &mut renderable_error
                         {
-                            let should_attempt_resume = response_stream
-                                .as_ref(ctx)
-                                .should_resume_conversation_after_stream_finished();
-                            *will_attempt_resume |= should_attempt_resume;
-                            if should_attempt_resume {
+                            *will_attempt_resume |= recovery_pending;
+                            if recovery_pending {
                                 let network_status = NetworkStatus::as_ref(ctx);
                                 *waiting_for_network = !network_status.is_online();
                             }
@@ -3398,6 +3571,7 @@ impl BlocklistAIController {
                         history_model.update(ctx, |history_model, ctx| {
                             history_model.mark_response_stream_completed_with_error(
                                 renderable_error,
+                                recovery_pending,
                                 &stream_id,
                                 conversation_id,
                                 self.terminal_view_id,
@@ -3482,7 +3656,9 @@ impl BlocklistAIController {
                                 error_message: error_message.to_string(),
                                 will_attempt_resume: false,
                                 waiting_for_network: false,
+                                is_user_error: false,
                             },
+                            /* recovery_pending */ false,
                             &stream_id,
                             conversation_id,
                             self.terminal_view_id,
@@ -3680,7 +3856,7 @@ impl BlocklistAIController {
             .unwrap_or(0);
 
         let history_model = BlocklistAIHistoryModel::handle(ctx);
-        history_model.update(ctx, |history_model, _| {
+        history_model.update(ctx, |history_model, ctx| {
             // Update conversation cost and usage information before updating and
             // persisting the conversation.
             history_model.update_conversation_cost_and_usage_for_request(
@@ -3691,6 +3867,7 @@ impl BlocklistAIController {
                 finished_event.token_usage,
                 finished_event.conversation_usage_metadata.take(),
                 did_request_contain_user_query,
+                ctx,
             );
         });
 
@@ -3758,7 +3935,9 @@ impl BlocklistAIController {
                             error_message: error_message.to_owned(),
                             will_attempt_resume: false,
                             waiting_for_network: false,
+                            is_user_error: false,
                         },
+                        /* recovery_pending */ false,
                         stream_id,
                         conversation_id,
                         self.terminal_view_id,
@@ -3771,6 +3950,7 @@ impl BlocklistAIController {
                 history_model.update(ctx, |history_model, ctx| {
                     history_model.mark_response_stream_completed_with_error(
                         RenderableAIError::ContextWindowExceeded(error_message.to_owned()),
+                        /* recovery_pending */ false,
                         stream_id,
                         conversation_id,
                         self.terminal_view_id,
@@ -3781,7 +3961,10 @@ impl BlocklistAIController {
             Some(warp_multi_agent_api::response_event::stream_finished::Reason::QuotaLimit(_)) => {
                 history_model.update(ctx, |history_model, ctx| {
                     history_model.mark_response_stream_completed_with_error(
-                        RenderableAIError::QuotaLimit,
+                        RenderableAIError::QuotaLimit {
+                            user_display_message: None,
+                        },
+                        /* recovery_pending */ false,
                         stream_id,
                         conversation_id,
                         self.terminal_view_id,
@@ -3797,7 +3980,9 @@ impl BlocklistAIController {
                             error_message: error_message.to_owned(),
                             will_attempt_resume: false,
                             waiting_for_network: false,
+                            is_user_error: false,
                         },
+                        /* recovery_pending */ false,
                         stream_id,
                         conversation_id,
                         self.terminal_view_id,
@@ -3812,11 +3997,23 @@ impl BlocklistAIController {
                     .try_into()
                     .ok()
                     .is_some_and(|p: LlmProvider| p == LlmProvider::AwsBedrock);
+                // Gemini Enterprise 在 Zap 中是保留功能(settings_view 的
+                // `GeminiEnterpriseWidget`、`FeatureFlag::GeminiEnterprise`、
+                // `LLMModelHost::GeminiEnterprise` 均在),它的凭据失效有专用的
+                // 可渲染错误 + inline action(刷新凭据 / 打开设置),
+                // 不能退化成通用的 InvalidApiKey 文案。
+                let is_gemini_enterprise = details
+                    .provider
+                    .try_into()
+                    .ok()
+                    .is_some_and(|p: LlmProvider| p == LlmProvider::GeminiEnterprise);
 
                 let error = if is_aws_bedrock {
                     RenderableAIError::AwsBedrockCredentialsExpiredOrInvalid {
                         model_name: details.model_name,
                     }
+                } else if is_gemini_enterprise {
+                    RenderableAIError::GeminiEnterpriseCredentialsExpiredOrInvalid
                 } else {
                     let provider = details.provider.try_into().ok().and_then(|p| match p {
                         LlmProvider::Google => Some("Google"),
@@ -3824,7 +4021,9 @@ impl BlocklistAIController {
                         LlmProvider::Openai => Some("OpenAI"),
                         LlmProvider::Xai => Some("xAI"),
                         LlmProvider::Openrouter => Some("OpenRouter"),
-                        LlmProvider::AwsBedrock | LlmProvider::Unknown => None,
+                        LlmProvider::AwsBedrock
+                        | LlmProvider::GeminiEnterprise
+                        | LlmProvider::Unknown => None,
                     });
                     RenderableAIError::InvalidApiKey {
                         provider: provider.unwrap_or("Unknown").to_string(),
@@ -3835,6 +4034,7 @@ impl BlocklistAIController {
                 history_model.update(ctx, |history_model, ctx| {
                     history_model.mark_response_stream_completed_with_error(
                         error,
+                        /* recovery_pending */ false,
                         stream_id,
                         conversation_id,
                         self.terminal_view_id,
@@ -3853,7 +4053,9 @@ impl BlocklistAIController {
                             error_message,
                             will_attempt_resume: false,
                             waiting_for_network: false,
+                            is_user_error: false,
                         },
+                        /* recovery_pending */ false,
                         stream_id,
                         conversation_id,
                         self.terminal_view_id,
@@ -3866,6 +4068,7 @@ impl BlocklistAIController {
                 history_model.update(ctx, |history_model, ctx| {
                     history_model.mark_response_stream_completed_with_error(
                         RenderableAIError::ContextWindowExceeded(error_message.to_owned()),
+                        /* recovery_pending */ false,
                         stream_id,
                         conversation_id,
                         self.terminal_view_id,

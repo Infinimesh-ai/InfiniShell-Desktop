@@ -1,9 +1,9 @@
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 #[cfg(feature = "local_fs")]
 use crate::ai::agent::AIAgentActionResultType;
-use crate::ai::skills::{SkillManager, SkillTelemetryEvent};
 #[cfg(feature = "local_fs")]
 use crate::ai::skills::extract_skill_parent_directory;
+use crate::ai::skills::{SkillManager, SkillTelemetryEvent};
 use crate::send_telemetry_from_ctx;
 use ai::agent::action_result::AnyFileContent;
 use ai::skills::SkillReference;
@@ -39,7 +39,7 @@ impl ReadSkillExecutor {
         &mut self,
         input: ExecuteActionInput,
         ctx: &mut ModelContext<Self>,
-    ) -> impl Into<AnyActionExecution> {
+    ) -> impl Into<AnyActionExecution> + use<> {
         let ExecuteActionInput { action, .. } = input;
         let AIAgentActionType::ReadSkill(ReadSkillRequest { skill: skill_ref }) = &action.action
         else {
@@ -68,8 +68,12 @@ impl ReadSkillExecutor {
         // `SkillReference::SkillPath(name)` 槽位(避免 proto schema 变更)。
         // 这里在 cache miss 时按 name 反查真实 SKILL.md 路径,覆盖 Skill 管理器
         // 能看到的所有 skill(文件 skill + bundled skill)。
-        if let SkillReference::Path(p) = skill_ref {
-            if let Some(candidate_name) = name_candidate(p) {
+        // `SkillReference::Path` 现在承载 `LocalOrRemotePath`;name 形态的引用
+        // 只可能落在 `Local` 分支上,远程路径直接跳过 name 反查。
+        if let SkillReference::Path(p) = skill_ref
+            && let Some(local_path) = p.to_local_path()
+        {
+            if let Some(candidate_name) = name_candidate(local_path) {
                 if let Some(skill) = manager.find_skill_by_name(candidate_name) {
                     send_telemetry_from_ctx!(
                         SkillTelemetryEvent::Read {
@@ -104,29 +108,28 @@ impl ReadSkillExecutor {
         // Cache miss fallback 仅在拥有本地文件系统的构建中可用;
         // WASM 等无 fs 构建里 `extract_skill_parent_directory` / `parse_skill`
         // 不存在,自然也无从读盘。
+        // `parse_skill` 只能读本地文件系统,因此远程 `LocalOrRemotePath` 不走这条兜底。
         #[cfg(feature = "local_fs")]
-        if let SkillReference::Path(path) = skill_ref {
+        if let SkillReference::Path(path) = skill_ref
+            && let Some(local_path) = path.to_local_path()
+        {
             if extract_skill_parent_directory(path).is_ok() {
-                let path = path.clone();
+                let path = local_path.to_path_buf();
                 let skill_ref_for_async = skill_ref.clone();
                 return ActionExecution::new_async(
                     async move { parse_skill(&path) },
                     move |parsed, _app| match parsed {
-                        Ok(skill) => AIAgentActionResultType::ReadSkill(
-                            ReadSkillResult::Success {
-                                content: FileContext::new(
-                                    skill.path.to_string_lossy().into_owned(),
-                                    AnyFileContent::StringContent(skill.content.clone()),
-                                    skill.line_range.clone(),
-                                    None,
-                                ),
-                            },
-                        ),
-                        Err(err) => AIAgentActionResultType::ReadSkill(
-                            ReadSkillResult::Error(format!(
-                                "Skill not found: {skill_ref_for_async:?} ({err})"
-                            )),
-                        ),
+                        Ok(skill) => AIAgentActionResultType::ReadSkill(ReadSkillResult::Success {
+                            content: FileContext::new(
+                                skill.path.display_path(),
+                                AnyFileContent::StringContent(skill.content.clone()),
+                                skill.line_range.clone(),
+                                None,
+                            ),
+                        }),
+                        Err(err) => AIAgentActionResultType::ReadSkill(ReadSkillResult::Error(
+                            format!("Skill not found: {skill_ref_for_async:?} ({err})"),
+                        )),
                     },
                 );
             }
@@ -160,9 +163,13 @@ impl ReadSkillExecutor {
 ///
 /// 抽出 helper 是为了让 `ActionExecution<T>` 的泛型 `T` 在 `success_execution`
 /// 和 `new_async` 两条路径里推导到相同类型(否则 Rust 会要求函数显式声明返回类型)。
-fn success_execution(skill: &ai::skills::ParsedSkill) -> ActionExecution<anyhow::Result<ai::skills::ParsedSkill>> {
+fn success_execution(
+    skill: &ai::skills::ParsedSkill,
+) -> ActionExecution<anyhow::Result<ai::skills::ParsedSkill>> {
     let content = FileContext::new(
-        skill.path.to_string_lossy().into_owned(),
+        // `ParsedSkill::path` 现在是 `LocalOrRemotePath`,用 `display_path()` 取
+        // 可显示的路径字符串(本地即原路径,远程为 `host:path` 形式)。
+        skill.path.display_path(),
         AnyFileContent::StringContent(skill.content.clone()),
         skill.line_range.clone(),
         None,

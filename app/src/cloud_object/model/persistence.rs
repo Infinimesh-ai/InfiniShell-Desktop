@@ -28,7 +28,8 @@ use std::sync::mpsc::SyncSender;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::cloud_object::StoredObject;
-use crate::util::sync::Condition;
+// Zap:`crate::util::sync` 已下沉到 `warp_util::sync`。
+use warp_util::sync::Condition;
 use chrono::{DateTime, Duration, Utc};
 use rand::Rng;
 use warp_core::features::FeatureFlag;
@@ -101,7 +102,7 @@ enum FolderOpenState {
 }
 
 /// [StoredObject] 信息的持久化 model。Zap 中它对应 SQLite 内的本地 object store。
-/// 超出基础 update/query 的逻辑应放在 [ObjectStoreViewModel] 并在 model_test.rs 覆盖。
+/// 超出基础 update/query 的逻辑应放在 [ObjectStoreViewModel] 并在 model_tests.rs 覆盖。
 pub struct ObjectStoreModel {
     objects_by_id: HashMap<ObjectUid, Box<dyn StoredObject>>,
     model_event_sender: Option<SyncSender<ModelEvent>>,
@@ -133,7 +134,7 @@ impl ObjectStoreModel {
     }
 
     /// 等待本地 object store 可读。Zap 下该条件在 SQLite restore 后立即满足。
-    pub fn initial_load_complete(&self) -> impl Future<Output = ()> {
+    pub fn initial_load_complete(&self) -> impl Future<Output = ()> + use<> {
         self.initial_load_complete.wait()
     }
 
@@ -1348,5 +1349,5 @@ impl Entity for ObjectStoreModel {
 impl SingletonEntity for ObjectStoreModel {}
 
 #[cfg(test)]
-#[path = "model_test.rs"]
+#[path = "model_tests.rs"]
 mod tests;

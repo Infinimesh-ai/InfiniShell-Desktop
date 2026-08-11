@@ -1,11 +1,12 @@
 use std::io;
 use std::sync::Mutex;
 
+use windows_registry::{CURRENT_USER, Key};
+use windows_result::HRESULT;
+
 /// Store user preferences in the Windows Registry.
 /// Modeled after https://github.com/neovide/neovide/blob/main/src/windows_utils.rs .
 use super::UserPreferences;
-use windows_registry::{Key, CURRENT_USER};
-use windows_result::HRESULT;
 
 pub struct RegistryBackedPreferences {
     app_key_path: String,
@@ -22,7 +23,7 @@ pub struct RegistryBackedPreferences {
     cached_key: Mutex<Option<Key>>,
 }
 
-static WARP_REGISTRY_BASE_PATH: &str = "Software\\Zap\\";
+static WARP_REGISTRY_BASE_PATH: &str = "Software\\InfiniShell\\";
 pub const KEY_NOT_FOUND_ERR: HRESULT = HRESULT::from_win32(0x80070002);
 
 impl RegistryBackedPreferences {
@@ -57,7 +58,7 @@ impl RegistryBackedPreferences {
                 let key = CURRENT_USER
                     .create(self.app_key_path.clone())
                     .map_err(|e| {
-                        log::error!("unable to access Zap app key in Windows Registry: {e:#}");
+                        log::error!("unable to access InfiniShell app key in Windows Registry: {e:#}");
                         super::Error::IoError(io::Error::from(e))
                     })?;
                 return f(&key);
@@ -68,7 +69,7 @@ impl RegistryBackedPreferences {
             let key = CURRENT_USER
                 .create(self.app_key_path.clone())
                 .map_err(|e| {
-                    log::error!("unable to access Zap app key in Windows Registry: {e:#}");
+                    log::error!("unable to access InfiniShell app key in Windows Registry: {e:#}");
                     super::Error::IoError(io::Error::from(e))
                 })?;
             *guard = Some(key);
