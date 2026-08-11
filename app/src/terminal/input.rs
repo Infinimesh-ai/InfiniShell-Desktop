@@ -161,7 +161,7 @@ use crate::ai::block_context::BlockContext;
 use crate::ai::blocklist::agent_view::shortcuts::AgentShortcutViewModel;
 use crate::ai::blocklist::agent_view::{
     AgentInputFooter, AgentInputFooterEvent, AgentViewController, AgentViewEntryOrigin,
-    EphemeralMessageModel, is_in_cloud_context,
+    ENTER_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE, EphemeralMessageModel, is_in_cloud_context,
 };
 use crate::ai::blocklist::block::cli_controller::{CLISubagentController, CLISubagentEvent};
 use crate::ai::blocklist::block::status_bar::BlocklistAIStatusBar;
@@ -15534,11 +15534,20 @@ impl TypedActionView for Input {
                 }
 
                 if FeatureFlag::AgentView.is_enabled() {
-                    // Zap:我方 `AgentViewEntryOrigin::Keybinding` 是单元变体(不携带
-                    // `Keystroke`),"新建会话前二次确认" 的门控在
-                    // `terminal::input::slash_commands` 里通过
-                    // `AgentViewController::should_start_new_conversation_for_keybinding`
-                    // (按 keybinding 名)完成,这里不再重复判定。
+                    // 键位触发的新建会话要过一次二次确认,避免肌肉记忆误按把当前会话重置掉。
+                    // Zap:我方 `AgentViewEntryOrigin::Keybinding` 是单元变体(上游那份带
+                    // `Keystroke`),所以这里直接用注册该 FixedBinding 时的同一个常量取键位。
+                    if matches!(origin, AgentViewEntryOrigin::Keybinding) {
+                        let keystroke = ENTER_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE.clone();
+                        let should_start_new_conversation =
+                            self.agent_view_controller.update(ctx, |controller, ctx| {
+                                controller
+                                    .should_start_new_conversation_for_keystroke(keystroke, ctx)
+                            });
+                        if !should_start_new_conversation {
+                            return;
+                        }
+                    }
                     ctx.emit(Event::EnterAgentView {
                         initial_prompt: None,
                         conversation_id: None,

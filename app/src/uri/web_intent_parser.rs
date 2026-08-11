@@ -34,7 +34,21 @@ impl WebIntent {
         } else {
             #[cfg(not(target_family = "wasm"))]
             {
-                return Err(anyhow!("Attempting to parse invalid url: {}", url));
+                // 桌面端也要认「本频道 web 根地址」下的链接:`maybe_rewrite_web_url_to_intent`
+                // 就是靠这条把 web 链接改写成本地 intent(例如 `<root>/app` → `infinishell://home`)。
+                // 其他 origin 一律拒绝,避免把任意外链吞进 app 内部路由。
+                let server_root = Url::parse(&ChannelState::server_root_url())
+                    .map_err(|_| anyhow!("Attempting to parse invalid url: {}", url))?;
+                if url.scheme() != server_root.scheme()
+                    || url.domain() != server_root.domain()
+                    || url.port_or_known_default() != server_root.port_or_known_default()
+                {
+                    return Err(anyhow!("Attempting to parse invalid url: {}", url));
+                }
+
+                url.path_segments()
+                    .map(|segments| segments.collect::<Vec<_>>())
+                    .unwrap_or_default()
             }
 
             #[cfg(target_family = "wasm")]

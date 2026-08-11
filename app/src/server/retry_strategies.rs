@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 use thiserror::Error;
+use warp_errors::{ErrorExt, register_error};
 use warpui::r#async::Timer;
 use warpui::{RetryOption, duration_with_jitter};
 
@@ -50,6 +51,17 @@ pub(crate) struct HttpStatusError {
     pub status: u16,
     pub body: String,
 }
+
+// Zap:上游这份 `HttpStatusError` 住在已剥离的 `warp_server_client::public_api`,连带丢掉了错误
+// 分类。没有 `ErrorExt` + `register_error!`,`AnyhowErrorExt::is_actionable()` 找不到注册项,
+// 会对任何 HTTP 状态恒返回 true,把 408/429 这类纯服务端限流也当成我方可修复的 bug 上报。
+impl ErrorExt for HttpStatusError {
+    fn is_actionable(&self) -> bool {
+        !matches!(self.status, 408 | 429)
+    }
+}
+
+register_error!(HttpStatusError);
 
 /// Classify an HTTP-backed error as transient (worth retrying) or permanent (fail fast).
 ///

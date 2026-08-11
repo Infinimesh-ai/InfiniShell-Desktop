@@ -411,6 +411,10 @@ fn test_directory_search_support() {
 
     use crate::search::ai_context_menu::files::search_item::FileSearchItem;
 
+    // Zap:accessibility label 已经走 i18n,loader 未初始化时 `t!` 会原样返回 key。
+    // 断言的是上游的英文前缀,所以这里把 locale 固定成 en。
+    crate::i18n::init(Some("en"));
+
     // Test that directories can be created with is_directory flag
     let directory_item = FileSearchItem {
         path: PathBuf::from("src/components/"),

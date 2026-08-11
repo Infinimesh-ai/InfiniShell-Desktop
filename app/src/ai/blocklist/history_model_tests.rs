@@ -172,6 +172,20 @@ fn create_exchange_with_query(
     }
 }
 
+/// Zap:我方在 `AIConversation::update_for_new_request_input` 里额外加了一次
+/// 「turn 启动即落盘」(user query 提交时先写一次,stream 中途强退也能保留提问记录),
+/// 所以凡是先提交请求再触发第二次持久化的用例,通道里会比上游多一条事件。
+/// 断言「最终持久化状态」的测试要取最后一条,而不是第一条。
+fn last_update_conversation_event(receiver: &std::sync::mpsc::Receiver<ModelEvent>) -> ModelEvent {
+    let mut last = receiver
+        .recv_timeout(Duration::from_secs(1))
+        .expect("at least one UpdateMultiAgentConversation event must arrive");
+    while let Ok(event) = receiver.recv_timeout(Duration::from_millis(200)) {
+        last = event;
+    }
+    last
+}
+
 fn persisted_agent_conversation_from_update_event(event: ModelEvent) -> AgentConversation {
     let ModelEvent::UpdateMultiAgentConversation {
         conversation_id,
@@ -2705,9 +2719,8 @@ fn test_truncate_from_exchange_to_empty_persist_event_has_empty_updated_tasks() 
                 .expect("truncating from an existing exchange must succeed");
         });
 
-        let event = receiver
-            .recv_timeout(Duration::from_secs(1))
-            .expect("truncate-to-empty must emit an UpdateMultiAgentConversation event");
+        // Zap:`update_for_new_request_input` 会先落盘一次,truncate 的持久化是最后一条事件。
+        let event = last_update_conversation_event(&receiver);
         let ModelEvent::UpdateMultiAgentConversation { updated_tasks, .. } = event else {
             panic!("expected UpdateMultiAgentConversation event");
         };
@@ -2874,7 +2887,7 @@ fn test_initialize_output_for_response_stream_persists_updated_conversation_stat
     App::test((), |mut app| async move {
         initialize_settings_for_tests(&mut app);
 
-        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        let (sender, receiver) = std::sync::mpsc::sync_channel(4);
         let mut global_resource_handles = GlobalResourceHandles::mock(&mut app);
         global_resource_handles.model_event_sender = Some(sender);
         app.add_singleton_model(|_| GlobalResourceHandlesProvider::new(global_resource_handles));
@@ -2933,11 +2946,11 @@ fn test_initialize_output_for_response_stream_persists_updated_conversation_stat
             );
         });
 
-        let persisted_conversation = persisted_agent_conversation_from_update_event(
-            receiver
-                .recv_timeout(Duration::from_secs(1))
-                .expect("stream init should persist conversation state"),
-        );
+        // Zap:请求提交时已经落盘过一次,StreamInit 的持久化是这条链路上的最后一条事件。
+        let persisted_conversation =
+            persisted_agent_conversation_from_update_event(last_update_conversation_event(
+                &receiver,
+            ));
         let restored =
             convert_persisted_conversation_to_ai_conversation_with_metadata(persisted_conversation)
                 .expect("persisted StreamInit conversation should be restorable");

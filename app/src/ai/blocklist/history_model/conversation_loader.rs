@@ -12,14 +12,18 @@ use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{
     AIConversation, AIConversationId, ServerAIConversationMetadata,
 };
-use crate::ai::agent::task::Task;
-use crate::persistence::model::{AgentConversation, AgentConversationData};
+use crate::persistence::model::{
+    AgentConversation, AgentConversationData, AgentConversationSummary,
+};
 use crate::terminal::model::block::SerializedBlock;
 
 #[cfg(feature = "local_fs")]
 use crate::persistence::agent::read_agent_conversation_by_id;
 
-use super::{AIConversationMetadata, BlocklistAIHistoryModel, MAX_HISTORICAL_CONVERSATIONS};
+use super::{
+    AIConversationMetadata, BlocklistAIHistoryModel, MAX_HISTORICAL_CONVERSATIONS,
+    agent_id_key_from_persisted_data,
+};
 
 /// A conversation transcript from a CLI agent harness (e.g. Claude Code).
 #[derive(Debug, Clone)]
@@ -76,7 +80,13 @@ pub fn convert_persisted_conversation_to_ai_conversation_with_metadata(
 
     let conversation_data = serde_json::from_str::<AgentConversationData>(&conversation_data).ok();
 
-    match AIConversation::new_restored(conversation_id, tasks, conversation_data) {
+    // 本地 DB 恢复走宽松分支:空的 `agent_tasks` 是「子会话在首个服务端响应前就被持久化」
+    // 的正常形态,严格版 `new_restored` 会把它当成畸形输入直接丢弃。
+    match AIConversation::new_restored_synthesizing_on_empty(
+        conversation_id,
+        tasks,
+        conversation_data,
+    ) {
         Ok(mut conversation) => {
             // 持久化 Task 里的旧消息可能没有 CurrentTime/timestamp,恢复 exchange 时会退到
             // Unix epoch。SQLite 行级更新时间是这个会话最后写入的可靠兜底时间。
@@ -197,21 +207,30 @@ impl BlocklistAIHistoryModel {
     }
 
     /// Initializes historical conversations from restored agent conversations.
+    ///
+    /// At startup the conversations carry only `agent_conversations` records
+    /// (empty task lists) whose summaries were computed at write time (or
+    /// derived once at read time); tests may pass fully-hydrated
+    /// conversations, whose summaries are derived from their tasks here.
     pub(super) fn initialize_historical_conversations(
         &mut self,
         conversations: &[AgentConversation],
     ) {
-        let conversations = conversations
+        struct HistoricalConversationRow<'a> {
+            agent_conversation: &'a AgentConversation,
+            conversation_id: AIConversationId,
+            conversation_data: Option<AgentConversationData>,
+            summary: AgentConversationSummary,
+        }
+
+        let historical_rows: Vec<_> = conversations
             .iter()
             .sorted_by_key(|c| c.conversation.last_modified_at)
-            .rev();
-
-        let collected: HashMap<AIConversationId, AIConversationMetadata> = conversations
+            .rev()
             .take(MAX_HISTORICAL_CONVERSATIONS)
-            .filter_map(|agent_conv| {
-                // Try to convert the conversation ID
+            .filter_map(|agent_conversation| {
                 let conversation_id = match AIConversationId::try_from(
-                    agent_conv.conversation.conversation_id.clone(),
+                    agent_conversation.conversation.conversation_id.clone(),
                 ) {
                     Ok(id) => id,
                     Err(e) => {
@@ -220,83 +239,113 @@ impl BlocklistAIHistoryModel {
                     }
                 };
 
-                if !agent_conv.is_restorable() {
+                // Prefer the write-time summary from the `summary` column;
+                // fall back to deriving from tasks for fully-hydrated inputs.
+                let summary = agent_conversation
+                    .conversation
+                    .summary
+                    .as_deref()
+                    .and_then(|json| serde_json::from_str::<AgentConversationSummary>(json).ok())
+                    .unwrap_or_else(|| {
+                        AgentConversationSummary::from_tasks(agent_conversation.tasks.iter())
+                    });
+
+                if !summary.is_restorable {
                     return None;
                 }
+
+                let conversation_data = serde_json::from_str::<AgentConversationData>(
+                    &agent_conversation.conversation.conversation_data,
+                )
+                .ok();
+
+                // Seed the reverse indexes before any child linkage runs so a
+                // child row that names its parent by `parent_agent_id` (run_id)
+                // can resolve it regardless of row ordering.
+                if let Some(data) = conversation_data.as_ref() {
+                    if let Some(agent_id) = agent_id_key_from_persisted_data(data) {
+                        self.agent_id_to_conversation_id
+                            .insert(agent_id.to_owned(), conversation_id);
+                    }
+                    if let Some(token) = data.server_conversation_token.as_ref() {
+                        self.server_token_to_conversation_id
+                            .insert(ServerConversationToken::new(token.clone()), conversation_id);
+                    }
+                }
+
+                Some(HistoricalConversationRow {
+                    agent_conversation,
+                    conversation_id,
+                    conversation_data,
+                    summary,
+                })
+            })
+            .collect();
+
+        let collected: HashMap<AIConversationId, AIConversationMetadata> = historical_rows
+            .into_iter()
+            .filter_map(|row| {
+                let HistoricalConversationRow {
+                    agent_conversation,
+                    conversation_id,
+                    conversation_data,
+                    summary,
+                } = row;
 
                 // Child agent conversations are managed by their parent's
                 // status card and should not appear in navigation/history.
                 // Record the parent→child mapping before filtering so that
                 // create_missing_child_agent_panes can discover children
                 // before they are loaded into conversations_by_id.
-                let conversation_data = serde_json::from_str::<AgentConversationData>(
-                    &agent_conv.conversation.conversation_data,
-                )
-                .ok();
-                if let Some(parent_id_str) = conversation_data
+                if let Some(parent_id) = conversation_data
                     .as_ref()
-                    .and_then(|data| data.parent_conversation_id.as_deref())
+                    .and_then(|data| self.resolved_parent_conversation_id_from_persisted_data(data))
                 {
-                    if let Ok(parent_id) = AIConversationId::try_from(parent_id_str.to_string()) {
-                        self.children_by_parent
-                            .entry(parent_id)
-                            .or_default()
-                            .push(conversation_id);
+                    self.index_child_conversation(conversation_id, parent_id);
+                    // Eagerly hydrate the child conversation into
+                    // `conversations_by_id` so the pill bar and orchestration
+                    // transcript name resolution can find it before the
+                    // parent's hidden child pane materializes lazily. This is
+                    // restricted to orchestration children only — non-child
+                    // historical conversations continue to load lazily via
+                    // `restore_conversations`. A subsequent `restore_conversations`
+                    // call replaces this entry idempotently.
+                    //
+                    // Startup rows carry no tasks, so the child's task payload
+                    // is loaded from the local DB; fully-hydrated inputs
+                    // convert directly.
+                    let child_conversation = if agent_conversation.tasks.is_empty() {
+                        self.load_conversation_from_db(&conversation_id)
+                    } else {
+                        convert_persisted_conversation_to_ai_conversation_with_metadata(
+                            agent_conversation.clone(),
+                        )
+                    };
+                    if let Some(child_conversation) = child_conversation {
+                        self.conversations_by_id
+                            .insert(conversation_id, child_conversation);
+                    } else {
+                        log::warn!(
+                            "Failed to eagerly hydrate orchestration child {conversation_id}; \
+                             pill bar / name resolution will fall back to lazy materialization",
+                        );
                     }
                     return None;
                 }
 
-                // Skip conversations that contain AutoCodeDiff system queries but do not contain any UserQuery messages.
-                // These are passive, auto-initiated diffs that were never interacted with (past accepting or rejecting the diff),
-                // so we don't want to list them as historical conversations.
-                let mut has_user_query = false;
-                let mut has_autocodediff = false;
-                for task in &agent_conv.tasks {
-                    for message in &task.messages {
-                        match &message.message {
-                            Some(warp_multi_agent_api::message::Message::UserQuery(_)) => {
-                                has_user_query = true;
-                            }
-                            Some(warp_multi_agent_api::message::Message::SystemQuery(sys)) => {
-                                if let Some(warp_multi_agent_api::message::system_query::Type::AutoCodeDiff(_)) = &sys.r#type {
-                                    has_autocodediff = true;
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                if has_autocodediff && !has_user_query {
+                // Skip conversations that only contain passive AutoCodeDiff
+                // system queries the user never interacted with (past
+                // accepting or rejecting the diff).
+                if summary.is_unlisted_auto_code_diff {
                     return None;
                 }
 
-                let root_task = agent_conv.tasks.iter().find(|task| {
-                    task.dependencies.is_none()
-                });
-
-                let initial_query = root_task.map(|task| {
-                    // find the first task with a user query
-                    // (or in the case of a passive code diff, the summary of the diff)
-                    task.messages.iter().find_map(|msg| {
-                        match &msg.message {
-                            Some(warp_multi_agent_api::message::Message::UserQuery(user_query)) => {
-                                Some(user_query.query.clone())
-                            }
-                            Some(warp_multi_agent_api::message::Message::ToolCall(tool_call))  => {
-                                let Some(tool) = &tool_call.tool else {
-                                    return None;
-                                };
-
-                                if let warp_multi_agent_api::message::tool_call::Tool::ApplyFileDiffs(diff_suggestion) = tool {
-                                    Some(diff_suggestion.summary.clone())
-                                } else {
-                                    None
-                                }
-                            }
-                            _ => None,
-                        }
-                    }).unwrap_or_default()
-                }).unwrap_or_default();
+                let AgentConversationSummary {
+                    initial_query,
+                    title,
+                    initial_working_directory,
+                    ..
+                } = summary;
 
                 if initial_query.is_empty() {
                     log::debug!(
@@ -305,16 +354,6 @@ impl BlocklistAIHistoryModel {
                     return None;
                 }
 
-                // We derive the title from the description of the root task,
-                // falling back to initial_query if the description is empty
-                let title = root_task
-                    .map(|task| task.description.clone())
-                    .filter(|desc| !desc.is_empty())
-                    .unwrap_or_else(|| initial_query.clone());
-
-                // Extract working directory from the first UserQuery message in the tasks
-                // TODO: search tasks in correct order once we've implemented task ordering.
-                let initial_working_directory = agent_conv.tasks.iter().find_map(Task::api_task_initial_working_directory);
                 let credits_spent = conversation_data
                     .as_ref()
                     .and_then(|data| data.conversation_usage_metadata.as_ref())
@@ -324,44 +363,37 @@ impl BlocklistAIHistoryModel {
                     .and_then(|data| data.artifacts_json.as_ref())
                     .and_then(|json| serde_json::from_str(json).ok())
                     .unwrap_or_default();
-                // 父子链接信息要在 conversation_data 被移动前取出,
-                // 未加载的会话靠它判断是否为子 agent 会话。
-                let parent_conversation_id = conversation_data
-                    .as_ref()
-                    .and_then(|data| data.parent_conversation_id.as_deref())
-                    .and_then(|id| AIConversationId::try_from(id.to_owned()).ok());
-                let parent_agent_id = conversation_data
-                    .as_ref()
-                    .and_then(|data| data.parent_agent_id.clone());
                 let server_conversation_token = conversation_data
-                    .and_then(|data| data.server_conversation_token)
-                    .map(ServerConversationToken::new);
+                    .as_ref()
+                    .and_then(|data| data.server_conversation_token.as_ref())
+                    .map(|token| ServerConversationToken::new(token.clone()));
 
-                Some((conversation_id, AIConversationMetadata {
-                    id: conversation_id,
-                    title,
-                    initial_query,
-                    last_modified_at: agent_conv.conversation.last_modified_at,
-                    initial_working_directory,
-                    credits_spent,
-                    server_conversation_token,
-                    is_restorable_locally: true,
-                    artifacts,
-                    ambient_agent_task_id: None,
-                    parent_conversation_id,
-                    parent_agent_id,
-                }))
+                Some((
+                    conversation_id,
+                    AIConversationMetadata {
+                        id: conversation_id,
+                        title,
+                        initial_query,
+                        last_modified_at: agent_conversation.conversation.last_modified_at,
+                        initial_working_directory,
+                        credits_spent,
+                        server_conversation_token,
+                        is_restorable_locally: true,
+                        artifacts,
+                        ambient_agent_task_id: None,
+                        // 父子链接信息即使父会话本地不可解析也要保留,
+                        // 未加载的会话靠它判断是否为子 agent 会话。
+                        parent_conversation_id: conversation_data
+                            .as_ref()
+                            .and_then(|data| data.parent_conversation_id.as_deref())
+                            .and_then(|id| AIConversationId::try_from(id.to_owned()).ok()),
+                        parent_agent_id: conversation_data
+                            .as_ref()
+                            .and_then(|data| data.parent_agent_id.clone()),
+                    },
+                ))
             })
             .collect();
-
-        // Populate the token → conversation reverse index alongside the
-        // forward metadata map.
-        for (conversation_id, metadata) in &collected {
-            if let Some(token) = &metadata.server_conversation_token {
-                self.server_token_to_conversation_id
-                    .insert(token.clone(), *conversation_id);
-            }
-        }
         self.all_conversations_metadata = collected;
     }
 }

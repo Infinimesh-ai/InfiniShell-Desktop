@@ -26,6 +26,9 @@ use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 fn initialize_app(app: &mut App) {
+    // Zap:菜单项文案已经走 i18n,loader 未初始化时 `t!` 会原样返回 key。
+    // 断言的是上游的英文文案,所以这里把 locale 固定成 en。
+    crate::i18n::init(Some("en"));
     initialize_settings_for_tests(app);
 
     let global_resources = GlobalResourceHandles::mock(app);

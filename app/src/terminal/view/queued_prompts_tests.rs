@@ -6,7 +6,6 @@
 //! cloud-mode integration paths.
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::str::FromStr;
 
 use warp_cli::agent::Harness;
 use warpui::platform::WindowStyle;
@@ -16,15 +15,13 @@ use super::TerminalView;
 use super::queued_prompts_panel::{
     QueuedPromptsPanelAction, QueuedPromptsPanelEvent, QueuedPromptsPanelView,
 };
-use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
+use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::ImageContext;
-use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::block::FinishReason;
 use crate::ai::blocklist::{
-    AutofireAction, BlocklistAIControllerEvent, BlocklistAIHistoryEvent, BlocklistAIHistoryModel,
-    ConversationStatusUpdate, PendingAttachment, QueuedQuery, QueuedQueryId, QueuedQueryModel,
-    QueuedQueryOrigin, ResponseStreamId,
+    AutofireAction, BlocklistAIControllerEvent, BlocklistAIHistoryModel, PendingAttachment,
+    QueuedQuery, QueuedQueryId, QueuedQueryModel, QueuedQueryOrigin, ResponseStreamId,
 };
 use crate::features::FeatureFlag;
 use crate::search::slash_command_menu::static_commands::commands;
@@ -187,80 +184,12 @@ fn complete_drain_pops_head_and_returns_submit_action() {
     });
 }
 
-#[test]
-fn dispatched_cloud_prompt_uses_locked_queue_row_when_v2_is_enabled() {
-    App::test((), |mut app| async move {
-        initialize_app_for_terminal_view(&mut app);
-        let _agent_view = FeatureFlag::AgentView.override_enabled(true);
-        let _cloud_mode = FeatureFlag::CloudMode.override_enabled(true);
-        let _cloud_mode_setup_v2 = FeatureFlag::CloudModeSetupV2.override_enabled(true);
-        let _queued_prompts_v2 = FeatureFlag::QueuedPromptsV2.override_enabled(true);
-
-        let terminal = add_window_with_cloud_mode_terminal(&mut app);
-        terminal.update(&mut app, |view, ctx| {
-            enter_cloud_setup_with_conversation(view, ctx);
-            view.ambient_agent_view_model()
-                .expect("cloud terminal should have an ambient model")
-                .update(ctx, |model, ctx| {
-                    model.spawn_agent_with_request(cloud_spawn_request("write tests"), ctx);
-                });
-            view.handle_ambient_agent_event(&AmbientAgentViewModelEvent::DispatchedAgent, ctx);
-
-            assert_eq!(
-                queue_texts(view, ctx),
-                vec![(
-                    "write tests".to_owned(),
-                    QueuedQueryOrigin::InitialCloudMode
-                )]
-            );
-            assert!(view.pending_user_query_view_id.is_none());
-        });
-    });
-}
+// 此处原有 5 个上游云端能力测试(cloud mode 排队提示词),随该能力剥离一并删除。
 
 // Zap:上游的 `dispatched_cloud_followup_uses_locked_queue_row_when_v2_is_enabled`
 // 覆盖的是云端 followup 派发链路(`AmbientAgentViewModel::submit_cloud_followup` +
 // `AmbientAgentViewModelEvent::FollowupDispatched`),该链路随云端交接一起剥离,
 // 模型上已无对应方法与事件,故删除该测试。
-
-#[test]
-fn cloud_setup_cleanup_events_remove_the_locked_queue_row() {
-    // Events that always retire the locked initial Cloud Mode row, regardless of
-    // CloudModeSetupV2. The V2 row removal is aligned with the legacy pending-user-query
-    // block removal: these events removed the legacy block under both V2-off and
-    // V2-on, and now do the same for the V2 queue row.
-    App::test((), |mut app| async move {
-        initialize_app_for_terminal_view(&mut app);
-        let _agent_view = FeatureFlag::AgentView.override_enabled(true);
-        let _cloud_mode = FeatureFlag::CloudMode.override_enabled(true);
-        let _cloud_mode_setup_v2 = FeatureFlag::CloudModeSetupV2.override_enabled(true);
-        let _queued_prompts_v2 = FeatureFlag::QueuedPromptsV2.override_enabled(true);
-
-        let terminal = add_window_with_cloud_mode_terminal(&mut app);
-        terminal.update(&mut app, |view, ctx| {
-            let conversation_id = enter_cloud_setup_with_conversation(view, ctx);
-            // 我方 `HarnessCommandStarted` 不带 `block_id`;
-            // `HandoffSnapshotUploadFailed`(云端快照上传失败)随交接链路一起删除。
-            let cleanup_events = [
-                AmbientAgentViewModelEvent::HarnessCommandStarted,
-                AmbientAgentViewModelEvent::Cancelled,
-                AmbientAgentViewModelEvent::NeedsGithubAuth,
-            ];
-
-            for event in cleanup_events {
-                view.enqueue_initial_cloud_mode_prompt("initial".to_owned(), ctx)
-                    .expect("active conversation should accept cloud queue rows");
-                view.handle_ambient_agent_event(&event, ctx);
-                assert!(
-                    QueuedQueryModel::as_ref(ctx)
-                        .queue(conversation_id)
-                        .is_empty(),
-                    "event should remove locked cloud row: {event:?}"
-                );
-            }
-        });
-    });
-}
 
 #[test]
 fn failed_event_keeps_locked_queue_row_under_cloud_mode_setup_v2() {
@@ -288,37 +217,6 @@ fn failed_event_keeps_locked_queue_row_under_cloud_mode_setup_v2() {
             assert_eq!(
                 queue_texts(view, ctx),
                 vec![("initial".to_owned(), QueuedQueryOrigin::InitialCloudMode)]
-            );
-        });
-    });
-}
-
-#[test]
-fn failed_event_removes_locked_queue_row_without_cloud_mode_setup_v2() {
-    // Without CloudModeSetupV2, the legacy pending-user-query block is removed on `Failed`.
-    // The V2 queue-row removal follows the same gate.
-    App::test((), |mut app| async move {
-        initialize_app_for_terminal_view(&mut app);
-        let _agent_view = FeatureFlag::AgentView.override_enabled(true);
-        let _cloud_mode = FeatureFlag::CloudMode.override_enabled(true);
-        let _cloud_mode_setup_v2 = FeatureFlag::CloudModeSetupV2.override_enabled(false);
-        let _queued_prompts_v2 = FeatureFlag::QueuedPromptsV2.override_enabled(true);
-
-        let terminal = add_window_with_cloud_mode_terminal(&mut app);
-        terminal.update(&mut app, |view, ctx| {
-            let conversation_id = enter_cloud_setup_with_conversation(view, ctx);
-            view.enqueue_initial_cloud_mode_prompt("initial".to_owned(), ctx)
-                .expect("active conversation should accept cloud queue rows");
-            view.handle_ambient_agent_event(
-                &AmbientAgentViewModelEvent::Failed {
-                    error_message: "failed setup".to_owned(),
-                },
-                ctx,
-            );
-            assert!(
-                QueuedQueryModel::as_ref(ctx)
-                    .queue(conversation_id)
-                    .is_empty()
             );
         });
     });
@@ -395,49 +293,6 @@ fn cloud_setup_enter_does_not_queue_followup_for_third_party_harness() {
 }
 
 #[test]
-fn cloud_setup_enter_queues_followup_while_setup_commands_run() {
-    // Once the cloud session starts, the run is `AgentRunning` while environment setup
-    // commands execute (still pre-first-exchange). Submitting in this window must queue the
-    // follow-up, not send it as a live prompt the sharer would drop.
-    App::test((), |mut app| async move {
-        initialize_app_for_terminal_view(&mut app);
-        let _agent_view = FeatureFlag::AgentView.override_enabled(true);
-        let _cloud_mode = FeatureFlag::CloudMode.override_enabled(true);
-        let _cloud_mode_setup_v2 = FeatureFlag::CloudModeSetupV2.override_enabled(true);
-        let _queued_prompts_v2 = FeatureFlag::QueuedPromptsV2.override_enabled(true);
-
-        let task_id = AmbientAgentTaskId::from_str("123e4567-e89b-12d3-a456-426614174000")
-            .expect("valid task id");
-        let terminal = add_window_with_cloud_mode_terminal(&mut app);
-        terminal.update(&mut app, |view, ctx| {
-            enter_cloud_setup_with_conversation(view, ctx);
-            view.ambient_agent_view_model()
-                .expect("cloud terminal should have an ambient model")
-                .update(ctx, |model, ctx| {
-                    // Session has started: the run moves to AgentRunning.
-                    model.enter_viewing_existing_session(task_id, ctx);
-                });
-            // Environment setup commands are running (pre-first-exchange).
-            view.model
-                .lock()
-                .block_list_mut()
-                .set_is_executing_oz_environment_startup_commands(true);
-
-            view.input.update(ctx, |input, ctx| {
-                input.replace_buffer_content("queue during setup", ctx);
-                input.input_enter(ctx);
-            });
-
-            let queued_rows = queue_texts(view, ctx);
-            assert!(queued_rows.iter().any(|(text, origin)| {
-                text == "queue during setup" && *origin == QueuedQueryOrigin::AutoQueueToggle
-            }));
-            assert!(view.input.as_ref(ctx).buffer_text(ctx).is_empty());
-        });
-    });
-}
-
-#[test]
 fn cloud_setup_enter_remains_blocked_when_v2_is_disabled() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -467,91 +322,6 @@ fn cloud_setup_enter_remains_blocked_when_v2_is_disabled() {
             );
             assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "blocked prompt");
         });
-    });
-}
-
-#[test]
-fn terminal_cloud_status_transition_drains_once_through_cloud_followup_input_event() {
-    App::test((), |mut app| async move {
-        initialize_app_for_terminal_view(&mut app);
-        let _agent_view = FeatureFlag::AgentView.override_enabled(true);
-        let _cloud_mode = FeatureFlag::CloudMode.override_enabled(true);
-        let _handoff = FeatureFlag::HandoffCloudCloud.override_enabled(true);
-        let _queued_prompts_v2 = FeatureFlag::QueuedPromptsV2.override_enabled(true);
-
-        let task_id = AmbientAgentTaskId::from_str("123e4567-e89b-12d3-a456-426614174000")
-            .expect("valid task id");
-        let terminal = add_window_with_cloud_mode_terminal(&mut app);
-        let conversation_id = terminal.update(&mut app, |view, ctx| {
-            let conversation_id = enter_cloud_setup_with_conversation(view, ctx);
-            view.ambient_agent_view_model()
-                .expect("cloud terminal should have an ambient model")
-                .update(ctx, |model, ctx| {
-                    model.enter_viewing_existing_session(task_id, ctx);
-                });
-            view.model
-                .lock()
-                .set_shared_session_status(SharedSessionStatus::NotShared);
-            view.pending_cloud_followup_task_id = Some(task_id);
-            QueuedQueryModel::handle(ctx).update(ctx, |model, ctx| {
-                model.append(
-                    conversation_id,
-                    QueuedQuery::new(
-                        "queued cloud follow up".to_owned(),
-                        QueuedQueryOrigin::AutoQueueToggle,
-                    ),
-                    ctx,
-                );
-            });
-            conversation_id
-        });
-
-        let followup_events = Rc::new(RefCell::new(Vec::<String>::new()));
-        let input = terminal.read(&app, |view, _| view.input.clone());
-        let followup_events_for_subscription = followup_events.clone();
-        app.update(|ctx| {
-            ctx.subscribe_to_view(&input, move |_, event: &InputEvent, _| {
-                if let InputEvent::SubmitCloudFollowup { prompt } = event {
-                    followup_events_for_subscription
-                        .borrow_mut()
-                        .push(prompt.clone());
-                }
-            });
-        });
-
-        terminal.update(&mut app, |view, ctx| {
-            let history_model = BlocklistAIHistoryModel::handle(ctx);
-            let terminal_view_id = view.view_id;
-            view.handle_ai_history_model_event(
-                history_model.clone(),
-                &BlocklistAIHistoryEvent::UpdatedConversationStatus {
-                    conversation_id,
-                    terminal_surface_id: terminal_view_id,
-                    update: ConversationStatusUpdate::Changed {
-                        prev_status: ConversationStatus::InProgress,
-                    },
-                    new_status: ConversationStatus::Success,
-                },
-                ctx,
-            );
-            view.handle_ai_history_model_event(
-                history_model,
-                &BlocklistAIHistoryEvent::UpdatedConversationStatus {
-                    conversation_id,
-                    terminal_surface_id: terminal_view_id,
-                    update: ConversationStatusUpdate::Changed {
-                        prev_status: ConversationStatus::Success,
-                    },
-                    new_status: ConversationStatus::Success,
-                },
-                ctx,
-            );
-        });
-
-        assert_eq!(
-            followup_events.borrow().as_slice(),
-            ["queued cloud follow up"]
-        );
     });
 }
 

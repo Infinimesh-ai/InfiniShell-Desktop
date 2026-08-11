@@ -509,10 +509,13 @@ impl BlocklistAIContextModel {
     }
 
     /// Returns `true` if the next AI query has any context that should force the input to be
-    /// locked in AI mode (skipping NLD): a pending image or file attachment, or a pending block.
+    /// locked in AI mode (skipping NLD): a pending image or file attachment, or a pending
+    /// inline `@` context attachment.
+    ///
+    /// 待附加的 block(`pending_context_block_ids`)刻意不算:上游 #10416 已把它移出锁定条件,
+    /// 仅选中一个 block 不应该把输入框锁死在 AI 模式。
     pub fn has_locking_attachment(&self) -> bool {
-        !self.pending_context_block_ids.is_empty()
-            || !self.pending_attachments.is_empty()
+        !self.pending_attachments.is_empty()
             || !self.pending_inline_at_context_attachments.is_empty()
     }
 

@@ -5,7 +5,8 @@ use warp_core::channel::{Channel, ChannelState};
 use warp_errors::report_error;
 use warpui_core::{Entity, ModelContext, SingletonEntity};
 
-// Spells "Zap" - should hopefully not conflict with other ports.
+// 9277 spells "WARP" on a phone keypad (upstream heritage) - should hopefully not conflict
+// with other ports.
 // Does not conflict with known ports on https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers
 const PORT_BASE: u16 = 9277;
 

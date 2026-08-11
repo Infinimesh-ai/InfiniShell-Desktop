@@ -398,37 +398,46 @@ fn test_tools_panel_does_not_suppress_vertical_tab_bar_traffic_light_padding() {
 /// would drop the override and let the source profile's default D win.
 #[test]
 fn copy_model_and_profile_preserves_explicit_model_over_source_profile_default() {
+    use ::settings::Setting as _;
     use warpui::EntityId;
 
-    use crate::ai::llms::{AvailableLLMs, LLMId, LLMInfo, ModelsByFeature};
+    use crate::ai::agent_providers::llm_id;
+    use crate::settings::{AISettings, AgentProvider, AgentProviderApiType, AgentProviderModel};
 
     App::test((), |mut app| async move {
         initialize_app(&mut app);
 
-        let m = LLMId::from("auto-genius");
-        let d = LLMId::from("auto");
+        // Zap 是 BYOP-only:模型清单完全由 `settings.agent_providers` 重建
+        // (`LLMPreferences::refresh_byop_models`),任何注入的「服务端目录」都会在下一次
+        // AISettings 变更时被覆盖掉。所以这里配真实 provider,M/D 用它的两个模型。
+        let provider_id = "carryover-provider";
+        let m = llm_id::encode(provider_id, "model-m");
+        let d = llm_id::encode(provider_id, "model-d");
 
         let source_id = EntityId::new();
         let new_id = EntityId::new();
 
         app.update(|ctx| {
-            // Catalog containing both slugs so profile/override ids resolve.
-            LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
-                let models = ModelsByFeature {
-                    agent_mode: AvailableLLMs::new(
-                        "auto".into(),
-                        vec![
-                            LLMInfo::new_for_test("auto"),
-                            LLMInfo::new_for_test("auto-genius"),
+            AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                let _ = settings.agent_providers.set_value(
+                    vec![AgentProvider {
+                        id: provider_id.to_owned(),
+                        name: "Carryover Provider".to_owned(),
+                        kind: Default::default(),
+                        api_type: AgentProviderApiType::Ollama,
+                        base_url: "http://localhost:11434".to_owned(),
+                        models: vec![
+                            AgentProviderModel::from_id("model-m".to_owned()),
+                            AgentProviderModel::from_id("model-d".to_owned()),
                         ],
-                        None,
-                    )
-                    .expect("valid available llms"),
-                    ..Default::default()
-                };
-                prefs.update_feature_model_choices(Ok(models), ctx);
+                        extra_headers: Vec::new(),
+                    }],
+                    ctx,
+                );
             });
+        });
 
+        app.update(|ctx| {
             // Default profile default = M (the destination pane's current profile).
             // Source uses a second profile whose default = D.
             let profiles = AIExecutionProfilesModel::handle(ctx);
@@ -443,6 +452,13 @@ fn copy_model_and_profile_preserves_explicit_model_over_source_profile_default()
             // Source's explicit selection = M (differs from its profile default D).
             LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
                 prefs.update_preferred_agent_mode_llm(&m, source_id, ctx);
+            });
+
+            // `update_preferred_agent_mode_llm` 会顺带写全局 `byop_last_used_model_id`,
+            // 而它在解析顺序上排在 profile 之前 —— 留着会让本用例无论 copy 是否正确都通过。
+            // 清掉它,断言才真正落在「override 有没有被原样搬过去」上。
+            AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                let _ = settings.byop_last_used_model_id.set_value(String::new(), ctx);
             });
         });
 

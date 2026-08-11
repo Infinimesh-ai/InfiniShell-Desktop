@@ -8566,12 +8566,13 @@ impl TerminalView {
         conversation_id: AIConversationId,
         ctx: &mut ViewContext<Self>,
     ) {
-        // 我方 `BlocklistAIController` 没有暴露 `has_active_stream_for_conversation`
-        // (`in_flight_response_streams` 是私有字段),用历史模型里的会话状态做等价判断:
-        // InProgress 说明还有在飞的响应流,取消流程会自己落状态;否则由下面手动置 Cancelled。
-        let had_active_stream = BlocklistAIHistoryModel::as_ref(ctx)
-            .conversation(&conversation_id)
-            .is_some_and(|conversation| conversation.status().is_in_progress());
+        // 只有真的还有在飞的响应流时,取消流程才会自己把会话落成 Cancelled;否则要靠下面手动置位。
+        // 不能拿「会话状态是不是 InProgress」当等价判断 —— 刚建出来、还没发过请求的会话就是
+        // InProgress 但没有流,那样会漏掉状态写入(Stop 接管后再按一次 Ctrl-C 取消不了会话)。
+        let had_active_stream = self
+            .ai_controller
+            .as_ref(ctx)
+            .has_active_stream_for_conversation(conversation_id, ctx);
 
         self.ai_controller.update(ctx, |controller, ctx| {
             controller.cancel_conversation_progress(

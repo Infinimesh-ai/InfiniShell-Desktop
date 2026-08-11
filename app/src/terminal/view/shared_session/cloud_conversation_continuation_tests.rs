@@ -451,29 +451,7 @@ fn environment_setup_failure_with_conversation_shows_continue_cta() {
     });
 }
 
-#[test]
-fn unknown_access_returns_error() {
-    App::test((), |mut app| async move {
-        let TestHandles {
-            terminal_view_id,
-            task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedOut,
-            AIAgentHarness::ClaudeCode,
-        );
-
-        app.update(|ctx| {
-            let state =
-                resolve_cloud_conversation_continuation_ui_state(terminal_view_id, task_id, ctx);
-
-            assert_eq!(
-                state,
-                Err(CloudConversationContinuationError::UnknownConversationAccess)
-            );
-        });
-    });
-}
+// 此处原有 1 个上游云端能力测试(cloud conversation continuation 访问校验),随该能力剥离一并删除。
 
 #[test]
 fn missing_metadata_returns_error() {

@@ -565,12 +565,29 @@ impl AgentViewController {
 
     /// Decides whether a keybinding-triggered `/agent` or `/new` should proceed immediately.
     ///
-    /// We only require a second press when the user is already in an active, non-empty
-    /// conversation. This protects against accidental conversation resets from muscle-memory
-    /// keypresses, while preserving single-step behavior for explicit typed/slash-menu execution.
+    /// Resolves the slash command's bound keystroke and defers to
+    /// [`Self::should_start_new_conversation_for_keystroke`].
     pub fn should_start_new_conversation_for_keybinding(
         &mut self,
         keybinding_name: &str,
+        ctx: &mut ModelContext<Self>,
+    ) -> bool {
+        let Some(keystroke) = keybinding_name_to_keystroke(keybinding_name, ctx) else {
+            log::warn!("Expected keybinding for slash command {keybinding_name}, but none was found");
+            return true;
+        };
+
+        self.should_start_new_conversation_for_keystroke(keystroke, ctx)
+    }
+
+    /// Decides whether a keybinding-triggered new conversation should proceed immediately.
+    ///
+    /// We only require a second press when the user is already in an active, non-empty
+    /// conversation. This protects against accidental conversation resets from muscle-memory
+    /// keypresses, while preserving single-step behavior for explicit typed/slash-menu execution.
+    pub fn should_start_new_conversation_for_keystroke(
+        &mut self,
+        keystroke: Keystroke,
         ctx: &mut ModelContext<Self>,
     ) -> bool {
         enum Decision {
@@ -598,13 +615,6 @@ impl AgentViewController {
             if conversation.is_empty() {
                 break 'decision Decision::StartNewConversation;
             }
-
-            let Some(keystroke) = keybinding_name_to_keystroke(keybinding_name, ctx) else {
-                log::warn!(
-                    "Expected keybinding for slash command {keybinding_name}, but none was found"
-                );
-                break 'decision Decision::StartNewConversation;
-            };
 
             let normalized_keystroke = keystroke.normalized();
             if self.is_new_conversation_keybinding_confirmation_active_for(

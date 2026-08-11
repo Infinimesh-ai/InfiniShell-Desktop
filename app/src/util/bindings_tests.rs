@@ -112,14 +112,15 @@ fn test_toggle_maximize_pane_binding_is_editable() {
                 "{TOGGLE_MAXIMIZE_PANE_BINDING_NAME} should be registered as an editable binding"
             );
 
-            // It ships with a mac-only default shortcut (cmd-shift-enter) via its custom
-            // action; other platforms have no default until the user assigns one. Either
-            // way, whatever resolves here is what the pane header menu item surfaces.
+            // It ships with a default shortcut via its custom action: `cmd-shift-enter` on
+            // mac and — Zap 相对上游新增 —— `ctrl-alt-m` 在 Linux/Windows(上游这两个平台
+            // 没有默认值)。见 `util::bindings` 里对该 CustomAction 的注释。
+            // 无论哪个平台,这里解析出来的就是 pane header 菜单项展示的内容。
             let default = keybinding_name_to_display_string(TOGGLE_MAXIMIZE_PANE_BINDING_NAME, ctx);
             if OperatingSystem::get().is_mac() {
                 assert_eq!(Some("⇧⌘⏎"), default.as_deref());
             } else {
-                assert_eq!(None, default);
+                assert_eq!(Some("Ctrl Alt M"), default.as_deref());
             }
 
             // A reassigned shortcut resolves to its display string on every platform.

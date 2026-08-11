@@ -15,11 +15,14 @@ use warpui::{
 
 use crate::{
     ai::{
+        active_agent_views_model::ActiveAgentViewsModel,
         agent::conversation::{AIConversationId, ConversationStatus},
         blocklist::BlocklistAIHistoryEvent,
     },
     terminal::BlockListSettings,
     ui_components::blended_colors,
+    view_components::DismissibleToast,
+    workspace::{ToastStack, WorkspaceAction},
     BlocklistAIHistoryModel,
 };
 
@@ -365,9 +368,44 @@ impl TypedActionView for AgentViewEntryBlock {
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
             EnterAgentBlockAction::EnterAgentMode { conversation_id } => {
-                ctx.emit(AgentViewEntryBlockEvent::EnterAgentView {
-                    conversation_id: *conversation_id,
-                });
+                // 这个入口卡片可能是别的 pane 里遗留的旧 banner:会话已经在另一个终端里打开了。
+                // 那种情况下点它应该把焦点切过去,而不是把会话(和它的 block)搬到本 pane 来。
+                let is_active =
+                    ActiveAgentViewsModel::as_ref(ctx).is_conversation_open(*conversation_id, ctx);
+                let is_active_in_this_pane = self
+                    .agent_view_controller
+                    .as_ref(ctx)
+                    .agent_view_state()
+                    .active_conversation_id()
+                    == Some(*conversation_id);
+
+                if is_active && !is_active_in_this_pane {
+                    let Some(target_terminal_view_id) = ActiveAgentViewsModel::as_ref(ctx)
+                        .terminal_view_id_for_conversation(*conversation_id, ctx)
+                    else {
+                        let window_id = ctx.window_id();
+                        ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
+                            toast_stack.add_ephemeral_toast(
+                                DismissibleToast::error(
+                                    "Couldn't navigate to conversation.".to_string(),
+                                ),
+                                window_id,
+                                ctx,
+                            );
+                        });
+                        return;
+                    };
+
+                    ctx.dispatch_typed_action_deferred(
+                        WorkspaceAction::FocusTerminalViewInWorkspace {
+                            terminal_view_id: target_terminal_view_id,
+                        },
+                    );
+                } else {
+                    ctx.emit(AgentViewEntryBlockEvent::EnterAgentView {
+                        conversation_id: *conversation_id,
+                    });
+                }
             }
         }
     }

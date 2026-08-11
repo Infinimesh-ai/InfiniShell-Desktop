@@ -25,6 +25,8 @@ use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::blocklist::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::appearance::Appearance;
+// Zap 命名体系:上游的 `CloudModel` 在我方叫 `ObjectStoreModel`。
+use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::global_resource_handles::GlobalResourceHandlesProvider;
 use crate::notebooks::editor::model::{
     FileLinkResolutionContext, NotebooksEditorModel, RichTextEditorModelEvent,
@@ -298,21 +300,49 @@ impl AIDocumentModel {
 
     /// Hydrates a plan document into the target conversation.
     ///
-    /// openWarp 本地化:没有 Warp Drive 可回源,只能把「已经加载在本模型里」的
-    /// plan 关联到目标会话;文档不在内存中时返回 Err,由调用方回报缺失。
+    /// 被请求的 plan 可能存在于 Drive(我方 `ObjectStoreModel`)但还没有加载进本模型,
+    /// 例如编排子 agent 去读父会话的 plan,或 plan id 从别的会话粘过来。这里按
+    /// `ai_document_id` 回源到 Drive 的 notebook 并就地建出文档。
     pub(in crate::ai) fn hydrate_saved_plan_from_warp_drive(
         &mut self,
         ai_document_id: AIDocumentId,
         conversation_id: AIConversationId,
-        _ctx: &mut ModelContext<Self>,
+        ctx: &mut ModelContext<Self>,
     ) -> Result<(), String> {
-        if !self.documents.contains_key(&ai_document_id) {
+        if self.documents.contains_key(&ai_document_id) {
+            self.latest_document_id_by_conversation_id
+                .insert(conversation_id, ai_document_id);
+            return Ok(());
+        }
+
+        let notebook = ObjectStoreModel::as_ref(ctx)
+            .get_all_active_notebooks()
+            .find(|notebook| notebook.model().ai_document_id.as_ref() == Some(&ai_document_id))
+            .map(|notebook| {
+                (
+                    notebook.id,
+                    notebook.model().title.clone(),
+                    notebook.model().data.clone(),
+                )
+            })
+            .ok_or_else(|| format!("Plan document {ai_document_id} was not found in Warp Drive."))?;
+        let (sync_id, title, content) = notebook;
+        if sync_id.into_server().is_none() {
             return Err(format!(
-                "Plan document {ai_document_id} is not loaded locally."
+                "Plan document {ai_document_id} is not backed by a saved Warp Drive notebook."
             ));
         }
-        self.latest_document_id_by_conversation_id
-            .insert(conversation_id, ai_document_id);
+
+        self.create_document_internal(
+            ai_document_id,
+            title,
+            content,
+            AIDocumentUpdateSource::Restoration,
+            conversation_id,
+            None,
+            Local::now(),
+            ctx,
+        );
         Ok(())
     }
 
