@@ -247,7 +247,6 @@ jobs:
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
           USE_ZIGBUILD: "true"
-          PKG_CONFIG_ALLOW_CROSS: 1
 
       - name: Package x86_64 remote-server tarball
         run: |
@@ -274,7 +273,6 @@ jobs:
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
           USE_ZIGBUILD: "true"
-          PKG_CONFIG_ALLOW_CROSS: 1
 
       - name: Package aarch64 remote-server tarball
         run: |
