@@ -902,14 +902,6 @@ impl Window {
         }
     }
 
-    pub fn set_window_alpha(window_id: WindowId, alpha: f32) {
-        unsafe {
-            if let Some(window) = Self::find_window_with_id(window_id) {
-                set_window_alpha(window, alpha as f64)
-            }
-        }
-    }
-
     /// Returns a reference to a `WarpWindow` identified by `window_id`, if any.
     ///
     /// # Safety
