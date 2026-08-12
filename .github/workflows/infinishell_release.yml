@@ -273,6 +273,8 @@ jobs:
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
           USE_ZIGBUILD: "true"
+          CFLAGS_aarch64_unknown_linux_musl: "-mno-outline-atomics"
+          CXXFLAGS_aarch64_unknown_linux_musl: "-mno-outline-atomics"
 
       - name: Package aarch64 remote-server tarball
         run: |
