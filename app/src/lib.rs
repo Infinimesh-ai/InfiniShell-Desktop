@@ -2096,7 +2096,11 @@ pub(crate) fn initialize_app(
     // AIDocumentModel subscribes to UpdateManager so that it can be notified when notebooks are created locally.
     ctx.add_singleton_model(AIDocumentModel::new);
 
-    // AgentConversationsModel subscribes to UpdateManager events that still flow through the local updater.
+    // AgentConversationsModel subscribes to ActiveAgentViewsModel during construction, so the
+    // active-views singleton must be registered first.
+    ctx.add_singleton_model(|_| crate::ai::active_agent_views_model::ActiveAgentViewsModel::new());
+
+    // AgentConversationsModel also subscribes to UpdateManager events that still flow through the local updater.
     ctx.add_singleton_model(AgentConversationsModel::new);
 
     // ByoLlmAuthBannerSessionState tracks dismissal of the BYO LLM auth banner (e.g., AWS Bedrock login).
@@ -2150,10 +2154,6 @@ pub(crate) fn initialize_app(
 
     ctx.add_singleton_model(LLMPreferences::new);
     ctx.add_singleton_model(HarnessAvailabilityModel::new);
-    // ActiveAgentViewsModel 跟踪活跃 agent 会话并在变化时通知订阅者。
-    // 该模块在本次合并中被恢复(22 个文件依赖它),此处的单例注册当时漏掉了,
-    // 导致 workspace/terminal 大量测试在 `as_ref(ctx)` 处 panic。
-    ctx.add_singleton_model(|_| crate::ai::active_agent_views_model::ActiveAgentViewsModel::new());
     ctx.add_singleton_model(ConnectedSelfHostedWorkersModel::new);
 
     let tip_model_handle = ctx.add_singleton_model(|ctx| {
