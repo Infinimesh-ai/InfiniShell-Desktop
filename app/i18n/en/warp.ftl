@@ -1512,6 +1512,8 @@ settings-update-environment-description-placeholder = e.g., this environment is 
 settings-agent-providers-title = Agent providers
 settings-agent-providers-description = Configure custom Agent providers across multiple protocols — OpenAI-compatible (DeepSeek, Zhipu GLM, Moonshot, DashScope, SiliconFlow, OpenRouter, etc.), Anthropic, Gemini, and local Ollama. You can add models manually (display name + model ID mapping) or fetch them automatically from the API. Provider metadata is stored in the local settings.toml; API keys are stored securely in the system keychain.
 settings-agent-providers-empty = No providers configured yet. Click [+ Add provider] in the top-right to add one.
+settings-agent-providers-placeholder-display-name = No custom provider configured — add one in Settings → AI
+settings-agent-providers-placeholder-base-model-name = Not configured
 settings-agent-providers-add-button = + Add provider
 settings-agent-providers-search-placeholder = Search providers…
 settings-agent-providers-quick-add-title = Quick add
@@ -2178,7 +2180,7 @@ rules-add-button = Add
 rules-init-project-button = Initialize Project
 
 # --- Agent view zero-state + message bar ---
-agent-zero-state-title = New Oz agent conversation
+agent-zero-state-title = New InfiniShell agent conversation
 agent-zero-state-description = Send a prompt below to start a new conversation
 agent-zero-state-description-with-location = Send a prompt below to start a new conversation in `{ $location }`
 agent-zero-state-recent-activity = RECENT ACTIVITY

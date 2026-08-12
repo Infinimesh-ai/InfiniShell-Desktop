@@ -287,7 +287,7 @@ impl Display for SettingsSection {
                 crate::t!("settings-section-editor-and-code-review")
             }
             SettingsSection::CloudSync => crate::t!("settings-section-cloud-sync"),
-            // 代理设置页面。i18n key `settings-section-network` 已在 en / zh-CN / ja 三种语言中齐全。
+            // 代理设置页面。i18n key `settings-section-network` 已在 en / zh-CN 两种语言中齐全。
             SettingsSection::Network => crate::t!("settings-section-network"),
             // Zap Wave 3-1:`OzCloudAPIKeys` Display arm 随 variant 一同物理删。
             // Zap Wave 7-3:`CloudEnvironments` Display arm 随 variant 物理删。

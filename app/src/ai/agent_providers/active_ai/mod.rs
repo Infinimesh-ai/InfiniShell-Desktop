@@ -154,9 +154,8 @@ pub mod prompt_suggestions {
         let language = match *LanguageSettings::as_ref(app).language {
             Language::English => "English",
             Language::SimplifiedChinese => "Simplified Chinese",
-            Language::Japanese => "Japanese",
             // Language::System follows the OS locale; resolve via the active i18n loader
-            // so Chinese/Japanese system-locale users still get CJK suggestions.
+            // so Chinese system-locale users still get Chinese suggestions.
             Language::System => {
                 let locale = crate::i18n::current_languages()
                     .into_iter()
@@ -165,8 +164,6 @@ pub mod prompt_suggestions {
                     .unwrap_or_default();
                 if locale.starts_with("zh") {
                     "Simplified Chinese"
-                } else if locale.starts_with("ja") {
-                    "Japanese"
                 } else {
                     "English"
                 }
