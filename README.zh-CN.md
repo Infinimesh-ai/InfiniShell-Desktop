@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/zap-logo.svg" alt="InfiniShell" width="128" />
+<img src="assets/infinishell-logo.svg" alt="InfiniShell" width="128" />
 
 # InfiniShell
 

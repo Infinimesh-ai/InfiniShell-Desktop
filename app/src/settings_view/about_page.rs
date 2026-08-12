@@ -137,7 +137,7 @@ impl SettingsWidget for AboutPageWidget {
         let ui_builder = appearance.ui_builder();
 
         // 始终用纯图标 logo,品牌名以独立文本 "InfiniShell" 呈现,不再依赖带 "warp" 字样的 svg
-        let image_path = "bundled/svg/warp-logo-light.svg";
+        let image_path = "bundled/svg/infinishell-logo.svg";
 
         // GIT_RELEASE_TAG 注入 → 显示 tag;否则进入 Dev 开发模式
         let version = ChannelState::app_version().unwrap_or("Dev");
