@@ -20,7 +20,8 @@
 ---
 
 Plug in any AI provider, bring in any CLI agent, manage SSH hosts inside the
-terminal — with keys, history and agent state staying on your machine by
+terminal — and organize those hosts into projects your agent can understand
+and operate on. Keys, history and agent state stay on your machine by
 default. No account. No mandatory cloud.
 
 ## Highlights
@@ -32,6 +33,11 @@ default. No account. No mandatory cloud.
   Google Antigravity (`agy`) wired into Blocks and the notification center.
 - 🖥️ **Built-in SSH host manager** — manage hosts, configs and sessions inside
   the terminal, with tmux integration and per-machine agent memory.
+- 🗂️ **Project-scoped agent mode** — group SSH servers, a Git repo and ops
+  rules into a project; agent conversations pick up the project context
+  automatically, run commands on project hosts, and fan out across hosts
+  with canary-first batch execution. See
+  [below](#project-scoped-agent-ops).
 - 📝 **Editable system prompts** — minijinja templates rendered on the client;
   see exactly what your agent is told, and change it.
 - 🈶 **Localized UI** — English, Simplified Chinese and Japanese out of the
@@ -40,6 +46,35 @@ default. No account. No mandatory cloud.
 - 🔒 **Privacy by default** — no account, no login, no Drive sync, no cloud
   agent history. Cloud Agent / Computer Use / telemetry are off by default;
   most of the reporting code paths are removed outright.
+
+## Project-scoped agent ops
+
+Think Codex / Claude Code-style project scoping, but aimed at SSH operations:
+organize a set of servers, a Git repository URL and your ops rules/habits into
+a **project** (open the panel with `Ctrl+7`, or `Alt+7` on Linux/Windows), and
+the agent gains a project-level view.
+
+- **Automatic context injection** — connect to any host in the project (from
+  the projects panel, the SSH manager, or a hand-typed `ssh`) and the
+  conversation automatically carries that project's host inventory, repo URL
+  and rules. The injected block is explicitly framed as "reference data, not
+  instructions" to resist prompt injection.
+- **Single-host execution** — once the SSH session is warpified, the agent's
+  `run_shell_command` runs directly on the remote host with structured command
+  blocks, reusing the existing approval flow and command allowlist.
+- **Cross-host batch execution** — the `run_command_on_hosts` tool orchestrates
+  one command across multiple project hosts: canary-first (a failing first
+  host aborts the rest), per-host exit codes and output aggregation, and a
+  per-command timeout cap. Before running, a dedicated approval card lists the
+  command and target hosts — reject, run once, or always allow (which writes
+  the command into the allowlist so future identical batches auto-execute).
+- **Local everything** — project data lives in local SQLite; SSH credentials
+  stay in the OS keychain (Keychain/DPAPI/keyring). No cloud dependency, same
+  as everywhere else.
+
+Typical workflow: create a project → link servers, set the repo URL and rules
+→ start an agent conversation from the project (or just connect to any project
+host) → have the agent inspect, reconfigure, or roll out across the fleet.
 
 ## Getting Started
 
