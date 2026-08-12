@@ -8,10 +8,10 @@
         {
           "fill" : "automatic",
           "glass" : false,
-          "image-name" : "logo.svg",
+          "image-name" : "logo.png",
           "name" : "logo",
           "position" : {
-            "scale" : 1.45,
+            "scale" : 2.3,
             "translation-in-points" : [
               0,
               0
