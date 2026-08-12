@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/infinishell-logo.svg" alt="InfiniShell" width="128" />
+<img src="assets/infinishell-logo.svg?v=8c9d9ba4" alt="InfiniShell" width="128" />
 
 # InfiniShell
 
