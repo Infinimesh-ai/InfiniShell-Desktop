@@ -2,8 +2,6 @@
 
 > 本文件是给在本仓库中工作的 AI/自动化 agent 的导航文档。它汇总了仓库的整体架构、Cargo 工作区中每个 crate 的职责、`app/` 主二进制下各子模块的边界,以及在做改动前必须遵守的工程约定。
 >
-> 与 `WARP.md` 是配套关系:`WARP.md` 是工程师手册(命令、风格、流程),本文件是**代码地图**。先读 `WARP.md`,再用本文件定位到正确的 crate / 模块。
-
 ---
 
 ## 1. 仓库总览
@@ -50,7 +48,7 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
                 managed_secrets / virtual_fs / watcher / asset_cache …
 ```
 
-关键架构模式(详见 `WARP.md`):
+关键架构模式:
 
 1. **Entity-Handle 系统**:`App` 全局拥有所有 view/model entity,View 之间通过 `ViewHandle<T>` 引用,而不是直接拥有。
 2. **Element / Action**:UI 由声明式 Element 树 + Action 事件系统组成(Flutter 风格)。
@@ -259,7 +257,7 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 
 ## 5. 工程纪律(给 Agent 的强约束)
 
-> 这些基于 `WARP.md` 与项目自定义规则整理;本文件对 agent 的验证要求以 `cargo check` 为准。
+> 以下为项目自定义规则;本文件对 agent 的验证要求以 `cargo check` 为准。
 
 ### 5.1 必读约定
 - **注释/回复一律使用简体中文**(用户规则)。
@@ -270,7 +268,7 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 - 多解释方案、暴露不确定性,而不是默默替用户做选择。
 - worktree路径：.worktrees/<worktree_name>/
 
-### 5.2 Rust 风格(摘自 `WARP.md`)
+### 5.2 Rust 风格
 - 闭包参数不要写多余类型注解。
 - 顶部统一 `use`,不要写一长串路径限定;`#[cfg]` 分支内例外。
 - 上下文参数命名为 `ctx` 且放在最后;若同时有闭包参数,闭包放最后。
