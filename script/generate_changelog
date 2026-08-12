@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# 本地预览 Zap Release notes — 与 .github/workflows/zap_release.yml 走同一份
+# 本地预览 InfiniShell Release notes — 与 .github/workflows/infinishell_release.yml 走同一份
 # cliff.toml,确保 CI 出的 release body 和你本地看到的内容一致。
 #
 # 用法:

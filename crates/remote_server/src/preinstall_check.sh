@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# Zap remote-server 二进制的预安装检查。
+# InfiniShell remote-server 二进制的预安装检查。
 #
 # stdout 输出结构化 key=value 摘要。退出码 0 表示探测完成;
 # 非 0 表示探测过程失败,客户端会按 `status=unknown` 处理并 fail open。
 #
-# 重要:Zap Linux remote-server 现在由 zap_release.yml 以
-# `x86_64-unknown-linux-musl` 目标静态链接构建(static-musl)。产物不依赖
-# 宿主的动态 libc,因此可以在任意 Linux x86_64 主机上运行 —— 包括旧 glibc
-# 发行版(CentOS 7 = 2.17、Amazon Linux 2 = 2.26、Ubuntu 20.04 / Debian 11
-# = 2.31)以及 musl 发行版(Alpine 等)。
+# 重要:InfiniShell Linux remote-server 现在由 infinishell_release.yml 以
+# x86_64/aarch64 musl 目标静态链接构建。产物不依赖宿主的动态 libc;
+# x86_64 版本可以在旧 glibc 发行版(CentOS 7 = 2.17、Amazon Linux 2 = 2.26、
+# Ubuntu 20.04 / Debian 11 = 2.31)运行,两种架构也都支持 Alpine 等 musl 发行版。
 #
 # 既然二进制是静态的,libc 探测不再用于「门禁」,只作为遥测信息保留。
 

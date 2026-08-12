@@ -4,7 +4,10 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 pub use glibc::{GlibcVersion, RemoteLibc};
-use warp_core::channel::{Channel, ChannelState};
+use warp_core::{
+    channel::{Channel, ChannelState},
+    paths::OSS_CONFIG_DIR,
+};
 pub const REMOTE_SERVER_ARTIFACT_VERSION_UNPINNED: &str = "unversioned";
 
 /// State machine for the remote server install → launch → initialize flow.
@@ -323,16 +326,16 @@ pub fn parse_uname_output(
 /// - dev:         `~/.warp-dev/remote-server`
 /// - local:       `~/.warp-local/remote-server`
 /// - integration: `~/.warp-dev/remote-server`
-/// - warp-oss:    `~/.zap/remote-server`
+/// - oss:         `~/.infinishell/remote-server`
 pub fn remote_server_dir() -> String {
-    let warp_dir = match ChannelState::channel() {
+    let config_dir = match ChannelState::channel() {
         Channel::Stable => ".warp",
         Channel::Preview => ".warp-preview",
         Channel::Dev | Channel::Integration => ".warp-dev",
         Channel::Local => ".warp-local",
-        Channel::Oss => ".zap",
+        Channel::Oss => OSS_CONFIG_DIR,
     };
-    format!("~/{warp_dir}/remote-server")
+    format!("~/{config_dir}/remote-server")
 }
 
 /// Returns a short, deterministic directory name for a remote-server
@@ -448,7 +451,7 @@ pub fn binary_name() -> &'static str {
 /// 返回当前 channel 和客户端版本对应的远端二进制完整路径。
 ///
 /// Local 构建保留无版本后缀路径,以便 `script/deploy_remote_server`
-/// 覆盖同一个开发 slot。Zap release 构建带 `GIT_RELEASE_TAG`
+/// 覆盖同一个开发 slot。InfiniShell release 构建带 `GIT_RELEASE_TAG`
 /// 时使用版本后缀,这样新版本会自然触发重新安装;源码本地构建没有
 /// release tag,仍使用无后缀路径。
 pub fn remote_server_binary() -> String {
@@ -543,13 +546,13 @@ pub fn install_script(staging_tarball_path: Option<&str>) -> String {
         .replace("{staging_tarball_path}", staging_tarball_path.unwrap_or(""))
 }
 
-/// 构造 Zap CLI release 资产下载基址。
+/// 构造 InfiniShell CLI release 资产下载基址。
 fn download_url() -> String {
     let release_path = match ChannelState::app_version() {
         Some(tag) => format!("download/{tag}"),
         None => "latest/download".to_string(),
     };
-    format!("https://github.com/zerx-lab/warp/releases/{release_path}")
+    format!("https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/{release_path}")
 }
 
 fn version_suffix() -> String {
@@ -562,11 +565,19 @@ fn version_suffix() -> String {
     }
 }
 
-/// 返回指定远端平台对应的 Zap CLI tarball URL。
+/// 返回指定远端平台对应的 InfiniShell CLI tarball URL。
 pub fn download_tarball_url(platform: &RemotePlatform) -> String {
     format!(
-        "{}/zap-{}-{}.tar.gz",
+        "{}/{}",
         download_url(),
+        remote_server_tarball_name(platform)
+    )
+}
+
+/// 返回指定远端平台对应的 InfiniShell CLI tarball 文件名。
+pub fn remote_server_tarball_name(platform: &RemotePlatform) -> String {
+    format!(
+        "infinishell-{}-{}.tar.gz",
         platform.os.as_str(),
         platform.arch.as_str(),
     )

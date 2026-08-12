@@ -89,6 +89,25 @@ if ($env:GIT_RELEASE_TAG) {
         Set-Content -Path $VersionMetadataPath -Encoding utf8
 }
 
+# 发布流水线通过该目录注入四个平台的 remote-server tarball。复制前再次
+# 校验版本、文件集合与 SHA-256，避免安装包带入缺失或串版本的产物。
+if ($env:WARP_BUNDLED_REMOTE_SERVER_DIR) {
+    if (-Not $env:GIT_RELEASE_TAG) {
+        Write-Error 'GIT_RELEASE_TAG is required when bundling remote-server resources'
+        exit 1
+    }
+    $RemoteServerDestination = Join-Path $DestinationDir 'remote-server'
+    Write-Output "Copying bundled remote-server resources to $RemoteServerDestination"
+    python "$RepoRoot\script\prepare_bundled_remote_server_resources.py" copy `
+        $env:WARP_BUNDLED_REMOTE_SERVER_DIR `
+        $env:GIT_RELEASE_TAG `
+        $RemoteServerDestination
+    if (-Not $?) {
+        Write-Error 'Failed to prepare bundled remote-server resources'
+        exit 1
+    }
+}
+
 # Copy channel-gated skills matching the current release channel.
 $GatedSource = Join-Path (Join-Path $RepoRoot 'resources') 'channel-gated-skills'
 $DestSkills = Join-Path (Join-Path $DestinationDir 'bundled') 'skills'

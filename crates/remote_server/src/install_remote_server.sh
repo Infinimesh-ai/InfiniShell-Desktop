@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 在远端主机安装 Zap CLI 二进制,用于 remote-server-proxy;并将 artifact 的
+# 在远端主机安装 InfiniShell CLI 二进制,用于 remote-server-proxy;并将 artifact 的
 # `resources/` 树(bundled skills、settings schema)安装到全局无版本目录:
 #
 #   {install_dir}/
@@ -7,8 +7,8 @@
 #   └── bundled_resources/              ← artifact 的 resources 树(如有)
 #
 # setup.rs 会在运行时替换这些占位符:
-#   {download_base_url}          - 例如 https://github.com/zerx-lab/warp/releases/latest/download
-#   {install_dir}                - 例如 ~/.zap/remote-server
+#   {download_base_url}          - 例如 https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/latest/download
+#   {install_dir}                - 例如 ~/.infinishell/remote-server
 #   {binary_name}                - 例如 infinishell
 #   {version_suffix}             - 例如 -v0.2026...,没有 release tag 时为空
 #   {bundled_resources_dir_name} - 全局 resources 目录名(例如 bundled_resources)
@@ -63,24 +63,24 @@ if [ -n "$staging_tarball_path" ]; then
   case "$staging_tarball_path" in
     "~"|"~/"*) staging_tarball_path="${HOME}${staging_tarball_path#\~}" ;;
   esac
-  mv "$staging_tarball_path" "$tmpdir/zap.tar.gz"
+  mv "$staging_tarball_path" "$tmpdir/infinishell.tar.gz"
 else
-  url="{download_base_url}/zap-$os_name-$arch_name.tar.gz"
+  url="{download_base_url}/infinishell-$os_name-$arch_name.tar.gz"
   if command -v curl >/dev/null 2>&1; then
-    curl -fSL --connect-timeout 15 "$url" -o "$tmpdir/zap.tar.gz"
+    curl -fSL --connect-timeout 15 "$url" -o "$tmpdir/infinishell.tar.gz"
   elif command -v wget >/dev/null 2>&1; then
-    wget -q -O "$tmpdir/zap.tar.gz" "$url"
+    wget -q -O "$tmpdir/infinishell.tar.gz" "$url"
   else
     echo "error: neither curl nor wget is available" >&2
     exit {no_http_client_exit_code}
   fi
 fi
 
-tar -xzf "$tmpdir/zap.tar.gz" -C "$tmpdir"
+tar -xzf "$tmpdir/infinishell.tar.gz" -C "$tmpdir"
 
 bin="$tmpdir/{binary_name}"
 if [ ! -f "$bin" ]; then
-  bin=$(find "$tmpdir" -type f \( -name 'infinishell' -o -name 'warp-oss' -o -name 'oz*' \) ! -path '*/resources/*' ! -name '*.tar.gz' | head -n1)
+  bin=$(find "$tmpdir" -type f \( -name '{binary_name}' -o -name 'infinishell' -o -name 'oz*' \) ! -path '*/resources/*' ! -name '*.tar.gz' | head -n1)
 fi
 if [ -z "$bin" ]; then echo "no binary found in tarball" >&2; exit 1; fi
 chmod +x "$bin"

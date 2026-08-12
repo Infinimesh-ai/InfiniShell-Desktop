@@ -1,4 +1,4 @@
-# git-cliff 配置 — 用于在 Zap Release 发布时自动生成「自上个 tag 以来的变更」。
+# git-cliff 配置 — 用于在 InfiniShell Release 发布时自动生成「自上个 tag 以来的变更」。
 #
 # 设计原则:
 # - 主分组按 conventional commit type(feat/fix/refactor/docs/test/build/ci/ui/perf/chore)。

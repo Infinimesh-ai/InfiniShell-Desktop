@@ -6,38 +6,30 @@ use std::path::Path;
 use anyhow::Result;
 use remote_server::ssh::SshCommandError;
 use remote_server::transport::{Error, InstallOutcome, InstallSource};
+use warp_core::safe_warn;
 
-/// Runs the binary install sequence for the SSH transport. It first asks the
-/// remote host to download directly, then falls back to uploading a cached
-/// client-side tarball over SCP when the remote download path fails.
+/// 运行 SSH remote-server 安装流程。优先上传安装包内置的 tarball；内置资源
+/// 不可用时才让远端直接下载，最后回退到客户端缓存/下载后通过 SCP 上传。
 pub(super) async fn install_binary(socket_path: &Path) -> InstallOutcome {
     let binary_path = remote_server::setup::remote_server_binary();
     log::info!("Installing remote server binary to {binary_path}");
-    let mut outcome = match install_on_server(socket_path).await {
-        Ok(()) => InstallOutcome {
-            source: Some(InstallSource::Server),
+    let mut outcome = match scp_fallback::install_bundled(socket_path).await {
+        Some(Ok(())) => InstallOutcome {
+            source: Some(InstallSource::Client),
             result: Ok(()),
         },
-        Err(server_err) => {
-            if scp_fallback::should_try_install(&server_err) {
-                log::info!("Remote server install failed; falling back to SCP upload");
-                match scp_fallback::install(socket_path).await {
-                    Ok(()) => InstallOutcome {
-                        source: Some(InstallSource::Client),
-                        result: Ok(()),
-                    },
-                    Err(e) => InstallOutcome {
-                        source: Some(InstallSource::Client),
-                        result: Err(e),
-                    },
-                }
-            } else {
-                InstallOutcome {
-                    source: Some(InstallSource::Server),
-                    result: Err(server_err),
-                }
-            }
+        Some(Err(error)) if !scp_fallback::should_try_install(&error) => InstallOutcome {
+            source: Some(InstallSource::Client),
+            result: Err(error),
+        },
+        Some(Err(error)) => {
+            safe_warn!(
+                safe: ("Bundled remote-server install failed; falling back to download"),
+                full: ("Bundled remote-server install failed; falling back to download: {error:#}")
+            );
+            install_with_download_fallback(socket_path).await
         }
+        None => install_with_download_fallback(socket_path).await,
     };
 
     // Post-install verification: confirm the binary actually landed at the
@@ -71,6 +63,35 @@ pub(super) async fn install_binary(socket_path: &Path) -> InstallOutcome {
     }
 
     outcome
+}
+
+async fn install_with_download_fallback(socket_path: &Path) -> InstallOutcome {
+    match install_on_server(socket_path).await {
+        Ok(()) => InstallOutcome {
+            source: Some(InstallSource::Server),
+            result: Ok(()),
+        },
+        Err(server_err) => {
+            if scp_fallback::should_try_install(&server_err) {
+                log::info!("Remote server install failed; falling back to SCP upload");
+                match scp_fallback::install(socket_path).await {
+                    Ok(()) => InstallOutcome {
+                        source: Some(InstallSource::Client),
+                        result: Ok(()),
+                    },
+                    Err(e) => InstallOutcome {
+                        source: Some(InstallSource::Client),
+                        result: Err(e),
+                    },
+                }
+            } else {
+                InstallOutcome {
+                    source: Some(InstallSource::Server),
+                    result: Err(server_err),
+                }
+            }
+        }
+    }
 }
 
 /// Runs the install script on the remote host to download and install the

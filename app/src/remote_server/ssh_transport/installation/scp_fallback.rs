@@ -2,12 +2,17 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::Context as _;
-use futures::{AsyncWriteExt as _, TryStreamExt as _};
+use futures::{AsyncReadExt as _, AsyncWriteExt as _, TryStreamExt as _};
 use http_client::StatusCode;
 use remote_server::setup::RemotePlatform;
 use remote_server::transport::Error;
+use serde::Deserialize;
+use sha2::{Digest as _, Sha256};
+use warp_core::safe_warn;
 
-const REMOTE_SERVER_TARBALL_CACHE_FILE_NAME: &str = "oz.tar.gz";
+const BUNDLED_REMOTE_SERVER_DIR_NAME: &str = "remote-server";
+const BUNDLED_REMOTE_SERVER_MANIFEST_NAME: &str = "manifest.json";
+const REMOTE_SERVER_TARBALL_CACHE_FILE_NAME: &str = "infinishell.tar.gz";
 
 const REMOTE_SERVER_TARBALL_DOWNLOAD_ATTEMPTS: usize = 3;
 // The local SCP fallback download can run over slow or captive networks. Match
@@ -25,6 +30,43 @@ pub(super) fn should_try_install(error: &Error) -> bool {
     !matches!(error, Error::ScriptFailed { exit_code, .. } if *exit_code == 2)
 }
 
+#[derive(Deserialize)]
+struct BundledRemoteServerManifest {
+    version: String,
+    artifacts: Vec<BundledRemoteServerArtifact>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BundledRemoteServerArtifact {
+    os: String,
+    arch: String,
+    file: String,
+    sha256: String,
+}
+
+/// 尝试使用安装包内置的 tarball。`None` 表示当前安装包没有可用内置资源，
+/// 调用方应继续走远端下载路径。
+pub(super) async fn install_bundled(socket_path: &Path) -> Option<Result<(), Error>> {
+    let platform = match super::super::detect_remote_platform(socket_path).await {
+        Ok(platform) => platform,
+        Err(error) => return Some(Err(error)),
+    };
+    let client_tarball_path = match bundled_remote_server_tarball(&platform).await {
+        Ok(Some(path)) => path,
+        Ok(None) => return None,
+        Err(error) => {
+            safe_warn!(
+                safe: ("Bundled remote-server tarball is unavailable; falling back to download"),
+                full: ("Bundled remote-server tarball is unavailable; falling back to download: {error:#}")
+            );
+            return None;
+        }
+    };
+
+    log::info!("Installing remote server from bundled tarball");
+    Some(install_tarball(socket_path, &client_tarball_path).await)
+}
+
 /// Installs the remote server via SCP fallback.
 ///
 /// The tarball is downloaded or reused from the local cache first, then uploaded
@@ -36,9 +78,13 @@ pub(super) async fn install(socket_path: &Path) -> Result<(), Error> {
     let client_tarball_path = cached_remote_server_tarball(&platform)
         .await
         .map_err(Error::Other)?;
+    install_tarball(socket_path, &client_tarball_path).await
+}
+
+async fn install_tarball(socket_path: &Path, client_tarball_path: &Path) -> Result<(), Error> {
     let timeout = remote_server::setup::SCP_INSTALL_TIMEOUT;
     let install_dir = remote_server::setup::remote_server_dir();
-    let remote_tarball_name = format!("oz-upload-{}.tar.gz", uuid::Uuid::new_v4());
+    let remote_tarball_name = format!("infinishell-upload-{}.tar.gz", uuid::Uuid::new_v4());
     let remote_tarball_path = format!("{install_dir}/{remote_tarball_name}");
 
     // The normal install script creates this directory before downloading, but
@@ -63,7 +109,7 @@ pub(super) async fn install(socket_path: &Path) -> Result<(), Error> {
     log::info!("Uploading tarball to remote at {remote_tarball_path}");
     remote_server::ssh::scp_upload(
         socket_path,
-        &client_tarball_path,
+        client_tarball_path,
         &remote_tarball_path,
         timeout,
     )
@@ -86,6 +132,98 @@ pub(super) async fn install(socket_path: &Path) -> Result<(), Error> {
             stderr,
         })
     }
+}
+
+async fn bundled_remote_server_tarball(
+    platform: &RemotePlatform,
+) -> anyhow::Result<Option<PathBuf>> {
+    let Some(resources_dir) = warp_core::paths::bundled_resources_dir() else {
+        return Ok(None);
+    };
+    let bundled_dir = resources_dir.join(BUNDLED_REMOTE_SERVER_DIR_NAME);
+    let manifest_path = bundled_dir.join(BUNDLED_REMOTE_SERVER_MANIFEST_NAME);
+    let manifest_json = match async_fs::read_to_string(&manifest_path).await {
+        Ok(manifest_json) => manifest_json,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(error).with_context(|| {
+                format!(
+                    "Failed to read bundled remote-server manifest '{}'",
+                    manifest_path.display()
+                )
+            });
+        }
+    };
+    let manifest: BundledRemoteServerManifest = serde_json::from_str(&manifest_json)
+        .context("Failed to parse bundled remote-server manifest")?;
+    let expected_version = remote_server::setup::remote_server_artifact_version();
+    let artifact = select_bundled_artifact(&manifest, platform, expected_version)?;
+
+    let tarball_path = bundled_dir.join(&artifact.file);
+    verify_tarball_sha256(&tarball_path, &artifact.sha256).await?;
+    Ok(Some(tarball_path))
+}
+
+fn select_bundled_artifact<'a>(
+    manifest: &'a BundledRemoteServerManifest,
+    platform: &RemotePlatform,
+    expected_version: &str,
+) -> anyhow::Result<&'a BundledRemoteServerArtifact> {
+    anyhow::ensure!(
+        manifest.version == expected_version,
+        "Bundled remote-server manifest version mismatch: expected '{expected_version}', got '{}'",
+        manifest.version
+    );
+
+    let expected_file = remote_server::setup::remote_server_tarball_name(platform);
+    let artifact = manifest
+        .artifacts
+        .iter()
+        .find(|artifact| {
+            artifact.os == platform.os.as_str() && artifact.arch == platform.arch.as_str()
+        })
+        .with_context(|| {
+            format!(
+                "Bundled remote-server manifest has no artifact for {}-{}",
+                platform.os.as_str(),
+                platform.arch.as_str()
+            )
+        })?;
+    anyhow::ensure!(
+        artifact.file == expected_file,
+        "Bundled remote-server manifest has unexpected artifact file '{}'",
+        artifact.file
+    );
+    Ok(artifact)
+}
+
+async fn verify_tarball_sha256(path: &Path, expected_sha256: &str) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        expected_sha256.len() == 64 && expected_sha256.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "Invalid SHA-256 value in bundled remote-server manifest"
+    );
+
+    let mut file = async_fs::File::open(path)
+        .await
+        .with_context(|| format!("Failed to open bundled tarball '{}'", path.display()))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let bytes_read = file
+            .read(&mut buffer)
+            .await
+            .with_context(|| format!("Failed to read bundled tarball '{}'", path.display()))?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+    let actual_sha256 = hex::encode(hasher.finalize());
+    anyhow::ensure!(
+        actual_sha256.eq_ignore_ascii_case(expected_sha256),
+        "Bundled remote-server tarball SHA-256 mismatch"
+    );
+    Ok(())
 }
 
 fn remote_server_tarball_cache_root() -> PathBuf {
@@ -303,3 +441,7 @@ fn is_retryable_download_status(status: StatusCode) -> bool {
         StatusCode::REQUEST_TIMEOUT | StatusCode::TOO_MANY_REQUESTS
     ) || status.is_server_error()
 }
+
+#[cfg(test)]
+#[path = "scp_fallback_tests.rs"]
+mod tests;

@@ -437,7 +437,7 @@ fn install_script_tolerates_tarball_without_resources() {
     ));
     let fake_home = test_root.join("home");
     let tar_source = test_root.join("tar-source");
-    let tarball = test_root.join("oz.tar.gz");
+    let tarball = test_root.join("infinishell.tar.gz");
     fs::create_dir_all(&fake_home).unwrap();
     fs::create_dir_all(&tar_source).unwrap();
     fs::write(
@@ -716,17 +716,17 @@ fn parse_preinstall_missing_status_falls_open() {
 }
 
 #[test]
-fn oss_remote_server_dir_uses_zap_namespace() {
-    assert_eq!(remote_server_dir(), "~/.zap/remote-server");
+fn oss_remote_server_dir_uses_infinishell_namespace() {
+    assert_eq!(remote_server_dir(), "~/.infinishell/remote-server");
 }
 
 #[test]
-fn oss_binary_name_matches_zap_cli() {
-    assert_eq!(binary_name(), "warp-oss");
+fn oss_binary_name_matches_infinishell_cli() {
+    assert_eq!(binary_name(), "infinishell");
 }
 
 #[test]
-fn oss_download_tarball_url_uses_github_release_asset() {
+fn oss_linux_x86_64_tarball_url_uses_infinishell_release_asset() {
     let platform = RemotePlatform {
         os: RemoteOs::Linux,
         arch: RemoteArch::X86_64,
@@ -735,20 +735,72 @@ fn oss_download_tarball_url_uses_github_release_asset() {
     let url = download_tarball_url(&platform);
 
     assert_eq!(
+        remote_server_tarball_name(&platform),
+        "infinishell-linux-x86_64.tar.gz"
+    );
+    assert_eq!(
         url,
-        "https://github.com/zerx-lab/warp/releases/latest/download/zap-linux-x86_64.tar.gz"
+        "https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/latest/download/infinishell-linux-x86_64.tar.gz"
     );
     assert!(!url.contains("app.warp.dev"));
     assert!(!url.contains("/download/cli"));
 }
 
 #[test]
-fn install_script_uses_zap_asset_and_staging_placeholder() {
-    let script = install_script(Some("~/.zap/remote-server/zap-upload.tar.gz"));
+fn oss_linux_aarch64_tarball_url_uses_infinishell_release_asset() {
+    let platform = RemotePlatform {
+        os: RemoteOs::Linux,
+        arch: RemoteArch::Aarch64,
+    };
 
-    assert!(script
-        .contains("staging_tarball_path=\"~/.zap/remote-server/zap-upload.tar.gz\""));
-    assert!(script.contains("zap-$os_name-$arch_name.tar.gz"));
+    let url = download_tarball_url(&platform);
+
+    assert_eq!(
+        url,
+        "https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/latest/download/infinishell-linux-aarch64.tar.gz"
+    );
+}
+
+#[test]
+fn oss_macos_aarch64_tarball_url_uses_infinishell_release_asset() {
+    let platform = RemotePlatform {
+        os: RemoteOs::MacOs,
+        arch: RemoteArch::Aarch64,
+    };
+
+    let url = download_tarball_url(&platform);
+
+    assert_eq!(
+        url,
+        "https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/latest/download/infinishell-macos-aarch64.tar.gz"
+    );
+}
+
+#[test]
+fn oss_macos_x86_64_tarball_url_uses_infinishell_release_asset() {
+    let platform = RemotePlatform {
+        os: RemoteOs::MacOs,
+        arch: RemoteArch::X86_64,
+    };
+
+    let url = download_tarball_url(&platform);
+
+    assert_eq!(
+        url,
+        "https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/latest/download/infinishell-macos-x86_64.tar.gz"
+    );
+}
+
+#[test]
+fn install_script_uses_infinishell_asset_and_staging_placeholder() {
+    let script = install_script(Some(
+        "~/.infinishell/remote-server/infinishell-upload.tar.gz",
+    ));
+
+    assert!(script.contains(
+        "staging_tarball_path=\"~/.infinishell/remote-server/infinishell-upload.tar.gz\""
+    ));
+    assert!(script.contains("infinishell-$os_name-$arch_name.tar.gz"));
     assert!(!script.contains("app.warp.dev"));
     assert!(!script.contains("/download/cli"));
 }
