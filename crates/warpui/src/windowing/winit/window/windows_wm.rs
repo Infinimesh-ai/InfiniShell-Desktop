@@ -9,9 +9,6 @@ use winit::monitor::MonitorHandle;
 use winit::platform::windows::MonitorHandleExtWindows;
 use winit::window::Window as WinitWindow;
 
-use windows::Win32::Graphics::Gdi::{MonitorFromWindow, MONITOR_DEFAULTTONEAREST};
-use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
-
 use super::get_monitor_logical_bounds;
 use crate::platform::WindowManager as _;
 use crate::windowing::winit::window::WindowManager;
