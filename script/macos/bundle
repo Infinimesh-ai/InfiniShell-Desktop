@@ -230,6 +230,8 @@ DEBUG=false
 ARTIFACT="app"
 CODESIGN=true
 SELFSIGN=false
+LOCAL_CODESIGN=false
+LOCAL_SIGNING_IDENTITY="${WARP_LOCAL_SIGNING_IDENTITY:-}"
 OPEN_AFTER_BUNDLE=false
 READ_PASSWORDS_FROM_ENV=false
 
@@ -259,6 +261,7 @@ while (( "$#" )); do
       echo "Skipping code signing."
       CODESIGN=false
       SELFSIGN=false
+      LOCAL_CODESIGN=false
       shift
       ;;
     # Sign with a local Apple Development cert instead of the official Zap cert.
@@ -268,7 +271,27 @@ while (( "$#" )); do
       echo "Self-signing enabled."
       CODESIGN=false
       SELFSIGN=true
+      LOCAL_CODESIGN=false
       shift
+      ;;
+    # Sign release artifacts with a Developer ID Application identity from the
+    # local keychain. Unlike official signing, this does not require GCP secrets
+    # and intentionally skips notarization when credentials are unavailable.
+    --local-sign)
+      echo "Local Developer ID signing enabled."
+      CODESIGN=false
+      SELFSIGN=false
+      LOCAL_CODESIGN=true
+      shift
+      ;;
+    --signing-identity)
+      if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
+        LOCAL_SIGNING_IDENTITY=$2
+        shift 2
+      else
+        echo "Error: Argument for $1 is missing" >&2
+        exit 1
+      fi
       ;;
     # Build only for the default target architecture instead of universal binary
     --nouniversal)
@@ -871,7 +894,26 @@ fi
 ## Step 3: Codesign the app ##
 ##############################
 
-if [[ $SELFSIGN = true ]]; then
+if [[ $LOCAL_CODESIGN = true ]]; then
+  if [[ -z "$LOCAL_SIGNING_IDENTITY" ]]; then
+    LOCAL_SIGNING_IDENTITY="$(security find-identity -p codesigning -v | awk '/Developer ID Application:/ {print $2; exit}')"
+  fi
+  if [[ -z "$LOCAL_SIGNING_IDENTITY" ]] || ! security find-identity -p codesigning -v | grep -F "$LOCAL_SIGNING_IDENTITY" > /dev/null; then
+    echo "No matching Developer ID Application identity found in the local keychain." >&2
+    exit 1
+  fi
+
+  echo "Using local Developer ID identity $LOCAL_SIGNING_IDENTITY"
+  if [[ "$ARTIFACT" == app ]]; then
+    echo "Signing $BUNDLE_DIR/$WARP_APP_NAME.app with the local Developer ID identity..."
+    codesign_with_retry --deep --force --options runtime --timestamp --sign "$LOCAL_SIGNING_IDENTITY" "$BUNDLE_DIR/$WARP_APP_NAME.app" --entitlements "$WORKSPACE_ROOT_DIR/script/Local-Release-Entitlements.plist"
+    codesign --verify --deep --strict --verbose=2 "$BUNDLE_DIR/$WARP_APP_NAME.app"
+  elif [[ "$ARTIFACT" == cli || "$ARTIFACT" == warpctrl || "$ARTIFACT" == tui ]]; then
+    echo "Signing $OUT_DIR/$WARP_BIN with the local Developer ID identity..."
+    codesign_with_retry --force --options runtime --timestamp --sign "$LOCAL_SIGNING_IDENTITY" "$OUT_DIR/$WARP_BIN" --entitlements "$WORKSPACE_ROOT_DIR/script/Local-Release-Entitlements.plist"
+    codesign --verify --strict --verbose=2 "$OUT_DIR/$WARP_BIN"
+  fi
+elif [[ $SELFSIGN = true ]]; then
   SIGNING_CERT="$(security find-identity -p codesigning -v | grep "Apple Development" | awk '{print $2}' | head -1)"
   if [[ -z "$SIGNING_CERT" ]]; then
     echo "No Apple Development cert found, falling back to ad-hoc signing."
@@ -953,7 +995,7 @@ if [[ "$ARTIFACT" = app ]]; then
 
   # If we're codesigning, stage the signed app and use that to create the DMG.
   # Otherwise, create a DMG from the bundle dir directly.
-  if [[ $CODESIGN = true ]]; then
+  if [[ $CODESIGN = true || $LOCAL_CODESIGN = true ]]; then
     if test -d "$DMG_DIR"; then
       echo "Clearing old dmg directory $DMG_DIR"
       rm -r "$DMG_DIR"
@@ -964,11 +1006,17 @@ if [[ "$ARTIFACT" = app ]]; then
 
     create_warp_dmg "$DMG_DIR"
 
-    echo "Codesigning $DMG_DIR/$DMG_NAME..."
-    codesign_with_retry -f -s "$APPLE_TEAM_ID" --timestamp "$DMG_DIR/$DMG_NAME"
+    if [[ $LOCAL_CODESIGN = true ]]; then
+      echo "Signing $DMG_DIR/$DMG_NAME with the local Developer ID identity..."
+      codesign_with_retry --force --sign "$LOCAL_SIGNING_IDENTITY" --timestamp "$DMG_DIR/$DMG_NAME"
+      codesign --verify --strict --verbose=2 "$DMG_DIR/$DMG_NAME"
+    else
+      echo "Codesigning $DMG_DIR/$DMG_NAME..."
+      codesign_with_retry -f -s "$APPLE_TEAM_ID" --timestamp "$DMG_DIR/$DMG_NAME"
 
-    NOTARIZATION_ARTIFACT="$DMG_DIR/$DMG_NAME"
-    STAPLE_TICKET=true
+      NOTARIZATION_ARTIFACT="$DMG_DIR/$DMG_NAME"
+      STAPLE_TICKET=true
+    fi
   else
     echo "Creating $DMG_DIR"
     mkdir -p "$DMG_DIR"
