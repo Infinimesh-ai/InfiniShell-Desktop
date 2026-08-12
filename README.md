@@ -40,8 +40,8 @@ default. No account. No mandatory cloud.
   [below](#project-scoped-agent-ops).
 - 📝 **Editable system prompts** — minijinja templates rendered on the client;
   see exactly what your agent is told, and change it.
-- 🈶 **Localized UI** — English, Simplified Chinese and Japanese out of the
-  box, community-extensible. CJK rendering fixes (soft-wrap caret, bold
+- 🈶 **Localized UI** — English and Simplified Chinese out of the box,
+  community-extensible. CJK rendering fixes (soft-wrap caret, bold
   subpixel) included.
 - 🔒 **Privacy by default** — no account, no login, no Drive sync, no cloud
   agent history. Cloud Agent / Computer Use / telemetry are off by default;
