@@ -360,6 +360,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::OzPlatformSkills,
         #[cfg(feature = "bundled_skills")]
         FeatureFlag::BundledSkills,
+        #[cfg(feature = "project_manager")]
+        FeatureFlag::ZapProjects,
         #[cfg(feature = "open_warp_launch_modal")]
         FeatureFlag::ZapLaunchModal,
         #[cfg(feature = "orchestration_launch_modal")]

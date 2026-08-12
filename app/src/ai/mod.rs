@@ -50,6 +50,7 @@ pub(crate) mod orchestration;
 // Zap:`persisted_workspace` 属云端 workspace 持久化,本次合并未引入,故不声明。
 pub(crate) mod predict;
 pub(crate) mod pricing_promotion;
+pub(crate) mod project_agent_context;
 pub(crate) mod project_rules_persister;
 #[cfg(all(not(target_family = "wasm"), feature = "local_fs"))]
 pub(crate) mod remote_agent_context;

@@ -47,7 +47,8 @@ pub use action_model::{
 #[cfg_attr(target_family = "wasm", allow(unused_imports))]
 pub(crate) use action_model::{
     FileReadResult, PromptSuggestionExecutor, PromptSuggestionExecutorEvent, ReadFileContextResult,
-    RequestFileEditsFormatKind, apply_edits, read_local_file_context,
+    RequestFileEditsFormatKind, agent_shell_command_block_output, apply_edits,
+    read_local_file_context,
 };
 // Consumed by `tui_export` for the `warp_tui` frontend.
 #[cfg(feature = "tui")]

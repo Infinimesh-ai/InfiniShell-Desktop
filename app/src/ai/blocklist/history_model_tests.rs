@@ -222,6 +222,8 @@ fn byop_test_task(task_id: &str, messages: Vec<api::Message>) -> api::Task {
 
 fn empty_agent_conversation_data_for_test() -> AgentConversationData {
     AgentConversationData {
+        project_id: None,
+        project_host_node_id: None,
         server_conversation_token: None,
         conversation_usage_metadata: None,
         reverted_action_ids: None,
@@ -981,6 +983,8 @@ fn test_initialize_historical_conversations_resolves_parent_agent_id_children_vi
             persisted_agent_conversation(
                 child_id,
                 AgentConversationData {
+                    project_id: None,
+                    project_host_node_id: None,
                     server_conversation_token: Some("child-token".to_string()),
                     conversation_usage_metadata: None,
                     reverted_action_ids: None,
@@ -1006,6 +1010,8 @@ fn test_initialize_historical_conversations_resolves_parent_agent_id_children_vi
             persisted_agent_conversation(
                 parent_id,
                 AgentConversationData {
+                    project_id: None,
+                    project_host_node_id: None,
                     server_conversation_token: Some("parent-token".to_string()),
                     conversation_usage_metadata: None,
                     reverted_action_ids: None,
@@ -1059,6 +1065,8 @@ fn test_initialize_historical_conversations_uses_root_task_description_title() {
                 id: 0,
                 conversation_id: conversation_id.to_string(),
                 conversation_data: serde_json::to_string(&AgentConversationData {
+                    project_id: None,
+                    project_host_node_id: None,
                     server_conversation_token: Some("renamed-title-token".to_string()),
                     conversation_usage_metadata: None,
                     reverted_action_ids: None,
@@ -1229,6 +1237,8 @@ fn test_initialize_historical_conversations_eagerly_hydrates_orchestration_child
             persisted_agent_conversation(
                 child_id,
                 AgentConversationData {
+                    project_id: None,
+                    project_host_node_id: None,
                     server_conversation_token: Some("child-token".to_string()),
                     conversation_usage_metadata: None,
                     reverted_action_ids: None,
@@ -1255,6 +1265,8 @@ fn test_initialize_historical_conversations_eagerly_hydrates_orchestration_child
             persisted_agent_conversation(
                 parent_id,
                 AgentConversationData {
+                    project_id: None,
+                    project_host_node_id: None,
                     server_conversation_token: Some("parent-token".to_string()),
                     conversation_usage_metadata: None,
                     reverted_action_ids: None,
@@ -3238,6 +3250,8 @@ fn test_find_by_token_after_insert_forked_conversation_from_tasks() {
 
         let forked_conversation_id = AIConversationId::new();
         let conversation_data = AgentConversationData {
+            project_id: None,
+            project_host_node_id: None,
             server_conversation_token: Some("forked-token".to_string()),
             conversation_usage_metadata: None,
             reverted_action_ids: None,
@@ -3461,6 +3475,8 @@ fn test_fork_then_bind_handoff_token_resolves_to_forked_conversation() {
             source_id,
             vec![root_task],
             Some(AgentConversationData {
+                project_id: None,
+                project_host_node_id: None,
                 server_conversation_token: Some("src-token".to_string()),
                 conversation_usage_metadata: None,
                 reverted_action_ids: None,
@@ -3552,6 +3568,8 @@ fn test_fork_then_bind_handoff_token_persists_to_restored_conversation() {
             source_id,
             vec![root_task],
             Some(AgentConversationData {
+                project_id: None,
+                project_host_node_id: None,
                 server_conversation_token: Some("src-token".to_string()),
                 conversation_usage_metadata: None,
                 reverted_action_ids: None,
@@ -3668,6 +3686,8 @@ fn test_fork_then_bind_handoff_token_updates_cached_metadata_and_emits_refresh_e
             source_id,
             vec![root_task],
             Some(AgentConversationData {
+                project_id: None,
+                project_host_node_id: None,
                 server_conversation_token: Some("src-token".to_string()),
                 conversation_usage_metadata: None,
                 reverted_action_ids: None,
@@ -3798,6 +3818,8 @@ fn test_fork_conversation_preserves_task_ids_when_requested() {
             source_id,
             vec![root_task, subtask],
             Some(AgentConversationData {
+                project_id: None,
+                project_host_node_id: None,
                 server_conversation_token: Some("src-token".to_string()),
                 conversation_usage_metadata: None,
                 reverted_action_ids: None,
@@ -3952,6 +3974,8 @@ fn test_fork_conversation_title_override_replaces_prefix() {
             source_id,
             vec![root_task],
             Some(AgentConversationData {
+                project_id: None,
+                project_host_node_id: None,
                 server_conversation_token: None,
                 conversation_usage_metadata: None,
                 reverted_action_ids: None,
@@ -4048,6 +4072,8 @@ fn hydrate_remote_child_placeholder_with_cloud_transcript_preserves_placeholder_
             placeholder_id,
             vec![placeholder_root],
             Some(AgentConversationData {
+                project_id: None,
+                project_host_node_id: None,
                 server_conversation_token: None,
                 conversation_usage_metadata: None,
                 reverted_action_ids: None,
@@ -4097,6 +4123,8 @@ fn hydrate_remote_child_placeholder_with_cloud_transcript_preserves_placeholder_
             cloud_id,
             cloud_tasks.clone(),
             Some(AgentConversationData {
+                project_id: None,
+                project_host_node_id: None,
                 server_conversation_token: Some("cloud-token".to_string()),
                 conversation_usage_metadata: None,
                 reverted_action_ids: None,
@@ -4855,6 +4883,8 @@ fn straddle_rewind_followup_requests_are_clean_and_durable() {
             conversation_id,
             vec![root_task, subtask],
             Some(AgentConversationData {
+                project_id: None,
+                project_host_node_id: None,
                 server_conversation_token: Some("token-1".to_string()),
                 conversation_usage_metadata: None,
                 reverted_action_ids: None,

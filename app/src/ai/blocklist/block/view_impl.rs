@@ -1160,6 +1160,7 @@ impl View for AIBlock {
                     .as_ref(),
                 imported_comments: &self.imported_comments,
                 run_agents_card_views: &self.run_agents_card_views,
+                batch_command_views: &self.batch_command_views,
                 #[cfg(feature = "local_fs")]
                 resolved_code_block_paths: &self.resolved_code_block_paths,
                 #[cfg(feature = "local_fs")]

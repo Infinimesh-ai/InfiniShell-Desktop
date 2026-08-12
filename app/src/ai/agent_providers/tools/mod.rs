@@ -29,6 +29,7 @@ pub mod long_shell;
 pub mod machine_memory;
 pub mod markers;
 pub mod mcp;
+pub mod project_hosts;
 pub mod search;
 pub mod shell;
 pub mod skill;
@@ -104,6 +105,9 @@ pub const REGISTRY: &[&OpenAiTool] = &[
     // Zap:每台 SSH 机器的 AI 记忆,由 chat_stream 本地写库。
     // gating:仅有 machine_memory 上下文时加入请求 tools 数组。
     &machine_memory::UPDATE_MACHINE_MEMORY,
+    // Zap M4:项目多主机批量执行,经 CallMcpTool 哨兵通道走 protobuf executor。
+    // gating:仅有 project_context 时加入请求 tools 数组。
+    &project_hosts::RUN_COMMAND_ON_HOSTS,
 ];
 
 /// 按 OpenAI function name 反查注册表。

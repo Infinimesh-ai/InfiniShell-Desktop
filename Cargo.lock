@@ -15432,6 +15432,7 @@ dependencies = [
  "winit",
  "winreg",
  "x11rb",
+ "zap_projects",
  "zap_sftp",
  "zap_sync",
  "zbus 5.9.0",
@@ -17887,6 +17888,20 @@ dependencies = [
  "quote",
  "syn 2.0.117",
  "synstructure",
+]
+
+[[package]]
+name = "zap_projects"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "diesel",
+ "libsqlite3-sys",
+ "log",
+ "persistence",
+ "thiserror 2.0.17",
+ "uuid",
 ]
 
 [[package]]

@@ -114,6 +114,9 @@ use crate::ai::blocklist::inline_action::ask_user_question_view::{
 use crate::ai::blocklist::inline_action::aws_bedrock_credentials_error::{
     AwsBedrockCredentialsErrorEvent, AwsBedrockCredentialsErrorView,
 };
+use crate::ai::blocklist::inline_action::batch_command_view::{
+    self, BatchCommandView, BatchCommandViewEvent,
+};
 use crate::ai::blocklist::inline_action::code_diff_view;
 use crate::ai::blocklist::inline_action::code_diff_view::convert_file_edits_to_file_diffs;
 use crate::ai::blocklist::inline_action::gemini_enterprise_credentials_error::{
@@ -266,6 +269,7 @@ pub fn init(app: &mut AppContext) {
 
     ask_user_question_view::init(app);
     code_diff_view::init(app);
+    batch_command_view::init(app);
     requested_command::init(app);
     run_agents_card_view::init(app);
     cli::init(app);
@@ -981,6 +985,10 @@ pub struct AIBlock {
     /// Per-action `RunAgentsCardView`, lazily created.
     run_agents_card_views: HashMap<AIAgentActionId, ViewHandle<RunAgentsCardView>>,
 
+    /// Zap M4-B:`run_command_on_hosts` 批量命令的专属确认卡,按 action 惰性
+    /// 创建;命中该工具名的 `CallMCPTool` action 不再走通用 MCP 工具卡。
+    batch_command_views: HashMap<AIAgentActionId, ViewHandle<BatchCommandView>>,
+
     /// Handle for the background link detection task, kept so we can abort a previous
     /// detection when a new one is spawned (e.g. on shell data change).
     link_detection_handle: Option<SpawnedFutureHandle>,
@@ -1409,6 +1417,7 @@ impl AIBlock {
             imported_comments: Default::default(),
             has_imported_comments: false,
             run_agents_card_views: Default::default(),
+            batch_command_views: Default::default(),
             link_detection_handle: None,
             #[cfg(feature = "local_fs")]
             resolved_code_block_paths: Default::default(),
@@ -1932,6 +1941,24 @@ impl AIBlock {
                     ..
                 } => {
                     self.handle_requested_command_stream_update(action_id, command, citations, ctx);
+                }
+                AIAgentAction {
+                    id: action_id,
+                    action:
+                        AIAgentActionType::CallMCPTool {
+                            server_id: _,
+                            name,
+                            input,
+                        },
+                    ..
+                } if name.as_str()
+                    == crate::ai::agent_providers::tools::project_hosts::TOOL_NAME =>
+                {
+                    // Zap M4-B:卡片选择分支 —— `run_command_on_hosts` 批量工具
+                    // 渲染专属确认卡(命令 / 主机清单 / 金丝雀 / 三按钮),
+                    // 不再落入下方的通用 MCP 工具卡。分支键只能是工具名,
+                    // 理由见 `project_hosts.rs` 模块注释。
+                    self.ensure_batch_command_view(action_id, input, ctx);
                 }
                 AIAgentAction {
                     id: action_id,
@@ -4625,6 +4652,12 @@ impl AIBlock {
             // ToggleEdit`, etc.) resolve.
             ctx.focus(card_view);
             did_focus_subview = true;
+        } else if let Some(batch_view) =
+            pending_action_id.and_then(|id| self.batch_command_views.get(id))
+        {
+            // Zap M4-B:批量命令确认卡聚焦,使其 enter/ctrl-c 键位生效。
+            ctx.focus(batch_view);
+            did_focus_subview = true;
         } else if let Some(keyboard_navigable_buttons) = self.keyboard_navigable_buttons.as_ref() {
             // If there's buttons to take action on, focus those.
             ctx.focus(keyboard_navigable_buttons);
@@ -6645,6 +6678,103 @@ impl AIBlock {
             }
         });
         self.run_agents_card_views.insert(action_id.clone(), view);
+    }
+
+    /// Zap M4-B:惰性创建 `run_command_on_hosts` 的批量命令确认卡。幂等:
+    /// 已存在时仅把最新流式参数同步进视图。Accept / 「始终允许」 / Reject 都
+    /// 经视图事件回流到这里,复用既有的 `execute_action` / `cancel_action` /
+    /// 命令 allowlist 入口。
+    fn ensure_batch_command_view(
+        &mut self,
+        action_id: &AIAgentActionId,
+        input: &serde_json::Value,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if let Some(existing_view) = self.batch_command_views.get(action_id) {
+            existing_view.update(ctx, |view, ctx| view.update_args(input, ctx));
+            return;
+        }
+
+        let action_id_clone = action_id.clone();
+        let action_model = self.action_model.clone();
+        let block_model = self.model.clone();
+        let input_clone = input.clone();
+        let view = ctx.add_typed_action_view(move |view_ctx| {
+            let mut view =
+                BatchCommandView::new(action_id_clone, action_model, block_model, view_ctx);
+            view.update_args(&input_clone, view_ctx);
+            view
+        });
+        let action_id_for_event = action_id.clone();
+        ctx.subscribe_to_view(&view, move |me, view, event, ctx| {
+            me.handle_batch_command_view_event(&action_id_for_event, view, event, ctx);
+        });
+        self.batch_command_views.insert(action_id.clone(), view);
+    }
+
+    fn handle_batch_command_view_event(
+        &mut self,
+        action_id: &AIAgentActionId,
+        view: ViewHandle<BatchCommandView>,
+        event: &BatchCommandViewEvent,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        // 已不再跟踪该 action 时直接短路。
+        if !self.batch_command_views.contains_key(action_id) {
+            return;
+        }
+        match event {
+            BatchCommandViewEvent::Accepted => {
+                self.action_model.update(ctx, |action_model, ctx| {
+                    action_model.execute_action(action_id, self.client_ids.conversation_id, ctx);
+                });
+                self.yield_batch_command_focus_if_focused(&view, ctx);
+                ctx.notify();
+            }
+            BatchCommandViewEvent::AcceptedAndAllowlisted { command } => {
+                // 「始终允许」:把命令(regex 转义后精确匹配)写入
+                // `can_autoexecute_command` 检查的命令 allowlist ——
+                // 与 requested_command 的自动执行判定同源,此后相同命令的
+                // 批量调用在 `CallMCPToolExecutor::should_autoexecute` 里
+                // 直接放行,不再弹卡。
+                match crate::settings::AgentModeCommandExecutionPredicate::new_regex(
+                    &regex::escape(command),
+                ) {
+                    Ok(predicate) => {
+                        BlocklistAIPermissions::handle(ctx).update(ctx, |permissions, ctx| {
+                            report_if_error!(
+                                permissions.add_command_to_autoexecution_allowlist(predicate, ctx)
+                            );
+                        });
+                    }
+                    Err(error) => {
+                        log::warn!("批量命令 allowlist 谓词构造失败,仅执行本次:{error}");
+                    }
+                }
+                self.action_model.update(ctx, |action_model, ctx| {
+                    action_model.execute_action(action_id, self.client_ids.conversation_id, ctx);
+                });
+                self.yield_batch_command_focus_if_focused(&view, ctx);
+                ctx.notify();
+            }
+            BatchCommandViewEvent::Rejected => {
+                // 与通用 MCP 卡一致:cancel_action 把拒绝结果回传给模型。
+                self.cancel_action(action_id, ctx);
+                self.yield_batch_command_focus_if_focused(&view, ctx);
+            }
+        }
+    }
+
+    /// 与 [`Self::yield_requested_action_focus_if_focused`] 同语义,针对批量
+    /// 命令卡(类型不同,无法直接复用)。
+    fn yield_batch_command_focus_if_focused(
+        &self,
+        view: &ViewHandle<BatchCommandView>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if view.is_self_or_child_focused(ctx) {
+            ctx.emit(AIBlockEvent::FocusTerminal);
+        }
     }
 }
 #[cfg(test)]

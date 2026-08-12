@@ -156,6 +156,8 @@ fn pill_bar_data_layer_finds_restored_children_before_pane_creation() {
                     id: 1,
                     conversation_id: child_id.to_string(),
                     conversation_data: serde_json::to_string(&AgentConversationData {
+                        project_id: None,
+                        project_host_node_id: None,
                         server_conversation_token: Some("child-token".to_string()),
                         conversation_usage_metadata: None,
                         reverted_action_ids: None,
@@ -210,6 +212,8 @@ fn pill_bar_data_layer_finds_restored_children_before_pane_creation() {
                     id: 2,
                     conversation_id: parent_id.to_string(),
                     conversation_data: serde_json::to_string(&AgentConversationData {
+                        project_id: None,
+                        project_host_node_id: None,
                         server_conversation_token: Some("parent-token".to_string()),
                         conversation_usage_metadata: None,
                         reverted_action_ids: None,
@@ -538,6 +542,8 @@ fn breadcrumbs_resolve_token_only_parent_linkage_after_restore() {
         let now = Utc::now().naive_utc();
 
         let root_data = AgentConversationData {
+            project_id: None,
+            project_host_node_id: None,
             server_conversation_token: Some("root-token".to_string()),
             conversation_usage_metadata: None,
             reverted_action_ids: None,
@@ -558,6 +564,8 @@ fn breadcrumbs_resolve_token_only_parent_linkage_after_restore() {
             cli_subagent_block_snapshots_json: None,
         };
         let child_data = AgentConversationData {
+            project_id: None,
+            project_host_node_id: None,
             server_conversation_token: None,
             conversation_usage_metadata: None,
             reverted_action_ids: None,

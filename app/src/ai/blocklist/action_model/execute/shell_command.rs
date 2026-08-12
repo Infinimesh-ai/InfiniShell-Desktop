@@ -49,7 +49,7 @@ use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessA
 ///
 /// Fallback: when output grids are empty (e.g. missing preexec / early-complete timing), extract
 /// the stdout portion from the command grid (everything after the first line).
-fn agent_shell_command_block_output(block: &Block) -> String {
+pub(crate) fn agent_shell_command_block_output(block: &Block) -> String {
     let primary = block.output_with_secrets_unobfuscated();
     if !primary.trim().is_empty() {
         return primary;

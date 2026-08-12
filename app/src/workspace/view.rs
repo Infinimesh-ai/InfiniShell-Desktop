@@ -616,6 +616,7 @@ pub(crate) const LEFT_PANEL_AGENT_CONVERSATIONS_BINDING_NAME: &str =
     "workspace:left_panel_agent_conversations";
 pub(crate) const LEFT_PANEL_SSH_MANAGER_BINDING_NAME: &str = "workspace:left_panel_ssh_manager";
 pub(crate) const LEFT_PANEL_SKILL_MANAGER_BINDING_NAME: &str = "workspace:left_panel_skill_manager";
+pub(crate) const LEFT_PANEL_PROJECTS_BINDING_NAME: &str = "workspace:toggle_projects_panel";
 
 const KEYBINDINGS_TO_CACHE: [&str; 4] = [
     ASK_AI_ASSISTANT_KEYBINDING_NAME,
@@ -2879,6 +2880,15 @@ impl Workspace {
             me.handle_cli_agent_sessions_event(event, ctx);
         });
 
+        // Zap M4:项目主机会话路由器请求为某 node 开 SSH 会话时,由
+        // WorkspaceView 复用 open_ssh_terminal 连接链路开新 tab。
+        ctx.subscribe_to_model(
+            &crate::project_manager::ProjectHostSessionRouter::handle(ctx),
+            |me, _, event, ctx| {
+                me.handle_project_host_router_event(event, ctx);
+            },
+        );
+
         // CLI agent 安装扫描完成后刷新 UI（新 tab 菜单、标题栏按钮等）
         ctx.subscribe_to_model(
             &CLIAgentInstallModel::handle(ctx),
@@ -3915,6 +3925,7 @@ impl Workspace {
                 LeftPanelDisplayedTab::SshManager => ToolPanelView::SshManager,
                 LeftPanelDisplayedTab::ServerFileBrowser => ToolPanelView::ServerFileBrowser,
                 LeftPanelDisplayedTab::SkillManager => ToolPanelView::SkillManager,
+                LeftPanelDisplayedTab::Projects => ToolPanelView::Projects,
             };
             lp.restore_active_view_from_snapshot(active_view, ctx);
             lp.set_active_pane_group(pane_group.clone(), &self.working_directories_model, ctx);
@@ -6039,6 +6050,16 @@ impl Workspace {
             LeftPanelEvent::OpenSftpPane { node_id, server: _ } => {
                 self.open_sftp_pane(node_id.clone(), ctx);
             }
+            LeftPanelEvent::OpenProjectDetail { project_id } => {
+                self.open_project_detail(project_id.clone(), ctx);
+            }
+            LeftPanelEvent::OpenProjectHostSession { node_id, server } => {
+                // 复用 SSH 管理器的连接链路(terminal pane + SecretInjector)。
+                self.open_ssh_terminal(node_id.clone(), server.clone(), ctx);
+            }
+            LeftPanelEvent::StartProjectConversation { project_id } => {
+                self.start_project_conversation(project_id.clone(), ctx);
+            }
             // Zap:云端登录链路已删除,`LeftPanelEvent` 没有 `SignInRequested`,
             // `AuthView` 也没有 `start_sign_in`,对应分支一并移除。
         }
@@ -6051,6 +6072,23 @@ impl Workspace {
         use crate::pane_group::pane::ssh_server_pane::SshServerPane;
         self.active_tab_pane_group().update(ctx, |pane_group, ctx| {
             let pane = SshServerPane::new(node_id, ctx);
+            let smart_split_direction =
+                pane_group.smart_split_direction(ctx, WORKFLOW_AND_ENV_VAR_SPLIT_RATIO);
+            pane_group.add_pane_with_direction(
+                smart_split_direction,
+                pane,
+                true, /* focus_new_pane */
+                ctx,
+            );
+        });
+    }
+
+    /// 在中央区域打开给定项目的详情编辑 pane。MVP 实现:**每次都开新
+    /// pane**(暂未做去重 / find_pane),与 `open_ssh_server` 同款。
+    pub fn open_project_detail(&mut self, project_id: String, ctx: &mut ViewContext<Self>) {
+        use crate::pane_group::pane::project_pane::ProjectPane;
+        self.active_tab_pane_group().update(ctx, |pane_group, ctx| {
+            let pane = ProjectPane::new(project_id, ctx);
             let smart_split_direction =
                 pane_group.smart_split_direction(ctx, WORKFLOW_AND_ENV_VAR_SPLIT_RATIO);
             pane_group.add_pane_with_direction(
@@ -6143,7 +6181,7 @@ impl Workspace {
         node_id: String,
         server: warp_ssh_manager::SshServerInfo,
         ctx: &mut ViewContext<Self>,
-    ) {
+    ) -> Option<ViewHandle<TerminalView>> {
         use warp_ssh_manager::{KeychainSecretStore, SecretKind, SshRepository, SshSecretStore};
 
         let (server_for_connection, secret_lookup_id, secret_kind) =
@@ -6193,7 +6231,7 @@ impl Workspace {
             .terminal_view_from_pane_id(focused_pane_id, ctx)
         else {
             log::warn!("open_ssh_terminal: no terminal in newly added tab");
-            return;
+            return None;
         };
 
         if AISettings::as_ref(ctx).default_session_mode(ctx) == DefaultSessionMode::Agent {
@@ -6255,6 +6293,87 @@ impl Workspace {
         // 3. 排队 ssh 命令,等 bootstrap 完成自动 flush。
         terminal_view.update(ctx, |view, ctx| {
             view.execute_command_or_set_pending(&cmd, ctx);
+        });
+
+        // Zap M4:注册 node_id → 终端视图,供项目批量执行路由器
+        // (`run_command_on_hosts`)复用已打开的 SSH tab。
+        crate::project_manager::ProjectHostSessionRouter::handle(ctx).update(ctx, |router, _ctx| {
+            router.register_session(node_id, terminal_view.downgrade());
+        });
+
+        Some(terminal_view)
+    }
+
+    /// Zap M4:处理项目主机路由器的开会话请求。多窗口下所有 WorkspaceView
+    /// 都订阅该事件,用 `claim_pending_open` 保证只有一个真正开 tab。
+    fn handle_project_host_router_event(
+        &mut self,
+        event: &crate::project_manager::ProjectHostRouterEvent,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let crate::project_manager::ProjectHostRouterEvent::OpenHostSession { node_id } = event;
+        let claimed = crate::project_manager::ProjectHostSessionRouter::handle(ctx)
+            .update(ctx, |router, _ctx| router.claim_pending_open(node_id));
+        if !claimed {
+            return;
+        }
+        let server = match warp_ssh_manager::with_conn(|conn| {
+            Ok(warp_ssh_manager::SshRepository::get_server(conn, node_id)?)
+        }) {
+            Ok(Some(server)) => server,
+            Ok(None) => {
+                log::warn!("project host router: node {node_id} not found in ssh_servers");
+                return;
+            }
+            Err(err) => {
+                log::warn!("project host router: server lookup failed for {node_id}: {err}");
+                return;
+            }
+        };
+        // open_ssh_terminal 内部会把新视图注册回路由器。
+        self.open_ssh_terminal(node_id.clone(), server, ctx);
+    }
+
+    /// 「从项目发起 Agent 对话」:取项目关联主机中第一台未悬挂的,复用
+    /// [`Self::open_ssh_terminal`] 连接链路开新 tab;远端 bootstrap 完成后自动
+    /// 进入 Agent 视图,并把 (project_id, node_id) 绑定暂存到终端,待新会话
+    /// 创建时写入会话数据(仅入口 UX,上下文注入走会话推断)。
+    pub fn start_project_conversation(&mut self, project_id: String, ctx: &mut ViewContext<Self>) {
+        let node_ids = match zap_projects::with_conn(|conn| {
+            Ok(zap_projects::ProjectRepository::servers_for_project(
+                conn,
+                &project_id,
+            )?)
+        }) {
+            Ok(node_ids) => node_ids,
+            Err(err) => {
+                log::warn!("start_project_conversation: host list load failed: {err}");
+                return;
+            }
+        };
+
+        // 第一台能解析出服务器详情的主机;悬挂引用(节点已删)跳过。
+        let first_host = node_ids.into_iter().find_map(|node_id| {
+            warp_ssh_manager::with_conn(|conn| {
+                Ok(warp_ssh_manager::SshRepository::get_server(conn, &node_id)?)
+            })
+            .unwrap_or_else(|err| {
+                log::warn!("start_project_conversation: server lookup failed for {node_id}: {err}");
+                None
+            })
+            .map(|server| (node_id, server))
+        });
+        let Some((node_id, server)) = first_host else {
+            log::warn!("start_project_conversation: project {project_id} has no usable host");
+            return;
+        };
+
+        let Some(terminal_view) = self.open_ssh_terminal(node_id.clone(), server, ctx) else {
+            return;
+        };
+        terminal_view.update(ctx, |view, _| {
+            view.set_enter_agent_view_after_ssh_bootstrap();
+            view.set_pending_project_binding(project_id, node_id);
         });
     }
 
@@ -18945,6 +19064,9 @@ impl Workspace {
                         ToolPanelView::SkillManager => {
                             crate::t!("workspace-left-panel-skill-manager")
                         }
+                        ToolPanelView::Projects => {
+                            crate::t!("workspace-left-panel-projects")
+                        }
                     }
                 } else {
                     crate::t!("workspace-tools-panel-tooltip")
@@ -19013,6 +19135,9 @@ impl Workspace {
                 }
                 ToolPanelView::SkillManager => {
                     crate::t!("workspace-left-panel-skill-manager")
+                }
+                ToolPanelView::Projects => {
+                    crate::t!("workspace-left-panel-projects")
                 }
             }
         } else {
@@ -22134,6 +22259,11 @@ impl Workspace {
         }
         // openWarp 独有:SSH 管理器,无 feature flag,默认始终显示。
         views.push(ToolPanelView::SshManager);
+        // openWarp 独有:项目管理器,由 ZapProjects flag 门控
+        // (默认 feature `project_manager` 打开)。
+        if FeatureFlag::ZapProjects.is_enabled() {
+            views.push(ToolPanelView::Projects);
+        }
         if FeatureFlag::ServerFileBrowser.is_enabled() && FeatureFlag::SshRemoteServer.is_enabled() {
             views.push(ToolPanelView::ServerFileBrowser);
         }
@@ -24095,6 +24225,13 @@ impl TypedActionView for Workspace {
                 let is_showing =
                     self.left_panel_view.as_ref(ctx).active_view() == ToolPanelView::SkillManager;
                 self.toggle_left_panel_view(&LeftPanelAction::SkillManager, is_showing, ctx);
+            }
+            ToggleProjectsPanel => {
+                if FeatureFlag::ZapProjects.is_enabled() {
+                    let is_showing =
+                        self.left_panel_view.as_ref(ctx).active_view() == ToolPanelView::Projects;
+                    self.toggle_left_panel_view(&LeftPanelAction::Projects, is_showing, ctx);
+                }
             }
             ToggleGlobalSearch => {
                 if FeatureFlag::GlobalSearch.is_enabled()

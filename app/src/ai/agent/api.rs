@@ -35,6 +35,7 @@ use crate::ai::facts::{AIFact, AIFactObjectModel};
 use crate::ai::llms::{LLMId, LLMPreferences};
 use crate::ai::machine_memory::{self, MachineMemoryContext};
 use crate::ai::mcp::TemplatableMCPServerManager;
+use crate::ai::project_agent_context::{self, ProjectAgentContext};
 use crate::cloud_object::StoredObject;
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
@@ -117,6 +118,9 @@ pub struct RequestParams {
     pub computer_use_model: LLMId,
     pub is_memory_enabled: bool,
     pub machine_memory: Option<MachineMemoryContext>,
+    /// 会话推断出的项目上下文(legacy SSH host+port → SSH 节点 → 所属项目),
+    /// 由 `chat_stream::render_project_context_block` 渲染进 system prompt。
+    pub project_context: Option<ProjectAgentContext>,
     pub machine_index: Option<String>,
     /// Zap BYOP 专用:用户在 设置 → Agents → Rules 创建的全局 Rules
     /// (`AIFact::Memory`)的快照,在 `new()` 中从 `ObjectStoreModel` 一次性拉取
@@ -248,6 +252,7 @@ impl RequestParams {
             computer_use_model: LLMId::from("byop:test"),
             is_memory_enabled: false,
             machine_memory: None,
+            project_context: None,
             machine_index: None,
             user_rules: Vec::new(),
             warp_drive_context_enabled: false,
@@ -289,6 +294,7 @@ impl RequestParams {
         let ai_settings = AISettings::as_ref(app);
         let is_memory_enabled = ai_settings.is_memory_enabled(app);
         let machine_memory = machine_memory::load_for_session(&session_context, app);
+        let project_context = project_agent_context::load_for_session(&session_context);
         let machine_index = machine_memory::load_index_for_session(&session_context, app);
         let warp_drive_context_enabled = ai_settings.is_warp_drive_context_enabled(app);
 
@@ -465,6 +471,7 @@ impl RequestParams {
             computer_use_model: request_input.computer_use_model_id.clone(),
             is_memory_enabled,
             machine_memory,
+            project_context,
             machine_index,
             user_rules,
             warp_drive_context_enabled,

@@ -243,9 +243,23 @@ impl TerminalView {
             .agent_view_state()
             .is_fullscreen();
 
+        let is_new_conversation = conversation_id.is_none();
         let conversation_id = self.agent_view_controller.update(ctx, |controller, ctx| {
             controller.try_enter_agent_view(conversation_id, origin.clone(), ctx)
         })?;
+
+        // Zap:「从项目发起 Agent 对话」入口暂存的绑定,在新会话创建成功后
+        // 写入会话数据(仅入口 UX / 历史过滤;上下文注入走会话推断链路)。
+        // 复用已有会话时不消费,避免把绑定误写到旧会话上。
+        if is_new_conversation {
+            if let Some((project_id, project_host_node_id)) = self.pending_project_binding.take() {
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, _| {
+                    if let Some(conversation) = history.conversation_mut(&conversation_id) {
+                        conversation.set_project_binding(project_id, project_host_node_id);
+                    }
+                });
+            }
+        }
 
         // Associate pending context blocks with the new conversation so they remain
         // visible in the agent view. This must happen after the conversation is created

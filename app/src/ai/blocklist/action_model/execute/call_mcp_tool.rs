@@ -22,15 +22,17 @@ use crate::{
 };
 
 pub struct CallMCPToolExecutor {
-    _active_session: ModelHandle<ActiveSession>,
+    /// Zap M4:`run_command_on_hosts` 的自动执行判定需要会话 shell 的转义字符。
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
+    active_session: ModelHandle<ActiveSession>,
     #[allow(dead_code)]
     terminal_view_id: EntityId,
 }
 
 impl CallMCPToolExecutor {
-    pub fn new(_active_session: ModelHandle<ActiveSession>, terminal_view_id: EntityId) -> Self {
+    pub fn new(active_session: ModelHandle<ActiveSession>, terminal_view_id: EntityId) -> Self {
         Self {
-            _active_session,
+            active_session,
             terminal_view_id,
         }
     }
@@ -53,7 +55,9 @@ impl CallMCPToolExecutor {
                     AIAgentAction {
                         action:
                             AIAgentActionType::CallMCPTool {
-                                server_id, name, ..
+                                server_id,
+                                name,
+                                input,
                             },
                         ..
                     },
@@ -62,6 +66,36 @@ impl CallMCPToolExecutor {
             else {
                 return false;
             };
+
+            // Zap M4:跨主机批量工具 —— 自动执行判定复用 shell 命令的
+            // allowlist/denylist 链路(与 requested_command 相同的
+            // `can_autoexecute_command`),而非 MCP server 白名单;判不过时
+            // 走既有的 MCP 工具卡确认流程。分支键只能是工具名:protobuf
+            // 转换里 server_id 受 `MCPGroupedServerContext` 门控,不可依赖。
+            if name.as_str() == crate::ai::agent_providers::tools::project_hosts::TOOL_NAME {
+                let Some(command) = input.get("command").and_then(|value| value.as_str()) else {
+                    return false;
+                };
+                let Some(escape_char) = self
+                    .active_session
+                    .as_ref(ctx)
+                    .shell_type(ctx)
+                    .map(|shell| warp_util::path::ShellFamily::from(shell).escape_char())
+                else {
+                    return false;
+                };
+                return BlocklistAIPermissions::as_ref(ctx)
+                    .can_autoexecute_command(
+                        &conversation_id,
+                        command,
+                        escape_char,
+                        false, /* is_read_only */
+                        None,  /* is_risky */
+                        Some(self.terminal_view_id),
+                        ctx,
+                    )
+                    .is_allowed();
+            }
 
             BlocklistAIPermissions::as_ref(ctx).can_call_mcp_tool(
                 server_id.as_ref(),
@@ -86,6 +120,7 @@ impl CallMCPToolExecutor {
 
         #[cfg(not(target_family = "wasm"))]
         {
+            let conversation_id = input.conversation_id;
             let server_output_id = get_server_output_id(input.conversation_id, ctx);
             let AIAgentAction {
                 action:
@@ -97,14 +132,21 @@ impl CallMCPToolExecutor {
                 ..
             } = input.action
             else {
-                return ActionExecution::InvalidAction;
+                return AnyActionExecution::InvalidAction;
             };
+
+            // Zap M4:跨主机批量工具按名字分流到项目主机路由器,不解析 MCP peer
+            // (哨兵 server_id 不对应任何真实 server,走下面的 peer 解析必然
+            // 报 "MCP server for tool not found")。
+            if name.as_str() == crate::ai::agent_providers::tools::project_hosts::TOOL_NAME {
+                return execute_project_hosts_batch(input, conversation_id, ctx);
+            }
 
             let name_owned = name.to_owned();
             let name_clone = name_owned.clone();
 
             let serde_json::Value::Object(mut arguments) = input.clone() else {
-                return ActionExecution::Sync(AIAgentActionResultType::CallMCPTool(
+                return AnyActionExecution::Sync(AIAgentActionResultType::CallMCPTool(
                     CallMCPToolResult::Error("MCP server tool input not an object".to_owned()),
                 ));
             };
@@ -134,7 +176,7 @@ impl CallMCPToolExecutor {
             };
 
             let Some(reconnecting_peer) = templatable_peer else {
-                return ActionExecution::Sync(AIAgentActionResultType::CallMCPTool(
+                return AnyActionExecution::Sync(AIAgentActionResultType::CallMCPTool(
                     CallMCPToolResult::Error("MCP server for tool not found".to_owned()),
                 ));
             };
@@ -151,6 +193,7 @@ impl CallMCPToolExecutor {
                 },
                 move |res, ctx| handle_call_tool_result(res, server_output_id, name_clone, ctx),
             )
+            .into()
         }
     }
 
@@ -284,6 +327,57 @@ fn coerce_value_against_schema(value: &mut serde_json::Value, schema: &serde_jso
         }
         _ => {}
     }
+}
+
+/// Zap M4:驱动 `run_command_on_hosts` 批量执行。
+///
+/// 执行本体在 [`crate::project_manager::ProjectHostSessionRouter`](单例 model,
+/// 用 ctx 回调 + Timer 轮询驱动状态机);这里的 async future 只等待路由器经
+/// oneshot 送回的聚合 JSON。结果作为 MCP text content 包进
+/// `CallMCPToolResult::Success`,模型拿到结构化 JSON,同时既有的 MCP 结果卡
+/// 与历史序列化(debug 字符串)也能完整携带 payload。
+#[cfg(not(target_family = "wasm"))]
+fn execute_project_hosts_batch(
+    input: &serde_json::Value,
+    conversation_id: crate::ai::agent::conversation::AIConversationId,
+    ctx: &mut ModelContext<CallMCPToolExecutor>,
+) -> AnyActionExecution {
+    use crate::ai::agent_providers::tools::project_hosts;
+    use crate::project_manager::ProjectHostSessionRouter;
+    use futures::channel::oneshot;
+
+    let args = match project_hosts::parse_batch_args(input) {
+        Ok(args) => args,
+        Err(error) => {
+            return AnyActionExecution::Sync(AIAgentActionResultType::CallMCPTool(
+                CallMCPToolResult::Error(format!(
+                    "invalid run_command_on_hosts arguments: {error}"
+                )),
+            ));
+        }
+    };
+    let (done_tx, done_rx) = oneshot::channel::<serde_json::Value>();
+    ProjectHostSessionRouter::handle(ctx).update(ctx, |router, ctx| {
+        router.start_batch(args, conversation_id, done_tx, ctx);
+    });
+    ActionExecution::new_async(
+        async move {
+            match done_rx.await {
+                Ok(value) => value,
+                // 路由器被销毁 / 批次异常终止:按取消上报。
+                Err(oneshot::Canceled) => serde_json::json!({ "status": "cancelled" }),
+            }
+        },
+        |value, _app| {
+            let text = serde_json::to_string(&value).unwrap_or_else(|_| "{}".to_owned());
+            AIAgentActionResultType::CallMCPTool(CallMCPToolResult::Success {
+                result: rmcp::model::CallToolResult::success(vec![rmcp::model::Content::text(
+                    text,
+                )]),
+            })
+        },
+    )
+    .into()
 }
 
 #[cfg(test)]

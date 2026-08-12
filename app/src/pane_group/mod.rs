@@ -1912,6 +1912,13 @@ impl PaneGroup {
                     "SFTP pane should not have been persisted, as it cannot be restored"
                 ))
             }
+            LeafContents::Project { .. } => {
+                // 项目详情编辑器 pane 不持久化 — 它只是持久化 `zap_projects`
+                // 表之上的临时编辑面,重启后从左侧项目管理器重新打开。
+                Err(anyhow::anyhow!(
+                    "Project pane should not have been persisted, as it cannot be restored"
+                ))
+            }
             LeafContents::Image { .. } => {
                 // Image viewer panes are intentionally not persisted (see
                 // `LeafContents::is_persisted`), so this should be unreachable.

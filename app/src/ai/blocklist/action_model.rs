@@ -30,7 +30,8 @@ pub use execute::{
     StartAgentRequest, StartAgentRequestId, read_local_file_context,
 };
 pub(crate) use execute::{
-    FileReadResult, MalformedFinalLineProxyEvent, apply_edits, coerce_integer_args,
+    FileReadResult, MalformedFinalLineProxyEvent, agent_shell_command_block_output, apply_edits,
+    coerce_integer_args,
 };
 #[cfg(test)]
 pub(crate) use execute::{compose_run_agents_child_prompt, run_agents_to_start_agent_mode};

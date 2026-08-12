@@ -62,6 +62,7 @@ mod prefix;
 mod preview_config_migration;
 mod pricing;
 mod profiling;
+mod project_manager;
 mod projects;
 mod prompt;
 mod quit_warning;
@@ -1432,6 +1433,8 @@ pub(crate) fn initialize_app(
     // 必须在 persistence::initialize 跑完 migration 之后才设路径,否则首个
     // SshManager 操作可能撞 missing-table。
     warp_ssh_manager::set_database_path(persistence::database_file_path_for_current_scope());
+    // 项目管理器同款:独立写连接,路径同样要等 migration 之后再设。
+    zap_projects::set_database_path(persistence::database_file_path_for_current_scope());
 
     let persistence_writer = PersistenceWriter::new(writer_handles);
 
@@ -1928,6 +1931,9 @@ pub(crate) fn initialize_app(
     workspace::auto_handoff::init(ctx);
     ctx.add_singleton_model(|_| KeybindingChangedNotifier::new());
     ctx.add_singleton_model(|_| crate::ssh_manager::SshTreeChangedNotifier::new());
+    ctx.add_singleton_model(|_| crate::project_manager::ProjectsChangedNotifier::new());
+    // Zap M4:项目主机会话路由器(run_command_on_hosts 批量执行核心)。
+    ctx.add_singleton_model(|_| crate::project_manager::ProjectHostSessionRouter::new());
     ctx.add_singleton_model(|_| search::command_palette::SelectedItems::new());
     ctx.add_singleton_model(search::files::model::FileSearchModel::new);
     ctx.add_singleton_model(|_| VimRegisters::new());

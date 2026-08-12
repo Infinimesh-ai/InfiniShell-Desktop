@@ -18,7 +18,7 @@ use super::schema::{
     project_rules, projects, server_experiments, settings_panes, ssh_machine_memories, ssh_nodes,
     ssh_onekey_credentials, ssh_servers, sync_meta, tab_groups, tabs, team_members, team_settings,
     teams, terminal_panes, user_profiles, windows, workflow_panes, workflows, workspace_teams,
-    workspaces,
+    workspaces, zap_project_servers, zap_projects,
 };
 
 #[derive(Insertable)]
@@ -1197,6 +1197,13 @@ pub struct AgentConversationData {
     /// CLI subagent 终端 block 快照 sidecar。具体 JSON schema 由 app 层负责。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cli_subagent_block_snapshots_json: Option<String>,
+    /// Zap:会话创建时显式绑定的项目 id(「从项目发起 Agent 对话」入口写入)。
+    /// 仅服务历史过滤/入口 UX;上下文注入走会话推断链路,不读这里。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    /// Zap:绑定项目时所连主机的 SSH 节点 id,与 `project_id` 同时写入。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_host_node_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -1652,6 +1659,8 @@ mod tests {
             compaction_state_json: None,
             byop_repair_state_json: None,
             cli_subagent_block_snapshots_json: None,
+            project_id: None,
+            project_host_node_id: None,
         };
         let json = serde_json::to_string(&data).expect("serialize");
         let roundtripped: AgentConversationData = serde_json::from_str(&json).expect("deserialize");
@@ -1691,6 +1700,8 @@ mod tests {
             compaction_state_json: None,
             byop_repair_state_json: None,
             cli_subagent_block_snapshots_json: None,
+            project_id: None,
+            project_host_node_id: None,
         };
         let json = serde_json::to_string(&data).expect("serialize");
         assert!(
@@ -1724,6 +1735,8 @@ mod tests {
             compaction_state_json: None,
             byop_repair_state_json: Some(r#"{"version":1,"records":[]}"#.to_string()),
             cli_subagent_block_snapshots_json: None,
+            project_id: None,
+            project_host_node_id: None,
         };
 
         let json = serde_json::to_string(&data).expect("serialize");
@@ -1758,6 +1771,8 @@ mod tests {
             cli_subagent_block_snapshots_json: Some(
                 r#"[{"task_id":"cli-task","block_id":"cli-block","block":{}}]"#.to_string(),
             ),
+            project_id: None,
+            project_host_node_id: None,
         };
 
         let json = serde_json::to_string(&data).expect("serialize");
@@ -1900,6 +1915,58 @@ pub struct NewSshMachineMemory<'a> {
     pub created_at: &'a str,
     pub updated_at: &'a str,
     pub deleted_at: Option<&'a str>,
+}
+
+// --- Zap Projects ------------------------------------------------------
+// 项目实体(聚合 SSH 服务器 / Git 地址 / 项目规则),由 crates/zap_projects
+// 的独立连接读写,行结构放在这里以复用生成的 schema。
+
+#[derive(Identifiable, Queryable, Selectable, Clone, Debug)]
+#[diesel(table_name = zap_projects)]
+#[diesel(primary_key(id))]
+pub struct ZapProjectRow {
+    pub id: String,
+    pub name: String,
+    pub git_url: Option<String>,
+    pub root_path: Option<String>,
+    pub rules: String,
+    pub notes: String,
+    pub default_profile_id: Option<String>,
+    pub sort_order: i32,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+    pub deleted_at: Option<NaiveDateTime>,
+}
+
+#[derive(Insertable, AsChangeset, Clone, Debug)]
+#[diesel(table_name = zap_projects)]
+pub struct NewZapProject<'a> {
+    pub id: &'a str,
+    pub name: &'a str,
+    pub git_url: Option<&'a str>,
+    pub root_path: Option<&'a str>,
+    pub rules: &'a str,
+    pub notes: &'a str,
+    pub default_profile_id: Option<&'a str>,
+    pub sort_order: i32,
+}
+
+#[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug)]
+#[diesel(table_name = zap_project_servers)]
+#[diesel(primary_key(project_id, node_id))]
+#[diesel(belongs_to(ZapProjectRow, foreign_key = project_id))]
+pub struct ZapProjectServerRow {
+    pub project_id: String,
+    pub node_id: String,
+    pub sort_order: i32,
+}
+
+#[derive(Insertable, Clone, Debug)]
+#[diesel(table_name = zap_project_servers)]
+pub struct NewZapProjectServer<'a> {
+    pub project_id: &'a str,
+    pub node_id: &'a str,
+    pub sort_order: i32,
 }
 
 // --- Sync Meta ---------------------------------------------------------

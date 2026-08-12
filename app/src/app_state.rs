@@ -175,6 +175,11 @@ pub enum LeafContents {
     Sftp {
         node_id: String,
     },
+    /// 项目详情编辑器 pane(openWarp 独有)。引用 `zap_projects.id` 主键
+    /// 加载/保存。**不持久化** — 重启后用户从左侧项目管理器重新打开。
+    Project {
+        project_id: String,
+    },
 }
 
 #[cfg(feature = "local_fs")]
@@ -196,6 +201,9 @@ impl LeafContents {
             LeafContents::SshServer { .. } => false,
             // SFTP 浏览器:远端文件系统依赖活跃 SSH 连接,pane 不可恢复。
             LeafContents::Sftp { .. } => false,
+            // 项目详情编辑器:数据持久化在 zap_projects 表里,pane 只是 view,
+            // 逻辑同 SshServer。
+            LeafContents::Project { .. } => false,
             // Network log: the backing log is an in-memory ring buffer that
             // starts empty on launch; persisting would also regress back to
             // an on-disk log via the app-state database.
@@ -349,6 +357,7 @@ pub enum LeftPanelDisplayedTab {
     SshManager,
     ServerFileBrowser,
     SkillManager,
+    Projects,
 }
 
 impl From<ToolPanelView> for LeftPanelDisplayedTab {
@@ -361,6 +370,7 @@ impl From<ToolPanelView> for LeftPanelDisplayedTab {
             ToolPanelView::SshManager => LeftPanelDisplayedTab::SshManager,
             ToolPanelView::ServerFileBrowser => LeftPanelDisplayedTab::ServerFileBrowser,
             ToolPanelView::SkillManager => LeftPanelDisplayedTab::SkillManager,
+            ToolPanelView::Projects => LeftPanelDisplayedTab::Projects,
         }
     }
 }

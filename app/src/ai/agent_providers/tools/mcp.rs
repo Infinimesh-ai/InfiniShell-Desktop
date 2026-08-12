@@ -184,7 +184,8 @@ pub fn parse_mcp_tool_call(
     ))
 }
 
-fn json_object_to_prost_struct(obj: &Map<String, Value>) -> prost_types::Struct {
+/// JSON object → `prost_types::Struct`(`project_hosts` 哨兵工具复用)。
+pub(crate) fn json_object_to_prost_struct(obj: &Map<String, Value>) -> prost_types::Struct {
     let mut fields = std::collections::BTreeMap::new();
     for (k, v) in obj {
         fields.insert(k.clone(), json_value_to_prost(v));
@@ -274,6 +275,20 @@ pub fn serialize_outgoing_call(
     tc: &api::message::tool_call::CallMcpTool,
     ctx: Option<&MCPContext>,
 ) -> (String, String) {
+    // Zap M4:哨兵 server_id 表示这是 `run_command_on_hosts` 顶层工具而非
+    // 真实 MCP 调用,历史回放时直接还原为顶层 function name,不能走
+    // `mcp__<server>__<tool>` 格式(会被反解为不存在的 MCP server)。
+    if tc.server_id == super::project_hosts::SENTINEL_SERVER_ID {
+        let args_value = tc
+            .args
+            .as_ref()
+            .map(|s| Value::Object(prost_struct_to_json(s)))
+            .unwrap_or_else(|| json!({}));
+        return (
+            super::project_hosts::TOOL_NAME.to_owned(),
+            args_value.to_string(),
+        );
+    }
     // 找回对应 server.name(若 mcp_context 已变,fallback 到 server_id)
     let server_name = ctx
         .and_then(|c| c.servers.iter().find(|s| s.id == tc.server_id))

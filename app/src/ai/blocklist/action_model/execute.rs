@@ -41,6 +41,8 @@ pub use run_agents::{RunAgentsExecutor, RunAgentsExecutorEvent, RunAgentsSpawnin
 #[cfg(test)]
 pub use run_agents::{compose_run_agents_child_prompt, run_agents_to_start_agent_mode};
 use serde::{Deserialize, Serialize};
+// Zap M4:项目批量执行(terminal/view.rs)复用同一套 block 输出提取逻辑。
+pub(crate) use shell_command::agent_shell_command_block_output;
 pub use shell_command::{ShellCommandExecutor, ShellCommandExecutorEvent};
 pub use start_agent::{
     StartAgentExecutor, StartAgentExecutorEvent, StartAgentOutcome, StartAgentRequest,

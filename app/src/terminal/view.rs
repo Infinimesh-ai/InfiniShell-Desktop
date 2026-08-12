@@ -245,6 +245,7 @@ use crate::ai::blocklist::telemetry_banner::should_collect_ai_ugc_telemetry;
 use crate::ai::blocklist::usage::conversation_usage_view::{
     ConversationUsageInfo, ConversationUsageView, TimingInfo,
 };
+use crate::ai::blocklist::agent_shell_command_block_output;
 use crate::ai::blocklist::{
     AIBlock, AIBlockEvent, ATTACH_AS_AGENT_MODE_CONTEXT_TEXT, AutofireAction,
     BlocklistAIActionEvent, BlocklistAIActionModel, BlocklistAIContextEvent,
@@ -2551,6 +2552,10 @@ pub struct TerminalView {
     /// SSH 管理器创建的 tab 会先启动本地 shell，再执行 ssh 并等待远端 shell
     /// bootstrap；默认 Agent 模式必须延后到远端会话可用后再进入。
     enter_agent_view_after_ssh_bootstrap: bool,
+    /// Zap:「从项目发起 Agent 对话」入口暂存的 (project_id, node_id) 绑定,
+    /// 在本终端下一次新建 Agent 会话时消费并写入会话数据(仅入口 UX,不参与
+    /// 上下文注入)。
+    pending_project_binding: Option<(String, String)>,
     slow_bootstrap_banner: ViewHandle<Banner<TerminalAction>>,
     is_slow_bootstrap_banner_open: bool,
     /// Timer that auto-dismisses the slow-bootstrap banner after
@@ -4240,6 +4245,7 @@ impl TerminalView {
             pending_command_queue: Default::default(),
             enter_agent_view_after_pending_commands: false,
             enter_agent_view_after_ssh_bootstrap: false,
+            pending_project_binding: None,
             slow_bootstrap_banner,
             is_slow_bootstrap_banner_open: false,
             slow_bootstrap_banner_auto_dismiss_handle: None,
@@ -15203,6 +15209,114 @@ impl TerminalView {
 
     pub fn set_enter_agent_view_after_ssh_bootstrap(&mut self) {
         self.enter_agent_view_after_ssh_bootstrap = true;
+    }
+
+    /// Zap:暂存项目绑定,等本终端新建 Agent 会话时消费(见
+    /// [`Self::try_enter_agent_view`])。
+    pub fn set_pending_project_binding(&mut self, project_id: String, node_id: String) {
+        self.pending_project_binding = Some((project_id, node_id));
+    }
+
+    /// Zap M4:项目批量工具(`run_command_on_hosts`)在本终端执行一条命令。
+    ///
+    /// 只提取 `handle_shell_command_executor_event` 中 ExecuteCommand 分支的
+    /// 最小内核:session_id 解析、PowerShell 多行包裹、`new_hidden` 元数据、
+    /// AI 执行来源 —— 不复制 workflow 遥测 / 共享会话逻辑(批量执行的会话由
+    /// 路由器专开,普通 AI source 即可)。
+    ///
+    /// 返回 `false` 表示没有可用会话(未执行)。
+    pub fn execute_project_agent_command(
+        &mut self,
+        command: &str,
+        action_id: AIAgentActionId,
+        conversation_id: AIConversationId,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let Some(session_id) = self.active_block_session_id() else {
+            return false;
+        };
+        let shell_family = self.sessions.read(ctx, |sessions, _| {
+            sessions
+                .get(session_id)
+                .map(|session| session.shell_family())
+        });
+        // PowerShell 不支持 bracketed paste,多行命令需包成脚本块,与
+        // ExecuteCommand 分支同款处理。
+        let trimmed = command.trim();
+        let command = if matches!(shell_family, Some(ShellFamily::PowerShell)) && trimmed.contains('\n')
+        {
+            format!(". {{ {trimmed} }}")
+        } else {
+            command.to_owned()
+        };
+        let metadata = AgentInteractionMetadata::new_hidden(action_id, conversation_id);
+        ctx.emit(Event::ExecuteCommand(ExecuteCommandEvent {
+            command,
+            session_id,
+            source: CommandExecutionSource::AI { metadata },
+            should_add_command_to_history: true,
+            workflow_id: None,
+            workflow_command: None,
+        }));
+        true
+    }
+
+    /// Zap M4:当前活动会话若是已完成 bootstrap 的 SSH 会话(legacy wrapper
+    /// 或 warpified remote),返回其原始 (host, port) 串供路由器做主机比对;
+    /// 否则视为未就绪返回 `None`。
+    pub fn project_host_ssh_endpoint(
+        &self,
+        ctx: &AppContext,
+    ) -> Option<(Option<String>, Option<String>)> {
+        let session_id = self.active_block_session_id()?;
+        let session = self.sessions.as_ref(ctx).get(session_id)?;
+        if !session.is_ssh_wrapper_session() {
+            return None;
+        }
+        let info = session
+            .subshell_info()
+            .as_ref()?
+            .ssh_connection_info
+            .as_ref()?;
+        Some((info.host.clone(), info.port.clone()))
+    }
+
+    /// Zap M4:当前活动 block 是否为长时间运行中(路由器 busy 判定)。
+    /// 锁纪律:单次 `lock()`,表达式结束即释放,不与其他 model 锁嵌套。
+    pub fn has_active_long_running_block(&self) -> bool {
+        self.model
+            .lock()
+            .block_list()
+            .active_block()
+            .is_active_and_long_running()
+    }
+
+    /// Zap M4:按 action_id 查询批量命令的 block 是否已结束。
+    /// `None` 表示 block 尚未出现(命令还没落到 blocklist)。
+    /// 锁纪律:单次 `lock()`,表达式结束即释放。
+    pub fn project_agent_block_finished(&self, action_id: &AIAgentActionId) -> Option<bool> {
+        self.model
+            .lock()
+            .block_list()
+            .block_for_ai_action_id(action_id)
+            .map(Block::finished)
+    }
+
+    /// Zap M4:按 action_id 取批量命令 block 的 (exit_code, 输出)。
+    /// block 未结束时 exit_code 为 `None`,输出为当前快照(超时路径)。
+    /// 锁纪律:单次 `lock()`,作用域覆盖到取完输出即结束。
+    pub fn project_agent_block_result(
+        &self,
+        action_id: &AIAgentActionId,
+    ) -> Option<(Option<i32>, String)> {
+        let model = self.model.lock();
+        let block = model.block_list().block_for_ai_action_id(action_id)?;
+        let exit_code = if block.finished() {
+            Some(block.exit_code().value())
+        } else {
+            None
+        };
+        Some((exit_code, agent_shell_command_block_output(block)))
     }
 
     /// Start a timer so that we can detect when a session does not bootstrap in a timely manner

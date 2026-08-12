@@ -44,6 +44,7 @@ use crate::pane_group::{
 use crate::server::telemetry::CodePanelsFileOpenEntrypoint;
 use crate::server::telemetry::{FileTreeSource, WarpDriveSource};
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
+use crate::project_manager::{ProjectManagerPanel, ProjectManagerPanelEvent};
 use crate::skill_manager::{SkillManagerPanel, SkillManagerPanelEvent};
 use crate::ssh_manager::SshManagerPanel;
 use crate::terminal::model::session::Session;
@@ -70,8 +71,9 @@ use crate::workspace::view::server_file_browser::{
 };
 use crate::workspace::view::{
     LEFT_PANEL_AGENT_CONVERSATIONS_BINDING_NAME, LEFT_PANEL_GLOBAL_SEARCH_BINDING_NAME,
-    LEFT_PANEL_PROJECT_EXPLORER_BINDING_NAME, LEFT_PANEL_SKILL_MANAGER_BINDING_NAME,
-    LEFT_PANEL_SSH_MANAGER_BINDING_NAME, LEFT_PANEL_WARP_DRIVE_BINDING_NAME,
+    LEFT_PANEL_PROJECT_EXPLORER_BINDING_NAME, LEFT_PANEL_PROJECTS_BINDING_NAME,
+    LEFT_PANEL_SKILL_MANAGER_BINDING_NAME, LEFT_PANEL_SSH_MANAGER_BINDING_NAME,
+    LEFT_PANEL_WARP_DRIVE_BINDING_NAME,
     OPEN_GLOBAL_SEARCH_BINDING_NAME, TOGGLE_CONVERSATION_LIST_VIEW_BINDING_NAME,
     TOGGLE_PROJECT_EXPLORER_BINDING_NAME, TOGGLE_WARP_DRIVE_BINDING_NAME,
 };
@@ -85,6 +87,7 @@ struct MouseStateHandles {
     ssh_manager_button: MouseStateHandle,
     server_file_browser_button: MouseStateHandle,
     skill_manager_button: MouseStateHandle,
+    projects_button: MouseStateHandle,
 }
 
 #[derive(Clone, Debug)]
@@ -96,6 +99,7 @@ pub enum LeftPanelAction {
     SshManager,
     ServerFileBrowser,
     SkillManager,
+    Projects,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -145,6 +149,20 @@ pub enum LeftPanelEvent {
         node_id: String,
         server: warp_ssh_manager::SshServerInfo,
     },
+    /// 用户点击项目管理器的项目行 / 新建项目 → 主窗口打开项目详情编辑
+    /// (part B 落地;当前为 log stub)。
+    OpenProjectDetail {
+        project_id: String,
+    },
+    /// 用户点击项目下的主机行 → 主窗口复用 `open_ssh_terminal` 连接链路。
+    OpenProjectHostSession {
+        node_id: String,
+        server: warp_ssh_manager::SshServerInfo,
+    },
+    /// 用户点击「从项目发起 Agent 对话」(M3 落地;当前为 log stub)。
+    StartProjectConversation {
+        project_id: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -156,6 +174,7 @@ pub enum ToolPanelView {
     SshManager,
     ServerFileBrowser,
     SkillManager,
+    Projects,
 }
 
 /// Encapsulates the active view state to enforce that all mutations go through
@@ -226,6 +245,7 @@ pub struct LeftPanelView {
     ssh_manager_view: ViewHandle<SshManagerPanel>,
     server_file_browser_view: ViewHandle<ServerFileBrowserView>,
     skill_manager_view: ViewHandle<SkillManagerPanel>,
+    projects_view: ViewHandle<ProjectManagerPanel>,
     active_view: active_view_state::ActiveViewState,
     toolbelt_buttons: Vec<ToolbeltButtonConfig>,
     active_pane_group: Option<WeakViewHandle<PaneGroup>>,
@@ -273,6 +293,32 @@ impl LeftPanelView {
         let ssh_manager_view = ctx.add_typed_action_view(SshManagerPanel::new);
         let server_file_browser_view = ctx.add_typed_action_view(ServerFileBrowserView::new);
         let skill_manager_view = ctx.add_typed_action_view(SkillManagerPanel::new);
+        let projects_view = ctx.add_typed_action_view(ProjectManagerPanel::new);
+        ctx.subscribe_to_view(&projects_view, |_me, _, event, ctx| match event {
+            ProjectManagerPanelEvent::OpenProjectDetail { project_id } => {
+                ctx.emit(LeftPanelEvent::OpenProjectDetail {
+                    project_id: project_id.clone(),
+                });
+            }
+            ProjectManagerPanelEvent::OpenHostSession {
+                project_id: _,
+                node_id,
+                server,
+            } => {
+                ctx.emit(LeftPanelEvent::OpenProjectHostSession {
+                    node_id: node_id.clone(),
+                    server: server.clone(),
+                });
+            }
+            ProjectManagerPanelEvent::StartProjectConversation { project_id } => {
+                ctx.emit(LeftPanelEvent::StartProjectConversation {
+                    project_id: project_id.clone(),
+                });
+            }
+            ProjectManagerPanelEvent::PersistenceError(msg) => {
+                log::error!("project_manager persistence error: {msg}");
+            }
+        });
         ctx.subscribe_to_view(&ssh_manager_view, |_me, _, event, ctx| {
             use crate::ssh_manager::SshManagerPanelEvent;
             match event {
@@ -432,6 +478,7 @@ impl LeftPanelView {
             ssh_manager_view,
             server_file_browser_view,
             skill_manager_view,
+            projects_view,
             active_view: active_view_state::new(active_view),
             toolbelt_buttons,
             active_pane_group: None,
@@ -474,6 +521,7 @@ impl LeftPanelView {
                 (ToolPanelView::SshManager, ToolPanelView::SshManager) => true,
                 (ToolPanelView::ServerFileBrowser, ToolPanelView::ServerFileBrowser) => true,
                 (ToolPanelView::SkillManager, ToolPanelView::SkillManager) => true,
+                (ToolPanelView::Projects, ToolPanelView::Projects) => true,
                 _ => std::mem::discriminant(v) == std::mem::discriminant(&current_view),
             }
         });
@@ -608,6 +656,20 @@ impl LeftPanelView {
                     active_icon: None,
                     tooltip_text: crate::t!("workspace-left-panel-skill-manager"),
                     action: LeftPanelAction::SkillManager,
+                    render_with_active_state: false,
+                    tooltip_keybinding: toolbelt_tooltip_keybinding(&tooltip_keybinding_names, ctx),
+                    tooltip_keybinding_names,
+                }
+            }
+            ToolPanelView::Projects => {
+                let tooltip_keybinding_names = vec![LEFT_PANEL_PROJECTS_BINDING_NAME];
+                ToolbeltButtonConfig {
+                    // LayersThree01:分层的"项目集合"隐喻,与 Folder(服务器文件)
+                    // / Server01(SSH)在工具条里视觉可区分。
+                    icon: Icon::LayersThree01,
+                    active_icon: None,
+                    tooltip_text: crate::t!("workspace-left-panel-projects"),
+                    action: LeftPanelAction::Projects,
                     render_with_active_state: false,
                     tooltip_keybinding: toolbelt_tooltip_keybinding(&tooltip_keybinding_names, ctx),
                     tooltip_keybinding_names,
@@ -909,6 +971,9 @@ impl LeftPanelView {
             ToolPanelView::SkillManager => {
                 ctx.focus(&self.skill_manager_view);
             }
+            ToolPanelView::Projects => {
+                ctx.focus(&self.projects_view);
+            }
         }
     }
 
@@ -1098,6 +1163,7 @@ impl LeftPanelView {
                 LeftPanelAction::SkillManager => {
                     self.active_view.get() == ToolPanelView::SkillManager
                 }
+                LeftPanelAction::Projects => self.active_view.get() == ToolPanelView::Projects,
             };
         }
     }
@@ -1248,6 +1314,9 @@ impl LeftPanelView {
             LeftPanelAction::SkillManager => {
                 active_view_state::set(self, ToolPanelView::SkillManager, ctx);
             }
+            LeftPanelAction::Projects => {
+                active_view_state::set(self, ToolPanelView::Projects, ctx);
+            }
         }
     }
 
@@ -1351,6 +1420,7 @@ impl View for LeftPanelView {
                 ToolPanelView::SshManager => ctx.focus(&self.ssh_manager_view),
                 ToolPanelView::ServerFileBrowser => ctx.focus(&self.server_file_browser_view),
                 ToolPanelView::SkillManager => ctx.focus(&self.skill_manager_view),
+                ToolPanelView::Projects => ctx.focus(&self.projects_view),
             }
         }
     }
@@ -1368,6 +1438,7 @@ impl View for LeftPanelView {
             self.mouse_state_handles.ssh_manager_button.clone(),
             self.mouse_state_handles.server_file_browser_button.clone(),
             self.mouse_state_handles.skill_manager_button.clone(),
+            self.mouse_state_handles.projects_button.clone(),
         ];
 
         // If there is only one button in the toolbelt row,
@@ -1440,6 +1511,14 @@ impl View for LeftPanelView {
             ToolPanelView::SkillManager => Shrinkable::new(
                 1.0,
                 Container::new(ChildView::new(&self.skill_manager_view).finish())
+                    .with_padding_left(2.)
+                    .with_padding_right(2.)
+                    .finish(),
+            )
+            .finish(),
+            ToolPanelView::Projects => Shrinkable::new(
+                1.0,
+                Container::new(ChildView::new(&self.projects_view).finish())
                     .with_padding_left(2.)
                     .with_padding_right(2.)
                     .finish(),

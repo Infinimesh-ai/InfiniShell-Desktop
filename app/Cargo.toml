@@ -248,6 +248,7 @@ rmcp.workspace = true
 warp_isolation_platform.workspace = true
 warp_ripgrep.workspace = true
 warp_managed_secrets.workspace = true
+zap_projects.workspace = true
 zap_sync = { path = "../crates/zap_sync" }
 warp_multi_agent_client.workspace = true
 local_control.workspace = true
@@ -449,6 +450,7 @@ ai_resume_button = []
 autoupdate = []
 figma_detection = []
 bundled_skills = []
+project_manager = []
 windows_high_performance_gpu_default = []
 agent_mode = []
 agent_mode_computer_use = []
@@ -563,6 +565,7 @@ default = [
     "list_skills",
     "ask_user_question",
     "bundled_skills",
+    "project_manager",
     "agent_mode_computer_use",
     "background_computer_use",
     "oz_platform_skills",

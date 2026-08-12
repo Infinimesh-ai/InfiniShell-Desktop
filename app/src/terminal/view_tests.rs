@@ -261,6 +261,8 @@ fn empty_agent_conversation_data_for_test() -> AgentConversationData {
         compaction_state_json: None,
         byop_repair_state_json: None,
         cli_subagent_block_snapshots_json: None,
+        project_id: None,
+        project_host_node_id: None,
     }
 }
 

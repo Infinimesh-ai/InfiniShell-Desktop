@@ -610,6 +610,10 @@ pub enum FeatureFlag {
     /// Enables loading and returning bundled skills in the SkillManager.
     BundledSkills,
 
+    /// 项目 (Project) + 项目级 Agent 模式:项目面板、项目↔SSH 服务器关联、
+    /// 项目上下文注入与跨主机批量执行工具。
+    ZapProjects,
+
     /// Enables the Zap launch modal announcing Zap going open-source.
     /// When enabled, the HOA onboarding flow is suppressed.
     ZapLaunchModal,

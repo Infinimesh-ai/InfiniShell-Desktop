@@ -89,6 +89,7 @@ use crate::ai::blocklist::inline_action::requested_action::{
     render_requested_action_row, render_requested_action_row_for_text,
 };
 use crate::ai::blocklist::inline_action::requested_command::RequestedCommand;
+use crate::ai::blocklist::inline_action::batch_command_view::BatchCommandView;
 use crate::ai::blocklist::inline_action::run_agents_card_view::RunAgentsCardView;
 use crate::ai::blocklist::inline_action::suggested_unit_tests::SuggestedUnitTestsView;
 use crate::ai::blocklist::inline_action::web_fetch::WebFetchView;
@@ -181,6 +182,9 @@ pub(crate) struct Props<'a> {
     /// `AIAgentActionId` and embeds it via `ChildView` when the action
     /// is rendered. Multi-card lifecycle = AIBlock lifecycle.
     pub(crate) run_agents_card_views: &'a HashMap<AIAgentActionId, ViewHandle<RunAgentsCardView>>,
+    /// Zap M4-B:`run_command_on_hosts` 批量命令确认卡(命中工具名的
+    /// `CallMCPTool` action 用它替代通用 MCP 工具卡渲染)。
+    pub(crate) batch_command_views: &'a HashMap<AIAgentActionId, ViewHandle<BatchCommandView>>,
     #[cfg(feature = "local_fs")]
     pub(crate) resolved_code_block_paths:
         &'a HashMap<std::path::PathBuf, Option<std::path::PathBuf>>,
@@ -679,7 +683,12 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                                 should_render_suggestions = false;
                             }
 
-                            if let Some(rendered_mcp_tool) = props
+                            // Zap M4-B:批量命令 action 渲染专属确认卡;
+                            // 其余 MCP 工具调用仍走通用卡。两个 map 按工具名
+                            // 分流填充,同一 action 只会命中其一。
+                            if let Some(batch_view) = props.batch_command_views.get(id) {
+                                output_items.add_child(ChildView::new(batch_view).finish());
+                            } else if let Some(rendered_mcp_tool) = props
                                 .requested_mcp_tools
                                 .get(id)
                                 .map(|requested_mcp_tool| requested_mcp_tool.render())

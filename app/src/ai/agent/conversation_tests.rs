@@ -49,6 +49,8 @@ fn conversation_data_with_provider_cost(
     total_provider_cost_in_cents: Option<f32>,
 ) -> AgentConversationData {
     AgentConversationData {
+        project_id: None,
+        project_host_node_id: None,
         server_conversation_token: None,
         conversation_usage_metadata: Some(ConversationUsageMetadata {
             total_provider_cost_in_cents,
@@ -325,6 +327,8 @@ fn cli_subagent_tool(subtask_id: &str, command_id: &str) -> api::message::tool_c
 
 fn empty_agent_conversation_data_for_test() -> AgentConversationData {
     AgentConversationData {
+        project_id: None,
+        project_host_node_id: None,
         server_conversation_token: None,
         conversation_usage_metadata: None,
         reverted_action_ids: None,

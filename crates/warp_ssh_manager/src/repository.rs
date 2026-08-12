@@ -55,6 +55,23 @@ impl SshRepository {
         row.map(server_from_row).transpose()
     }
 
+    /// 按 host(大小写不敏感)+ port 查找第一台匹配的服务器,返回其 node_id。
+    /// 项目上下文注入用:把会话的 SSH 连接信息反查回 SSH 管理器节点。
+    pub fn find_server_node_by_host_port(
+        conn: &mut SqliteConnection,
+        host: &str,
+        port: u16,
+    ) -> Result<Option<String>, SshRepositoryError> {
+        let rows: Vec<(String, String)> = ssh_servers::table
+            .filter(ssh_servers::port.eq(port as i32))
+            .order(ssh_servers::node_id.asc())
+            .select((ssh_servers::node_id, ssh_servers::host))
+            .load(conn)?;
+        Ok(rows
+            .into_iter()
+            .find_map(|(node_id, row_host)| row_host.eq_ignore_ascii_case(host).then_some(node_id)))
+    }
+
     pub fn create_folder(
         conn: &mut SqliteConnection,
         parent_id: Option<&str>,
@@ -643,6 +660,52 @@ mod tests {
             notes: None,
             last_connected_at: None,
         }
+    }
+
+    #[test]
+    fn find_server_node_matches_host_case_insensitively() {
+        let mut conn = setup_in_memory();
+        let mut info = sample_server("edge1");
+        info.host = "Edge1.Example.COM".into();
+        let node = SshRepository::create_server(&mut conn, None, "edge1", &info).unwrap();
+
+        let found =
+            SshRepository::find_server_node_by_host_port(&mut conn, "edge1.example.com", 22)
+                .unwrap();
+        assert_eq!(found.as_deref(), Some(node.id.as_str()));
+    }
+
+    #[test]
+    fn find_server_node_requires_port_match() {
+        let mut conn = setup_in_memory();
+        let mut info = sample_server("edge1");
+        info.port = 2222;
+        let node = SshRepository::create_server(&mut conn, None, "edge1", &info).unwrap();
+
+        assert_eq!(
+            SshRepository::find_server_node_by_host_port(&mut conn, "edge1.example.com", 22)
+                .unwrap(),
+            None,
+            "端口不匹配时不应命中"
+        );
+        assert_eq!(
+            SshRepository::find_server_node_by_host_port(&mut conn, "edge1.example.com", 2222)
+                .unwrap()
+                .as_deref(),
+            Some(node.id.as_str())
+        );
+    }
+
+    #[test]
+    fn find_server_node_unknown_host_returns_none() {
+        let mut conn = setup_in_memory();
+        SshRepository::create_server(&mut conn, None, "edge1", &sample_server("edge1")).unwrap();
+
+        assert_eq!(
+            SshRepository::find_server_node_by_host_port(&mut conn, "nope.example.com", 22)
+                .unwrap(),
+            None
+        );
     }
 
     #[test]
