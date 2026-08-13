@@ -1,4 +1,4 @@
-# InfiniShell 自托管 CI Runner
+# InfiniShell-Desktop 自托管 CI Runner
 
 本仓库使用两台长期运行的 GitHub Actions self-hosted runner 做 Linux/Windows
 跨平台预检，不依赖 Oz 或 `oz-dev`。工作流位于

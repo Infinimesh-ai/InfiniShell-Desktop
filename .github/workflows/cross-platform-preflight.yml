@@ -64,7 +64,7 @@ jobs:
           cmake --version
           protoc --version
 
-      - name: Check Warp
+      - name: Check InfiniShell-Desktop
         shell: bash
         run: cargo check -p warp --lib
 
@@ -128,7 +128,7 @@ jobs:
           cmake --version
           protoc --version
 
-      - name: Check Warp
+      - name: Check InfiniShell-Desktop
         shell: pwsh
         run: cargo check -p warp --lib
 
