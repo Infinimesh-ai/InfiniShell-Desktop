@@ -37,6 +37,7 @@ struct ByopDispatch {
     /// 由 adapter 自己按模型名后缀推断;非 Auto 经 client capability gate 后注入。
     reasoning_effort: crate::settings::ReasoningEffortSetting,
     extra_headers: Vec<(String, String)>,
+    responses: crate::settings::AgentProviderResponsesOptions,
     /// conversation 的 root task id — 必须用本地已注册的 id,
     /// 否则下游 `Action::AddMessagesToTask` 在 task_store 找不到会 `TaskNotFound`。
     root_task_id: String,
@@ -147,6 +148,7 @@ fn byop_dispatch_info(
         api_type: provider.api_type,
         reasoning_effort,
         extra_headers,
+        responses: provider.responses,
         root_task_id,
         target_task_id,
         needs_create_task,
@@ -303,6 +305,7 @@ impl ResponseStream {
                             api_type: byop.api_type,
                             reasoning_effort: byop.reasoning_effort,
                             extra_headers: byop.extra_headers,
+                            responses: byop.responses,
                             task_id: byop.root_task_id,
                             target_task_id: byop.target_task_id,
                             needs_create_task: byop.needs_create_task,
@@ -411,6 +414,7 @@ impl ResponseStream {
                             api_type: byop.api_type,
                             reasoning_effort: byop.reasoning_effort,
                             extra_headers: byop.extra_headers,
+                            responses: byop.responses,
                             task_id: byop.root_task_id,
                             target_task_id: byop.target_task_id,
                             needs_create_task: byop.needs_create_task,

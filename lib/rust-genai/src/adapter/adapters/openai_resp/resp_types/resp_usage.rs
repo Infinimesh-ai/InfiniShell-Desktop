@@ -45,9 +45,13 @@ impl RespUsage {
 #[skip_serializing_none]
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct InputTokensDetails {
-	/// Anthropic: `cache_creation_input_tokens`.
+	/// Anthropic: `cache_creation_input_tokens`; OpenAI GPT-5.6+: `cache_write_tokens`。
 	/// Tokens used to build the cache (not yet cached). These may incur a small surcharge; subsequent requests benefit via `cached_tokens`.
-	#[serde(default, deserialize_with = "crate::support::zero_as_none")]
+	#[serde(
+		default,
+		alias = "cache_write_tokens",
+		deserialize_with = "crate::support::zero_as_none"
+	)]
 	pub cache_creation_tokens: Option<i32>,
 	/// Anthropic: `cache_read_input_tokens`.
 	#[serde(default, deserialize_with = "crate::support::zero_as_none")]

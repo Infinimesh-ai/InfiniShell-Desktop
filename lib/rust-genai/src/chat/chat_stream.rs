@@ -2,6 +2,7 @@ use crate::adapter::inter_stream::{InterStreamEnd, InterStreamEvent};
 use crate::chat::{ChatMessage, ContentPart, MessageContent, StopReason, ToolCall, Usage};
 use futures::Stream;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -121,6 +122,18 @@ pub struct StreamEnd {
 
 	/// Response ID for stateful sessions (OpenAI Responses API).
 	pub captured_response_id: Option<String>,
+
+	/// Responses 完成事件中的原始 output items，用于 `store:false` 精确回放。
+	pub captured_response_items: Vec<Value>,
+
+	/// 最后成功应用的 Responses sequence number。
+	pub captured_last_sequence_number: Option<u64>,
+
+	/// 无法识别的 Responses event 原始 JSON，供 trace 和前向兼容诊断。
+	pub captured_unknown_events: Vec<Value>,
+
+	/// Responses `url_citation` annotations 中的网页地址。
+	pub captured_web_citations: Vec<String>,
 }
 
 impl From<InterStreamEnd> for StreamEnd {
@@ -179,6 +192,10 @@ impl From<InterStreamEnd> for StreamEnd {
 			captured_content,
 			captured_reasoning_content: inter_end.captured_reasoning_content,
 			captured_response_id: inter_end.captured_response_id,
+			captured_response_items: Vec::new(),
+			captured_last_sequence_number: None,
+			captured_unknown_events: Vec::new(),
+			captured_web_citations: Vec::new(),
 		}
 	}
 }

@@ -43,6 +43,9 @@ pub enum AIApiError {
     #[error("Failed with status code {0}: {1}")]
     ErrorStatus(http::StatusCode, String),
 
+    #[error("Provider response protocol error: {0}")]
+    ProviderProtocol(String),
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 
@@ -163,26 +166,15 @@ impl AIApiError {
             | AIApiError::Deserialization(_)
             | AIApiError::NoContextFound
             | AIApiError::Stream { .. } => true,
+            AIApiError::ProviderProtocol(_) => false,
             AIApiError::Other(error) => error.downcast_ref::<BlockedByopReadinessError>().is_none(),
         }
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ai::byop_readiness::{BlockedByopReadinessError, ReadinessCategory};
-
-    #[test]
-    fn byop_blocked_readiness_error_is_not_retryable() {
-        let error = AIApiError::Other(
-            BlockedByopReadinessError::new(ReadinessCategory::MissingResultWithoutRepairSource)
-                .into(),
-        );
-
-        assert!(!error.is_retryable());
-    }
-}
+#[path = "api_error_tests.rs"]
+mod tests;
 
 impl ErrorExt for AIApiError {
     fn is_actionable(&self) -> bool {
@@ -192,9 +184,10 @@ impl ErrorExt for AIApiError {
             AIApiError::Other(error) => error.is_actionable(),
             AIApiError::Stream { source, .. } => source.is_actionable(),
             AIApiError::ErrorStatus(_, _) => self.is_retryable(),
-            AIApiError::QuotaLimit | AIApiError::ServerOverloaded | AIApiError::NoContextFound => {
-                false
-            }
+            AIApiError::QuotaLimit
+            | AIApiError::ServerOverloaded
+            | AIApiError::NoContextFound
+            | AIApiError::ProviderProtocol(_) => false,
         }
     }
 }

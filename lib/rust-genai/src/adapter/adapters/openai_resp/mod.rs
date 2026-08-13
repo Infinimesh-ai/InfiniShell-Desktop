@@ -9,6 +9,7 @@ mod resp_types;
 mod streamer;
 
 pub use adapter_impl::*;
+pub(crate) use resp_types::reasoning_item_signature;
 pub use streamer::*;
 
 // endregion: --- Modules

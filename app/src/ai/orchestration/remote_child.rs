@@ -346,6 +346,7 @@ pub fn classify_cloud_agent_startup_error(error: &anyhow::Error) -> CloudAgentSt
             | AIApiError::Deserialization(_)
             | AIApiError::NoContextFound
             | AIApiError::ErrorStatus(_, _)
+            | AIApiError::ProviderProtocol(_)
             | AIApiError::Other(_)
             | AIApiError::Stream { .. } => {}
         }

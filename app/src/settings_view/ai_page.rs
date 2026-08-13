@@ -3784,6 +3784,33 @@ pub enum AISettingsPageAction {
         provider_id: String,
         api_type: crate::settings::AgentProviderApiType,
     },
+    SetAgentProviderResponsesStateMode {
+        provider_id: String,
+        state_mode: crate::settings::ResponsesStateModeSetting,
+    },
+    SetAgentProviderResponsesTransport {
+        provider_id: String,
+        transport: crate::settings::ResponsesTransportSetting,
+    },
+    ToggleAgentProviderResponsesBackground {
+        provider_id: String,
+    },
+    SetAgentProviderResponsesCompactThreshold {
+        provider_id: String,
+        compact_threshold: u32,
+    },
+    ToggleAgentProviderResponsesProgrammaticToolCalling {
+        provider_id: String,
+    },
+    ToggleAgentProviderResponsesReasoningProMode {
+        provider_id: String,
+    },
+    ToggleAgentProviderResponsesReasoningAllTurns {
+        provider_id: String,
+    },
+    ToggleAgentProviderResponsesMultiAgentBeta {
+        provider_id: String,
+    },
     UpdateAgentProviderApiKey {
         provider_id: String,
         api_key: String,
@@ -4768,6 +4795,115 @@ impl TypedActionView for AISettingsPageView {
                     }
                     let _ = settings.agent_providers.set_value(providers, ctx);
                 });
+                self.rebuild_current_page(ctx);
+            }
+            AISettingsPageAction::SetAgentProviderResponsesStateMode {
+                provider_id,
+                state_mode,
+            } => {
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    let mut providers = settings.agent_providers.value().clone();
+                    if let Some(provider) = providers.iter_mut().find(|p| p.id == *provider_id) {
+                        provider.responses.state_mode = *state_mode;
+                        if *state_mode == crate::settings::ResponsesStateModeSetting::LocalReplay {
+                            provider.responses.background = false;
+                        }
+                    }
+                    let _ = settings.agent_providers.set_value(providers, ctx);
+                });
+                self.rebuild_current_page(ctx);
+            }
+            AISettingsPageAction::SetAgentProviderResponsesTransport {
+                provider_id,
+                transport,
+            } => {
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    let mut providers = settings.agent_providers.value().clone();
+                    if let Some(provider) = providers.iter_mut().find(|p| p.id == *provider_id) {
+                        provider.responses.transport = *transport;
+                        if *transport == crate::settings::ResponsesTransportSetting::WebSocket {
+                            provider.responses.background = false;
+                        }
+                    }
+                    let _ = settings.agent_providers.set_value(providers, ctx);
+                });
+                self.rebuild_current_page(ctx);
+            }
+            AISettingsPageAction::ToggleAgentProviderResponsesBackground { provider_id } => {
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    let mut providers = settings.agent_providers.value().clone();
+                    if let Some(provider) = providers.iter_mut().find(|p| p.id == *provider_id)
+                        && provider.responses.state_mode
+                            != crate::settings::ResponsesStateModeSetting::LocalReplay
+                        && provider.responses.transport
+                            == crate::settings::ResponsesTransportSetting::Http
+                    {
+                        provider.responses.background = !provider.responses.background;
+                    }
+                    let _ = settings.agent_providers.set_value(providers, ctx);
+                });
+                self.rebuild_current_page(ctx);
+            }
+            AISettingsPageAction::SetAgentProviderResponsesCompactThreshold {
+                provider_id,
+                compact_threshold,
+            } => {
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    let mut providers = settings.agent_providers.value().clone();
+                    if let Some(provider) = providers.iter_mut().find(|p| p.id == *provider_id) {
+                        provider.responses.compact_threshold = *compact_threshold;
+                    }
+                    let _ = settings.agent_providers.set_value(providers, ctx);
+                });
+                self.rebuild_current_page(ctx);
+            }
+            AISettingsPageAction::ToggleAgentProviderResponsesProgrammaticToolCalling {
+                provider_id,
+            } => {
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    let mut providers = settings.agent_providers.value().clone();
+                    if let Some(provider) = providers.iter_mut().find(|p| p.id == *provider_id) {
+                        provider.responses.programmatic_tool_calling =
+                            !provider.responses.programmatic_tool_calling;
+                    }
+                    let _ = settings.agent_providers.set_value(providers, ctx);
+                });
+                self.rebuild_current_page(ctx);
+            }
+            AISettingsPageAction::ToggleAgentProviderResponsesReasoningProMode { provider_id } => {
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    let mut providers = settings.agent_providers.value().clone();
+                    if let Some(provider) = providers.iter_mut().find(|p| p.id == *provider_id) {
+                        provider.responses.reasoning_pro_mode =
+                            !provider.responses.reasoning_pro_mode;
+                    }
+                    let _ = settings.agent_providers.set_value(providers, ctx);
+                });
+                self.rebuild_current_page(ctx);
+            }
+            AISettingsPageAction::ToggleAgentProviderResponsesReasoningAllTurns { provider_id } => {
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    let mut providers = settings.agent_providers.value().clone();
+                    if let Some(provider) = providers.iter_mut().find(|p| p.id == *provider_id) {
+                        provider.responses.reasoning_all_turns =
+                            !provider.responses.reasoning_all_turns;
+                    }
+                    let _ = settings.agent_providers.set_value(providers, ctx);
+                });
+                self.rebuild_current_page(ctx);
+            }
+            AISettingsPageAction::ToggleAgentProviderResponsesMultiAgentBeta { provider_id } => {
+                if FeatureFlag::ResponsesMultiAgentBeta.is_enabled() {
+                    AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                        let mut providers = settings.agent_providers.value().clone();
+                        if let Some(provider) = providers.iter_mut().find(|p| p.id == *provider_id)
+                        {
+                            provider.responses.multi_agent_beta =
+                                !provider.responses.multi_agent_beta;
+                        }
+                        let _ = settings.agent_providers.set_value(providers, ctx);
+                    });
+                }
                 self.rebuild_current_page(ctx);
             }
             AISettingsPageAction::UpdateAgentProviderApiKey {

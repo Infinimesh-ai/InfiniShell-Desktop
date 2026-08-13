@@ -432,6 +432,7 @@ fn copy_model_and_profile_preserves_explicit_model_over_source_profile_default()
                             AgentProviderModel::from_id("model-d".to_owned()),
                         ],
                         extra_headers: Vec::new(),
+                        responses: Default::default(),
                     }],
                     ctx,
                 );

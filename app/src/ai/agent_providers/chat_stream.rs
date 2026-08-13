@@ -40,19 +40,21 @@
 //! controller 自动接管。
 
 use std::collections::{HashMap, HashSet};
+use std::pin::Pin;
 use std::sync::Arc;
 
 use ai::agent::convert::ConvertToAPITypeError;
 use futures::StreamExt;
 use genai::adapter::AdapterKind;
 use genai::chat::{
-    Binary, BinarySource, CacheControl, ChatMessage, ChatOptions, ChatRequest, ChatRole,
-    ChatStreamEvent, ContentPart, MessageContent, Tool as GenaiTool, ToolCall, ToolResponse,
+    Binary, CacheControl, ChatMessage, ChatOptions, ChatRequest, ChatRole, ChatStreamEvent,
+    ContentPart, MessageContent, Tool as GenaiTool, ToolCall, ToolResponse,
 };
 use genai::resolver::{AuthData, Endpoint, ServiceTargetResolver};
 use genai::{Client, ModelIden, ServiceTarget, WebConfig};
 use http_client::current_proxy_config;
 use instant::Instant;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
 use warp_multi_agent_api as api;
@@ -82,6 +84,18 @@ use crate::ai::byop_readiness::{
     classify_projection,
 };
 use crate::settings::AgentProviderApiType;
+use warp_core::features::FeatureFlag;
+
+#[cfg(not(target_family = "wasm"))]
+type ProviderChatEventStream = Pin<
+    Box<
+        dyn futures::Stream<Item = Result<ChatStreamEvent, OpenAiCompatibleError>> + Send + 'static,
+    >,
+>;
+
+#[cfg(target_family = "wasm")]
+type ProviderChatEventStream =
+    Pin<Box<dyn futures::Stream<Item = Result<ChatStreamEvent, OpenAiCompatibleError>> + 'static>>;
 
 /// 从 input 中抽出最近一条 `UserQuery.context`(等价 warp `convert_to.rs::convert_input` 取的那条)。
 fn latest_input_context(input: &[AIAgentInput]) -> &[AIAgentContext] {
@@ -345,6 +359,38 @@ fn xml_attr(s: &str) -> String {
 /// Anthropic / Gemini adapter 序列化层会忽略 `ContentPart::ReasoningContent`
 /// (各自走 thinking blocks / thought signature),不受这个 gate 影响,但保持一致仍走 `false` 分支不挂。
 const REASONING_ECHO_PLACEHOLDER: &str = " ";
+const PROVIDER_RESPONSE_STATE_PREFIX: &str = "byop-provider-response-state-v1:";
+
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
+struct ProviderResponseState {
+    response_id: Option<String>,
+    conversation_id: Option<String>,
+    request_context_fingerprint: Option<String>,
+    last_sequence_number: Option<u64>,
+    state_mode: Option<crate::settings::ResponsesStateModeSetting>,
+    encrypted_reasoning_items: Vec<String>,
+    response_items: Vec<Value>,
+    unknown_events: Vec<Value>,
+}
+
+fn encode_provider_response_state(state: &ProviderResponseState) -> Option<String> {
+    serde_json::to_string(state)
+        .ok()
+        .map(|json| format!("{PROVIDER_RESPONSE_STATE_PREFIX}{json}"))
+}
+
+fn decode_provider_response_state(value: &str) -> Option<ProviderResponseState> {
+    let json = value.strip_prefix(PROVIDER_RESPONSE_STATE_PREFIX)?;
+    serde_json::from_str(json).ok()
+}
+
+fn latest_provider_response_state(params: &RequestParams) -> Option<ProviderResponseState> {
+    collect_linearized_task_messages(&params.tasks)
+        .into_iter()
+        .rev()
+        .find_map(|message| decode_provider_response_state(&message.server_message_data))
+}
 
 #[derive(Default)]
 struct AssistantBuffer {
@@ -355,6 +401,8 @@ struct AssistantBuffer {
     /// 的 reasoning_content 字段(genai 内部按 adapter 序列化:DeepSeek/Kimi 走 reasoning_content,
     /// Anthropic 走 thinking blocks)。
     reasoning: Option<String>,
+    /// Responses `store:false` 手动回放所需的完整 encrypted reasoning items。
+    thought_signatures: Vec<String>,
     /// thinking-mode adapter 强制回传 reasoning_content(非空占位)。由
     /// `super::reasoning::model_requires_reasoning_echo` 决定。
     force_echo_reasoning: bool,
@@ -403,8 +451,17 @@ impl AssistantBuffer {
             // 注:即便 `reasoning` 是 Some(非空),也丢弃 — 见上方 gate 反转说明。
             None
         };
-        if let Some(t) = self.text.take() {
-            let mut msg = ChatMessage::assistant(t);
+        let text = self.text.take();
+        let had_text = text.is_some();
+        let thought_signatures = std::mem::take(&mut self.thought_signatures);
+        if let Some(t) = text {
+            let mut parts: Vec<ContentPart> = thought_signatures
+                .iter()
+                .cloned()
+                .map(ContentPart::ThoughtSignature)
+                .collect();
+            parts.push(ContentPart::Text(t));
+            let mut msg = ChatMessage::assistant(MessageContent::from_parts(parts));
             if has_tool_calls {
                 // DeepSeek thinking mode 要求每条 assistant message 都带
                 // reasoning_content。text + tool_calls 被 genai 建模成两条
@@ -420,7 +477,14 @@ impl AssistantBuffer {
         if has_tool_calls {
             // genai `From<Vec<ToolCall>> for ChatMessage` 自动产 assistant role +
             // MessageContent::from_tool_calls。
-            let mut msg = ChatMessage::from(std::mem::take(&mut self.tool_calls));
+            let mut msg = if had_text {
+                ChatMessage::from(std::mem::take(&mut self.tool_calls))
+            } else {
+                ChatMessage::assistant_tool_calls_with_thoughts(
+                    std::mem::take(&mut self.tool_calls),
+                    thought_signatures,
+                )
+            };
             if let Some(r) = echo_reasoning {
                 msg = msg.with_reasoning_content(Some(r));
             }
@@ -505,7 +569,7 @@ fn build_user_message_with_binaries(
 
     if !error_replacements.is_empty() {
         log::info!(
-            "[byop] {} attachment(s) replaced with ERROR text — caps={caps:?} does not support: {error_replacements:?}",
+            "[byop] {} attachment(s) replaced with unsupported-modality ERROR text",
             error_replacements.len()
         );
     }
@@ -1266,6 +1330,8 @@ fn accepted_history_repair_log_message(
 /// 修复 DeepSeek-v4-flash / Kimi 等收紧校验的 thinking-mode endpoint。
 fn build_chat_request(
     params: &RequestParams,
+    include_history: bool,
+    enable_programmatic_tool_calling: bool,
     force_echo_reasoning: bool,
     api_type: AgentProviderApiType,
     attachment_caps: attachment_caps::AttachmentCaps,
@@ -1409,6 +1475,29 @@ fn build_chat_request(
         &compacted_tool_msg_ids,
     )?;
 
+    let raw_response_request_ids: HashSet<&str> = all_msgs
+        .iter()
+        .filter_map(|message| {
+            decode_provider_response_state(&message.server_message_data)
+                .filter(|state| !state.response_items.is_empty())
+                .map(|_| message.request_id.as_str())
+        })
+        .collect();
+    let response_tool_callers: HashMap<String, (Option<Value>, Option<String>)> = all_msgs
+        .iter()
+        .filter_map(|message| decode_provider_response_state(&message.server_message_data))
+        .flat_map(|state| state.response_items)
+        .filter_map(|item| {
+            let call_id = item.get("call_id")?.as_str()?.to_owned();
+            let caller = item.get("caller").cloned();
+            let caller_id = item
+                .get("caller_id")
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            (caller.is_some() || caller_id.is_some()).then_some((call_id, (caller, caller_id)))
+        })
+        .collect();
+
     let mut buf = AssistantBuffer::new(force_echo_reasoning);
     // Zap:历史里被 skip 掉的 subagent ToolCall 对应的 call_id —— 它们的
     // ToolCallResult 也必须 skip,否则会成为孤儿 tool_response,Anthropic 直接 400
@@ -1424,6 +1513,9 @@ fn build_chat_request(
         .collect();
 
     for (idx, msg) in all_msgs.iter().enumerate() {
+        if !include_history {
+            break;
+        }
         // 摘要请求:tail 区间不送上游(只送 head + 末尾追加 SUMMARY_TEMPLATE)
         if let Some(head_end) = summarize_head_end {
             if idx >= head_end {
@@ -1440,9 +1532,37 @@ fn build_chat_request(
             }
             continue;
         }
+        if let Some(state) = decode_provider_response_state(&msg.server_message_data) {
+            if state.response_items.is_empty() {
+                for signature in state.encrypted_reasoning_items {
+                    if !buf.thought_signatures.contains(&signature) {
+                        buf.thought_signatures.push(signature);
+                    }
+                }
+            } else {
+                flush_assistant_buffer(&mut buf, &mut messages, &mut outbound_tool_groups);
+                messages.push(ChatMessage::assistant(MessageContent::from_parts(
+                    state
+                        .response_items
+                        .into_iter()
+                        .map(|item| ContentPart::from_custom(item, None))
+                        .collect::<Vec<_>>(),
+                )));
+            }
+        }
         let Some(inner) = &msg.message else {
             continue;
         };
+        if raw_response_request_ids.contains(msg.request_id.as_str())
+            && matches!(
+                inner,
+                api::message::Message::AgentReasoning(_)
+                    | api::message::Message::AgentOutput(_)
+                    | api::message::Message::ToolCall(_)
+            )
+        {
+            continue;
+        }
         match inner {
             api::message::Message::UserQuery(u) => {
                 flush_assistant_buffer(&mut buf, &mut messages, &mut outbound_tool_groups);
@@ -1593,10 +1713,14 @@ fn build_chat_request(
                 } else {
                     r#"{"status":"empty"}"#.to_owned()
                 };
-                messages.push(ChatMessage::from(ToolResponse::new(
-                    tcr.tool_call_id.clone(),
-                    content,
-                )));
+                let (caller, caller_id) = response_tool_callers
+                    .get(&tcr.tool_call_id)
+                    .cloned()
+                    .unwrap_or_default();
+                messages.push(ChatMessage::from(
+                    ToolResponse::new(tcr.tool_call_id.clone(), content)
+                        .with_response_caller(caller, caller_id),
+                ));
             }
             _ => {
                 // 其他 message 类型(SystemQuery/UpdateTodos/...)BYOP 暂不送上游。
@@ -1696,7 +1820,14 @@ fn build_chat_request(
                 let content = tools::serialize_action_result(result).unwrap_or_else(|| {
                     serde_json::json!({ "result": result.result.to_string() }).to_string()
                 });
-                messages.push(ChatMessage::from(ToolResponse::new(tool_call_id, content)));
+                let (caller, caller_id) = response_tool_callers
+                    .get(&tool_call_id)
+                    .cloned()
+                    .unwrap_or_default();
+                messages.push(ChatMessage::from(
+                    ToolResponse::new(tool_call_id, content)
+                        .with_response_caller(caller, caller_id),
+                ));
             }
             AIAgentInput::InvokeSkill {
                 skill, user_query, ..
@@ -1782,7 +1913,11 @@ fn build_chat_request(
     // 这里统一兜底:末尾若是 assistant,追加一条隐式 user 消息让上游继续。
     ensure_ends_with_user(&mut messages);
 
-    let mut tools_array = build_tools_array(params);
+    let mut tools_array = build_tools_array(
+        params,
+        enable_programmatic_tool_calling,
+        api_type == AgentProviderApiType::OpenAiResp,
+    );
 
     // Anthropic 路径:给 tools 数组**最后一个 tool**打 1h cache_control breakpoint,
     // 使整个 tools 段成为长 TTL 的静态前缀(对齐 Zed
@@ -1843,7 +1978,6 @@ fn build_chat_request(
     Ok(req)
 }
 
-const BYOP_DIAG_SNIPPET_CHARS: usize = 240;
 const REPAIR_PLACEHOLDER_NOTE: &str =
     "tool result was unavailable in repaired conversation history";
 
@@ -1883,57 +2017,6 @@ fn should_replace_tool_response(existing: &ToolResponse, candidate: &ToolRespons
         || !is_placeholder_tool_response_content(&candidate.content)
 }
 
-fn snippet_for_log(s: &str, max_chars: usize) -> String {
-    use std::fmt::Write as _;
-
-    let mut out = String::new();
-    for (idx, ch) in s.chars().enumerate() {
-        if idx >= max_chars {
-            out.push_str("...");
-            break;
-        }
-        match ch {
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if c.is_control() => {
-                let _ = write!(out, "\\u{{{:04x}}}", c as u32);
-            }
-            c => out.push(c),
-        }
-    }
-    out
-}
-
-fn json_value_for_log(value: &Value) -> (usize, String) {
-    let json = serde_json::to_string(value)
-        .unwrap_or_else(|_| "<failed-to-serialize-json-value>".to_owned());
-    (json.len(), snippet_for_log(&json, BYOP_DIAG_SNIPPET_CHARS))
-}
-
-fn binary_for_log(binary: &Binary) -> String {
-    let name = binary
-        .name
-        .as_deref()
-        .map(|n| snippet_for_log(n, 80))
-        .unwrap_or_default();
-    match &binary.source {
-        BinarySource::Base64(data) => format!(
-            "mime={} name={} source=base64 chars={}",
-            binary.content_type,
-            name,
-            data.len()
-        ),
-        BinarySource::Url(url) => format!(
-            "mime={} name={} source=url chars={} url={}",
-            binary.content_type,
-            name,
-            url.len(),
-            snippet_for_log(url, 120)
-        ),
-    }
-}
-
 fn log_chat_request_details(
     chat_req: &ChatRequest,
     model_id: &str,
@@ -1946,237 +2029,54 @@ fn log_chat_request_details(
             .first()
             .map(|m| matches!(m.role, ChatRole::System))
             .unwrap_or(false);
-    let tool_count = chat_req.tools.as_ref().map(|t| t.len()).unwrap_or(0);
-    let tool_names: Vec<String> = chat_req
-        .tools
-        .as_ref()
-        .map(|tools| tools.iter().map(|t| t.name.as_str().to_owned()).collect())
-        .unwrap_or_default();
-    log::info!(
-        "[byop-diag] request summary: adapter={:?} model={} system_len={} \
-         system_in_messages_head={} messages={} tools={} tool_names={:?} \
-         previous_response_id_present={} store={:?} system_snippet={:?}",
-        effective_adapter_kind_for(api_type, model_id, base_url),
-        model_id,
-        chat_req.system.as_deref().map(str::len).unwrap_or(0),
-        system_in_head,
-        chat_req.messages.len(),
-        tool_count,
-        tool_names,
-        chat_req.previous_response_id.is_some(),
-        chat_req.store,
-        chat_req
-            .system
-            .as_deref()
-            .map(|s| snippet_for_log(s, BYOP_DIAG_SNIPPET_CHARS))
-            .unwrap_or_default(),
-    );
-
-    if let Some(tools) = &chat_req.tools {
-        for (idx, tool) in tools.iter().enumerate() {
-            let schema_len = tool
-                .schema
-                .as_ref()
-                .and_then(|schema| serde_json::to_string(schema).ok())
-                .map(|schema| schema.len())
-                .unwrap_or(0);
-            log::info!(
-                "[byop-diag] request tool[{idx}]: name={} desc_len={} schema_len={} \
-                 strict={:?} cache_control={:?}",
-                tool.name.as_str(),
-                tool.description.as_deref().map(str::len).unwrap_or(0),
-                schema_len,
-                tool.strict,
-                tool.cache_control,
-            );
-        }
-    }
-
-    let flow: Vec<String> = chat_req
-        .messages
-        .iter()
-        .enumerate()
-        .map(|(idx, msg)| {
-            let text_len: usize = msg.content.texts().iter().map(|t| t.len()).sum();
-            let tool_call_ids: Vec<String> = msg
-                .content
-                .tool_calls()
-                .iter()
-                .map(|tc| tc.call_id.clone())
-                .collect();
-            let tool_response_ids: Vec<String> = msg
-                .content
-                .tool_responses()
-                .iter()
-                .map(|tr| tr.call_id.clone())
-                .collect();
-            format!(
-                "{idx}:{:?}(text_len={text_len},tool_calls={tool_call_ids:?},tool_responses={tool_response_ids:?})",
-                msg.role
-            )
-        })
-        .collect();
-    log::info!("[byop-diag] request message_flow={flow:?}");
-
-    for (idx, msg) in chat_req.messages.iter().enumerate() {
-        let mut text_count = 0;
-        let mut text_total_len = 0;
-        let mut first_text_snippet: Option<String> = None;
-        let mut binary_summaries: Vec<String> = Vec::new();
-        let mut tool_call_summaries: Vec<String> = Vec::new();
-        let mut tool_response_summaries: Vec<String> = Vec::new();
-        let mut thought_count = 0;
-        let mut thought_total_len = 0;
-        let mut reasoning_count = 0;
-        let mut reasoning_total_len = 0;
-        let mut custom_count = 0;
-
-        for part in &msg.content {
-            match part {
-                ContentPart::Text(text) => {
-                    text_count += 1;
-                    text_total_len += text.len();
-                    if first_text_snippet.is_none() {
-                        first_text_snippet = Some(snippet_for_log(text, BYOP_DIAG_SNIPPET_CHARS));
-                    }
-                }
-                ContentPart::Binary(binary) => {
-                    binary_summaries.push(binary_for_log(binary));
-                }
-                ContentPart::ToolCall(tool_call) => {
-                    let (args_len, args_snippet) = json_value_for_log(&tool_call.fn_arguments);
-                    tool_call_summaries.push(format!(
-                        "call_id={} name={} args_len={} args={} thought_signatures={}",
-                        tool_call.call_id,
-                        tool_call.fn_name,
-                        args_len,
-                        args_snippet,
-                        tool_call
-                            .thought_signatures
-                            .as_ref()
-                            .map(|s| s.len())
-                            .unwrap_or(0)
-                    ));
-                }
-                ContentPart::ToolResponse(tool_response) => {
-                    tool_response_summaries.push(format!(
-                        "call_id={} content_len={} placeholder={} content={}",
-                        tool_response.call_id,
-                        tool_response.content.len(),
-                        is_placeholder_tool_response_content(&tool_response.content),
-                        snippet_for_log(&tool_response.content, BYOP_DIAG_SNIPPET_CHARS)
-                    ));
-                }
-                ContentPart::ThoughtSignature(thought) => {
-                    thought_count += 1;
-                    thought_total_len += thought.len();
-                }
-                ContentPart::ReasoningContent(reasoning) => {
-                    reasoning_count += 1;
-                    reasoning_total_len += reasoning.len();
-                }
-                ContentPart::Custom(_) => {
-                    custom_count += 1;
-                }
-            }
-        }
-
-        let cache_control = msg
+    let mut text_parts = 0;
+    let mut binary_parts = 0;
+    let mut tool_call_parts = 0;
+    let mut tool_response_parts = 0;
+    let mut reasoning_parts = 0;
+    let mut cache_breakpoints = 0;
+    for message in &chat_req.messages {
+        if message
             .options
             .as_ref()
             .and_then(|options| options.cache_control.as_ref())
-            .map(|cache| format!("{cache:?}"))
-            .unwrap_or_else(|| "None".to_owned());
-        log::info!(
-            "[byop-diag] request message[{idx}]: role={:?} parts={} size={} \
-             cache_control={} text_parts={} text_total_len={} first_text={:?} \
-             binaries={:?} tool_calls={:?} tool_responses={:?} \
-             thought_signatures={} thought_total_len={} reasoning_parts={} \
-             reasoning_total_len={} custom_parts={}",
-            msg.role,
-            msg.content.len(),
-            msg.content.size(),
-            cache_control,
-            text_count,
-            text_total_len,
-            first_text_snippet.unwrap_or_default(),
-            binary_summaries,
-            tool_call_summaries,
-            tool_response_summaries,
-            thought_count,
-            thought_total_len,
-            reasoning_count,
-            reasoning_total_len,
-            custom_count,
-        );
-    }
-
-    for (idx, msg) in chat_req.messages.iter().enumerate() {
-        let expected_call_ids: Vec<String> = msg
-            .content
-            .tool_calls()
-            .iter()
-            .map(|tc| tc.call_id.clone())
-            .collect();
-        if expected_call_ids.is_empty() {
-            continue;
+            .is_some()
+        {
+            cache_breakpoints += 1;
         }
-        let next = chat_req.messages.get(idx + 1);
-        let next_role = next.map(|m| format!("{:?}", m.role)).unwrap_or_default();
-        let response_call_ids: Vec<String> = next
-            .filter(|m| matches!(m.role, ChatRole::Tool))
-            .map(|m| {
-                m.content
-                    .tool_responses()
-                    .iter()
-                    .map(|tr| tr.call_id.clone())
-                    .collect()
-            })
-            .unwrap_or_default();
-        let matched = response_call_ids == expected_call_ids;
-        if matched {
-            log::info!(
-                "[byop-diag] request tool_pair idx={idx}: expected_call_ids={expected_call_ids:?} \
-                 next_role={next_role} response_call_ids={response_call_ids:?}"
-            );
-        } else {
-            log::warn!(
-                "[byop-diag] request tool_pair mismatch idx={idx}: \
-                 expected_call_ids={expected_call_ids:?} next_role={next_role} \
-                 response_call_ids={response_call_ids:?}"
-            );
+        for part in &message.content {
+            match part {
+                ContentPart::Text(_) => text_parts += 1,
+                ContentPart::Binary(_) => binary_parts += 1,
+                ContentPart::ToolCall(_) => tool_call_parts += 1,
+                ContentPart::ToolResponse(_) => tool_response_parts += 1,
+                ContentPart::ThoughtSignature(_) | ContentPart::ReasoningContent(_) => {
+                    reasoning_parts += 1;
+                }
+                ContentPart::Custom(_) => {}
+            }
         }
     }
 
-    for (idx, msg) in chat_req.messages.iter().enumerate() {
-        if !matches!(msg.role, ChatRole::Tool) {
-            continue;
-        }
-        let response_call_ids: Vec<String> = msg
-            .content
-            .tool_responses()
-            .iter()
-            .map(|tr| tr.call_id.clone())
-            .collect();
-        let previous_expected: Vec<String> = idx
-            .checked_sub(1)
-            .and_then(|prev_idx| chat_req.messages.get(prev_idx))
-            .filter(|prev| matches!(prev.role, ChatRole::Assistant))
-            .map(|prev| {
-                prev.content
-                    .tool_calls()
-                    .iter()
-                    .map(|tc| tc.call_id.clone())
-                    .collect()
-            })
-            .unwrap_or_default();
-        if response_call_ids != previous_expected {
-            log::warn!(
-                "[byop-diag] request orphan_or_misordered_tool_response idx={idx}: \
-                 response_call_ids={response_call_ids:?} previous_assistant_call_ids={previous_expected:?}"
-            );
-        }
-    }
+    log::debug!(
+        "[byop-diag] request summary: adapter={:?} system_present={} \
+         system_in_messages_head={} messages={} tools={} text_parts={} binary_parts={} \
+         tool_call_parts={} tool_response_parts={} reasoning_parts={} cache_breakpoints={} \
+         previous_response_id_present={} store={:?}",
+        effective_adapter_kind_for(api_type, model_id, base_url),
+        chat_req.system.is_some(),
+        system_in_head,
+        chat_req.messages.len(),
+        chat_req.tools.as_ref().map(Vec::len).unwrap_or(0),
+        text_parts,
+        binary_parts,
+        tool_call_parts,
+        tool_response_parts,
+        reasoning_parts,
+        cache_breakpoints,
+        chat_req.previous_response_id.is_some(),
+        chat_req.store,
+    );
 }
 
 /// 1:1 移植自 opencode `provider/transform.ts::applyCaching` 的 Anthropic 分支:
@@ -2812,7 +2712,11 @@ pub fn available_tool_names(params: &RequestParams) -> Vec<String> {
     names
 }
 
-fn build_tools_array(params: &RequestParams) -> Vec<GenaiTool> {
+fn build_tools_array(
+    params: &RequestParams,
+    enable_programmatic_tool_calling: bool,
+    strict_functions: bool,
+) -> Vec<GenaiTool> {
     // Zap A2:LRC tag-in 场景剔除 `run_shell_command`,迫使模型选 PTY 操作类工具。
     //
     // 在 alt-screen 长命令(nvim/htop)+ 用户 tag-in 状态下,**模型最容易犯的错**是
@@ -2883,9 +2787,18 @@ fn build_tools_array(params: &RequestParams) -> Vec<GenaiTool> {
             } else {
                 t.description.to_owned()
             };
-            GenaiTool::new(t.name)
+            let mut tool = GenaiTool::new(t.name)
                 .with_description(description)
-                .with_schema((t.parameters)())
+                .with_schema((t.parameters)());
+            if strict_functions {
+                tool = tool.with_strict(true);
+            }
+            if enable_programmatic_tool_calling && ptc_allows_tool(t.name) {
+                tool = tool.with_config(json!({
+                    "allowed_callers": ["programmatic"]
+                }));
+            }
+            tool
         })
         .collect();
 
@@ -2897,6 +2810,12 @@ fn build_tools_array(params: &RequestParams) -> Vec<GenaiTool> {
                     .with_schema(parameters),
             );
         }
+    }
+    if enable_programmatic_tool_calling {
+        out.push(
+            GenaiTool::new("programmatic_tool_calling")
+                .with_config(json!({"type": "programmatic_tool_calling"})),
+        );
     }
     if is_lrc {
         log::info!(
@@ -2914,6 +2833,29 @@ fn build_tools_array(params: &RequestParams) -> Vec<GenaiTool> {
         );
     }
     out
+}
+
+fn ptc_allows_tool(name: &str) -> bool {
+    matches!(
+        name,
+        "read_files"
+            | "grep"
+            | "file_glob"
+            | "read_shell_command_output"
+            | "read_skill"
+            | "read_documents"
+            | tools::webfetch::TOOL_NAME
+            | tools::websearch::TOOL_NAME
+    )
+}
+
+fn is_gpt56_model(model_id: &str) -> bool {
+    model_id
+        .rsplit('/')
+        .next()
+        .unwrap_or(model_id)
+        .to_ascii_lowercase()
+        .starts_with("gpt-5.6")
 }
 
 // ---------------------------------------------------------------------------
@@ -3062,7 +3004,7 @@ pub(super) fn build_client(
     api_key: String,
 ) -> Client {
     let endpoint_url = normalize_endpoint_url(api_type, base_url);
-    log::info!("[byop] build_client: api_type={api_type:?} endpoint_url={endpoint_url}");
+    log::info!("[byop] build_client: api_type={api_type:?}");
     let key_for_resolver = api_key.clone();
     let resolver = ServiceTargetResolver::from_resolver_fn(
         move |service_target: ServiceTarget| -> Result<ServiceTarget, genai::resolver::Error> {
@@ -3133,10 +3075,7 @@ pub(super) fn build_client(
                     &proxy_cfg.password,
                     &proxy_cfg.no_proxy,
                 ) {
-                    log::warn!(
-                        "[byop] proxy URL '{}' 无效,跳过代理配置: {err}",
-                        proxy_cfg.url
-                    );
+                    log::warn!("[byop] 自定义代理 URL 无效，跳过代理配置: {err}");
                 }
             }
         }
@@ -3386,6 +3325,10 @@ fn map_genai_error(err: genai::Error) -> OpenAiCompatibleError {
         | G::JsonValueExt(_)
         | G::InvalidJsonResponseElement { .. } => OpenAiCompatibleError::Decode(format!("{err}")),
 
+        G::ResponsesStreamTerminal { .. } | G::ResponsesStreamEnded { .. } => {
+            OpenAiCompatibleError::Protocol(format!("{err}"))
+        }
+
         // 网络/流式发送阶段失败(reqwest 连接、TLS、DNS、超时、流中断等)
         G::WebStream { .. } | G::WebAdapterCall { .. } | G::WebModelCall { .. } => {
             OpenAiCompatibleError::Stream(format!("{err}"))
@@ -3407,6 +3350,28 @@ fn map_genai_error(err: genai::Error) -> OpenAiCompatibleError {
 
         // 其余(请求构造、鉴权、能力不支持等)归为通用错误,避免误导成"解析失败"
         other => OpenAiCompatibleError::Other(format!("{other}")),
+    }
+}
+
+fn into_ai_api_error(context: &'static str, error: OpenAiCompatibleError) -> AIApiError {
+    match error {
+        OpenAiCompatibleError::Http(error) => AIApiError::Transport(error),
+        OpenAiCompatibleError::Status { status, body } => {
+            match http::StatusCode::from_u16(status) {
+                Ok(status) => AIApiError::ErrorStatus(status, body),
+                Err(_) => AIApiError::ProviderProtocol(format!(
+                    "{context}: provider returned invalid HTTP status {status}"
+                )),
+            }
+        }
+        OpenAiCompatibleError::InvalidBaseUrl(message)
+        | OpenAiCompatibleError::Decode(message)
+        | OpenAiCompatibleError::Protocol(message) => {
+            AIApiError::ProviderProtocol(format!("{context}: {message}"))
+        }
+        OpenAiCompatibleError::Stream(message) | OpenAiCompatibleError::Other(message) => {
+            AIApiError::Other(anyhow::anyhow!("{context}: {message}"))
+        }
     }
 }
 
@@ -3432,6 +3397,7 @@ pub struct ByopOutputInput {
     pub api_type: AgentProviderApiType,
     pub reasoning_effort: crate::settings::ReasoningEffortSetting,
     pub extra_headers: Vec<(String, String)>,
+    pub responses: crate::settings::AgentProviderResponsesOptions,
     pub task_id: String,
     pub target_task_id: String,
     pub needs_create_task: bool,
@@ -3459,13 +3425,14 @@ pub async fn generate_byop_output(
         api_type,
         reasoning_effort,
         extra_headers,
+        responses,
         task_id,
         target_task_id,
         needs_create_task,
         lrc_command_id,
         lrc_should_spawn_subagent,
         context_window,
-        cancellation_rx: _cancellation_rx,
+        cancellation_rx,
         attachment_caps,
     } = input;
 
@@ -3484,33 +3451,312 @@ pub async fn generate_byop_output(
         } else {
             api_type
         };
-    let chat_req = build_chat_request(
+    let supports_gpt56_responses_features =
+        !is_openai_api_host(&base_url) || is_gpt56_model(&model_id);
+    let enable_programmatic_tool_calling = api_type == AgentProviderApiType::OpenAiResp
+        && responses.programmatic_tool_calling
+        && supports_gpt56_responses_features;
+    let enable_multi_agent = api_type == AgentProviderApiType::OpenAiResp
+        && responses.multi_agent_beta
+        && supports_gpt56_responses_features
+        && FeatureFlag::ResponsesMultiAgentBeta.is_enabled();
+    let enable_reasoning_pro_mode = api_type == AgentProviderApiType::OpenAiResp
+        && responses.reasoning_pro_mode
+        && supports_gpt56_responses_features;
+    let enable_reasoning_all_turns = api_type == AgentProviderApiType::OpenAiResp
+        && responses.reasoning_all_turns
+        && supports_gpt56_responses_features;
+    if responses.programmatic_tool_calling && !enable_programmatic_tool_calling {
+        log::warn!("[byop] 当前官方模型不支持 Responses Programmatic Tool Calling");
+    }
+    if (responses.reasoning_pro_mode || responses.reasoning_all_turns)
+        && !(enable_reasoning_pro_mode || enable_reasoning_all_turns)
+    {
+        log::warn!("[byop] 当前官方模型不支持 GPT-5.6 Responses 推理扩展");
+    }
+    if responses.multi_agent_beta && !enable_multi_agent {
+        log::warn!("[byop] Responses Multi-agent Beta 配置未生效：需要 GPT-5.6 能力与功能开关");
+    }
+    if api_type == AgentProviderApiType::OpenAiResp {
+        if responses.background
+            && matches!(
+                responses.state_mode,
+                crate::settings::ResponsesStateModeSetting::LocalReplay
+            )
+        {
+            return Err(ConvertToAPITypeError::Other(anyhow::anyhow!(
+                "Responses 本地/ZDR 模式不能启用 background"
+            )));
+        }
+        if responses.background
+            && matches!(
+                responses.transport,
+                crate::settings::ResponsesTransportSetting::WebSocket
+            )
+        {
+            return Err(ConvertToAPITypeError::Other(anyhow::anyhow!(
+                "Responses WebSocket 模式不能发送 background"
+            )));
+        }
+    }
+
+    let mut chat_req = build_chat_request(
         &params,
+        true,
+        enable_programmatic_tool_calling,
         force_echo_reasoning,
         shaping_api_type,
         attachment_caps,
     )?;
+    let full_replay_chat_req = chat_req.clone();
+    let response_context_fingerprint = (api_type == AgentProviderApiType::OpenAiResp).then(|| {
+        let tools = chat_req.tools.as_ref().map(|tools| {
+            tools
+                .iter()
+                .filter_map(|tool| serde_json::to_value(tool).ok())
+                .collect::<Vec<_>>()
+        });
+        super::responses::response_request_context_fingerprint(
+            &base_url,
+            Some(&model_id),
+            chat_req.system.as_deref(),
+            tools.as_deref(),
+        )
+    });
+    let previous_provider_state = latest_provider_response_state(&params);
+    let compatible_provider_state = previous_provider_state.as_ref().filter(|state| {
+        state.request_context_fingerprint.as_ref() == response_context_fingerprint.as_ref()
+            && state.state_mode == Some(responses.state_mode)
+    });
+    let mut response_conversation_id = None;
+
+    if api_type == AgentProviderApiType::OpenAiResp {
+        match responses.state_mode {
+            crate::settings::ResponsesStateModeSetting::LocalReplay => {
+                if matches!(
+                    responses.transport,
+                    crate::settings::ResponsesTransportSetting::WebSocket
+                ) && let Some(previous_response_id) =
+                    compatible_provider_state.and_then(|state| state.response_id.as_deref())
+                {
+                    chat_req = build_chat_request(
+                        &params,
+                        false,
+                        enable_programmatic_tool_calling,
+                        force_echo_reasoning,
+                        shaping_api_type,
+                        attachment_caps,
+                    )?
+                    .with_previous_response_id(previous_response_id)
+                    .with_store(false);
+                } else {
+                    chat_req.store = Some(false);
+                }
+            }
+            crate::settings::ResponsesStateModeSetting::PreviousResponse => {
+                if let Some(previous_response_id) =
+                    compatible_provider_state.and_then(|state| state.response_id.as_deref())
+                {
+                    chat_req = build_chat_request(
+                        &params,
+                        false,
+                        enable_programmatic_tool_calling,
+                        force_echo_reasoning,
+                        shaping_api_type,
+                        attachment_caps,
+                    )?
+                    .with_previous_response_id(previous_response_id)
+                    .with_store(true);
+                } else {
+                    chat_req.store = Some(true);
+                }
+            }
+            crate::settings::ResponsesStateModeSetting::Conversation => {
+                let existing_id =
+                    compatible_provider_state.and_then(|state| state.conversation_id.clone());
+                let conversation_id = match existing_id {
+                    Some(conversation_id) => {
+                        chat_req = build_chat_request(
+                            &params,
+                            false,
+                            enable_programmatic_tool_calling,
+                            force_echo_reasoning,
+                            shaping_api_type,
+                            attachment_caps,
+                        )?;
+                        conversation_id
+                    }
+                    None => {
+                        let responses_client = super::responses::ResponsesClient::new(
+                            Arc::new(http_client::Client::new()),
+                            &base_url,
+                            api_key.clone(),
+                            extra_headers.clone(),
+                        )
+                        .map_err(|error| {
+                            ConvertToAPITypeError::Other(anyhow::anyhow!(
+                                "创建 Responses client 失败: {error}"
+                            ))
+                        })?;
+                        responses_client
+                            .create_conversation(None, Vec::new())
+                            .await
+                            .map_err(|error| {
+                                ConvertToAPITypeError::Other(anyhow::anyhow!(
+                                    "创建 Responses conversation 失败: {error}"
+                                ))
+                            })?
+                            .id
+                    }
+                };
+                chat_req = chat_req
+                    .with_conversation(conversation_id.clone())
+                    .with_store(true);
+                response_conversation_id = Some(conversation_id);
+            }
+        }
+    }
     let conversation_id = params
         .conversation_token
         .as_ref()
         .map(|t| t.as_str().to_string())
         .unwrap_or_default();
-    let chat_opts = build_chat_options(
+    let mut chat_opts = build_chat_options(
         api_type,
         &base_url,
         &model_id,
         reasoning_effort,
-        extra_headers,
+        extra_headers.clone(),
         if conversation_id.is_empty() {
             None
         } else {
             Some(conversation_id.as_str())
         },
     );
+    if api_type == AgentProviderApiType::OpenAiResp {
+        let mut response_options = serde_json::Map::new();
+        response_options.insert("parallel_tool_calls".to_owned(), Value::Bool(true));
+        if responses.background {
+            response_options.insert("background".to_owned(), Value::Bool(true));
+        }
+        if responses.compact_threshold > 0 {
+            response_options.insert(
+                "context_management".to_owned(),
+                json!([{
+                    "type": "compaction",
+                    "compact_threshold": responses.compact_threshold,
+                }]),
+            );
+        }
+        let mut reasoning_options = serde_json::Map::new();
+        if enable_reasoning_pro_mode {
+            reasoning_options.insert("mode".to_owned(), Value::String("pro".to_owned()));
+        }
+        if enable_reasoning_all_turns {
+            reasoning_options.insert("context".to_owned(), Value::String("all_turns".to_owned()));
+        }
+        if !reasoning_options.is_empty() {
+            response_options.insert("reasoning".to_owned(), Value::Object(reasoning_options));
+        }
+        if enable_multi_agent {
+            response_options.insert(
+                "multi_agent".to_owned(),
+                json!({
+                    "enabled": true,
+                    "max_concurrent_subagents": responses.max_concurrent_subagents.clamp(1, 8),
+                }),
+            );
+        }
+        chat_opts = chat_opts.with_extra_body(Value::Object(response_options));
+    }
+    let native_responses_request = if api_type == AgentProviderApiType::OpenAiResp {
+        let payload =
+            genai::responses::build_request_payload(&model_id, chat_req.clone(), &chat_opts, true)
+                .map_err(|error| {
+                    ConvertToAPITypeError::Other(anyhow::anyhow!(
+                        "构造原生 Responses 请求失败: {error}"
+                    ))
+                })?;
+        let request: super::responses::ResponseCreateRequest = serde_json::from_value(payload)
+            .map_err(|error| {
+                ConvertToAPITypeError::Other(anyhow::anyhow!(
+                    "解析原生 Responses 请求失败: {error}"
+                ))
+            })?;
+        let state_fallback_request = if request.previous_response_id.is_some() {
+            let payload = genai::responses::build_request_payload(
+                &model_id,
+                full_replay_chat_req.clone().with_store(!matches!(
+                    responses.state_mode,
+                    crate::settings::ResponsesStateModeSetting::LocalReplay
+                )),
+                &chat_opts,
+                true,
+            )
+            .map_err(|error| {
+                ConvertToAPITypeError::Other(anyhow::anyhow!(
+                    "构造 Responses 状态回退请求失败: {error}"
+                ))
+            })?;
+            Some(
+                serde_json::from_value::<super::responses::ResponseCreateRequest>(payload)
+                    .map_err(|error| {
+                        ConvertToAPITypeError::Other(anyhow::anyhow!(
+                            "解析 Responses 状态回退请求失败: {error}"
+                        ))
+                    })?,
+            )
+        } else {
+            None
+        };
+        let client = super::responses::ResponsesClient::new(
+            Arc::new(http_client::Client::new()),
+            &base_url,
+            api_key.clone(),
+            extra_headers.clone(),
+        )
+        .map_err(|error| {
+            ConvertToAPITypeError::Other(anyhow::anyhow!("创建原生 Responses client 失败: {error}"))
+        })?
+        .with_multi_agent_beta(enable_multi_agent);
+        let control =
+            super::responses::NativeResponseControl::new(client.clone(), responses.background);
+        Some((
+            client,
+            request,
+            state_fallback_request,
+            matches!(
+                responses.transport,
+                crate::settings::ResponsesTransportSetting::WebSocket
+            ),
+            control,
+        ))
+    } else {
+        None
+    };
+    // Responses token counting 会把图像、文件、instructions、tools、结构化输出和
+    // provider 会话状态一并计算，比本地字符估算可靠。兼容端点未实现该接口时
+    // 安静降级到终止响应里的 usage，不阻断 Agent 主请求。
+    let preflight_input_tokens = if context_window.is_some() || responses.compact_threshold > 0 {
+        match native_responses_request.as_ref() {
+            Some((client, request, _, _, _)) => client
+                .count_input_tokens(request)
+                .await
+                .ok()
+                .and_then(|count| i32::try_from(count.input_tokens).ok())
+                .unwrap_or_default(),
+            None => 0,
+        }
+    } else {
+        0
+    };
     let client = build_client(api_type, &base_url, api_key);
     let request_id = Uuid::new_v4().to_string();
     let mcp_context = params.mcp_context.clone();
     let tool_names_for_extract = available_tool_names(&params);
+    let response_cancel_control = native_responses_request
+        .as_ref()
+        .map(|(_, _, _, _, control)| control.clone());
 
     // ⚠️ BYOP 持久化关键:warp 自家路径下,以下 ClientAction 都是 server 端 emit
     // 让 client 端把 UserQuery / ToolCallResult 等"非模型产出"的 message
@@ -3554,70 +3800,6 @@ pub async fn generate_byop_output(
     // 导诊断者，这里加上 `system_in_messages_head` 提示。
     log_chat_request_details(&chat_req, &model_id, shaping_api_type, &base_url);
 
-    // 诊断:构造包含 system / messages / tools 的完整 ChatRequest JSON dump,保存到
-    // stream 闭包。真实 Anthropic wire body 会由 genai adapter 再转换一层,但这里已经
-    // 覆盖所有传入 BYOP 的原始字符串,足够定位非法 escape 来自 prompt、工具描述、
-    // schema 还是 tool result。
-    let diag_body_json = serde_json::to_string(&json!({
-        "model": &model_id,
-        "chat_request": &chat_req,
-    }))
-    .unwrap_or_default();
-    log::info!("[byop] diag_body_approx_len={}", diag_body_json.len());
-    log::info!("[byop-diag] full_request_json={diag_body_json}");
-
-    // 主动扫描原始文本里的"可疑反斜杠序列":serde_json 把源字符串里的字面
-    // `\` 序列化为 `\\`,所以 wire body 里出现"两个连续反斜杠 + u/x" 才意味着
-    // 原文有字面 `\u` / `\x`,这是 proxy 误"还原 `\\u` → `\u`"触发 invalid escape
-    // 的真实风险点。源字符串里的 `\n` / `\r` / `\t` 经 serde_json 输出为单个反斜杠 +
-    // 字母,本身就是合法 JSON escape,proxy 不会再二次还原,不算可疑。
-    fn scan_suspicious_backslash(label: &str, s: &str) {
-        let bytes = s.as_bytes();
-        let mut bs_hits: Vec<(usize, String)> = Vec::new();
-        let mut ctrl_hits: Vec<(usize, u8)> = Vec::new();
-        let mut i = 0;
-        while i < bytes.len() {
-            let b = bytes[i];
-            // 字面 `\\u` / `\\x` 序列(源字符串中含 `\u` / `\x`)。
-            if b == b'\\'
-                && i + 2 < bytes.len()
-                && bytes[i + 1] == b'\\'
-                && matches!(bytes[i + 2], b'u' | b'x')
-            {
-                let end = (i + 10).min(bytes.len());
-                let snippet = String::from_utf8_lossy(&bytes[i..end]).to_string();
-                if bs_hits.len() < 5 {
-                    bs_hits.push((i, snippet));
-                }
-                // 跳过这一对,避免对同一位置触发多次。
-                i += 3;
-                continue;
-            }
-            // raw 控制字符(byte 0x00-0x08, 0x0B-0x0C, 0x0E-0x1F)。
-            // serde_json 会 escape 为 `\u00XX`,合法 JSON;但部分 strict proxy
-            // 或经过 base64 / 中间编码层时这些字节最容易出错。
-            if (b < 0x20 && !matches!(b, b'\t' | b'\n' | b'\r')) && ctrl_hits.len() < 10 {
-                ctrl_hits.push((i, b));
-            }
-            i += 1;
-        }
-        if !bs_hits.is_empty() {
-            log::warn!("[byop] {label} suspicious literal '\\\\u'/'\\\\x' patterns: {bs_hits:?}");
-        }
-        if !ctrl_hits.is_empty() {
-            log::warn!("[byop] {label} contains raw control chars (offset, byte): {ctrl_hits:?}");
-        }
-    }
-    scan_suspicious_backslash("full_request_json", &diag_body_json);
-    if let Some(sys) = chat_req.system.as_deref() {
-        scan_suspicious_backslash("system", sys);
-    }
-    for (idx, m) in chat_req.messages.iter().enumerate() {
-        if let Some(t) = m.content.first_text() {
-            scan_suspicious_backslash(&format!("msg[{idx}]"), t);
-        }
-    }
-
     let stream = async_stream::stream! {
         // 1) StreamInit — 始终先发,UI 能立刻显示 "thinking..."
         yield Ok(api::ResponseEvent {
@@ -3655,16 +3837,13 @@ pub async fn generate_byop_output(
                     ..
                 } => {
                     let attachments = user_context::collect_user_attachments(context);
-                    log::info!(
-                        "[byop-diag] persistence input[{input_idx}]: task_id={} \
-                         kind=UserQuery query_len={} binaries={} running_command={} \
-                         lrc_command_id={} query={:?}",
-                        persistence_task_id,
+                    log::debug!(
+                        "[byop-diag] persistence input[{input_idx}]: kind=UserQuery \
+                         query_len={} binaries={} running_command={} lrc_command_present={}",
                         query.len(),
                         attachments.binaries.len(),
                         running_command.is_some(),
-                        lrc_command_id.as_deref().unwrap_or(""),
-                        snippet_for_log(query, BYOP_DIAG_SNIPPET_CHARS),
+                        lrc_command_id.is_some(),
                     );
                     persistence_order.push(format!(
                         "{input_idx}:UserQuery(query_len={},binaries={})",
@@ -3682,17 +3861,13 @@ pub async fn generate_byop_output(
                     let content = tools::serialize_action_result(result).unwrap_or_else(|| {
                         serde_json::json!({ "result": result.result.to_string() }).to_string()
                     });
-                    log::info!(
-                        "[byop-diag] persistence input[{input_idx}]: task_id={} \
-                         kind=ActionResult call_id={} content_len={} content={:?}",
-                        persistence_task_id,
-                        result.id,
+                    log::debug!(
+                        "[byop-diag] persistence input[{input_idx}]: \
+                         kind=ActionResult content_len={}",
                         content.len(),
-                        snippet_for_log(&content, BYOP_DIAG_SNIPPET_CHARS),
                     );
                     persistence_order.push(format!(
-                        "{input_idx}:ActionResult(call_id={},content_len={})",
-                        result.id,
+                        "{input_idx}:ActionResult(content_len={})",
                         content.len()
                     ));
                     persistence_messages.push(make_tool_call_result_message(
@@ -3705,11 +3880,8 @@ pub async fn generate_byop_output(
                 _ => {}
             }
         }
-        log::info!(
-            "[byop-diag] persistence summary: request_id={} task_id={} emitted_messages={} \
-             input_order={:?}",
-            request_id,
-            persistence_task_id,
+        log::debug!(
+            "[byop-diag] persistence summary: emitted_messages={} input_order={:?}",
             persistence_messages.len(),
             persistence_order,
         );
@@ -3753,10 +3925,7 @@ pub async fn generate_byop_output(
             };
             let subtask_id = Uuid::new_v4().to_string();
             let tool_call_id = Uuid::new_v4().to_string();
-            log::info!(
-                "[byop] LRC tag-in: spawning cli subagent subtask={subtask_id} \
-                 command_id={command_id} parent={task_id}"
-            );
+            log::info!("[byop] LRC tag-in: spawning cli subagent");
 
             let subagent_tool = api::message::tool_call::Tool::Subagent(
                 api::message::tool_call::Subagent {
@@ -3810,21 +3979,50 @@ pub async fn generate_byop_output(
         }
 
         log::info!("[byop] opening stream: model={model_id}");
-        let mut sdk_stream = match client
-            .exec_chat_stream(&model_id, chat_req, Some(&chat_opts))
-            .await
+        let mut sdk_stream: ProviderChatEventStream = if let Some((
+            responses_client,
+            responses_request,
+            state_fallback_request,
+            use_websocket,
+            response_control,
+        )) = native_responses_request
         {
-            Ok(resp) => {
-                log::info!("[byop] stream opened OK (HTTP request accepted)");
-                resp.stream
+            match super::responses::create_native_chat_stream(
+                responses_client,
+                responses_request,
+                state_fallback_request,
+                use_websocket,
+                response_control,
+            )
+            .await
+            {
+                Ok(stream) => Box::pin(stream.map(|event| {
+                    event.map_err(|error| OpenAiCompatibleError::Protocol(error.to_string()))
+                })),
+                Err(error) => {
+                    log::error!("[byop] 原生 Responses stream 打开失败");
+                    yield Err(Arc::new(into_ai_api_error(
+                        "BYOP Responses open stream failed",
+                        OpenAiCompatibleError::Protocol(error.to_string()),
+                    )));
+                    return;
+                }
             }
-            Err(e) => {
-                let mapped = map_genai_error(e);
-                log::error!("[byop] open stream failed: {mapped:#}");
-                yield Err(Arc::new(AIApiError::Other(anyhow::anyhow!(
-                    "BYOP open stream failed: {mapped}"
-                ))));
-                return;
+        } else {
+            match client
+                .exec_chat_stream(&model_id, chat_req, Some(&chat_opts))
+                .await
+            {
+                Ok(resp) => {
+                    log::info!("[byop] stream opened OK (HTTP request accepted)");
+                    Box::pin(resp.stream.map(|event| event.map_err(map_genai_error)))
+                }
+                Err(e) => {
+                    let mapped = map_genai_error(e);
+                    log::error!("[byop] open stream failed");
+                    yield Err(Arc::new(into_ai_api_error("BYOP open stream failed", mapped)));
+                    return;
+                }
             }
         };
 
@@ -3863,7 +4061,7 @@ pub async fn generate_byop_output(
         let mut reasoning_bytes: usize = 0;
         let mut tool_chunk_count: u32 = 0;
         let mut end_count: u32 = 0;
-        let mut other_count: u32 = 0;
+        let other_count: u32 = 0;
         let mut captured_assistant_text: Option<String> = None;
         // Ollama 等 provider 的 End.captured_content 有时为空,但 Chunk 事件已送达正文;
         // 流式累积作为 content→tool 提取的可靠来源(仅 assistant 正文;reasoning 中的
@@ -3873,7 +4071,7 @@ pub async fn generate_byop_output(
         // captured_usage(Option<Usage>),其 prompt_tokens 是本轮整段 history
         // (Anthropic / OpenAI 都按"完整请求 prompt"计),completion_tokens 是模型输出。
         // 二者相加除以 context_window 即为"context 占用率",和 warp 自家 server 路径语义一致。
-        let mut captured_prompt_tokens: i32 = 0;
+        let mut captured_prompt_tokens: i32 = preflight_input_tokens;
         let mut captured_completion_tokens: i32 = 0;
         // P0-6 prompt cache 命中率监控:从 genai `Usage.prompt_tokens_details` 里拼
         // 出 Anthropic / OpenAI / Gemini 返回的 cache_read / cache_create 字段。
@@ -3881,38 +4079,19 @@ pub async fn generate_byop_output(
         // 依然保持 0。
         let mut captured_cache_read_tokens: i32 = 0;
         let mut captured_cache_create_tokens: i32 = 0;
+        let mut captured_response_id: Option<String> = None;
+        let mut captured_thought_signatures: Vec<String> = Vec::new();
+        let mut captured_response_items: Vec<Value> = Vec::new();
+        let mut captured_last_sequence_number: Option<u64> = None;
+        let mut captured_unknown_events: Vec<Value> = Vec::new();
+        let mut captured_web_citations: Vec<String> = Vec::new();
 
         while let Some(item) = sdk_stream.next().await {
             let event = match item {
                 Ok(ev) => ev,
-                Err(e) => {
-                    let mapped = map_genai_error(e);
-                    let err_text = format!("{mapped:#}");
-                    log::error!("[byop] stream chunk error: {err_text}");
-                    log::error!("[byop-diag] full_request_json_on_error={diag_body_json}");
-                    // 从错误消息里 parse "column N",dump diag_body_json 该位置 ±200 char 上下文 + 字节 hex。
-                    if let Some(col) = err_text
-                        .split("column ")
-                        .nth(1)
-                        .and_then(|s| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<usize>().ok())
-                    {
-                        let body = &diag_body_json;
-                        let byte_len = body.len();
-                        let start = col.saturating_sub(200).min(byte_len);
-                        let end = (col + 200).min(byte_len);
-                        let context = body.get(start..end).unwrap_or("(slice failed: 非 char 边界)");
-                        log::error!(
-                            "[byop] error column={col} diag_body_len={byte_len} context[{start}..{end}]={context:?}"
-                        );
-                        let hex_start = col.saturating_sub(20).min(byte_len);
-                        let hex_end = (col + 20).min(byte_len);
-                        if let Some(slice) = body.as_bytes().get(hex_start..hex_end) {
-                            log::error!("[byop] error bytes[{hex_start}..{hex_end}] hex={slice:02x?}");
-                        }
-                    }
-                    yield Err(Arc::new(AIApiError::Other(anyhow::anyhow!(
-                        "BYOP stream error: {mapped}"
-                    ))));
+                Err(mapped) => {
+                    log::error!("[byop] stream failed");
+                    yield Err(Arc::new(into_ai_api_error("BYOP stream failed", mapped)));
                     return;
                 }
             };
@@ -4031,6 +4210,13 @@ pub async fn generate_byop_output(
                     }
                 }
                 ChatStreamEvent::ReasoningChunk(_) => {}
+                ChatStreamEvent::ThoughtSignatureChunk(chunk) => {
+                    if !chunk.content.is_empty()
+                        && !captured_thought_signatures.contains(&chunk.content)
+                    {
+                        captured_thought_signatures.push(chunk.content);
+                    }
+                }
                 ChatStreamEvent::ToolCallChunk(tc) => {
                     tool_chunk_count += 1;
                     let mut call = tc.tool_call;
@@ -4117,6 +4303,25 @@ pub async fn generate_byop_output(
                 }
                 ChatStreamEvent::End(end) => {
                     end_count += 1;
+                    if let Some(response_id) = end.captured_response_id.as_ref() {
+                        captured_response_id = Some(response_id.clone());
+                    }
+                    if !end.captured_response_items.is_empty() {
+                        captured_response_items = end.captured_response_items.clone();
+                    }
+                    captured_last_sequence_number = end.captured_last_sequence_number;
+                    captured_unknown_events = end.captured_unknown_events.clone();
+                    captured_web_citations = end.captured_web_citations.clone();
+                    if let Some(signatures) = end.captured_thought_signatures() {
+                        for signature in signatures {
+                            if !captured_thought_signatures
+                                .iter()
+                                .any(|existing| existing == signature)
+                            {
+                                captured_thought_signatures.push(signature.to_owned());
+                            }
+                        }
+                    }
                     // genai >= 0.4.0 的 captured_content 含 tool_calls。
                     // 优先用 captured_content 里的 tool_calls(更完整),
                     // 否则用 streaming 中累积的 tool_bufs。
@@ -4168,11 +4373,72 @@ pub async fn generate_byop_output(
                         }
                     }
                 }
-                _ => {
-                    other_count += 1;
-                    // ThoughtSignatureChunk 等暂不处理(Gemini 3 thoughts 需要回传给后续轮次,
-                    // 当前 BYOP 不持久化 thought_signatures,接受降级)
-                }
+            }
+        }
+
+        if !captured_web_citations.is_empty() {
+            let citations = captured_web_citations
+                .into_iter()
+                .map(|url| api::Citation {
+                    document_id: url,
+                    document_type: api::DocumentType::WebPage as i32,
+                })
+                .collect();
+            if let Some(message_id) = text_msg_id.clone() {
+                let mut message =
+                    make_agent_output_message(&current_task_id, &request_id, String::new());
+                message.id = message_id;
+                message.citations = citations;
+                yield Ok(make_update_message_event(
+                    &current_task_id,
+                    message,
+                    vec!["citations".to_owned()],
+                ));
+            } else {
+                let mut message =
+                    make_agent_output_message(&current_task_id, &request_id, String::new());
+                message.citations = citations;
+                text_msg_id = Some(message.id.clone());
+                yield Ok(make_add_messages_event(&current_task_id, vec![message]));
+            }
+        }
+
+        if api_type == AgentProviderApiType::OpenAiResp
+            && (captured_response_id.is_some()
+                || response_conversation_id.is_some()
+                || !captured_thought_signatures.is_empty())
+            && let Some(server_message_data) = encode_provider_response_state(&ProviderResponseState {
+                response_id: captured_response_id,
+                conversation_id: response_conversation_id,
+                request_context_fingerprint: response_context_fingerprint,
+                last_sequence_number: captured_last_sequence_number,
+                state_mode: Some(responses.state_mode),
+                encrypted_reasoning_items: captured_thought_signatures,
+                response_items: captured_response_items,
+                unknown_events: captured_unknown_events,
+            })
+        {
+            if let Some(message_id) = reasoning_msg_id.clone().or_else(|| text_msg_id.clone()) {
+                let mut message = make_reasoning_message(
+                    &current_task_id,
+                    &request_id,
+                    String::new(),
+                );
+                message.id = message_id;
+                message.server_message_data = server_message_data;
+                yield Ok(make_update_message_event(
+                    &current_task_id,
+                    message,
+                    vec!["server_message_data".to_owned()],
+                ));
+            } else {
+                let mut message = make_reasoning_message(
+                    &current_task_id,
+                    &request_id,
+                    String::new(),
+                );
+                message.server_message_data = server_message_data;
+                yield Ok(make_add_messages_event(&current_task_id, vec![message]));
             }
         }
 
@@ -4195,12 +4461,8 @@ pub async fn generate_byop_output(
                     continue;
                 }
                 log::info!(
-                    "[byop] content_tool_extract: found={} names={:?} source_len={}",
+                    "[byop] content_tool_extract: found={} source_len={}",
                     extracted.len(),
-                    extracted
-                        .iter()
-                        .map(|call| call.fn_name.as_str())
-                        .collect::<Vec<_>>(),
                     text.len()
                 );
                 for call in extracted {
@@ -4213,10 +4475,8 @@ pub async fn generate_byop_output(
                 break;
             }
             if tool_bufs.is_empty() && parsed_any_text {
-                let preview: String = streamed_assistant_text.chars().take(240).collect();
                 log::info!(
-                    "[byop] content_tool_extract: no tools parsed (streamed={}B captured={}B) \
-                     preview={preview:?}",
+                    "[byop] content_tool_extract: no tools parsed (streamed={}B captured={}B)",
                     streamed_assistant_text.len(),
                     captured_assistant_text.as_ref().map(|t| t.len()).unwrap_or(0),
                 );
@@ -4295,50 +4555,14 @@ pub async fn generate_byop_output(
             // 路径 `tool_calls[]` 顺序跨调用稳定(不漂移 cache prefix),但应告警。
             log::warn!(
                 "[byop] {} tool_calls fell through to dict-sort fallback — \
-                 provider inconsistency between ChunkArgs and captured_content; \
-                 call_ids={:?}",
+                 provider inconsistency between ChunkArgs and captured_content",
                 unordered_tool_calls.len(),
-                unordered_tool_calls.iter().map(|t| t.call_id.as_str()).collect::<Vec<_>>(),
             );
         }
         unordered_tool_calls.sort_by(|a, b| a.call_id.cmp(&b.call_id));
         ordered_tool_calls.extend(unordered_tool_calls);
         for call in ordered_tool_calls {
-            // 诊断:dump 模型实际发的 tool_call raw payload
-            // (call_id / fn_name / fn_arguments JSON 原文 + 类型标注),
-            // 便于核对模型是否按 schema 出入参(常见问题:bool 字段被字符串化、
-            // 数字被加引号、嵌套对象塌成字符串等)。
-            // debug 级:只在排查 schema 问题时开 RUST_LOG=debug,平时不污染 INFO。
-            // info 级保留一行不带 args 的简短摘要,便于看流式时序。
-            log::info!(
-                "[byop] tool_call_in: name={} call_id={}",
-                call.fn_name,
-                call.call_id,
-            );
-            if log::log_enabled!(log::Level::Debug) {
-                let args_repr = if call.fn_arguments.is_string() {
-                    format!("string({:?})", call.fn_arguments.as_str().unwrap_or(""))
-                } else {
-                    format!(
-                        "{}({})",
-                        match &call.fn_arguments {
-                            Value::Object(_) => "object",
-                            Value::Array(_) => "array",
-                            Value::Bool(_) => "bool",
-                            Value::Number(_) => "number",
-                            Value::Null => "null",
-                            Value::String(_) => "string",
-                        },
-                        call.fn_arguments
-                    )
-                };
-                log::debug!(
-                    "[byop] tool_call_in_args: name={} call_id={} args={}",
-                    call.fn_name,
-                    call.call_id,
-                    args_repr,
-                );
-            }
+            log::info!("[byop] 收到结构化 tool call");
 
             // Zap BYOP todowrite 拦截:不映射到 protobuf executor,合成
             // `Message::UpdateTodos` 直接写 conversation.todo_lists 触发 chip + popup
@@ -4402,10 +4626,7 @@ pub async fn generate_byop_output(
                     }
                     Err(e) => {
                         // args 解析失败:跟 from_args 失败一样,emit error tool_result。
-                        log::warn!(
-                            "[byop] todowrite args parse failed: call_id={} err={e:#}",
-                            call.call_id
-                        );
+                        log::warn!("[byop] todowrite 参数解析失败: {e:#}");
                         let error_payload = tools::todowrite::invalid_arguments_result_to_json(
                             e.to_string(),
                             &args_str,
@@ -4686,7 +4907,15 @@ pub async fn generate_byop_output(
         yield Ok(make_finished_done(usage_metadata));
     };
 
-    Ok(Box::pin(stream))
+    let cancellation = async move {
+        let _ = cancellation_rx.await;
+        if let Some(control) = response_cancel_control
+            && control.cancel().await.is_err()
+        {
+            log::warn!("[byop] 取消后台 Responses 请求失败");
+        }
+    };
+    Ok(Box::pin(stream.take_until(cancellation)))
 }
 
 /// 用独立 BYOP 配置发一个短的非工具请求,让模型对首条 user query 生成会话标题。
@@ -4953,7 +5182,7 @@ where
     let args = match tools::machine_memory::parse_args(args_str) {
         Ok(args) => args,
         Err(error) => {
-            log::warn!("[byop][machine-memory] invalid arguments: {error:#}");
+            log::warn!("[byop][machine-memory] 参数无效");
             return tools::machine_memory::invalid_arguments_result_to_json(error.to_string());
         }
     };
@@ -4964,11 +5193,8 @@ where
     let stored_chars = content.chars().count();
     match write(&memory.machine_key, &content) {
         Ok(()) => tools::machine_memory::success_result_to_json(stored_chars),
-        Err(error) => {
-            log::warn!(
-                "[byop][machine-memory] write failed for {}: {error}",
-                memory.machine_key
-            );
+        Err(_) => {
+            log::warn!("[byop][machine-memory] 写入失败");
             tools::machine_memory::error_result_to_json("failed to update machine memory")
         }
     }
@@ -4985,7 +5211,7 @@ async fn dispatch_byop_web_tool(tool_name: &str, args_str: &str) -> Value {
     let client = match web_runtime::build_ssrf_safe_client() {
         Ok(c) => c,
         Err(e) => {
-            log::warn!("[byop] reqwest client build failed: {e:#}");
+            log::warn!("[byop] web 工具 HTTP client 构建失败");
             return web_runtime::error_to_json(tool_name, &anyhow::anyhow!(e.to_string()));
         }
     };
@@ -4994,7 +5220,7 @@ async fn dispatch_byop_web_tool(tool_name: &str, args_str: &str) -> Value {
             Ok(args) => match web_runtime::run_webfetch(&client, args).await {
                 Ok(out) => web_runtime::fetch_output_to_json(&out),
                 Err(e) => {
-                    log::warn!("[byop][webfetch] error: {e:#}");
+                    log::warn!("[byop][webfetch] 请求失败");
                     web_runtime::error_to_json(tool_name, &e)
                 }
             },
@@ -5011,7 +5237,7 @@ async fn dispatch_byop_web_tool(tool_name: &str, args_str: &str) -> Value {
                 match web_runtime::run_websearch(&client, args, api_key.as_deref(), None).await {
                     Ok(out) => web_runtime::search_output_to_json(&out),
                     Err(e) => {
-                        log::warn!("[byop][websearch] error: {e:#}");
+                        log::warn!("[byop][websearch] 请求失败");
                         web_runtime::error_to_json(tool_name, &e)
                     }
                 }
@@ -5050,30 +5276,16 @@ fn parse_incoming_tool_call(
             if let Some(coerced) = tools::coerce::coerce_args_against_schema(&args_str, &schema) {
                 match (tool.from_args)(&coerced) {
                     Ok(t) => {
-                        log::info!(
-                            "[byop] from_args coerced ok: tool={} original_err={e:#}",
-                            call.fn_name
-                        );
+                        log::info!("[byop] tool 参数类型修复成功");
                         return Ok(t);
                     }
                     Err(e2) => {
-                        log::warn!(
-                            "[byop] from_args failed (after coerce): tool={} err={e2:#} original_err={e:#} coerced_args={coerced} args_str={args_str}",
-                            call.fn_name
-                        );
+                        log::warn!("[byop] tool 参数类型修复后仍解析失败");
                         return Err(e2);
                     }
                 }
             }
-            // 诊断:解析失败时把 from_args 实际拿到的字符串原样打出来,
-            // 配合上层 [byop] tool_call_in 的 args= 行可以判断:
-            //   1. 是否模型出参类型错(bool→"true" / 数字→"1" 等)
-            //   2. 是否 genai Value→string 转换中 escape 出问题
-            //   3. 是否 fn_arguments 整段被字符串化(应该 object 却是 string)
-            log::warn!(
-                "[byop] from_args failed: tool={} err={e:#} args_str={args_str}",
-                call.fn_name
-            );
+            log::warn!("[byop] tool 参数解析失败");
             Err(e)
         }
     }
@@ -6487,6 +6699,8 @@ mod serializer_readiness_tests {
     fn build_openai_request(params: &RequestParams) -> Result<ChatRequest, ConvertToAPITypeError> {
         build_chat_request(
             params,
+            true,
+            false,
             false,
             AgentProviderApiType::OpenAi,
             attachment_caps::AttachmentCaps::default(),
@@ -8025,3 +8239,7 @@ mod machine_memory_tests;
 #[cfg(test)]
 #[path = "chat_stream_project_agent_context_tests.rs"]
 mod project_agent_context_tests;
+
+#[cfg(test)]
+#[path = "chat_stream_responses_tests.rs"]
+mod responses_tests;

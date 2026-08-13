@@ -27,6 +27,7 @@ use std::collections::{HashMap, HashSet};
 
 use settings::Setting;
 use strum::IntoEnumIterator;
+use warp_core::features::FeatureFlag;
 use warpui::elements::{
     ChildView, Container, CornerRadius, CrossAxisAlignment, Expanded, Flex, MainAxisAlignment,
     MouseStateHandle, ParentElement, Radius, Text, Wrap,
@@ -42,7 +43,10 @@ use crate::appearance::Appearance;
 use crate::editor::{
     EditorView, Event as EditorEvent, SingleLineEditorOptions, TextColors, TextOptions,
 };
-use crate::settings::{AISettings, AgentProvider, AgentProviderApiType, AgentProviderModel};
+use crate::settings::{
+    AISettings, AgentProvider, AgentProviderApiType, AgentProviderModel, ResponsesStateModeSetting,
+    ResponsesTransportSetting,
+};
 
 const CARD_BUTTON_PADDING: f32 = 6.0;
 const FIELD_LABEL_MARGIN_TOP: f32 = 6.0;
@@ -125,6 +129,14 @@ struct ProviderRow {
     add_header_button_state: MouseStateHandle,
     /// 5 个 ApiType chip 各自的鼠标状态。HashMap 由 chip 显示名映射。
     api_type_chip_states: RefCell<HashMap<AgentProviderApiType, MouseStateHandle>>,
+    responses_state_chip_states: RefCell<HashMap<ResponsesStateModeSetting, MouseStateHandle>>,
+    responses_transport_chip_states: RefCell<HashMap<ResponsesTransportSetting, MouseStateHandle>>,
+    responses_compaction_chip_states: RefCell<HashMap<u32, MouseStateHandle>>,
+    responses_background_chip_state: MouseStateHandle,
+    responses_ptc_chip_state: MouseStateHandle,
+    responses_reasoning_pro_chip_state: MouseStateHandle,
+    responses_reasoning_context_chip_state: MouseStateHandle,
+    responses_multi_agent_chip_state: MouseStateHandle,
     model_rows: Vec<ModelRow>,
 }
 
@@ -562,6 +574,14 @@ impl AgentProvidersWidget {
             header_rows,
             add_header_button_state,
             api_type_chip_states: RefCell::new(HashMap::new()),
+            responses_state_chip_states: RefCell::new(HashMap::new()),
+            responses_transport_chip_states: RefCell::new(HashMap::new()),
+            responses_compaction_chip_states: RefCell::new(HashMap::new()),
+            responses_background_chip_state: MouseStateHandle::default(),
+            responses_ptc_chip_state: MouseStateHandle::default(),
+            responses_reasoning_pro_chip_state: MouseStateHandle::default(),
+            responses_reasoning_context_chip_state: MouseStateHandle::default(),
+            responses_multi_agent_chip_state: MouseStateHandle::default(),
             model_rows,
         }
     }
@@ -657,6 +677,235 @@ impl AgentProvidersWidget {
             .on_click(move |ctx, _, _| {
                 ctx.dispatch_typed_action(action.clone());
             })
+            .finish()
+    }
+
+    fn render_responses_options(
+        &self,
+        provider: &AgentProvider,
+        row: &ProviderRow,
+        draft_editors: ProviderDraftEditors,
+        label_color: warp_core::ui::theme::Fill,
+        appearance: &Appearance,
+    ) -> Box<dyn Element> {
+        let label = |text: &str| {
+            Container::new(
+                Text::new(
+                    text.to_owned(),
+                    appearance.ui_font_family(),
+                    appearance.ui_font_size(),
+                )
+                .with_color(label_color.into())
+                .finish(),
+            )
+            .with_margin_top(FIELD_LABEL_MARGIN_TOP)
+            .with_margin_bottom(FIELD_LABEL_MARGIN_BOTTOM)
+            .finish()
+        };
+        let selected_label = |selected: bool, text: &str| {
+            if selected {
+                format!("● {text}")
+            } else {
+                text.to_owned()
+            }
+        };
+
+        let mut state_row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+        {
+            let mut states = row.responses_state_chip_states.borrow_mut();
+            for state_mode in ResponsesStateModeSetting::iter() {
+                let display = match state_mode {
+                    ResponsesStateModeSetting::LocalReplay => {
+                        crate::t!("settings-agent-providers-responses-state-local").to_string()
+                    }
+                    ResponsesStateModeSetting::PreviousResponse => {
+                        crate::t!("settings-agent-providers-responses-state-provider-chain")
+                            .to_string()
+                    }
+                    ResponsesStateModeSetting::Conversation => {
+                        crate::t!("settings-agent-providers-responses-state-cloud-conversation")
+                            .to_string()
+                    }
+                };
+                let button = Self::render_card_button_preserving_draft(
+                    selected_label(provider.responses.state_mode == state_mode, &display),
+                    states.entry(state_mode).or_default().clone(),
+                    draft_editors.clone(),
+                    AISettingsPageAction::SetAgentProviderResponsesStateMode {
+                        provider_id: provider.id.clone(),
+                        state_mode,
+                    },
+                    appearance,
+                );
+                state_row =
+                    state_row.with_child(Container::new(button).with_margin_right(6.).finish());
+            }
+        }
+
+        let mut transport_row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+        {
+            let mut states = row.responses_transport_chip_states.borrow_mut();
+            for transport in ResponsesTransportSetting::iter() {
+                let display = match transport {
+                    ResponsesTransportSetting::Http => "HTTP + SSE",
+                    ResponsesTransportSetting::WebSocket => "WebSocket",
+                };
+                let button = Self::render_card_button_preserving_draft(
+                    selected_label(provider.responses.transport == transport, display),
+                    states.entry(transport).or_default().clone(),
+                    draft_editors.clone(),
+                    AISettingsPageAction::SetAgentProviderResponsesTransport {
+                        provider_id: provider.id.clone(),
+                        transport,
+                    },
+                    appearance,
+                );
+                transport_row =
+                    transport_row.with_child(Container::new(button).with_margin_right(6.).finish());
+            }
+        }
+
+        let mut compaction_row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+        {
+            let mut states = row.responses_compaction_chip_states.borrow_mut();
+            for (threshold, display) in [
+                (0, "Off"),
+                (32_000, "32k"),
+                (64_000, "64k"),
+                (128_000, "128k"),
+            ] {
+                let button = Self::render_card_button_preserving_draft(
+                    selected_label(provider.responses.compact_threshold == threshold, display),
+                    states.entry(threshold).or_default().clone(),
+                    draft_editors.clone(),
+                    AISettingsPageAction::SetAgentProviderResponsesCompactThreshold {
+                        provider_id: provider.id.clone(),
+                        compact_threshold: threshold,
+                    },
+                    appearance,
+                );
+                compaction_row = compaction_row
+                    .with_child(Container::new(button).with_margin_right(6.).finish());
+            }
+        }
+
+        let background_enabled = provider.responses.state_mode
+            != ResponsesStateModeSetting::LocalReplay
+            && provider.responses.transport == ResponsesTransportSetting::Http;
+        let background_text = if background_enabled {
+            selected_label(
+                provider.responses.background,
+                &crate::t!("settings-agent-providers-responses-background"),
+            )
+        } else {
+            crate::t!("settings-agent-providers-responses-background-requires-cloud").to_string()
+        };
+        let background = Self::render_card_button_preserving_draft(
+            background_text,
+            row.responses_background_chip_state.clone(),
+            draft_editors.clone(),
+            AISettingsPageAction::ToggleAgentProviderResponsesBackground {
+                provider_id: provider.id.clone(),
+            },
+            appearance,
+        );
+        let ptc = Self::render_card_button_preserving_draft(
+            selected_label(
+                provider.responses.programmatic_tool_calling,
+                &crate::t!("settings-agent-providers-responses-ptc"),
+            ),
+            row.responses_ptc_chip_state.clone(),
+            draft_editors.clone(),
+            AISettingsPageAction::ToggleAgentProviderResponsesProgrammaticToolCalling {
+                provider_id: provider.id.clone(),
+            },
+            appearance,
+        );
+        let mut capabilities_row = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(Container::new(background).with_margin_right(6.).finish())
+            .with_child(Container::new(ptc).with_margin_right(6.).finish());
+        if FeatureFlag::ResponsesMultiAgentBeta.is_enabled() {
+            capabilities_row =
+                capabilities_row.with_child(Self::render_card_button_preserving_draft(
+                    selected_label(
+                        provider.responses.multi_agent_beta,
+                        &crate::t!("settings-agent-providers-responses-multi-agent"),
+                    ),
+                    row.responses_multi_agent_chip_state.clone(),
+                    draft_editors.clone(),
+                    AISettingsPageAction::ToggleAgentProviderResponsesMultiAgentBeta {
+                        provider_id: provider.id.clone(),
+                    },
+                    appearance,
+                ));
+        }
+        let reasoning_pro = Self::render_card_button_preserving_draft(
+            selected_label(
+                provider.responses.reasoning_pro_mode,
+                &crate::t!("settings-agent-providers-responses-reasoning-pro"),
+            ),
+            row.responses_reasoning_pro_chip_state.clone(),
+            draft_editors.clone(),
+            AISettingsPageAction::ToggleAgentProviderResponsesReasoningProMode {
+                provider_id: provider.id.clone(),
+            },
+            appearance,
+        );
+        let reasoning_context = Self::render_card_button_preserving_draft(
+            selected_label(
+                provider.responses.reasoning_all_turns,
+                &crate::t!("settings-agent-providers-responses-reasoning-all-turns"),
+            ),
+            row.responses_reasoning_context_chip_state.clone(),
+            draft_editors,
+            AISettingsPageAction::ToggleAgentProviderResponsesReasoningAllTurns {
+                provider_id: provider.id.clone(),
+            },
+            appearance,
+        );
+        let reasoning_row = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(Container::new(reasoning_pro).with_margin_right(6.).finish())
+            .with_child(reasoning_context)
+            .finish();
+
+        let hint = Container::new(
+            Text::new(
+                crate::t!("settings-agent-providers-responses-privacy-hint"),
+                appearance.ui_font_family(),
+                appearance.ui_font_size(),
+            )
+            .with_color(appearance.theme().disabled_ui_text_color().into())
+            .soft_wrap(true)
+            .finish(),
+        )
+        .with_margin_top(4.)
+        .finish();
+
+        Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(label(&crate::t!(
+                "settings-agent-providers-responses-state-label"
+            )))
+            .with_child(state_row.finish())
+            .with_child(label(&crate::t!(
+                "settings-agent-providers-responses-transport-label"
+            )))
+            .with_child(transport_row.finish())
+            .with_child(label(&crate::t!(
+                "settings-agent-providers-responses-compaction-label"
+            )))
+            .with_child(compaction_row.finish())
+            .with_child(label(&crate::t!(
+                "settings-agent-providers-responses-reasoning-label"
+            )))
+            .with_child(reasoning_row)
+            .with_child(label(&crate::t!(
+                "settings-agent-providers-responses-capabilities-label"
+            )))
+            .with_child(capabilities_row.finish())
+            .with_child(hint)
             .finish()
     }
 
@@ -992,6 +1241,16 @@ impl AgentProvidersWidget {
             label_color,
             appearance,
         );
+        let responses_options =
+            (provider.api_type == AgentProviderApiType::OpenAiResp).then(|| {
+                self.render_responses_options(
+                    provider,
+                    row,
+                    draft_editors.clone(),
+                    label_color,
+                    appearance,
+                )
+            });
         let base_url_field = field_block(
             &crate::t!("settings-agent-providers-field-base-url"),
             ChildView::new(&row.base_url_editor).finish(),
@@ -1290,31 +1549,33 @@ impl AgentProvidersWidget {
         // 用透明 detail_color 触发它被读取(避免 unused 警告);仅用于潜在配色。
         let _ = detail_color;
 
-        Container::new(
-            Flex::column()
-                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-                .with_child(name_field)
-                .with_child(api_type_field)
-                .with_child(base_url_field)
-                .with_child(api_key_field)
-                .with_child(
-                    Container::new(headers_column.finish())
-                        .with_margin_top(8.)
-                        .finish(),
-                )
-                .with_child(
-                    Container::new(models_column.finish())
-                        .with_margin_top(8.)
-                        .finish(),
-                )
-                .with_child(Container::new(bottom_row).with_margin_top(10.).finish())
+        let mut content = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(name_field)
+            .with_child(api_type_field);
+        if let Some(responses_options) = responses_options {
+            content.add_child(responses_options);
+        }
+        content.add_child(base_url_field);
+        content.add_child(api_key_field);
+        content.add_child(
+            Container::new(headers_column.finish())
+                .with_margin_top(8.)
                 .finish(),
-        )
-        .with_background(appearance.theme().surface_1())
-        .with_uniform_padding(12.)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(6.)))
-        .with_margin_bottom(8.)
-        .finish()
+        );
+        content.add_child(
+            Container::new(models_column.finish())
+                .with_margin_top(8.)
+                .finish(),
+        );
+        content.add_child(Container::new(bottom_row).with_margin_top(10.).finish());
+
+        Container::new(content.finish())
+            .with_background(appearance.theme().surface_1())
+            .with_uniform_padding(12.)
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(6.)))
+            .with_margin_bottom(8.)
+            .finish()
     }
 }
 
@@ -1594,7 +1855,7 @@ impl SettingsWidget for AgentProvidersWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "agent provider providers custom openai compatible deepseek glm moonshot dashscope qwen ollama base url api key models save 提供商 自定义 模型 保存"
+        "agent provider providers custom openai responses compatible deepseek glm moonshot dashscope qwen ollama base url api key models save state websocket background compaction programmatic multi-agent ZDR 提供商 自定义 模型 保存 状态 后台 压缩"
     }
 
     fn render(

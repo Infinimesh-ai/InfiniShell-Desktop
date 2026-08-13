@@ -1127,6 +1127,121 @@ pub enum AgentProviderApiType {
     DeepSeek,
 }
 
+/// OpenAI Responses API 的会话状态策略。
+///
+/// 默认使用本地回放，保证 `store:false`，也兼容不实现 provider 持久状态的
+/// OpenAI-compatible endpoint。其余两种模式会把会话内容持久化到 provider，
+/// 因此必须由用户显式选择。
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+    EnumIter,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponsesStateModeSetting {
+    #[default]
+    LocalReplay,
+    PreviousResponse,
+    Conversation,
+}
+
+impl ResponsesStateModeSetting {
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::LocalReplay => "Local / ZDR",
+            Self::PreviousResponse => "Provider chain",
+            Self::Conversation => "Cloud conversation",
+        }
+    }
+}
+
+/// Responses 主请求使用的传输。
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+    EnumIter,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponsesTransportSetting {
+    #[default]
+    Http,
+    WebSocket,
+}
+
+impl ResponsesTransportSetting {
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::Http => "HTTP + SSE",
+            Self::WebSocket => "WebSocket",
+        }
+    }
+}
+
+/// 单个自定义 provider 的 Responses 专属能力配置。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct AgentProviderResponsesOptions {
+    #[serde(default)]
+    pub state_mode: ResponsesStateModeSetting,
+    #[serde(default)]
+    pub transport: ResponsesTransportSetting,
+    /// 后台响应可在断线后按 sequence number 恢复；本地/ZDR 模式不允许启用。
+    #[serde(default)]
+    pub background: bool,
+    /// 服务端自动 compaction 阈值；0 表示不发送 `context_management`。
+    #[serde(default)]
+    pub compact_threshold: u32,
+    /// 启用 Programmatic Tool Calling。写操作仍由本地审批和沙箱执行。
+    #[serde(default)]
+    pub programmatic_tool_calling: bool,
+    /// GPT-5.6 Pro reasoning mode，以更高延迟和 token 消耗换取复杂任务可靠性。
+    #[serde(default)]
+    pub reasoning_pro_mode: bool,
+    /// GPT-5.6 跨轮复用可用 reasoning items，而非只使用当前轮 reasoning。
+    #[serde(default)]
+    pub reasoning_all_turns: bool,
+    /// OpenAI Responses Multi-agent Beta。还会受独立 feature flag 保护。
+    #[serde(default)]
+    pub multi_agent_beta: bool,
+    #[serde(default = "default_responses_max_concurrent_subagents")]
+    pub max_concurrent_subagents: u8,
+}
+
+impl Default for AgentProviderResponsesOptions {
+    fn default() -> Self {
+        Self {
+            state_mode: ResponsesStateModeSetting::default(),
+            transport: ResponsesTransportSetting::default(),
+            background: false,
+            compact_threshold: 0,
+            programmatic_tool_calling: false,
+            reasoning_pro_mode: false,
+            reasoning_all_turns: false,
+            multi_agent_beta: false,
+            max_concurrent_subagents: default_responses_max_concurrent_subagents(),
+        }
+    }
+}
+
+fn default_responses_max_concurrent_subagents() -> u8 {
+    3
+}
+
 /// Provider 级别的 reasoning effort(思考深度)偏好。
 ///
 /// 语义说明:
@@ -1275,6 +1390,10 @@ pub struct AgentProvider {
     /// `api_key` 仍走 `Authorization: Bearer` 标准路径。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extra_headers: Vec<(String, String)>,
+
+    /// 仅在 `api_type = open_ai_resp` 时生效。
+    #[serde(default)]
+    pub responses: AgentProviderResponsesOptions,
 }
 
 impl AgentProvider {
@@ -1292,6 +1411,7 @@ impl AgentProvider {
             base_url: String::new(),
             models: Vec::new(),
             extra_headers: Vec::new(),
+            responses: AgentProviderResponsesOptions::default(),
         }
     }
 }

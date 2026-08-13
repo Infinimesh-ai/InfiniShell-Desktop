@@ -1,7 +1,7 @@
 use crate::adapter::adapters::support::get_api_key;
 use crate::adapter::openai::OpenAIAdapter;
 use crate::adapter::openai_resp::OpenAIRespStreamer;
-use crate::adapter::openai_resp::resp_types::RespResponse;
+use crate::adapter::openai_resp::resp_types::{RespResponse, reasoning_item_from_signature};
 use crate::adapter::{Adapter, AdapterDispatcher, AdapterKind, ServiceType, WebRequestData};
 use crate::chat::{
 	CacheControl, ChatOptionsSet, ChatRequest, ChatResponse, ChatResponseFormat, ChatRole, ChatStream,
@@ -102,7 +102,13 @@ impl Adapter for OpenAIRespAdapter {
 
 		// -- Extract stateful session fields before consuming chat_req
 		let previous_response_id = chat_req.previous_response_id.clone();
+		let conversation = chat_req.conversation.clone();
 		let explicit_store = chat_req.store;
+		if previous_response_id.is_some() && conversation.is_some() {
+			return Err(Error::Internal(
+				"Responses previous_response_id 与 conversation 不能同时设置".to_owned(),
+			));
+		}
 
 		// -- Build the basic payload
 		let OpenAIRespRequestParts {
@@ -136,6 +142,9 @@ impl Adapter for OpenAIRespAdapter {
 		// -- Stateful session: add previous_response_id
 		if let Some(prev_id) = &previous_response_id {
 			payload.x_insert("previous_response_id", prev_id.as_str())?;
+		}
+		if let Some(conversation) = conversation {
+			payload.x_insert("conversation", conversation)?;
 		}
 
 		// -- Set reasoning options
@@ -237,6 +246,25 @@ impl Adapter for OpenAIRespAdapter {
 			};
 			if let Some(prompt_cache_retention) = prompt_cache_retention {
 				payload.x_insert("prompt_cache_retention", prompt_cache_retention)?;
+			}
+		}
+
+		// Responses 专属扩展字段。显式类型化字段始终优先，扩展只能补充当前
+		// adapter 尚未建模的键，避免调用方意外覆盖 model/input/store。
+		if let Some(extra_body) = chat_options.extra_body()
+			&& let (Some(extra), Some(payload)) = (extra_body.as_object(), payload.as_object_mut())
+		{
+			for (key, value) in extra {
+				if key == "reasoning"
+					&& let (Some(existing), Some(additions)) =
+						(payload.get_mut(key).and_then(Value::as_object_mut), value.as_object())
+				{
+					for (field, value) in additions {
+						existing.entry(field.clone()).or_insert_with(|| value.clone());
+					}
+					continue;
+				}
+				payload.entry(key.clone()).or_insert_with(|| value.clone());
 			}
 		}
 
@@ -352,7 +380,7 @@ impl OpenAIRespAdapter {
 	/// - All messages get added with the corresponding roles (tools are not supported for now)
 	///
 	fn into_openai_request_parts(_model_iden: &ModelIden, chat_req: ChatRequest) -> Result<OpenAIRespRequestParts> {
-		let mut input_items: Vec<Value> = Vec::new();
+		let mut input_items = chat_req.responses_input_items;
 
 		// -- Process the system
 		if let Some(system_msg) = chat_req.system {
@@ -483,10 +511,29 @@ impl OpenAIRespAdapter {
 							// TODO: Probably need towarn on this one (probably need to add binary here)
 							ContentPart::Binary(_) => {}
 							ContentPart::ToolResponse(_) => {}
-							ContentPart::ThoughtSignature(_) => {}
+							ContentPart::ThoughtSignature(signature) => {
+								let reasoning_item = reasoning_item_from_signature(&signature).unwrap_or_else(|| {
+									json!({
+										"type": "reasoning",
+										"encrypted_content": signature,
+									})
+								});
+								input_items.push(reasoning_item);
+							}
 							ContentPart::ReasoningContent(_) => {}
-							// Custom are ignored for this logic
-							ContentPart::Custom(_) => {}
+							// 原生 Responses item 原样回放。先 flush 同 message 内已累积的文本，
+							// 保持 reasoning/program/tool item 的真实相对顺序。
+							ContentPart::Custom(item) => {
+								if !item_message_content.is_empty() {
+									input_items.push(json!({
+										"type": "message",
+										"role": "assistant",
+										"content": item_message_content
+									}));
+									item_message_content = Vec::new();
+								}
+								input_items.push(item.data);
+							}
 						}
 					}
 
@@ -504,11 +551,18 @@ impl OpenAIRespAdapter {
 				ChatRole::Tool => {
 					for part in msg.content {
 						if let ContentPart::ToolResponse(tool_response) = part {
-							input_items.push(json!({
+							let mut item = json!({
 								"type": "function_call_output",
 								"call_id": tool_response.call_id,
 								"output": tool_response.content,
-							}))
+							});
+							if let Some(caller) = tool_response.caller {
+								item.x_insert("caller", caller)?;
+							}
+							if let Some(caller_id) = tool_response.caller_id {
+								item.x_insert("caller_id", caller_id)?;
+							}
+							input_items.push(item)
 						}
 					}
 
@@ -558,6 +612,13 @@ impl OpenAIRespAdapter {
 				};
 				tool_value
 			}
+			"programmatic_tool_calling" => {
+				let mut tool_value = json!({"type": "programmatic_tool_calling"});
+				if let Some(ToolConfig::Custom(config_value)) = config {
+					tool_value.x_merge(config_value)?;
+				}
+				tool_value
+			}
 			name => {
 				let strict = strict.unwrap_or(false);
 				let mut parameters = schema;
@@ -576,13 +637,17 @@ impl OpenAIRespAdapter {
 					});
 				}
 
-				json!({
+				let mut tool_value = json!({
 					"type": "function",
 					"name": name,
 					"description": description,
 					"parameters": parameters,
 					"strict": strict,
-				})
+				});
+				if let Some(ToolConfig::Custom(config_value)) = config {
+					tool_value.x_merge(config_value)?;
+				}
+				tool_value
 			}
 		};
 

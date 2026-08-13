@@ -51,8 +51,12 @@ pub fn model_reasoning_variants(
             vec![]
         }
         AgentProviderApiType::OpenAi | AgentProviderApiType::OpenAiResp => {
+            if id.contains("gpt-5.6") {
+                // GPT-5.6 支持 none/low/medium/high/xhigh/max，不再提供 minimal。
+                return vec![R::Medium, R::Low, R::High, R::XHigh, R::Max, R::Off];
+            }
             if id.contains("gpt-5") || id.contains("codex") {
-                // GPT-5 / codex: minimal + xhigh 都可用
+                // GPT-5.5 及更早 GPT-5 / codex: minimal + xhigh。
                 return vec![R::Medium, R::Minimal, R::Low, R::High, R::XHigh, R::Off];
             }
             if is_openai_reasoning_model(&id) {
@@ -591,6 +595,14 @@ mod tests {
         assert!(v.contains(&ReasoningEffortSetting::Minimal));
         assert!(v.contains(&ReasoningEffortSetting::XHigh));
         assert_eq!(v.first().copied(), Some(ReasoningEffortSetting::Medium));
+    }
+
+    #[test]
+    fn gpt_5_6_variants_have_max_without_minimal() {
+        let v = model_reasoning_variants(AgentProviderApiType::OpenAiResp, "gpt-5.6-sol");
+        assert!(v.contains(&ReasoningEffortSetting::Max));
+        assert!(!v.contains(&ReasoningEffortSetting::Minimal));
+        assert!(v.contains(&ReasoningEffortSetting::XHigh));
     }
 
     #[test]

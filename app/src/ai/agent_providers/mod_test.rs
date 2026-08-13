@@ -21,6 +21,7 @@ fn sample_provider(id: &str) -> AgentProvider {
         base_url: "http://localhost:11434".to_owned(),
         models: vec![AgentProviderModel::from_id("llama3.2".to_owned())],
         extra_headers: Vec::new(),
+        responses: Default::default(),
     }
 }
 

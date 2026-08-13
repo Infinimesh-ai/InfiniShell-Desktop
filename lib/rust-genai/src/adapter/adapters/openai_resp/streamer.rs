@@ -1,6 +1,6 @@
 use crate::adapter::adapters::support::{StreamerCapturedData, StreamerOptions};
 use crate::adapter::inter_stream::{InterStreamEnd, InterStreamEvent};
-use crate::adapter::openai_resp::resp_types::RespResponse;
+use crate::adapter::openai_resp::resp_types::{RespResponse, reasoning_item_signature};
 use crate::chat::{ChatOptionsSet, StopReason, ToolCall};
 use crate::webc::{Event, EventSourceStream};
 use crate::{Error, ModelIden, Result};
@@ -96,8 +96,48 @@ enum RespStreamEvent {
 	#[serde(rename = "response.incomplete")]
 	ResponseIncomplete { response: RespResponse },
 
+	#[serde(rename = "error")]
+	TopLevelError {
+		#[serde(default)]
+		code: Option<String>,
+		message: String,
+		#[serde(default)]
+		_param: Option<String>,
+	},
+
 	#[serde(other)]
 	Unknown,
+}
+
+fn response_terminal_error(event: &'static str, response: RespResponse, model_iden: ModelIden) -> Error {
+	let code = response
+		.error
+		.as_ref()
+		.and_then(|error| error.get("code"))
+		.and_then(Value::as_str)
+		.map(str::to_owned);
+	let message = response
+		.error
+		.as_ref()
+		.and_then(|error| error.get("message"))
+		.and_then(Value::as_str)
+		.or_else(|| {
+			response
+				.incomplete_details
+				.as_ref()
+				.and_then(|details| details.get("reason"))
+				.and_then(Value::as_str)
+		})
+		.unwrap_or("Responses API returned a non-completed terminal response")
+		.to_owned();
+
+	Error::ResponsesStreamTerminal {
+		model_iden,
+		event: event.to_owned(),
+		response_id: (!response.id.is_empty()).then_some(response.id),
+		code,
+		message,
+	}
 }
 
 impl OpenAIRespStreamer {
@@ -127,12 +167,11 @@ impl futures::Stream for OpenAIRespStreamer {
 					let stream_event: RespStreamEvent = match serde_json::from_str(&message.data) {
 						Ok(stream_event) => stream_event,
 						Err(serde_error) => {
-							// If we are in debug, we might want to know about this
-							tracing::warn!(
-								"OpenAIRespStreamer - fail to parse event (skipping). Cause: {serde_error}. Data: {}",
-								message.data
-							);
-							continue;
+							self.done = true;
+							return Poll::Ready(Some(Err(Error::StreamParse {
+								model_iden: self.options.model_iden.clone(),
+								serde_error,
+							})));
 						}
 					};
 
@@ -236,9 +275,10 @@ impl futures::Stream for OpenAIRespStreamer {
 								let mut thought_sigs: Vec<String> = Vec::new();
 								for item in &response.output {
 									if item.x_get_str("type").ok() == Some("reasoning")
-										&& let Ok(encrypted) = item.x_get_str("encrypted_content")
+										&& item.get("encrypted_content").is_some()
+										&& let Some(signature) = reasoning_item_signature(item)
 									{
-										thought_sigs.push(encrypted.to_string());
+										thought_sigs.push(signature);
 									}
 								}
 								if !thought_sigs.is_empty() {
@@ -261,35 +301,31 @@ impl futures::Stream for OpenAIRespStreamer {
 
 						RespStreamEvent::ResponseFailed { response } => {
 							self.done = true;
-							let error_msg = response
-								.error
-								.as_ref()
-								.and_then(|e| e.x_get_str("message").ok())
-								.unwrap_or("OpenAI Response Failed");
-
-							return Poll::Ready(Some(Err(Error::StreamParse {
-								model_iden: self.options.model_iden.clone(),
-								serde_error: serde::de::Error::custom(error_msg),
-							})));
+							return Poll::Ready(Some(Err(response_terminal_error(
+								"response.failed",
+								response,
+								self.options.model_iden.clone(),
+							))));
 						}
 
 						RespStreamEvent::ResponseIncomplete { response } => {
 							self.done = true;
-							self.captured_data.stop_reason = Some(response.status.clone());
-							// For incomplete, we might still want to return what we have?
-							// But for now, let's treat it as a successful end but with whatever we captured.
-							let resp_id = response.id.clone();
-							let inter_stream_end = InterStreamEnd {
-								captured_usage: response.usage.map(Into::into),
-								captured_stop_reason: self.captured_data.stop_reason.take().map(StopReason::from),
-								captured_text_content: self.captured_data.content.take(),
-								captured_reasoning_content: self.captured_data.reasoning_content.take(),
-								captured_tool_calls: self.captured_data.tool_calls.take(),
-								captured_thought_signatures: None,
-								captured_response_id: Some(resp_id),
-							};
+							return Poll::Ready(Some(Err(response_terminal_error(
+								"response.incomplete",
+								response,
+								self.options.model_iden.clone(),
+							))));
+						}
 
-							return Poll::Ready(Some(Ok(InterStreamEvent::End(inter_stream_end))));
+						RespStreamEvent::TopLevelError { code, message, .. } => {
+							self.done = true;
+							return Poll::Ready(Some(Err(Error::ResponsesStreamTerminal {
+								model_iden: self.options.model_iden.clone(),
+								event: "error".to_owned(),
+								response_id: None,
+								code,
+								message,
+							})));
 						}
 
 						RespStreamEvent::Unknown => {
@@ -298,7 +334,6 @@ impl futures::Stream for OpenAIRespStreamer {
 					}
 				}
 				Some(Err(err)) => {
-					tracing::error!("Error: {}", err);
 					return Poll::Ready(Some(Err(Error::WebStream {
 						model_iden: self.options.model_iden.clone(),
 						cause: err.to_string(),
@@ -308,16 +343,9 @@ impl futures::Stream for OpenAIRespStreamer {
 				None => {
 					if !self.done {
 						self.done = true;
-						let inter_stream_end = InterStreamEnd {
-							captured_usage: self.captured_data.usage.take(),
-							captured_stop_reason: self.captured_data.stop_reason.take().map(StopReason::from),
-							captured_text_content: self.captured_data.content.take(),
-							captured_reasoning_content: self.captured_data.reasoning_content.take(),
-							captured_tool_calls: self.captured_data.tool_calls.take(),
-							captured_thought_signatures: None,
-							captured_response_id: None,
-						};
-						return Poll::Ready(Some(Ok(InterStreamEvent::End(inter_stream_end))));
+						return Poll::Ready(Some(Err(Error::ResponsesStreamEnded {
+							model_iden: self.options.model_iden.clone(),
+						})));
 					}
 					return Poll::Ready(None);
 				}
@@ -327,3 +355,7 @@ impl futures::Stream for OpenAIRespStreamer {
 		Poll::Pending
 	}
 }
+
+#[cfg(test)]
+#[path = "streamer_tests.rs"]
+mod tests;

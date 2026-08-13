@@ -905,6 +905,10 @@ pub enum FeatureFlag {
     /// between credits and dollars. When disabled (prod/stable), the footer
     /// falls back to a static, non-interactive credits total.
     TuiCostTransparency,
+
+    /// 允许 BYOP OpenAI Responses provider 使用官方 Multi-agent Beta 协议。
+    /// Provider 配置仍需显式开启，稳定通道默认不启用该实验能力。
+    ResponsesMultiAgentBeta,
 }
 
 static FLAG_STATES: [AtomicBool; cardinality::<FeatureFlag>()] =
@@ -982,6 +986,7 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::BoxDrawingGlyphs,
     FeatureFlag::WellKnownMcpIds,
     FeatureFlag::TuiCostTransparency,
+    FeatureFlag::ResponsesMultiAgentBeta,
 ];
 
 /// Features enabled for feature preview build users (e.g.: Friends of Zap).

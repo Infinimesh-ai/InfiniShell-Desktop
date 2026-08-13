@@ -19,6 +19,7 @@ pub mod adapter;
 pub mod chat;
 pub mod embed;
 pub mod resolver;
+pub mod responses;
 pub mod webc;
 
 // endregion: --- Modules

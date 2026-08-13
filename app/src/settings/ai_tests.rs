@@ -918,6 +918,7 @@ fn extra_headers_skip_when_empty() {
         base_url: "https://api.example.com/v1".to_string(),
         models: Vec::new(),
         extra_headers: Vec::new(),
+        responses: Default::default(),
     };
     let serialized = toml::to_string(&provider).expect("should serialize");
     assert!(
@@ -1056,4 +1057,32 @@ fn ai_autodetection_setting_can_be_toggled_on_and_off() {
             assert!(!settings.is_ai_autodetection_enabled(ctx));
         });
     });
+}
+
+#[test]
+fn responses_provider_options默认隐私优先且可完整往返() {
+    let default_options = AgentProviderResponsesOptions::default();
+    assert_eq!(
+        default_options.state_mode,
+        ResponsesStateModeSetting::LocalReplay
+    );
+    assert_eq!(default_options.transport, ResponsesTransportSetting::Http);
+    assert!(!default_options.background);
+    assert!(!default_options.multi_agent_beta);
+
+    let configured = AgentProviderResponsesOptions {
+        state_mode: ResponsesStateModeSetting::Conversation,
+        transport: ResponsesTransportSetting::Http,
+        background: true,
+        compact_threshold: 64_000,
+        programmatic_tool_calling: true,
+        reasoning_pro_mode: true,
+        reasoning_all_turns: true,
+        multi_agent_beta: true,
+        max_concurrent_subagents: 5,
+    };
+    let serialized = serde_json::to_value(&configured).expect("配置应能序列化");
+    let decoded: AgentProviderResponsesOptions =
+        serde_json::from_value(serialized).expect("配置应能反序列化");
+    assert_eq!(decoded, configured);
 }

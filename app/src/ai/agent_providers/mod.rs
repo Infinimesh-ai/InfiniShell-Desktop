@@ -19,6 +19,7 @@ pub mod oneshot;
 pub mod openai_compatible;
 pub mod prompt_renderer;
 pub mod reasoning;
+pub mod responses;
 pub mod secrets;
 pub mod tools;
 pub mod user_context;

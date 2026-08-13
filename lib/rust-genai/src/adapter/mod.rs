@@ -16,6 +16,9 @@ mod dispatcher;
 mod dispatcher_macros;
 
 // -- Flatten (private, crate, public)
+pub(crate) use adapters::openai_resp::{
+	OpenAIRespAdapter as ResponsesAdapter, reasoning_item_signature as encode_reasoning_item,
+};
 use adapters::*;
 
 pub(crate) use adapter_types::*;

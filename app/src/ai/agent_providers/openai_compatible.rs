@@ -42,6 +42,9 @@ pub enum OpenAiCompatibleError {
     #[error("网络/流式请求失败: {0}")]
     Stream(String),
 
+    #[error("Responses 协议失败: {0}")]
+    Protocol(String),
+
     #[error("调用失败: {0}")]
     Other(String),
 }

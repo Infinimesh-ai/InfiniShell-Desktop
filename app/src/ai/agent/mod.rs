@@ -863,6 +863,12 @@ impl From<&Arc<AIApiError>> for RenderableAIError {
                 waiting_for_network: false,
                 is_user_error,
             },
+            AIApiError::ProviderProtocol(message) => Self::Other {
+                error_message: message.clone(),
+                will_attempt_resume: false,
+                waiting_for_network: false,
+                is_user_error,
+            },
             AIApiError::Deserialization(DeserializationError::Json(_))
             | AIApiError::NoContextFound
             | AIApiError::ErrorStatus(_, _)

@@ -3,6 +3,7 @@
 use crate::chat::{ChatMessage, ChatRole, StreamEnd, Tool, ToolCall, ToolResponse};
 use crate::support;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 // region:    --- ChatRequest
 
@@ -24,6 +25,15 @@ pub struct ChatRequest {
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub previous_response_id: Option<String>,
 
+	/// Responses Conversations API 的 conversation id 或完整 conversation object。
+	/// 与 `previous_response_id` 互斥。
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub conversation: Option<Value>,
+
+	/// 已完成 Responses 输出 item 的原始回放窗口。只由 Responses adapter 使用。
+	#[serde(default, skip_serializing_if = "Vec::is_empty")]
+	pub responses_input_items: Vec<Value>,
+
 	/// Whether to store the response for stateful sessions (OpenAI Responses API).
 	/// When true, the response_id can be used as previous_response_id in future calls.
 	/// Default: None → false (always opt-in, never implicit). Must be explicitly set to
@@ -41,6 +51,8 @@ impl ChatRequest {
 			system: None,
 			tools: None,
 			previous_response_id: None,
+			conversation: None,
+			responses_input_items: Vec::new(),
 			store: None,
 		}
 	}
@@ -52,6 +64,8 @@ impl ChatRequest {
 			messages: Vec::new(),
 			tools: None,
 			previous_response_id: None,
+			conversation: None,
+			responses_input_items: Vec::new(),
 			store: None,
 		}
 	}
@@ -63,6 +77,8 @@ impl ChatRequest {
 			messages: vec![ChatMessage::user(content.into())],
 			tools: None,
 			previous_response_id: None,
+			conversation: None,
+			responses_input_items: Vec::new(),
 			store: None,
 		}
 	}
@@ -74,6 +90,8 @@ impl ChatRequest {
 			messages,
 			tools: None,
 			previous_response_id: None,
+			conversation: None,
+			responses_input_items: Vec::new(),
 			store: None,
 		}
 	}
@@ -116,6 +134,20 @@ impl ChatRequest {
 	/// Set the previous response ID for stateful sessions.
 	pub fn with_previous_response_id(mut self, previous_response_id: impl Into<String>) -> Self {
 		self.previous_response_id = Some(previous_response_id.into());
+		self.conversation = None;
+		self
+	}
+
+	/// 使用 Responses Conversations API 保存会话状态。
+	pub fn with_conversation(mut self, conversation: impl Into<Value>) -> Self {
+		self.conversation = Some(conversation.into());
+		self.previous_response_id = None;
+		self
+	}
+
+	/// 追加需要原样回放的 Responses item。
+	pub fn with_responses_input_items(mut self, items: impl IntoIterator<Item = Value>) -> Self {
+		self.responses_input_items.extend(items);
 		self
 	}
 
@@ -195,6 +227,8 @@ impl From<Vec<ChatMessage>> for ChatRequest {
 			messages,
 			tools: None,
 			previous_response_id: None,
+			conversation: None,
+			responses_input_items: Vec::new(),
 			store: None,
 		}
 	}

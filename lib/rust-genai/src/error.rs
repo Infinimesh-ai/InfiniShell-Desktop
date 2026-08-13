@@ -111,6 +111,18 @@ Cause:\n{cause}
 		serde_error: serde_json::Error,
 	},
 
+	#[display("Responses stream received terminal event '{event}' for model '{model_iden}': {message}")]
+	ResponsesStreamTerminal {
+		model_iden: ModelIden,
+		event: String,
+		response_id: Option<String>,
+		code: Option<String>,
+		message: String,
+	},
+
+	#[display("Responses stream ended before a terminal event for model '{model_iden}'")]
+	ResponsesStreamEnded { model_iden: ModelIden },
+
 	#[display("Web stream error for model '{model_iden}'.\nCause: {cause}")]
 	WebStream {
 		model_iden: ModelIden,

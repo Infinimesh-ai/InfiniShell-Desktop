@@ -77,7 +77,7 @@ fn machine_memory_tool_is_gated_by_machine_context() {
             .any(|name| name == tools::machine_memory::TOOL_NAME)
     );
     assert!(
-        !build_tools_array(&params)
+        !build_tools_array(&params, false, false)
             .iter()
             .any(|tool| tool.name == tools::machine_memory::TOOL_NAME.into())
     );
@@ -93,7 +93,7 @@ fn machine_memory_tool_is_gated_by_machine_context() {
             .any(|name| name == tools::machine_memory::TOOL_NAME)
     );
     assert!(
-        build_tools_array(&params)
+        build_tools_array(&params, false, false)
             .iter()
             .any(|tool| tool.name == tools::machine_memory::TOOL_NAME.into())
     );

@@ -20,6 +20,10 @@ pub struct RespResponse {
 	/// {code: String, message: string}
 	pub error: Option<Value>,
 
+	/// Details about why a response stopped before completing, such as
+	/// `max_output_tokens` or a content-filter interruption.
+	pub incomplete_details: Option<Value>,
+
 	/// An upper bound for the number of tokens that can be generated for a response, including visible output tokens and reasoning tokens.
 	pub max_output_tokens: Option<i64>,
 

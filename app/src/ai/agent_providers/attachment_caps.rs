@@ -2,7 +2,9 @@
 //!
 //! genai 0.6 的 `ContentPart::Binary` 在线协议层全自动适配(参见
 //! `chat_stream.rs` 注释表格):
-//! - OpenAI: image→`image_url{data:URL}`,pdf/file→`type:"file" file_data:data:URL`,audio→`input_audio`
+//! - OpenAI Chat: image→`image_url{data:URL}`,pdf/file→`type:"file" file_data:data:URL`,audio→`input_audio`
+//! - OpenAI Responses: image→`input_image`,pdf/file→`input_file`;音频默认关闭，避免把
+//!   模型目录中的 Realtime/Chat 音频能力误当成 Responses 输入能力
 //! - Anthropic: image→`image base64`,其它→`document base64`(实际仅 PDF 有效)
 //! - Gemini: 全部走 `inline_data`
 //!
@@ -58,7 +60,7 @@ pub fn caps_for(api_type: AgentProviderApiType, model_id: &str) -> AttachmentCap
         return AttachmentCaps {
             images: c.vision,
             pdf: c.pdf,
-            audio: c.audio,
+            audio: c.audio && api_type != AgentProviderApiType::OpenAiResp,
         };
     }
     caps_for_by_substring(api_type, model_id)
@@ -80,7 +82,7 @@ pub fn resolve_for_model(
         AttachmentCaps {
             images: c.vision,
             pdf: c.pdf,
-            audio: c.audio,
+            audio: c.audio && api_type != AgentProviderApiType::OpenAiResp,
         }
     } else {
         caps_for_by_substring(api_type, &model.id)
@@ -103,7 +105,7 @@ pub fn inferred_for_model(
         AttachmentCaps {
             images: c.vision,
             pdf: c.pdf,
-            audio: c.audio,
+            audio: c.audio && api_type != AgentProviderApiType::OpenAiResp,
         }
     } else {
         caps_for_by_substring(api_type, model_id)
@@ -118,7 +120,7 @@ pub fn inferred_for_model(
 fn caps_for_by_substring(api_type: AgentProviderApiType, model_id: &str) -> AttachmentCaps {
     let lower = model_id.to_ascii_lowercase();
     match api_type {
-        AgentProviderApiType::OpenAi | AgentProviderApiType::OpenAiResp => {
+        AgentProviderApiType::OpenAi => {
             // GPT-4o / 4.1 / 5 系列:image + pdf。3.5 系列纯文本。
             if lower.contains("gpt-4o")
                 || lower.contains("gpt-4.1")
@@ -137,6 +139,23 @@ fn caps_for_by_substring(api_type: AgentProviderApiType, model_id: &str) -> Atta
                     images: true,
                     pdf: true,
                     audio: true,
+                }
+            } else {
+                AttachmentCaps::default()
+            }
+        }
+        AgentProviderApiType::OpenAiResp => {
+            if lower.contains("gpt-4o")
+                || lower.contains("gpt-4.1")
+                || lower.contains("gpt-5")
+                || lower.contains("o1")
+                || lower.contains("o3")
+                || lower.contains("o4")
+            {
+                AttachmentCaps {
+                    images: true,
+                    pdf: true,
+                    audio: false,
                 }
             } else {
                 AttachmentCaps::default()
@@ -223,6 +242,15 @@ mod tests {
     fn openai_3_5_text_only() {
         let caps = caps_for_by_substring(AgentProviderApiType::OpenAi, "gpt-3.5-turbo");
         assert!(caps.is_text_only());
+    }
+
+    #[test]
+    fn responses不会把realtime音频能力当成input_file支持() {
+        let caps = caps_for_by_substring(
+            AgentProviderApiType::OpenAiResp,
+            "gpt-realtime-audio-preview",
+        );
+        assert!(!caps.audio);
     }
 
     #[test]
