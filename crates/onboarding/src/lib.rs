@@ -31,7 +31,7 @@ pub use localization::set_localizer;
 /// skip-login confirmation dialog so the two always stay in sync.
 pub const AI_FEATURES: &[&str] = &[
     "InfiniShell agents",
-    "Oz local agents platform",
+    "InfiniShell local agents platform",
     "Next command predictions",
     "Prompt suggestions",
     "Remote control with Claude Code, Codex, and other agents",

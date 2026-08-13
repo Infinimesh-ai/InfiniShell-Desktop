@@ -9,9 +9,31 @@ use super::{
 };
 
 #[test]
+fn infinishell_provider_reads_legacy_serialization() {
+    for legacy_name in [r#""Warp""#, r#""Zap""#] {
+        assert_eq!(
+            serde_json::from_str::<SkillProvider>(legacy_name).unwrap(),
+            SkillProvider::InfiniShell
+        );
+    }
+    assert_eq!(
+        serde_json::to_string(&SkillProvider::InfiniShell).unwrap(),
+        r#""InfiniShell""#
+    );
+}
+
+#[test]
+fn infinishell_provider_reads_legacy_strings() {
+    assert_eq!("Warp".parse(), Ok(SkillProvider::InfiniShell));
+    assert_eq!("Zap".parse(), Ok(SkillProvider::InfiniShell));
+    assert_eq!("InfiniShell".parse(), Ok(SkillProvider::InfiniShell));
+    assert_eq!(SkillProvider::InfiniShell.to_string(), "InfiniShell");
+}
+
+#[test]
 fn warp_home_skills_path_uses_warp_home_path() {
     assert_eq!(
-        home_skills_path(SkillProvider::Zap),
+        home_skills_path(SkillProvider::InfiniShell),
         warp_core::paths::warp_home_skills_dir()
     );
 }
@@ -26,7 +48,7 @@ fn warp_home_skill_path_is_home_warp_skill() {
 
     assert_eq!(
         get_provider_for_path(&LocalOrRemotePath::Local(path.clone())),
-        Some(SkillProvider::Zap)
+        Some(SkillProvider::InfiniShell)
     );
     assert_eq!(get_scope_for_path(&path), SkillScope::Home);
 }

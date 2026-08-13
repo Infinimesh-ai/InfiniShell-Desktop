@@ -173,13 +173,13 @@ impl FileMCPWatcher {
             initial_config_parses.push((
                 mcp_config_path.config_path,
                 mcp_config_path.root_path,
-                MCPProvider::Zap,
+                MCPProvider::InfiniShell,
             ));
         }
 
         if let Some(home_dir) = dirs::home_dir() {
             for provider in MCPProvider::iter() {
-                if provider == MCPProvider::Zap {
+                if provider == MCPProvider::InfiniShell {
                     continue;
                 }
                 match home_subdir_to_watch(provider) {
@@ -229,7 +229,7 @@ impl FileMCPWatcher {
         self.update_servers_from_config_file(
             &config.config_path,
             config.root_path,
-            MCPProvider::Zap,
+            MCPProvider::InfiniShell,
             ctx,
         );
     }
@@ -357,7 +357,7 @@ impl FileMCPWatcher {
         };
 
         for provider in MCPProvider::iter() {
-            if provider == MCPProvider::Zap {
+            if provider == MCPProvider::InfiniShell {
                 continue;
             }
             match home_subdir_to_watch(provider) {
@@ -447,7 +447,7 @@ impl FileMCPWatcher {
             || update.moved.keys().any(|target| target.path == config_path);
         self.handle_single_config_update(
             mcp_config_path.root_path,
-            MCPProvider::Zap,
+            MCPProvider::InfiniShell,
             config_path,
             was_deleted,
             was_added,
@@ -751,7 +751,7 @@ async fn parse_mcp_config_file(
                 });
             }
         },
-        MCPProvider::Claude | MCPProvider::Zap | MCPProvider::Agents => file_contents,
+        MCPProvider::Claude | MCPProvider::InfiniShell | MCPProvider::Agents => file_contents,
     };
 
     let resolved_contents = match substitute_env_vars(&json) {

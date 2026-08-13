@@ -152,7 +152,7 @@ impl WarpifySuccessBlock {
     pub fn render_title_ui(&self, theme: &WarpTheme, appearance: &Appearance) -> Box<dyn Element> {
         let header_contents = render::build_header_row(
             "Session Warpified",
-            Icon::new(UiIcon::Zap.into(), theme.active_ui_detail()),
+            Icon::new(UiIcon::InfiniShell.into(), theme.active_ui_detail()),
             theme,
             appearance,
         )

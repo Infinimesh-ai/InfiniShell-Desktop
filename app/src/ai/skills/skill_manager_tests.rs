@@ -871,7 +871,7 @@ fn bundled_test_skill(id: &str, description: &str) -> ParsedSkill {
         path: LocalOrRemotePath::Local(format!("/bundled/skills/{id}/SKILL.md").into()),
         content: format!("# {id}"),
         line_range: None,
-        provider: SkillProvider::Zap,
+        provider: SkillProvider::InfiniShell,
         scope: SkillScope::Bundled,
     }
 }
@@ -964,7 +964,7 @@ fn get_skills_for_working_directory_respects_location() {
         )),
         content: "# remote-bundled".to_string(),
         line_range: None,
-        provider: SkillProvider::Zap,
+        provider: SkillProvider::InfiniShell,
         scope: SkillScope::Bundled,
     };
 
@@ -1636,7 +1636,7 @@ fn make_skill(name: &str, provider_dir: &str) -> ParsedSkill {
         path: path.clone(),
         content: format!("# {name}"),
         line_range: None,
-        provider: get_provider_for_path(&path).unwrap_or(SkillProvider::Zap),
+        provider: get_provider_for_path(&path).unwrap_or(SkillProvider::InfiniShell),
         scope: SkillScope::Project,
     }
 }

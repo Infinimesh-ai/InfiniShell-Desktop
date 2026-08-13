@@ -299,8 +299,6 @@ pub enum OrchestrationPillBarAction {
     OpenInNewPane(AIConversationId),
     /// Menu item: open this child in a new tab.
     OpenInNewTab(AIConversationId),
-    /// Menu item: open this child's run in the Oz web app.
-    ViewInOz(AIConversationId),
     /// Menu item: stop the in-progress task.
     Stop(AIConversationId),
     /// Menu item: cancel and remove from local history.
@@ -502,13 +500,6 @@ impl OrchestrationPillBar {
                 ),
             ]
         };
-        if Self::oz_run_url_for_conversation(conversation_id, ctx).is_some() {
-            items.push(item(
-                "View in Oz",
-                Icon::Oz,
-                OrchestrationPillBarAction::ViewInOz(conversation_id),
-            ));
-        }
         // Stop is shown only while the agent is in progress; Kill becomes
         // Delete once the agent's run has finished (Success / Error /
         // Cancelled). Blocked is treated as not-yet-finished (the agent
@@ -557,17 +548,6 @@ impl OrchestrationPillBar {
         }
         self.menu_open_for = None;
         ctx.notify();
-    }
-
-    /// Zap:`ChannelState::oz_root_url()`(Oz web 根地址)随云端配置一并删除,
-    /// 本地优先分支不存在可跳转的 Oz run 页面。签名保留(调用点靠返回 `None`
-    /// 隐藏 "View in Oz" 菜单项并让该动作成为 no-op)。
-    fn oz_run_url_for_conversation(
-        conversation_id: AIConversationId,
-        app: &AppContext,
-    ) -> Option<String> {
-        let _ = (conversation_id, app);
-        None
     }
 
     fn set_hovered_pill(
@@ -1016,18 +996,6 @@ impl TypedActionView for OrchestrationPillBar {
                         },
                     ),
                 );
-            }
-            OrchestrationPillBarAction::ViewInOz(id) => {
-                self.emit_pill_bar_interaction(
-                    PillBarActionKind::ViewInOz,
-                    PillBarPillKind::Child,
-                    *id,
-                    ctx,
-                );
-                self.close_menu(ctx);
-                if let Some(url) = Self::oz_run_url_for_conversation(*id, ctx) {
-                    ctx.open_url(&url);
-                }
             }
             OrchestrationPillBarAction::Stop(id) => {
                 self.emit_pill_bar_interaction(

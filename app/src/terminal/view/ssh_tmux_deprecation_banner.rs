@@ -78,7 +78,7 @@ impl View for SshTmuxDeprecationBanner {
 
         // Zap 图标,与其它 warpification block 保持一致(我方 icon 集里 `Warp` 已更名为 `Zap`)。
         let icon = Container::new(
-            ConstrainedBox::new(Icon::Zap.to_warpui_icon(fg_color.into()).finish())
+            ConstrainedBox::new(Icon::InfiniShell.to_warpui_icon(fg_color.into()).finish())
                 .with_width(16.)
                 .with_height(16.)
                 .finish(),

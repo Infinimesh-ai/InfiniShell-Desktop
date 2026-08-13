@@ -1,6 +1,6 @@
 //! Skill provider definitions and utilities.
 //!
-//! This module defines the supported skill providers (i.e. Agents, Claude, Codex, Zap) and their
+//! This module defines the supported skill providers (i.e. InfiniShell, Agents, Claude, and Codex) and their
 //! associated skills directory paths. It provides utilities for looking up providers
 //! from paths and vice versa.
 use std::path::{Path, PathBuf};
@@ -14,7 +14,7 @@ use warp_core::ui::icons::Icon;
 use warp_core::ui::theme::Fill;
 use warp_util::local_or_remote_path::LocalOrRemotePath;
 
-/// Represents a skill provider/origin (Agents, Claude, Codex, or Zap).
+/// Represents a skill provider/origin.
 #[derive(
     Debug,
     Clone,
@@ -29,7 +29,9 @@ use warp_util::local_or_remote_path::LocalOrRemotePath;
     VariantNames,
 )]
 pub enum SkillProvider {
-    Zap,
+    #[serde(alias = "Warp", alias = "Zap")]
+    #[strum(serialize = "InfiniShell", serialize = "Warp", serialize = "Zap")]
+    InfiniShell,
     Agents,
     Claude,
     Codex,
@@ -63,7 +65,7 @@ pub enum SkillScope {
     Home,
     /// Skills from a project directory (e.g., `./repo/.agents/skills`).
     Project,
-    /// Bundled skills distributed with Zap.
+    /// Bundled skills distributed with InfiniShell.
     Bundled,
 }
 
@@ -83,12 +85,12 @@ impl SkillProvider {
             SkillProvider::Gemini => Icon::GeminiLogo,
             SkillProvider::Droid => Icon::DroidLogo,
             SkillProvider::OpenCode => Icon::OpenCodeLogo,
-            SkillProvider::Zap
+            SkillProvider::InfiniShell
             | SkillProvider::Agents
             | SkillProvider::Cursor
             | SkillProvider::Copilot
             | SkillProvider::Github
-            | SkillProvider::Kiro => Icon::WarpLogoLight,
+            | SkillProvider::Kiro => Icon::InfiniShell,
         }
     }
 
@@ -111,7 +113,7 @@ pub static SKILL_PROVIDER_DEFINITIONS: LazyLock<Vec<SkillProviderDefinition>> =
                 skills_path: PathBuf::from(".agents").join("skills"),
             },
             SkillProviderDefinition {
-                provider: SkillProvider::Zap,
+                provider: SkillProvider::InfiniShell,
                 skills_path: PathBuf::from(".warp").join("skills"),
             },
             SkillProviderDefinition {
@@ -164,7 +166,7 @@ pub fn provider_rank(provider: SkillProvider) -> usize {
 }
 
 pub fn home_skills_path(provider: SkillProvider) -> Option<PathBuf> {
-    if provider == SkillProvider::Zap {
+    if provider == SkillProvider::InfiniShell {
         return warp_core::paths::warp_home_skills_dir();
     }
     let definition = SKILL_PROVIDER_DEFINITIONS

@@ -274,7 +274,7 @@ impl TerminalView {
                     .selected_conversation(app)
                     .is_some())
         {
-            // Conversation-bound terminal: same shared helper — produces an OzAgent variant for
+            // Conversation-bound terminal: same shared helper — produces an InfiniShellAgent variant for
             // local conversations and a CLIAgent variant for the (rare) CLI-backed terminal.
             terminal_view_agent_icon_variant(self, app).map(render_agent_circle)
         } else {

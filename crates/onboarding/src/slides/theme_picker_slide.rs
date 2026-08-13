@@ -255,7 +255,7 @@ impl ThemePickerSlide {
 
         let theme_picker_last = FeatureFlag::ZapNewSettingsModes.is_enabled();
         let next_label = if theme_picker_last {
-            localized("common-get-warping", "Get Warping")
+            localized("common-get-warping", "Get started")
         } else {
             localized("common-next", "Next")
         };

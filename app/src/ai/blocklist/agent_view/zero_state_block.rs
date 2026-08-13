@@ -341,11 +341,7 @@ impl View for AgentViewZeroStateBlock {
         let header_props = HeaderProps {
             title: crate::t!("agent-zero-state-title").into(),
             description: AgentViewDescription::PlainText(vec![local_description.into()]),
-            icon: if self.origin.is_ambient_agent() {
-                Icon::OzCloud
-            } else {
-                Icon::Oz
-            },
+            icon: Icon::Agent,
             // ambient agent 不提供 × 按钮，其余场景都在标题右侧展示。
             hide_hints_state: (!self.origin.is_ambient_agent())
                 .then(|| self.state_handles.hide_hints.clone()),
@@ -413,7 +409,7 @@ pub enum AgentViewZeroStateAction {
         conversation_id: AIConversationId,
     },
     /// 点击标题右侧「×」按钮：永久隐藏零状态快捷键提示（包含 message bar 那一排）。
-    /// 用户可在「设置 → Zap 智能体 → AI 输入」中重新开启。
+    /// 用户可在「设置 → InfiniShell Agent → AI 输入」中重新开启。
     HideZeroStateHints,
 }
 

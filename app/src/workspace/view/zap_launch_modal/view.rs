@@ -53,7 +53,7 @@ fn feature_items() -> [FeatureItem; 3] {
             }),
         },
         FeatureItem {
-            icon: Icon::Oz,
+            icon: Icon::Agent,
             title: crate::t!("zap-launch-oad-title"),
             description: crate::t!("zap-launch-oad-description"),
             inline_link: None,
@@ -379,7 +379,7 @@ impl Entity for ZapLaunchModal {
 
 impl View for ZapLaunchModal {
     fn ui_name() -> &'static str {
-        "ZapLaunchModal"
+        "InfiniShellLaunchModal"
     }
 
     fn on_focus(&mut self, _focus_ctx: &warpui::FocusContext, ctx: &mut ViewContext<Self>) {

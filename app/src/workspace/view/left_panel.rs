@@ -597,7 +597,7 @@ impl LeftPanelView {
                 ];
 
                 ToolbeltButtonConfig {
-                    icon: Icon::ZapDrive,
+                    icon: Icon::InfiniShellDrive,
                     active_icon: None,
                     tooltip_text: crate::t!("workspace-left-panel-warp-drive"),
                     action: LeftPanelAction::ZapDrive,

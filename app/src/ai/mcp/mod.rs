@@ -509,14 +509,14 @@ pub enum MCPServerUpdate {
 
 pub(crate) fn home_config_file_path(provider: MCPProvider) -> Option<PathBuf> {
     match provider {
-        MCPProvider::Zap => warp_core::paths::warp_home_mcp_config_file_path(),
+        MCPProvider::InfiniShell => warp_core::paths::warp_home_mcp_config_file_path(),
         _ => dirs::home_dir().map(|home_dir| home_dir.join(provider.home_config_path())),
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
 pub enum MCPProvider {
-    Zap,
+    InfiniShell,
     Claude,
     Codex,
     Agents,
@@ -525,7 +525,7 @@ pub enum MCPProvider {
 impl MCPProvider {
     pub fn display_name(&self) -> &str {
         match self {
-            MCPProvider::Zap => "InfiniShell",
+            MCPProvider::InfiniShell => "InfiniShell",
             MCPProvider::Claude => "Claude",
             MCPProvider::Codex => "Codex",
             MCPProvider::Agents => "Other Agents",
@@ -534,13 +534,13 @@ impl MCPProvider {
 
     pub fn icon(&self) -> Icon {
         match self {
-            // Zap's own agent MCP config — use the Zap brand mark.
-            MCPProvider::Zap => Icon::Zap,
+            // InfiniShell's own MCP config uses the InfiniShell brand mark.
+            MCPProvider::InfiniShell => Icon::InfiniShell,
             MCPProvider::Claude => Icon::ClaudeLogo,
             MCPProvider::Codex => Icon::OpenAILogo,
             // "Other Agents" is the cross-tool .agents/.mcp.json convention for
-            // third-party agent tooling (not Zap-branded). Use a neutral AI
-            // icon so this row never carries the Zap brand mark, and the two
+            // third-party agent tooling (not InfiniShell-branded). Use a neutral AI
+            // icon so this row never carries the InfiniShell brand mark, and the two
             // rows remain visually distinct.
             MCPProvider::Agents => Icon::AiAssistant,
         }
@@ -549,7 +549,8 @@ impl MCPProvider {
     /// Returns the path of the provider's config file relative to the home directory.
     pub fn home_config_path(&self) -> &'static Path {
         match self {
-            MCPProvider::Zap => Path::new(".warp/.mcp.json"),
+            // `.warp` is a compatibility path shared with upstream installations.
+            MCPProvider::InfiniShell => Path::new(".warp/.mcp.json"),
             MCPProvider::Claude => Path::new(".claude.json"),
             MCPProvider::Codex => Path::new(".codex/config.toml"),
             MCPProvider::Agents => Path::new(".agents/.mcp.json"),
@@ -559,7 +560,8 @@ impl MCPProvider {
     /// Returns the path of the provider's config file relative to a project root.
     pub fn project_config_path(&self) -> &'static Path {
         match self {
-            MCPProvider::Zap => Path::new(".warp/.mcp.json"),
+            // `.warp` is a compatibility path shared with upstream installations.
+            MCPProvider::InfiniShell => Path::new(".warp/.mcp.json"),
             MCPProvider::Claude => Path::new(".mcp.json"),
             MCPProvider::Codex => Path::new(".codex/config.toml"),
             MCPProvider::Agents => Path::new(".agents/.mcp.json"),

@@ -44,7 +44,7 @@ struct AgentIconFields {
 impl AgentIconFields {
     fn from_variant(variant: &IconWithStatusVariant) -> Option<Self> {
         match variant {
-            IconWithStatusVariant::OzAgent { status, is_ambient } => Some(Self {
+            IconWithStatusVariant::InfiniShellAgent { status, is_ambient } => Some(Self {
                 is_cli: false,
                 cli_agent: None,
                 status: status.clone(),

@@ -34,7 +34,7 @@ impl WarpifyFooterView {
                 crate::t!("terminal-warpify-subshell"),
                 AgentFooterButtonTheme::new(None),
             )
-            .with_icon(Icon::Zap)
+            .with_icon(Icon::InfiniShell)
             .with_size(button_size)
             .with_tooltip(crate::t!("terminal-warpify-subshell-tooltip"))
             .with_tooltip_alignment(TooltipAlignment::Left)
@@ -48,7 +48,7 @@ impl WarpifyFooterView {
                 crate::t!("terminal-use-agent"),
                 AgentFooterButtonTheme::new(None),
             )
-            .with_icon(Icon::Oz)
+            .with_icon(Icon::Agent)
             .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
             .with_size(button_size)
             .with_tooltip(crate::t!("terminal-use-agent-tooltip"))

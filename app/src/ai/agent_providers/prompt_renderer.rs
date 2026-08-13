@@ -680,8 +680,8 @@ mod tests {
             name: "find-skills".into(),
             description: "Help discover and install new agent skills.".into(),
             scope: SkillScope::Bundled,
-            provider: SkillProvider::Zap,
-            icon_override: Some(Icon::WarpLogoLight),
+            provider: SkillProvider::InfiniShell,
+            icon_override: Some(Icon::InfiniShell),
         };
         let ctx = vec![AIAgentContext::Skills {
             skills: vec![skill],

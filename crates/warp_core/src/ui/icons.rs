@@ -63,9 +63,8 @@ pub enum Icon {
     CloudOffline,
     Compass,
     CreateTeam,
-    ZapDrive,
-    Zap,
-    WarpLogoLight,
+    InfiniShellDrive,
+    InfiniShell,
     ArrowLeft,
     ArrowBlockLeft,
     ArrowBlockUp,
@@ -290,14 +289,12 @@ pub enum Icon {
     AntigravityLogo,
     OmpLogo,
     NLD,
-    Oz,
-    OzCloud,
-    /// The Warp "W" glyph used as the agent brand mark (sourced from
-    /// `bundled/svg/warp-drive.svg`). The background and tint color are
+    /// The InfiniShell glyph used as the built-in agent brand mark (sourced from
+    /// `bundled/svg/infinishell-mark.svg`). The background and tint color are
     /// the **call site's responsibility** — this variant carries the shape
     /// only. Most surfaces tint it with the surrounding theme color (light
     /// theme: dark glyph; dark theme: light glyph). Kept distinct from
-    /// `Warp` so agent surfaces and non-agent Warp UI (e.g.
+    /// `InfiniShell` so agent surfaces and non-agent product UI (e.g.
     /// `QueryFilter::Drive`) can evolve independently.
     Agent,
     Conversation,
@@ -414,9 +411,8 @@ impl From<Icon> for &'static str {
             Icon::CloudOffline => "bundled/svg/cloud-offline.svg",
             Icon::Compass => "bundled/svg/compass-3.svg",
             Icon::CreateTeam => "bundled/svg/create-team.svg",
-            Icon::ZapDrive => "bundled/svg/warp.svg",
-            Icon::Zap => "bundled/svg/warp-drive.svg",
-            Icon::WarpLogoLight => "bundled/svg/warp-drive.svg",
+            Icon::InfiniShellDrive => "bundled/svg/infinishell-drive.svg",
+            Icon::InfiniShell => "bundled/svg/infinishell-mark.svg",
             Icon::ArrowLeft => "bundled/svg/arrow-left.svg",
             Icon::ArrowBlockLeft => "bundled/svg/arrow-block-left.svg",
             Icon::ArrowBlockUp => "bundled/svg/arrow-block-up.svg",
@@ -641,9 +637,7 @@ impl From<Icon> for &'static str {
             Icon::AntigravityLogo => "bundled/svg/antigravity.svg",
             Icon::OmpLogo => "bundled/svg/omp.svg",
             Icon::NLD => "bundled/svg/nld.svg",
-            Icon::Oz => "bundled/svg/oz.svg",
-            Icon::OzCloud => "bundled/svg/oz-cloud.svg",
-            Icon::Agent => "bundled/svg/warp-drive.svg",
+            Icon::Agent => "bundled/svg/infinishell-mark.svg",
             Icon::Conversation => "bundled/svg/conversation.svg",
             Icon::Prompt => "bundled/svg/prompt.svg",
             Icon::Grid => "bundled/svg/grid.svg",
@@ -706,3 +700,7 @@ impl Icon {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "icons_tests.rs"]
+mod tests;

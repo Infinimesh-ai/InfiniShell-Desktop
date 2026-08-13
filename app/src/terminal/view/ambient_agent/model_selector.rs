@@ -245,7 +245,7 @@ impl ModelSelector {
                 if !query.is_empty() && !display_name.to_lowercase().contains(&query) {
                     return None;
                 }
-                let icon = llm.provider.icon().unwrap_or(Icon::Oz);
+                let icon = llm.provider.icon().unwrap_or(Icon::Agent);
                 Some(MenuItem::Item(
                     MenuItemFields::new(display_name)
                         .with_icon(icon)

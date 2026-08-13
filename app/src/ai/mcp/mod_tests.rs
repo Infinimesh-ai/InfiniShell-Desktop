@@ -19,8 +19,8 @@ fn mcp_provider_from_file_path_recognizes_warp_home_path() {
     {
         assert_eq!(
             mcp_provider_from_file_path(&warp_home_mcp_config_file_path),
-            // Zap:我方 `MCPProvider` 只有 `Zap` 变体(上游叫 `Warp`)。
-            Some(MCPProvider::Zap)
+            // InfiniShell 沿用上游 `.warp/.mcp.json` 配置路径以保持兼容。
+            Some(MCPProvider::InfiniShell)
         );
     }
 }

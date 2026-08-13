@@ -63,7 +63,7 @@ fn resolve_from_skill_dirs_by_directory_scan(
 fn home_skill_dirs_for_resolution() -> Vec<PathBuf> {
     let mut skill_dirs = Vec::new();
     for provider in SKILL_PROVIDER_DEFINITIONS.iter() {
-        if provider.provider == SkillProvider::Zap {
+        if provider.provider == SkillProvider::InfiniShell {
             for dir in warp_managed_skill_dirs() {
                 push_unique_path(&mut skill_dirs, dir);
             }

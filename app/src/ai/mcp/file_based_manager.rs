@@ -291,7 +291,7 @@ impl FileBasedMCPManager {
     /// config location.
     ///
     /// "Global" means the installation was detected outside of a user repository:
-    /// - For `MCPProvider::Zap`: the logical root for `~/.warp*/.mcp.json`.
+    /// - For `MCPProvider::InfiniShell`: the logical root for `~/.warp*/.mcp.json`.
     /// - For any other provider: the user's home directory (e.g. `~/.claude.json`).
     ///
     /// Project-scoped installations (those detected inside a repo) are not considered
@@ -317,7 +317,7 @@ impl FileBasedMCPManager {
             .any(|(root_path, provider_map)| {
                 Self::is_global_warp_root(root_path)
                     && provider_map
-                        .get(&MCPProvider::Zap)
+                        .get(&MCPProvider::InfiniShell)
                         .is_some_and(|hashes| hashes.contains(&hash))
             })
     }
@@ -328,7 +328,7 @@ impl FileBasedMCPManager {
 
     fn scope_for_source(root_path: &Path, provider: MCPProvider) -> FileBasedMCPServerScope {
         match provider {
-            MCPProvider::Zap => {
+            MCPProvider::InfiniShell => {
                 if Self::is_global_warp_root(root_path) {
                     FileBasedMCPServerScope::Global
                 } else {
@@ -673,7 +673,7 @@ impl FileBasedMCPManager {
 #[cfg(any(feature = "tui", test))]
 fn provider_sort_key(provider: MCPProvider) -> u8 {
     match provider {
-        MCPProvider::Zap => 0,
+        MCPProvider::InfiniShell => 0,
         MCPProvider::Claude => 1,
         MCPProvider::Codex => 2,
         MCPProvider::Agents => 3,

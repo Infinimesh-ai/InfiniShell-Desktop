@@ -104,7 +104,7 @@ fn summary_pane_kind_icons_distinguish_agent_terminals_from_plain_terminals() {
             ),
             (
                 EntityId::from_usize(30),
-                SummaryPaneKind::OzAgent { is_ambient: false },
+                SummaryPaneKind::InfiniShellAgent { is_ambient: false },
             ),
         ]),
         Some(SummaryPaneKindIcons::Pair {
@@ -154,18 +154,18 @@ fn summary_pane_kind_icons_distinguish_ambient_claude_from_local_claude() {
 #[test]
 fn preferred_agent_tab_titles_default_to_title_like_text() {
     let agent_text = TerminalAgentText {
-        conversation_display_title: Some("Generated Oz title".to_string()),
-        conversation_latest_user_prompt: Some("Latest Oz prompt".to_string()),
+        conversation_display_title: Some("Generated InfiniShell Agent title".to_string()),
+        conversation_latest_user_prompt: Some("Latest InfiniShell Agent prompt".to_string()),
         cli_agent_title: Some("CLI summary".to_string()),
         cli_agent_latest_user_prompt: Some("Latest CLI prompt".to_string()),
-        is_oz_agent: true,
+        is_infinishell_agent: true,
         cli_agent: Some(CLIAgent::Claude),
     };
 
     assert_eq!(
         preferred_agent_tab_titles(&agent_text, AgentTabTextPreference::ConversationTitle),
         (
-            Some("Generated Oz title".to_string()),
+            Some("Generated InfiniShell Agent title".to_string()),
             Some("CLI summary".to_string())
         )
     );
@@ -178,7 +178,7 @@ fn preferred_agent_tab_titles_do_not_use_cli_prompt_when_disabled() {
         conversation_latest_user_prompt: None,
         cli_agent_title: None,
         cli_agent_latest_user_prompt: Some("Latest CLI prompt".to_string()),
-        is_oz_agent: false,
+        is_infinishell_agent: false,
         cli_agent: Some(CLIAgent::Claude),
     };
 
@@ -195,7 +195,7 @@ fn terminal_primary_line_uses_terminal_title_when_disabled_cli_has_only_prompt()
         conversation_latest_user_prompt: None,
         cli_agent_title: None,
         cli_agent_latest_user_prompt: Some("Latest CLI prompt".to_string()),
-        is_oz_agent: false,
+        is_infinishell_agent: false,
         cli_agent: Some(CLIAgent::Claude),
     };
     let (conversation_title, cli_title) =
@@ -224,18 +224,18 @@ fn terminal_primary_line_uses_terminal_title_when_disabled_cli_has_only_prompt()
 #[test]
 fn preferred_agent_tab_titles_use_latest_prompt_when_enabled() {
     let agent_text = TerminalAgentText {
-        conversation_display_title: Some("Generated Oz title".to_string()),
-        conversation_latest_user_prompt: Some("Latest Oz prompt".to_string()),
+        conversation_display_title: Some("Generated InfiniShell Agent title".to_string()),
+        conversation_latest_user_prompt: Some("Latest InfiniShell Agent prompt".to_string()),
         cli_agent_title: Some("CLI summary".to_string()),
         cli_agent_latest_user_prompt: Some("Latest CLI prompt".to_string()),
-        is_oz_agent: true,
+        is_infinishell_agent: true,
         cli_agent: Some(CLIAgent::Claude),
     };
 
     assert_eq!(
         preferred_agent_tab_titles(&agent_text, AgentTabTextPreference::LatestUserPrompt),
         (
-            Some("Latest Oz prompt".to_string()),
+            Some("Latest InfiniShell Agent prompt".to_string()),
             Some("Latest CLI prompt".to_string())
         )
     );
@@ -248,7 +248,7 @@ fn terminal_primary_line_uses_cli_prompt_when_enabled_cli_has_prompt() {
         conversation_latest_user_prompt: None,
         cli_agent_title: None,
         cli_agent_latest_user_prompt: Some("Latest CLI prompt".to_string()),
-        is_oz_agent: false,
+        is_infinishell_agent: false,
         cli_agent: Some(CLIAgent::Claude),
     };
     let (conversation_title, cli_title) =
@@ -274,7 +274,7 @@ fn terminal_primary_line_uses_cli_prompt_when_enabled_cli_is_long_running() {
         conversation_latest_user_prompt: None,
         cli_agent_title: None,
         cli_agent_latest_user_prompt: Some("Latest CLI prompt".to_string()),
-        is_oz_agent: false,
+        is_infinishell_agent: false,
         cli_agent: Some(CLIAgent::Claude),
     };
     let (conversation_title, cli_title) =
@@ -296,18 +296,18 @@ fn terminal_primary_line_uses_cli_prompt_when_enabled_cli_is_long_running() {
 #[test]
 fn preferred_agent_tab_titles_fall_back_when_preferred_text_is_missing() {
     let agent_text = TerminalAgentText {
-        conversation_display_title: Some("Generated Oz title".to_string()),
+        conversation_display_title: Some("Generated InfiniShell Agent title".to_string()),
         conversation_latest_user_prompt: None,
         cli_agent_title: None,
         cli_agent_latest_user_prompt: Some("Latest CLI prompt".to_string()),
-        is_oz_agent: true,
+        is_infinishell_agent: true,
         cli_agent: Some(CLIAgent::Claude),
     };
 
     assert_eq!(
         preferred_agent_tab_titles(&agent_text, AgentTabTextPreference::LatestUserPrompt),
         (
-            Some("Generated Oz title".to_string()),
+            Some("Generated InfiniShell Agent title".to_string()),
             Some("Latest CLI prompt".to_string())
         )
     );
@@ -1175,7 +1175,7 @@ fn summary_search_fragments_include_hidden_overflow_values() {
                 text: "Claude".to_string(),
                 status: Some(ConversationStatus::InProgress),
             },
-            label("Oz"),
+            label("InfiniShell Agent"),
             label("cargo"),
             label("code review"),
             label("hidden work"),

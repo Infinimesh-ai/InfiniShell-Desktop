@@ -646,8 +646,8 @@ fn test_warp_tui_variant_properties() {
     );
     assert_eq!(CLIAgent::WarpTui.display_name(), "Warp TUI");
     assert_eq!(CLIAgent::WarpTui.brand_color(), Some(ColorU::black()));
-    // Zap 品牌图标(我方 `Icon::Warp` 已更名为 `Icon::Zap`)。
-    assert_eq!(CLIAgent::WarpTui.icon(), Some(Icon::Zap));
+    // InfiniShell TUI 使用 InfiniShell 品牌图标。
+    assert_eq!(CLIAgent::WarpTui.icon(), Some(Icon::InfiniShell));
     assert_eq!(CLIAgent::WarpTui.brand_icon_color(), ColorU::white());
     assert!(CLIAgent::WarpTui.supported_skill_providers().is_empty());
     assert!(!CLIAgent::WarpTui.supports_bash_mode());

@@ -13,7 +13,7 @@ use crate::t_static;
 pub static AGENT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/agent",
     description: t_static!("slash-cmd-agent-desc"),
-    icon_path: "bundled/svg/oz.svg",
+    icon_path: "bundled/svg/infinishell-mark.svg",
     availability: Availability::AI_ENABLED,
     auto_enter_ai_mode: false,
     argument: Some(Argument::optional().with_execute_on_selection()),
@@ -141,7 +141,7 @@ pub const INIT_NAME: &str = "/init";
 pub static INIT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: INIT_NAME,
     description: t_static!("slash-cmd-init-desc"),
-    icon_path: "bundled/svg/warp-2.svg",
+    icon_path: "bundled/svg/infinishell-mark.svg",
     availability: Availability::AI_ENABLED,
     auto_enter_ai_mode: true,
     argument: Some(Argument::optional()),
@@ -213,7 +213,7 @@ pub static NEW: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
 pub static MODEL: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/model",
     description: t_static!("slash-cmd-model-desc"),
-    icon_path: "bundled/svg/oz.svg",
+    icon_path: "bundled/svg/infinishell-mark.svg",
     availability: Availability::AGENT_VIEW | Availability::AI_ENABLED,
     auto_enter_ai_mode: true,
     argument: None,

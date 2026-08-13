@@ -26,7 +26,7 @@ impl SkillDescriptor {
 
     pub fn new_bundled(id: String, skill: ParsedSkill, icon: Icon) -> Self {
         Self {
-            provider: SkillProvider::Zap,
+            provider: SkillProvider::InfiniShell,
             scope: SkillScope::Bundled,
             reference: SkillReference::BundledSkillId(id),
             name: skill.name,

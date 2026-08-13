@@ -284,7 +284,6 @@ pub enum PillBarActionKind {
     Kill,
     TogglePinOn,
     TogglePinOff,
-    ViewInOz,
     OpenMenu,
 }
 

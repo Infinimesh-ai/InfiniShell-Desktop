@@ -898,7 +898,7 @@ enum VerticalTabsResolvedMode {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum SummaryPaneKind {
     Terminal,
-    OzAgent { is_ambient: bool },
+    InfiniShellAgent { is_ambient: bool },
     CLIAgent { agent: CLIAgent, is_ambient: bool },
     Code { title: String },
     CodeDiff,
@@ -1052,7 +1052,7 @@ fn normalize_summary_text(text: &str) -> Option<String> {
 
 /// Returns the conversation status for a terminal pane, used to render the per-line status
 /// pill prefix in Summary mode. Mirrors the status sources used by `render_detail_status_pill`
-/// in the detail sidecar — CLI agent sessions with rich status, Oz agent conversations, or
+/// in the detail sidecar — CLI agent sessions with rich status, InfiniShell Agent conversations, or
 /// ambient agent sessions. Returns `None` for plain terminals or conversations without status.
 fn summary_conversation_status_for_terminal(
     terminal_view: &TerminalView,
@@ -3594,8 +3594,8 @@ impl TypedPane<'_> {
                 // Route through the shared helper so summary mode agrees with
                 // `resolve_icon_with_status_variant` on what the tab represents.
                 match terminal_view_agent_icon_variant(terminal_view, app) {
-                    Some(IconWithStatusVariant::OzAgent { is_ambient, .. }) => {
-                        SummaryPaneKind::OzAgent { is_ambient }
+                    Some(IconWithStatusVariant::InfiniShellAgent { is_ambient, .. }) => {
+                        SummaryPaneKind::InfiniShellAgent { is_ambient }
                     }
                     Some(IconWithStatusVariant::CLIAgent {
                         agent, is_ambient, ..
@@ -4092,7 +4092,7 @@ fn terminal_pane_search_text_fragments(
         primary_text,
         working_directory,
         terminal_view.current_git_branch(app),
-        terminal_kind_badge_label(agent_text.is_oz_agent, agent_text.cli_agent),
+        terminal_kind_badge_label(agent_text.is_infinishell_agent, agent_text.cli_agent),
         pull_request_label,
         terminal_view.current_diff_line_changes(app),
     )
@@ -4168,10 +4168,10 @@ fn terminal_primary_line_data(
     }
 }
 
-fn terminal_kind_badge_label(is_oz_agent: bool, cli_agent: Option<CLIAgent>) -> String {
+fn terminal_kind_badge_label(is_infinishell_agent: bool, cli_agent: Option<CLIAgent>) -> String {
     if let Some(cli_agent) = cli_agent {
         cli_agent.display_name().to_string()
-    } else if is_oz_agent {
+    } else if is_infinishell_agent {
         crate::t!("vertical-tabs-terminal-kind-oz")
     } else {
         crate::t!("vertical-tabs-pane-kind-terminal")
@@ -4190,7 +4190,7 @@ struct TerminalAgentText {
     conversation_latest_user_prompt: Option<String>,
     cli_agent_title: Option<String>,
     cli_agent_latest_user_prompt: Option<String>,
-    is_oz_agent: bool,
+    is_infinishell_agent: bool,
     cli_agent: Option<CLIAgent>,
 }
 
@@ -4233,7 +4233,7 @@ fn terminal_agent_text(terminal_view: &TerminalView, app: &AppContext) -> Termin
     let is_ambient_agent = terminal_view.is_ambient_agent_session(app);
 
     let mut agent_text = TerminalAgentText {
-        is_oz_agent: is_ambient_agent,
+        is_infinishell_agent: is_ambient_agent,
         cli_agent: cli_agent_session.map(|session| session.agent),
         ..Default::default()
     };
@@ -4245,8 +4245,8 @@ fn terminal_agent_text(terminal_view: &TerminalView, app: &AppContext) -> Termin
     agent_text.conversation_display_title = terminal_view.selected_conversation_display_title(app);
     agent_text.conversation_latest_user_prompt =
         terminal_view.selected_conversation_latest_user_prompt_for_tab_name(app);
-    agent_text.is_oz_agent =
-        agent_text.conversation_display_title.is_some() || agent_text.is_oz_agent;
+    agent_text.is_infinishell_agent =
+        agent_text.conversation_display_title.is_some() || agent_text.is_infinishell_agent;
 
     if let Some(session) = cli_agent_session {
         agent_text.cli_agent_title = session.session_context.title_like_text();
@@ -4332,7 +4332,7 @@ impl PaneGroup {
 
 /// Returns the [`SummaryPaneKind`] representing how the given pane should
 /// be rendered visually, matching the treatment used by vertical tabs
-/// Summary mode. For Terminal panes, distinguishes Oz vs Oz cloud vs each
+/// Summary mode. For Terminal panes, distinguishes local and ambient InfiniShell Agent runs from each
 /// known CLI agent (Claude, Codex, …) by routing through
 /// `terminal_view_agent_icon_variant`; for other pane types it falls back
 /// to `TypedPane::summary_pane_kind`. Returns `None` when `pane_id` does
@@ -4995,7 +4995,7 @@ pub(super) fn render_summary_pane_kind_icon_circle(
     let icon_size = total_size * SUMMARY_INLINE_ICON_RATIO;
     let padding = total_size * SUMMARY_INLINE_PADDING_RATIO;
     let (icon_element, background): (Box<dyn Element>, ElementFill) = match kind {
-        SummaryPaneKind::OzAgent { .. } => unreachable!("handled by ambient_agent_variant"),
+        SummaryPaneKind::InfiniShellAgent { .. } => unreachable!("handled by ambient_agent_variant"),
         SummaryPaneKind::CLIAgent { agent, .. } => {
             let icon_color = agent.brand_icon_color();
             let icon_element = render_cli_agent_logo(
@@ -5062,10 +5062,12 @@ pub(super) fn render_summary_pane_kind_icon_circle(
 /// Non-ambient CLI agents and non-agent kinds fall back to inline summary rendering.
 fn ambient_agent_variant(kind: &SummaryPaneKind) -> Option<IconWithStatusVariant> {
     match kind {
-        SummaryPaneKind::OzAgent { is_ambient } => Some(IconWithStatusVariant::OzAgent {
-            status: None,
-            is_ambient: *is_ambient,
-        }),
+        SummaryPaneKind::InfiniShellAgent { is_ambient } => {
+            Some(IconWithStatusVariant::InfiniShellAgent {
+                status: None,
+                is_ambient: *is_ambient,
+            })
+        }
         SummaryPaneKind::CLIAgent {
             agent,
             is_ambient: true,
@@ -5091,12 +5093,12 @@ fn summary_pane_kind_icon(
 
     match kind {
         SummaryPaneKind::Terminal => (WarpIcon::Terminal, main_text),
-        // Local agent: Agent-brand glyph with theme main-text color, consistent
+        // Local InfiniShell Agent: brand glyph with theme main-text color, consistent
         // with the tab row and summary circle.
-        // Note: this arm is currently unreachable — OzAgent is matched by the dedicated arm in
+        // Note: this arm is currently unreachable — InfiniShellAgent is matched by the dedicated arm in
         // render_summary_pane_kind_icon_circle before summary_pane_kind_icon is called.
         // Kept for completeness in case callers change.
-        SummaryPaneKind::OzAgent { .. } => (WarpIcon::Agent, main_text),
+        SummaryPaneKind::InfiniShellAgent { .. } => (WarpIcon::Agent, main_text),
         SummaryPaneKind::CLIAgent { agent, .. } => (
             agent.icon().unwrap_or(WarpIcon::Terminal),
             WarpThemeFill::Solid(agent.brand_icon_color()),
@@ -5241,7 +5243,7 @@ fn render_terminal_primary_line_for_view(
 
 /// Primary line for terminal pane rows. Precedence:
 /// 1. CLI agent session with plugin data (query/summary) + status
-/// 2. Oz agent conversation title + status
+/// 2. InfiniShell Agent conversation title + status
 /// 3. Terminal title
 fn render_terminal_primary_line(
     primary_line: TerminalPrimaryLineData,
@@ -6759,13 +6761,14 @@ fn render_terminal_detail_section(
     let agent_text = terminal_agent_text(terminal_view, app);
     let (conversation_display_title, cli_agent_title) =
         preferred_agent_tab_titles(&agent_text, agent_tab_text_preference(app));
-    let kind_label = terminal_kind_badge_label(agent_text.is_oz_agent, agent_text.cli_agent);
+    let kind_label =
+        terminal_kind_badge_label(agent_text.is_infinishell_agent, agent_text.cli_agent);
     // Zap:保留更严格的 DeepSeek 门控(legacy OSC 9 路径不具备可信的细粒度状态)。
     let status = if let Some(session) =
         cli_agent_session.filter(|s| s.listener.is_some() && session_supports_rich_status(s))
     {
         Some(session.status.to_conversation_status())
-    } else if agent_text.is_oz_agent {
+    } else if agent_text.is_infinishell_agent {
         terminal_view.selected_conversation_status_for_display(app)
     } else {
         None

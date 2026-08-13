@@ -295,7 +295,7 @@ impl CLIAgent {
             CLIAgent::Vibe => None,
             CLIAgent::Antigravity => Some(Icon::AntigravityLogo),
             CLIAgent::Omp => Some(Icon::OmpLogo),
-            CLIAgent::WarpTui => Some(Icon::Zap),
+            CLIAgent::WarpTui => Some(Icon::InfiniShell),
             CLIAgent::Unknown => None,
         }
     }

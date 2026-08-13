@@ -79,7 +79,7 @@ impl IntroSlide {
         let theme = appearance.theme();
 
         let logo_fill = internal_colors::fg_overlay_4(theme);
-        let logo = ConstrainedBox::new(Icon::WarpLogoLight.to_warpui_icon(logo_fill).finish())
+        let logo = ConstrainedBox::new(Icon::InfiniShell.to_warpui_icon(logo_fill).finish())
             .with_width(64.)
             .with_height(64.)
             .finish();

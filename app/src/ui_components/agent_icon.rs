@@ -174,7 +174,7 @@ fn agent_icon_variant_from_terminal_inputs(
 
     // 3. Selected conversation OR ambient (Oz) terminal: Oz agent variant.
     if inputs.has_selected_conversation || inputs.is_ambient {
-        return Some(IconWithStatusVariant::OzAgent {
+        return Some(IconWithStatusVariant::InfiniShellAgent {
             status: inputs.selected_conversation_status.clone(),
             is_ambient: inputs.is_ambient,
         });
@@ -200,7 +200,7 @@ pub(crate) fn agent_icon_variant_for_run(
             status: Some(status),
             is_ambient,
         },
-        None => IconWithStatusVariant::OzAgent {
+        None => IconWithStatusVariant::InfiniShellAgent {
             status: Some(status),
             is_ambient,
         },

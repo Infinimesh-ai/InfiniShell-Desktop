@@ -67,7 +67,7 @@ const FEATURE_ITEMS: &[FeatureItem] = &[
     FeatureItem {
         icon: Icon::Cloud,
         title: "Run any agent harness in the cloud",
-        description: "Use Oz to spin up Claude Code or Codex agents in the cloud; Oz will help you track and steer the agents.",
+        description: "Use InfiniShell Agent to spin up Claude Code or Codex agents in the cloud and track or steer their work.",
         badge: None,
     },
     FeatureItem {
@@ -280,7 +280,7 @@ impl OrchestrationLaunchModal {
 
     fn render_description(appearance: &Appearance) -> Box<dyn Element> {
         Text::new(
-            "We've made major improvements to Warp's cloud agent orchestration platform, Oz.",
+            "We've made major improvements to InfiniShell's agent orchestration platform.",
             appearance.ui_font_family(),
             14.,
         )

@@ -304,7 +304,7 @@ impl ProjectSlide {
                 if theme_picker_last {
                     localized("common-next", "Next")
                 } else {
-                    localized("common-get-warping", "Get Zapping")
+                    localized("common-get-warping", "Get started")
                 },
                 Keystroke::parse("enter").unwrap_or_default(),
                 ProjectSlideAction::NextClicked,

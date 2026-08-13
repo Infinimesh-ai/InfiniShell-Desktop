@@ -796,7 +796,7 @@ pub enum BannerSeverity {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum BannerButtonVariant {
     /// No fill, no border, just text (and optional icon). Used for the primary
-    /// action in the Figma design (e.g. "Fix with Oz").
+    /// action in the Figma design (e.g. "Fix with InfiniShell Agent").
     Naked,
     /// Border-only, no fill (e.g. "Open file").
     Outlined,
@@ -9096,34 +9096,39 @@ impl Workspace {
         }
     }
 
-    /// Install the Oz CLI by creating a symlink in /usr/local/bin
+    /// Install the InfiniShell Agent CLI (`oz`) by creating a symlink in /usr/local/bin.
     #[cfg(target_os = "macos")]
     fn install_oz(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.spawn(async { cli_install::install_oz() }, |view, result, ctx| {
             let command_name = ChannelState::channel().cli_command_name();
-            let message = format!("Installed the Oz CLI globally. You can now run '{command_name}' from any terminal outside of Warp.");
+            let message = format!("Installed the InfiniShell Agent CLI globally. You can now run '{command_name}' from any terminal outside of InfiniShell.");
             let toast = DismissibleToast::success(message).with_link(
                 ToastLink::new("Learn more".to_string())
                     .with_href("https://docs.warp.dev/reference/cli".to_string()),
             );
-            view.handle_cli_command_result(result, toast, "Failed to install Oz command", ctx);
+            view.handle_cli_command_result(
+                result,
+                toast,
+                "Failed to install the InfiniShell Agent CLI command",
+                ctx,
+            );
         });
     }
 
-    /// Uninstall the Oz CLI by removing the symlink from /usr/local/bin
+    /// Uninstall the InfiniShell Agent CLI (`oz`) by removing the symlink from /usr/local/bin.
     #[cfg(target_os = "macos")]
     fn uninstall_oz(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.spawn(
             async { cli_install::uninstall_oz() },
             |view, result, ctx| {
                 let toast = DismissibleToast::success(
-                    "Removed the global Oz CLI installation — it still works inside Warp."
+                    "Removed the global InfiniShell Agent CLI installation — it still works inside InfiniShell."
                         .to_string(),
                 );
                 view.handle_cli_command_result(
                     result,
                     toast,
-                    "Failed to uninstall Oz command",
+                    "Failed to uninstall the InfiniShell Agent CLI command",
                     ctx,
                 );
             },
@@ -13451,7 +13456,7 @@ impl Workspace {
         ctx.spawn(future, move |workspace, source_conversation, ctx| {
             let Some(LoadedConversationData::Oz(source_conversation)) = source_conversation else {
                 report_error!(
-                    "Failed to load Oz conversation for forking.",
+                    "Failed to load an InfiniShell Agent conversation for forking.",
                     extra: { "conversation_id" => %conversation_id }
                 );
                 WorkspaceToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
@@ -19436,7 +19441,7 @@ impl Workspace {
             // Left: Zap logo - clickable to link to warp.dev
             let warp_logo = Hoverable::new(self.mouse_states.warp_logo.clone(), |_state| {
                 ConstrainedBox::new(
-                    warp_core::ui::Icon::Zap
+                    warp_core::ui::Icon::InfiniShell
                         .to_warpui_icon(appearance.theme().foreground())
                         .finish(),
                 )
@@ -20710,8 +20715,8 @@ impl Workspace {
             AISettings::as_ref(app)
                 .is_any_ai_enabled(app)
                 .then(|| WorkspaceBannerButtonDetails {
-                    text: "Fix with Oz".to_owned(),
-                    action: WorkspaceAction::FixSettingsWithOz {
+                    text: "Fix with InfiniShell Agent".to_owned(),
+                    action: WorkspaceAction::FixSettingsWithAgent {
                         error_description: error.to_string(),
                     },
                     variant: BannerButtonVariant::Naked,
@@ -22685,7 +22690,7 @@ impl TypedActionView for Workspace {
             | ShowCloudModeV2EnvironmentCreationModal
             | OpenCreateAuthSecretModal { .. }
             | OpenNetworkLogPane => {}
-            FixSettingsWithOz { error_description } => {
+            FixSettingsWithAgent { error_description } => {
                 use crate::ai::skills::SkillManager;
                 let modify_settings_skill = SkillManager::as_ref(ctx)
                     .active_local_bundled_skill("modify-settings", ctx)
@@ -23490,7 +23495,7 @@ impl TypedActionView for Workspace {
             }
             RunAISuggestedCommand(code) => {
                 let command = code.trim().to_string();
-                let workflow = Workflow::new("Command from Oz", command);
+                let workflow = Workflow::new("Command from InfiniShell Agent", command);
                 self.run_workflow_in_active_input(
                     &WorkflowType::AIGenerated {
                         workflow,
@@ -27399,7 +27404,7 @@ fn render_group_member_icon_collage(
         // element (leaving room for the cloud badge). Shift right-down by
         // (1 - CIRCLE_RATIO)/2 * icon_diameter so the circle centers on the grid point.
         let collage_pos = match &kind {
-            SummaryPaneKind::OzAgent { is_ambient: true }
+            SummaryPaneKind::InfiniShellAgent { is_ambient: true }
             | SummaryPaneKind::CLIAgent {
                 is_ambient: true, ..
             } => {

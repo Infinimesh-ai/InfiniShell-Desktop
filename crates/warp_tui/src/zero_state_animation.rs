@@ -82,7 +82,7 @@ const SVG_MAX_X: f64 = 216.155;
 const SVG_MIN_Y: f64 = 25.5701;
 const SVG_MAX_Y: f64 = 170.489;
 
-/// The upper-right and lower-left faces from `warp-logo-light.svg`.
+/// The upper-right and lower-left faces of the legacy upstream logo.
 ///
 /// Rounded corners are intentionally squared off: at terminal-cell resolution,
 /// preserving the diagonal cut and offset silhouette contributes much more to

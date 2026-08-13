@@ -77,7 +77,7 @@ impl IntentionSlide {
         let theme = appearance.theme();
 
         let logo_fill = internal_colors::fg_overlay_4(theme);
-        let logo = ConstrainedBox::new(Icon::WarpLogoLight.to_warpui_icon(logo_fill).finish())
+        let logo = ConstrainedBox::new(Icon::InfiniShell.to_warpui_icon(logo_fill).finish())
             .with_width(64.)
             .with_height(64.)
             .finish();
@@ -265,7 +265,7 @@ impl IntentionSlide {
                 localized("onboarding-ai-feature-warp-agents", "InfiniShell agents"),
                 localized(
                     "onboarding-ai-feature-oz-cloud-agents-platform",
-                    "Oz local agents platform",
+                    "InfiniShell local agents platform",
                 ),
                 localized(
                     "onboarding-ai-feature-next-command-predictions",
@@ -439,7 +439,7 @@ impl IntentionSlide {
 
         let new_settings_modes = FeatureFlag::ZapNewSettingsModes.is_enabled();
         let next_text = if !new_settings_modes && selected_index == 1 {
-            localized("common-get-warping", "Get Zapping")
+            localized("common-get-warping", "Get started")
         } else {
             localized("common-next", "Next")
         };

@@ -14,7 +14,7 @@ fn bundled_skill(content: &str) -> BundledSkill {
             path: LocalOrRemotePath::Local("/bundled/skills/test-skill/SKILL.md".into()),
             content: content.to_string(),
             line_range: None,
-            provider: SkillProvider::Zap,
+            provider: SkillProvider::InfiniShell,
             scope: SkillScope::Bundled,
         },
         BundledSkillActivation::Always,

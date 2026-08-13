@@ -140,7 +140,7 @@ fn servers_changed_only_emits_for_effective_source_set_changes() {
         manager.update(&mut app, |manager, ctx| {
             manager.apply_parsed_servers(
                 root_path.clone(),
-                MCPProvider::Zap,
+                MCPProvider::InfiniShell,
                 parse_mcp_json(json),
                 ctx,
             );
@@ -150,7 +150,7 @@ fn servers_changed_only_emits_for_effective_source_set_changes() {
         manager.update(&mut app, |manager, ctx| {
             manager.apply_parsed_servers(
                 root_path.clone(),
-                MCPProvider::Zap,
+                MCPProvider::InfiniShell,
                 parse_mcp_json(json),
                 ctx,
             );
@@ -158,12 +158,12 @@ fn servers_changed_only_emits_for_effective_source_set_changes() {
         events.read(&app, |events, _| assert_eq!(events.count, 1));
 
         manager.update(&mut app, |manager, ctx| {
-            manager.remove_servers_for_root_provider(&root_path, MCPProvider::Zap, ctx);
+            manager.remove_servers_for_root_provider(&root_path, MCPProvider::InfiniShell, ctx);
         });
         events.read(&app, |events, _| assert_eq!(events.count, 2));
 
         manager.update(&mut app, |manager, ctx| {
-            manager.remove_servers_for_root_provider(&root_path, MCPProvider::Zap, ctx);
+            manager.remove_servers_for_root_provider(&root_path, MCPProvider::InfiniShell, ctx);
         });
         events.read(&app, |events, _| assert_eq!(events.count, 2));
     });
@@ -177,14 +177,14 @@ fn test_config_error_preserves_last_known_good_servers() {
     App::test((), |mut app| async move {
         let manager_handle = setup_app(&mut app);
         manager_handle.update(&mut app, |manager, ctx| {
-            manager.apply_parsed_servers(root_path.clone(), MCPProvider::Zap, parsed, ctx);
+            manager.apply_parsed_servers(root_path.clone(), MCPProvider::InfiniShell, parsed, ctx);
             assert_eq!(manager.file_based_servers.len(), 1);
 
             manager.handle_watcher_event(
                 &FileMCPWatcherEvent::ConfigError {
                     diagnostic: FileMCPConfigDiagnostic {
                         config_path: config_path.clone(),
-                        provider: MCPProvider::Zap,
+                        provider: MCPProvider::InfiniShell,
                         kind: FileMCPConfigDiagnosticKind::Parse,
                         message: "invalid JSON".to_string(),
                     },
@@ -449,7 +449,7 @@ fn test_global_warp_server_from_managed_home_root_always_spawns() {
         manager.update(&mut app, |m, ctx| {
             m.apply_parsed_servers(
                 warp_mcp_config_path.root_path.clone(),
-                MCPProvider::Zap,
+                MCPProvider::InfiniShell,
                 parsed,
                 ctx,
             );
@@ -583,7 +583,7 @@ fn tui_global_warp_servers_start_only_after_activation() {
             manager.global_warp_servers_activated = false;
             manager.apply_parsed_servers(
                 warp_mcp_config_path.root_path,
-                MCPProvider::Zap,
+                MCPProvider::InfiniShell,
                 parsed,
                 ctx,
             );
@@ -621,7 +621,12 @@ fn test_project_scoped_servers_never_auto_spawn() {
 
         manager.update(&mut app, |m, ctx| {
             m.apply_parsed_servers(repo_path.clone(), MCPProvider::Claude, claude_parsed, ctx);
-            m.apply_parsed_servers(repo_path.clone(), MCPProvider::Zap, warp_parsed, ctx);
+            m.apply_parsed_servers(
+                repo_path.clone(),
+                MCPProvider::InfiniShell,
+                warp_parsed,
+                ctx,
+            );
         });
 
         // Neither detection should emit a spawn event.
@@ -675,7 +680,12 @@ fn test_project_scoped_cloud_scan_has_detected_servers_but_empty_wait_set() {
 
         manager.update(&mut app, |m, ctx| {
             m.apply_parsed_servers(repo_path.clone(), MCPProvider::Claude, claude_parsed, ctx);
-            m.apply_parsed_servers(repo_path.clone(), MCPProvider::Zap, warp_parsed, ctx);
+            m.apply_parsed_servers(
+                repo_path.clone(),
+                MCPProvider::InfiniShell,
+                warp_parsed,
+                ctx,
+            );
             m.handle_cloud_environment_scan_complete(&repo_path, ctx);
         });
 
@@ -714,7 +724,7 @@ fn test_auto_started_cloud_scan_uuids_are_in_wait_set() {
         let events = subscribe_events(&mut app, &manager);
 
         manager.update(&mut app, |m, ctx| {
-            m.apply_parsed_servers(root_path.clone(), MCPProvider::Zap, parsed, ctx);
+            m.apply_parsed_servers(root_path.clone(), MCPProvider::InfiniShell, parsed, ctx);
             m.handle_cloud_environment_scan_complete(&root_path, ctx);
         });
 

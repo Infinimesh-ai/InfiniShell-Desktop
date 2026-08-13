@@ -3947,7 +3947,7 @@ impl Input {
                     // TODO: instead of blocking, connect to the live shared session
                     // and submit the prompt to the running remote VM. Or, auto close and reopen the link.
                     self.show_ephemeral_error_toast(
-                        "This pane is out of date. Reopen the Oz session link in a new pane and try submitting again.",
+                        "This pane is out of date. Reopen the InfiniShell Agent session link in a new pane and try submitting again.",
                         ctx,
                     );
                 }

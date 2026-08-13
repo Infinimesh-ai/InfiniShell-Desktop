@@ -25,7 +25,7 @@ fn cleanup_env_vars(vars: &[&str]) {
 fn abort_config_parse_cancels_and_removes_inflight_task() {
     let (file_mcp_tx, _file_mcp_rx) = async_channel::unbounded();
     let config_path = PathBuf::from("/tmp/.mcp.json");
-    let key = (config_path.clone(), MCPProvider::Zap);
+    let key = (config_path.clone(), MCPProvider::InfiniShell);
     let (abort_handle, _abort_registration) = AbortHandle::new_pair();
     let observed_handle = abort_handle.clone();
     let mut watcher = FileMCPWatcher {
@@ -35,7 +35,7 @@ fn abort_config_parse_cancels_and_removes_inflight_task() {
         project_repo_watchers: HashSet::new(),
     };
 
-    watcher.abort_config_parse(&config_path, MCPProvider::Zap);
+    watcher.abort_config_parse(&config_path, MCPProvider::InfiniShell);
 
     assert!(observed_handle.is_aborted());
     assert!(!watcher.parse_abort_handles.contains_key(&key));
@@ -100,7 +100,7 @@ fn project_initial_scan_covers_each_supported_provider_config() {
     let discovered = providers_in_scope(repo.clone(), repo.clone()).collect::<HashSet<_>>();
 
     for provider in [
-        MCPProvider::Zap,
+        MCPProvider::InfiniShell,
         MCPProvider::Claude,
         MCPProvider::Codex,
         MCPProvider::Agents,
@@ -116,7 +116,7 @@ fn project_initial_scan_covers_each_supported_provider_config() {
 fn incremental_updates_detect_each_supported_provider_config() {
     let repo = PathBuf::from("/work/repository");
     for provider in [
-        MCPProvider::Zap,
+        MCPProvider::InfiniShell,
         MCPProvider::Claude,
         MCPProvider::Codex,
         MCPProvider::Agents,
@@ -212,12 +212,12 @@ async fn parse_outcomes_distinguish_missing_invalid_and_valid_configs() {
     let path = directory.path().join(".mcp.json");
 
     assert!(matches!(
-        parse_mcp_config_file(&path, MCPProvider::Zap).await,
+        parse_mcp_config_file(&path, MCPProvider::InfiniShell).await,
         FileMCPConfigParseOutcome::Missing
     ));
 
     std::fs::write(&path, "{invalid").expect("invalid config should be written");
-    match parse_mcp_config_file(&path, MCPProvider::Zap).await {
+    match parse_mcp_config_file(&path, MCPProvider::InfiniShell).await {
         FileMCPConfigParseOutcome::Error(diagnostic) => {
             assert_eq!(diagnostic.kind, FileMCPConfigDiagnosticKind::Parse);
         }
@@ -231,7 +231,7 @@ async fn parse_outcomes_distinguish_missing_invalid_and_valid_configs() {
         r#"{"mcpServers":{"test":{"command":"${WARP_MCP_TEST_MISSING}"}}}"#,
     )
     .expect("missing-env config should be written");
-    match parse_mcp_config_file(&path, MCPProvider::Zap).await {
+    match parse_mcp_config_file(&path, MCPProvider::InfiniShell).await {
         FileMCPConfigParseOutcome::Error(diagnostic) => {
             assert_eq!(
                 diagnostic.kind,
@@ -246,7 +246,7 @@ async fn parse_outcomes_distinguish_missing_invalid_and_valid_configs() {
         r#"{"mcpServers":{"test":{"command":"test-command"}}}"#,
     )
     .expect("valid config should be written");
-    match parse_mcp_config_file(&path, MCPProvider::Zap).await {
+    match parse_mcp_config_file(&path, MCPProvider::InfiniShell).await {
         FileMCPConfigParseOutcome::Parsed(servers) => assert_eq!(servers.len(), 1),
         _ => panic!("valid config should produce one server"),
     }

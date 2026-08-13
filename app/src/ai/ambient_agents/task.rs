@@ -76,7 +76,7 @@ impl AgentSource {
             AgentSource::Cli => "CLI",
             AgentSource::ScheduledAgent => "Scheduled",
             AgentSource::Interactive | AgentSource::CloudMode => "InfiniShell (local agent)",
-            AgentSource::WebApp => "Oz Web",
+            AgentSource::WebApp => "InfiniShell Agent",
             AgentSource::GitHubAction => "GitHub Action",
             AgentSource::GitHubWebhook => "GitHub",
         }

@@ -556,7 +556,7 @@ impl Input {
         app: &AppContext,
     ) -> Option<&ViewHandle<HostSelector>> {
         let host_selector = self.host_selector()?;
-        // Zap 的 `HostSelector` 只有单一 `Host::Zap`,没有上游的「默认 host」概念
+        // InfiniShell 的 `HostSelector` 只有单一 `Host::InfiniShell`,没有上游的「默认 host」概念
         // (`has_default_host()`),因此只保留自建 worker 的判断。
         let should_show = !ConnectedSelfHostedWorkersModel::as_ref(app)
             .worker_hosts_excluding(None)

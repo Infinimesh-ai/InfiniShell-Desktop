@@ -193,7 +193,7 @@ pub fn icon_override_for_skill_name(name: &str) -> Option<Icon> {
 /// 拿到根目录下的第一层组件(即 skill 名)后拼出 `SKILL.md`。
 fn home_skill_path_from_local_path(file_path: &Path) -> Option<PathBuf> {
     for definition in SKILL_PROVIDER_DEFINITIONS.iter() {
-        let home_skill_dirs = if definition.provider == SkillProvider::Zap {
+        let home_skill_dirs = if definition.provider == SkillProvider::InfiniShell {
             warp_managed_skill_dirs()
         } else {
             home_skills_path(definition.provider).into_iter().collect()

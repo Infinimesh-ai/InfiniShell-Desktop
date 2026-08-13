@@ -205,12 +205,12 @@ pub fn install_oz() -> Result<()> {
     let oz_path = oz_install_target_path();
     let current_binary =
         std::env::current_exe().context("Failed to get current executable path")?;
-    install_symlink(&current_binary, &oz_path, "Oz CLI")
+    install_symlink(&current_binary, &oz_path, "InfiniShell Agent CLI")
 }
 
 /// Uninstall the Oz CLI by removing the symlink from /usr/local/bin
 pub fn uninstall_oz() -> Result<()> {
-    uninstall_symlink(&oz_install_target_path(), "Oz command")
+    uninstall_symlink(&oz_install_target_path(), "InfiniShell Agent CLI command")
 }
 
 /// Install Warp Control by symlinking its bundled wrapper into /usr/local/bin.

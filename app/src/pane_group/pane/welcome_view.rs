@@ -244,7 +244,7 @@ impl View for WelcomeView {
                     Container::new(
                         ConstrainedBox::new(
                             Icon::new(
-                                "bundled/svg/warp-logo-neutral.svg",
+                                "bundled/svg/infinishell-mark.svg",
                                 appearance.theme().foreground(),
                             )
                             .finish(),
