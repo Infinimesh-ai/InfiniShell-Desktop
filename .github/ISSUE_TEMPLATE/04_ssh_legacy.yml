@@ -1,21 +1,21 @@
 name: Legacy SSH Issue (no subshell bootstrap)
-description: "(Legacy) The shell does not bootstrap as a subshell over SSH in Zap."
+description: "(Legacy) The shell does not bootstrap as a subshell over SSH in InfiniShell-Desktop."
 labels: ["bug", "area:ssh"]
 body:
   - type: markdown
     attributes:
       value: |
-        Use this template when **Zap** fails to bootstrap a subshell over SSH (the legacy non-tmux Warpify path).
+        Use this template when **InfiniShell-Desktop** fails to bootstrap a subshell over SSH (the legacy non-tmux Shell Integration path).
 
-        - Cloud-account or Warpify-SSO issues belong to upstream Zap, not Zap.
-        - If your failure is specifically with **tmux Warpification**, use the *SSH Warpify (tmux)* template instead.
+        - Cloud-account or Warpify-SSO issues belong to upstream Warp, not InfiniShell-Desktop.
+        - If your failure is specifically with **tmux Shell Integration**, use the *SSH Shell Integration (tmux)* template instead.
   - type: checkboxes
     attributes:
       label: "Pre-submit Checks"
       options:
-        - label: "I have [searched Zap SSH issues](https://github.com/zerx-lab/warp/issues?q=is%3Aissue+label%3Aarea%3Assh) and there are no duplicates."
+        - label: "I have [searched InfiniShell-Desktop SSH issues](https://github.com/Infinimesh-ai/InfiniShell-Desktop/issues?q=is%3Aissue+label%3Aarea%3Assh) and there are no duplicates."
           required: true
-        - label: "This is reproducible in **Zap** (not only in upstream Zap)."
+        - label: "This is reproducible in **InfiniShell-Desktop** (not only in upstream Warp)."
           required: true
         - label: "I have included relevant logs (`RUST_LOG=info` output, SSH session output). Optional, but greatly speeds up triage."
           required: false
@@ -53,9 +53,9 @@ body:
     validations:
       required: true
   - type: input
-    id: "zap-version"
+    id: "infinishell-desktop-version"
     attributes:
-      label: "Zap version / commit"
+      label: "InfiniShell-Desktop version / commit"
       description: "Open Settings → About to copy the version, or run `git rev-parse --short HEAD` if built from source."
     validations:
       required: true
@@ -77,29 +77,29 @@ body:
     id: "xtrace-output"
     attributes:
       label: "Include shell xtrace output"
-      description: "Run `WARP_DEBUG_MODE=1 ssh YOUR-HOSTNAME-HERE` from inside Zap and paste the full output starting from the SSH command block. Redact secrets before posting."
+      description: "Run `WARP_DEBUG_MODE=1 ssh YOUR-HOSTNAME-HERE` from inside InfiniShell-Desktop and paste the full output starting from the SSH command block. Redact secrets before posting."
     validations:
       required: true
   - type: dropdown
     id: "blocker"
     attributes:
-      label: "Does this block your daily use of Zap?"
+      label: "Does this block your daily use of InfiniShell-Desktop?"
       description: "All feedback is reviewed even if you select 'No'."
       multiple: false
       options:
         - "No"
-        - "Yes — this prevents me from using Zap daily."
+        - "Yes — this prevents me from using InfiniShell-Desktop daily."
     validations:
       required: true
   - type: dropdown
     id: "terminals"
     attributes:
-      label: "Reproducible only in Zap?"
+      label: "Reproducible only in InfiniShell-Desktop?"
       description: "Verifying whether other terminals are affected helps narrow down the root cause."
       multiple: false
       options:
-        - "Only in Zap."
-        - "Also reproducible in upstream Zap."
+        - "Only in InfiniShell-Desktop."
+        - "Also reproducible in upstream Warp."
         - "Also reproducible in other terminals (iTerm2, Windows Terminal, Alacritty, etc.)."
         - "Not tested elsewhere."
     validations:

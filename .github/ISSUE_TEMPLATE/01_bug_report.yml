@@ -1,22 +1,22 @@
 name: Bug Report
-description: "Found a bug in Zap? Please search existing issues first. For SSH-specific failures, use one of the SSH templates below."
+description: "Found a bug in InfiniShell-Desktop? Please search existing issues first. For SSH-specific failures, use one of the SSH templates below."
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve **Zap** — a community fork of Zap focused on BYOP (bring-your-own-provider) AI, local credentials, and a privacy-first terminal.
+        Thanks for helping improve **InfiniShell-Desktop** — a community fork of Warp focused on BYOP (bring-your-own-provider) AI, local credentials, and a privacy-first terminal.
 
         **Out of scope (please do not file here):**
-        - Zap cloud account / billing / Zap AI quota / Warpify SSO / Zap Drive cloud sync — these belong to upstream Zap, not Zap.
-        - Issues only reproducible with Zap's first-party cloud agent (Zap ships it disabled).
+        - Warp cloud account / billing / Warp AI quota / Warpify SSO / Warp Drive cloud sync — these belong to upstream Warp, not InfiniShell-Desktop.
+        - Issues only reproducible with Warp's first-party cloud agent (InfiniShell-Desktop ships it disabled).
   - type: checkboxes
     attributes:
       label: "Pre-submit Checks"
       options:
-        - label: "I have [searched Zap issues](https://github.com/zerx-lab/warp/issues?q=is%3Aissue+label%3Abug) and there are no duplicates."
+        - label: "I have [searched InfiniShell-Desktop issues](https://github.com/Infinimesh-ai/InfiniShell-Desktop/issues?q=is%3Aissue+label%3Abug) and there are no duplicates."
           required: true
-        - label: "This bug is in Zap itself — not in upstream Zap's cloud account, billing, Warpify SSO, or cloud-only features."
+        - label: "This bug is in InfiniShell-Desktop itself — not in upstream Warp's cloud account, billing, Warpify SSO, or cloud-only features."
           required: true
         - label: "I have included relevant logs (`RUST_LOG=info` output, panic traces, etc.). Optional, but greatly speeds up triage."
           required: false
@@ -80,9 +80,9 @@ body:
     validations:
       required: false
   - type: input
-    id: "zap-version"
+    id: "infinishell-desktop-version"
     attributes:
-      label: "Zap version / commit"
+      label: "InfiniShell-Desktop version / commit"
       description: "Open Settings → About to copy the version, or run `git rev-parse --short HEAD` if you built from source."
     validations:
       required: true
@@ -108,11 +108,11 @@ body:
     id: "regression"
     attributes:
       label: "Regression"
-      description: "Is this a regression compared to a previous Zap build?"
+      description: "Is this a regression compared to a previous InfiniShell-Desktop build?"
       multiple: false
       options:
-        - "No, this issue has existed throughout my use of Zap."
-        - "Yes, this started after a recent Zap build / upstream sync."
+        - "No, this issue has existed throughout my use of InfiniShell-Desktop."
+        - "Yes, this started after a recent InfiniShell-Desktop build / upstream sync."
         - "Unknown."
     validations:
       required: true
@@ -120,7 +120,7 @@ body:
     id: "last-known-good"
     attributes:
       label: "Last known good build / date (if regression)"
-      description: "Most recent commit SHA or date where Zap behaved as expected."
+      description: "Most recent commit SHA or date where InfiniShell-Desktop behaved as expected."
     validations:
       required: false
   - type: textarea
@@ -133,23 +133,23 @@ body:
   - type: dropdown
     id: "blocker"
     attributes:
-      label: "Does this block your daily use of Zap?"
+      label: "Does this block your daily use of InfiniShell-Desktop?"
       description: "All feedback is reviewed even if you select 'No'."
       multiple: false
       options:
         - "No"
-        - "Yes — this prevents me from using Zap daily."
+        - "Yes — this prevents me from using InfiniShell-Desktop daily."
     validations:
       required: true
   - type: dropdown
     id: "terminals"
     attributes:
-      label: "Reproducible only in Zap?"
+      label: "Reproducible only in InfiniShell-Desktop?"
       description: "Verifying whether other terminals are affected helps narrow down the root cause."
       multiple: false
       options:
-        - "Only in Zap."
-        - "Also reproducible in upstream Zap."
+        - "Only in InfiniShell-Desktop."
+        - "Also reproducible in upstream Warp."
         - "Also reproducible in other terminals (iTerm2, Windows Terminal, Alacritty, etc.)."
         - "Not tested elsewhere."
     validations:

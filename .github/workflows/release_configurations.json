@@ -6,8 +6,8 @@
             "type": "weekly",
             "is_prerelease": false,
             "is_autopush": false,
-            "release_base_name": "Zap",
-            "release_body_text": "Zap release (fork of Zap Terminal, oss channel)",
+            "release_base_name": "InfiniShell-Desktop",
+            "release_body_text": "InfiniShell-Desktop release (community fork of Warp, oss channel)",
             "changelog_slack_channel": "",
             "gcs_cache_control_value": "",
             "web_gcs_bucket_prefix": ""

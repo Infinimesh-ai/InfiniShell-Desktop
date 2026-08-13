@@ -1,6 +1,6 @@
 # Release Configurations
 
-This README file documents the format of the `release_configurations.json` file located in this directory.  The file defines Zap's various release channels, and provides values for the various variables that are necessary to run the `create_new_releases.yml` GitHub workflow.
+This README file documents the format of the `release_configurations.json` file located in this directory.  The file defines InfiniShell-Desktop's various release channels, and provides values for the various variables that are necessary to run the `create_new_releases.yml` GitHub workflow.
 
 At some point, we may want to replace this document with a JSON schema file (which could be used to validate the correctness of the configuration as part of PR presubmit).
 

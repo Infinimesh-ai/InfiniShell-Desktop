@@ -1,14 +1,14 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Zap Issue Search
-    url: https://github.com/zerx-lab/warp/issues?q=is%3Aissue+sort%3Areactions-%2B1-desc
-    about: Search existing Zap bugs and feature requests before opening a new one.
-  - name: Zap README
-    url: https://github.com/zerx-lab/warp#readme
-    about: BYOP setup, supported providers, and core features of Zap.
-  - name: Zap Docs
-    url: https://github.com/zerx-lab/warp/tree/main/docs
+  - name: InfiniShell-Desktop Issue Search
+    url: https://github.com/Infinimesh-ai/InfiniShell-Desktop/issues?q=is%3Aissue+sort%3Areactions-%2B1-desc
+    about: Search existing InfiniShell-Desktop bugs and feature requests before opening a new one.
+  - name: InfiniShell-Desktop README
+    url: https://github.com/Infinimesh-ai/InfiniShell-Desktop#readme
+    about: BYOP setup, supported providers, and core features of InfiniShell-Desktop.
+  - name: InfiniShell-Desktop Docs
+    url: https://github.com/Infinimesh-ai/InfiniShell-Desktop/tree/main/docs
     about: Architecture notes, upstream-sync plan, and design docs in the repo.
-  - name: Upstream Zap (reference only)
+  - name: Upstream Warp (reference only)
     url: https://github.com/warpdotdev/warp
-    about: Zap is an unaffiliated community fork — upstream Zap is shown for reference only. Cloud / billing / account / Warpify SSO issues belong upstream, not here.
+    about: InfiniShell-Desktop is an unaffiliated community fork — upstream Warp is shown for reference only. Cloud / billing / account / Warpify SSO issues belong upstream, not here.

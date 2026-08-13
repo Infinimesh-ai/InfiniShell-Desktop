@@ -1,28 +1,28 @@
 name: Feature Request
-description: "Have an idea for Zap? Search existing requests first and upvote if it already exists."
+description: "Have an idea for InfiniShell-Desktop? Search existing requests first and upvote if it already exists."
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        **Zap's direction.** Zap is a community fork of Zap focused on:
+        **InfiniShell-Desktop's direction.** InfiniShell-Desktop is a community fork of Warp focused on:
 
         - **BYOP (Bring Your Own Provider)** — any OpenAI / Anthropic / Gemini / Ollama / DeepSeek-compatible endpoint, configured locally.
         - **Local-first & privacy-first** — credentials stay on disk; cloud agent / Computer Use / telemetry are off by default.
         - **Editable system prompts** — minijinja templates, no opaque server-side assembly.
-        - **Preserved Zap UX** — Blocks, Workflows, Keymaps, themes; continuously merged from upstream.
+        - **Preserved Warp UX** — Blocks, Workflows, Keymaps, themes; continuously merged from upstream.
         - **Localized UI** — English + Simplified Chinese, community-extensible.
 
-        **Out of scope:** features that require Zap's cloud account, Zap AI gateway, Zap Drive cloud sync, Warpify SSO, billing, team/enterprise admin, or Zap's first-party telemetry. Those belong to upstream Zap.
+        **Out of scope:** features that require Warp's cloud account, Warp AI gateway, Warp Drive cloud sync, Warpify SSO, billing, team/enterprise admin, or Warp's first-party telemetry. Those belong to upstream Warp.
   - type: checkboxes
     attributes:
       label: "Pre-submit Checks"
       options:
-        - label: "I have [searched Zap feature requests](https://github.com/zerx-lab/warp/issues?q=is%3Aissue+label%3Aenhancement) and there are no duplicates."
+        - label: "I have [searched InfiniShell-Desktop feature requests](https://github.com/Infinimesh-ai/InfiniShell-Desktop/issues?q=is%3Aissue+label%3Aenhancement) and there are no duplicates."
           required: true
-        - label: "I have read the [Zap README](https://github.com/zerx-lab/warp#readme) and this feature is not already supported."
+        - label: "I have read the [InfiniShell-Desktop README](https://github.com/Infinimesh-ai/InfiniShell-Desktop#readme) and this feature is not already supported."
           required: true
-        - label: "This request fits Zap's BYOP / local-first / privacy-first direction (it does NOT require Zap cloud account, Zap AI gateway, Zap Drive cloud sync, Warpify SSO, billing, or telemetry)."
+        - label: "This request fits InfiniShell-Desktop's BYOP / local-first / privacy-first direction (it does NOT require a Warp cloud account, Warp AI gateway, Warp Drive cloud sync, Warpify SSO, billing, or telemetry)."
           required: true
   - type: textarea
     id: "describe-solution"
@@ -42,15 +42,15 @@ body:
   - type: textarea
     id: "alignment"
     attributes:
-      label: "How does this align with Zap's direction?"
-      description: "Briefly explain which axis it improves: BYOP coverage, local-first/privacy, prompt-template authoring, preserved Zap UX, localization, or maintainability of the upstream-sync workflow."
+      label: "How does this align with InfiniShell-Desktop's direction?"
+      description: "Briefly explain which axis it improves: BYOP coverage, local-first/privacy, prompt-template authoring, preserved Warp UX, localization, or maintainability of the upstream-sync workflow."
     validations:
       required: false
   - type: textarea
     id: "additional-context"
     attributes:
       label: "Additional context"
-      description: "Mockups, screenshots, links, references to similar tools (opencode, Zed, etc.), or upstream Zap behavior worth contrasting."
+      description: "Mockups, screenshots, links, references to similar tools (opencode, Zed, etc.), or upstream Warp behavior worth contrasting."
     validations:
       required: false
   - type: dropdown

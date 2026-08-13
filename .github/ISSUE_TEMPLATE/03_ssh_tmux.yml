@@ -1,21 +1,21 @@
-name: SSH Warpify (tmux) Issue
-description: "SSH Warpification with tmux fails in Zap. Use this template for that specific scenario."
+name: SSH Shell Integration (tmux) Issue
+description: "SSH shell integration with tmux fails in InfiniShell-Desktop. Use this template for that specific scenario."
 labels: ["bug", "area:ssh"]
 body:
   - type: markdown
     attributes:
       value: |
-        Use this template only when SSH **Warpification** (subshell bootstrap over SSH with tmux) fails in **Zap**.
+        Use this template only when SSH **Shell Integration** (subshell bootstrap over SSH with tmux) fails in **InfiniShell-Desktop**.
 
-        - Cloud-account or Warpify-SSO issues belong to upstream Zap, not Zap.
+        - Cloud-account or Warpify-SSO issues belong to upstream Warp, not InfiniShell-Desktop.
         - For non-tmux SSH bootstrap failures, use the *Legacy SSH* template instead.
   - type: checkboxes
     attributes:
       label: "Pre-submit Checks"
       options:
-        - label: "I have [searched Zap SSH issues](https://github.com/zerx-lab/warp/issues?q=is%3Aissue+label%3Aarea%3Assh) and there are no duplicates."
+        - label: "I have [searched InfiniShell-Desktop SSH issues](https://github.com/Infinimesh-ai/InfiniShell-Desktop/issues?q=is%3Aissue+label%3Aarea%3Assh) and there are no duplicates."
           required: true
-        - label: "This is reproducible in **Zap** (not only in upstream Zap)."
+        - label: "This is reproducible in **InfiniShell-Desktop** (not only in upstream Warp)."
           required: true
         - label: "I have included relevant logs (`RUST_LOG=info` output, SSH/tmux session output). Optional, but greatly speeds up triage."
           required: false
@@ -68,9 +68,9 @@ body:
     validations:
       required: false
   - type: input
-    id: "zap-version"
+    id: "infinishell-desktop-version"
     attributes:
-      label: "Zap version / commit"
+      label: "InfiniShell-Desktop version / commit"
       description: "Open Settings → About to copy the version, or run `git rev-parse --short HEAD` if built from source."
     validations:
       required: true

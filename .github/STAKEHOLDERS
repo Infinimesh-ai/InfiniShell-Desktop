@@ -13,7 +13,7 @@
 # Team: App
 ###########################################################################
 
-# Conversation and session restoration / cloud-synced conversations / planning / Zap Drive
+# Conversation and session restoration / cloud-synced conversations / planning / InfiniShell-Desktop Drive
 /app/src/ai/agent_conversations_model.rs @seemeroland
 /app/src/ai/persisted_workspace.rs @seemeroland
 /app/src/ai/restored_conversations.rs @seemeroland
@@ -166,7 +166,7 @@
 # Self-hosted agents
 /crates/remote_server/ @kevinyang372 @alokedesai
 
-# Scheduled agents / Zap CLI / cloud and ambient agents
+# Scheduled agents / InfiniShell-Desktop CLI / cloud and ambient agents
 /app/src/ai/ambient_agents/ @bnavetta
 /app/src/terminal/view/ambient_agent/ @bnavetta
 /app/src/workspace/view/launch_modal/oz_launch.rs @bnavetta
@@ -178,5 +178,5 @@
 /crates/managed_secrets/ @bnavetta @ianhodge
 /crates/warp_web_event_bus/ @bnavetta @ianhodge
 
-# Shell completions in the Zap CLI
+# Shell completions in the InfiniShell-Desktop CLI
 /crates/warp_cli/src/completions.rs @zachbai @szgupta @alokedesai

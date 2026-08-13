@@ -16,8 +16,8 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    # 仅在配置了部署密钥时运行,避免 fork / 未配置环境时报错
-    if: ${{ github.repository == 'zerx-lab/zap' }}
+    # 仅在当前仓库显式启用网站部署时运行,避免 fork / 未配置环境时报错
+    if: ${{ github.repository == 'Infinimesh-ai/InfiniShell-Desktop' && vars.DEPLOY_WEBSITE_ENABLED == 'true' }}
     defaults:
       run:
         working-directory: website
@@ -47,7 +47,7 @@ jobs:
           PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           USER: ${{ secrets.DEPLOY_USER }}
           HOST: ${{ secrets.DEPLOY_HOST }}
-          # DEPLOY_PATH = 站点 index 目录,例如 /opt/1panel/www/sites/zap.zerx.dev/index
+          # DEPLOY_PATH = 站点 index 目录,例如 /opt/1panel/www/sites/infinishell-desktop/index
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           # 在站点父目录(index 的上一级)准备暂存区与脚本目录
