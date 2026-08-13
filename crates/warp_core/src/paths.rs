@@ -209,13 +209,21 @@ pub fn gui_mcp_config_file_path() -> Option<PathBuf> {
 /// Returns the macOS config directory name for the TUI front-end (`warp-tui`)
 /// for the current channel.
 ///
-/// This mirrors [`macos_config_dir_name`] but under a `.warp_cli*` directory so
-/// the TUI keeps its settings separate from the GUI's `.warp*` directory. Like
-/// the GUI names, these are persisted on disk as directory names and must not be
-/// changed once established.
+/// This mirrors [`macos_config_dir_name`] but uses a CLI-specific sibling directory
+/// (`.warp_cli*`, or `.infinishell_cli*` for OSS) so the TUI keeps its settings
+/// separate from the GUI. Like the GUI names, these are persisted on disk as
+/// directory names and must not be changed once established.
 #[cfg(target_os = "macos")]
 fn macos_tui_config_dir_name() -> String {
-    macos_config_dir_name().replacen(WARP_CONFIG_DIR, ".warp_cli", 1)
+    let config_dir_name = macos_config_dir_name();
+    match ChannelState::channel() {
+        Channel::Oss => config_dir_name.replacen(OSS_CONFIG_DIR, ".infinishell_cli", 1),
+        Channel::Stable
+        | Channel::Preview
+        | Channel::Dev
+        | Channel::Integration
+        | Channel::Local => config_dir_name.replacen(WARP_CONFIG_DIR, ".warp_cli", 1),
+    }
 }
 
 /// Returns the path to the directory where non-portable configuration files for
@@ -223,9 +231,9 @@ fn macos_tui_config_dir_name() -> String {
 ///
 /// This is intentionally distinct from [`config_local_dir`] so the GUI and the
 /// TUI never share (and clobber) a settings file. On macOS it is a sibling
-/// `.warp_cli*` directory (mirroring the GUI's `.warp*`); on other platforms —
-/// whose config dirs are already app-id based — it nests under a `cli`
-/// subdirectory of the standard config dir.
+/// CLI-specific sibling directory; on other platforms — whose config dirs are
+/// already app-id based — it nests under a `cli` subdirectory of the standard
+/// config dir.
 pub fn tui_config_local_dir() -> PathBuf {
     cfg_if! {
         if #[cfg(target_os = "macos")] {

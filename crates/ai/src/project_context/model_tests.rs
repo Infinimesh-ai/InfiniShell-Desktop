@@ -676,7 +676,10 @@ fn fast_path_finds_agents_md_in_cwd() {
     let entry = ProjectContextModel::scan_fast_path(&cwd);
     assert_eq!(entry.rules.len(), 1, "期望命中 1 个规则");
     assert_eq!(entry.rules[0].content, "hello agents");
-    assert_eq!(entry.rules[0].path, cwd.join("AGENTS.md"));
+    assert_eq!(
+        entry.rules[0].path,
+        LocalOrRemotePath::Local(cwd.join("AGENTS.md"))
+    );
     assert_eq!(entry.root_path, cwd);
     assert_eq!(entry.stamps.len(), 1);
 }
@@ -696,7 +699,10 @@ fn fast_path_warp_md_takes_priority_over_agents_md() {
         "同目录两个规则文件只取 1 个(对齐 RuleAtPath::respected_rule)"
     );
     assert_eq!(entry.rules[0].content, "warp wins");
-    assert_eq!(entry.rules[0].path, cwd.join("WARP.md"));
+    assert_eq!(
+        entry.rules[0].path,
+        LocalOrRemotePath::Local(cwd.join("WARP.md"))
+    );
 }
 
 #[cfg(feature = "local_fs")]
@@ -818,7 +824,10 @@ fn fast_path_finds_claude_md() {
     let entry = ProjectContextModel::scan_fast_path(&cwd);
     assert_eq!(entry.rules.len(), 1, "CLAUDE.md 应被默认识别");
     assert_eq!(entry.rules[0].content, "claude rules");
-    assert_eq!(entry.rules[0].path, cwd.join("CLAUDE.md"));
+    assert_eq!(
+        entry.rules[0].path,
+        LocalOrRemotePath::Local(cwd.join("CLAUDE.md"))
+    );
 }
 
 #[cfg(feature = "local_fs")]
@@ -832,7 +841,10 @@ fn fast_path_warp_md_priority_over_claude_md() {
     let entry = ProjectContextModel::scan_fast_path(&cwd);
     assert_eq!(entry.rules.len(), 1);
     assert_eq!(entry.rules[0].content, "warp wins");
-    assert_eq!(entry.rules[0].path, cwd.join("WARP.md"));
+    assert_eq!(
+        entry.rules[0].path,
+        LocalOrRemotePath::Local(cwd.join("WARP.md"))
+    );
 }
 
 #[cfg(feature = "local_fs")]
@@ -846,19 +858,22 @@ fn fast_path_agents_md_priority_over_claude_md() {
     let entry = ProjectContextModel::scan_fast_path(&cwd);
     assert_eq!(entry.rules.len(), 1);
     assert_eq!(entry.rules[0].content, "agents wins");
-    assert_eq!(entry.rules[0].path, cwd.join("AGENTS.md"));
+    assert_eq!(
+        entry.rules[0].path,
+        LocalOrRemotePath::Local(cwd.join("AGENTS.md"))
+    );
 }
 
 #[test]
 fn upsert_rule_recognizes_claude_md() {
     // 纯内存路径(不走 fs)验证 ProjectRules::upsert_rule 能识别 CLAUDE.md
     let mut rules = ProjectRules::default();
-    rules.upsert_rule(Path::new("/a/CLAUDE.md"), "claude in /a".to_string());
+    rules.upsert_rule(&local_path("/a/CLAUDE.md"), "claude in /a".to_string());
 
-    let path = PathBuf::from("/a/sub/file.rs");
+    let path = local_path("/a/sub/file.rs");
     let result = rules.find_active_or_applicable_rules(&path).active_rules;
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].path, PathBuf::from("/a/CLAUDE.md"));
+    assert_eq!(result[0].path, local_path("/a/CLAUDE.md"));
     assert_eq!(result[0].content, "claude in /a");
 }
 
@@ -866,57 +881,57 @@ fn upsert_rule_recognizes_claude_md() {
 fn upsert_rule_priority_three_way() {
     // 同目录同时存在 WARP / AGENTS / CLAUDE → 只拿优先级最高的 WARP
     let mut rules = ProjectRules::default();
-    rules.upsert_rule(Path::new("/a/WARP.md"), "warp".to_string());
-    rules.upsert_rule(Path::new("/a/AGENTS.md"), "agents".to_string());
-    rules.upsert_rule(Path::new("/a/CLAUDE.md"), "claude".to_string());
+    rules.upsert_rule(&local_path("/a/WARP.md"), "warp".to_string());
+    rules.upsert_rule(&local_path("/a/AGENTS.md"), "agents".to_string());
+    rules.upsert_rule(&local_path("/a/CLAUDE.md"), "claude".to_string());
 
     let result = rules
-        .find_active_or_applicable_rules(&PathBuf::from("/a/x.rs"))
+        .find_active_or_applicable_rules(&local_path("/a/x.rs"))
         .active_rules;
     assert_eq!(result.len(), 1, "同目录多个规则文件只取优先级最高的");
-    assert_eq!(result[0].path, PathBuf::from("/a/WARP.md"));
+    assert_eq!(result[0].path, local_path("/a/WARP.md"));
 }
 
 #[test]
 fn upsert_rule_priority_agents_beats_claude() {
     // 同目录 AGENTS + CLAUDE → 取 AGENTS
     let mut rules = ProjectRules::default();
-    rules.upsert_rule(Path::new("/a/AGENTS.md"), "agents".to_string());
-    rules.upsert_rule(Path::new("/a/CLAUDE.md"), "claude".to_string());
+    rules.upsert_rule(&local_path("/a/AGENTS.md"), "agents".to_string());
+    rules.upsert_rule(&local_path("/a/CLAUDE.md"), "claude".to_string());
 
     let result = rules
-        .find_active_or_applicable_rules(&PathBuf::from("/a/x.rs"))
+        .find_active_or_applicable_rules(&local_path("/a/x.rs"))
         .active_rules;
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].path, PathBuf::from("/a/AGENTS.md"));
+    assert_eq!(result[0].path, local_path("/a/AGENTS.md"));
 }
 
 #[test]
 fn remove_rule_recognizes_claude_md() {
     let mut rules = ProjectRules::default();
-    rules.upsert_rule(Path::new("/a/CLAUDE.md"), "x".to_string());
-    rules.upsert_rule(Path::new("/a/AGENTS.md"), "y".to_string());
+    rules.upsert_rule(&local_path("/a/CLAUDE.md"), "x".to_string());
+    rules.upsert_rule(&local_path("/a/AGENTS.md"), "y".to_string());
 
-    let removed = rules.remove_rule(Path::new("/a/CLAUDE.md"));
+    let removed = rules.remove_rule(&local_path("/a/CLAUDE.md"));
     assert!(removed.is_some(), "能移除 CLAUDE.md");
 
     // 移除 CLAUDE 后 AGENTS 仍保留为该目录的生效规则
     let result = rules
-        .find_active_or_applicable_rules(&PathBuf::from("/a/x.rs"))
+        .find_active_or_applicable_rules(&local_path("/a/x.rs"))
         .active_rules;
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].path, PathBuf::from("/a/AGENTS.md"));
+    assert_eq!(result[0].path, local_path("/a/AGENTS.md"));
 }
 
 #[test]
 fn upsert_rule_case_insensitive_filename() {
     // 大小写不敏感:claude.md / Agents.MD 也能识别
     let mut rules = ProjectRules::default();
-    rules.upsert_rule(Path::new("/a/claude.md"), "lower".to_string());
+    rules.upsert_rule(&local_path("/a/claude.md"), "lower".to_string());
 
     let result = rules
-        .find_active_or_applicable_rules(&PathBuf::from("/a/x.rs"))
+        .find_active_or_applicable_rules(&local_path("/a/x.rs"))
         .active_rules;
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].path, PathBuf::from("/a/claude.md"));
+    assert_eq!(result[0].path, local_path("/a/claude.md"));
 }

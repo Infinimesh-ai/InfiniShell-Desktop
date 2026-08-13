@@ -31,7 +31,6 @@ fn persisted_provider_api_key_updates_request_state() {
     warpui_core::App::test((), |mut app| async move {
         app.update(|ctx| {
             warpui_extras::secure_storage::register_noop("test", ctx);
-            warp_core::telemetry::testing::MockTelemetryContextProvider::register(ctx);
         });
         let manager = app.add_singleton_model(ApiKeyManager::new);
 
@@ -59,7 +58,6 @@ fn persisted_provider_api_key_can_be_cleared() {
     warpui_core::App::test((), |mut app| async move {
         app.update(|ctx| {
             warpui_extras::secure_storage::register_noop("test", ctx);
-            warp_core::telemetry::testing::MockTelemetryContextProvider::register(ctx);
         });
         let manager = app.add_singleton_model(ApiKeyManager::new);
 

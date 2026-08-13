@@ -1,4 +1,4 @@
-use warpui::color::ColorU;
+use warpui_core::color::ColorU;
 
 use super::*;
 use crate::ui::theme::mock_terminal_colors;
@@ -259,7 +259,7 @@ fn test_terminal_fallback_font_family_can_be_updated() {
 /// Also exercises the `theme_overrides.is_empty()` zero-cost fast path.
 #[test]
 fn test_per_window_theme_override_resolution() {
-    use warpui::{WindowId, current_render_window, set_current_render_window};
+    use warpui_core::{WindowId, current_render_window, set_current_render_window};
 
     let mut appearance = mock_appearance();
     let window_a = WindowId::from_usize(1);
