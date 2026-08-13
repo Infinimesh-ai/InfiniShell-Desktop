@@ -121,7 +121,9 @@ See [docs/roadmap.md](docs/roadmap.md).
 
 Issues and PRs are welcome — start with
 [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow, spec process and testing
-expectations. Security reports go through [SECURITY.md](SECURITY.md).
+expectations. To provision the repository's Linux and Windows self-hosted CI,
+see the [runner guide](docs/self-hosted-runners.zh-CN.md). Security reports go
+through [SECURITY.md](SECURITY.md).
 
 ## License
 

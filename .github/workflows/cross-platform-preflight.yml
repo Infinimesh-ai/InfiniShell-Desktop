@@ -1,0 +1,146 @@
+name: Cross-platform preflight
+
+on:
+  push:
+    branches:
+      - "ci/**"
+  workflow_dispatch:
+    inputs:
+      run_linux:
+        description: Run the Linux self-hosted job
+        required: true
+        default: true
+        type: boolean
+      run_windows:
+        description: Run the Windows self-hosted job
+        required: true
+        default: true
+        type: boolean
+      full_workspace_tests:
+        description: Run the full workspace nextest suite after focused checks
+        required: true
+        default: false
+        type: boolean
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+# 自托管 runner 只需要读取代码。这个 workflow 不接收部署密钥，也不向仓库写入内容。
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-platform-preflight-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  linux:
+    name: Linux x64
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_linux) ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       contains(github.event.pull_request.labels.*.name, 'self-hosted-ci'))
+    runs-on: [self-hosted, linux, x64, infinishell-ci]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          clean: true
+
+      - name: Verify provisioned toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          git --version
+          rustc --version
+          cargo --version
+          cmake --version
+          protoc --version
+
+      - name: Check Warp
+        shell: bash
+        run: cargo check -p warp --lib
+
+      - name: Test Responses integration
+        shell: bash
+        run: cargo test -p warp --lib responses -- --nocapture
+
+      - name: Test rust-genai
+        shell: bash
+        run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
+
+      - name: Run full workspace tests
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        shell: bash
+        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2
+
+  windows:
+    name: Windows x64
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_windows) ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       contains(github.event.pull_request.labels.*.name, 'self-hosted-ci'))
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          clean: true
+
+      - name: Configure Windows build environment
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          $strawberryPerl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (Test-Path $strawberryPerl) {
+            'C:\Strawberry\perl\bin' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+            "OPENSSL_SRC_PERL=$strawberryPerl" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+          $libclang = 'C:\Program Files\LLVM\bin'
+          if (Test-Path (Join-Path $libclang 'libclang.dll')) {
+            $libclang | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+            "LIBCLANG_PATH=$libclang" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+
+      - name: Verify provisioned toolchain
+        shell: pwsh
+        run: |
+          $commands = @('git', 'bash', 'rustc', 'cargo', 'cmake', 'protoc', 'perl')
+          foreach ($command in $commands) {
+            if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
+              throw "Required command is missing: $command"
+            }
+          }
+          git --version
+          rustc --version
+          cargo --version
+          cmake --version
+          protoc --version
+
+      - name: Check Warp
+        shell: pwsh
+        run: cargo check -p warp --lib
+
+      - name: Test Responses integration
+        shell: pwsh
+        run: cargo test -p warp --lib responses -- --nocapture
+
+      - name: Test rust-genai
+        shell: pwsh
+        run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
+
+      - name: Run full workspace tests
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        shell: pwsh
+        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2

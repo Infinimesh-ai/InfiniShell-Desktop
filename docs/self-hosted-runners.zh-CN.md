@@ -1,0 +1,149 @@
+# InfiniShell 自托管 CI Runner
+
+本仓库使用两台长期运行的 GitHub Actions self-hosted runner 做 Linux/Windows
+跨平台预检，不依赖 Oz 或 `oz-dev`。工作流位于
+`.github/workflows/cross-platform-preflight.yml`。
+
+## 1. Runner 约定
+
+| 平台 | 推荐名称 | 必需标签 |
+|---|---|---|
+| Linux x64 | `infinishell-linux-x64` | `self-hosted`, `linux`, `x64`, `infinishell-ci` |
+| Windows x64 | `infinishell-windows-x64` | `self-hosted`, `windows`, `x64`, `infinishell-ci` |
+
+`self-hosted`、操作系统和架构标签由 GitHub 自动添加；注册时只需添加自定义标签
+`infinishell-ci`。如果服务器实际是 ARM64，不要添加 `x64`，并同步调整 workflow。
+
+若 runner 供组织内多个仓库使用，建议创建 `infinishell-preflight` runner group，
+并只授权 `Infinimesh-ai/InfiniShell-Desktop`。如果两台机器仅供本仓库使用，直接注册
+repository-level runner 即可。
+
+## 2. 安全边界
+
+self-hosted runner 会直接执行仓库代码，因此两台服务器必须是专用构建机：
+
+- 使用独立低权限系统账号，不保存个人 SSH key、云凭据或生产密钥。
+- 不挂载开发机目录，不与生产服务共享 Docker socket 或管理员会话。
+- workflow 的 `GITHUB_TOKEN` 只授予 `contents: read`，checkout 不保留凭据。
+- PR 自动触发只接受同仓库分支，并且必须由维护者添加 `self-hosted-ci` label；fork PR
+  不会进入自托管 runner。
+- 建议用 VM 快照定期重置。长期复用机器时，应监控剩余磁盘并及时更新 runner 程序。
+- 初始安装依赖可能需要管理员权限；runner 服务账号日常不应拥有免密 root/管理员权限。
+
+## 3. Linux 安装
+
+推荐 Ubuntu 22.04/24.04 x64。创建专用账号并完成一次性依赖安装：
+
+```bash
+sudo useradd --create-home --shell /bin/bash infinishell-runner
+sudo -iu infinishell-runner
+git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git
+cd InfiniShell-Desktop
+```
+
+在允许该账号临时使用 `sudo` 的安装窗口中运行：
+
+```bash
+./script/linux/install_build_deps
+./script/install_cargo_test_deps
+```
+
+安装完成后撤销临时 sudo 权限。随后在 GitHub 仓库页面进入
+`Settings → Actions → Runners → New self-hosted runner`，选择 Linux/x64，复制页面当前
+版本的下载和校验命令。解压到 `/opt/actions-runner-infinishell` 后注册：
+
+```bash
+sudo mkdir -p /opt/actions-runner-infinishell
+sudo chown infinishell-runner:infinishell-runner /opt/actions-runner-infinishell
+cd /opt/actions-runner-infinishell
+```
+
+下载、校验和解压都应以 `infinishell-runner` 身份完成。然后执行：
+
+```bash
+./config.sh \
+  --url https://github.com/Infinimesh-ai/InfiniShell-Desktop \
+  --token '<GitHub 页面生成的短期 token>' \
+  --name infinishell-linux-x64 \
+  --labels infinishell-ci \
+  --work _work \
+  --unattended
+
+sudo ./svc.sh install infinishell-runner
+sudo ./svc.sh start
+sudo ./svc.sh status
+```
+
+服务启动后，GitHub Runners 页面应显示 `Idle`，并列出四个必需标签。
+
+## 4. Windows 安装
+
+推荐 Windows Server 2022 或 Windows 11 x64。创建专用本地账号，以该账号登录并在
+管理员 PowerShell 中准备仓库：
+
+```powershell
+git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git
+Set-Location InfiniShell-Desktop
+$env:WARP_SKIP_GCLOUD_AUTH = '1'
+.\script\windows\bootstrap.ps1
+```
+
+完成后重启终端，确认 `cargo`、MSVC/Windows SDK、CMake、LLVM、Strawberry Perl 和
+Protobuf 25.1 可用。Runner 建议安装到 `C:\actions-runner`。在 GitHub 的
+`New self-hosted runner → Windows → x64` 页面复制当前版本的下载命令，然后注册。不要把
+账户密码放到命令行；配置程序询问是否作为服务运行时选择 `Y`，并填写上一步的专用
+低权限 runner 账户：
+
+```powershell
+.\config.cmd --url https://github.com/Infinimesh-ai/InfiniShell-Desktop --token '<GitHub 页面生成的短期 token>' --name infinishell-windows-x64 --labels infinishell-ci --work _work
+```
+
+Windows 服务必须使用刚才完成工具链安装的专用账号，否则用户级 Rust、`PROTOC` 等环境
+变量不可见。安装完成后在 Services 中确认 GitHub Actions Runner 服务正在运行。
+
+## 5. 触发验证
+
+工作流尚未合并到默认分支时，推送 `ci/**` 分支即可同时运行 Linux 和 Windows 聚焦
+检查。这也用于首次确认 runner 配置：
+
+```bash
+git push origin HEAD:refs/heads/ci/responses-api
+```
+
+工作流进入默认分支后，建议在 GitHub 的 Actions 页面手动运行
+`Cross-platform preflight`。可单独关闭某个平台；`full_workspace_tests` 默认关闭，仅运行：
+
+```text
+cargo check -p warp --lib
+cargo test -p warp --lib responses -- --nocapture
+cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
+```
+
+需要发布前全量回归时，再开启 `full_workspace_tests`，追加：
+
+```text
+cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2
+```
+
+也可以使用 GitHub CLI：
+
+```bash
+gh workflow run cross-platform-preflight.yml \
+  --ref '<远端分支>' \
+  -f run_linux=true \
+  -f run_windows=true \
+  -f full_workspace_tests=false
+
+gh run list --workflow cross-platform-preflight.yml --limit 5
+```
+
+内部 PR 需要维护者添加 `self-hosted-ci` label 才会自动运行。Fork PR 永远不会运行。
+每次 PR 更新会取消同一 PR 正在运行的旧任务并验证最新提交。
+
+## 6. 日常维护
+
+- 每月检查 runner 版本、操作系统安全更新、Rust toolchain 和剩余磁盘。
+- 更新工具链后手动运行一次双平台预检。
+- Runner 离线时任务会排队；先从 GitHub Runners 页面检查 `Offline/Busy`，再检查系统服务。
+- 失败日志通过 Actions 页面或 `gh run view <run-id> --log-failed` 获取。
+- 替换服务器时重新注册并重新添加 `infinishell-ci` 标签；旧 runner 应从 GitHub 删除。
