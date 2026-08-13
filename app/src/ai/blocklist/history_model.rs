@@ -1549,12 +1549,8 @@ impl BlocklistAIHistoryModel {
             .filter_map(|t| t.source().cloned())
             .collect();
 
-        let updated_tasks_with_new_ids = update_forked_task_properties(
-            tasks.clone(),
-            prefix,
-            preserve_task_ids,
-            title_override,
-        );
+        let updated_tasks_with_new_ids =
+            update_forked_task_properties(tasks.clone(), prefix, preserve_task_ids, title_override);
         let byop_repair_state_json = byop_fork_repair_state_json(
             &tasks,
             &updated_tasks_with_new_ids,

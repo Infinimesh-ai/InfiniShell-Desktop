@@ -13,9 +13,10 @@
 //! - opencode v5 的 anthropicAdaptiveEfforts / OPENAI_EFFORTS 名单
 //! - 各 provider 官方文档的 thinking-mode model 列表
 
-use crate::settings::{AgentProviderApiType, ReasoningEffortSetting};
 use std::collections::HashSet;
 use std::sync::{OnceLock, RwLock};
+
+use crate::settings::{AgentProviderApiType, ReasoningEffortSetting};
 
 /// 返回指定 (api_type, model_id) 实际可用的 reasoning effort 档位列表。
 ///

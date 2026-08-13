@@ -57,10 +57,13 @@ fn try_create_mutex() -> Result<Option<MutexHandle>, Error> {
     // NOTE: This lock name must stay in sync with `AppMutexName` in
     // `script/windows/windows-installer.iss`, which the installer uses to detect whether
     // InfiniShell is running.
-    let name = format!("Local\\InfiniShell{:?}_SingleInstance", ChannelState::channel())
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect::<Vec<u16>>();
+    let name = format!(
+        "Local\\InfiniShell{:?}_SingleInstance",
+        ChannelState::channel()
+    )
+    .encode_utf16()
+    .chain(std::iter::once(0))
+    .collect::<Vec<u16>>();
     let handle = unsafe { CreateMutexW(None, true, windows::core::PCWSTR(name.as_ptr())) };
 
     // https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createmutexw#return-value

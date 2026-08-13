@@ -54,10 +54,8 @@ fn render_known_ssh_machines_block_none() {
 #[test]
 fn render_known_ssh_machines_block_escapes_index_and_forbids_auto_connect() {
     assert_eq!(
-        render_known_ssh_machines_block(Some(
-            "- web-01:22: nginx uses <custom.conf> & /opt/nginx"
-        ))
-        .unwrap(),
+        render_known_ssh_machines_block(Some("- web-01:22: nginx uses <custom.conf> & /opt/nginx"))
+            .unwrap(),
         "\n\n<known_ssh_machines>\n  \
          <fact>These are remote SSH machines known from previous sessions. Use this index to identify a machine when the user refers to it by name.</fact>\n  \
          <machines>\n- web-01:22: nginx uses &lt;custom.conf&gt; &amp; /opt/nginx\n  </machines>\n  \
@@ -73,24 +71,32 @@ fn render_known_ssh_machines_block_escapes_index_and_forbids_auto_connect() {
 fn machine_memory_tool_is_gated_by_machine_context() {
     let mut params = RequestParams::new_for_test(Vec::new(), Vec::new());
 
-    assert!(!available_tool_names(&params)
-        .iter()
-        .any(|name| name == tools::machine_memory::TOOL_NAME));
-    assert!(!build_tools_array(&params)
-        .iter()
-        .any(|tool| tool.name == tools::machine_memory::TOOL_NAME.into()));
+    assert!(
+        !available_tool_names(&params)
+            .iter()
+            .any(|name| name == tools::machine_memory::TOOL_NAME)
+    );
+    assert!(
+        !build_tools_array(&params)
+            .iter()
+            .any(|tool| tool.name == tools::machine_memory::TOOL_NAME.into())
+    );
 
     params.machine_memory = Some(MachineMemoryContext {
         machine_key: "web-01:22".to_owned(),
         content: String::new(),
     });
 
-    assert!(available_tool_names(&params)
-        .iter()
-        .any(|name| name == tools::machine_memory::TOOL_NAME));
-    assert!(build_tools_array(&params)
-        .iter()
-        .any(|tool| tool.name == tools::machine_memory::TOOL_NAME.into()));
+    assert!(
+        available_tool_names(&params)
+            .iter()
+            .any(|name| name == tools::machine_memory::TOOL_NAME)
+    );
+    assert!(
+        build_tools_array(&params)
+            .iter()
+            .any(|tool| tool.name == tools::machine_memory::TOOL_NAME.into())
+    );
 }
 
 #[test]

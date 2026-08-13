@@ -1,23 +1,23 @@
 // Zap(本地化,Phase 2d-1):本文件原先承担 "offline banner / 同步状态谓词" 的角色,
 // 在云端腿(SyncQueue / NetworkStatus 在线门控)被完全下线后这些代码全部失去意义,
 // 整体移除并精简 imports。Pane 容器视图本身保留,负责在 Rules / RuleEditor 两页之间切换。
+use std::path::PathBuf;
+
+use warp_core::ui::appearance::Appearance;
+use warp_util::local_or_remote_path::LocalOrRemotePath;
+use warpui::elements::{
+    Align, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, Flex,
+    MainAxisSize, ParentElement, ScrollbarWidth,
+};
+use warpui::{
+    AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
+    ViewContext, ViewHandle,
+};
+
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
 use crate::server::ids::SyncId;
-use std::path::PathBuf;
-use warp_core::ui::appearance::Appearance;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::{
-    elements::{
-        Align, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, Flex,
-        MainAxisSize, ParentElement, ScrollbarWidth,
-    },
-    AppContext, Element, Entity, FocusContext, ModelHandle, TypedActionView, View, ViewContext,
-};
-
-use warpui::elements::ChildView;
-use warpui::{SingletonEntity, ViewHandle};
 
 pub mod rule;
 pub mod rule_editor;

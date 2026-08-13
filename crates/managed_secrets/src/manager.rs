@@ -1,15 +1,15 @@
-use std::{collections::HashMap, future::Future, sync::Arc};
+use std::collections::HashMap;
+use std::future::Future;
+use std::sync::Arc;
 
 use warpui_core::{Entity, SingletonEntity};
 
-use crate::{
-    ManagedSecret, ManagedSecretValue,
-    client::{
-        IdentityTokenOptions, ManagedSecretConfigs, ManagedSecretsClient, SecretOwner,
-        TaskIdentityToken,
-    },
-    envelope::UploadKey,
+use crate::client::{
+    IdentityTokenOptions, ManagedSecretConfigs, ManagedSecretsClient, SecretOwner,
+    TaskIdentityToken,
 };
+use crate::envelope::UploadKey;
+use crate::{ManagedSecret, ManagedSecretValue};
 
 /// Singleton model for working with Zap-managed secrets.
 pub struct ManagedSecretManager {

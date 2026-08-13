@@ -689,7 +689,8 @@ impl ProjectContextModel {
     /// 后续请求百分百走正常路径(能拿到子目录规则 + watcher 实时更新)。
     #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
     pub fn find_rules_with_fast_path(&self, cwd: &Path) -> Option<ProjectRulesResult> {
-        if let Some(found) = self.find_applicable_rules(&LocalOrRemotePath::Local(cwd.to_path_buf()))
+        if let Some(found) =
+            self.find_applicable_rules(&LocalOrRemotePath::Local(cwd.to_path_buf()))
         {
             #[cfg(feature = "local_fs")]
             {

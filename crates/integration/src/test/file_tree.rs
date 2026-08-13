@@ -75,9 +75,12 @@ pub fn test_file_tree_opens_files_in_warp() -> Builder {
                 }),
         )
         .with_step(
-            new_step_with_default_assertions("Verify file opened in InfiniShell editor").add_assertion(
-                assert_pane_title(0, 1, Regex::new(r"test_file\.txt$").unwrap()),
-            ),
+            new_step_with_default_assertions("Verify file opened in InfiniShell editor")
+                .add_assertion(assert_pane_title(
+                    0,
+                    1,
+                    Regex::new(r"test_file\.txt$").unwrap(),
+                )),
         )
 }
 

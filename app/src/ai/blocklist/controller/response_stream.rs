@@ -1,26 +1,23 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::Arc;
 
-use crate::ai::api_error::AIApiError;
 use anyhow::anyhow;
 use chrono::{DateTime, Local, TimeDelta};
 use futures::channel::oneshot;
 use futures_util::StreamExt;
 use uuid::Uuid;
 use warp_multi_agent_api::response_event;
-use warpui::{Entity, ModelContext};
+use warpui::{Entity, ModelContext, SingletonEntity};
 
-use crate::{
-    ai::agent::{
-        api::{self, ConvertToAPITypeError},
-        conversation::AIConversationId,
-        AIAgentInput, AIIdentifiers, CancellationReason,
-    },
-    ai::blocklist::BlocklistAIHistoryModel,
-    ai::byop_readiness::BlockedByopReadinessError,
-    network::NetworkStatus,
-    report_error, send_telemetry_from_ctx,
-};
-use warpui::SingletonEntity;
+use crate::ai::agent::api::{self, ConvertToAPITypeError};
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::{AIAgentInput, AIIdentifiers, CancellationReason};
+use crate::ai::api_error::AIApiError;
+use crate::ai::blocklist::BlocklistAIHistoryModel;
+use crate::ai::byop_readiness::BlockedByopReadinessError;
+use crate::network::NetworkStatus;
+use crate::{report_error, send_telemetry_from_ctx};
 
 /// BYOP 路径的请求分流参数。从 LLMId、settings、conversation 中提取后
 /// 一次性塞给 spawn closure(ctx 不能跨 await 边界)。

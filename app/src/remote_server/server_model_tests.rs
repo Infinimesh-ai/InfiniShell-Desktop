@@ -6,16 +6,16 @@ use warp_util::standardized_path::StandardizedPath;
 use warpui::App;
 
 use super::super::diff_state_tracker::RemoteDiffStateManager;
+use super::super::proto::{
+    Authenticate, BundledSkillMetadata, HomeSkillMetadata, Initialize, RemoteAgentContextSnapshot,
+    RemoteContextFileProto, RemoteSkillProto, ServerMessage, WriteFileResponse, WriteFileSuccess,
+    remote_skill_proto, server_message, write_file_response,
+};
 #[cfg(feature = "local_fs")]
 use super::super::proto::{
     CreateDirectory, ListDirectory, ReadFileChunk, ResolvePath, WriteFileChunk,
     list_directory_response, read_file_chunk_response, resolve_path_response,
     write_file_chunk_response,
-};
-use super::super::proto::{
-    Authenticate, BundledSkillMetadata, HomeSkillMetadata, Initialize, RemoteAgentContextSnapshot,
-    RemoteContextFileProto, RemoteSkillProto, ServerMessage, WriteFileResponse, WriteFileSuccess,
-    remote_skill_proto, server_message, write_file_response,
 };
 use super::super::protocol::RequestId;
 #[cfg(feature = "local_fs")]
@@ -573,8 +573,7 @@ fn read_and_write_file_chunks_round_trip_binary_data() {
         else {
             panic!("expected WriteFileChunkResponse");
         };
-        let Some(write_file_chunk_response::Result::Success(write_success)) =
-            write_response.result
+        let Some(write_file_chunk_response::Result::Success(write_success)) = write_response.result
         else {
             panic!("expected write chunk success");
         };

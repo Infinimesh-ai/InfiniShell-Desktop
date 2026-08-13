@@ -16,27 +16,35 @@ pub(super) mod suggest_new_conversation;
 pub(super) mod suggest_prompt;
 pub(super) mod wait_for_events;
 
+use std::any::Any;
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::sync::Arc;
+
 use ai::agent::action_result::{InsertReviewCommentsResult, RequestCommandOutputResult};
 pub use ask_user_question::AskUserQuestionExecutor;
-pub(crate) use call_mcp_tool::coerce_integer_args;
 use call_mcp_tool::CallMCPToolExecutor;
+pub(crate) use call_mcp_tool::coerce_integer_args;
 use create_documents::CreateDocumentsExecutor;
 use edit_documents::EditDocumentsExecutor;
 use file_glob::FileGlobExecutor;
-use futures::{future::BoxFuture, FutureExt};
+#[cfg(feature = "local_fs")]
+use futures::AsyncReadExt;
+use futures::FutureExt;
+use futures::future::BoxFuture;
 use grep::GrepExecutor;
+#[cfg(feature = "local_fs")]
+use mime_guess::from_path;
 use parking_lot::FairMutex;
 use read_documents::ReadDocumentsExecutor;
 pub(super) use read_files::ReadFilesExecutor;
 use read_mcp_resource::ReadMCPResourceExecutor;
 use read_skill::ReadSkillExecutor;
-pub(crate) use request_file_edits::apply_edits;
-pub(crate) use request_file_edits::FileReadResult;
-pub(crate) use request_file_edits::MalformedFinalLineProxyEvent;
 pub use request_file_edits::{
     EditAcceptAndContinueClickedEvent, EditAcceptClickedEvent, EditResolvedEvent, EditStats,
     RequestFileEditsExecutor, RequestFileEditsFormatKind, RequestFileEditsTelemetryEvent,
 };
+pub(crate) use request_file_edits::{FileReadResult, MalformedFinalLineProxyEvent, apply_edits};
 pub use run_agents::{RunAgentsExecutor, RunAgentsExecutorEvent, RunAgentsSpawningSnapshot};
 #[cfg(test)]
 pub use run_agents::{compose_run_agents_child_prompt, run_agents_to_start_agent_mode};
@@ -52,51 +60,38 @@ pub use suggest_new_conversation::NewConversationDecision;
 use suggest_new_conversation::SuggestNewConversationExecutor;
 pub use suggest_prompt::{PromptSuggestionExecutor, PromptSuggestionExecutorEvent};
 use wait_for_events::WaitForEventsExecutor;
-use warp_core::{execution_mode::AppExecutionMode, features::FeatureFlag};
-
-#[cfg(feature = "local_fs")]
-use crate::util::openable_file_type::is_binary_file;
-#[cfg(feature = "local_fs")]
-use futures::AsyncReadExt;
-use std::{any::Any, path::PathBuf, pin::Pin, sync::Arc};
+use warp_core::execution_mode::AppExecutionMode;
+use warp_core::features::FeatureFlag;
 #[cfg(feature = "local_fs")]
 use warp_files::{FileModel, TextFileReadResult};
 #[cfg(feature = "local_fs")]
 use warp_util::file::FileLoadError;
 #[cfg(feature = "local_fs")]
 use warp_util::file_type::is_buffer_binary;
-use warpui::{
-    r#async::{Spawnable, SpawnableOutput},
-    AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity,
-};
+use warpui::r#async::{Spawnable, SpawnableOutput};
+use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
-#[cfg(feature = "local_fs")]
-use crate::util::image::{
-    is_supported_image_mime_type, process_image_for_agent, ProcessImageResult,
+use crate::BlocklistAIHistoryModel;
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::{
+    AIAgentAction, AIAgentActionId, AIAgentActionResult, AIAgentActionResultType,
+    AIAgentActionType, CancellationReason, FileContext, FileLocations, ServerOutputId,
 };
-#[cfg(feature = "local_fs")]
-use mime_guess::from_path;
-
+use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::ai::blocklist::telemetry::send_run_agents_completed_telemetry;
 #[cfg(feature = "local_fs")]
 use crate::ai::{agent::AnyFileContent, paths::host_native_absolute_path};
-use crate::{
-    ai::{
-        agent::{
-            conversation::AIConversationId, AIAgentAction, AIAgentActionId, AIAgentActionResult,
-            AIAgentActionResultType, AIAgentActionType, CancellationReason, FileContext,
-            FileLocations, ServerOutputId,
-        },
-        ambient_agents::AmbientAgentTaskId,
-        blocklist::telemetry::send_run_agents_completed_telemetry,
-    },
-    terminal::{
-        model::session::{active_session::ActiveSession, ExecuteCommandOptions, Session},
-        model_events::ModelEventDispatcher,
-        shell::ShellType,
-        ShellLaunchData, TerminalModel,
-    },
-    BlocklistAIHistoryModel,
+use crate::terminal::model::session::active_session::ActiveSession;
+use crate::terminal::model::session::{ExecuteCommandOptions, Session};
+use crate::terminal::model_events::ModelEventDispatcher;
+use crate::terminal::shell::ShellType;
+use crate::terminal::{ShellLaunchData, TerminalModel};
+#[cfg(feature = "local_fs")]
+use crate::util::image::{
+    ProcessImageResult, is_supported_image_mime_type, process_image_for_agent,
 };
+#[cfg(feature = "local_fs")]
+use crate::util::openable_file_type::is_binary_file;
 
 /// Types of actions that can be executed in parallel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -649,7 +649,7 @@ fn build_prompt_suggestions_byop_request(
     terminal_view_id: EntityId,
     ctx: &warpui::AppContext,
 ) -> Option<crate::ai::agent_providers::active_ai::RenderedRequest> {
-    use crate::ai::agent_providers::active_ai::{prompt_suggestions, BlockSnippet};
+    use crate::ai::agent_providers::active_ai::{BlockSnippet, prompt_suggestions};
 
     let exit_code = block.serialized_block.exit_code;
     let working_dir = block

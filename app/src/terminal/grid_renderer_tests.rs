@@ -1,23 +1,20 @@
-use pathfinder_geometry::rect::RectF;
-use pathfinder_geometry::vector::{Vector2F, vec2f};
-use warpui::fonts::Cache as FontCache;
-use warpui::units::{IntoLines, Lines, Pixels};
-
-use super::{CachedBackgroundColor, active_or_next_match};
-use crate::terminal::grid_size_util::calculate_grid_baseline_position;
-use crate::terminal::model::index::Point;
-use crate::terminal::model::selection::SelectionPoint;
 use std::any::Any;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::Result;
 use futures::FutureExt as _;
-use pathfinder_geometry::vector::Vector2I;
-use warpui::fonts::{FamilyId, FontId, GlyphId, Metrics, Properties};
+use pathfinder_geometry::rect::RectF;
+use pathfinder_geometry::vector::{Vector2F, Vector2I, vec2f};
+use warpui::fonts::{Cache as FontCache, FamilyId, FontId, GlyphId, Metrics, Properties};
 use warpui::platform::{self, LoadedSystemFonts, TextLayoutSystem};
 use warpui::text_layout::{ClipConfig, Line, TextAlignment, TextFrame};
+use warpui::units::{IntoLines, Lines, Pixels};
 
+use super::{CachedBackgroundColor, active_or_next_match};
+use crate::terminal::grid_size_util::calculate_grid_baseline_position;
+use crate::terminal::model::index::Point;
+use crate::terminal::model::selection::SelectionPoint;
 use crate::terminal::{SizeInfo, grid_renderer};
 
 fn rect_from_points(min_x: f32, min_y: f32, max_x: f32, max_y: f32) -> RectF {

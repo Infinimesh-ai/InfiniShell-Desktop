@@ -4,7 +4,7 @@ pub(crate) mod review;
 
 use std::fmt::Display;
 
-use warp_ssh_manager::{resolve_machine_key, MachineMemory, MachineMemoryRepository};
+use warp_ssh_manager::{MachineMemory, MachineMemoryRepository, resolve_machine_key};
 use warpui::{AppContext, SingletonEntity as _};
 
 use crate::ai::blocklist::SessionContext;

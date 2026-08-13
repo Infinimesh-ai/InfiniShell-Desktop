@@ -1,22 +1,19 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use ai::skills::SkillProvider;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
-use warpui::{
-    elements::{
-        Border, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
-        Container, CornerRadius, CrossAxisAlignment, Element, Fill as ElementFill, Flex, Hoverable,
-        MainAxisSize, MouseStateHandle, Padding, ParentElement, Radius, SavePosition, ScrollTarget,
-        ScrollToPositionMode, ScrollbarWidth, Shrinkable, Text,
-    },
-    platform::Cursor,
-    text_layout::ClipConfig,
-    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+use warpui::elements::{
+    Border, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
+    Container, CornerRadius, CrossAxisAlignment, Element, Fill as ElementFill, Flex, Hoverable,
+    MainAxisSize, MouseStateHandle, Padding, ParentElement, Radius, SavePosition, ScrollTarget,
+    ScrollToPositionMode, ScrollbarWidth, Shrinkable, Text,
 };
+use warpui::platform::Cursor;
+use warpui::text_layout::ClipConfig;
+use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
 
 use crate::ai::skills::{
     SkillInventoryDuplicate, SkillInventoryItem, SkillManager, SkillManagerEvent,
@@ -67,7 +64,10 @@ impl SkillManagerPanel {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
         let query_editor = ctx.add_typed_action_view(|ctx| {
             let options = EditorOptions {
-                text: TextOptions::ui_text(Some(Appearance::as_ref(ctx).ui_font_subheading()), Appearance::as_ref(ctx)),
+                text: TextOptions::ui_text(
+                    Some(Appearance::as_ref(ctx).ui_font_subheading()),
+                    Appearance::as_ref(ctx),
+                ),
                 propagate_and_no_op_vertical_navigation_keys:
                     PropagateAndNoOpNavigationKeys::AtBoundary,
                 propagate_horizontal_navigation_keys: PropagateHorizontalNavigationKeys::Always,

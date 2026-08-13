@@ -5,33 +5,35 @@
 //! `Code` 在侧边栏不再是 umbrella(没有第二个子页可挂),改为单层 Page。
 //! 页面渲染的就是这一组开关本身。
 
-#[cfg(feature = "local_fs")]
-use super::features::external_editor::ExternalEditorView;
-use super::{
-    flags,
-    settings_page::{
-        render_body_item, MatchData, PageType, SettingsPageMeta, SettingsPageViewHandle,
-        SettingsWidget,
-    },
-    LocalOnlyIconState, SettingsAction, SettingsSection, ToggleSettingActionPair, ToggleState,
-};
-use crate::{
-    appearance::Appearance, send_telemetry_from_ctx, settings::CodeSettings,
-    terminal::general_settings::GeneralSettings, workspace::tab_settings::TabSettings,
-    TelemetryEvent,
-};
-use ai::project_context::model::{ProjectContextModel, ProjectContextModelEvent};
-
 use std::path::PathBuf;
-use warp_core::{features::FeatureFlag, settings::ToggleableSetting as _};
+
+use ai::project_context::model::{ProjectContextModel, ProjectContextModelEvent};
+use warp_core::features::FeatureFlag;
+use warp_core::settings::ToggleableSetting as _;
 // Zap:错误上报入口已从 warp_core 迁移到 warp_errors crate。
 use warp_errors::report_if_error;
+use warpui::elements::{ChildView, Element, Empty};
+use warpui::keymap::ContextPredicate;
+use warpui::ui_components::components::UiComponent;
+use warpui::ui_components::switch::SwitchStateHandle;
 use warpui::{
-    elements::{ChildView, Element, Empty},
-    keymap::ContextPredicate,
-    ui_components::{components::UiComponent, switch::SwitchStateHandle},
     Action, AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
+
+#[cfg(feature = "local_fs")]
+use super::features::external_editor::ExternalEditorView;
+use super::settings_page::{
+    MatchData, PageType, SettingsPageMeta, SettingsPageViewHandle, SettingsWidget, render_body_item,
+};
+use super::{
+    LocalOnlyIconState, SettingsAction, SettingsSection, ToggleSettingActionPair, ToggleState,
+    flags,
+};
+use crate::appearance::Appearance;
+use crate::settings::CodeSettings;
+use crate::terminal::general_settings::GeneralSettings;
+use crate::workspace::tab_settings::TabSettings;
+use crate::{TelemetryEvent, send_telemetry_from_ctx};
 
 pub struct CodeSettingsPageView {
     page: PageType<Self>,
@@ -64,8 +66,7 @@ impl CodeSettingsPageView {
     fn build_page(
         ctx: &mut ViewContext<Self>,
     ) -> (PageType<Self>, Option<ViewHandle<ExternalEditorView>>) {
-        let (widgets, external_editor_view) = if FeatureFlag::ZapNewSettingsModes.is_enabled()
-        {
+        let (widgets, external_editor_view) = if FeatureFlag::ZapNewSettingsModes.is_enabled() {
             let editor_view = ctx.add_typed_action_view(ExternalEditorView::new);
             let widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
                 Box::new(ExternalEditorCodeWidget),
@@ -161,9 +162,11 @@ impl TypedActionView for CodeSettingsPageView {
             }
             CodeSettingsPageAction::ToggleShowCodeReviewDiffStats => {
                 TabSettings::handle(ctx).update(ctx, |settings, ctx| {
-                    report_if_error!(settings
-                        .show_code_review_diff_stats
-                        .toggle_and_save_value(ctx));
+                    report_if_error!(
+                        settings
+                            .show_code_review_diff_stats
+                            .toggle_and_save_value(ctx)
+                    );
                 });
                 ctx.notify();
             }
@@ -193,9 +196,11 @@ impl TypedActionView for CodeSettingsPageView {
             }
             CodeSettingsPageAction::ToggleAutoOpenCodeReviewPane => {
                 GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
-                    report_if_error!(settings
-                        .auto_open_code_review_pane_on_first_agent_change
-                        .toggle_and_save_value(ctx));
+                    report_if_error!(
+                        settings
+                            .auto_open_code_review_pane_on_first_agent_change
+                            .toggle_and_save_value(ctx)
+                    );
                 });
                 send_telemetry_from_ctx!(
                     TelemetryEvent::FeaturesPageAction {

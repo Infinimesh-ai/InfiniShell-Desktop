@@ -7,13 +7,13 @@
 //! 注:`rmcp::model::Tool` 与 `rmcp::model::Resource`(= `Annotated<RawResource>`)
 //! 来自上游 vendor crate,这里只用其公开构造路径(`Tool::new` / `RawResource::new`)。
 
-use rmcp::model::{AnnotateAble, RawResource, Tool};
-use serde_json::json;
 use std::sync::Arc;
 
-use crate::ai::agent::{MCPContext, MCPServer};
+use rmcp::model::{AnnotateAble, RawResource, Tool};
+use serde_json::json;
 
 use super::{build_mcp_tool_defs, function_name};
+use crate::ai::agent::{MCPContext, MCPServer};
 
 /// 构造一个 `rmcp::model::Tool`,带最小输入 schema。
 fn mk_tool(name: &'static str, desc: &'static str) -> Tool {

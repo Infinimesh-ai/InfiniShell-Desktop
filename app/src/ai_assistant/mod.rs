@@ -1,10 +1,13 @@
 //! AI Assistant has since been renamed to "InfiniShell AI" in the product.
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
+use std::sync::Arc;
 
-use crate::{server::telemetry::OpenedWarpAISource, terminal::model::terminal_model::BlockIndex};
 use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
 use warp_core::command::ExitCode;
+
+use crate::server::telemetry::OpenedWarpAISource;
+use crate::terminal::model::terminal_model::BlockIndex;
 
 pub mod execution_context;
 pub mod panel;

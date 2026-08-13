@@ -5,7 +5,13 @@ mod local_minidump;
 mod linux;
 
 use std::borrow::Cow;
+use std::collections::HashMap;
+
 use lazy_static::lazy_static;
+#[cfg(linux_or_windows)]
+pub use local_minidump::run_server as run_minidump_server;
+use parking_lot::RwLock;
+use regex::Regex;
 use warp_core::channel::Channel;
 use warpui::r#async::block_on;
 use warpui::rendering::GPUDeviceInfo;
@@ -18,12 +24,6 @@ use crate::auth::{AuthStateProvider, UserUid};
 use crate::channel::ChannelState;
 use crate::features::FeatureFlag;
 use crate::settings::{PrivacySettings, PrivacySettingsChangedEvent};
-use parking_lot::RwLock;
-use regex::Regex;
-use std::collections::HashMap;
-
-#[cfg(linux_or_windows)]
-pub use local_minidump::run_server as run_minidump_server;
 
 lazy_static! {
     /// A map from sensitive error messages to "scrubbed" error messages.

@@ -1,17 +1,17 @@
 use std::fmt::Debug;
 
-use crate::{
-    appearance::Appearance,
-    cloud_object::{
-        GenericStoredObject, GenericStringObjectFormat, GenericStringObjectUniqueKey, ObjectType,
-        SerializedModel, StoredObject, StoredObjectModel,
-    },
-    drive::{items::WarpDriveItem, ObjectTypeAndId},
-    persistence::ModelEvent,
-    server::ids::{ObjectUid, ServerId, SyncId},
-};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+
+use crate::appearance::Appearance;
+use crate::cloud_object::{
+    GenericStoredObject, GenericStringObjectFormat, GenericStringObjectUniqueKey, ObjectType,
+    SerializedModel, StoredObject, StoredObjectModel,
+};
+use crate::drive::ObjectTypeAndId;
+use crate::drive::items::WarpDriveItem;
+use crate::persistence::ModelEvent;
+use crate::server::ids::{ObjectUid, ServerId, SyncId};
 
 /// A trait that generic string-based objects should implement.
 pub trait StoredStringObject: StoredObject + Send + Sync {

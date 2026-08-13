@@ -21,8 +21,8 @@
 //!   return count >= usable(input)
 //! }
 //! ```
-use super::consts::COMPACTION_BUFFER;
 use super::CompactionConfig;
+use super::consts::COMPACTION_BUFFER;
 
 /// 模型 token 限制 — 来源:models.dev metadata 或 BYOP provider 配置。
 #[derive(Debug, Clone, Copy)]

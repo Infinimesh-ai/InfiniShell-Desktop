@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use warp_managed_secrets::client::{
     ManagedSecretConfigs, ManagedSecretsClient, SecretOwner, TaskIdentityToken,
@@ -65,6 +65,8 @@ impl ManagedSecretsClient for DisabledManagedSecretsClient {
         &self,
         _options: warp_managed_secrets::client::IdentityTokenOptions,
     ) -> Result<TaskIdentityToken> {
-        Err(anyhow!("Task identity token issuance disabled in InfiniShell"))
+        Err(anyhow!(
+            "Task identity token issuance disabled in InfiniShell"
+        ))
     }
 }

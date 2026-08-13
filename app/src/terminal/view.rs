@@ -14,6 +14,7 @@ pub(crate) mod queued_prompts_panel;
 #[path = "view/queued_prompts_tests.rs"]
 mod queued_prompts_tests;
 use ai::agent::action::InsertReviewComment;
+use fuzzy_match::match_indices_case_insensitive;
 pub use load_ai_conversation::ConversationRestorationInNewPaneType;
 use onboarding::callout::{FinalState, OnboardingCalloutViewEvent, OnboardingQuery};
 use onboarding::{OnboardingCalloutView, OnboardingKeybindings};
@@ -24,10 +25,9 @@ use warp_util::standardized_path::StandardizedPath;
 use crate::ai::block_context::BlockContext;
 #[cfg(feature = "local_fs")]
 use crate::ai::skills::SkillOpenOrigin;
+use crate::global_resource_handles::GlobalResourceHandlesProvider;
 use crate::ssh_manager::onekey::{OneKeyCredentialKind, load_saved_ssh_credentials};
 use crate::ssh_manager::password_prompt::bytes_look_like_password_prompt;
-use fuzzy_match::match_indices_case_insensitive;
-use crate::global_resource_handles::GlobalResourceHandlesProvider;
 pub(crate) mod docker_sandbox;
 mod link_detection;
 mod open_in_warp;
@@ -86,13 +86,13 @@ pub use init::{
 use init::{INPUT_BOX_VISIBLE_KEY, TOGGLE_BLOCK_FILTER_KEYBINDING};
 use inline_banner::{
     AliasExpansionBanner, AliasExpansionBannerAction, AwsBedrockLoginBannerAction,
-    AwsBedrockLoginBannerState,
-    AwsCliNotInstalledBannerAction, AwsCliNotInstalledBannerState, ByoLlmAuthBannerSessionState,
-    OpenInWarpBannerState, VimModeBannerAction, render_alias_expansion_banner,
-    render_aws_bedrock_login_banner, render_aws_cli_not_installed_banner,
-    render_inline_notifications_discovery_banner, render_inline_notifications_error_banner,
-    render_inline_shared_session_ended_banner, render_inline_shared_session_started_banner,
-    render_open_in_warp_banner, render_shell_process_terminated_banner, render_vim_mode_banner,
+    AwsBedrockLoginBannerState, AwsCliNotInstalledBannerAction, AwsCliNotInstalledBannerState,
+    ByoLlmAuthBannerSessionState, OpenInWarpBannerState, VimModeBannerAction,
+    render_alias_expansion_banner, render_aws_bedrock_login_banner,
+    render_aws_cli_not_installed_banner, render_inline_notifications_discovery_banner,
+    render_inline_notifications_error_banner, render_inline_shared_session_ended_banner,
+    render_inline_shared_session_started_banner, render_open_in_warp_banner,
+    render_shell_process_terminated_banner, render_vim_mode_banner,
 };
 pub use inline_banner::{NotificationsDiscoveryBannerAction, NotificationsErrorBannerAction};
 use instant::Instant;
@@ -107,10 +107,6 @@ use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::repositories::RepoDetectionSource;
 use serde::Serialize;
 use serde_json::json;
-use crate::terminal::shared_session::protocol::{
-    LongRunningCommandAgentInteractionState, ParticipantId, Role, SessionEndedReason,
-    WindowSize as SessionSharingWindowSize,
-};
 use settings::{Setting, ToggleableSetting};
 use shared_session::cloud_conversation_continuation::CloudConversationContinuationUiState;
 pub(crate) use shared_session::cloud_conversation_continuation::{
@@ -245,7 +241,6 @@ use crate::ai::blocklist::telemetry_banner::should_collect_ai_ugc_telemetry;
 use crate::ai::blocklist::usage::conversation_usage_view::{
     ConversationUsageInfo, ConversationUsageView, TimingInfo,
 };
-use crate::ai::blocklist::agent_shell_command_block_output;
 use crate::ai::blocklist::{
     AIBlock, AIBlockEvent, ATTACH_AS_AGENT_MODE_CONTEXT_TEXT, AutofireAction,
     BlocklistAIActionEvent, BlocklistAIActionModel, BlocklistAIContextEvent,
@@ -255,12 +250,11 @@ use crate::ai::blocklist::{
     InputTypeAutoDetectionSource, LegacyPassiveSuggestionsEvent, LegacyPassiveSuggestionsModel,
     MaaPassiveSuggestionsEvent, MaaPassiveSuggestionsModel, PRE_REWIND_PREFIX,
     PassiveSuggestionsModels, PendingAttachment, PendingQueryState, PromptSuggestionExecutor,
-    PromptSuggestionExecutorEvent, QueuedQuery, QueuedQueryId,
-    QueuedQueryModel, QueuedQueryOrigin, RequestFileEditsFormatKind, ShellCommandExecutor,
-    ShellCommandExecutorEvent, SlashCommandRequest, ai_brand_color,
-    block_context_from_terminal_model,
-    get_ai_block_overflow_menu_element_position_id, get_attached_blocks_chip_element_position_id,
-    is_lrc_auto_queue_active,
+    PromptSuggestionExecutorEvent, QueuedQuery, QueuedQueryId, QueuedQueryModel, QueuedQueryOrigin,
+    RequestFileEditsFormatKind, ShellCommandExecutor, ShellCommandExecutorEvent,
+    SlashCommandRequest, agent_shell_command_block_output, ai_brand_color,
+    block_context_from_terminal_model, get_ai_block_overflow_menu_element_position_id,
+    get_attached_blocks_chip_element_position_id, is_lrc_auto_queue_active,
 };
 use crate::ai::conversation_utils;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentModel, AIDocumentVersion};
@@ -276,10 +270,7 @@ use crate::ai::predict::prompt_suggestions::{
 use crate::ai_assistant::{ASK_AI_ASSISTANT_TEXT, AskAIType};
 use crate::antivirus::AntivirusInfo;
 use crate::appearance::{Appearance, AppearanceEvent};
-use crate::auth::AuthManager;
-use crate::auth::AuthState;
-use crate::auth::AuthViewVariant;
-use crate::auth::AuthStateProvider;
+use crate::auth::{AuthManager, AuthState, AuthStateProvider, AuthViewVariant};
 use crate::autoupdate::{self, AutoupdateStage, get_update_state};
 use crate::banner::{
     Banner, BannerAction, BannerEvent, BannerState, BannerTextButton, BannerTextContent,
@@ -287,6 +278,7 @@ use crate::banner::{
 };
 use crate::cloud_object::model::actions::ObjectActionType;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::update_manager::UpdateManager;
 use crate::cloud_object::{GenericStringObjectFormat, JsonObjectType, StoredObject};
 #[cfg(feature = "local_fs")]
 use crate::code::editor_management::CodeSource;
@@ -314,7 +306,8 @@ use crate::drive::settings::WarpDriveSettings;
 use crate::drive::sharing::ShareableObject;
 use crate::editor::{
     AutosuggestionType, CrdtOperation, EditorAction, EditorView, Event as EditorEvent,
-    PropagateAndNoOpEscapeKey, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions, TextOptions,
+    PropagateAndNoOpEscapeKey, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
+    TextOptions,
 };
 use crate::env_vars::env_var_collection_block::{
     EnvVarCollectionBlock, EnvVarCollectionBlockEvent,
@@ -336,13 +329,13 @@ use crate::resource_center::{
     Tip, TipHint, TipsCompleted, mark_feature_used_and_write_to_user_defaults,
 };
 use crate::search::slash_command_menu::static_commands::commands;
-use crate::cloud_object::update_manager::UpdateManager;
 use crate::server::ids::{ObjectUid, SyncId};
 use crate::server::telemetry::{
     self, AgentModeAttachContextMethod, AgentModeEntrypoint, AgentModeRewindEntrypoint,
     BootstrappingInfo, InteractionSource, NotificationAgentVariant, NotificationsTurnedOnSource,
-    PaletteSource, PromptSuggestionViewType, SaveAsWorkflowModalSource, SecretInteraction,
-    SlowBootstrapInfo, TelemetryEvent, ToggleBlockFilterSource, WorkflowTelemetryMetadata,
+    PaletteSource, PromptSuggestionFallbackReason, PromptSuggestionViewType,
+    SaveAsWorkflowModalSource, SecretInteraction, SlowBootstrapInfo, TelemetryEvent,
+    ToggleBlockFilterSource, WorkflowTelemetryMetadata,
 };
 use crate::session_management::{CommandContext, SessionNavigationPromptElements};
 use crate::settings::ai::FocusedTerminalInfo;
@@ -449,6 +442,10 @@ use crate::terminal::session_settings::{
     SessionSettings, SessionSettingsChangedEvent, ToolbarChipSelection,
 };
 use crate::terminal::settings::{TerminalSettings, TerminalSettingsChangedEvent};
+use crate::terminal::shared_session::protocol::{
+    LongRunningCommandAgentInteractionState, ParticipantId, Role, SessionEndedReason,
+    WindowSize as SessionSharingWindowSize,
+};
 use crate::terminal::shared_session::{
     SharedSessionActionSource, SharedSessionScrollbackType, SharedSessionSource,
     SharedSessionStatus,
@@ -474,7 +471,6 @@ use crate::terminal::view::ssh_remote_server_failed_banner::{
 use crate::terminal::view::ssh_tmux_deprecation_banner::{
     SshTmuxDeprecationBanner, SshTmuxDeprecationBannerEvent,
 };
-use crate::server::telemetry::PromptSuggestionFallbackReason;
 use crate::terminal::view::zero_state_block::TerminalViewZeroStateBlock;
 use crate::terminal::warpify::SubshellSource;
 use crate::terminal::warpify::render::render_subshell_separator;
@@ -635,16 +631,13 @@ const ENV_VAR_BOOTSTRAP_FAILED_DURATION: Duration = Duration::from_secs(60);
 /// dismissal keeps the warning informational without turning it into a
 /// permanent fixture.
 const SLOW_BOOTSTRAP_BANNER_AUTO_DISMISS_DURATION: Duration = Duration::from_secs(30);
-const KNOWN_ISSUES_URL: &str =
-    "";
+const KNOWN_ISSUES_URL: &str = "";
 
 /// Link to supported custom prompts.
-const PROMPT_COMPATIBILITY_URL: &str =
-    "";
+const PROMPT_COMPATIBILITY_URL: &str = "";
 
 /// Link to troubleshooting steps for ControlMaster errors.
-const CONTROLMASTER_ISSUES_URL: &str =
-    "";
+const CONTROLMASTER_ISSUES_URL: &str = "";
 
 /// Link to instructions on how to update p10k.
 const P10K_UPDATE_INSTRUCTIONS_URL: &str =
@@ -670,10 +663,8 @@ const MIN_DELTA_FOR_TEXT_SELECTION: f32 = 0.5;
 
 /// Notifications-specific info
 /// TODO (suraj): add documentation for notifications in gitbook
-const NOTIFICATIONS_LEARN_MORE_URL: &str =
-    "";
-pub const NOTIFICATIONS_TROUBLESHOOT_URL: &str =
-    "";
+const NOTIFICATIONS_LEARN_MORE_URL: &str = "";
+pub const NOTIFICATIONS_TROUBLESHOOT_URL: &str = "";
 
 const DEBOUNCE_PERIOD: Duration = Duration::from_millis(40);
 
@@ -2078,7 +2069,9 @@ impl ContextMenuInfo {
             ContextMenuType::BlockList { .. } => "Block",
             ContextMenuType::Prompt { .. } => "Prompt",
             ContextMenuType::Input { .. } => "Input",
-            ContextMenuType::OneKeyPrompt | ContextMenuType::SuRootPasswordConfirm => "OneKeyPrompt",
+            ContextMenuType::OneKeyPrompt | ContextMenuType::SuRootPasswordConfirm => {
+                "OneKeyPrompt"
+            }
             ContextMenuType::AltScreen { .. } => "AltScreen",
             ContextMenuType::AIBlockAttachedContext { .. } => "AIBlockContextList",
             ContextMenuType::AIBlockOverflowMenu { .. } => "AIBlockOverflowMenu",
@@ -2100,7 +2093,9 @@ impl ContextMenuInfo {
             },
             ContextMenuType::Prompt { .. } => "RightClick",
             ContextMenuType::Input { .. } => "RightClick",
-            ContextMenuType::OneKeyPrompt | ContextMenuType::SuRootPasswordConfirm => "PasswordPrompt",
+            ContextMenuType::OneKeyPrompt | ContextMenuType::SuRootPasswordConfirm => {
+                "PasswordPrompt"
+            }
             ContextMenuType::AltScreen { .. } => "AltScreen",
             ContextMenuType::AIBlockAttachedContext { .. } => "AIBlockAttachedBlockChipLeftClick",
             ContextMenuType::AIBlockOverflowMenu { .. } => "AIBlockOverflowMenuClick",
@@ -6522,12 +6517,7 @@ impl TerminalView {
 
         let should_forward_windows_ctrl_c = is_live;
         ctx.subscribe_to_view(&subagent_view, move |me, view, event, ctx| {
-            me.handle_cli_subagent_view_event(
-                view.id(),
-                event,
-                should_forward_windows_ctrl_c,
-                ctx,
-            );
+            me.handle_cli_subagent_view_event(view.id(), event, should_forward_windows_ctrl_c, ctx);
         });
 
         if is_live {
@@ -9842,7 +9832,9 @@ impl TerminalView {
                 keystroke.displayed(),
                 lowercase_title
             ),
-            None => format!("You can Warpify this {lowercase_title} for more InfiniShell features."),
+            None => {
+                format!("You can Warpify this {lowercase_title} for more InfiniShell features.")
+            }
         };
 
         model
@@ -11787,8 +11779,10 @@ impl TerminalView {
 
                                     // 使用 OSC 9 通知的 agent 不会发结构化 SessionStart 事件，
                                     // 因此在命令检测时主动创建监听器。
-                                    if let Some((agent @ (CLIAgent::Codex | CLIAgent::DeepSeek), _)) =
-                                        detection
+                                    if let Some((
+                                        agent @ (CLIAgent::Codex | CLIAgent::DeepSeek),
+                                        _,
+                                    )) = detection
                                     {
                                         me.register_cli_agent_listener_without_session_start_event(
                                             agent, ctx,
@@ -15243,12 +15237,12 @@ impl TerminalView {
         // PowerShell 不支持 bracketed paste,多行命令需包成脚本块,与
         // ExecuteCommand 分支同款处理。
         let trimmed = command.trim();
-        let command = if matches!(shell_family, Some(ShellFamily::PowerShell)) && trimmed.contains('\n')
-        {
-            format!(". {{ {trimmed} }}")
-        } else {
-            command.to_owned()
-        };
+        let command =
+            if matches!(shell_family, Some(ShellFamily::PowerShell)) && trimmed.contains('\n') {
+                format!(". {{ {trimmed} }}")
+            } else {
+                command.to_owned()
+            };
         let metadata = AgentInteractionMetadata::new_hidden(action_id, conversation_id);
         ctx.emit(Event::ExecuteCommand(ExecuteCommandEvent {
             command,
@@ -15928,11 +15922,13 @@ impl TerminalView {
                             Some(model.link_at_range(url, RespectObfuscatedSecrets::Yes));
                         url_content
                             .map(|url_content| {
-                                vec![MenuItemFields::new(crate::t!("menu-block-copy-url"))
-                                    .with_on_select_action(TerminalAction::ContextMenu(
-                                        ContextMenuAction::CopyUrl { url_content },
-                                    ))
-                                    .into_item()]
+                                vec![
+                                    MenuItemFields::new(crate::t!("menu-block-copy-url"))
+                                        .with_on_select_action(TerminalAction::ContextMenu(
+                                            ContextMenuAction::CopyUrl { url_content },
+                                        ))
+                                        .into_item(),
+                                ]
                             })
                             .unwrap_or_default()
                     }
@@ -16233,28 +16229,30 @@ impl TerminalView {
                         ))
                         .into_item(),
                 ]);
-                items.append(&mut vec![MenuItemFields::new(crate::t!(
-                    "menu-block-toggle-block-filter"
-                ))
-                .with_on_select_action(TerminalAction::ToggleBlockFilterOnSelectedOrLastBlock(
-                    ToggleBlockFilterSource::ContextMenu,
-                ))
-                .with_key_shortcut_label(keybinding_name_to_display_string(
-                    TOGGLE_BLOCK_FILTER_KEYBINDING,
-                    ctx,
-                ))
-                .into_item()]);
-                items.append(&mut vec![MenuItemFields::new(crate::t!(
-                    "menu-block-toggle-bookmark"
-                ))
-                .with_on_select_action(TerminalAction::ContextMenu(
-                    ContextMenuAction::ToggleBookmark,
-                ))
-                .with_key_shortcut_label(keybinding_name_to_display_string(
-                    "terminal:bookmark_selected_block",
-                    ctx,
-                ))
-                .into_item()]);
+                items.append(&mut vec![
+                    MenuItemFields::new(crate::t!("menu-block-toggle-block-filter"))
+                        .with_on_select_action(
+                            TerminalAction::ToggleBlockFilterOnSelectedOrLastBlock(
+                                ToggleBlockFilterSource::ContextMenu,
+                            ),
+                        )
+                        .with_key_shortcut_label(keybinding_name_to_display_string(
+                            TOGGLE_BLOCK_FILTER_KEYBINDING,
+                            ctx,
+                        ))
+                        .into_item(),
+                ]);
+                items.append(&mut vec![
+                    MenuItemFields::new(crate::t!("menu-block-toggle-bookmark"))
+                        .with_on_select_action(TerminalAction::ContextMenu(
+                            ContextMenuAction::ToggleBookmark,
+                        ))
+                        .with_key_shortcut_label(keybinding_name_to_display_string(
+                            "terminal:bookmark_selected_block",
+                            ctx,
+                        ))
+                        .into_item(),
+                ]);
 
                 items.append(&mut vec![
                     MenuItem::Separator,
@@ -16490,12 +16488,14 @@ impl TerminalView {
         is_rprompt_shown: bool,
         position: PromptPosition,
     ) -> Vec<MenuItem<TerminalAction>> {
-        let mut items = vec![MenuItemFields::new(crate::t!("menu-block-copy-prompt"))
-            .with_on_select_action(TerminalAction::ContextMenu(ContextMenuAction::CopyPrompt {
-                position,
-                part: PromptPart::EntirePrompt,
-            }))
-            .into_item()];
+        let mut items = vec![
+            MenuItemFields::new(crate::t!("menu-block-copy-prompt"))
+                .with_on_select_action(TerminalAction::ContextMenu(ContextMenuAction::CopyPrompt {
+                    position,
+                    part: PromptPart::EntirePrompt,
+                }))
+                .into_item(),
+        ];
 
         if is_rprompt_shown {
             items.push(
@@ -27474,27 +27474,31 @@ impl View for TerminalView {
                     }
                 },
             ),
-            Some(ContextMenuType::OneKeyPrompt) | Some(ContextMenuType::SuRootPasswordConfirm) => stack.add_positioned_overlay_child(
-                ChildView::new(&self.context_menu).finish(),
-                match input_mode {
-                    InputMode::PinnedToBottom | InputMode::Waterfall => {
-                        OffsetPositioning::offset_from_save_position_element(
-                            self.input.as_ref(app).save_position_id(),
-                            vec2f(0., -8.),
-                            PositionedElementOffsetBounds::WindowByPosition,
-                            PositionedElementAnchor::TopLeft,
-                            ChildAnchor::BottomLeft,
-                        )
-                    }
-                    InputMode::PinnedToTop => OffsetPositioning::offset_from_save_position_element(
-                        self.input.as_ref(app).save_position_id(),
-                        vec2f(0., 8.),
-                        PositionedElementOffsetBounds::WindowByPosition,
-                        PositionedElementAnchor::BottomLeft,
-                        ChildAnchor::TopLeft,
-                    ),
-                },
-            ),
+            Some(ContextMenuType::OneKeyPrompt) | Some(ContextMenuType::SuRootPasswordConfirm) => {
+                stack.add_positioned_overlay_child(
+                    ChildView::new(&self.context_menu).finish(),
+                    match input_mode {
+                        InputMode::PinnedToBottom | InputMode::Waterfall => {
+                            OffsetPositioning::offset_from_save_position_element(
+                                self.input.as_ref(app).save_position_id(),
+                                vec2f(0., -8.),
+                                PositionedElementOffsetBounds::WindowByPosition,
+                                PositionedElementAnchor::TopLeft,
+                                ChildAnchor::BottomLeft,
+                            )
+                        }
+                        InputMode::PinnedToTop => {
+                            OffsetPositioning::offset_from_save_position_element(
+                                self.input.as_ref(app).save_position_id(),
+                                vec2f(0., 8.),
+                                PositionedElementOffsetBounds::WindowByPosition,
+                                PositionedElementAnchor::BottomLeft,
+                                ChildAnchor::TopLeft,
+                            )
+                        }
+                    },
+                )
+            }
             Some(ContextMenuType::AIBlockAttachedContext { ai_block_view_id }) => stack
                 .add_positioned_overlay_child(
                     ChildView::new(&self.context_menu).finish(),

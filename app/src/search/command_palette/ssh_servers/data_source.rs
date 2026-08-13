@@ -1,13 +1,12 @@
-use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
+use fuzzy_match::{FuzzyMatchResult, match_indices_case_insensitive};
 use itertools::Itertools;
+use warp_ssh_manager::{NodeKind, SshRepository};
 use warpui::{AppContext, Entity};
 
 use super::SshServerSearchItem;
 use crate::search::command_palette::mixer::CommandPaletteItemAction;
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::{DataSourceRunErrorWrapper, SyncDataSource};
-
-use warp_ssh_manager::{NodeKind, SshRepository};
 
 /// 上限。SSH 一般几个到几十个,不会爆。
 const MAX_SSH_SERVERS_CONSIDERED: usize = 200;

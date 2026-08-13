@@ -11,23 +11,22 @@ use warpui::platform::OperatingSystem;
 use warpui::{AppContext, Entity, ModelHandle, SingletonEntity, View, ViewContext};
 
 use super::{AgentViewState, EphemeralMessageModel, EphemeralMessageModelEvent};
+use crate::BlocklistAIHistoryModel;
 use crate::ai::agent::conversation::AIConversation;
 use crate::ai::agent::{
     AIAgentExchangeId, AIAgentOutputStatus, FinishedAIAgentOutput, RenderableAIError,
 };
 use crate::ai::blocklist::agent_view::shortcuts::AgentShortcutViewModel;
 use crate::ai::blocklist::agent_view::{
-    agent_view_bg_fill, AgentViewController, AgentViewControllerEvent,
+    AgentViewController, AgentViewControllerEvent, agent_view_bg_fill,
 };
 use crate::ai::blocklist::{
     BlocklistAIContextEvent, BlocklistAIContextModel, BlocklistAIHistoryEvent,
     BlocklistAIInputEvent, BlocklistAIInputModel,
 };
 use crate::ai::document::ai_document_model::{AIDocumentModel, AIDocumentModelEvent};
-use crate::ai::mcp::{
-    templatable_manager::{FigmaMcpStatus, TemplatableMCPServerManagerEvent},
-    TemplatableMCPServerManager,
-};
+use crate::ai::mcp::TemplatableMCPServerManager;
+use crate::ai::mcp::templatable_manager::{FigmaMcpStatus, TemplatableMCPServerManagerEvent};
 use crate::ai::request_usage_model::{AIRequestUsageModel, AIRequestUsageModelEvent};
 use crate::search::slash_command_menu::static_commands::commands;
 use crate::settings::{InputSettings, InputSettingsChangedEvent};
@@ -50,10 +49,9 @@ use crate::terminal::model::TerminalModel;
 use crate::terminal::view::TerminalAction;
 use crate::ui_components::blended_colors;
 use crate::util::bindings::keybinding_name_to_keystroke;
-use crate::workspace::tab_settings::{TabSettings, TabSettingsChangedEvent};
 #[cfg(not(target_family = "wasm"))]
 use crate::workspace::WorkspaceAction;
-use crate::BlocklistAIHistoryModel;
+use crate::workspace::tab_settings::{TabSettings, TabSettingsChangedEvent};
 
 const FIGMA_ICON_SIZE: f32 = 14.;
 

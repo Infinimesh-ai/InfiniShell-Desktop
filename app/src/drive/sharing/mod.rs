@@ -1,23 +1,20 @@
-use std::{borrow::Cow, str::FromStr};
+use std::borrow::Cow;
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use warp_core::ui::appearance::Appearance;
-use warpui::{
-    color::ColorU,
-    ui_components::components::{UiComponent, UiComponentStyles},
-    AppContext, SingletonEntity,
-};
+use warpui::color::ColorU;
+use warpui::ui_components::components::{UiComponent, UiComponentStyles};
+use warpui::{AppContext, SingletonEntity};
 
-use crate::{
-    auth::UserUid,
-    cloud_object::{model::persistence::ObjectStoreModel, Owner},
-    server::ids::ServerId,
-    ui_components::{
-        avatar::{Avatar, AvatarContent},
-        icons::Icon,
-    },
-    workspaces::{user_profiles::UserProfiles, user_workspaces::UserWorkspaces},
-};
+use crate::auth::UserUid;
+use crate::cloud_object::Owner;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::server::ids::ServerId;
+use crate::ui_components::avatar::{Avatar, AvatarContent};
+use crate::ui_components::icons::Icon;
+use crate::workspaces::user_profiles::UserProfiles;
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 // Zap Phase 2a: `dialog/` (cloud sharing modal UI) deleted along with
 // all consumer triggers. `style.rs` is retained because the Subject /

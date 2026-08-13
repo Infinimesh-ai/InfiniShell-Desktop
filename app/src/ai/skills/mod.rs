@@ -28,7 +28,9 @@ pub use ai::skills::SkillReference;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(target_family = "wasm", allow(dead_code))]
 pub enum SkillManagerEvent {
-    SkillsChanged { home_skills_changed: bool },
+    SkillsChanged {
+        home_skills_changed: bool,
+    },
     /// Zap 自有:skill 清单发生变化,Skill 管理面板据此刷新。
     InventoryChanged,
 }

@@ -6,16 +6,11 @@
 
 use warpui::{AppContext, ModelHandle, View, ViewContext, ViewHandle};
 
-use crate::{
-    app_state::LeafContents,
-    pane_group::{
-        pane::{ShareableLink, ShareableLinkError},
-        BackingView, PaneConfiguration, PaneContent, PaneGroup, PaneView,
-    },
-    ssh_manager::server_view::SshServerView,
-};
-
 use super::PaneId;
+use crate::app_state::LeafContents;
+use crate::pane_group::pane::{ShareableLink, ShareableLinkError};
+use crate::pane_group::{BackingView, PaneConfiguration, PaneContent, PaneGroup, PaneView};
+use crate::ssh_manager::server_view::SshServerView;
 
 pub struct SshServerPane {
     view: ViewHandle<PaneView<SshServerView>>,

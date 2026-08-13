@@ -3,8 +3,8 @@
 use serde_json::json;
 
 use super::{
-    aggregate_results, host_result_to_json, is_canary_failure, truncate_output, BatchHostResult,
-    BatchHostStatus, OUTPUT_MAX_CHARS,
+    BatchHostResult, BatchHostStatus, OUTPUT_MAX_CHARS, aggregate_results, host_result_to_json,
+    is_canary_failure, truncate_output,
 };
 
 fn ok_result(node_id: &str) -> BatchHostResult {
@@ -100,6 +100,9 @@ fn status_strings_are_stable() {
     assert_eq!(BatchHostStatus::Error.as_str(), "error");
     assert_eq!(BatchHostStatus::Timeout.as_str(), "timeout");
     assert_eq!(BatchHostStatus::Busy.as_str(), "busy");
-    assert_eq!(BatchHostStatus::SessionNotReady.as_str(), "session_not_ready");
+    assert_eq!(
+        BatchHostStatus::SessionNotReady.as_str(),
+        "session_not_ready"
+    );
     assert_eq!(BatchHostStatus::CanaryAborted.as_str(), "canary_aborted");
 }

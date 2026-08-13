@@ -7,8 +7,8 @@ use warpui::{App, SingletonEntity};
 
 use super::{
     AIConversation, AIConversationAutoexecuteMode, AIConversationId, ConversationStatus,
-    ConversationUsageTotals, RestoreConversationError, TaskId,
-    artifact_from_fork_proto, footer_model_token_usage,
+    ConversationUsageTotals, RestoreConversationError, TaskId, artifact_from_fork_proto,
+    footer_model_token_usage,
 };
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::SerializedBlockListItem;
@@ -274,7 +274,11 @@ fn run_shell_command_tool() -> api::message::tool_call::Tool {
     })
 }
 
-fn tool_call_message_with_tool(id: &str, call_id: &str, tool: api::message::tool_call::Tool) -> api::Message {
+fn tool_call_message_with_tool(
+    id: &str,
+    call_id: &str,
+    tool: api::message::tool_call::Tool,
+) -> api::Message {
     api::Message {
         fetched_memories: vec![],
         id: id.to_string(),
@@ -1323,11 +1327,7 @@ fn test_cli_subagent_serialized_block_preserves_block_id_and_metadata() {
             api::Task {
                 id: "root-task".to_string(),
                 messages: vec![
-                    tool_call_message_with_tool(
-                        "tool-call-1",
-                        "call-1",
-                        run_shell_command_tool(),
-                    ),
+                    tool_call_message_with_tool("tool-call-1", "call-1", run_shell_command_tool()),
                     tool_call_result_message_with_result(
                         "tool-result-1",
                         "call-1",

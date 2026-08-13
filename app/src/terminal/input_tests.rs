@@ -4672,11 +4672,12 @@ fn test_cmd_enter_enters_agent_view_when_input_is_focused() {
         });
 
         terminal.read(&app, |view, ctx| {
-            assert!(view
-                .agent_view_controller()
-                .as_ref(ctx)
-                .agent_view_state()
-                .is_fullscreen());
+            assert!(
+                view.agent_view_controller()
+                    .as_ref(ctx)
+                    .agent_view_state()
+                    .is_fullscreen()
+            );
         });
         input.read(&app, |input, ctx| {
             assert_eq!(input.buffer_text(ctx), "draft");
@@ -8553,11 +8554,13 @@ fn test_ai_context_menu_keeps_workflow_reference_in_ai_input() {
         input.read(&app, |input, ctx| {
             assert_eq!(input.buffer_text(ctx), "@proxy ");
             assert!(!input.is_workflows_info_box_open());
-            assert!(input
-                .ai_context_model
-                .as_ref(ctx)
-                .pending_at_context_attachments()
-                .contains_key("@proxy"));
+            assert!(
+                input
+                    .ai_context_model
+                    .as_ref(ctx)
+                    .pending_at_context_attachments()
+                    .contains_key("@proxy")
+            );
             assert_eq!(
                 input
                     .ai_context_model
@@ -8654,11 +8657,13 @@ fn test_ai_context_menu_enters_ai_mode_for_ai_only_context_items() {
                 assert!(input.ai_input_model.as_ref(ctx).is_ai_input_enabled());
                 if let Some(reference) = expected_buffer.strip_suffix(' ') {
                     if reference.starts_with('@') {
-                        assert!(input
-                            .ai_context_model
-                            .as_ref(ctx)
-                            .pending_at_context_attachments()
-                            .contains_key(reference));
+                        assert!(
+                            input
+                                .ai_context_model
+                                .as_ref(ctx)
+                                .pending_at_context_attachments()
+                                .contains_key(reference)
+                        );
                         let attachment = input
                             .ai_context_model
                             .as_ref(ctx)

@@ -1,18 +1,13 @@
 use warp_core::ui::appearance::Appearance;
-use warpui::{
-    elements::ParentElement,
-    prelude::{Container, Empty, Flex, Text},
-    AppContext, Element, Entity, ModelHandle, SingletonEntity, View, ViewContext,
-};
+use warpui::elements::ParentElement;
+use warpui::prelude::{Container, Empty, Flex, Text};
+use warpui::{AppContext, Element, Entity, ModelHandle, SingletonEntity, View, ViewContext};
 
-use crate::{
-    ai::blocklist::block::view_impl::{
-        query::render_query, WithContentItemSpacing, CONTENT_VERTICAL_PADDING,
-    },
-    auth::AuthStateProvider,
-    terminal::view::ambient_agent::{AmbientAgentViewModel, AmbientAgentViewModelEvent},
-    workspace::view::DEFAULT_USER_DISPLAY_NAME,
-};
+use crate::ai::blocklist::block::view_impl::query::render_query;
+use crate::ai::blocklist::block::view_impl::{CONTENT_VERTICAL_PADDING, WithContentItemSpacing};
+use crate::auth::AuthStateProvider;
+use crate::terminal::view::ambient_agent::{AmbientAgentViewModel, AmbientAgentViewModelEvent};
+use crate::workspace::view::DEFAULT_USER_DISPLAY_NAME;
 
 /// Renders the submitted prompt immediately while the environment is still being set up, so ambient-agent setup feels like local agent mode even before the first exchange is available in history.
 pub struct AmbientAgentInitialUserQuery {

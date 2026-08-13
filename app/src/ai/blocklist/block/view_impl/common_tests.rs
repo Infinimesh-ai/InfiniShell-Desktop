@@ -12,9 +12,9 @@ use warpui::elements::{Empty, MouseStateHandle};
 use warpui::{App, Element};
 
 use super::{
-    CollapsibleElementState, CollapsibleExpansionState, VisualMarkdownLightboxCollection,
-    collect_visual_markdown_lightbox_collection, compute_visual_section_width,
-    QueryContextReference, display_query_without_context_references,
+    CollapsibleElementState, CollapsibleExpansionState, QueryContextReference,
+    VisualMarkdownLightboxCollection, collect_visual_markdown_lightbox_collection,
+    compute_visual_section_width, display_query_without_context_references,
     image_tooltip_handles_for_group, inline_image_source_label,
     is_supported_blocklist_image_source, lightbox_trigger_for_section, query_context_references,
     query_prefix_highlight_len, render_scrollable_collapsible_content,

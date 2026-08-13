@@ -74,9 +74,9 @@ mod search_bar;
 mod server;
 mod server_time;
 mod session_management;
+mod sftp_manager;
 mod shell_indicator;
 mod skill_manager;
-mod sftp_manager;
 mod ssh_manager;
 mod suggestions;
 mod system;
@@ -211,12 +211,12 @@ pub use warp_core::r#async::debounce;
 use warp_core::execution_mode::{AppExecutionMode, ExecutionMode};
 // Re-export the send_telemetry_from_ctx macro at the crate root level
 pub use warp_core::send_telemetry_from_app_ctx;
-pub use warp_core::send_telemetry_from_ctx;
-pub use warp_core::{
-    send_telemetry_on_executor, send_telemetry_sync_from_app_ctx, send_telemetry_sync_from_ctx,
-};
 // Re-export the safe logging macros at the crate root level for backwards compatibility
 pub use warp_core::{safe_debug, safe_error, safe_info, safe_warn};
+pub use warp_core::{
+    send_telemetry_from_ctx, send_telemetry_on_executor, send_telemetry_sync_from_app_ctx,
+    send_telemetry_sync_from_ctx,
+};
 use warp_errors::{report_error, report_if_error};
 #[cfg(feature = "local_fs")]
 use warp_files::FileModel;

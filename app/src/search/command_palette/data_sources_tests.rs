@@ -517,4 +517,3 @@ fn test_full_text_drive_data_source_indexes_the_first_directly_shared_object() {
         );
     })
 }
-

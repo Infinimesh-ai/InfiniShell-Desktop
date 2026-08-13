@@ -1,4 +1,4 @@
-﻿use std::io::Write as _;
+use std::io::Write as _;
 use std::sync::Arc;
 
 use ai::diff_validation::{DiffDelta, ParsedDiff, V4AHunk};
@@ -7,11 +7,10 @@ use tempfile::NamedTempFile;
 use vec1::vec1;
 use warpui::App;
 
+use super::*;
 use crate::ai::agent::{AIIdentifiers, FileEdit};
 use crate::ai::blocklist::SessionContext;
 use crate::auth::AuthState;
-
-use super::*;
 
 fn update_deltas(diff: &AIRequestedCodeDiff) -> &[DiffDelta] {
     match &diff.diff_type {
@@ -368,10 +367,12 @@ fn test_apply_diffs_fails_with_only_noop() {
 
         let errors = result.expect_err("Expected an error due to noop diff");
         match &errors[..] {
-            [DiffApplicationError::UnmatchedDiffs {
-                file,
-                match_failures,
-            }] => {
+            [
+                DiffApplicationError::UnmatchedDiffs {
+                    file,
+                    match_failures,
+                },
+            ] => {
                 assert_eq!(*file, file_path);
                 assert_eq!(match_failures.noop_deltas, 1);
                 assert_eq!(match_failures.fuzzy_match_failures, 0);
@@ -772,10 +773,12 @@ fn test_apply_v4a_edits_noop() {
 
         let errors = result.expect_err("Expected an error due to noop V4A edit");
         match &errors[..] {
-            [DiffApplicationError::UnmatchedDiffs {
-                file,
-                match_failures,
-            }] => {
+            [
+                DiffApplicationError::UnmatchedDiffs {
+                    file,
+                    match_failures,
+                },
+            ] => {
                 assert_eq!(*file, file_path);
                 assert_eq!(match_failures.noop_deltas, 1);
             }

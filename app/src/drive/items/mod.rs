@@ -1,17 +1,13 @@
-use warpui::{elements::MouseStateHandle, AppContext, Element};
+use warpui::elements::MouseStateHandle;
+use warpui::{AppContext, Element};
 
-use crate::{
-    appearance::Appearance,
-    cloud_object::{Space, StoredObjectMetadata},
-    themes::theme::Fill,
-    ui_components::icons::Icon,
-};
-
-use super::{
-    cloud_object_styling::warp_drive_icon_color,
-    index::{warp_drive_section_header_position_id, DriveIndexAction, DriveIndexSection},
-    DriveObjectType, ObjectTypeAndId,
-};
+use super::cloud_object_styling::warp_drive_icon_color;
+use super::index::{DriveIndexAction, DriveIndexSection, warp_drive_section_header_position_id};
+use super::{DriveObjectType, ObjectTypeAndId};
+use crate::appearance::Appearance;
+use crate::cloud_object::{Space, StoredObjectMetadata};
+use crate::themes::theme::Fill;
+use crate::ui_components::icons::Icon;
 
 pub mod ai_fact;
 pub mod ai_fact_collection;

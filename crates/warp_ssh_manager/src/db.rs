@@ -11,12 +11,13 @@
 //! 路径由调用方在初始化时传入(`set_database_path`),避免本 crate 直接依赖 app
 //! 层的 `database_file_path()`。未传路径时,`with_conn` 返回 `Err(NotInitialized)`。
 
+use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
+
 use anyhow::{Result, anyhow};
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
-use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
 
 static DB_PATH: OnceLock<PathBuf> = OnceLock::new();
 static CONN: OnceLock<Mutex<Option<SqliteConnection>>> = OnceLock::new();

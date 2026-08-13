@@ -1,8 +1,7 @@
 use warpui::App;
 
-use crate::auth::{AuthManager, AuthStateProvider};
-
 use super::*;
+use crate::auth::{AuthManager, AuthStateProvider};
 
 #[test]
 // Tests behavior based on which query parameters are required.

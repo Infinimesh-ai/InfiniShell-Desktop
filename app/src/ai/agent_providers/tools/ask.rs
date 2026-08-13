@@ -10,7 +10,7 @@
 
 use anyhow::Result;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use uuid::Uuid;
 use warp_multi_agent_api as api;
 
@@ -115,8 +115,8 @@ fn from_args(args: &str) -> Result<api::message::tool_call::Tool> {
 }
 
 fn result_to_json(result: &api::message::tool_call_result::Result) -> Option<Value> {
-    use api::ask_user_question_result::answer_item::Answer as A;
     use api::ask_user_question_result::Result as AR;
+    use api::ask_user_question_result::answer_item::Answer as A;
     use api::message::tool_call_result::Result as R;
     let r = match result {
         R::AskUserQuestion(r) => r,

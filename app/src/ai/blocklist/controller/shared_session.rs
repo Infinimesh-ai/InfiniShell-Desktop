@@ -1,17 +1,18 @@
 // BlocklistAIController 的共享会话本地展示逻辑。
+use ai::skills::SkillPathOrigin;
 use itertools::Itertools;
+use warp_multi_agent_api::client_action::Action;
+use warp_multi_agent_api::message::Message;
 use warp_multi_agent_api::response_event::ClientActions;
-use warp_multi_agent_api::{client_action::Action, message::Message};
+use warpui::{AppContext, ModelContext, SingletonEntity};
 
 use super::response_stream::ResponseStreamId;
 use super::{BlocklistAIController, RequestInput};
-use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::agent::AIAgentActionId;
+use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
 use crate::terminal::shared_session::ParticipantId;
-use ai::skills::SkillPathOrigin;
-use warpui::{AppContext, ModelContext, SingletonEntity};
 
 #[derive(Default)]
 pub(super) struct SharedSessionState {

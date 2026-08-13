@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::terminal::shared_session::protocol::SessionId;
 use ui_components::lightbox;
 use warp_util::path::LineAndColumnArg;
 use warpui::accessibility::AccessibilityVerbosity;
@@ -38,6 +37,7 @@ use crate::tab::{NewSessionMenuItem, SelectedTabColor};
 use crate::tab_configs::TabConfig;
 use crate::terminal::CLIAgent;
 use crate::terminal::available_shells::AvailableShell;
+use crate::terminal::shared_session::protocol::SessionId;
 use crate::terminal::view::inline_banner::ZeroStatePromptSuggestionType;
 use crate::themes::theme::AnsiColorIdentifier;
 use crate::themes::theme_chooser::ThemeChooserMode;
@@ -1147,7 +1147,6 @@ impl WorkspaceAction {
             | TriggerAutoHandoffToCloud
             | OpenFreeAiRemovalModal
             | ResetFreeAiRemovalModalState
-
             | InstallOpenCodeWarpPlugin
             | UseLocalOpenCodeWarpPlugin => false,
             #[cfg(not(target_family = "wasm"))]

@@ -8,14 +8,10 @@ use warp_core::settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, S
 use warp_errors::report_error;
 use warpui::{AppContext, ModelContext, SingletonEntity};
 
-use crate::{
-    cloud_object::{
-        model::persistence::{ObjectStoreEvent, ObjectStoreModel},
-        StoredObject as _,
-    },
-    drive::ObjectTypeAndId,
-    server::ids::SyncId,
-};
+use crate::cloud_object::StoredObject as _;
+use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
+use crate::drive::ObjectTypeAndId;
+use crate::server::ids::SyncId;
 
 define_settings_group!(WorkflowAliases, settings: [
     aliases: Aliases {

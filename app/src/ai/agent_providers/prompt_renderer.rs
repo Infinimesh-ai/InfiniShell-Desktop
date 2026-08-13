@@ -634,8 +634,9 @@ mod tests {
     /// 而非仅 name/description,否则模型无法正确调用 read_skill 工具。
     #[test]
     fn render_includes_skill_path_for_read_skill_tool() {
-        use crate::ai::skills::SkillDescriptor;
         use ai::skills::{SkillProvider, SkillReference, SkillScope};
+
+        use crate::ai::skills::SkillDescriptor;
 
         let skill_path = "/home/user/.agents/skills/open-browser-use/SKILL.md";
         let skill = SkillDescriptor {
@@ -669,9 +670,10 @@ mod tests {
     /// 以避免模型使用必然失败的 @warp-skill:{id} 值。
     #[test]
     fn render_omits_skill_path_for_bundled_skill() {
-        use crate::ai::skills::SkillDescriptor;
         use ai::skills::{SkillProvider, SkillReference, SkillScope};
         use warp_core::ui::icons::Icon;
+
+        use crate::ai::skills::SkillDescriptor;
 
         let skill = SkillDescriptor {
             reference: SkillReference::BundledSkillId("find-skills".into()),

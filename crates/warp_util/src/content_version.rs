@@ -36,7 +36,6 @@ impl ContentVersion {
         ContentVersion(usize::try_from(val).unwrap_or(usize::MAX))
     }
 
-
     /// Returns the underlying value as a `u64` for wire serialization.
     pub fn as_u64(&self) -> u64 {
         self.0 as u64

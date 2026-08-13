@@ -49,8 +49,12 @@ use warpui_core::{
 
 #[derive(Clone, Debug)]
 pub enum AgentOnboardingEvent {
-    ThemeSelected { theme_name: String },
-    SyncWithOsToggled { enabled: bool },
+    ThemeSelected {
+        theme_name: String,
+    },
+    SyncWithOsToggled {
+        enabled: bool,
+    },
     OnboardingCompleted(SelectedSettings),
     OnboardingSkipped,
     LoginFromWelcomeRequested,

@@ -6,12 +6,12 @@
 
 use pathfinder_geometry::vector::Vector2F;
 use warp_core::ui::appearance::Appearance;
+use warpui::Element;
 use warpui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Flex, Hoverable,
     MainAxisSize, ParentElement, Radius, SavePosition, Text,
 };
 use warpui::platform::Cursor;
-use warpui::Element;
 
 /// 右键菜单宽度
 const CONTEXT_MENU_WIDTH: f32 = 150.0;
@@ -30,7 +30,10 @@ pub struct ContextMenuState {
 impl ContextMenuState {
     /// 创建新的右键菜单状态
     pub fn new(entry_index: usize, position: Vector2F) -> Self {
-        Self { entry_index, position }
+        Self {
+            entry_index,
+            position,
+        }
     }
 }
 
@@ -181,9 +184,10 @@ pub fn render_context_menu(state: &ContextMenuState, appearance: &Appearance) ->
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use pathfinder_geometry::vector::Vector2F;
     use warpui::TypedActionView;
+
+    use super::*;
 
     // ============================================================
     // ContextMenuState 测试
@@ -251,10 +255,22 @@ mod tests {
         let items = build_file_menu_items(index);
 
         assert!(matches!(&items[0].action, SftpBrowserAction::OpenEntry(7)));
-        assert!(matches!(&items[1].action, SftpBrowserAction::DownloadEntry(7)));
-        assert!(matches!(&items[2].action, SftpBrowserAction::RenameEntry(7)));
-        assert!(matches!(&items[3].action, SftpBrowserAction::DeleteEntry(7)));
-        assert!(matches!(&items[4].action, SftpBrowserAction::DetailsEntry(7)));
+        assert!(matches!(
+            &items[1].action,
+            SftpBrowserAction::DownloadEntry(7)
+        ));
+        assert!(matches!(
+            &items[2].action,
+            SftpBrowserAction::RenameEntry(7)
+        ));
+        assert!(matches!(
+            &items[3].action,
+            SftpBrowserAction::DeleteEntry(7)
+        ));
+        assert!(matches!(
+            &items[4].action,
+            SftpBrowserAction::DetailsEntry(7)
+        ));
     }
 
     /// 测试 index=0 时菜单项动作正确
@@ -262,8 +278,14 @@ mod tests {
     fn test_build_file_menu_items_zero_index() {
         let items = build_file_menu_items(0);
         assert!(matches!(&items[0].action, SftpBrowserAction::OpenEntry(0)));
-        assert!(matches!(&items[3].action, SftpBrowserAction::DeleteEntry(0)));
-        assert!(matches!(&items[4].action, SftpBrowserAction::DetailsEntry(0)));
+        assert!(matches!(
+            &items[3].action,
+            SftpBrowserAction::DeleteEntry(0)
+        ));
+        assert!(matches!(
+            &items[4].action,
+            SftpBrowserAction::DetailsEntry(0)
+        ));
     }
 
     // ============================================================
@@ -273,9 +295,10 @@ mod tests {
     /// 通过 browser 视图触发 ContextMenu 后渲染不 panic
     #[test]
     fn test_render_context_menu_via_browser() {
+        use warp_core::ui::appearance::Appearance;
+
         use crate::settings_view::keybindings::KeybindingChangedNotifier;
         use crate::test_util::settings::initialize_settings_for_tests;
-        use warp_core::ui::appearance::Appearance;
 
         warpui::App::test((), |mut app| async move {
             initialize_settings_for_tests(&mut app);
@@ -286,10 +309,9 @@ mod tests {
             let temp_db = std::env::temp_dir().join("warp_sftp_ctx_test.sqlite");
             let _ = warp_ssh_manager::set_database_path(temp_db);
 
-            let (_, view) = app.add_window(
-                warpui::platform::WindowStyle::NotStealFocus,
-                |ctx| crate::sftp_manager::browser::SftpBrowserView::new("test-node".to_string(), ctx),
-            );
+            let (_, view) = app.add_window(warpui::platform::WindowStyle::NotStealFocus, |ctx| {
+                crate::sftp_manager::browser::SftpBrowserView::new("test-node".to_string(), ctx)
+            });
 
             // 触发右键菜单
             view.update(&mut app, |view, ctx| {

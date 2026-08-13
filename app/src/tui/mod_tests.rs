@@ -11,10 +11,8 @@ use super::{
     has_validated_identity, initial_login_phase, set_logged_out_phase, set_login_phase,
     start_tui_device_login, tui_verification_url,
 };
-use crate::auth::AuthStateProvider;
-use crate::auth::{AuthManager, AuthManagerEvent};
-use crate::auth::AuthState;
 use crate::auth::credentials::Credentials;
+use crate::auth::{AuthManager, AuthManagerEvent, AuthState, AuthStateProvider};
 use crate::server::server_api::ServerApiProvider;
 use crate::server::server_api::auth::UserAuthenticationError;
 fn login_model(phase: TuiLoginPhase) -> TuiLoginModel {

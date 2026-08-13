@@ -84,7 +84,10 @@ impl IntentionSlide {
 
         let title = appearance
             .ui_builder()
-            .paragraph(localized("onboarding-intention-title", "Welcome to InfiniShell"))
+            .paragraph(localized(
+                "onboarding-intention-title",
+                "Welcome to InfiniShell",
+            ))
             .with_style(UiComponentStyles {
                 font_size: Some(36.),
                 font_weight: Some(Weight::Medium),

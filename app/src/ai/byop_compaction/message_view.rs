@@ -65,8 +65,9 @@ pub struct WarpMessageView<'a> {
 
 /// 估算单条 message 的 token 占用 — 累加可见文本字符数 / 4。
 fn estimate_message(msg: &api::Message) -> usize {
-    use super::token::estimate;
     use api::message::Message as M;
+
+    use super::token::estimate;
     let chars = msg
         .message
         .as_ref()

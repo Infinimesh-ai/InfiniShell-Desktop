@@ -9,17 +9,10 @@
 
 use std::collections::HashSet;
 
-use crate::editor::{
-    EditorOptions, EditorView, EnterAction, EnterSettings, Event as EditorEvent,
-    SingleLineEditorOptions, TextColors, TextOptions,
-};
-use crate::pane_group::focus_state::PaneFocusHandle;
-use crate::pane_group::pane::view;
-use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
-use crate::project_manager::ProjectsChangedNotifier;
 use pathfinder_geometry::vector::vec2f;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
+use warp_ssh_manager::{NodeKind, SshRepository};
 use warpui::elements::{
     Align, Border, ChildAnchor, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, Dismiss, Element, Fill, Flex, Hoverable,
@@ -34,9 +27,16 @@ use warpui::{
     AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
-
-use warp_ssh_manager::{NodeKind, SshRepository};
 use zap_projects::{Project, ProjectRepository};
+
+use crate::editor::{
+    EditorOptions, EditorView, EnterAction, EnterSettings, Event as EditorEvent,
+    SingleLineEditorOptions, TextColors, TextOptions,
+};
+use crate::pane_group::focus_state::PaneFocusHandle;
+use crate::pane_group::pane::view;
+use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
+use crate::project_manager::ProjectsChangedNotifier;
 
 const FIELD_LABEL_MARGIN_TOP: f32 = 6.0;
 const FIELD_LABEL_MARGIN_BOTTOM: f32 = 4.0;
@@ -652,7 +652,7 @@ impl ProjectView {
 
     /// 删除 confirmation 弹层(套路同 SshServerView 的 ClearMachineMemory)。
     fn render_delete_confirmation(&self, appearance: &Appearance) -> Box<dyn Element> {
-        use crate::ui_components::dialog::{dialog_styles, Dialog};
+        use crate::ui_components::dialog::{Dialog, dialog_styles};
 
         let cancel_button = appearance
             .ui_builder()

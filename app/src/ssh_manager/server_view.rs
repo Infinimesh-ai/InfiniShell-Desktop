@@ -5,18 +5,15 @@
 //!
 //! Phase 3 起加 "连接" 按钮 → emit OpenSshTerminal → SecretInjector。
 
-use crate::editor::{
-    EditorView, Event as EditorEvent, SingleLineEditorOptions, TextColors, TextOptions,
-};
-use crate::pane_group::focus_state::PaneFocusHandle;
-use crate::pane_group::pane::view;
-use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
-use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
-use crate::view_components::dropdown::{Dropdown, DropdownItem};
 use markdown_parser::parse_markdown;
 use pathfinder_geometry::vector::vec2f;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
+use warp_ssh_manager::{
+    AuthType, ConnectionStatus, KeychainSecretStore, MachineMemory, MachineMemoryRepository,
+    NodeKind, OneKeyCredentialKind, SecretKind, SshNode, SshOneKeyCredential, SshRepository,
+    SshSecretStore, SshSecretStoreError, SshServerInfo, resolve_machine_key,
+};
 use warpui::elements::{
     Align, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Element, Fill, Flex,
@@ -32,13 +29,16 @@ use warpui::{
     AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
-
-use warp_ssh_manager::{
-    resolve_machine_key, AuthType, ConnectionStatus, KeychainSecretStore, MachineMemory,
-    MachineMemoryRepository, NodeKind, OneKeyCredentialKind, SecretKind, SshNode,
-    SshOneKeyCredential, SshRepository, SshSecretStore, SshSecretStoreError, SshServerInfo,
-};
 use zeroize::Zeroizing;
+
+use crate::editor::{
+    EditorView, Event as EditorEvent, SingleLineEditorOptions, TextColors, TextOptions,
+};
+use crate::pane_group::focus_state::PaneFocusHandle;
+use crate::pane_group::pane::view;
+use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
+use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
+use crate::view_components::dropdown::{Dropdown, DropdownItem};
 
 const FIELD_LABEL_MARGIN_TOP: f32 = 6.0;
 const FIELD_LABEL_MARGIN_BOTTOM: f32 = 4.0;
@@ -1710,7 +1710,7 @@ impl SshServerView {
         &self,
         appearance: &Appearance,
     ) -> Box<dyn Element> {
-        use crate::ui_components::dialog::{dialog_styles, Dialog};
+        use crate::ui_components::dialog::{Dialog, dialog_styles};
 
         let cancel_button = appearance
             .ui_builder()

@@ -3,9 +3,8 @@
 //! 等第二阶段做 multi-agent 调用时,这里会扩展为完整的
 //! Chat Completions + 工具调用 stream。
 
-use serde::Deserialize;
-
 use http_client::Client;
+use serde::Deserialize;
 
 /// `/models` 端点返回的单个模型条目。
 ///

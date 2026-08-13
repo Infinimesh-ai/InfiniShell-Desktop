@@ -1,24 +1,21 @@
 use warp_core::ui::appearance::Appearance;
-use warpui::{platform::WindowStyle, App};
-
-use crate::{
-    ai::blocklist::BlocklistAIHistoryModel,
-    auth::{AuthManager, AuthStateProvider},
-    cloud_object::update_manager::UpdateManager,
-    cloud_object::{
-        model::{persistence::ObjectStoreModel, view::ObjectStoreViewModel},
-        Space,
-    },
-    drive::index::DriveIndexSection,
-    network::NetworkStatus,
-    settings_view::keybindings::KeybindingChangedNotifier,
-    terminal::resizable_data::ResizableData,
-    test_util::settings::initialize_settings_for_tests,
-    workspaces::user_workspaces::UserWorkspaces,
-    ObjectActions, ASSETS,
-};
+use warpui::App;
+use warpui::platform::WindowStyle;
 
 use super::DrivePanel;
+use crate::ai::blocklist::BlocklistAIHistoryModel;
+use crate::auth::{AuthManager, AuthStateProvider};
+use crate::cloud_object::Space;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::model::view::ObjectStoreViewModel;
+use crate::cloud_object::update_manager::UpdateManager;
+use crate::drive::index::DriveIndexSection;
+use crate::network::NetworkStatus;
+use crate::settings_view::keybindings::KeybindingChangedNotifier;
+use crate::terminal::resizable_data::ResizableData;
+use crate::test_util::settings::initialize_settings_for_tests;
+use crate::workspaces::user_workspaces::UserWorkspaces;
+use crate::{ASSETS, ObjectActions};
 
 fn initialize_app(app: &mut App) {
     initialize_settings_for_tests(app);

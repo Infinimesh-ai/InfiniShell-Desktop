@@ -1617,11 +1617,7 @@ impl SettingsView {
             );
         }
 
-        if items.is_empty() {
-            None
-        } else {
-            Some(items)
-        }
+        if items.is_empty() { None } else { Some(items) }
     }
 
     fn context_menu_items(&self, ctx: &mut ViewContext<Self>) -> Vec<MenuItem<SettingsAction>> {

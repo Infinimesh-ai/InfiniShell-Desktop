@@ -1,6 +1,6 @@
 //! Shared agent-event stream utilities used by third-party harness bridges.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 
 mod driver;

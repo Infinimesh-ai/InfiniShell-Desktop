@@ -6,20 +6,18 @@ use warp_core::features::FeatureFlag;
 use warpui::r#async::{SpawnedFutureHandle, Timer};
 use warpui::{Entity, EntityId, ModelContext, SingletonEntity};
 
+use super::AmbientAgentProgressUIState;
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_conversations_model::AgentConversationsModel;
-use crate::ai::ambient_agents::spawn::{spawn_task, AmbientAgentEvent};
+use crate::ai::ambient_agents::spawn::{AmbientAgentEvent, spawn_task};
 use crate::ai::ambient_agents::task::{HarnessAuthSecretsConfig, HarnessConfig};
 use crate::ai::ambient_agents::{
     AgentConfigSnapshot, AmbientAgentTaskId, AmbientAgentTaskState, AttachmentInput,
-    SpawnAgentRequest, OUT_OF_CREDITS_TASK_FAILURE_MESSAGE, SERVER_OVERLOADED_TASK_FAILURE_MESSAGE,
+    OUT_OF_CREDITS_TASK_FAILURE_MESSAGE, SERVER_OVERLOADED_TASK_FAILURE_MESSAGE, SpawnAgentRequest,
 };
 use crate::ai::api_error::AIApiError;
-use crate::ai::blocklist::BlocklistAIHistoryModel;
-use crate::ai::blocklist::BlocklistAIPermissions;
+use crate::ai::blocklist::{BlocklistAIHistoryModel, BlocklistAIPermissions};
 use crate::ai::llms::{LLMId, LLMPreferences};
-
-use super::AmbientAgentProgressUIState;
 
 /// Tracks progress timestamps for each step during ambient agent spawning.
 #[derive(Debug, Clone)]

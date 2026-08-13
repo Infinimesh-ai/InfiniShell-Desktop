@@ -2644,11 +2644,10 @@ impl Input {
                 #[cfg(not(target_family = "wasm"))]
                 AgentInputFooterEvent::OpenPluginInstructionsPane(agent, kind) => {
                     ctx.emit(Event::OpenPluginInstructionsPane(*agent, *kind));
-                }
-                // Zap:footer 的 handoff chip(local→cloud 交接入口)已随
-                // `AgentInputFooterEvent::HandoffChipClicked` 一起删除;
-                // 交接 compose 仍可由输入框的 `&` 前缀触发
-                // (见 `activate_cloud_handoff_compose(HandoffEntryPoint::Ampersand, ..)`)。
+                } // Zap:footer 的 handoff chip(local→cloud 交接入口)已随
+                  // `AgentInputFooterEvent::HandoffChipClicked` 一起删除;
+                  // 交接 compose 仍可由输入框的 `&` 前缀触发
+                  // (见 `activate_cloud_handoff_compose(HandoffEntryPoint::Ampersand, ..)`)。
             }
         });
         ctx.subscribe_to_model(&CLIAgentSessionsModel::handle(ctx), |me, _, event, ctx| {
@@ -14200,7 +14199,9 @@ impl Input {
         // `queued_query_retry` 只在上传失败回滚时才需要,现在没有失败路径。
         let _ = queued_query_retry;
         if !images.is_empty() || !files.is_empty() {
-            log::warn!("Cannot upload viewer attachments: presigned upload is unavailable in InfiniShell");
+            log::warn!(
+                "Cannot upload viewer attachments: presigned upload is unavailable in InfiniShell"
+            );
         }
         ctx.emit(Event::SendAgentPrompt {
             server_conversation_token,

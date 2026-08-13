@@ -56,7 +56,6 @@ use windows_only::*;
 
 use crate::themes::theme::WarpTheme;
 
-
 #[cfg(any(target_os = "windows", any(target_os = "linux", target_os = "freebsd")))]
 const BUTTON_ICON_SIZE: f32 = 22.;
 

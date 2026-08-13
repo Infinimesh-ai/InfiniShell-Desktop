@@ -1,27 +1,26 @@
 //! [`TerminalView`]-specific implementation for ambient agent functionality.
 
 use warp_cli::agent::Harness;
-
-use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
-use crate::ai::agent::RenderableAIError;
-use crate::ai::AIRequestUsageModel;
-use warpui::prelude::Empty;
-
-use crate::ai::blocklist::{agent_view::AgentViewEntryOrigin, BlocklistAIHistoryModel};
-use crate::terminal::view::ambient_agent::AmbientAgentInitialUserQuery;
-use crate::terminal::view::rich_content::RichContentInsertionPosition;
-use crate::terminal::view::TerminalView;
-use crate::terminal::CLIAgent;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use warp_core::ui::appearance::Appearance;
 use warpui::elements::Align;
+use warpui::prelude::Empty;
 use warpui::{AppContext, Element, EntityId, SingletonEntity, ViewContext};
 
+use super::AmbientAgentViewModelEvent;
 use super::loading_screen::{
     render_ambient_agent_cancelled_screen, render_ambient_agent_error_screen,
     render_ambient_agent_github_auth_required_screen, render_ambient_agent_loading_screen,
 };
-use super::AmbientAgentViewModelEvent;
+use crate::ai::AIRequestUsageModel;
+use crate::ai::agent::RenderableAIError;
+use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
+use crate::ai::blocklist::BlocklistAIHistoryModel;
+use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
+use crate::terminal::CLIAgent;
+use crate::terminal::view::TerminalView;
+use crate::terminal::view::ambient_agent::AmbientAgentInitialUserQuery;
+use crate::terminal::view::rich_content::RichContentInsertionPosition;
+use crate::workspaces::user_workspaces::UserWorkspaces;
 const CHILD_AGENT_GITHUB_AUTH_REQUIRED_BLOCKED_ACTION: &str =
     "GitHub authentication required before starting the child agent.";
 
@@ -128,7 +127,10 @@ impl TerminalView {
                     return;
                 }
                 if false {
-                    if ambient_agent_view_model.as_ref(ctx).is_third_party_harness() {
+                    if ambient_agent_view_model
+                        .as_ref(ctx)
+                        .is_third_party_harness()
+                    {
                         // Non-oz runs: render the submitted prompt via the queued-prompt UI.
                         // The block is removed later by `HarnessCommandStarted` / failure /
                         // cancel / auth handlers.
@@ -142,10 +144,7 @@ impl TerminalView {
                         }
                     } else {
                         let initial_user_query = ctx.add_view(|ctx| {
-                            AmbientAgentInitialUserQuery::new(
-                                ambient_agent_view_model.clone(),
-                                ctx,
-                            )
+                            AmbientAgentInitialUserQuery::new(ambient_agent_view_model.clone(), ctx)
                         });
                         self.insert_rich_content(
                             None,

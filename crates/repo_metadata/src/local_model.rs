@@ -2244,8 +2244,9 @@ mod tests;
 
 #[cfg(all(test, feature = "local_fs"))]
 mod is_unsafe_watch_root_tests {
-    use super::is_unsafe_watch_root;
     use std::path::Path;
+
+    use super::is_unsafe_watch_root;
 
     #[test]
     fn rejects_home_and_its_ancestors() {

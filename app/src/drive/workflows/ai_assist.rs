@@ -2,17 +2,12 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use warpui::ViewContext;
 
-use crate::{
-    ai::agent_providers::active_ai::workflow_metadata,
-    send_telemetry_from_ctx,
-    server::telemetry::TelemetryEvent,
-    workflows::workflow::{Argument, Workflow},
-};
-
-use super::{
-    arguments::ArgumentsState,
-    modal::{AiAssistState, WorkflowModal, WorkflowModalEvent},
-};
+use super::arguments::ArgumentsState;
+use super::modal::{AiAssistState, WorkflowModal, WorkflowModalEvent};
+use crate::ai::agent_providers::active_ai::workflow_metadata;
+use crate::send_telemetry_from_ctx;
+use crate::server::telemetry::TelemetryEvent;
+use crate::workflows::workflow::{Argument, Workflow};
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum GeneratedCommandMetadataError {

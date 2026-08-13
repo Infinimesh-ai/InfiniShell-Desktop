@@ -262,7 +262,6 @@ const CODE_REVIEW_EDITOR_LINE_HEIGHT_RATIO: f32 = 1.4;
 /// Extra scroll buffer (in pixels) added when scrolling to a line that has a comment editor below it.
 const COMMENT_EDITOR_SCROLL_BUFFER: f32 = 200.0;
 
-
 pub fn get_discard_button_disabled_tooltip(git_operation_blocked: bool) -> String {
     if git_operation_blocked {
         "Cannot discard changes while a git operation (merge, rebase, etc.) is in progress"

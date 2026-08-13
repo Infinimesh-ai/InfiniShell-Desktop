@@ -36,11 +36,11 @@ use super::keybindings::KeyBindingModifyingState;
 #[cfg(feature = "local_tty")]
 use super::settings_page::render_sub_sub_header;
 use super::settings_page::{
-    AdditionalInfo, Category, HEADER_PADDING, LocalOnlyIconState, MatchData,
-    PageType, SettingsPageMeta, SettingsPageViewHandle, SettingsWidget,
-    TOGGLE_BUTTON_RIGHT_PADDING, ToggleState, add_setting, build_reset_button,
-    build_toggle_element, render_body_item, render_body_item_label, render_dropdown_item,
-    render_dropdown_item_label, render_local_only_icon,
+    AdditionalInfo, Category, HEADER_PADDING, LocalOnlyIconState, MatchData, PageType,
+    SettingsPageMeta, SettingsPageViewHandle, SettingsWidget, TOGGLE_BUTTON_RIGHT_PADDING,
+    ToggleState, add_setting, build_reset_button, build_toggle_element, render_body_item,
+    render_body_item_label, render_dropdown_item, render_dropdown_item_label,
+    render_local_only_icon,
 };
 use super::{
     DisplayCount, SettingsAction, SettingsSection, ToggleSettingActionPair, features, flags,
@@ -1564,9 +1564,11 @@ impl TypedActionView for FeaturesPageView {
             }
             TogglePersistConversations => {
                 GeneralSettings::handle(ctx).update(ctx, |general_settings, ctx| {
-                    report_if_error!(general_settings
-                        .persist_conversations
-                        .toggle_and_save_value(ctx))
+                    report_if_error!(
+                        general_settings
+                            .persist_conversations
+                            .toggle_and_save_value(ctx)
+                    )
                 })
             }
             ToggleAutocompleteSymbols => {
@@ -1589,9 +1591,11 @@ impl TypedActionView for FeaturesPageView {
             }
             ToggleSshAutoDiscovery => {
                 SshSettings::handle(ctx).update(ctx, |ssh_settings, ctx| {
-                    report_if_error!(ssh_settings
-                        .enable_ssh_auto_discovery
-                        .toggle_and_save_value(ctx));
+                    report_if_error!(
+                        ssh_settings
+                            .enable_ssh_auto_discovery
+                            .toggle_and_save_value(ctx)
+                    );
                 });
             }
             OpenUrl(url) => {
@@ -4679,9 +4683,7 @@ impl SettingsWidget for SessionRestorationWidget {
             crate::t!("settings-features-restore-session"),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
-                on_click_action: Some(FeaturesPageAction::OpenUrl(
-                    "".into(),
-                )),
+                on_click_action: Some(FeaturesPageAction::OpenUrl("".into())),
                 secondary_text: None,
                 tooltip_override_text: None,
             }),
@@ -4813,9 +4815,7 @@ impl SettingsWidget for SnackbarHeaderWidget {
             crate::t!("settings-features-show-sticky-command-header"),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
-                on_click_action: Some(FeaturesPageAction::OpenUrl(
-                    "".into(),
-                )),
+                on_click_action: Some(FeaturesPageAction::OpenUrl("".into())),
                 secondary_text: None,
                 tooltip_override_text: None,
             }),
@@ -5696,10 +5696,7 @@ impl SettingsWidget for GlobalHotkeyWidget {
                         ui_builder
                             .link(
                                 crate::t!("settings-features-see-docs"),
-                                Some(
-                                    ""
-                                        .to_owned(),
-                                ),
+                                Some("".to_owned()),
                                 None,
                                 view.button_mouse_states.global_hotkey_link.clone(),
                             )
@@ -6812,10 +6809,7 @@ impl SettingsWidget for MouseReportingWidget {
             crate::t!("settings-features-enable-mouse-reporting"),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
-                on_click_action: Some(FeaturesPageAction::OpenUrl(
-                    ""
-                        .into(),
-                )),
+                on_click_action: Some(FeaturesPageAction::OpenUrl("".into())),
                 secondary_text: None,
                 tooltip_override_text: None,
             }),
@@ -7077,9 +7071,7 @@ impl SettingsWidget for SmartSelectWidget {
             crate::t!("settings-features-double-click-smart-selection"),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
-                on_click_action: Some(FeaturesPageAction::OpenUrl(
-                    "".into(),
-                )),
+                on_click_action: Some(FeaturesPageAction::OpenUrl("".into())),
                 secondary_text: None,
                 tooltip_override_text: None,
             }),
@@ -7366,9 +7358,7 @@ impl SettingsWidget for WorkflowsInCommandSearch {
             crate::t!("settings-features-show-global-workflows-in-command-search"),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
-                on_click_action: Some(FeaturesPageAction::OpenUrl(
-                    "".into(),
-                )),
+                on_click_action: Some(FeaturesPageAction::OpenUrl("".into())),
                 secondary_text: None,
                 tooltip_override_text: None,
             }),

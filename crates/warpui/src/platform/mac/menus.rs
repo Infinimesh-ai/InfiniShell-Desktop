@@ -220,7 +220,12 @@ fn resolve_standard_action(action: StandardAction) -> StandardMenuItemProperties
             cmd,
             ns_string!("q"),
         ),
-        StandardAction::Hide => make(ns_string!("Hide InfiniShell"), sel!(hide:), cmd, ns_string!("h")),
+        StandardAction::Hide => make(
+            ns_string!("Hide InfiniShell"),
+            sel!(hide:),
+            cmd,
+            ns_string!("h"),
+        ),
         StandardAction::HideOtherApps => make(
             ns_string!("Hide Others"),
             sel!(hideOtherApplications:),

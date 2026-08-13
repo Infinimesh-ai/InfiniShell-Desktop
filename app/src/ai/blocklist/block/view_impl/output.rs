@@ -77,6 +77,7 @@ use crate::ai::blocklist::block::{
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
 use crate::ai::blocklist::inline_action::ask_user_question_view::AskUserQuestionView;
 use crate::ai::blocklist::inline_action::aws_bedrock_credentials_error::AwsBedrockCredentialsErrorView;
+use crate::ai::blocklist::inline_action::batch_command_view::BatchCommandView;
 use crate::ai::blocklist::inline_action::create_or_edit_document::CreateOrEditDocumentAction;
 use crate::ai::blocklist::inline_action::gemini_enterprise_credentials_error::GeminiEnterpriseCredentialsErrorView;
 use crate::ai::blocklist::inline_action::inline_action_header::{
@@ -89,7 +90,6 @@ use crate::ai::blocklist::inline_action::requested_action::{
     render_requested_action_row, render_requested_action_row_for_text,
 };
 use crate::ai::blocklist::inline_action::requested_command::RequestedCommand;
-use crate::ai::blocklist::inline_action::batch_command_view::BatchCommandView;
 use crate::ai::blocklist::inline_action::run_agents_card_view::RunAgentsCardView;
 use crate::ai::blocklist::inline_action::suggested_unit_tests::SuggestedUnitTestsView;
 use crate::ai::blocklist::inline_action::web_fetch::WebFetchView;
@@ -1021,7 +1021,9 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                                 body_color,
                                 Default::default(),
                             )
-                            .with_heading_to_font_size_multipliers(appearance.heading_font_size_multipliers().clone())
+                            .with_heading_to_font_size_multipliers(
+                                appearance.heading_font_size_multipliers().clone(),
+                            )
                             .set_selectable(true);
 
                             let mut action =

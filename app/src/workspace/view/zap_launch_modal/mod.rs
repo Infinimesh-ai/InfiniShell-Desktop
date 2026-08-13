@@ -1,3 +1,3 @@
 mod view;
 
-pub use view::{init, ZapLaunchModal, ZapLaunchModalEvent};
+pub use view::{ZapLaunchModal, ZapLaunchModalEvent, init};

@@ -42,51 +42,57 @@ impl ProjectRulesPersister {
         persistence_tx: Option<SyncSender<ModelEvent>>,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
-        ctx.subscribe_to_model(&ProjectContextModel::handle(ctx), |me, _handle, event, _ctx| {
-            let ProjectContextModelEvent::KnownRulesChanged(delta) = event else {
-                return;
-            };
+        ctx.subscribe_to_model(
+            &ProjectContextModel::handle(ctx),
+            |me, _handle, event, _ctx| {
+                let ProjectContextModelEvent::KnownRulesChanged(delta) = event else {
+                    return;
+                };
 
-            let mut events = vec![];
+                let mut events = vec![];
 
-            if !delta.discovered_rules.is_empty() {
-                events.push(ModelEvent::UpsertProjectRules {
-                    project_rule_paths: delta.discovered_rules.clone(),
-                });
-            }
-
-            if !delta.deleted_rules.is_empty() {
-                events.push(ModelEvent::DeleteProjectRules {
-                    path: delta.deleted_rules.clone(),
-                });
-            }
-
-            if events.is_empty() {
-                return;
-            }
-
-            let Some(tx) = me.persistence_tx.as_ref() else {
-                return;
-            };
-
-            for event in events {
-                if let Err(err) = tx.send(event) {
-                    log::warn!("ProjectRulesPersister: 写入 SQLite 失败: {err}");
+                if !delta.discovered_rules.is_empty() {
+                    events.push(ModelEvent::UpsertProjectRules {
+                        project_rule_paths: delta.discovered_rules.clone(),
+                    });
                 }
-            }
-        });
 
-        ctx.subscribe_to_model(&DetectedRepositories::handle(ctx), |_me, _handle, event, ctx| {
-            let DetectedRepositoriesEvent::DetectedGitRepo { repository, .. } = event;
-            let repo_path = repository.as_ref(ctx).root_dir().to_local_path_lossy();
+                if !delta.deleted_rules.is_empty() {
+                    events.push(ModelEvent::DeleteProjectRules {
+                        path: delta.deleted_rules.clone(),
+                    });
+                }
 
-            ProjectContextModel::handle(ctx).update(ctx, |model, ctx| {
-                // 上游把规则文件的读取抽成注入的 `ProjectRuleContentReader`
-                // (远端文件读取实现在 app crate),这里传与 `lib.rs`
-                // `new_from_persisted` 相同的实现。
-                let _ = model.index_and_store_rules(repo_path, read_project_rule_contents, ctx);
-            });
-        });
+                if events.is_empty() {
+                    return;
+                }
+
+                let Some(tx) = me.persistence_tx.as_ref() else {
+                    return;
+                };
+
+                for event in events {
+                    if let Err(err) = tx.send(event) {
+                        log::warn!("ProjectRulesPersister: 写入 SQLite 失败: {err}");
+                    }
+                }
+            },
+        );
+
+        ctx.subscribe_to_model(
+            &DetectedRepositories::handle(ctx),
+            |_me, _handle, event, ctx| {
+                let DetectedRepositoriesEvent::DetectedGitRepo { repository, .. } = event;
+                let repo_path = repository.as_ref(ctx).root_dir().to_local_path_lossy();
+
+                ProjectContextModel::handle(ctx).update(ctx, |model, ctx| {
+                    // 上游把规则文件的读取抽成注入的 `ProjectRuleContentReader`
+                    // (远端文件读取实现在 app crate),这里传与 `lib.rs`
+                    // `new_from_persisted` 相同的实现。
+                    let _ = model.index_and_store_rules(repo_path, read_project_rule_contents, ctx);
+                });
+            },
+        );
 
         Self { persistence_tx }
     }

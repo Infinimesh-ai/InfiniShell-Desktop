@@ -6,7 +6,9 @@ use warpui::{AppContext, SingletonEntity, ViewHandle};
 use super::enum_creation_dialog::{EnumCreationDialog, WorkflowEnumData};
 use super::workflow_arg_selector::WorkflowArgSelector;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
-use crate::cloud_object::update_manager::{app_sync_id_to_model, model_sync_id_to_app, UpdateManager};
+use crate::cloud_object::update_manager::{
+    UpdateManager, app_sync_id_to_model, model_sync_id_to_app,
+};
 use crate::cloud_object::{Owner, StoredObjectEventEntrypoint};
 use crate::editor::EditorView;
 use crate::server::ids::SyncId;

@@ -1,29 +1,25 @@
 use settings::Setting;
-use warp_core::ui::{appearance::Appearance, Icon};
-use warpui::prelude::Empty;
-use warpui::AppContext;
-use warpui::{
-    elements::{
-        ConstrainedBox, Container, CrossAxisAlignment, Flex, Hoverable, MainAxisSize,
-        MouseStateHandle, ParentElement, Shrinkable, Text,
-    },
-    fonts::Properties,
-    platform::Cursor,
-    prelude::{CornerRadius, Radius},
-    text_layout::ClipConfig,
-    Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
-    WeakModelHandle,
+use warp_core::ui::Icon;
+use warp_core::ui::appearance::Appearance;
+use warpui::elements::{
+    ConstrainedBox, Container, CrossAxisAlignment, Flex, Hoverable, MainAxisSize, MouseStateHandle,
+    ParentElement, Shrinkable, Text,
 };
-
-use crate::ai::blocklist::agent_view::{render_block_container, AgentViewEntryOrigin};
-use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
-use crate::{
-    pane_group::pane::{PaneConfiguration, PaneConfigurationEvent, PaneStack},
-    terminal::{BlockListSettings, TerminalManager, TerminalView},
-    ui_components::blended_colors,
+use warpui::fonts::Properties;
+use warpui::platform::Cursor;
+use warpui::prelude::{CornerRadius, Empty, Radius};
+use warpui::text_layout::ClipConfig;
+use warpui::{
+    AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
+    ViewHandle, WeakModelHandle,
 };
 
 use super::super::{AmbientAgentViewModelEvent, Status};
+use crate::ai::blocklist::agent_view::{AgentViewEntryOrigin, render_block_container};
+use crate::pane_group::pane::{PaneConfiguration, PaneConfigurationEvent, PaneStack};
+use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
+use crate::terminal::{BlockListSettings, TerminalManager, TerminalView};
+use crate::ui_components::blended_colors;
 
 /// Icon size for the status indicator
 const STATUS_ICON_SIZE: f32 = 16.;
@@ -49,7 +45,11 @@ impl AmbientAgentEntryBlock {
         ctx: &mut ViewContext<Self>,
     ) -> Self {
         // `ambient_agent_view_model` 现在是 `Option`,pane 未承载 ambient agent 时不订阅。
-        if let Some(view_model) = terminal_view.as_ref(ctx).ambient_agent_view_model().cloned() {
+        if let Some(view_model) = terminal_view
+            .as_ref(ctx)
+            .ambient_agent_view_model()
+            .cloned()
+        {
             ctx.subscribe_to_model(&view_model, Self::handle_ambient_agent_view_model_event);
         }
 

@@ -23,9 +23,9 @@
 //! `ToolCallResultType::CallMcpTool(CallMcpToolResult)` 中的 result 是结构化
 //! 的 MCP content,转成 JSON 给上游模型。
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use prost_types::value::Kind as ProstKind;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use warp_multi_agent_api as api;
 
 use crate::ai::agent::{MCPContext, MCPServer};

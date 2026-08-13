@@ -1,18 +1,17 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use warpui::{AppContext, ModelHandle, SingletonEntity, View, ViewContext, ViewHandle};
 
-use crate::{
-    app_state::LeafContents,
-    notebooks::image::{ImageViewerEvent, ImageViewerView},
-    terminal::model::session::Session,
-    workspace::ActiveSession,
-};
-
+use super::view::PaneView;
 use super::{
-    view::PaneView, DetachType, PaneConfiguration, PaneContent, PaneGroup, PaneId, ShareableLink,
+    DetachType, PaneConfiguration, PaneContent, PaneGroup, PaneId, ShareableLink,
     ShareableLinkError,
 };
+use crate::app_state::LeafContents;
+use crate::notebooks::image::{ImageViewerEvent, ImageViewerView};
+use crate::terminal::model::session::Session;
+use crate::workspace::ActiveSession;
 
 /// A read-only pane that displays a local image. Mirrors [`super::file_pane::FilePane`], but
 /// backs onto [`ImageViewerView`] and drops the workflow/link plumbing — images emit nothing.
@@ -105,9 +104,7 @@ impl PaneContent for ImagePane {
         ctx.subscribe_to_view(
             &self.image_view(ctx),
             move |pane_group, _, event, ctx| match event {
-                ImageViewerEvent::Opened => {
-                    ctx.emit(crate::pane_group::Event::AppStateChanged)
-                }
+                ImageViewerEvent::Opened => ctx.emit(crate::pane_group::Event::AppStateChanged),
                 ImageViewerEvent::Pane(pane_event) => {
                     pane_group.handle_pane_event(pane_id, pane_event, ctx)
                 }
@@ -140,7 +137,8 @@ impl PaneContent for ImagePane {
     }
 
     fn focus(&self, ctx: &mut ViewContext<PaneGroup>) {
-        self.image_view(ctx).update(ctx, |view, ctx| view.focus(ctx));
+        self.image_view(ctx)
+            .update(ctx, |view, ctx| view.focus(ctx));
     }
 
     fn shareable_link(

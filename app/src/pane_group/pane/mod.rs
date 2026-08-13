@@ -406,16 +406,12 @@ impl PaneId {
     }
 
     /// Creates a [`PaneId`] from a [`PaneView<SftpBrowserView>`] entity ID.
-    pub fn from_sftp_pane_view(
-        sftp_pane_view: &ViewHandle<PaneView<SftpBrowserView>>,
-    ) -> Self {
+    pub fn from_sftp_pane_view(sftp_pane_view: &ViewHandle<PaneView<SftpBrowserView>>) -> Self {
         Self::new(IPaneType::Sftp, sftp_pane_view)
     }
 
     /// Creates a [`PaneId`] from a [`PaneView<ProjectView>`] entity ID.
-    pub fn from_project_pane_view(
-        project_pane_view: &ViewHandle<PaneView<ProjectView>>,
-    ) -> Self {
+    pub fn from_project_pane_view(project_pane_view: &ViewHandle<PaneView<ProjectView>>) -> Self {
         Self::new(IPaneType::Project, project_pane_view)
     }
 

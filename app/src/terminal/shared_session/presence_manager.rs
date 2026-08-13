@@ -7,14 +7,6 @@ use futures_util::future::join_all;
 use itertools::{Either, Itertools};
 use pathfinder_color::ColorU;
 use rand::Rng;
-
-// Zap:session-sharing-protocol crate 已剥离,改用本地 protocol 模块
-#[cfg(not(target_arch = "wasm32"))]
-use crate::terminal::shared_session::protocol::Viewer;
-use crate::terminal::shared_session::protocol::{
-    InputReplicaId, ParticipantId, ParticipantInfo, ParticipantList, ParticipantPresenceUpdate,
-    PresenceUpdate, Role, RoleRequestId, Selection,
-};
 use warpui::assets::asset_cache::{AssetCache, AssetState};
 use warpui::r#async::SpawnedFutureHandle;
 use warpui::image_cache::ImageType;
@@ -25,6 +17,13 @@ use crate::editor::{CursorColors, PeerSelectionData};
 use crate::terminal::model::block::BlockId;
 use crate::terminal::model::blocks::BlockList;
 use crate::terminal::model::terminal_model::BlockIndex;
+// Zap:session-sharing-protocol crate 已剥离,改用本地 protocol 模块
+#[cfg(not(target_arch = "wasm32"))]
+use crate::terminal::shared_session::protocol::Viewer;
+use crate::terminal::shared_session::protocol::{
+    InputReplicaId, ParticipantId, ParticipantInfo, ParticipantList, ParticipantPresenceUpdate,
+    PresenceUpdate, Role, RoleRequestId, Selection,
+};
 use crate::util::color::coloru_with_opacity;
 
 /// Selections have 25% opacity.

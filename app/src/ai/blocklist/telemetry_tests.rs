@@ -1,9 +1,10 @@
-use super::*;
 use ai::agent::action::{RunAgentsAgentRunConfig, RunAgentsExecutionMode, RunAgentsRequest};
 use ai::agent::action_result::{
     RunAgentsAgentOutcome, RunAgentsAgentOutcomeKind, RunAgentsLaunchedExecutionMode,
     RunAgentsResult,
 };
+
+use super::*;
 
 fn request() -> RunAgentsRequest {
     RunAgentsRequest {

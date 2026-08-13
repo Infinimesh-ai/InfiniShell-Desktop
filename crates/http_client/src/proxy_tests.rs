@@ -8,8 +8,9 @@
 //! `.build()` 需要一个全局 crypto provider 已安装,否则 panic。生产代码由
 //! `app/src/lib.rs::init_common` 安装,单测进程里需要我们自己装上。
 
-use super::*;
 use std::sync::Once;
+
+use super::*;
 
 static INSTALL_CRYPTO_PROVIDER: Once = Once::new();
 

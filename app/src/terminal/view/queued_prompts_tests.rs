@@ -15,8 +15,10 @@ use super::TerminalView;
 use super::queued_prompts_panel::{
     QueuedPromptsPanelAction, QueuedPromptsPanelEvent, QueuedPromptsPanelView,
 };
-use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::ImageContext;
+use crate::ai::agent::conversation::AIConversationId;
+// `server::server_api`(云端 API 网关)已剥离;我方 `SpawnAgentRequest` 在 `ai::ambient_agents`。
+use crate::ai::ambient_agents::SpawnAgentRequest;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::block::FinishReason;
 use crate::ai::blocklist::{
@@ -25,8 +27,6 @@ use crate::ai::blocklist::{
 };
 use crate::features::FeatureFlag;
 use crate::search::slash_command_menu::static_commands::commands;
-// `server::server_api`(云端 API 网关)已剥离;我方 `SpawnAgentRequest` 在 `ai::ambient_agents`。
-use crate::ai::ambient_agents::SpawnAgentRequest;
 use crate::terminal::input::{Event as InputEvent, Input};
 use crate::terminal::shared_session::SharedSessionStatus;
 use crate::terminal::view::ambient_agent::AmbientAgentViewModelEvent;

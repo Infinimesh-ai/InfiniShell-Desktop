@@ -4,9 +4,9 @@
 //! 真实实现见 `super::message_view`。
 use std::hash::Hash;
 
-use super::consts::{PRUNE_MINIMUM, PRUNE_PROTECT, PRUNE_PROTECTED_TOOLS};
-use super::overflow::{usable, ModelLimit};
 use super::CompactionConfig;
+use super::consts::{PRUNE_MINIMUM, PRUNE_PROTECT, PRUNE_PROTECTED_TOOLS};
+use super::overflow::{ModelLimit, usable};
 
 /// 消息的角色 — 用于 turn 检测与 select。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

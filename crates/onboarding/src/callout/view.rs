@@ -57,7 +57,10 @@ fn get_universal_input_callout_options(
 ) -> Option<CalloutOptions> {
     match state {
         UniversalInputCalloutState::MeetInput => Some(CalloutOptions {
-            title: localized_static("onboarding-callout-meet-input-title", "Meet the InfiniShell input"),
+            title: localized_static(
+                "onboarding-callout-meet-input-title",
+                "Meet the InfiniShell input",
+            ),
             text: format!(
                 "{} {} {}",
                 localized(

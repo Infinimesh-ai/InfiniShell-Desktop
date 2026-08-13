@@ -13,20 +13,20 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use tokio::sync::Mutex as AsyncMutex;
 use uuid::Uuid;
-use warpui::r#async::SpawnedFutureHandle;
 use warpui::ModelSpawner;
+use warpui::r#async::SpawnedFutureHandle;
 
 use crate::ai::agent_events::{
-    run_agent_event_driver, AgentEventConsumer, AgentEventConsumerControlFlow,
-    AgentEventDriverConfig, AgentEventStreamClient, AgentEventStreamClientEventSource,
-    AgentRunEvent, MessageHydrator,
+    AgentEventConsumer, AgentEventConsumerControlFlow, AgentEventDriverConfig,
+    AgentEventStreamClient, AgentEventStreamClientEventSource, AgentRunEvent, MessageHydrator,
+    run_agent_event_driver,
 };
 use crate::ai::agent_sdk::driver::{AgentDriver, OZ_MESSAGE_LISTENER_STATE_ROOT_ENV};
 

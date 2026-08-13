@@ -3,11 +3,13 @@ use std::collections::{HashMap, HashSet};
 use std::num::ParseIntError;
 use std::ops::{Range, RangeInclusive};
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use async_channel::Sender;
 use base64::Engine;
 use hex::FromHexError;
+use instant::Instant;
 use itertools::{Either, Itertools};
 use serde::Serialize;
 use string_offset::CharOffset;
@@ -73,9 +75,6 @@ use crate::terminal::model::grid::IndexRegion;
 use crate::terminal::model::index::VisibleRow;
 use crate::terminal::model::iterm_image::{ITermImage, ITermImageMetadata};
 use crate::terminal::model::secrets::ObfuscateSecrets;
-use instant::Instant;
-use std::str::FromStr;
-
 // Zap:session-sharing-protocol crate 已剥离,改用本地 shared_session::protocol
 use crate::terminal::model::session::SessionInfo;
 use crate::terminal::shared_session::ai_agent::encode_agent_response_event;

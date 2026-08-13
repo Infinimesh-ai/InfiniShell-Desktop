@@ -4,10 +4,8 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 pub use glibc::{GlibcVersion, RemoteLibc};
-use warp_core::{
-    channel::{Channel, ChannelState},
-    paths::OSS_CONFIG_DIR,
-};
+use warp_core::channel::{Channel, ChannelState};
+use warp_core::paths::OSS_CONFIG_DIR;
 pub const REMOTE_SERVER_ARTIFACT_VERSION_UNPINNED: &str = "unversioned";
 
 /// State machine for the remote server install → launch → initialize flow.

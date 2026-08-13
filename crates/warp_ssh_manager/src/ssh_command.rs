@@ -19,13 +19,15 @@
 //! 通过临时文件传给 askpass 脚本(不写 env var,降低泄漏面),整个生命周期
 //! 由 `AskpassSession` RAII 守卫保证 ssh 退出后立即清理。
 
-use crate::types::{AuthType, ConnectionStatus, SshServerInfo};
-#[cfg(not(windows))]
-use futures_lite::io::AsyncWriteExt as _;
 use std::borrow::Cow;
 use std::process::Stdio;
 use std::time::Duration;
+
+#[cfg(not(windows))]
+use futures_lite::io::AsyncWriteExt as _;
 use zeroize::Zeroizing;
+
+use crate::types::{AuthType, ConnectionStatus, SshServerInfo};
 
 pub fn build_ssh_args(server: &SshServerInfo) -> Vec<String> {
     let mut args: Vec<String> = vec!["ssh".into()];

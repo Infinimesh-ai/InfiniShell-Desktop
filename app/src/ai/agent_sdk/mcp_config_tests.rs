@@ -1,4 +1,4 @@
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use warp_cli::mcp::MCPSpec;
 
 use super::build_mcp_servers_from_specs;
@@ -217,9 +217,10 @@ fn validation_rejects_invalid_entries() {
     .to_string();
 
     let err = build_mcp_servers_from_specs(&[MCPSpec::Json(spec)]).unwrap_err();
-    assert!(err
-        .to_string()
-        .contains("must have exactly one of: 'warp_id', 'command', or 'url'"));
+    assert!(
+        err.to_string()
+            .contains("must have exactly one of: 'warp_id', 'command', or 'url'")
+    );
 
     // warp_id must be a UUID string.
     let spec = json!({ "mcpServers": { "bad": { "warp_id": "not-a-uuid" } } }).to_string();
@@ -260,8 +261,7 @@ fn validation_rejects_invalid_entries() {
 
 #[test]
 fn serializes_mcp_servers_as_object_not_string() {
-    use crate::ai::ambient_agents::AgentConfigSnapshot;
-    use crate::ai::ambient_agents::SpawnAgentRequest;
+    use crate::ai::ambient_agents::{AgentConfigSnapshot, SpawnAgentRequest};
 
     let uuid = uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
     let mcp_servers = build_mcp_servers_from_specs(&[MCPSpec::Uuid(uuid)])

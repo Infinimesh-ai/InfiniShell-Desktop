@@ -1,24 +1,20 @@
 pub mod text {
-    use std::{
-        collections::HashSet,
-        fmt,
-        io::{self, Write},
-    };
+    use std::collections::HashSet;
+    use std::fmt;
+    use std::io::{self, Write};
 
     const CANCELLED_MESSAGE: &str = "<cancelled>";
 
     use ai::agent::action_result::ReadSkillResult;
     use itertools::Itertools;
 
-    use crate::{
-        ai::agent::{
-            AIAgentActionType, AIAgentInput, AIAgentOutput, AIAgentOutputMessageType, AIAgentTodo,
-            ArtifactCreatedData, CallMCPToolResult, FileGlobResult, FileGlobV2Result, GrepResult,
-            ReadFilesResult, ReadMCPResourceResult, RequestCommandOutputResult,
-            RequestFileEditsResult, SuggestNewConversationResult, SuggestPromptResult,
-            TodoOperation, WebFetchStatus, WebSearchStatus, WriteToLongRunningShellCommandResult,
-        },
-        AIAgentActionResultType,
+    use crate::AIAgentActionResultType;
+    use crate::ai::agent::{
+        AIAgentActionType, AIAgentInput, AIAgentOutput, AIAgentOutputMessageType, AIAgentTodo,
+        ArtifactCreatedData, CallMCPToolResult, FileGlobResult, FileGlobV2Result, GrepResult,
+        ReadFilesResult, ReadMCPResourceResult, RequestCommandOutputResult, RequestFileEditsResult,
+        SuggestNewConversationResult, SuggestPromptResult, TodoOperation, WebFetchStatus,
+        WebSearchStatus, WriteToLongRunningShellCommandResult,
     };
 
     /// Format an agent input as a human-readable string. For action results, it's assumed that
@@ -348,8 +344,7 @@ pub mod text {
                     }
                     AIAgentActionType::AskUserQuestion { .. } => (),
                     // 多智能体编排动作在无头 SDK 输出流里不做人类可读呈现。
-                    AIAgentActionType::RunAgents(_)
-                    | AIAgentActionType::WaitForEvents { .. } => (),
+                    AIAgentActionType::RunAgents(_) | AIAgentActionType::WaitForEvents { .. } => (),
                 },
                 AIAgentOutputMessageType::TodoOperation(operation) => match operation {
                     TodoOperation::UpdateTodos { todos } => {
@@ -480,24 +475,21 @@ pub mod text {
 }
 
 pub mod json {
-    use crate::{
-        ai::agent::{
-            AIAgentActionType, AIAgentInput, AIAgentOutput, AIAgentOutputMessage,
-            AIAgentOutputMessageType, AIAgentTodo, ArtifactCreatedData, CallMCPToolResult,
-            FileContext, FileGlobResult, FileGlobV2Result, GrepResult, ReadFilesResult,
-            ReadMCPResourceResult, RequestCommandOutputResult, RequestFileEditsResult,
-            SubagentCall, TodoOperation, WriteToLongRunningShellCommandResult,
-        },
-        AIAgentActionResultType,
-    };
-
-    use crate::ai::agent::comment::ReviewComment;
-    use serde::Serialize;
+    use std::borrow::Cow;
+    use std::io::{self, Write};
+    use std::ops::Range;
     use std::path::Path;
-    use std::{
-        borrow::Cow,
-        io::{self, Write},
-        ops::Range,
+
+    use serde::Serialize;
+
+    use crate::AIAgentActionResultType;
+    use crate::ai::agent::comment::ReviewComment;
+    use crate::ai::agent::{
+        AIAgentActionType, AIAgentInput, AIAgentOutput, AIAgentOutputMessage,
+        AIAgentOutputMessageType, AIAgentTodo, ArtifactCreatedData, CallMCPToolResult, FileContext,
+        FileGlobResult, FileGlobV2Result, GrepResult, ReadFilesResult, ReadMCPResourceResult,
+        RequestCommandOutputResult, RequestFileEditsResult, SubagentCall, TodoOperation,
+        WriteToLongRunningShellCommandResult,
     };
 
     /// JSON representation of messages in an agent conversation. This is intentionally not 1:1 with our internal `AIAgent*` types - it's
@@ -959,8 +951,9 @@ pub mod json {
                     | AIAgentActionType::TransferShellCommandControlToUser { .. } => None,
                     AIAgentActionType::AskUserQuestion { .. } => None,
                     // 多智能体编排动作不映射为 SDK JSON 工具调用。
-                    AIAgentActionType::RunAgents(_)
-                    | AIAgentActionType::WaitForEvents { .. } => None,
+                    AIAgentActionType::RunAgents(_) | AIAgentActionType::WaitForEvents { .. } => {
+                        None
+                    }
                 },
                 AIAgentOutputMessageType::TodoOperation(operation) => match operation {
                     TodoOperation::UpdateTodos { todos } => Some(JsonMessage::UpdateTodos {
@@ -1142,9 +1135,10 @@ pub mod json {
     }
 }
 
+use std::io::{self, BufWriter, Write};
+
 use crate::ai::agent::{AIAgentText, AIAgentTextSection};
 use crate::code::editor_management::CodeSource;
-use std::io::{self, BufWriter, Write};
 /// Execute a closure with a buffered stdout writer and flush it afterwards.
 pub fn with_stdout_buffered<F>(f: F) -> io::Result<()>
 where

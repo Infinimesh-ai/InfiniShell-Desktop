@@ -2,6 +2,7 @@ use chrono::{Duration, Utc};
 use settings::manager::SettingsManager;
 use warpui::{App, SingletonEntity};
 
+use crate::NetworkStatus;
 use crate::ai::facts::{AIFact, AIFactObject, AIFactObjectModel, AIMemory};
 use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
@@ -17,7 +18,6 @@ use crate::settings::AISettings;
 use crate::system::SystemStats;
 use crate::workspaces::user_profiles::UserProfiles;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::NetworkStatus;
 
 fn mock_ai_fact(id: i64, name: &str, content: &str, revision: Revision) -> AIFactObject {
     let sync_id = SyncId::ServerId(id.into());

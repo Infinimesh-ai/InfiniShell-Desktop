@@ -16,7 +16,8 @@
 //! 为简化第一版,这里也提供了 username 字段;password 仍由 managed_secrets 管理。
 
 use serde::{Deserialize, Serialize};
-use settings::{macros::define_settings_group, SupportedPlatforms, SyncToCloud};
+use settings::macros::define_settings_group;
+use settings::{SupportedPlatforms, SyncToCloud};
 
 /// 用户可见的代理模式。
 ///

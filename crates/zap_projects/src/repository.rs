@@ -8,12 +8,12 @@ use chrono::Utc;
 use diesel::prelude::*;
 use diesel::result::Error as DieselError;
 use diesel::sqlite::SqliteConnection;
+use persistence::model::{NewZapProject, NewZapProjectServer, ZapProjectRow};
+use persistence::schema::{zap_project_servers, zap_projects};
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::types::Project;
-use persistence::model::{NewZapProject, NewZapProjectServer, ZapProjectRow};
-use persistence::schema::{zap_project_servers, zap_projects};
 
 #[derive(Debug, Error)]
 pub enum ProjectRepositoryError {
@@ -31,7 +31,10 @@ impl ProjectRepository {
     pub fn list(conn: &mut SqliteConnection) -> Result<Vec<Project>, ProjectRepositoryError> {
         let rows: Vec<ZapProjectRow> = zap_projects::table
             .filter(zap_projects::deleted_at.is_null())
-            .order((zap_projects::sort_order.asc(), zap_projects::created_at.asc()))
+            .order((
+                zap_projects::sort_order.asc(),
+                zap_projects::created_at.asc(),
+            ))
             .load(conn)?;
         Ok(rows.into_iter().map(project_from_row).collect())
     }

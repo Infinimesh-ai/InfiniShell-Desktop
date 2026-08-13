@@ -98,7 +98,10 @@ impl DataSource {
         searcher: Box<dyn WarpDriveSearcher>,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
-        ctx.subscribe_to_model(&ObjectStoreModel::handle(ctx), Self::handle_cloud_object_updated);
+        ctx.subscribe_to_model(
+            &ObjectStoreModel::handle(ctx),
+            Self::handle_cloud_object_updated,
+        );
         ctx.subscribe_to_model(
             &UserWorkspaces::handle(ctx),
             Self::handle_user_workspaces_updated,

@@ -6,12 +6,13 @@
 //!
 //! 路径由 app 启动时经 `set_database_path` 传入;未初始化时 `with_conn` 报错。
 
+use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
+
 use anyhow::{Result, anyhow};
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
-use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
 
 static DB_PATH: OnceLock<PathBuf> = OnceLock::new();
 static CONN: OnceLock<Mutex<Option<SqliteConnection>>> = OnceLock::new();

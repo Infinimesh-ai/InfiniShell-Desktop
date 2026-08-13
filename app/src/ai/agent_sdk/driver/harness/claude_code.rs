@@ -13,31 +13,31 @@ use uuid::Uuid;
 use warp_cli::agent::Harness;
 use warpui::{ModelHandle, ModelSpawner};
 
-use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::agent_events::AgentEventStreamClient;
-use crate::ai::ambient_agents::AmbientAgentTaskId;
-use crate::terminal::model::block::BlockId;
-use crate::terminal::model::session::ExecuteCommandOptions;
-use crate::terminal::CLIAgent;
-
 use super::super::terminal::{CommandHandle, TerminalDriver};
 use super::super::{AgentDriver, AgentDriverError};
 use super::json_utils::{read_json_file_or_default, write_json_file};
-use super::{write_temp_file, HarnessRunner, ManagedSecretValue, SavePoint, ThirdPartyHarness};
+use super::{HarnessRunner, ManagedSecretValue, SavePoint, ThirdPartyHarness, write_temp_file};
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent_events::AgentEventStreamClient;
+use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::terminal::CLIAgent;
+use crate::terminal::model::block::BlockId;
+use crate::terminal::model::session::ExecuteCommandOptions;
 mod parent_bridge;
 
-#[cfg(test)]
-use super::super::OZ_MESSAGE_LISTENER_STATE_ROOT_ENV;
 use parent_bridge::MessageBridge;
 #[cfg(test)]
 use parent_bridge::{
+    MESSAGE_BRIDGE_CONTEXT_PREAMBLE, MessageBridgeHookOutput, MessageBridgeMessageRecord,
     acknowledge_parent_bridge_hook_output, ensure_parent_bridge_state_dir,
     parent_bridge_char_count, parent_bridge_hook_output_ack_file, parent_bridge_hook_output_file,
     parent_bridge_root, parent_bridge_staged_message_path, parent_bridge_surfaced_message_path,
     prepare_parent_bridge_hook_output, render_parent_bridge_message_block,
-    stage_parent_bridge_message, MessageBridgeHookOutput, MessageBridgeMessageRecord,
-    MESSAGE_BRIDGE_CONTEXT_PREAMBLE,
+    stage_parent_bridge_message,
 };
+
+#[cfg(test)]
+use super::super::OZ_MESSAGE_LISTENER_STATE_ROOT_ENV;
 
 pub(crate) struct ClaudeHarness;
 

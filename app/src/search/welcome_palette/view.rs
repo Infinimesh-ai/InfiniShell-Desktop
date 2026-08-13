@@ -16,8 +16,8 @@ use warpui::elements::{
 use warpui::platform::Cursor;
 use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
 use warpui::ui_components::components::UiComponent as _;
+use warpui::units::{IntoPixels, Pixels};
 use warpui::{
-    units::{IntoPixels, Pixels},
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView,
     ViewContext, ViewHandle,
 };
@@ -28,24 +28,25 @@ use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::drive::ObjectTypeAndId;
 use crate::palette::PaletteMode;
 use crate::pane_group::pane::welcome_view::WelcomeViewAction;
+use crate::search::QueryFilter;
 use crate::search::action::search_item::MatchedBinding;
 use crate::search::action::{CommandBindingDataSource, Event as CommandBindingDataSourceEvent};
 use crate::search::binding_source::BindingSource;
 use crate::search::command_palette::conversations::{self};
 use crate::search::command_palette::mixer::CommandPaletteItemAction;
 use crate::search::command_palette::new_session::{AllowedSessionKinds, NewSessionDataSource};
-use crate::search::command_palette::{launch_config, warp_drive, CommandPaletteMixer};
+use crate::search::command_palette::{CommandPaletteMixer, launch_config, warp_drive};
 use crate::search::command_search::projects::project_data_source::ProjectDataSource;
 use crate::search::command_search::projects::{ProjectSearchItem, SuggestedProjectsDataSource};
 use crate::search::data_source::QueryResult;
-use crate::search::mixer::{dedupe_score, DedupeStrategy};
+use crate::search::mixer::{DedupeStrategy, dedupe_score};
 use crate::search::result_renderer::QueryResultRenderer;
 use crate::search::search_bar::{
     SearchBar, SearchBarEvent, SearchBarState, SearchResultOrdering, SelectionUpdate,
 };
-use crate::search::QueryFilter;
 use crate::send_telemetry_from_ctx;
-use crate::server::{ids::SyncId, telemetry::TelemetryEvent};
+use crate::server::ids::SyncId;
+use crate::server::telemetry::TelemetryEvent;
 use crate::settings::AISettings;
 use crate::terminal::History;
 use crate::themes::theme::WarpTheme;

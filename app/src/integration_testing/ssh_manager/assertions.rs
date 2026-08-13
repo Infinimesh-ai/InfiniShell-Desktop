@@ -3,7 +3,8 @@
 use std::sync::{Arc, Mutex};
 
 use warp_ssh_manager::SshRepository;
-use warpui::{async_assert, integration::AssertionCallback, App, ViewHandle, WindowId};
+use warpui::integration::AssertionCallback;
+use warpui::{App, ViewHandle, WindowId, async_assert};
 
 use crate::integration_testing::view_getters::workspace_view;
 use crate::ssh_manager::server_view::SshServerView;

@@ -38,8 +38,7 @@ use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::cloud_object::model::view::ObjectStoreViewModel;
 use crate::cloud_object::update_manager::UpdateManager;
 use crate::context_chips::prompt::Prompt;
-use crate::editor::Event;
-use crate::editor::ReplicaId;
+use crate::editor::{Event, ReplicaId};
 use crate::gpu_state::GPUState;
 use crate::network::NetworkStatus;
 use crate::notebooks::editor::keys::NotebookKeybindings;
@@ -60,9 +59,9 @@ use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::history::History;
 use crate::terminal::keys::TerminalKeybindings;
 use crate::terminal::local_tty::spawner::PtySpawner;
-use crate::terminal::shared_session::protocol::SessionId;
-use crate::terminal::shared_session::protocol::SessionSourceType;
-use crate::terminal::shared_session::protocol::{ParticipantId, ParticipantList};
+use crate::terminal::shared_session::protocol::{
+    ParticipantId, ParticipantList, SessionId, SessionSourceType,
+};
 use crate::terminal::shared_session::{
     SharedSessionScrollbackType, SharedSessionSource, SharedSessionStatus,
 };
@@ -460,7 +459,9 @@ fn copy_model_and_profile_preserves_explicit_model_over_source_profile_default()
             // 而它在解析顺序上排在 profile 之前 —— 留着会让本用例无论 copy 是否正确都通过。
             // 清掉它,断言才真正落在「override 有没有被原样搬过去」上。
             AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                let _ = settings.byop_last_used_model_id.set_value(String::new(), ctx);
+                let _ = settings
+                    .byop_last_used_model_id
+                    .set_value(String::new(), ctx);
             });
         });
 

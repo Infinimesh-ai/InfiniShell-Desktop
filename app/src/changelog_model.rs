@@ -9,11 +9,9 @@ use warpui::assets::asset_cache::{AssetCache, AssetSource};
 use warpui::image_cache::ImageType;
 use warpui::{Entity, ModelContext, SingletonEntity};
 
-use crate::{
-    autoupdate::{self},
-    channel::{Channel, ChannelState},
-    features::PREVIEW_FLAGS,
-};
+use crate::autoupdate::{self};
+use crate::channel::{Channel, ChannelState};
+use crate::features::PREVIEW_FLAGS;
 
 pub struct ChangelogModel {
     pub changelog: ChangelogState,

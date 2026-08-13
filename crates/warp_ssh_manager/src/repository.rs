@@ -8,6 +8,11 @@ use chrono::Utc;
 use diesel::prelude::*;
 use diesel::result::Error as DieselError;
 use diesel::sqlite::SqliteConnection;
+use persistence::model::{
+    NewSshNode, NewSshOneKeyCredential, NewSshServer, NewSyncMeta, SshNodeRow,
+    SshOneKeyCredentialRow, SshServerRow, SyncMetaRow,
+};
+use persistence::schema::{ssh_nodes, ssh_onekey_credentials, ssh_servers, sync_meta};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -16,11 +21,6 @@ use crate::types::{
     AuthType, NodeKind, OneKeyCredentialKind, ResolvedSshAuth, SshNode, SshOneKeyCredential,
     SshServerInfo,
 };
-use persistence::model::{
-    NewSshNode, NewSshOneKeyCredential, NewSshServer, NewSyncMeta, SshNodeRow,
-    SshOneKeyCredentialRow, SshServerRow, SyncMetaRow,
-};
-use persistence::schema::{ssh_nodes, ssh_onekey_credentials, ssh_servers, sync_meta};
 
 #[derive(Debug, Error)]
 pub enum SshRepositoryError {

@@ -1,101 +1,92 @@
-#[cfg(target_family = "wasm")]
-use crate::uri::web_intent_parser::open_url_on_desktop;
-// Zap:`crate::util::sync` 已下沉到 `warp_util::sync`,与 `one_time_modal_model.rs` 保持一致。
-use warp_util::sync::Condition;
+use std::any::Any;
+use std::collections::HashMap;
+use std::sync::Arc;
 
-use crate::{
-    ai::{
-        document::ai_document_model::AIDocumentId,
-        facts::{AIFact, AIMemory},
-    },
-    appearance::Appearance,
-    auth::{
-        AuthState, AuthStateProvider, AuthViewVariant, {AuthManager, LoginGatedFeature},
-    },
-    cloud_object::{
-        model::{
-            persistence::{ObjectStoreEvent, ObjectStoreModel},
-            view::{ObjectStoreViewModel, ObjectStoreViewModelEvent, UpdateTimestamp},
-        },
-        update_manager::{FetchSingleObjectOption, UpdateManager},
-        GenericStoredObject, GenericStringObjectFormat, JsonObjectType, ObjectType, Space,
-        StoredObject, StoredObjectLocation,
-    },
-    editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions},
-    env_vars::EnvVarCollectionObject,
-    features::FeatureFlag,
-    menu::{Event, Menu, MenuItem, MenuItemFields},
-    network::NetworkStatus,
-    notebooks::NotebookObjectModel,
-    report_if_error, send_telemetry_from_ctx,
-    server::{
-        ids::{ClientId, ObjectUid, ServerId, SyncId},
-        telemetry::TelemetryEvent,
-    },
-    settings::app_installation_detection::{UserAppInstallDetectionSettings, UserAppInstallStatus},
-    ui_components::{
-        blended_colors,
-        buttons::{highlight, icon_button},
-        icons::{Icon, ICON_DIMENSIONS},
-        menu_button::{icon_button_with_context_menu, MenuDirection},
-    },
-    util::color::coloru_with_opacity,
-    view_components::{Dropdown, DropdownItem},
-    workflows::{WorkflowObject, WorkflowViewMode},
-    workspace::active_terminal_in_window,
-    workspaces::{user_workspaces::UserWorkspaces, workspace::WorkspaceUid},
-    ObjectActions,
-};
-
-use super::{
-    cloud_object_naming_dialog::ObjectNamingDialog,
-    drive_helpers::{
-        has_feature_gated_anonymous_user_reached_env_var_limit,
-        has_feature_gated_anonymous_user_reached_notebook_limit,
-        has_feature_gated_anonymous_user_reached_workflow_limit,
-    },
-    empty_trash_confirmation_dialog::{EmptyTrashConfirmationDialog, EmptyTrashConfirmationEvent},
-    folders::FolderObject,
-    items::{
-        ai_fact_collection::WarpDriveAIFactCollection,
-        item::{tools_panel_menu_direction, ItemStates, WarpDriveRow},
-        mcp_server_collection::WarpDriveMCPServerCollection,
-        WarpDriveItemId,
-    },
-    settings::WarpDriveSettings,
-    sharing::ContentEditability,
-    DriveObjectType, DriveSortOrder, ObjectTypeAndId,
-};
-use crate::drive::panel::DrivePanelAction;
 use futures::Future;
 use itertools::Itertools;
 use pathfinder_color::ColorU;
-use pathfinder_geometry::vector::{vec2f, Vector2F};
-use std::{any::Any, collections::HashMap, sync::Arc};
+use pathfinder_geometry::vector::{Vector2F, vec2f};
 use url::Url;
-use warp_core::{context_flag::ContextFlag, settings::Setting};
+use warp_core::context_flag::ContextFlag;
+use warp_core::settings::Setting;
+// Zap:`crate::util::sync` 已下沉到 `warp_util::sync`,与 `one_time_modal_model.rs` 保持一致。
+use warp_util::sync::Condition;
+use warpui::clipboard::ClipboardContent;
+use warpui::elements::{
+    Align, AnchorPair, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ClippedScrollable,
+    ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dash, DropTarget, DropTargetData,
+    Empty, Flex, Highlight, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
+    OffsetPositioning, OffsetType, ParentAnchor, ParentElement, ParentOffsetBounds,
+    PositionedElementAnchor, PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition,
+    ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack, Text, XAxisAnchor,
+    YAxisAnchor,
+};
+use warpui::fonts::{Properties, Weight};
+use warpui::keymap::FixedBinding;
+use warpui::platform::{Cursor, OperatingSystem};
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use warpui::units::IntoPixels;
 use warpui::{
-    clipboard::ClipboardContent,
-    elements::{
-        Align, AnchorPair, Border, ChildAnchor, ChildView, ClippedScrollStateHandle,
-        ClippedScrollable, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dash,
-        DropTarget, DropTargetData, Empty, Flex, Highlight, Hoverable, MainAxisAlignment,
-        MainAxisSize, MouseStateHandle, OffsetPositioning, OffsetType, ParentAnchor, ParentElement,
-        ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds,
-        PositioningAxis, Radius, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth,
-        Shrinkable, Stack, Text, XAxisAnchor, YAxisAnchor,
-    },
-    fonts::{Properties, Weight},
-    keymap::FixedBinding,
-    platform::{Cursor, OperatingSystem},
-    ui_components::{
-        button::ButtonVariant,
-        components::{Coords, UiComponent, UiComponentStyles},
-    },
-    units::IntoPixels,
     AppContext, BlurContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView,
     UpdateView, View, ViewContext, ViewHandle, WindowId,
 };
+
+use super::cloud_object_naming_dialog::ObjectNamingDialog;
+use super::drive_helpers::{
+    has_feature_gated_anonymous_user_reached_env_var_limit,
+    has_feature_gated_anonymous_user_reached_notebook_limit,
+    has_feature_gated_anonymous_user_reached_workflow_limit,
+};
+use super::empty_trash_confirmation_dialog::{
+    EmptyTrashConfirmationDialog, EmptyTrashConfirmationEvent,
+};
+use super::folders::FolderObject;
+use super::items::WarpDriveItemId;
+use super::items::ai_fact_collection::WarpDriveAIFactCollection;
+use super::items::item::{ItemStates, WarpDriveRow, tools_panel_menu_direction};
+use super::items::mcp_server_collection::WarpDriveMCPServerCollection;
+use super::settings::WarpDriveSettings;
+use super::sharing::ContentEditability;
+use super::{DriveObjectType, DriveSortOrder, ObjectTypeAndId};
+use crate::ai::document::ai_document_model::AIDocumentId;
+use crate::ai::facts::{AIFact, AIMemory};
+use crate::appearance::Appearance;
+use crate::auth::{AuthManager, AuthState, AuthStateProvider, AuthViewVariant, LoginGatedFeature};
+use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
+use crate::cloud_object::model::view::{
+    ObjectStoreViewModel, ObjectStoreViewModelEvent, UpdateTimestamp,
+};
+use crate::cloud_object::update_manager::{FetchSingleObjectOption, UpdateManager};
+use crate::cloud_object::{
+    GenericStoredObject, GenericStringObjectFormat, JsonObjectType, ObjectType, Space,
+    StoredObject, StoredObjectLocation,
+};
+use crate::drive::panel::DrivePanelAction;
+use crate::editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions};
+use crate::env_vars::EnvVarCollectionObject;
+use crate::features::FeatureFlag;
+use crate::menu::{Event, Menu, MenuItem, MenuItemFields};
+use crate::network::NetworkStatus;
+use crate::notebooks::NotebookObjectModel;
+use crate::server::ids::{ClientId, ObjectUid, ServerId, SyncId};
+use crate::server::telemetry::TelemetryEvent;
+use crate::settings::app_installation_detection::{
+    UserAppInstallDetectionSettings, UserAppInstallStatus,
+};
+use crate::ui_components::blended_colors;
+use crate::ui_components::buttons::{highlight, icon_button};
+use crate::ui_components::icons::{ICON_DIMENSIONS, Icon};
+use crate::ui_components::menu_button::{MenuDirection, icon_button_with_context_menu};
+#[cfg(target_family = "wasm")]
+use crate::uri::web_intent_parser::open_url_on_desktop;
+use crate::util::color::coloru_with_opacity;
+use crate::view_components::{Dropdown, DropdownItem};
+use crate::workflows::{WorkflowObject, WorkflowViewMode};
+use crate::workspace::active_terminal_in_window;
+use crate::workspaces::user_workspaces::UserWorkspaces;
+use crate::workspaces::workspace::WorkspaceUid;
+use crate::{ObjectActions, report_if_error, send_telemetry_from_ctx};
 
 // Team zero state consts
 const HINT_HORIZONTAL_PADDING: f32 = 18.;
@@ -4246,12 +4237,14 @@ impl DriveIndex {
             space: *space,
             offset,
         });
-        let menu_items = vec![MenuItemFields::new(crate::t!("drive-collapse-all"))
-            .with_on_select_action(DriveIndexAction::CollapseAllInLocation(
-                StoredObjectLocation::Space(*space),
-            ))
-            .with_icon(Icon::ListCollapsed)
-            .into_item()];
+        let menu_items = vec![
+            MenuItemFields::new(crate::t!("drive-collapse-all"))
+                .with_on_select_action(DriveIndexAction::CollapseAllInLocation(
+                    StoredObjectLocation::Space(*space),
+                ))
+                .with_icon(Icon::ListCollapsed)
+                .into_item(),
+        ];
 
         ctx.update_view(&self.menu, |menu, ctx| {
             menu.set_items(menu_items, ctx);

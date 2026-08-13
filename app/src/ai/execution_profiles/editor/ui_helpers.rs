@@ -1,30 +1,23 @@
-use crate::ai::execution_profiles::{AIExecutionProfile, ActionPermission};
-use crate::editor::EditorView;
-use crate::settings::AISettings;
-use crate::ui_components::icons::Icon;
-use crate::view_components::FilterableDropdown;
-use crate::view_components::{Dropdown, SubmittableTextInput};
-use crate::Appearance;
-use crate::TemplatableMCPServerManager;
 use pathfinder_geometry::vector::vec2f;
 use uuid::Uuid;
 use warp_core::features::FeatureFlag;
-use warpui::elements::Hoverable;
-use warpui::elements::MouseStateHandle;
 use warpui::elements::{
-    ChildAnchor, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment,
-    MainAxisSize, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Shrinkable,
-    Stack, Text,
+    ChildAnchor, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex, Hoverable,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    ParentElement, ParentOffsetBounds, Shrinkable, Stack, Text,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::ui_components::components::UiComponent;
-use warpui::AppContext;
-use warpui::{Element, SingletonEntity, ViewHandle};
+use warpui::{AppContext, Element, SingletonEntity, ViewHandle};
 
-use super::ExecutionProfileEditorView;
-use super::ExecutionProfileEditorViewAction;
-
-use crate::settings_view::{render_input_list, render_separator, InputListItem};
+use super::{ExecutionProfileEditorView, ExecutionProfileEditorViewAction};
+use crate::ai::execution_profiles::{AIExecutionProfile, ActionPermission};
+use crate::editor::EditorView;
+use crate::settings::AISettings;
+use crate::settings_view::{InputListItem, render_input_list, render_separator};
+use crate::ui_components::icons::Icon;
+use crate::view_components::{Dropdown, FilterableDropdown, SubmittableTextInput};
+use crate::{Appearance, TemplatableMCPServerManager};
 
 pub fn workspace_override_tooltip_message() -> String {
     crate::t!("settings-exec-profile-editor-workspace-override-tooltip")
@@ -101,7 +94,9 @@ pub fn render_section_label(label: &str, appearance: &Appearance) -> Box<dyn Ele
 
 // Zap:`DropdownItemAction` 的 blanket impl 要求 `PartialEq`(`eq_action` 用它比较选中项),
 // 因此这里的泛型参数必须补上 `PartialEq` 约束。
-fn render_filterable_dropdown_row<T: Clone + PartialEq + 'static + std::fmt::Debug + Send + Sync>(
+fn render_filterable_dropdown_row<
+    T: Clone + PartialEq + 'static + std::fmt::Debug + Send + Sync,
+>(
     appearance: &Appearance,
     label: &str,
     desc: &str,

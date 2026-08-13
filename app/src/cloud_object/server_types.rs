@@ -1,35 +1,34 @@
-use std::{borrow::Cow, fmt, str::FromStr};
+use std::borrow::Cow;
+use std::fmt;
+use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
-use derivative::Derivative;
-use pathfinder_geometry::vector::vec2f;
-use serde::{Deserialize, Serialize};
-use warp_core::ui::{appearance::Appearance, theme::Fill, Icon};
-use warpui::{
-    elements::{
-        Align, ChildAnchor, ConstrainedBox, Hoverable, MouseStateHandle, OffsetPositioning,
-        ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
-    },
-    ui_components::components::UiComponent,
-    Element,
-};
-
-use crate::{
-    auth::UserUid,
-    drive::sharing::{SharingAccessLevel, Subject},
-    server::ids::{ServerId, SyncId},
-    server_time::ServerTimestamp,
-};
-
 // Zap:以下类型上游已抽到 `crates/cloud_objects`,合并时我方保留了一份结构相同的
 // 本地副本,导致同名类型在两处定义、跨 crate 传递时触发 E0308/E0277
 // (`ObjectIdType` / `ObjectType` 等)。改为直接复用 crate 版本消除分裂;
 // 下面 `StoredObject*` 系列是 Zap 自有的命名体系(上游叫 `CloudObject*`),继续本地定义。
 pub use cloud_objects::cloud_object::{
-    GenericStringObjectFormat, JsonObjectType, NumInFlightRequests, ObjectIdType, ObjectType, Owner,
-    Revision, ServerObjectContainer, GENERIC_STRING_OBJECT_PREFIX, JSON_OBJECT_PREFIX,
+    GENERIC_STRING_OBJECT_PREFIX, GenericStringObjectFormat, JSON_OBJECT_PREFIX, JsonObjectType,
+    NumInFlightRequests, ObjectIdType, ObjectType, Owner, Revision, ServerObjectContainer,
 };
+use derivative::Derivative;
+use pathfinder_geometry::vector::vec2f;
+use serde::{Deserialize, Serialize};
+use warp_core::ui::Icon;
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::theme::Fill;
+use warpui::Element;
+use warpui::elements::{
+    Align, ChildAnchor, ConstrainedBox, Hoverable, MouseStateHandle, OffsetPositioning,
+    ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
+};
+use warpui::ui_components::components::UiComponent;
+
+use crate::auth::UserUid;
+use crate::drive::sharing::{SharingAccessLevel, Subject};
+use crate::server::ids::{ServerId, SyncId};
+use crate::server_time::ServerTimestamp;
 
 #[derive(Clone, Debug)]
 pub enum StoredObjectSyncStatus {

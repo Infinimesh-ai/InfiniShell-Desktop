@@ -1,32 +1,27 @@
 use pathfinder_color::ColorU;
 use settings::Setting;
-use warp_core::ui::{appearance::Appearance, Icon};
-use warpui::{
-    elements::{
-        ConstrainedBox, Container, CrossAxisAlignment, Empty, Flex, Hoverable, MainAxisSize,
-        MouseStateHandle, ParentElement, Shrinkable, Text,
-    },
-    fonts::{Properties, Style, Weight::Bold},
-    platform::Cursor,
-    prelude::{Border, CornerRadius, Radius},
-    text_layout::ClipConfig,
-    Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
+use warp_core::ui::Icon;
+use warp_core::ui::appearance::Appearance;
+use warpui::elements::{
+    ConstrainedBox, Container, CrossAxisAlignment, Empty, Flex, Hoverable, MainAxisSize,
+    MouseStateHandle, ParentElement, Shrinkable, Text,
 };
-
-use crate::{
-    ai::{
-        active_agent_views_model::ActiveAgentViewsModel,
-        agent::conversation::{AIConversationId, ConversationStatus},
-        blocklist::BlocklistAIHistoryEvent,
-    },
-    terminal::BlockListSettings,
-    ui_components::blended_colors,
-    view_components::DismissibleToast,
-    workspace::{ToastStack, WorkspaceAction},
-    BlocklistAIHistoryModel,
-};
+use warpui::fonts::Weight::Bold;
+use warpui::fonts::{Properties, Style};
+use warpui::platform::Cursor;
+use warpui::prelude::{Border, CornerRadius, Radius};
+use warpui::text_layout::ClipConfig;
+use warpui::{Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext};
 
 use super::{AgentViewController, AgentViewEntryOrigin};
+use crate::BlocklistAIHistoryModel;
+use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
+use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
+use crate::ai::blocklist::BlocklistAIHistoryEvent;
+use crate::terminal::BlockListSettings;
+use crate::ui_components::blended_colors;
+use crate::view_components::DismissibleToast;
+use crate::workspace::{ToastStack, WorkspaceAction};
 
 #[derive(Default)]
 struct StateHandles {

@@ -25,9 +25,7 @@ use warpui::{AppContext, Entity, SingletonEntity};
 
 use crate::TuiMountFn;
 use crate::ai::mcp::FileBasedMCPManager;
-use crate::auth::{AuthManager, AuthManagerEvent};
-use crate::auth::AuthState;
-use crate::auth::{self, AuthStateProvider};
+use crate::auth::{self, AuthManager, AuthManagerEvent, AuthState, AuthStateProvider};
 use crate::tui_onboarding_markers::TuiOnboardingMarkers;
 
 /// Login state of the headless TUI, observed by the `warp_tui` root view to

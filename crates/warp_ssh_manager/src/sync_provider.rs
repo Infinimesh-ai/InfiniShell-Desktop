@@ -3,20 +3,21 @@
 // author: logic
 // date: 2026-05-26
 
-use crate::db::with_conn;
-use crate::memory::{MachineMemory, MachineMemoryRepository, MAX_MEMORY_CHARS};
-use crate::repository::{SshRepository, SyncMetaRepository};
-use crate::secrets::{KeychainSecretStore, SecretKind, SshSecretStore};
-use crate::types::{NodeKind, OneKeyCredentialKind};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, HashSet, VecDeque};
+
 use chrono::{DateTime, Utc};
 use diesel::connection::{Connection, SimpleConnection};
 use diesel::{QueryDsl, RunQueryDsl};
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashSet, VecDeque};
-use zap_sync::crypto;
-use zap_sync::{ApplyDataOutcome, SyncDataProvider, SyncEngineError, SyncVersionStore};
+use zap_sync::{ApplyDataOutcome, SyncDataProvider, SyncEngineError, SyncVersionStore, crypto};
 use zeroize::Zeroizing;
+
+use crate::db::with_conn;
+use crate::memory::{MAX_MEMORY_CHARS, MachineMemory, MachineMemoryRepository};
+use crate::repository::{SshRepository, SyncMetaRepository};
+use crate::secrets::{KeychainSecretStore, SecretKind, SshSecretStore};
+use crate::types::{NodeKind, OneKeyCredentialKind};
 
 /// keychain 三种凭据 kind,用于 collect/apply/orphan-cleanup 时统一遍历
 const ALL_SECRET_KINDS: [SecretKind; 4] = [

@@ -14,8 +14,7 @@ use warpui::{App, ModelHandle, SingletonEntity};
 use warpui_extras::user_preferences;
 
 use super::{ChipUpdateStatus, CurrentPrompt, PromptContext};
-use crate::auth::AuthManager;
-use crate::auth::AuthStateProvider;
+use crate::auth::{AuthManager, AuthStateProvider};
 #[cfg(feature = "local_fs")]
 use crate::code_review::diff_state::DiffStats;
 #[cfg(feature = "local_fs")]
@@ -429,8 +428,9 @@ fn github_repo_model_for_test(
             .unwrap()
     });
     let metadata = git_status_metadata(branch);
-    let git_status =
-        app.add_model(move |ctx| GitRepoStatusModel::new_local_for_test(repo_handle, Some(metadata), ctx));
+    let git_status = app.add_model(move |ctx| {
+        GitRepoStatusModel::new_local_for_test(repo_handle, Some(metadata), ctx)
+    });
     let model = app.add_model(move |ctx| GitHubRepoModel::new_local_for_test(git_status, ctx));
     (temp_dir, model)
 }

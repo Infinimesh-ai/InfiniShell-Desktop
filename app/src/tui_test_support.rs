@@ -32,8 +32,7 @@ use crate::ai::llms::{LLMId, LLMPreferences};
 use crate::ai::mcp::templatable_manager::TemplatableMCPServerManager;
 #[cfg(feature = "voice_input")]
 use crate::ai::request_usage_model::AIRequestUsageModel;
-use crate::auth::AuthStateProvider;
-use crate::auth::AuthManager;
+use crate::auth::{AuthManager, AuthStateProvider};
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::code_review::git_repo_model::GitRepoModels;
 use crate::network::NetworkStatus;

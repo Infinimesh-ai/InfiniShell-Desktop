@@ -1,12 +1,11 @@
 use warp_util::content_version::ContentVersion;
 // Re-export from warp_util so existing app-level imports continue to work.
 pub use warp_util::local_or_remote_path::LocalOrRemotePath;
-pub use warp_util::remote_path::RemotePath;
-
 /// 兼容别名:Zap 早期把该类型叫 `BufferLocation`,上游重构后统一为
 /// `warp_util::local_or_remote_path::LocalOrRemotePath`。保留别名以兼容
 /// 尚未迁移的调用点,新代码请直接用 `LocalOrRemotePath`。
 pub use warp_util::local_or_remote_path::LocalOrRemotePath as BufferLocation;
+pub use warp_util::remote_path::RemotePath;
 
 /// Tracks sync state between client and server for a single remote buffer.
 ///
@@ -70,11 +69,13 @@ impl SyncClock {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::path::PathBuf;
+
     use warp_util::file_type::is_markdown_file;
     use warp_util::host_id::HostId;
     use warp_util::standardized_path::StandardizedPath;
+
+    use super::*;
 
     fn remote(path: &str) -> LocalOrRemotePath {
         LocalOrRemotePath::Remote(RemotePath::new(

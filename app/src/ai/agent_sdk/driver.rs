@@ -1,71 +1,58 @@
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    ffi::OsString,
-    future::Future,
-    io::{self, Write},
-    path::PathBuf,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
-    },
-    thread,
-    time::Duration,
-};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::ffi::OsString;
+use std::future::Future;
+use std::io::{self, Write};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
-use crate::ai::llms::{LLMId, LLMPreferences};
-use crate::ai::mcp::MCPServerState;
-
-use crate::ai::agent_sdk::driver::harness::{
-    task_env_vars, HarnessKind, HarnessRunner, SavePoint, ThirdPartyHarness,
-};
-use crate::terminal::cli_agent_sessions::plugin_manager::{
-    plugin_manager_for, CliAgentPluginManager,
-};
-use crate::terminal::cli_agent_sessions::{
-    CLIAgentSessionStatus, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
-};
-use crate::{
-    ai::{
-        agent::{
-            AIAgentExchange, AIAgentInput, AIAgentOutput, CancellationReason, RenderableAIError,
-        },
-        agent_events::DisabledAgentEventStreamClient,
-        ambient_agents::{
-            conversation_output_status_from_conversation, AmbientAgentTaskId,
-            AmbientConversationStatus,
-        },
-        blocklist::{
-            agent_view::AgentViewEntryOrigin, BlocklistAIHistoryEvent, BlocklistAIHistoryModel,
-            BlocklistAIPermissions,
-        },
-        execution_profiles::profiles::AIExecutionProfilesModel,
-        mcp::{
-            parsing::{normalize_mcp_json, ParsedTemplatableMCPServerResult},
-            templatable_manager::TemplatableMCPServerManagerEvent,
-            TemplatableMCPServerInstallation, TemplatableMCPServerManager,
-        },
-    },
-    auth::AuthStateProvider,
-    server::ids::{ServerId, SyncId},
-};
 use anyhow::Context as _;
-use futures::{
-    channel::oneshot,
-    future::{self, Either},
-    FutureExt as _,
-};
+use futures::FutureExt as _;
+use futures::channel::oneshot;
+use futures::future::{self, Either};
 use oneshot::{Canceled, Receiver, Sender};
 use uuid::Uuid;
 use warp_cli::agent::{Harness, OutputFormat};
 use warp_cli::mcp::MCPSpec;
-use warp_core::{features::FeatureFlag, safe_debug, safe_info};
+use warp_core::features::FeatureFlag;
+use warp_core::{safe_debug, safe_info};
 // Zap:`report_if_error` 已从 warp_core 迁到 warp_errors crate。
 use warp_errors::report_if_error;
 use warp_managed_secrets::ManagedSecretValue;
-use warpui::{
-    r#async::{FutureExt, TimeoutError},
-    Entity, ModelContext, ModelHandle, ModelSpawner, SingletonEntity,
+use warpui::r#async::{FutureExt, TimeoutError};
+use warpui::{Entity, ModelContext, ModelHandle, ModelSpawner, SingletonEntity};
+
+use crate::ai::agent::{
+    AIAgentExchange, AIAgentInput, AIAgentOutput, CancellationReason, RenderableAIError,
+};
+use crate::ai::agent_events::DisabledAgentEventStreamClient;
+use crate::ai::agent_sdk::driver::harness::{
+    HarnessKind, HarnessRunner, SavePoint, ThirdPartyHarness, task_env_vars,
+};
+use crate::ai::ambient_agents::{
+    AmbientAgentTaskId, AmbientConversationStatus, conversation_output_status_from_conversation,
+};
+use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
+use crate::ai::blocklist::{
+    BlocklistAIHistoryEvent, BlocklistAIHistoryModel, BlocklistAIPermissions,
+};
+use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
+use crate::ai::llms::{LLMId, LLMPreferences};
+use crate::ai::mcp::parsing::{ParsedTemplatableMCPServerResult, normalize_mcp_json};
+use crate::ai::mcp::templatable_manager::TemplatableMCPServerManagerEvent;
+use crate::ai::mcp::{
+    MCPServerState, TemplatableMCPServerInstallation, TemplatableMCPServerManager,
+};
+use crate::auth::AuthStateProvider;
+use crate::server::ids::{ServerId, SyncId};
+use crate::terminal::cli_agent_sessions::plugin_manager::{
+    CliAgentPluginManager, plugin_manager_for,
+};
+use crate::terminal::cli_agent_sessions::{
+    CLIAgentSessionStatus, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
 
 pub(crate) mod harness;
@@ -1252,14 +1239,18 @@ impl AgentDriver {
 
         // Final save after the command finishes.
         log::debug!("Triggering final save of harness conversation data");
-        report_if_error!(runner
-            .save_conversation(SavePoint::Final, foreground)
-            .await
-            .context("Failed to save harness conversation (final)"));
-        report_if_error!(runner
-            .cleanup(foreground)
-            .await
-            .context("Failed to clean up harness runtime state"));
+        report_if_error!(
+            runner
+                .save_conversation(SavePoint::Final, foreground)
+                .await
+                .context("Failed to save harness conversation (final)")
+        );
+        report_if_error!(
+            runner
+                .cleanup(foreground)
+                .await
+                .context("Failed to clean up harness runtime state")
+        );
 
         // A runtime failure detected mid-run takes precedence over the harness's
         // own exit code: surface the actionable detail rather than a generic
@@ -1639,15 +1630,18 @@ impl AgentDriver {
                             log::debug!(
                                 "Triggering post-turn harness session update from CLI agent event"
                             );
-                            report_if_error!(runner
-                                .handle_session_update(&spawner)
-                                .await
-                                .context("Failed to update harness state from CLI session event"));
+                            report_if_error!(
+                                runner.handle_session_update(&spawner).await.context(
+                                    "Failed to update harness state from CLI session event"
+                                )
+                            );
                             log::debug!("Triggering post-turn save of harness conversation data");
-                            report_if_error!(runner
-                                .save_conversation(SavePoint::PostTurn, &spawner)
-                                .await
-                                .context("Failed to save harness conversation (post-turn)"));
+                            report_if_error!(
+                                runner
+                                    .save_conversation(SavePoint::PostTurn, &spawner)
+                                    .await
+                                    .context("Failed to save harness conversation (post-turn)")
+                            );
                         },
                         |_, _, _| {},
                     );
@@ -1663,9 +1657,7 @@ impl AgentDriver {
     fn handle_terminal_driver_event(&mut self, event: &TerminalDriverEvent) {
         match event {
             TerminalDriverEvent::SlowBootstrap => {
-                eprintln!(
-                    "Warning: Terminal session is slow to bootstrap."
-                );
+                eprintln!("Warning: Terminal session is slow to bootstrap.");
             }
         }
     }
@@ -1681,9 +1673,11 @@ impl SingletonEntity for AgentDriver {}
 
 /// Write the run ID to stdout using the appropriate output format.
 pub(super) fn write_run_started(run_id: &str, output_format: OutputFormat) {
-    report_if_error!(output::with_stdout_buffered(|buf| match output_format {
-        OutputFormat::Json | OutputFormat::Ndjson => output::json::run_started(run_id, buf),
-        OutputFormat::Text | OutputFormat::Pretty => output::text::run_started(run_id, buf),
-    })
-    .context("Failed to write run ID"));
+    report_if_error!(
+        output::with_stdout_buffered(|buf| match output_format {
+            OutputFormat::Json | OutputFormat::Ndjson => output::json::run_started(run_id, buf),
+            OutputFormat::Text | OutputFormat::Pretty => output::text::run_started(run_id, buf),
+        })
+        .context("Failed to write run ID")
+    );
 }

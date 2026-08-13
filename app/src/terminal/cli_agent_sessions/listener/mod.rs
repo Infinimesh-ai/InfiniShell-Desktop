@@ -223,11 +223,7 @@ impl DeepSeekSessionHandler {
             .collect::<Vec<_>>()
             .join("\n");
 
-        if title.is_empty() {
-            None
-        } else {
-            Some(title)
-        }
+        if title.is_empty() { None } else { Some(title) }
     }
 }
 
@@ -379,15 +375,19 @@ mod zap_tests {
     #[test]
     fn codex_try_parse_ignores_titled_notifications() {
         let mut handler = CodexSessionHandler;
-        assert!(handler
-            .try_parse(Some("some-title"), "Agent turn complete", false)
-            .is_none());
+        assert!(
+            handler
+                .try_parse(Some("some-title"), "Agent turn complete", false)
+                .is_none()
+        );
     }
 
     #[test]
     fn codex_try_parse_handles_osc9() {
         let mut handler = CodexSessionHandler;
-        let event = handler.try_parse(None, "Agent turn complete", false).unwrap();
+        let event = handler
+            .try_parse(None, "Agent turn complete", false)
+            .unwrap();
         assert_eq!(event.event, CLIAgentEventType::Stop);
     }
 

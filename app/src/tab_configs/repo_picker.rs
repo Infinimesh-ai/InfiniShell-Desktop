@@ -7,11 +7,9 @@ use warpui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
-use crate::{
-    appearance::Appearance,
-    tab_configs::PickerStyle,
-    view_components::{DropdownItem, FilterableDropdown},
-};
+use crate::appearance::Appearance;
+use crate::tab_configs::PickerStyle;
+use crate::view_components::{DropdownItem, FilterableDropdown};
 
 const DEFAULT_DROPDOWN_WIDTH: f32 = 380.;
 

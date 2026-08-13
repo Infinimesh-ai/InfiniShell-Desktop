@@ -1,25 +1,21 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
+use std::time::Duration;
 
 use instant::Instant;
-
 use parking_lot::FairMutex;
 use warp_core::ui::appearance::Appearance;
+use warpui::r#async::SpawnedFutureHandle;
 use warpui::keymap::Keystroke;
-use warpui::AppContext;
-use warpui::{
-    r#async::SpawnedFutureHandle, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity,
-};
-
-use crate::terminal::input::message_bar::{Message, MessageItem};
-use crate::terminal::input::slash_commands::SlashCommandTrigger;
-use crate::util::bindings::keybinding_name_to_keystroke;
-use crate::{
-    ai::agent::conversation::AIConversationId,
-    terminal::{view::ambient_agent::AmbientAgentViewModel, TerminalModel},
-    BlocklistAIHistoryModel,
-};
+use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::{DismissalStrategy, EphemeralMessage, EphemeralMessageModel};
+use crate::BlocklistAIHistoryModel;
+use crate::ai::agent::conversation::AIConversationId;
+use crate::terminal::TerminalModel;
+use crate::terminal::input::message_bar::{Message, MessageItem};
+use crate::terminal::input::slash_commands::SlashCommandTrigger;
+use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
+use crate::util::bindings::keybinding_name_to_keystroke;
 
 /// Error returned when entering the agent view fails.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -573,7 +569,9 @@ impl AgentViewController {
         ctx: &mut ModelContext<Self>,
     ) -> bool {
         let Some(keystroke) = keybinding_name_to_keystroke(keybinding_name, ctx) else {
-            log::warn!("Expected keybinding for slash command {keybinding_name}, but none was found");
+            log::warn!(
+                "Expected keybinding for slash command {keybinding_name}, but none was found"
+            );
             return true;
         };
 
@@ -820,11 +818,10 @@ impl AgentViewController {
             origin,
             AgentViewEntryOrigin::AmbientAgent | AgentViewEntryOrigin::ExternalAmbientAgent
         );
-        self.terminal_model.lock().block_list_mut().enter_conversation_context(
-            conversation_id,
-            display_mode.is_inline(),
-            is_ambient,
-        );
+        self.terminal_model
+            .lock()
+            .block_list_mut()
+            .enter_conversation_context(conversation_id, display_mode.is_inline(), is_ambient);
 
         if origin == AgentViewEntryOrigin::AmbientAgent {
             self.ambient_agent_view_model.update(ctx, |model, ctx| {

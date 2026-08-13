@@ -1,31 +1,28 @@
 use warp_core::ui::appearance::Appearance;
-use warpui::{
-    platform::WindowStyle, AddSingletonModel, App, SingletonEntity, TypedActionView, ViewHandle,
-};
-
-use crate::{
-    ai::blocklist::BlocklistAIHistoryModel,
-    auth::{AuthManager, AuthStateProvider},
-    cloud_object::{
-        model::{
-            actions::ObjectActions, persistence::ObjectStoreModel, view::ObjectStoreViewModel,
-        },
-        update_manager::UpdateManager,
-        ObjectType, Owner, Space, StoredObjectSyncStatus,
-    },
-    drive::{items::WarpDriveItemId, ObjectTypeAndId},
-    menu::MenuItem,
-    network::NetworkStatus,
-    notebooks::{NotebookObject, NotebookObjectModel},
-    server::ids::{ClientId, SyncId},
-    settings_view::keybindings::KeybindingChangedNotifier,
-    test_util::settings::initialize_settings_for_tests,
-    workflows::{workflow::Workflow, WorkflowObject, WorkflowObjectModel},
-    workspaces::{user_profiles::UserProfiles, user_workspaces::UserWorkspaces},
-    ASSETS,
-};
+use warpui::platform::WindowStyle;
+use warpui::{AddSingletonModel, App, SingletonEntity, TypedActionView, ViewHandle};
 
 use super::{DriveIndex, DriveIndexAction};
+use crate::ASSETS;
+use crate::ai::blocklist::BlocklistAIHistoryModel;
+use crate::auth::{AuthManager, AuthStateProvider};
+use crate::cloud_object::model::actions::ObjectActions;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::model::view::ObjectStoreViewModel;
+use crate::cloud_object::update_manager::UpdateManager;
+use crate::cloud_object::{ObjectType, Owner, Space, StoredObjectSyncStatus};
+use crate::drive::ObjectTypeAndId;
+use crate::drive::items::WarpDriveItemId;
+use crate::menu::MenuItem;
+use crate::network::NetworkStatus;
+use crate::notebooks::{NotebookObject, NotebookObjectModel};
+use crate::server::ids::{ClientId, SyncId};
+use crate::settings_view::keybindings::KeybindingChangedNotifier;
+use crate::test_util::settings::initialize_settings_for_tests;
+use crate::workflows::workflow::Workflow;
+use crate::workflows::{WorkflowObject, WorkflowObjectModel};
+use crate::workspaces::user_profiles::UserProfiles;
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 fn initialize_app(app: &mut App) {
     initialize_settings_for_tests(app);

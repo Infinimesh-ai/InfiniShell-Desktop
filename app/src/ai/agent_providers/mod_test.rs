@@ -4,7 +4,7 @@ use ai::LLMId;
 use settings::Setting;
 use warpui::{App, SingletonEntity};
 
-use crate::ai::agent_providers::{llm_id, lookup_byop, AgentProviderSecrets};
+use crate::ai::agent_providers::{AgentProviderSecrets, llm_id, lookup_byop};
 use crate::ai::llms::{DisableReason, LLMPreferences};
 use crate::auth::{AuthManager, AuthStateProvider};
 use crate::network::NetworkStatus;

@@ -13,9 +13,9 @@
 //! 哨兵 server_id 仅用于历史回放(`mcp.rs::serialize_outgoing_call`)时把
 //! 该调用还原为顶层 function name。
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use warp_multi_agent_api as api;
 
 use super::OpenAiTool;
@@ -30,8 +30,7 @@ pub const SENTINEL_SERVER_ID: &str = "00000000-0000-4000-8000-5a70de70015a";
 
 /// 哨兵 server_id 的 `Uuid` 形式(需要与 `Option<Uuid>` 比较的调用方使用)。
 pub fn sentinel_uuid() -> uuid::Uuid {
-    uuid::Uuid::parse_str(SENTINEL_SERVER_ID)
-        .expect("SENTINEL_SERVER_ID 是合法的 UUID 字面量")
+    uuid::Uuid::parse_str(SENTINEL_SERVER_ID).expect("SENTINEL_SERVER_ID 是合法的 UUID 字面量")
 }
 
 /// 单次批量调用的主机数上限(与 JSON Schema 中 maxItems 保持一致)。

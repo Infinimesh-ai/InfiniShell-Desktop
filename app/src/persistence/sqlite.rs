@@ -69,22 +69,21 @@ use crate::app_state::{
     RightPanelSnapshot, SettingsPaneSnapshot, SplitDirection, TabGroupSnapshot, TabSnapshot,
     TerminalPaneSnapshot, WindowSnapshot, WorkflowPaneSnapshot,
 };
-use crate::auth::AuthStateProvider;
-use crate::auth::PersistedCurrentUserInformation;
-use crate::auth::UserUid;
+use crate::auth::{AuthStateProvider, PersistedCurrentUserInformation, UserUid};
 // Zap:我方 `ObjectAction` 走 `TryFrom<PersistedObjectAction>`,
 // 上游改成了自由函数 `object_action_from_persisted`,该函数在我方不存在。
 use crate::cloud_object::model::actions::{ObjectAction, ObjectActionSubtype};
 use crate::cloud_object::model::generic_string_model::{GenericStringObjectId, StoredStringObject};
 use crate::cloud_object::{
-    GENERIC_STRING_OBJECT_PREFIX, JSON_OBJECT_PREFIX, JsonObjectType, ObjectIdType, ObjectType,
-    Owner, StoredObject,
+    GENERIC_STRING_OBJECT_PREFIX, JSON_OBJECT_PREFIX, JsonObjectType, NumInFlightRequests,
+    ObjectIdType, ObjectType, Owner, Revision, StoredObject, StoredObjectMetadata,
+    StoredObjectPermissions, StoredObjectStatuses, StoredObjectSyncStatus,
 };
 use crate::code::editor_management::CodeSource;
 use crate::drive::ZapDriveObjectSettings;
 use crate::drive::folders::{FolderId, FolderObject, FolderObjectModel};
 use crate::env_vars::{EnvVarCollectionObject, EnvVarCollectionObjectModel};
-use crate::notebooks::{NotebookId, NotebookObject};
+use crate::notebooks::{NotebookId, NotebookObject, NotebookObjectModel};
 use crate::persistence::block_list::{
     get_all_restored_blocks, process_ai_queries_for_uparrow_prompt, read_recent_ai_queries,
 };
@@ -109,11 +108,6 @@ use crate::workspace::tab_group::TabGroupId;
 use crate::workspaces::team::Team as TeamMetadata;
 use crate::workspaces::user_profiles::{UserProfileWithUID, user_profile_from_persistence};
 use crate::workspaces::workspace::{Workspace as WorkspaceMetadata, WorkspaceUid};
-use crate::cloud_object::{
-    NumInFlightRequests, Revision, StoredObjectMetadata, StoredObjectPermissions,
-    StoredObjectStatuses, StoredObjectSyncStatus,
-};
-use crate::notebooks::NotebookObjectModel;
 use crate::{safe_info, send_telemetry_from_app_ctx};
 
 diesel::define_sql_function! {

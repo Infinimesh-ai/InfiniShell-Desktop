@@ -16,7 +16,8 @@ use crate::ui_components::icons::Icon as UIIcon;
 use crate::util::color::{ContrastingColor, MinimumAllowedContrast};
 
 const OPEN_WARP_AI_ITEM_BODY_TEXT: &str = "Ask InfiniShell AI for command suggestions";
-const TRANSLATE_WITH_WARP_AI_ITEM_BODY_TEXT: &str = "Translate into shell command using InfiniShell AI";
+const TRANSLATE_WITH_WARP_AI_ITEM_BODY_TEXT: &str =
+    "Translate into shell command using InfiniShell AI";
 
 #[derive(Clone, Debug)]
 pub enum WarpAISearchItem {

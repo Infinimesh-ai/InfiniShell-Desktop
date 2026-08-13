@@ -1,42 +1,41 @@
+use std::path::{Path, PathBuf};
+
+use ai::api_keys::{ApiKeyManager, ApiKeyManagerEvent};
+use itertools::Itertools;
+use regex::Regex;
+use warpui::elements::{
+    Align, ChildView, ClippedScrollStateHandle, ClippedScrollable, Container, Flex,
+    MouseStateHandle, ParentElement, ScrollbarWidth,
+};
+use warpui::ui_components::switch::SwitchStateHandle;
+use warpui::{
+    AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
+    ViewHandle,
+};
+
 use crate::ai::blocklist::BlocklistAIPermissions;
 use crate::ai::execution_profiles::model_menu_items::available_model_menu_items;
+use crate::ai::execution_profiles::profiles::{
+    AIExecutionProfilesModel, AIExecutionProfilesModelEvent,
+};
 use crate::ai::execution_profiles::{
-    profiles::{AIExecutionProfilesModel, AIExecutionProfilesModelEvent},
     AIExecutionProfile, ActionPermission, ExecutionProfileId, WriteToPtyPermission,
 };
 use crate::ai::llms::{LLMId, LLMInfo, LLMPreferences, LLMPreferencesEvent};
 use crate::ai::paths::host_native_absolute_path;
-use crate::editor::InteractionState;
-use crate::editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions};
+use crate::editor::{EditorView, Event as EditorEvent, InteractionState, SingleLineEditorOptions};
 use crate::pane_group::focus_state::PaneFocusHandle;
+use crate::pane_group::pane::view;
+use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
 use crate::settings::{AISettings, AgentModeCommandExecutionPredicate};
 use crate::ui_components::icons::Icon;
+use crate::view_components::action_button::{ActionButton, DangerSecondaryTheme};
 use crate::view_components::{
-    action_button::{ActionButton, DangerSecondaryTheme},
     Dropdown, DropdownAction, DropdownItem, FilterableDropdown, SubmittableTextInput,
     SubmittableTextInputEvent,
 };
 use crate::workspaces::user_workspaces::UserWorkspacesEvent;
-use crate::TemplatableMCPServerManager;
-use crate::UserWorkspaces;
-use crate::{
-    pane_group::{pane::view, BackingView, PaneConfiguration, PaneEvent},
-    Appearance,
-};
-use ai::api_keys::{ApiKeyManager, ApiKeyManagerEvent};
-use itertools::Itertools;
-use regex::Regex;
-use warpui::ui_components::switch::SwitchStateHandle;
-
-use std::path::{Path, PathBuf};
-use warpui::{
-    elements::{
-        Align, ChildView, ClippedScrollStateHandle, ClippedScrollable, Container, Flex,
-        MouseStateHandle, ParentElement, ScrollbarWidth,
-    },
-    AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
-    ViewHandle,
-};
+use crate::{Appearance, TemplatableMCPServerManager, UserWorkspaces};
 
 const MODEL_MENU_WIDTH: f32 = 250.;
 

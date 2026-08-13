@@ -2959,10 +2959,9 @@ fn test_initialize_output_for_response_stream_persists_updated_conversation_stat
         });
 
         // Zap:请求提交时已经落盘过一次,StreamInit 的持久化是这条链路上的最后一条事件。
-        let persisted_conversation =
-            persisted_agent_conversation_from_update_event(last_update_conversation_event(
-                &receiver,
-            ));
+        let persisted_conversation = persisted_agent_conversation_from_update_event(
+            last_update_conversation_event(&receiver),
+        );
         let restored =
             convert_persisted_conversation_to_ai_conversation_with_metadata(persisted_conversation)
                 .expect("persisted StreamInit conversation should be restorable");

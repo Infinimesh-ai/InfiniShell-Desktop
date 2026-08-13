@@ -12,8 +12,8 @@
 //!
 //! 参数 schema 与 opencode `webfetch.ts:12-20` 对齐。
 
-use anyhow::{anyhow, Result};
-use serde_json::{json, Value};
+use anyhow::{Result, anyhow};
+use serde_json::{Value, json};
 use warp_multi_agent_api as api;
 
 use super::OpenAiTool;

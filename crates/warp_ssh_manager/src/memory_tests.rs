@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use diesel::connection::SimpleConnection;
 
 use super::*;
-use crate::repository::{setup_in_memory, SyncMetaRepository};
+use crate::repository::{SyncMetaRepository, setup_in_memory};
 
 fn timestamp(value: &str) -> DateTime<Utc> {
     DateTime::parse_from_rfc3339(value)

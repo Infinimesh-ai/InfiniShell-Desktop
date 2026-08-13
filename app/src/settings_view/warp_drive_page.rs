@@ -35,7 +35,10 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
         vec![
             ToggleSettingActionPair::custom(
-                SettingActionPairDescriptions::new("Enable InfiniShell Drive", "Disable InfiniShell Drive"),
+                SettingActionPairDescriptions::new(
+                    "Enable InfiniShell Drive",
+                    "Disable InfiniShell Drive",
+                ),
                 builder(SettingsAction::ZapDrive(
                     WarpDriveSettingsPageAction::ToggleShowWarpDrive,
                 )),

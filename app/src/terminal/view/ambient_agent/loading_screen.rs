@@ -1,17 +1,16 @@
 //! Loading screen UI for ambient-agent initialization.
 
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
+use warp_core::ui::Icon;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::AnsiColorIdentifier;
-use warp_core::ui::Icon;
 use warpui::elements::shimmering_text::ShimmeringTextStateHandle;
 use warpui::elements::{
     Align, Border, ConstrainedBox, Container, CrossAxisAlignment, Element, Expanded, Flex,
     FormattedTextElement, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
     SelectableArea, SelectionHandle, Text,
 };
-use warpui::fonts::Properties;
-use warpui::fonts::Weight;
+use warpui::fonts::{Properties, Weight};
 use warpui::prelude::{CornerRadius, Radius};
 use warpui::text_layout::TextAlignment;
 use warpui::ui_components::button::ButtonVariant;

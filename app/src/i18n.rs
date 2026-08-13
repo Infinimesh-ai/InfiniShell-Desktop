@@ -10,14 +10,13 @@
 //!   - 当前 locale 没有 → fluent 内部 fallback 到 fallback_language (en)
 //!   - 连英文都没有 → 返回 key 本身字符串(并 log::warn,便于 CI 抓未翻译条目)
 
+use std::sync::OnceLock;
+
 #[cfg(not(target_os = "macos"))]
 use i18n_embed::DesktopLanguageRequester;
-use i18n_embed::{
-    fluent::{fluent_language_loader, FluentLanguageLoader},
-    LanguageLoader,
-};
+use i18n_embed::LanguageLoader;
+use i18n_embed::fluent::{FluentLanguageLoader, fluent_language_loader};
 use rust_embed::RustEmbed;
-use std::sync::OnceLock;
 use unic_langid::LanguageIdentifier;
 
 /// 把 `app/i18n` 目录嵌进二进制。每次构建会重新嵌入(debug-embed feature 已在 workspace 开)。
@@ -93,7 +92,8 @@ fn system_requested_languages() -> Vec<LanguageIdentifier> {
 
 #[cfg(target_os = "macos")]
 fn macos_requested_languages() -> Vec<LanguageIdentifier> {
-    use objc::{class, msg_send, runtime::Object, sel, sel_impl};
+    use objc::runtime::Object;
+    use objc::{class, msg_send, sel, sel_impl};
     use warpui::platform::mac::utils::nsstring_as_str;
 
     unsafe {

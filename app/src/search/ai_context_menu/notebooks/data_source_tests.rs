@@ -93,13 +93,21 @@ fn filtered_state_adds_recency_bonus_to_equal_matches() {
         // All titles contain "plan" so fuzzy scores should be similar
         ObjectStoreModel::handle(&app).update(&mut app, |model, _| {
             for notebook in [
-                mock_notebook_with_revision(1, "my first plan", (now - Duration::minutes(3)).into()),
+                mock_notebook_with_revision(
+                    1,
+                    "my first plan",
+                    (now - Duration::minutes(3)).into(),
+                ),
                 mock_notebook_with_revision(
                     2,
                     "my second plan",
                     (now - Duration::minutes(2)).into(),
                 ),
-                mock_notebook_with_revision(3, "my third plan", (now - Duration::minutes(1)).into()),
+                mock_notebook_with_revision(
+                    3,
+                    "my third plan",
+                    (now - Duration::minutes(1)).into(),
+                ),
             ] {
                 model.add_object(notebook.id, notebook);
             }

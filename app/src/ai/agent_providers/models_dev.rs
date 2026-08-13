@@ -19,8 +19,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::OnceLock;
-use std::sync::RwLock;
+use std::sync::{OnceLock, RwLock};
 use std::time::{Duration, SystemTime};
 
 use http_client::Client;

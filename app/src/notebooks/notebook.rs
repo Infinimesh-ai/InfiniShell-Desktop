@@ -49,6 +49,7 @@ use crate::appearance::Appearance;
 use crate::cloud_object::grab_edit_access_modal::{GrabEditAccessModal, GrabEditAccessModalEvent};
 use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel, UpdateSource};
 use crate::cloud_object::model::view::{Editor, EditorState};
+use crate::cloud_object::update_manager::{FetchSingleObjectOption, UpdateManager};
 use crate::cloud_object::{ObjectType, Owner, Space, StoredObject, StoredObjectEventEntrypoint};
 use crate::drive::drive_helpers::has_feature_gated_anonymous_user_reached_notebook_limit;
 use crate::drive::export::ExportManager;
@@ -67,7 +68,6 @@ use crate::notebooks::editor::rich_text_styles;
 use crate::pane_group::focus_state::{PaneFocusHandle, PaneGroupFocusEvent};
 use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
-use crate::cloud_object::update_manager::{FetchSingleObjectOption, UpdateManager};
 use crate::server::ids::{ClientId, ServerId, SyncId};
 use crate::server::telemetry::{
     NotebookActionEvent, NotebookTelemetryMetadata, ObjectTelemetryMetadata, TelemetryEvent,
@@ -1835,11 +1835,7 @@ impl NotebookView {
         // Load the server's version of the notebook now that the object store has been updated.
         // This will also switch back to edit mode if there isn't an active editor.
         if let Some(notebook) = ObjectStoreModel::as_ref(ctx).get_notebook(&id) {
-            self.load(
-                notebook.clone(),
-                &ZapDriveObjectSettings::default(),
-                ctx,
-            );
+            self.load(notebook.clone(), &ZapDriveObjectSettings::default(), ctx);
         }
         ctx.notify();
     }

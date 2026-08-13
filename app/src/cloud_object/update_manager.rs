@@ -1,51 +1,45 @@
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::mcp::templatable::{TemplatableMCPServer, TemplatableMCPServerObjectModel};
-use crate::{
-    ai::{
-        execution_profiles::{AIExecutionProfile, AIExecutionProfileObjectModel},
-        facts::{AIFact, AIFactObjectModel},
-    },
-    auth::TEST_USER_UID,
-    cloud_object::{
-        model::{
-            actions::{ObjectAction, ObjectActionHistory, ObjectActionType, ObjectActions},
-            generic_string_model::{
-                GenericStringModel, GenericStringObjectId, Serializer, StringModel,
-            },
-            persistence::{ObjectStoreEvent, ObjectStoreModel, UpdateSource},
-            view::{Editor, EditorState, ObjectStoreViewModel},
-        },
-        GenericStoredObject, GenericStringObjectFormat, JsonObjectType, ObjectIdType, ObjectType,
-        Owner, Revision, Space, StoredObject, StoredObjectEventEntrypoint, StoredObjectLocation,
-        StoredObjectModel,
-    },
-    drive::{
-        folders::{FolderId, FolderObjectModel},
-        ObjectTypeAndId,
-    },
-    env_vars::{EnvVarCollection, EnvVarCollectionObjectModel},
-    notebooks::{NotebookId, NotebookObjectModel},
-    persistence::ModelEvent,
-    server::ids::{ClientId, HashableId, ObjectUid, ServerId, SyncId, ToServerId},
-    server_time::ServerTimestamp,
-    settings::cloud_preferences::Preference,
-    workflows::{
-        workflow::Workflow,
-        workflow_enum::{WorkflowEnum, WorkflowEnumObject, WorkflowEnumObjectModel},
-        WorkflowId, WorkflowObjectModel,
-    },
-    workspaces::user_workspaces::UserWorkspaces,
-};
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::sync::mpsc::SyncSender;
+
 use chrono::{DateTime, Utc};
 use futures::channel::oneshot::{self, Receiver};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::collections::HashSet;
-use std::sync::{mpsc::SyncSender, Arc};
 use warpui::r#async::FutureId;
-use warpui::AppContext;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
+
+use crate::ai::execution_profiles::{AIExecutionProfile, AIExecutionProfileObjectModel};
+use crate::ai::facts::{AIFact, AIFactObjectModel};
+#[cfg(not(target_family = "wasm"))]
+use crate::ai::mcp::templatable::{TemplatableMCPServer, TemplatableMCPServerObjectModel};
+use crate::auth::TEST_USER_UID;
+use crate::cloud_object::model::actions::{
+    ObjectAction, ObjectActionHistory, ObjectActionType, ObjectActions,
+};
+use crate::cloud_object::model::generic_string_model::{
+    GenericStringModel, GenericStringObjectId, Serializer, StringModel,
+};
+use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel, UpdateSource};
+use crate::cloud_object::model::view::{Editor, EditorState, ObjectStoreViewModel};
+use crate::cloud_object::{
+    GenericStoredObject, GenericStringObjectFormat, JsonObjectType, ObjectIdType, ObjectType,
+    Owner, Revision, Space, StoredObject, StoredObjectEventEntrypoint, StoredObjectLocation,
+    StoredObjectModel,
+};
+use crate::drive::ObjectTypeAndId;
+use crate::drive::folders::{FolderId, FolderObjectModel};
+use crate::env_vars::{EnvVarCollection, EnvVarCollectionObjectModel};
+use crate::notebooks::{NotebookId, NotebookObjectModel};
+use crate::persistence::ModelEvent;
+use crate::server::ids::{ClientId, HashableId, ObjectUid, ServerId, SyncId, ToServerId};
+use crate::server_time::ServerTimestamp;
+use crate::settings::cloud_preferences::Preference;
+use crate::workflows::workflow::Workflow;
+use crate::workflows::workflow_enum::{WorkflowEnum, WorkflowEnumObject, WorkflowEnumObjectModel};
+use crate::workflows::{WorkflowId, WorkflowObjectModel};
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 lazy_static! {
     static ref DUPLICATE_OBJECT_NAME_REGEX: Regex =
@@ -554,7 +548,9 @@ impl UpdateManager {
                 let object: Option<&WorkflowEnumObject> =
                     object_store_model.get_object_of_type(&model_sync_id_to_app(enum_id));
                 let Some(object) = object else {
-                    log::error!("Could not find referenced workflow enum to copy over to the new space, skipping");
+                    log::error!(
+                        "Could not find referenced workflow enum to copy over to the new space, skipping"
+                    );
                     continue;
                 };
 

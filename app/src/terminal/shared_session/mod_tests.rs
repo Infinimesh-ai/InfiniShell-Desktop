@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
 use serde_json::Value;
-// Zap:session-sharing-protocol crate 已剥离,改用本地 protocol 模块
-use crate::terminal::shared_session::protocol::{Scrollback, ScrollbackBlock};
 use url::Url;
 use warp_core::command::ExitCode;
 use warp_core::features::FeatureFlag;
@@ -18,6 +16,8 @@ use crate::terminal::event_listener::ChannelEventListener;
 use crate::terminal::model::ObfuscateSecrets;
 use crate::terminal::model::block::{BlockId, BlockState, SerializedBlock};
 use crate::terminal::model::test_utils::block_size;
+// Zap:session-sharing-protocol crate 已剥离,改用本地 protocol 模块
+use crate::terminal::shared_session::protocol::{Scrollback, ScrollbackBlock};
 use crate::themes::default_themes::dark_theme;
 use crate::uri::web_intent_parser::maybe_rewrite_web_url_to_intent;
 

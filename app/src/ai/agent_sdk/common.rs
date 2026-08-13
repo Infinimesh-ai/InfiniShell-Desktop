@@ -3,16 +3,14 @@
 use std::future::Future;
 
 use futures::TryFutureExt;
-
 use warpui::r#async::FutureExt;
 use warpui::{AppContext, SingletonEntity as _};
 
 use crate::ai::agent_sdk::driver::WARP_DRIVE_SYNC_TIMEOUT;
-
 use crate::ai::llms::{LLMId, LLMPreferences};
 use crate::auth::AuthStateProvider;
-use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::cloud_object::Owner;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 pub fn validate_agent_mode_base_model_id(

@@ -13,12 +13,11 @@
 //! 这套测试是 Zap 的"防退化护栏"——后续任何修改 prompt
 //! 构造路径的改动只要破坏字节级稳定性,这里就会断言失败。
 
-use crate::ai::agent::{MCPContext, MCPServer};
 use api::message;
 use warp_multi_agent_api as api;
 
-use super::chat_stream;
-use super::tools;
+use super::{chat_stream, tools};
+use crate::ai::agent::{MCPContext, MCPServer};
 
 // ---------------------------------------------------------------------------
 // P1-8: tool schema 字段顺序稳定性
@@ -122,8 +121,10 @@ fn serialize_grep_preserves_queries_order() {
 /// `prost_types::Struct.fields` 内部用 `BTreeMap`,本身就稳定,这里覆盖一下确认。
 #[test]
 fn serialize_mcp_tool_call_is_deterministic() {
-    use prost_types::{value::Kind, Struct, Value as ProstValue};
     use std::collections::BTreeMap;
+
+    use prost_types::value::Kind;
+    use prost_types::{Struct, Value as ProstValue};
 
     let mut fields = BTreeMap::new();
     fields.insert(
@@ -252,9 +253,10 @@ fn full_tools_array_serialization_is_stable() {
 /// 带 MCP server 的端到端拼接稳定性(对接 P0-3 排序保证)。
 #[test]
 fn full_tools_array_with_mcp_is_stable() {
+    use std::sync::Arc;
+
     use rmcp::model::{AnnotateAble, RawResource, Tool as McpTool};
     use serde_json::json;
-    use std::sync::Arc;
 
     let schema_obj = json!({
         "type": "object",

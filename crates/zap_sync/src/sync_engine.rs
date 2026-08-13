@@ -3,9 +3,10 @@
 // author: logic
 // date: 2026-05-24
 
+use chrono::Utc;
+
 use crate::gist_client::{GistClient, GistOps};
 use crate::types::*;
-use chrono::Utc;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ApplyDataOutcome {
@@ -361,9 +362,10 @@ fn apply_provider_sections(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use super::*;
     use crate::GistClientError;
-    use std::sync::{Arc, Mutex};
 
     struct MockVersionStore {
         version: Arc<Mutex<i64>>,

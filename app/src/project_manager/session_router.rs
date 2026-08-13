@@ -26,14 +26,14 @@ use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use futures::channel::oneshot;
-use serde_json::{json, Value};
-use warp_ssh_manager::{resolve_machine_key, SshRepository};
+use serde_json::{Value, json};
+use warp_ssh_manager::{SshRepository, resolve_machine_key};
 use warpui::r#async::Timer;
 use warpui::{Entity, ModelContext, SingletonEntity, ViewHandle, WeakViewHandle};
 use zap_projects::ProjectRepository;
 
-use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::AIAgentActionId;
+use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_providers::tools::project_hosts::BatchArgs;
 use crate::terminal::view::TerminalView;
 
@@ -161,7 +161,10 @@ struct CurrentHost {
 #[derive(Clone, Debug)]
 enum HostPhase {
     /// 等待(新开的)会话连接就绪。
-    WaitingReady { host: CurrentHost, deadline: Instant },
+    WaitingReady {
+        host: CurrentHost,
+        deadline: Instant,
+    },
     /// 命令已派发,等待 block 完成。
     WaitingFinish {
         host: CurrentHost,
@@ -267,7 +270,9 @@ impl ProjectHostSessionRouter {
             if let Some(batch) = self.batch.as_mut() {
                 while batch.index < batch.args.node_ids.len() {
                     let node_id = batch.args.node_ids[batch.index].clone();
-                    batch.results.push(BatchHostResult::skipped_by_canary(node_id));
+                    batch
+                        .results
+                        .push(BatchHostResult::skipped_by_canary(node_id));
                     batch.index += 1;
                 }
             }
@@ -424,10 +429,7 @@ impl ProjectHostSessionRouter {
                             host: host.host_display,
                             status: BatchHostStatus::SessionNotReady,
                             exit_code: None,
-                            output: format!(
-                                "会话在 {} 秒内未连接就绪",
-                                READY_TIMEOUT.as_secs()
-                            ),
+                            output: format!("会话在 {} 秒内未连接就绪", READY_TIMEOUT.as_secs()),
                             duration_ms: 0,
                         },
                         ctx,
@@ -458,12 +460,14 @@ impl ProjectHostSessionRouter {
                     );
                     return;
                 };
-                let finished =
-                    view.read(ctx, |view, _app| view.project_agent_block_finished(&action_id));
+                let finished = view.read(ctx, |view, _app| {
+                    view.project_agent_block_finished(&action_id)
+                });
                 match finished {
                     Some(true) => {
-                        let block_result = view
-                            .read(ctx, |view, _app| view.project_agent_block_result(&action_id));
+                        let block_result = view.read(ctx, |view, _app| {
+                            view.project_agent_block_result(&action_id)
+                        });
                         let (exit_code, output) = block_result.unwrap_or((None, String::new()));
                         let status = if exit_code == Some(0) {
                             BatchHostStatus::Ok
@@ -552,10 +556,9 @@ fn resolve_target(node_id: &str) -> Result<CurrentHost, String> {
         Err(err) => return Err(format!("SSH 节点查询失败: {err}")),
     };
     // 项目归属校验:不属于任何项目的 node 拒绝执行(工具仅面向项目会话)。
-    let in_project = zap_projects::with_conn(|conn| {
-        Ok(ProjectRepository::projects_for_node(conn, node_id)?)
-    })
-    .map(|projects: Vec<String>| !projects.is_empty());
+    let in_project =
+        zap_projects::with_conn(|conn| Ok(ProjectRepository::projects_for_node(conn, node_id)?))
+            .map(|projects: Vec<String>| !projects.is_empty());
     match in_project {
         Ok(true) => {}
         Ok(false) => return Err("node 不属于任何项目,拒绝执行".to_owned()),

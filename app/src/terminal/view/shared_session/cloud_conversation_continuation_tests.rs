@@ -253,11 +253,7 @@ fn routing_is_live_remote_vm_for_retained_failed_execution() {
         let TestHandles {
             terminal_view_id,
             task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedIn,
-            AIAgentHarness::Oz,
-        );
+        } = setup_app(&mut app, AuthFixture::LoggedIn, AIAgentHarness::Oz);
         let mut task = active_ambient_agent_task(task_id);
         task.state = AmbientAgentTaskState::Error;
         AgentConversationsModel::handle(&app).update(&mut app, |model, _| {
@@ -283,11 +279,7 @@ fn routing_starts_new_cloud_vm_for_ended_failed_execution() {
         let TestHandles {
             terminal_view_id,
             task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedIn,
-            AIAgentHarness::Oz,
-        );
+        } = setup_app(&mut app, AuthFixture::LoggedIn, AIAgentHarness::Oz);
         let mut task =
             ambient_agent_task(task_id, CONVERSATION_TOKEN, AmbientAgentTaskState::Failed);
         task.session_link = Some("https://example.com/session/stale".to_string());
@@ -339,11 +331,7 @@ fn oz_conversation_with_edit_access_shows_inline_followup_input() {
         let TestHandles {
             terminal_view_id,
             task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedIn,
-            AIAgentHarness::Oz,
-        );
+        } = setup_app(&mut app, AuthFixture::LoggedIn, AIAgentHarness::Oz);
 
         app.update(|ctx| {
             let state =
@@ -362,11 +350,7 @@ fn third_party_conversation_with_edit_access_shows_continue_in_cloud_tombstone()
         let TestHandles {
             terminal_view_id,
             task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedIn,
-            AIAgentHarness::ClaudeCode,
-        );
+        } = setup_app(&mut app, AuthFixture::LoggedIn, AIAgentHarness::ClaudeCode);
 
         app.update(|ctx| {
             let state =
@@ -388,11 +372,7 @@ fn environment_setup_failure_without_conversation_shows_tombstone_without_cta() 
         let TestHandles {
             terminal_view_id,
             task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedIn,
-            AIAgentHarness::ClaudeCode,
-        );
+        } = setup_app(&mut app, AuthFixture::LoggedIn, AIAgentHarness::ClaudeCode);
         AgentConversationsModel::handle(&app).update(&mut app, |model, _| {
             let mut task =
                 ambient_agent_task(task_id, CONVERSATION_TOKEN, AmbientAgentTaskState::Failed);
@@ -422,11 +402,7 @@ fn environment_setup_failure_with_conversation_shows_continue_cta() {
         let TestHandles {
             terminal_view_id,
             task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedIn,
-            AIAgentHarness::ClaudeCode,
-        );
+        } = setup_app(&mut app, AuthFixture::LoggedIn, AIAgentHarness::ClaudeCode);
         AgentConversationsModel::handle(&app).update(&mut app, |model, _| {
             let mut task =
                 ambient_agent_task(task_id, CONVERSATION_TOKEN, AmbientAgentTaskState::Failed);
@@ -532,11 +508,7 @@ fn active_task_execution_returns_error() {
         let TestHandles {
             terminal_view_id,
             task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedIn,
-            AIAgentHarness::Oz,
-        );
+        } = setup_app(&mut app, AuthFixture::LoggedIn, AIAgentHarness::Oz);
         AgentConversationsModel::handle(&app).update(&mut app, |model, _| {
             model.insert_task_for_test(active_ambient_agent_task(task_id));
         });
@@ -558,11 +530,7 @@ fn retained_failed_task_execution_returns_active_execution_error() {
         let TestHandles {
             terminal_view_id,
             task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedIn,
-            AIAgentHarness::Oz,
-        );
+        } = setup_app(&mut app, AuthFixture::LoggedIn, AIAgentHarness::Oz);
         let mut task = active_ambient_agent_task(task_id);
         task.state = AmbientAgentTaskState::Failed;
         AgentConversationsModel::handle(&app).update(&mut app, |model, _| {
@@ -587,11 +555,7 @@ fn ended_failed_task_uses_ordinary_cloud_continuation() {
         let TestHandles {
             terminal_view_id,
             task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedIn,
-            AIAgentHarness::Oz,
-        );
+        } = setup_app(&mut app, AuthFixture::LoggedIn, AIAgentHarness::Oz);
         let mut task =
             ambient_agent_task(task_id, CONVERSATION_TOKEN, AmbientAgentTaskState::Failed);
         task.session_link = Some("https://example.com/session/stale".to_string());
@@ -690,11 +654,7 @@ fn routing_is_new_cloud_vm_for_owned_oz_disconnected_pane() {
         let TestHandles {
             terminal_view_id,
             task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedIn,
-            AIAgentHarness::Oz,
-        );
+        } = setup_app(&mut app, AuthFixture::LoggedIn, AIAgentHarness::Oz);
         let model = ambient_pane_model(task_id, SharedSessionStatus::NotShared);
         app.update(|ctx| {
             assert_eq!(
@@ -711,11 +671,7 @@ fn routing_is_live_remote_vm_for_active_execution_without_attached_viewer() {
         let TestHandles {
             terminal_view_id,
             task_id,
-        } = setup_app(
-            &mut app,
-            AuthFixture::LoggedIn,
-            AIAgentHarness::Oz,
-        );
+        } = setup_app(&mut app, AuthFixture::LoggedIn, AIAgentHarness::Oz);
         AgentConversationsModel::handle(&app).update(&mut app, |model, _| {
             model.insert_task_for_test(active_ambient_agent_task(task_id));
         });

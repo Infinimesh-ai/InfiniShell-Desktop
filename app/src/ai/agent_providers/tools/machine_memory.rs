@@ -3,9 +3,9 @@
 //! 该工具不映射 protobuf executor variant。`chat_stream.rs` 会在
 //! `parse_incoming_tool_call` 前按名称拦截，解析完整记忆文档并写入本地数据库。
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use warp_multi_agent_api as api;
 use warp_ssh_manager::memory::MAX_MEMORY_CHARS;
 

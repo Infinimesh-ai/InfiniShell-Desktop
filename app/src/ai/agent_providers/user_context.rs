@@ -27,12 +27,12 @@
 
 use std::collections::HashMap;
 
+use ai::agent::action_result::{AnyFileContent, FileContext};
 use base64::Engine;
+use warp_multi_agent_api as api;
 
 use crate::ai::agent::{AIAgentAttachment, AIAgentContext, DriveObjectPayload, ImageContext};
 use crate::ai::block_context::BlockContext;
-use ai::agent::action_result::{AnyFileContent, FileContext};
-use warp_multi_agent_api as api;
 
 /// `collect_user_attachments` 返回的双通道结果。
 ///

@@ -5,8 +5,7 @@ use std::time::Duration;
 
 use futures::Stream;
 
-use super::AmbientAgentTaskId;
-use super::{AmbientAgentTask, AmbientAgentTaskState};
+use super::{AmbientAgentTask, AmbientAgentTaskId, AmbientAgentTaskState};
 use crate::ai::ambient_agents::{SpawnAgentRequest, TaskStatusMessage};
 
 /// How long to poll for the agent to be ready.

@@ -10,7 +10,8 @@
 
 use enum_iterator::Sequence;
 use serde::{Deserialize, Serialize};
-use warp_core::settings::{macros::define_settings_group, SupportedPlatforms, SyncToCloud};
+use warp_core::settings::macros::define_settings_group;
+use warp_core::settings::{SupportedPlatforms, SyncToCloud};
 
 #[derive(
     Default,

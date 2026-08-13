@@ -166,8 +166,9 @@ fn coerce_object(value: &mut Value, props: &Value, parent_schema: &Value, change
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     fn shell_schema() -> Value {
         json!({

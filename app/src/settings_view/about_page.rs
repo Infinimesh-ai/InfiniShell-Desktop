@@ -70,9 +70,11 @@ impl TypedActionView for AboutPageView {
         match action {
             AboutPageAction::ToggleAutomaticUpdates => {
                 AutoupdateSettings::handle(ctx).update(ctx, |settings, ctx| {
-                    report_if_error!(settings
-                        .automatic_updates_enabled
-                        .toggle_and_save_value(ctx));
+                    report_if_error!(
+                        settings
+                            .automatic_updates_enabled
+                            .toggle_and_save_value(ctx)
+                    );
                 });
                 ctx.notify();
             }
@@ -291,7 +293,9 @@ impl AboutPageWidget {
         // - UpdateReady / UpdatedPendingRestart:可以安装 + "立即安装"按钮
         // - UnableTo*: 自动安装失败 + "前往 GitHub 下载"兜底链接
         let stage = autoupdate::get_update_state(app);
-        let progress = autoupdate::AutoupdateState::as_ref(app).download_progress().cloned();
+        let progress = autoupdate::AutoupdateState::as_ref(app)
+            .download_progress()
+            .cloned();
 
         let (status_text, action) = match &stage {
             AutoupdateStage::CheckingForUpdate => (

@@ -1,14 +1,13 @@
 use settings::macros::define_settings_group;
 use settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
+// 重导出底层 warp_core 定义的 UI 字号常量,
+// 使 `crate::settings::DEFAULT_UI_FONT_SIZE` / `UI_FONT_SIZE_MIN` / `UI_FONT_SIZE_MAX` 仍可用。
+pub use warp_core::ui::appearance::{DEFAULT_UI_FONT_SIZE, UI_FONT_SIZE_MAX, UI_FONT_SIZE_MIN};
 use warp_core::ui::builder::MIN_FONT_SIZE;
 use warpui::elements::{DEFAULT_UI_LINE_HEIGHT_RATIO, HeadingFontSizeMultipliers};
 use warpui::fonts::Weight;
 use warpui::rendering::ThinStrokes;
 use warpui::{AppContext, SingletonEntity};
-
-// 重导出底层 warp_core 定义的 UI 字号常量,
-// 使 `crate::settings::DEFAULT_UI_FONT_SIZE` / `UI_FONT_SIZE_MIN` / `UI_FONT_SIZE_MAX` 仍可用。
-pub use warp_core::ui::appearance::{DEFAULT_UI_FONT_SIZE, UI_FONT_SIZE_MAX, UI_FONT_SIZE_MIN};
 
 use super::EnforceMinimumContrast as EnforceMinimumContrastEnum;
 

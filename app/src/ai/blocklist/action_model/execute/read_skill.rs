@@ -1,23 +1,20 @@
+use std::path::Path;
+
+use ai::agent::action_result::{AnyFileContent, FileContext};
+use ai::skills::SkillReference;
+#[cfg(feature = "local_fs")]
+use ai::skills::parse_skill;
+use futures::future::{BoxFuture, FutureExt};
+use warpui::{Entity, ModelContext, SingletonEntity};
+
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 #[cfg(feature = "local_fs")]
 use crate::ai::agent::AIAgentActionResultType;
+use crate::ai::agent::{AIAgentActionType, ReadSkillRequest, ReadSkillResult};
 #[cfg(feature = "local_fs")]
 use crate::ai::skills::extract_skill_parent_directory;
 use crate::ai::skills::{SkillManager, SkillTelemetryEvent};
 use crate::send_telemetry_from_ctx;
-use ai::agent::action_result::AnyFileContent;
-use ai::skills::SkillReference;
-#[cfg(feature = "local_fs")]
-use ai::skills::parse_skill;
-use std::path::Path;
-use warpui::{ModelContext, SingletonEntity};
-
-use crate::ai::agent::AIAgentActionType;
-use crate::ai::agent::ReadSkillRequest;
-use crate::ai::agent::ReadSkillResult;
-use ai::agent::action_result::FileContext;
-use futures::future::{BoxFuture, FutureExt};
-use warpui::Entity;
 
 pub struct ReadSkillExecutor;
 

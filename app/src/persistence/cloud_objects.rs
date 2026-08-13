@@ -1,21 +1,21 @@
 //! Supporting types for persisting cloud objects to SQLite.
 
 use anyhow::anyhow;
-use diesel::{result::Error, SqliteConnection};
+use diesel::SqliteConnection;
+use diesel::result::Error;
+use persistence::model::{NewObjectMetadata, NewObjectPermissions};
 use serde::{Deserialize, Serialize};
 use warp_core::features::FeatureFlag;
 
-use crate::{
-    auth::UserUid,
-    cloud_object::{
-        LinkSharing, ObjectIdType, ObjectType, Owner, ServerObjectContainer, StoredObjectGuest,
-        StoredObjectMetadata, StoredObjectPermissions,
-    },
-    drive::sharing::{SharingAccessLevel, Subject, TeamKind, UserKind},
-    persistence::{model::ObjectMetadata, schema},
-    server::ids::ServerId,
+use crate::auth::UserUid;
+use crate::cloud_object::{
+    LinkSharing, ObjectIdType, ObjectType, Owner, ServerObjectContainer, StoredObjectGuest,
+    StoredObjectMetadata, StoredObjectPermissions,
 };
-use persistence::model::{NewObjectMetadata, NewObjectPermissions};
+use crate::drive::sharing::{SharingAccessLevel, Subject, TeamKind, UserKind};
+use crate::persistence::model::ObjectMetadata;
+use crate::persistence::schema;
+use crate::server::ids::ServerId;
 
 pub type StoredObjectId = i32;
 pub type CreateStoredObjectFn =
@@ -32,6 +32,7 @@ pub fn upsert_stored_object(
     create_object_fn: CreateStoredObjectFn,
     update_object_fn: UpdateStoredObjectFn,
 ) -> Result<(), Error> {
+    use diesel::prelude::*;
     use schema::object_metadata::dsl::{
         client_id, current_editor, folder_id, is_pending, last_editor_uid,
         metadata_last_updated_ts, object_metadata, revision_ts, server_id, trashed_ts,
@@ -40,8 +41,6 @@ pub fn upsert_stored_object(
         anyone_with_link_access_level, anyone_with_link_source, object_guests, object_metadata_id,
         object_permissions, permissions_last_updated_at, subject_id, subject_type, subject_uid,
     };
-
-    use diesel::prelude::*;
 
     let (subject_type_value, subject_id_value, subject_uid_value) =
         match cloud_object_permissions.owner {

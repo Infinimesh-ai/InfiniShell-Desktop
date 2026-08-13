@@ -1,9 +1,9 @@
-use crate::terminal::view::TerminalView;
-
-use crate::terminal::shared_session::protocol::WindowSize;
-use warpui::{ViewContext, elements::MouseStateHandle};
+use warpui::ViewContext;
+use warpui::elements::MouseStateHandle;
 
 use super::adapter::Participant;
+use crate::terminal::shared_session::protocol::WindowSize;
+use crate::terminal::view::TerminalView;
 
 pub struct Viewer {
     pub sharer: Option<Participant>,

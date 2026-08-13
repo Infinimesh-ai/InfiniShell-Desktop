@@ -1,9 +1,9 @@
-use crate::{
-    auth::UserUid,
-    cloud_object::{ServerObjectContainer, StoredObjectGuest},
-    drive::sharing::{LinkSharingSubjectType, SharingAccessLevel, Subject, TeamKind, UserKind},
-    server::ids::ServerId,
+use crate::auth::UserUid;
+use crate::cloud_object::{ServerObjectContainer, StoredObjectGuest};
+use crate::drive::sharing::{
+    LinkSharingSubjectType, SharingAccessLevel, Subject, TeamKind, UserKind,
 };
+use crate::server::ids::ServerId;
 
 #[test]
 fn test_roundtrip_guests() {

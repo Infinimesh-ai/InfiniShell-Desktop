@@ -14,9 +14,8 @@ use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::{BoxFuture, DataSourceRunErrorWrapper};
 use crate::server::ids::SyncId;
 use crate::settings::AISettings;
-use crate::workflows::WorkflowObjectModel;
-
 use crate::terminal::input::slash_commands::{AcceptSlashCommandOrSavedPrompt, InlineItem};
+use crate::workflows::WorkflowObjectModel;
 
 pub(super) struct SavedPromptCandidate {
     pub(super) id: SyncId,

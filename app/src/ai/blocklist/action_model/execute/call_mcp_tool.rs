@@ -342,9 +342,10 @@ fn execute_project_hosts_batch(
     conversation_id: crate::ai::agent::conversation::AIConversationId,
     ctx: &mut ModelContext<CallMCPToolExecutor>,
 ) -> AnyActionExecution {
+    use futures::channel::oneshot;
+
     use crate::ai::agent_providers::tools::project_hosts;
     use crate::project_manager::ProjectHostSessionRouter;
-    use futures::channel::oneshot;
 
     let args = match project_hosts::parse_batch_args(input) {
         Ok(args) => args,

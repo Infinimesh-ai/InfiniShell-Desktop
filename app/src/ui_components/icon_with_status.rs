@@ -136,11 +136,7 @@ pub(crate) fn render_cli_agent_logo(
         _ => None,
     };
     if let Some(path) = multi_color_logo_path {
-        Image::new(
-            AssetSource::Bundled { path },
-            CacheOption::BySize,
-        )
-        .finish()
+        Image::new(AssetSource::Bundled { path }, CacheOption::BySize).finish()
     } else {
         agent
             .icon()
@@ -267,12 +263,14 @@ pub(crate) fn render_icon_with_status_with_badge_style(
                 render_cli_agent_logo(agent, WarpThemeFill::Solid(icon_color), sub_text);
             // 多色品牌 logo(DeepSeek / Antigravity / Omp)放在主题背景色上,
             // 其余 agent 沿用品牌色圆底。
-            let background =
-                if matches!(agent, CLIAgent::DeepSeek | CLIAgent::Antigravity | CLIAgent::Omp) {
-                    theme.background()
-                } else {
-                    ThemeFill::Solid(brand_color)
-                };
+            let background = if matches!(
+                agent,
+                CLIAgent::DeepSeek | CLIAgent::Antigravity | CLIAgent::Omp
+            ) {
+                theme.background()
+            } else {
+                ThemeFill::Solid(brand_color)
+            };
             let circle = render_circle(icon_element, background, total_size);
             attach_status_overlay(
                 circle,

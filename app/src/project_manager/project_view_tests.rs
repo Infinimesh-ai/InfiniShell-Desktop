@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use super::{
-    linked_ids_in_tree_order, normalize_optional_field, server_row_subtitle, ProjectServerRow,
+    ProjectServerRow, linked_ids_in_tree_order, normalize_optional_field, server_row_subtitle,
 };
 
 fn row(node_id: &str) -> ProjectServerRow {

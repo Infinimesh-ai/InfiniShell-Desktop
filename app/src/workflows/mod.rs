@@ -16,18 +16,17 @@ pub mod workflow;
 pub mod workflow_enum;
 pub mod workflow_view;
 
+pub use categories::{CategoriesView, CategoriesViewEvent, WorkflowsViewAction};
+
 use crate::appearance::Appearance;
 use crate::cloud_object::model::view::ObjectStoreViewModel;
-use crate::cloud_object::{GenericStoredObject, ObjectType, StoredObjectModel};
-
-use crate::cloud_object::SerializedModel;
-use crate::drive::items::workflow::WarpDriveWorkflow;
-use crate::drive::items::WarpDriveItem;
+use crate::cloud_object::{GenericStoredObject, ObjectType, SerializedModel, StoredObjectModel};
 use crate::drive::ObjectTypeAndId;
+use crate::drive::items::WarpDriveItem;
+use crate::drive::items::workflow::WarpDriveWorkflow;
 use crate::notebooks::{NotebookId, NotebookLocation};
 use crate::persistence::ModelEvent;
 use crate::server::ids::{ServerId, SyncId};
-pub use categories::{CategoriesView, CategoriesViewEvent, WorkflowsViewAction};
 
 pub fn init(app: &mut AppContext) {
     categories::init(app);

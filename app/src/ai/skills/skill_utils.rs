@@ -51,8 +51,7 @@ fn try_insert_skill(
             let existing_rank = provider_rank(e.get().provider);
             if new_rank < existing_rank
                 || (new_rank == existing_rank
-                    && descriptor.reference.to_string().len()
-                        < e.get().reference.to_string().len())
+                    && descriptor.reference.to_string().len() < e.get().reference.to_string().len())
             {
                 e.insert(descriptor);
             }

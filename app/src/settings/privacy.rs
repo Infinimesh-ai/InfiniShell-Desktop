@@ -14,9 +14,7 @@ use warp_errors::{report_error, report_if_error};
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
 
 use crate::ai::blocklist::telemetry_banner::should_collect_ai_ugc_telemetry;
-use crate::auth::AuthState;
-use crate::auth::AuthStateProvider;
-use crate::auth::SyncedUserSettings;
+use crate::auth::{AuthState, AuthStateProvider, SyncedUserSettings};
 use crate::cloud_object::model::persistence::ObjectStoreModel;
 // Zap Wave 3-1:`AuthClient` trait + `MockAuthClient` 随 server_api/auth.rs
 // 整件物理删,`SyncedUserSettings` 迁到 `crate::auth`。
@@ -24,7 +22,6 @@ use crate::cloud_object::model::persistence::ObjectStoreModel;
 // `auth_client = ServerApiProvider::as_ref(ctx).get_auth_client()` 的所有调用点
 // 随 AuthClient trait 一同物理删。
 use crate::terminal::safe_mode_settings::SafeModeSettings;
-
 // Zap(本地化,Phase 5):`PreferencesSyncer` 已物理删除。
 use crate::workspaces::workspace::EnterpriseSecretRegex;
 
@@ -262,23 +259,26 @@ impl PrivacySettings {
         );
 
         // Listen for changes to the object store and update ourselves when they happen.
-        ctx.subscribe_to_model(&WarpDrivePrivacySettings::handle(ctx), |me, _, event, ctx| {
-            let privacy_settings = WarpDrivePrivacySettings::as_ref(ctx);
-            match event {
-                WarpDrivePrivacySettingsChangedEvent::IsTelemetryEnabled { .. } => {
-                    me.set_is_telemetry_enabled(
-                        *privacy_settings.is_telemetry_enabled.value(),
-                        ctx,
-                    );
+        ctx.subscribe_to_model(
+            &WarpDrivePrivacySettings::handle(ctx),
+            |me, _, event, ctx| {
+                let privacy_settings = WarpDrivePrivacySettings::as_ref(ctx);
+                match event {
+                    WarpDrivePrivacySettingsChangedEvent::IsTelemetryEnabled { .. } => {
+                        me.set_is_telemetry_enabled(
+                            *privacy_settings.is_telemetry_enabled.value(),
+                            ctx,
+                        );
+                    }
+                    WarpDrivePrivacySettingsChangedEvent::IsCrashReportingEnabled { .. } => {
+                        me.set_is_crash_reporting_enabled(
+                            *privacy_settings.is_crash_reporting_enabled.value(),
+                            ctx,
+                        );
+                    }
                 }
-                WarpDrivePrivacySettingsChangedEvent::IsCrashReportingEnabled { .. } => {
-                    me.set_is_crash_reporting_enabled(
-                        *privacy_settings.is_crash_reporting_enabled.value(),
-                        ctx,
-                    );
-                }
-            }
-        });
+            },
+        );
 
         let user_secret_regex_list: CustomSecretRegexList =
             CustomSecretRegexList::new_from_storage(ctx);

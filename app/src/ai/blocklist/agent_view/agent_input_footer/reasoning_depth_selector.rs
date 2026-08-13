@@ -6,37 +6,32 @@
 //! - 不写 settings.toml,不发 telemetry,不接 cloud
 //! - 当前模型不支持 reasoning(variants 为空)→ 整个组件渲染空,picker 自然消失
 
+use std::sync::Arc;
+
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use warp_core::ui::color::blend::Blend;
 use warp_core::ui::theme::Fill;
+use warpui::elements::{
+    ChildAnchor, ChildView, ConstrainedBox, OffsetPositioning, ParentAnchor, ParentElement,
+    ParentOffsetBounds, Stack,
+};
 use warpui::{
-    elements::{
-        ChildAnchor, ChildView, ConstrainedBox, OffsetPositioning, ParentAnchor, ParentElement,
-        ParentOffsetBounds, Stack,
-    },
     AppContext, Element, Entity, EntityId, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
 
-use std::sync::Arc;
-
-use crate::{
-    ai::{
-        agent_providers::reasoning::model_reasoning_variants,
-        llms::{LLMPreferences, LLMPreferencesEvent},
-    },
-    appearance::Appearance,
-    context_chips::display_menu::{
-        ChipMenuType, DisplayChipMenu, GenericMenuItem, PromptDisplayMenuEvent,
-    },
-    settings::{AgentProviderApiType, ReasoningEffortSetting},
-    terminal::input::{MenuPositioning, MenuPositioningProvider},
-    ui_components::icons::Icon,
-    view_components::action_button::{ActionButton, ActionButtonTheme, ButtonSize},
-};
-
 use super::AgentInputButtonTheme;
+use crate::ai::agent_providers::reasoning::model_reasoning_variants;
+use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
+use crate::appearance::Appearance;
+use crate::context_chips::display_menu::{
+    ChipMenuType, DisplayChipMenu, GenericMenuItem, PromptDisplayMenuEvent,
+};
+use crate::settings::{AgentProviderApiType, ReasoningEffortSetting};
+use crate::terminal::input::{MenuPositioning, MenuPositioningProvider};
+use crate::ui_components::icons::Icon;
+use crate::view_components::action_button::{ActionButton, ActionButtonTheme, ButtonSize};
 
 /// 输入框 toolbar 的"Reasoning Depth"选择器。
 pub struct ReasoningDepthSelector {

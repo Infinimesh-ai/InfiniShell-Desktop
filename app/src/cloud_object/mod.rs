@@ -22,34 +22,36 @@
 //! 真正的 "服务端往返" 类型正在分批物理删除；服务端对象 enum、字段转换、
 //! 初始加载 fan-in 与旧服务端泛型对象承载结构已删除。
 
-use self::{breadcrumbs::ContainingObject, model::persistence::ObjectStoreModel};
-use crate::{
-    appearance::Appearance,
-    auth::UserUid,
-    channel::ChannelState,
-    drive::{
-        items::WarpDriveItem, ObjectTypeAndId, ZapDriveObjectArgs, ZapDriveObjectSettings,
-    },
-    persistence::ModelEvent,
-    server::ids::{ClientId, HashableId, HashedSqliteId, ObjectUid, ServerId, SyncId, ToServerId},
-    server_time::ServerTimestamp,
-    util::time_format::format_approx_duration_from_now_utc,
-    workflows::{WorkflowObject, WorkflowSource},
-    workspaces::{user_profiles::UserProfiles, user_workspaces::UserWorkspaces},
-};
+use std::any::Any;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
+use std::sync::Arc;
+
 use chrono::{Duration, Utc};
 use derivative::Derivative;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::{
-    any::Any,
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-    sync::Arc,
-};
 use url::Url;
-use warp_core::{channel::Channel, features::FeatureFlag};
+use warp_core::channel::Channel;
+use warp_core::features::FeatureFlag;
 use warpui::{AppContext, SingletonEntity};
+
+use self::breadcrumbs::ContainingObject;
+use self::model::persistence::ObjectStoreModel;
+use crate::appearance::Appearance;
+use crate::auth::UserUid;
+use crate::channel::ChannelState;
+use crate::drive::items::WarpDriveItem;
+use crate::drive::{ObjectTypeAndId, ZapDriveObjectArgs, ZapDriveObjectSettings};
+use crate::persistence::ModelEvent;
+use crate::server::ids::{
+    ClientId, HashableId, HashedSqliteId, ObjectUid, ServerId, SyncId, ToServerId,
+};
+use crate::server_time::ServerTimestamp;
+use crate::util::time_format::format_approx_duration_from_now_utc;
+use crate::workflows::{WorkflowObject, WorkflowSource};
+use crate::workspaces::user_profiles::UserProfiles;
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 pub mod breadcrumbs;
 pub mod grab_edit_access_modal;

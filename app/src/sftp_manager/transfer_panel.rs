@@ -5,12 +5,13 @@
 //! date: 2026-05-26
 
 use warp_core::ui::appearance::Appearance;
+use warpui::Element;
 use warpui::elements::{
     Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable,
-    MainAxisSize, MainAxisAlignment, MouseStateHandle, ParentElement, Radius, SavePosition, Shrinkable, Text,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, SavePosition,
+    Shrinkable, Text,
 };
 use warpui::platform::Cursor;
-use warpui::Element;
 
 use crate::sftp_manager::browser::SftpBrowserAction;
 use crate::sftp_manager::types::{TransferDirection, TransferState, TransferTask};
@@ -263,8 +264,6 @@ pub fn render_transfer_panel(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use std::cell::RefCell;
     use std::path::PathBuf;
     use std::rc::Rc;
@@ -275,6 +274,8 @@ mod tests {
         App, AppContext, Entity, Event, Presenter, SingletonEntity, TypedActionView, View,
         ViewContext, WindowInvalidation,
     };
+
+    use super::*;
 
     struct TransferPanelTestView {
         transfers: Vec<TransferTask>,

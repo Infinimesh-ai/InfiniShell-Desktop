@@ -585,10 +585,7 @@ impl TitleWidget {
     fn render_top_of_page(&self, appearance: &Appearance, _app: &AppContext) -> Box<dyn Element> {
         let warpify_description = vec![
             FormattedTextFragment::plain_text(crate::t!("settings-warpify-description-prefix")),
-            FormattedTextFragment::hyperlink(
-                crate::t!("settings-warpify-learn-more"),
-                "",
-            ),
+            FormattedTextFragment::hyperlink(crate::t!("settings-warpify-learn-more"), ""),
         ];
 
         let warpify_description = FormattedTextElement::new(

@@ -1,54 +1,45 @@
+use std::borrow::Cow;
+use std::cmp::Reverse;
+use std::path::Path;
+use std::sync::Arc;
+
 use itertools::Itertools as _;
 use markdown_parser::parse_markdown;
 use parking_lot::FairMutex;
 use settings::Setting as _;
-use std::{borrow::Cow, cmp::Reverse, path::Path, sync::Arc};
 use warp_core::ui::Icon;
+use warpui::elements::{
+    Container, CornerRadius, CrossAxisAlignment, Expanded, Flex, FormattedTextElement,
+    MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
+};
+use warpui::fonts::{Properties, Weight};
+use warpui::keymap::Keystroke;
+use warpui::prelude::{ConstrainedBox, Cursor, Empty, Hoverable, SavePosition};
+use warpui::scene::Border;
 use warpui::{
-    elements::{
-        Container, CornerRadius, CrossAxisAlignment, Expanded, Flex, FormattedTextElement,
-        MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
-    },
-    fonts::{Properties, Weight},
-    keymap::Keystroke,
-    prelude::{ConstrainedBox, Cursor, Empty, Hoverable, SavePosition},
-    scene::Border,
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
-use crate::{
-    ai::{
-        agent::conversation::AIConversationId,
-        blocklist::{
-            agent_view::{
-                agent_view_bg_color, AgentViewController, AgentViewEntryOrigin,
-                ENTER_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE,
-            },
-            history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel},
-        },
-        conversation_navigation::ConversationNavigationData,
-    },
-    appearance::Appearance,
-    report_if_error,
-    settings::{InputSettings, InputSettingsChangedEvent},
-    terminal::{
-        self,
-        event::BlockType,
-        input::message_bar::{common::render_standard_message, Message, MessageItem},
-        model::{
-            blocks::BlockHeightItem,
-            session::{BootstrapSessionType, Session, SessionType, Sessions},
-        },
-        model_events::{AnsiHandlerEvent, ModelEvent, ModelEventDispatcher},
-        prompt,
-        view::{
-            ambient_agent::{AmbientAgentViewModel, AmbientAgentViewModelEvent},
-            TerminalAction,
-        },
-        TerminalModel,
-    },
-    util::time_format::format_approx_duration_from_now_utc,
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::blocklist::agent_view::{
+    AgentViewController, AgentViewEntryOrigin, ENTER_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE,
+    agent_view_bg_color,
 };
+use crate::ai::blocklist::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
+use crate::ai::conversation_navigation::ConversationNavigationData;
+use crate::appearance::Appearance;
+use crate::report_if_error;
+use crate::settings::{InputSettings, InputSettingsChangedEvent};
+use crate::terminal::event::BlockType;
+use crate::terminal::input::message_bar::common::render_standard_message;
+use crate::terminal::input::message_bar::{Message, MessageItem};
+use crate::terminal::model::blocks::BlockHeightItem;
+use crate::terminal::model::session::{BootstrapSessionType, Session, SessionType, Sessions};
+use crate::terminal::model_events::{AnsiHandlerEvent, ModelEvent, ModelEventDispatcher};
+use crate::terminal::view::TerminalAction;
+use crate::terminal::view::ambient_agent::{AmbientAgentViewModel, AmbientAgentViewModelEvent};
+use crate::terminal::{self, TerminalModel, prompt};
+use crate::util::time_format::format_approx_duration_from_now_utc;
 
 const MAX_RECENT_CONVERSATION_COUNT: usize = 3;
 
@@ -583,7 +574,9 @@ fn render_title_and_description(props: HeaderProps, app: &AppContext) -> Vec<Box
                     sub_text_color,
                     Default::default(),
                 )
-                .with_heading_to_font_size_multipliers(appearance.heading_font_size_multipliers().clone())
+                .with_heading_to_font_size_multipliers(
+                    appearance.heading_font_size_multipliers().clone(),
+                )
                 .with_inline_code_properties(Some(main_text_color), None)
                 .finish()
             });

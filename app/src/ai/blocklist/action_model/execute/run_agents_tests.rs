@@ -19,13 +19,13 @@ use crate::ai::mcp::templatable_manager::TemplatableMCPServerManager;
 use crate::appearance::Appearance;
 use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
-use crate::network::NetworkStatus;
 use crate::cloud_object::update_manager::UpdateManager;
+use crate::network::NetworkStatus;
+use crate::notifications::model::NotificationsModel;
 use crate::settings::PrivacySettings;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::test_util::settings::initialize_settings_for_tests_with_mode;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::notifications::model::NotificationsModel;
 use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider, LaunchMode};
 
 struct RunAgentsTestState {
@@ -742,4 +742,3 @@ fn should_autoexecute_remote_warp_harness_without_default_auth_secret() {
         assert!(should_autoexecute);
     });
 }
-

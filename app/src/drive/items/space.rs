@@ -1,13 +1,12 @@
-use warpui::{elements::MouseStateHandle, Element};
-
-use crate::{
-    appearance::Appearance,
-    cloud_object::{Space, StoredObjectMetadata},
-    drive::{index::DriveIndexAction, DriveObjectType},
-    themes::theme::Fill,
-};
+use warpui::Element;
+use warpui::elements::MouseStateHandle;
 
 use super::{WarpDriveItem, WarpDriveItemId};
+use crate::appearance::Appearance;
+use crate::cloud_object::{Space, StoredObjectMetadata};
+use crate::drive::DriveObjectType;
+use crate::drive::index::DriveIndexAction;
+use crate::themes::theme::Fill;
 
 #[derive(Clone)]
 pub struct WarpDriveSpace {

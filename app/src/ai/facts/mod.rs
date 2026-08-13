@@ -1,19 +1,18 @@
-use crate::ai::agent::SuggestedLoggingId;
-use crate::drive::items::{ai_fact::WarpDriveAIFact, WarpDriveItem};
-use crate::server::ids::SyncId;
-use crate::{
-    cloud_object::{
-        model::{
-            generic_string_model::{GenericStringModel, GenericStringObjectId, StringModel},
-            json_model::{JsonModel, JsonSerializer},
-        },
-        GenericStoredObject, GenericStringObjectFormat, GenericStringObjectUniqueKey,
-        JsonObjectType,
-    },
-    drive::ObjectTypeAndId,
-};
 use serde::{Deserialize, Serialize};
 use warp_core::ui::appearance::Appearance;
+
+use crate::ai::agent::SuggestedLoggingId;
+use crate::cloud_object::model::generic_string_model::{
+    GenericStringModel, GenericStringObjectId, StringModel,
+};
+use crate::cloud_object::model::json_model::{JsonModel, JsonSerializer};
+use crate::cloud_object::{
+    GenericStoredObject, GenericStringObjectFormat, GenericStringObjectUniqueKey, JsonObjectType,
+};
+use crate::drive::ObjectTypeAndId;
+use crate::drive::items::WarpDriveItem;
+use crate::drive::items::ai_fact::WarpDriveAIFact;
+use crate::server::ids::SyncId;
 
 pub mod manager;
 pub mod view;

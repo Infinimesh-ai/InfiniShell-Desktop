@@ -196,8 +196,8 @@ fn build_title_text(
     header_background: Fill,
     app: &AppContext,
 ) -> Box<dyn Element> {
-    use warpui::elements::shimmering_text::{ShimmerConfig, ShimmeringTextElement};
     use warpui::elements::Text;
+    use warpui::elements::shimmering_text::{ShimmerConfig, ShimmeringTextElement};
 
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();

@@ -29,16 +29,16 @@ use warpui::{
     ViewHandle,
 };
 
-use crate::ai::agent::{icons, AIAgentActionId, AIAgentActionResultType, CallMCPToolResult};
+use crate::ai::agent::{AIAgentActionId, AIAgentActionResultType, CallMCPToolResult, icons};
 use crate::ai::agent_providers::tools::project_hosts::{self, BatchArgs};
 use crate::ai::blocklist::action_model::{AIActionStatus, BlocklistAIActionModel};
+use crate::ai::blocklist::block::AIBlock;
 use crate::ai::blocklist::block::model::AIBlockModel;
 use crate::ai::blocklist::block::view_impl::WithContentItemSpacing;
-use crate::ai::blocklist::block::AIBlock;
 use crate::ai::blocklist::inline_action::inline_action_header::{HeaderConfig, InteractionMode};
 use crate::ai::blocklist::inline_action::inline_action_icons;
 use crate::ai::blocklist::inline_action::requested_action::{
-    render_requested_action_row_for_text, CTRL_C_KEYSTROKE, ENTER_KEYSTROKE,
+    CTRL_C_KEYSTROKE, ENTER_KEYSTROKE, render_requested_action_row_for_text,
 };
 use crate::appearance::Appearance;
 use crate::menu::{Event as MenuEvent, Menu, MenuItemFields, MenuVariant};
@@ -46,7 +46,7 @@ use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
 use crate::view_components::action_button::{ButtonSize, KeystrokeSource, NakedTheme};
 use crate::view_components::compactible_action_button::{
-    CompactibleActionButton, RenderCompactibleActionButton, MEDIUM_SIZE_SWITCH_THRESHOLD,
+    CompactibleActionButton, MEDIUM_SIZE_SWITCH_THRESHOLD, RenderCompactibleActionButton,
 };
 use crate::view_components::compactible_split_action_button::CompactibleSplitActionButton;
 
@@ -142,9 +142,13 @@ pub(crate) fn capped_host_rows(rows: &[HostRow]) -> (&[HostRow], usize) {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum BatchOutcome {
     /// 聚合状态 ok;`counts` 为 `(成功台数, 总台数)`,payload 缺失时为 `None`。
-    Success { counts: Option<(usize, usize)> },
+    Success {
+        counts: Option<(usize, usize)>,
+    },
     /// 聚合状态 error(逐主机失败/金丝雀中止)。
-    Failed { counts: Option<(usize, usize)> },
+    Failed {
+        counts: Option<(usize, usize)>,
+    },
     /// 传输层 / 参数错误(`CallMCPToolResult::Error`)。
     Error(String),
     Cancelled,
@@ -209,10 +213,8 @@ pub(crate) fn batch_outcome(result: &CallMCPToolResult) -> BatchOutcome {
 fn resolve_host_rows(node_ids: &[String]) -> Vec<HostRow> {
     let resolved = warp_ssh_manager::with_conn(|conn| {
         let nodes = warp_ssh_manager::SshRepository::list_nodes(conn)?;
-        let name_by_id: HashMap<String, String> = nodes
-            .into_iter()
-            .map(|node| (node.id, node.name))
-            .collect();
+        let name_by_id: HashMap<String, String> =
+            nodes.into_iter().map(|node| (node.id, node.name)).collect();
         let mut endpoint_by_id: HashMap<String, HostEndpoint> =
             HashMap::with_capacity(node_ids.len());
         for node_id in node_ids {

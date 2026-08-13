@@ -10,12 +10,11 @@
 //! - secret 全程用 `Zeroizing<String>` 持有,丢弃时自动清零。
 
 use anyhow::Result;
-use zeroize::Zeroizing;
-
 use warp_ssh_manager::{
     AuthType, KeychainSecretStore, NodeKind, OneKeyCredentialKind as StoredOneKeyCredentialKind,
     SecretKind, SshRepository, SshSecretStore,
 };
+use zeroize::Zeroizing;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OneKeyCredentialKind {

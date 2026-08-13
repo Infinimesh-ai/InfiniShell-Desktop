@@ -12,16 +12,15 @@ use warp_cli::agent::Harness;
 use warp_managed_secrets::ManagedSecretValue;
 use warpui::{ModelHandle, ModelSpawner};
 
-use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::agent_events::AgentEventStreamClient;
-use crate::ai::ambient_agents::AmbientAgentTaskId;
-use crate::terminal::model::block::BlockId;
-use crate::terminal::CLIAgent;
-
 use super::super::terminal::{CommandHandle, TerminalDriver};
 use super::super::{AgentDriver, AgentDriverError};
 use super::json_utils::{read_json_file_or_default, write_json_file};
-use super::{write_temp_file, HarnessRunner, SavePoint, ThirdPartyHarness};
+use super::{HarnessRunner, SavePoint, ThirdPartyHarness, write_temp_file};
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent_events::AgentEventStreamClient;
+use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::terminal::CLIAgent;
+use crate::terminal::model::block::BlockId;
 
 pub(crate) struct GeminiHarness;
 

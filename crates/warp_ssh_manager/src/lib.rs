@@ -29,8 +29,7 @@ pub use sync_provider::{
     DbVersionStore, SshSyncData, SshSyncProvider, SyncMachineMemory, SyncNode,
     SyncOneKeyCredential, SyncServer,
 };
-pub use types::ConnectionStatus;
 pub use types::{
-    AuthType, NodeKind, OneKeyCredentialKind, ResolvedSshAuth, SshNode, SshOneKeyCredential,
-    SshServerInfo,
+    AuthType, ConnectionStatus, NodeKind, OneKeyCredentialKind, ResolvedSshAuth, SshNode,
+    SshOneKeyCredential, SshServerInfo,
 };

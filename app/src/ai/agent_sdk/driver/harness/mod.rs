@@ -9,17 +9,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use tempfile::NamedTempFile;
 use warp_cli::agent::Harness;
-use warp_managed_secrets::ManagedSecretValue;
-use warpui::{ModelHandle, ModelSpawner, SingletonEntity};
-
-use crate::ai::agent_events::AgentEventStreamClient;
-use crate::ai::ambient_agents::AmbientAgentTaskId;
-use crate::ai::ambient_agents::task::HarnessModelConfig;
-use crate::terminal::cli_agent_sessions::{CLIAgentSessionStatus, CLIAgentSessionsModel};
-use crate::terminal::CLIAgent;
-use crate::util::path::resolve_executable;
 use warp_cli::{OZ_CLI_ENV, OZ_HARNESS_ENV, OZ_PARENT_RUN_ID_ENV, OZ_RUN_ID_ENV};
 use warp_core::channel::ChannelState;
+use warp_managed_secrets::ManagedSecretValue;
+use warpui::{ModelHandle, ModelSpawner, SingletonEntity};
 
 use super::terminal::{CommandHandle, TerminalDriver};
 use super::{
@@ -27,6 +20,12 @@ use super::{
     LEGACY_OZ_PARENT_STATE_ROOT_ENV, OZ_MESSAGE_LISTENER_MANAGED_EXTERNALLY_ENV,
     OZ_MESSAGE_LISTENER_STATE_ROOT_ENV,
 };
+use crate::ai::agent_events::AgentEventStreamClient;
+use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::ai::ambient_agents::task::HarnessModelConfig;
+use crate::terminal::CLIAgent;
+use crate::terminal::cli_agent_sessions::{CLIAgentSessionStatus, CLIAgentSessionsModel};
+use crate::util::path::resolve_executable;
 
 mod claude_code;
 mod gemini;

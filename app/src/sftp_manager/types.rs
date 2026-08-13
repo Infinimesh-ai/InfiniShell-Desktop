@@ -137,7 +137,9 @@ pub enum Dialog {
         file_size: u64,
         direction: TransferDirection,
     },
-    FileDetails { entry: FileEntry },
+    FileDetails {
+        entry: FileEntry,
+    },
     /// 关闭传输面板确认（有活跃传输时）
     CloseTransferPanelConfirm,
 }
@@ -169,9 +171,10 @@ pub fn format_size(size: u64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::path::PathBuf;
     use std::sync::atomic::Ordering;
+
+    use super::*;
 
     /// 测试 format_size 零字节
     #[test]
@@ -400,7 +403,10 @@ mod tests {
     #[test]
     fn test_transfer_state_variants() {
         assert!(matches!(TransferState::Pending, TransferState::Pending));
-        assert!(matches!(TransferState::InProgress, TransferState::InProgress));
+        assert!(matches!(
+            TransferState::InProgress,
+            TransferState::InProgress
+        ));
         assert!(matches!(TransferState::Completed, TransferState::Completed));
         assert!(matches!(TransferState::Cancelled, TransferState::Cancelled));
         let failed = TransferState::Failed("io error".into());
@@ -559,7 +565,10 @@ mod tests {
     /// 测试 Dialog::DeleteConfirm 空路径列表
     #[test]
     fn test_dialog_delete_confirm_empty_paths() {
-        let dialog = Dialog::DeleteConfirm { paths: vec![], is_dirs: vec![] };
+        let dialog = Dialog::DeleteConfirm {
+            paths: vec![],
+            is_dirs: vec![],
+        };
         assert!(matches!(dialog, Dialog::DeleteConfirm { .. }));
     }
 

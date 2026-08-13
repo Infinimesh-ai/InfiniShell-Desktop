@@ -394,11 +394,11 @@ impl From<api::message::tool_call::read_skill::SkillReference> for SkillReferenc
     fn from(value: api::message::tool_call::read_skill::SkillReference) -> Self {
         use warp_multi_agent_api::message::tool_call::read_skill::SkillReference as ApiSkillReference;
         match value {
-            ApiSkillReference::SkillPath(skill_path) => SkillReference::Path(
-                warp_util::local_or_remote_path::LocalOrRemotePath::Local(PathBuf::from(
-                    skill_path,
-                )),
-            ),
+            ApiSkillReference::SkillPath(skill_path) => {
+                SkillReference::Path(warp_util::local_or_remote_path::LocalOrRemotePath::Local(
+                    PathBuf::from(skill_path),
+                ))
+            }
             ApiSkillReference::BundledSkillId(id) => SkillReference::BundledSkillId(id),
         }
     }

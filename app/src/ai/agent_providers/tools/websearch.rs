@@ -10,8 +10,8 @@
 //!
 //! 参数 schema 与 opencode `websearch.ts:7-22` 对齐。
 
-use anyhow::{anyhow, Result};
-use serde_json::{json, Value};
+use anyhow::{Result, anyhow};
+use serde_json::{Value, json};
 use warp_multi_agent_api as api;
 
 use super::OpenAiTool;

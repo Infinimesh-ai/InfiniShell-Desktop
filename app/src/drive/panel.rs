@@ -1,36 +1,38 @@
 use futures::Future;
+use warpui::elements::{
+    Align, Flex, Hoverable, MouseStateHandle, ParentElement, SavePosition, Shrinkable,
+};
+use warpui::presenter::ChildView;
+use warpui::windowing::{StateEvent, WindowManager};
 use warpui::{
-    elements::{Align, Flex, Hoverable, MouseStateHandle, ParentElement, SavePosition, Shrinkable},
-    presenter::ChildView,
-    windowing::{StateEvent, WindowManager},
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
 
-use crate::{
-    ai::{document::ai_document_model::AIDocumentId, facts::AIFactObjectModel},
-    cloud_object::{
-        model::{persistence::ObjectStoreModel, view::ObjectStoreViewModel},
-        update_manager::{InitiatedBy, UpdateManager},
-        GenericStringObjectFormat, JsonObjectType, Owner, Space, StoredObjectEventEntrypoint,
-    },
-    env_vars::{manager::EnvVarCollectionSource, EnvVarCollectionObject},
-    notebooks::{manager::NotebookSource, NotebookObject},
-    server::ids::{ClientId, ServerId, SyncId},
-    workflows::{manager::WorkflowOpenSource, WorkflowObject, WorkflowViewMode},
-    workspaces::user_workspaces::UserWorkspaces,
+use super::drive_helpers::{
+    has_feature_gated_anonymous_user_reached_env_var_limit,
+    has_feature_gated_anonymous_user_reached_notebook_limit,
+    has_feature_gated_anonymous_user_reached_workflow_limit,
 };
-
-use super::{
-    drive_helpers::{
-        has_feature_gated_anonymous_user_reached_env_var_limit,
-        has_feature_gated_anonymous_user_reached_notebook_limit,
-        has_feature_gated_anonymous_user_reached_workflow_limit,
-    },
-    index::{DriveIndex, DriveIndexAction, DriveIndexEvent},
-    items::WarpDriveItemId,
-    DriveObjectType, ObjectTypeAndId,
+use super::index::{DriveIndex, DriveIndexAction, DriveIndexEvent};
+use super::items::WarpDriveItemId;
+use super::{DriveObjectType, ObjectTypeAndId};
+use crate::ai::document::ai_document_model::AIDocumentId;
+use crate::ai::facts::AIFactObjectModel;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
+use crate::cloud_object::model::view::ObjectStoreViewModel;
+use crate::cloud_object::update_manager::{InitiatedBy, UpdateManager};
+use crate::cloud_object::{
+    GenericStringObjectFormat, JsonObjectType, Owner, Space, StoredObjectEventEntrypoint,
 };
+use crate::env_vars::EnvVarCollectionObject;
+use crate::env_vars::manager::EnvVarCollectionSource;
+use crate::notebooks::NotebookObject;
+use crate::notebooks::manager::NotebookSource;
+use crate::server::ids::{ClientId, ServerId, SyncId};
+use crate::workflows::manager::WorkflowOpenSource;
+use crate::workflows::{WorkflowObject, WorkflowViewMode};
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 pub const MIN_SIDEBAR_WIDTH: f32 = 250.;
 pub const MAX_SIDEBAR_WIDTH_RATIO: f32 = 0.75;

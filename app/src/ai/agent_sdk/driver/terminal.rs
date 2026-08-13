@@ -1,12 +1,10 @@
-use std::{
-    collections::HashMap,
-    ffi::OsString,
-    future::Future,
-    path::PathBuf,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::collections::HashMap;
+use std::ffi::OsString;
+use std::future::Future;
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::Duration;
 
 use futures::channel::oneshot;
 use warp_completer::completer::CommandOutput;
@@ -15,29 +13,23 @@ use warp_terminal::model::grid::Dimensions;
 use warp_util::path::ShellFamily;
 // Zap:`Condition` 位于 warp_util crate,app 侧的 `crate::util` 没有 `sync` 子模块。
 use warp_util::sync::Condition;
-use warpui::{r#async::FutureExt, AppContext, Entity, ModelContext, ModelHandle, ViewHandle};
-
-use crate::terminal::model::session::ExecuteCommandOptions;
-
-use crate::{
-    ai::ambient_agents::AmbientAgentTaskId,
-    pane_group::NewTerminalOptions,
-    root_view::{open_new_with_workspace_source, NewWorkspaceSource},
-    terminal::{
-        model::block::{BlockId, SerializedBlock},
-        model::find::RegexDFAs,
-        model::grid::RespectDisplayedOutput,
-        model::index::Point,
-        model::RespectObfuscatedSecrets,
-        shared_session::IsSharedSessionCreator,
-        shell::ShellType,
-        TerminalView,
-    },
-};
-
-use crate::ai::attachment_utils::attachments_download_dir;
+use warpui::r#async::FutureExt;
+use warpui::{AppContext, Entity, ModelContext, ModelHandle, ViewHandle};
 
 use super::AgentDriverError;
+use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::ai::attachment_utils::attachments_download_dir;
+use crate::pane_group::NewTerminalOptions;
+use crate::root_view::{NewWorkspaceSource, open_new_with_workspace_source};
+use crate::terminal::TerminalView;
+use crate::terminal::model::RespectObfuscatedSecrets;
+use crate::terminal::model::block::{BlockId, SerializedBlock};
+use crate::terminal::model::find::RegexDFAs;
+use crate::terminal::model::grid::RespectDisplayedOutput;
+use crate::terminal::model::index::Point;
+use crate::terminal::model::session::ExecuteCommandOptions;
+use crate::terminal::shared_session::IsSharedSessionCreator;
+use crate::terminal::shell::ShellType;
 
 const TERMINAL_SESSION_BOOTSTRAP_TIMEOUT: Duration = Duration::from_secs(60);
 

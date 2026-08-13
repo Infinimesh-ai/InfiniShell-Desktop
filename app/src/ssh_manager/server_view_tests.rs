@@ -1,14 +1,15 @@
-/// resolve_test_password 单元测试
-/// author: logic
-/// date: 2026/06/01
-use super::*;
-use pathfinder_geometry::vector::vec2f;
 use std::collections::HashMap;
 use std::sync::Mutex;
+
+use pathfinder_geometry::vector::vec2f;
 use warp_core::ui::appearance::Appearance;
 use warpui::platform::WindowStyle;
 use warpui::{App, EntityIdSet, WindowInvalidation};
 
+/// resolve_test_password 单元测试
+/// author: logic
+/// date: 2026/06/01
+use super::*;
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::view_components::dropdown::DropdownAction;
 
@@ -337,9 +338,9 @@ fn selecting_onekey_dropdown_item_does_not_rebuild_dropdown_while_it_is_borrowed
         let dropdown = view.read(&app, |view, _| view.onekey_credential_dropdown.clone());
         dropdown.update(&mut app, |dropdown, ctx| {
             dropdown.handle_action(
-                &DropdownAction::select_action_and_close(
-                    SshServerAction::SelectOneKeyCredential(Some(0)),
-                ),
+                &DropdownAction::select_action_and_close(SshServerAction::SelectOneKeyCredential(
+                    Some(0),
+                )),
                 ctx,
             );
         });

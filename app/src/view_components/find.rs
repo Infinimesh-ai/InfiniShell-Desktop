@@ -38,7 +38,6 @@ const FIND_EDITOR_PADDING: f32 = 6.;
 pub const FIND_EDITOR_BORDER_RADIUS: f32 = 6.;
 pub(crate) const FIND_EDITOR_BORDER_WIDTH: f32 = 1.;
 
-
 pub const REGEX_TOGGLE_LABEL: &str = ". *";
 pub const REGEX_TOGGLE_TOOLTIP: &str = "Regex toggle";
 
@@ -332,12 +331,16 @@ impl<T: FindModel + Entity<Event = FindEvent> + 'static> Find<T> {
                 "Scanning...".to_string()
             };
             // Zap:UI 字号可配置(#151),FIND_EDITOR_FONT_SIZE 常量已移除。
-            return Text::new_inline(label, appearance.ui_font_family(), appearance.ui_font_body())
-                .with_color(blended_colors::text_sub(
-                    appearance.theme(),
-                    appearance.theme().surface_1(),
-                ))
-                .finish();
+            return Text::new_inline(
+                label,
+                appearance.ui_font_family(),
+                appearance.ui_font_body(),
+            )
+            .with_color(blended_colors::text_sub(
+                appearance.theme(),
+                appearance.theme().surface_1(),
+            ))
+            .finish();
         }
 
         // If there is some match index, we add 1 to it since the UI is 1-indexed
@@ -347,12 +350,16 @@ impl<T: FindModel + Entity<Event = FindEvent> + 'static> Find<T> {
             Some(idx) => idx + 1,
         };
         let label = format!("{}/{}", index, model.match_count());
-        Text::new_inline(label, appearance.ui_font_family(), appearance.ui_font_body())
-            .with_color(blended_colors::text_sub(
-                appearance.theme(),
-                appearance.theme().surface_1(),
-            ))
-            .finish()
+        Text::new_inline(
+            label,
+            appearance.ui_font_family(),
+            appearance.ui_font_body(),
+        )
+        .with_color(blended_colors::text_sub(
+            appearance.theme(),
+            appearance.theme().surface_1(),
+        ))
+        .finish()
     }
 
     #[allow(clippy::too_many_arguments)]

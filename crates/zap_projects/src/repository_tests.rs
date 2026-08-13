@@ -36,7 +36,10 @@ fn update_roundtrips_all_fields() {
         .unwrap()
         .unwrap();
     assert_eq!(loaded.name, "改名");
-    assert_eq!(loaded.git_url.as_deref(), Some("git@github.com:org/repo.git"));
+    assert_eq!(
+        loaded.git_url.as_deref(),
+        Some("git@github.com:org/repo.git")
+    );
     assert_eq!(loaded.root_path.as_deref(), Some("/srv/app"));
     assert_eq!(loaded.rules, "发布前先跑冒烟");
     assert_eq!(loaded.notes, "备注");
@@ -64,7 +67,11 @@ fn soft_delete_hides_project_and_clears_links() {
     ProjectRepository::soft_delete(&mut conn, &project.id).unwrap();
 
     assert!(ProjectRepository::list(&mut conn).unwrap().is_empty());
-    assert!(ProjectRepository::get(&mut conn, &project.id).unwrap().is_none());
+    assert!(
+        ProjectRepository::get(&mut conn, &project.id)
+            .unwrap()
+            .is_none()
+    );
     assert!(
         ProjectRepository::servers_for_project(&mut conn, &project.id)
             .unwrap()

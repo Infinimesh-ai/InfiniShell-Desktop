@@ -1,14 +1,11 @@
 use instant::Duration;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-// Zap:session-sharing-protocol crate 已剥离,改用本地 protocol 模块;
-// 角色变更(RoleUpdateReason)随云端 shared session 管理一并移除
-use crate::terminal::shared_session::protocol::{ParticipantId, ParticipantInfo, Role};
 use warpui::accessibility::AccessibilityContent;
 use warpui::r#async::{SpawnedFutureHandle, Timer};
 use warpui::elements::{
-    ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    Fill, Flex, Hoverable, MainAxisAlignment, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Fill,
+    Flex, Hoverable, MainAxisAlignment, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Stack,
 };
 use warpui::platform::Cursor;
@@ -22,6 +19,9 @@ use super::render_util::non_hoverable_participant_avatar;
 use crate::appearance::Appearance;
 use crate::menu::{Event as MenuEvent, Menu, MenuItem, MenuItemFields};
 use crate::pane_group::{PaneHeaderAction, PaneHeaderCustomAction};
+// Zap:session-sharing-protocol crate 已剥离,改用本地 protocol 模块;
+// 角色变更(RoleUpdateReason)随云端 shared session 管理一并移除
+use crate::terminal::shared_session::protocol::{ParticipantId, ParticipantInfo, Role};
 use crate::terminal::view::TerminalAction;
 use crate::ui_components::buttons::icon_button;
 use crate::ui_components::icons::Icon;
@@ -147,9 +147,11 @@ impl ParticipantAvatarView {
 
     fn context_menu_items(&self) -> Vec<MenuItem<ParticipantAvatarAction>> {
         // Zap:云端角色变更菜单已移除,仅展示参与者名
-        vec![MenuItemFields::new(self.display_name.clone())
-            .with_disabled(true)
-            .into_item()]
+        vec![
+            MenuItemFields::new(self.display_name.clone())
+                .with_disabled(true)
+                .into_item(),
+        ]
     }
 
     fn handle_menu_event(&mut self, event: &MenuEvent, ctx: &mut ViewContext<Self>) {

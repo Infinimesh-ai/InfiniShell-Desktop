@@ -1,14 +1,13 @@
-use super::items::folder::WarpDriveFolder;
-use super::items::WarpDriveItem;
 use super::ObjectTypeAndId;
-use crate::{
-    appearance::Appearance,
-    cloud_object::{GenericStoredObject, ObjectType, SerializedModel, Space, StoredObjectModel},
-    persistence::ModelEvent,
-    server::ids::SyncId,
+use super::items::WarpDriveItem;
+use super::items::folder::WarpDriveFolder;
+use crate::appearance::Appearance;
+use crate::cloud_object::{
+    GenericStoredObject, ObjectType, SerializedModel, Space, StoredObjectModel,
 };
-
+use crate::persistence::ModelEvent;
 pub use crate::server::ids::FolderId;
+use crate::server::ids::SyncId;
 
 /// The model for a `FolderObject`.
 #[derive(Clone, Debug, PartialEq)]

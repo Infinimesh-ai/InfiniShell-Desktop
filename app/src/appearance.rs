@@ -20,10 +20,10 @@ use macos_app_icon::*;
 pub use warp_core::ui::appearance::{Appearance, AppearanceEvent};
 
 use crate::ASSETS;
+use crate::settings::font::heading_font_size_multipliers_from_settings;
 use crate::settings::{
     FontSettings, FontSettingsChangedEvent, MonospaceFontSize, Settings, ThemeSettings,
     UI_FONT_SIZE_MAX, UI_FONT_SIZE_MIN, active_theme_kind,
-    font::heading_font_size_multipliers_from_settings,
 };
 use crate::themes::theme::{ThemeKind, WarpTheme};
 
@@ -492,8 +492,9 @@ fn build_appearance(ctx: &mut AppContext) -> Appearance {
     let ui_font_family = if ui_font_name.is_empty() {
         load_default_ui_font_family(ctx).expect("unable to load default ui font family")
     } else {
-        get_or_load_font_family(&ui_font_name, ctx)
-            .unwrap_or_else(|| load_default_ui_font_family(ctx).expect("unable to load default ui font family"))
+        get_or_load_font_family(&ui_font_name, ctx).unwrap_or_else(|| {
+            load_default_ui_font_family(ctx).expect("unable to load default ui font family")
+        })
     };
 
     let am_font_family_from_settings = get_or_load_font_family(&am_font_name, ctx);

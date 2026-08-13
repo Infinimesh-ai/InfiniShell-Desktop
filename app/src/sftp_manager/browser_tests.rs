@@ -7,18 +7,16 @@
 
 use std::path::PathBuf;
 
-use warp_core::ui::appearance::Appearance;
-use warpui::platform::WindowStyle;
-use warpui::TypedActionView;
-
-use crate::settings_view::keybindings::KeybindingChangedNotifier;
-use crate::test_util::settings::initialize_settings_for_tests;
-
 use pathfinder_geometry::vector::Vector2F;
+use warp_core::ui::appearance::Appearance;
+use warpui::TypedActionView;
+use warpui::platform::WindowStyle;
 
 use super::browser::{SftpBrowserAction, SftpBrowserView};
 use super::types::{ConnectionState, Dialog, TransferDirection, TransferState};
 use crate::editor::EditorView;
+use crate::settings_view::keybindings::KeybindingChangedNotifier;
+use crate::test_util::settings::initialize_settings_for_tests;
 
 /// 初始化测试所需的最小单例集合
 fn initialize_app(app: &mut warpui::App) {
@@ -278,13 +276,7 @@ fn test_context_menu_sets_state() {
 
         let position = Vector2F::new(100.0, 200.0);
         view.update(&mut app, |view, ctx| {
-            view.handle_action(
-                &SftpBrowserAction::ContextMenu {
-                    index: 3,
-                    position,
-                },
-                ctx,
-            );
+            view.handle_action(&SftpBrowserAction::ContextMenu { index: 3, position }, ctx);
         });
 
         view.read(&app, |view, _| {
@@ -295,10 +287,7 @@ fn test_context_menu_sets_state() {
             let cm = view.context_menu.as_ref().unwrap();
             assert_eq!(cm.entry_index, 3, "entry_index 应为 3");
             assert_eq!(cm.position, position, "position 应与传入值一致");
-            assert!(
-                view.selected.contains(&3),
-                "ContextMenu 后应选中索引 3"
-            );
+            assert!(view.selected.contains(&3), "ContextMenu 后应选中索引 3");
         });
     });
 }
@@ -375,18 +364,9 @@ fn test_context_menu_replaces_previous() {
         view.read(&app, |view, _| {
             let cm = view.context_menu.as_ref().unwrap();
             assert_eq!(cm.entry_index, 5, "应更新为新的 entry_index");
-            assert_eq!(
-                cm.position, new_position,
-                "应更新为新的 position"
-            );
-            assert!(
-                view.selected.contains(&5),
-                "应选中新索引 5"
-            );
-            assert!(
-                !view.selected.contains(&0),
-                "应取消选中旧索引 0"
-            );
+            assert_eq!(cm.position, new_position, "应更新为新的 position");
+            assert!(view.selected.contains(&5), "应选中新索引 5");
+            assert!(!view.selected.contains(&0), "应取消选中旧索引 0");
         });
     });
 }
@@ -406,13 +386,7 @@ fn test_context_menu_zero_index() {
 
         let position = Vector2F::new(0.0, 0.0);
         view.update(&mut app, |view, ctx| {
-            view.handle_action(
-                &SftpBrowserAction::ContextMenu {
-                    index: 0,
-                    position,
-                },
-                ctx,
-            );
+            view.handle_action(&SftpBrowserAction::ContextMenu { index: 0, position }, ctx);
         });
 
         view.read(&app, |view, _| {
@@ -463,13 +437,7 @@ fn test_context_menu_negative_position() {
 
         let position = Vector2F::new(-50.0, -100.0);
         view.update(&mut app, |view, ctx| {
-            view.handle_action(
-                &SftpBrowserAction::ContextMenu {
-                    index: 1,
-                    position,
-                },
-                ctx,
-            );
+            view.handle_action(&SftpBrowserAction::ContextMenu { index: 1, position }, ctx);
         });
 
         view.read(&app, |view, _| {
@@ -497,10 +465,7 @@ fn test_close_context_menu_when_none() {
         });
 
         view.read(&app, |view, _| {
-            assert!(
-                view.context_menu.is_none(),
-                "关闭后仍应为 None"
-            );
+            assert!(view.context_menu.is_none(), "关闭后仍应为 None");
         });
     });
 }
@@ -574,10 +539,7 @@ fn test_context_menu_multiple_open_close_cycles() {
                 view.handle_action(&SftpBrowserAction::CloseContextMenu, ctx);
             });
             view.read(&app, |view, _| {
-                assert!(
-                    view.context_menu.is_none(),
-                    "第 {i} 次关闭后应为 None"
-                );
+                assert!(view.context_menu.is_none(), "第 {i} 次关闭后应为 None");
             });
         }
     });
@@ -632,10 +594,7 @@ fn test_action_context_menu_variant() {
     };
     assert!(matches!(
         action,
-        SftpBrowserAction::ContextMenu {
-            index: 3,
-            ..
-        }
+        SftpBrowserAction::ContextMenu { index: 3, .. }
     ));
 }
 
@@ -790,9 +749,10 @@ fn test_confirm_new_folder_no_connection_with_dialog() {
                 parent_path: PathBuf::from("/home"),
             });
             // 先输入非空名称以跳过空名称检查
-            view.new_folder_editor.update(ctx, |e: &mut EditorView, ctx| {
-                e.set_buffer_text("new_folder", ctx);
-            });
+            view.new_folder_editor
+                .update(ctx, |e: &mut EditorView, ctx| {
+                    e.set_buffer_text("new_folder", ctx);
+                });
             view.handle_action(&SftpBrowserAction::ConfirmNewFolder, ctx);
         });
 
@@ -1197,10 +1157,7 @@ fn test_execute_upload_nonexistent_file() {
 
         view.read(&app, |view, _| {
             assert_eq!(view.transfers.len(), 1);
-            assert!(matches!(
-                view.transfers[0].state,
-                TransferState::Failed(_)
-            ));
+            assert!(matches!(view.transfers[0].state, TransferState::Failed(_)));
         });
     });
 }

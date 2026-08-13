@@ -6,16 +6,11 @@
 
 use warpui::{AppContext, ModelHandle, View, ViewContext, ViewHandle};
 
-use crate::{
-    app_state::LeafContents,
-    pane_group::{
-        pane::{ShareableLink, ShareableLinkError},
-        BackingView, PaneConfiguration, PaneContent, PaneGroup, PaneView,
-    },
-    project_manager::project_view::ProjectView,
-};
-
 use super::PaneId;
+use crate::app_state::LeafContents;
+use crate::pane_group::pane::{ShareableLink, ShareableLinkError};
+use crate::pane_group::{BackingView, PaneConfiguration, PaneContent, PaneGroup, PaneView};
+use crate::project_manager::project_view::ProjectView;
 
 pub struct ProjectPane {
     view: ViewHandle<PaneView<ProjectView>>,

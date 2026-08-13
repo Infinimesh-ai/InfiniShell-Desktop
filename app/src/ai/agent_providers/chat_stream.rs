@@ -42,12 +42,8 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use ai::agent::convert::ConvertToAPITypeError;
 use futures::StreamExt;
-use instant::Instant;
-use serde_json::{json, Value};
-use uuid::Uuid;
-use warp_multi_agent_api as api;
-
 use genai::adapter::AdapterKind;
 use genai::chat::{
     Binary, BinarySource, CacheControl, ChatMessage, ChatOptions, ChatRequest, ChatRole,
@@ -56,24 +52,10 @@ use genai::chat::{
 use genai::resolver::{AuthData, Endpoint, ServiceTargetResolver};
 use genai::{Client, ModelIden, ServiceTarget, WebConfig};
 use http_client::current_proxy_config;
-
-use crate::ai::agent::api::{RequestParams, ResponseStream};
-use crate::ai::agent::{AIAgentActionResult, AIAgentInput, RunningCommand, UserQueryMode};
-use crate::ai::api_error::AIApiError;
-use crate::ai::byop_compaction;
-use crate::ai::byop_readiness::{
-    classify_projection, AcceptedRepair, BlockedByopReadinessError, LiveToolCall,
-    LiveToolCallState, ProjectedToolCall, ProjectedToolResult, ProjectionItem, ReadinessCategory,
-    ReadinessContext, ReadinessDiagnosticCoalescer, ReadinessDiagnosticContext,
-    ReadinessDiagnosticLevel, ReadinessReport, ReadinessState, ReadinessTriggerLayer,
-    RedactedToolKind, RepairSource, RepairStateStatus, TerminalResultKind, ToolCallKey,
-    ToolCallRef, ToolResultSource,
-};
-use crate::settings::AgentProviderApiType;
-use ai::agent::convert::ConvertToAPITypeError;
-
-use super::openai_compatible::OpenAiCompatibleError;
-use super::tools;
+use instant::Instant;
+use serde_json::{Value, json};
+use uuid::Uuid;
+use warp_multi_agent_api as api;
 
 // ---------------------------------------------------------------------------
 // System prompt
@@ -82,11 +64,24 @@ use super::tools;
 // 按 LLMId 模型族选 system/{anthropic,gpt,beast,gemini,kimi,codex,trinity,default}.j2,
 // 并把 warp 客户端已经收集好的 AIAgentContext(env / git / skills / project_rules / codebase / current_time)
 // 渲染进 system,让 BYOP 路径也能拥有跟 warp 自家路径相当的环境信息。
-
 use super::attachment_caps;
-use super::prompt_renderer;
-use super::user_context;
-use crate::ai::agent::AIAgentContext;
+use super::openai_compatible::OpenAiCompatibleError;
+use super::{prompt_renderer, tools, user_context};
+use crate::ai::agent::api::{RequestParams, ResponseStream};
+use crate::ai::agent::{
+    AIAgentActionResult, AIAgentContext, AIAgentInput, RunningCommand, UserQueryMode,
+};
+use crate::ai::api_error::AIApiError;
+use crate::ai::byop_compaction;
+use crate::ai::byop_readiness::{
+    AcceptedRepair, BlockedByopReadinessError, LiveToolCall, LiveToolCallState, ProjectedToolCall,
+    ProjectedToolResult, ProjectionItem, ReadinessCategory, ReadinessContext,
+    ReadinessDiagnosticCoalescer, ReadinessDiagnosticContext, ReadinessDiagnosticLevel,
+    ReadinessReport, ReadinessState, ReadinessTriggerLayer, RedactedToolKind, RepairSource,
+    RepairStateStatus, TerminalResultKind, ToolCallKey, ToolCallRef, ToolResultSource,
+    classify_projection,
+};
+use crate::settings::AgentProviderApiType;
 
 /// 从 input 中抽出最近一条 `UserQuery.context`(等价 warp `convert_to.rs::convert_input` 取的那条)。
 fn latest_input_context(input: &[AIAgentInput]) -> &[AIAgentContext] {
@@ -3158,8 +3153,8 @@ pub(super) fn build_client(
 ///
 /// 应用名一律从 `ChannelState::app_id().application_name()` 取,确保与入口 bin
 /// 注册的 `AppId` 一致(`bin/oss.rs` 注册 "InfiniShell")。
-fn build_user_agent_header(
-) -> Result<reqwest::header::HeaderValue, reqwest::header::InvalidHeaderValue> {
+fn build_user_agent_header()
+-> Result<reqwest::header::HeaderValue, reqwest::header::InvalidHeaderValue> {
     let app_name = warp_core::channel::ChannelState::app_id()
         .application_name()
         .to_owned();
@@ -5527,8 +5522,9 @@ fn make_finished_done(
 
 #[cfg(test)]
 mod assistant_buffer_tests {
-    use super::*;
     use genai::chat::{ChatRole, ToolCall};
+
+    use super::*;
 
     fn reasoning_part(msg: &ChatMessage) -> Option<&str> {
         for p in msg.content.parts() {
@@ -5750,9 +5746,10 @@ mod dashscope_thinking_tests {
 /// - OpenAI / OpenAiResp:`reasoning_effort: "none"`(GPT-5 接受)
 #[cfg(test)]
 mod build_chat_options_off_tests {
+    use genai::chat::ReasoningEffort as GE;
+
     use super::*;
     use crate::settings::ReasoningEffortSetting as R;
-    use genai::chat::ReasoningEffort as GE;
 
     fn opts(api_type: AgentProviderApiType, model: &str, effort: R) -> genai::chat::ChatOptions {
         build_chat_options(
@@ -5883,8 +5880,9 @@ mod build_chat_options_off_tests {
 
 #[cfg(test)]
 mod adapter_routing_tests {
-    use super::*;
     use genai::adapter::AdapterKind;
+
+    use super::*;
 
     const OPENAI_HOST: &str = "https://api.openai.com/v1/";
     const ANTHROPIC_HOST: &str = "https://api.anthropic.com/v1/";
@@ -6035,8 +6033,9 @@ mod ollama_endpoint_tests {
 /// 上游哈希必不一致 → 100% miss。反之输出一致也不能保证命中。
 #[cfg(test)]
 mod cache_boundary_stability_tests {
-    use super::*;
     use genai::chat::{ChatMessage, ChatRole};
+
+    use super::*;
 
     /// 构造一个典型的多轮对话 messages 序列:
     /// system + user_1 + assistant_1 + user_2 + assistant_2 + user_3
@@ -6356,16 +6355,17 @@ mod cache_boundary_stability_tests {
 
 #[cfg(test)]
 mod serializer_readiness_tests {
+    use std::collections::{HashMap, HashSet};
+    use std::sync::Arc;
+
     use super::*;
     use crate::ai::agent::task::TaskId;
     use crate::ai::agent::{AIAgentActionId, AIAgentActionResultType, RequestCommandOutputResult};
     use crate::ai::byop_compaction::state::{CompactionState, CompletedCompaction};
     use crate::ai::byop_readiness::{
-        PendingByopToolResultsError, RepairRecord, RepairState, ToolCallKey, ToolCallRef,
-        BLOCKED_BYOP_REQUEST_MESSAGE,
+        BLOCKED_BYOP_REQUEST_MESSAGE, PendingByopToolResultsError, RepairRecord, RepairState,
+        ToolCallKey, ToolCallRef,
     };
-    use std::collections::{HashMap, HashSet};
-    use std::sync::Arc;
 
     fn kind() -> RedactedToolKind {
         RedactedToolKind::new("shell")
@@ -7026,9 +7026,11 @@ mod serializer_readiness_tests {
     #[test]
     fn strict_request_body_checker_rejects_orphans_duplicates_and_early_boundaries() {
         let orphan = vec![ChatMessage::user("hi"), tool_response("a")];
-        assert!(strict_chat_completions_ordering_errors(&orphan)
-            .iter()
-            .any(|error| error.contains("orphan")));
+        assert!(
+            strict_chat_completions_ordering_errors(&orphan)
+                .iter()
+                .any(|error| error.contains("orphan"))
+        );
 
         let duplicate = vec![
             ChatMessage::user("hi"),
@@ -7036,9 +7038,11 @@ mod serializer_readiness_tests {
             tool_response("a"),
             tool_response("a"),
         ];
-        assert!(strict_chat_completions_ordering_errors(&duplicate)
-            .iter()
-            .any(|error| error.contains("duplicate")));
+        assert!(
+            strict_chat_completions_ordering_errors(&duplicate)
+                .iter()
+                .any(|error| error.contains("duplicate"))
+        );
 
         let early_boundary = vec![
             ChatMessage::user("hi"),
@@ -7046,9 +7050,11 @@ mod serializer_readiness_tests {
             ChatMessage::user("too soon"),
             tool_response("a"),
         ];
-        assert!(strict_chat_completions_ordering_errors(&early_boundary)
-            .iter()
-            .any(|error| error.contains("before pending")));
+        assert!(
+            strict_chat_completions_ordering_errors(&early_boundary)
+                .iter()
+                .any(|error| error.contains("before pending"))
+        );
 
         let out_of_order = vec![
             ChatMessage::user("hi"),
@@ -7056,9 +7062,11 @@ mod serializer_readiness_tests {
             tool_response("b"),
             tool_response("a"),
         ];
-        assert!(strict_chat_completions_ordering_errors(&out_of_order)
-            .iter()
-            .any(|error| error.contains("out-of-order")));
+        assert!(
+            strict_chat_completions_ordering_errors(&out_of_order)
+                .iter()
+                .any(|error| error.contains("out-of-order"))
+        );
     }
 
     #[test]
@@ -7412,9 +7420,10 @@ mod serializer_readiness_tests {
 /// 缺失结果必须先被 readiness 阻断,不能再走这里补占位。
 #[cfg(test)]
 mod accepted_history_repair_tests {
+    use genai::chat::{ChatMessage, ChatRole, ToolCall};
+
     use super::*;
     use crate::ai::byop_readiness::{RepairRecord, ToolCallKey, ToolCallRef};
-    use genai::chat::{ChatMessage, ChatRole, ToolCall};
 
     fn make_tool_call(call_id: &str) -> ToolCall {
         ToolCall {

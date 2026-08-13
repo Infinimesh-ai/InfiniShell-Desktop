@@ -3,12 +3,12 @@
 //! 这个模块只处理已经投影出来的安全元数据,不读取原始 prompt、工具参数或工具输出,
 //! 也不修改 controller、serializer 或 conversation 状态。
 
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+use serde::{Deserialize, Serialize};
+
 pub const REPAIR_STATE_VERSION: u32 = 1;
-pub const BLOCKED_BYOP_REQUEST_MESSAGE: &str =
-    "Can't continue this conversation: an earlier tool result is missing or corrupted in this conversation's history, so InfiniShell can't safely send the request to your provider. Start a new conversation or fork from an earlier point to continue.";
+pub const BLOCKED_BYOP_REQUEST_MESSAGE: &str = "Can't continue this conversation: an earlier tool result is missing or corrupted in this conversation's history, so InfiniShell can't safely send the request to your provider. Start a new conversation or fork from an earlier point to continue.";
 pub const PENDING_BYOP_TOOL_RESULTS_MESSAGE: &str =
     "Waiting for a running tool to finish before sending your next request.";
 

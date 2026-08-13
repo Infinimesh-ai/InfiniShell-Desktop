@@ -6,8 +6,10 @@ use channel_versions::VersionInfo;
 use instant::Duration;
 use warp_core::channel::{Channel, ChannelState};
 
-use super::release_assets_directory_url;
-use super::{DownloadProgress, DownloadReady, ProgressCallback, ReadyForRelaunch};
+use super::{
+    DownloadProgress, DownloadReady, ProgressCallback, ReadyForRelaunch,
+    release_assets_directory_url,
+};
 
 lazy_static::lazy_static! {
     /// Stores the path to the current executable.
@@ -147,26 +149,21 @@ mod appimage {
             if downloaded - last_reported >= REPORT_BYTES_THRESHOLD
                 || last_reported_at.elapsed() >= REPORT_TIME_THRESHOLD
             {
-                on_progress(DownloadProgress {
-                    downloaded,
-                    total,
-                });
+                on_progress(DownloadProgress { downloaded, total });
                 last_reported = downloaded;
                 last_reported_at = Instant::now();
             }
         }
-        on_progress(DownloadProgress {
-            downloaded,
-            total,
-        });
+        on_progress(DownloadProgress { downloaded, total });
 
         // openWarp:在覆盖原 AppImage 之前先对临时文件做 SHA-256 校验,
         // 防御 CDN 中间人 / 网络损坏。其他 channel 跳过(有自家流程)。
         if matches!(channel, warp_core::channel::Channel::Oss) {
             let temp_path = new_appimage.path().to_path_buf();
-            if let Err(e) =
-                crate::autoupdate::verify_oss_asset_sha256(&temp_path, "InfiniShell-x86_64.AppImage")
-            {
+            if let Err(e) = crate::autoupdate::verify_oss_asset_sha256(
+                &temp_path,
+                "InfiniShell-x86_64.AppImage",
+            ) {
                 // 临时文件会随 NamedTempFile drop 自动清理,这里只需返回错误。
                 return Err(e);
             }
@@ -395,9 +392,7 @@ impl PackageManager {
             .output();
         let output = match output {
             Ok(o) => o,
-            Err(err) => {
-                return Err(err).context("Failed to run package manager detection script")
-            }
+            Err(err) => return Err(err).context("Failed to run package manager detection script"),
         };
 
         // exit 1 = 这个候选名没被任何 PM 识别;不是错,继续下一个候选。

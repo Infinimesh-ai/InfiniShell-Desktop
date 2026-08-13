@@ -4,111 +4,97 @@ pub mod editor;
 mod reasoning_depth_selector;
 pub mod toolbar_item;
 
-use crate::{
-    ai::{
-        blocklist::{
-            history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel},
-            prompt::prompt_alert::PromptAlertView,
-            usage::icon_for_context_window_usage,
-            BlocklistAIInputModel,
-        },
-        execution_profiles::profiles::AIExecutionProfilesModel,
-        AIRequestUsageModel,
-    },
-    appearance::Appearance,
-    completer::SessionContext,
-    context_chips::{
-        self,
-        display_chip::{DisplayChip, DisplayChipConfig},
-        prompt_type::PromptType,
-        ContextChipKind,
-    },
-    features::FeatureFlag,
-    network::NetworkStatus,
-    send_telemetry_from_ctx,
-    server::telemetry::{PluginChipTelemetryKind, TelemetryEvent},
-    settings::{AISettings, AISettingsChangedEvent},
-    settings_view::SettingsSection,
-    terminal::{
-        cli_agent_sessions::{
-            listener::session_supports_rich_status, CLIAgentInputState, CLIAgentSessionsModel,
-            CLIAgentSessionsModelEvent,
-        },
-        input::{models::InlineModelSelectorTab, MenuPositioningProvider},
-        model_events::ModelEvent,
-        profile_model_selector::{ProfileModelSelector, ProfileModelSelectorEvent},
-        session_settings::{SessionSettings, SessionSettingsChangedEvent, ToolbarChipSelection},
-        shared_session::SharedSessionStatus,
-        view::ambient_agent::{AmbientAgentViewModel, ModelSelector},
-        view::init::OPEN_CLI_AGENT_RICH_INPUT_KEYBINDING,
-        view::TerminalAction,
-        CLIAgent, TerminalModel,
-    },
-    ui_components::{icon_with_status::render_cli_agent_logo, icons::Icon},
-    view_components::{
-        action_button::{
-            ActionButton, ActionButtonTheme, AdjoinedSide, ButtonSize, KeystrokeSource, NakedTheme,
-            TooltipAlignment,
-        },
-        DismissibleToast,
-    },
-    workspace::{view::TOGGLE_PROJECT_EXPLORER_BINDING_NAME, ToastStack},
-    workspaces::user_workspaces::UserWorkspaces,
-};
-use toolbar_item::AgentToolbarItemKind;
-// Zap Wave 7-3:`warp_cli::agent::Harness` import was removed with the hosted-mode footer.
-
-use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
+// Zap Wave 7-3:`warp_cli::agent::Harness` import was removed with the hosted-mode footer.
+use std::sync::atomic::{self, AtomicBool};
+
+use toolbar_item::AgentToolbarItemKind;
+
+use crate::ai::AIRequestUsageModel;
+use crate::ai::blocklist::BlocklistAIInputModel;
+use crate::ai::blocklist::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
+use crate::ai::blocklist::prompt::prompt_alert::PromptAlertView;
+use crate::ai::blocklist::usage::icon_for_context_window_usage;
+use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
+use crate::appearance::Appearance;
+use crate::completer::SessionContext;
+use crate::context_chips::display_chip::{DisplayChip, DisplayChipConfig};
+use crate::context_chips::prompt_type::PromptType;
+use crate::context_chips::{self, ContextChipKind};
+use crate::features::FeatureFlag;
+use crate::network::NetworkStatus;
+use crate::send_telemetry_from_ctx;
+use crate::server::telemetry::{PluginChipTelemetryKind, TelemetryEvent};
+use crate::settings::{AISettings, AISettingsChangedEvent};
+use crate::settings_view::SettingsSection;
+use crate::terminal::cli_agent_sessions::listener::session_supports_rich_status;
+use crate::terminal::cli_agent_sessions::{
+    CLIAgentInputState, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
+};
+use crate::terminal::input::MenuPositioningProvider;
+use crate::terminal::input::models::InlineModelSelectorTab;
+use crate::terminal::model_events::ModelEvent;
+use crate::terminal::profile_model_selector::{ProfileModelSelector, ProfileModelSelectorEvent};
+use crate::terminal::session_settings::{
+    SessionSettings, SessionSettingsChangedEvent, ToolbarChipSelection,
+};
+use crate::terminal::shared_session::SharedSessionStatus;
+use crate::terminal::view::TerminalAction;
+use crate::terminal::view::ambient_agent::{AmbientAgentViewModel, ModelSelector};
+use crate::terminal::view::init::OPEN_CLI_AGENT_RICH_INPUT_KEYBINDING;
+use crate::terminal::{CLIAgent, TerminalModel};
+use crate::ui_components::icon_with_status::render_cli_agent_logo;
+use crate::ui_components::icons::Icon;
+use crate::view_components::DismissibleToast;
+use crate::view_components::action_button::{
+    ActionButton, ActionButtonTheme, AdjoinedSide, ButtonSize, KeystrokeSource, NakedTheme,
+    TooltipAlignment,
+};
+use crate::workspace::ToastStack;
+use crate::workspace::view::TOGGLE_PROJECT_EXPLORER_BINDING_NAME;
+use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// FTU(首次使用)model callout 是否已经在本次运行中展示过。
 /// 上游移除了对应的持久化设置项,这里用进程内标记代替。
 static FTU_MODEL_CALLOUT_SHOWN: AtomicBool = AtomicBool::new(false);
 
 #[cfg(not(target_family = "wasm"))]
-use crate::terminal::local_shell::LocalShellState;
-#[cfg(not(target_family = "wasm"))]
-use crate::terminal::ShellLaunchData;
-#[cfg(feature = "voice_input")]
-use crate::voice::transcriber::TranscribeError;
-use ai::document::{AIDocumentId, AIDocumentVersion};
-use parking_lot::FairMutex;
-use pathfinder_color::ColorU;
-use pathfinder_geometry::vector::{vec2f, Vector2F};
-use settings::{Setting as _, ToggleableSetting};
-#[cfg(not(target_family = "wasm"))]
 use std::env;
 #[cfg(not(target_family = "wasm"))]
 use std::path::PathBuf;
 #[cfg(not(target_family = "wasm"))]
 use std::time::Duration;
+
+use ai::document::{AIDocumentId, AIDocumentVersion};
+use parking_lot::FairMutex;
+use pathfinder_color::ColorU;
+use pathfinder_geometry::vector::{Vector2F, vec2f};
+use settings::{Setting as _, ToggleableSetting};
 #[cfg(not(target_family = "wasm"))]
 use tokio::fs;
 #[cfg(feature = "voice_input")]
 use voice_input::{StartListeningError, VoiceSessionResult};
-
 // Zap:`report_if_error` 已从 warp_core 迁到 warp_errors crate。
 use warp_core::ui::{
-    color::{blend::Blend, contrast::MinimumAllowedContrast, ContrastingColor},
-    theme::{color::internal_colors, Fill},
+    color::{ContrastingColor, blend::Blend, contrast::MinimumAllowedContrast},
+    theme::{Fill, color::internal_colors},
 };
 use warp_errors::report_if_error;
 #[cfg(feature = "voice_input")]
 use warpui::r#async::SpawnedFutureHandle;
+#[cfg(not(target_family = "wasm"))]
+use warpui::r#async::Timer;
+use warpui::elements::{
+    Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
+    CrossAxisAlignment, DEFAULT_UI_LINE_HEIGHT_RATIO, DispatchEventResult, Element, EventHandler,
+    Expanded, Flex, MainAxisAlignment, MainAxisSize, OffsetPositioning, ParentElement,
+    PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Shrinkable, Stack, Text, Wrap,
+    WrapFill, WrapFillEntireRun,
+};
 use warpui::{
-    elements::{
-        Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
-        CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Expanded, Flex,
-        MainAxisAlignment, MainAxisSize, OffsetPositioning, ParentElement, PositionedElementAnchor,
-        PositionedElementOffsetBounds, Radius, Shrinkable, Stack, Text, Wrap, WrapFill,
-        WrapFillEntireRun, DEFAULT_UI_LINE_HEIGHT_RATIO,
-    },
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
-
-#[cfg(not(target_family = "wasm"))]
-use warpui::r#async::Timer;
 
 // Zap Wave 7-3:`EnvironmentSelector` / `EnvironmentSelectorEvent` re-export was removed
 // with the hosted-mode footer.
@@ -118,12 +104,18 @@ pub(crate) use self::reasoning_depth_selector::{
 #[cfg(not(target_family = "wasm"))]
 use crate::server::telemetry::PluginChipTelemetryAction;
 #[cfg(not(target_family = "wasm"))]
+use crate::terminal::ShellLaunchData;
+#[cfg(not(target_family = "wasm"))]
 use crate::terminal::cli_agent_sessions::plugin_manager::{
-    compare_versions, plugin_manager_for, plugin_manager_for_with_shell, CliAgentPluginManager,
-    PluginInstallError, PluginModalKind,
+    CliAgentPluginManager, PluginInstallError, PluginModalKind, compare_versions,
+    plugin_manager_for, plugin_manager_for_with_shell,
 };
 #[cfg(not(target_family = "wasm"))]
+use crate::terminal::local_shell::LocalShellState;
+#[cfg(not(target_family = "wasm"))]
 use crate::view_components::ToastLink;
+#[cfg(feature = "voice_input")]
+use crate::voice::transcriber::TranscribeError;
 #[cfg(not(target_family = "wasm"))]
 use crate::workspace::WorkspaceAction;
 
@@ -2128,9 +2120,11 @@ impl TypedActionView for AgentInputFooter {
             AgentInputFooterAction::ToggleAutodetectionSetting => {
                 let ai_settings = AISettings::handle(ctx);
                 ai_settings.update(ctx, |settings, ctx| {
-                    report_if_error!(settings
-                        .ai_autodetection_enabled_internal
-                        .toggle_and_save_value(ctx));
+                    report_if_error!(
+                        settings
+                            .ai_autodetection_enabled_internal
+                            .toggle_and_save_value(ctx)
+                    );
                 });
             }
             AgentInputFooterAction::DismissFtuModelCallout => {

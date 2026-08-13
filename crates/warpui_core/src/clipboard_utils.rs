@@ -367,7 +367,7 @@ pub fn read_images_from_clipboard(
 fn try_read_image_via_custom_windows_formats(
     filename: Option<String>,
 ) -> Option<crate::clipboard::ImageData> {
-    use clipboard_win::{raw, Clipboard, EnumFormats};
+    use clipboard_win::{Clipboard, EnumFormats, raw};
 
     // RAII OpenClipboard / CloseClipboard. arboard has already released the
     // clipboard by the time we get here (its `get().image()` call returned).
@@ -480,9 +480,10 @@ fn try_decode_dib_to_png(
     bytes: &[u8],
     filename: Option<String>,
 ) -> Option<crate::clipboard::ImageData> {
+    use std::io::Cursor;
+
     use image::codecs::bmp::BmpDecoder;
     use image::{DynamicImage, ImageFormat};
-    use std::io::Cursor;
 
     let decoder = match BmpDecoder::new_without_file_header(Cursor::new(bytes)) {
         Ok(d) => d,

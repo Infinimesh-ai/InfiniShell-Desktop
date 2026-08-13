@@ -1100,7 +1100,9 @@ where
             // Received a Zap OSC used for in-band generators.
             WARP_IN_BAND_GENERATOR_OSC_MARKER => match params.get(1) {
                 Some(&WARP_IN_BAND_GENERATOR_START_BYTE) => {
-                    log::info!("Received a InfiniShell OSC marker for starting in-band command output.");
+                    log::info!(
+                        "Received a InfiniShell OSC marker for starting in-band command output."
+                    );
                     self.handler.start_in_band_command_output();
                 }
                 Some(&WARP_IN_BAND_GENERATOR_END_BYTE) => {
@@ -1178,7 +1180,9 @@ where
                         .map(|osc_data| String::from_utf8_lossy(osc_data))
                         .and_then(|format| CompletionsShellData::from_format_type(&format))
                     else {
-                        log::warn!("InfiniShell start completions OSC marker contained invalid format.");
+                        log::warn!(
+                            "InfiniShell start completions OSC marker contained invalid format."
+                        );
                         return;
                     };
                     self.handler.start_completions_output(format);
@@ -1242,7 +1246,9 @@ where
                     self.handler.send_completions_prompt();
                 }
                 _ => {
-                    log::warn!("Received a InfiniShell OSC completions marker missing required param.");
+                    log::warn!(
+                        "Received a InfiniShell OSC completions marker missing required param."
+                    );
                 }
             },
 

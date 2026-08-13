@@ -15,28 +15,25 @@
 use std::collections::HashMap;
 
 use pathfinder_geometry::vector::Vector2F;
+use settings::Setting;
 use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::{
-    AcceptedByDropTarget, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius,
-    CrossAxisAlignment, Dismiss, Draggable, DraggableState, DropTarget, DropTargetData, Element,
-    Empty, Fill as ElementFill, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
-    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, SavePosition,
-    ScrollbarWidth, Stack, Text,
+use warp_ssh_manager::{
+    AuthType, KeychainSecretStore, NodeKind, SecretKind, SshNode, SshRepository, SshSecretStore,
+    SshServerInfo,
 };
-use warpui::elements::{ClippedScrollStateHandle, ClippedScrollable};
+use warpui::elements::{
+    AcceptedByDropTarget, Border, ChildAnchor, ClippedScrollStateHandle, ClippedScrollable,
+    ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Draggable,
+    DraggableState, DropTarget, DropTargetData, Element, Empty, Fill as ElementFill, Flex,
+    Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    ParentElement, ParentOffsetBounds, Radius, SavePosition, ScrollbarWidth, Stack, Text,
+};
 use warpui::platform::Cursor;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
-
-use warp_ssh_manager::{
-    AuthType, KeychainSecretStore, NodeKind, SecretKind, SshNode, SshRepository, SshSecretStore,
-    SshServerInfo,
-};
-
-use settings::Setting;
 
 use crate::editor::{
     EditorView, Event as EditorEvent, SingleLineEditorOptions, TextColors, TextOptions,

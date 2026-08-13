@@ -29,8 +29,8 @@ use warp_util::path::LineAndColumnArg;
 use warp_util::path::convert_wsl_to_windows_host_path;
 use warp_util::remote_path::RemotePath;
 use warpui::elements::{
-    ChildView, CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Flex,
-    MainAxisSize, ParentElement, Shrinkable, Stack,
+    ChildView, CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Flex, MainAxisSize,
+    ParentElement, Shrinkable, Stack,
 };
 use warpui::keymap::{Context, EditableBinding, FixedBinding};
 use warpui::notification::NotificationSendError;
@@ -73,6 +73,8 @@ use crate::appearance::Appearance;
 use crate::banner::{Banner, BannerEvent, BannerState, BannerTextContent, DismissalType};
 use crate::channel::{Channel, ChannelState};
 use crate::cloud_object::Space;
+#[cfg(target_family = "wasm")]
+use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::code::active_file::ActiveFileModel;
 use crate::code::buffer_location::LocalOrRemotePath;
 #[cfg(feature = "local_fs")]
@@ -90,18 +92,16 @@ use crate::palette::PaletteMode;
 use crate::pane_group::focus_state::PaneGroupFocusEvent;
 use crate::pane_group::pane::ActionOrigin;
 use crate::pane_group::pane::get_started_pane::GetStartedPane;
-use crate::pane_group::pane::welcome_pane::WelcomePane;
 #[cfg(not(target_family = "wasm"))]
 use crate::pane_group::pane::terminal_pane::{
     host_terminal_shared_session_source_type, inherit_share_for_local_child,
 };
+use crate::pane_group::pane::welcome_pane::WelcomePane;
 use crate::persistence::ModelEvent;
 use crate::quit_warning::UnsavedStateSummary;
 use crate::resource_center::{
     Tip, TipAction, TipsCompleted, mark_feature_used_and_write_to_user_defaults,
 };
-#[cfg(target_family = "wasm")]
-use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::server::ids::{ObjectUid, SyncId};
 use crate::server::telemetry::{PaletteSource, TelemetryEvent};
 use crate::session_management::SessionNavigationData;
@@ -166,8 +166,6 @@ pub mod pane;
 pub mod tree;
 pub mod working_directories;
 use focus_state::PaneGroupFocusState;
-
-pub use crate::code_review::CodeReviewPanelArg;
 pub use pane::ai_document_pane::AIDocumentPane;
 pub use pane::ai_fact_pane::AIFactPane;
 pub use pane::code_diff_pane::CodeDiffPane;
@@ -191,6 +189,7 @@ use warp_errors::report_error;
 pub use working_directories::{WorkingDirectoriesEvent, WorkingDirectoriesModel};
 
 use self::pane::{DetachType, PaneViewEvent};
+pub use crate::code_review::CodeReviewPanelArg;
 
 /// Binding name for the action that toggles maximizing the active pane. Shared so
 /// the pane header menu item can surface the same shortcut the binding resolves to.
@@ -260,8 +259,7 @@ fn resolve_tab_config_shell(name: &str, ctx: &AppContext) -> Option<AvailableShe
 
     AvailableShell::try_from(name).ok()
 }
-const WARP_SHELL_COMPATIBILITY_DOCS: &str =
-    "";
+const WARP_SHELL_COMPATIBILITY_DOCS: &str = "";
 // Default minimum width for a newly created Agent Mode pane so that it is legible. Called "default"
 // because this value may be too large for small windows. In that case, we fall back to 50% of the
 // window width.

@@ -3,9 +3,9 @@ use warpui::keymap::{EditableBinding, Keystroke, Trigger};
 use warpui::platform::OperatingSystem;
 
 use crate::terminal;
-use crate::util::bindings::{keybinding_name_to_display_string, trigger_to_keystroke};
 #[cfg(any(windows, target_os = "linux"))]
 use crate::util::bindings::{CustomAction, custom_tag_to_keystroke};
+use crate::util::bindings::{keybinding_name_to_display_string, trigger_to_keystroke};
 use crate::workspace::WorkspaceAction;
 
 #[test]

@@ -37,36 +37,25 @@ use super::proto::{
     FileOperationError, FragmentMetadataLookupError as ProtoFragmentMetadataLookupError,
     FragmentMetadataLookupErrorCode, GetBranchesError, GetBranchesResponse, GetBranchesSuccess,
     GetDiffStateResponse, GetFragmentMetadataFromHash, GetFragmentMetadataFromHashResponse,
-    GitCommitChainRequest,
-    GitCommitChainResponse, GitCommitChainSuccess, GitCreatePrRequest, GitCreatePrResponse,
-    GitGenerateCommitMessageRequest, GitGenerateCommitMessageResponse,
+    GitCommitChainRequest, GitCommitChainResponse, GitCommitChainSuccess, GitCreatePrRequest,
+    GitCreatePrResponse, GitGenerateCommitMessageRequest, GitGenerateCommitMessageResponse,
     GitGetCommittedBranchFilesRequest, GitGetCommittedBranchFilesResponse,
     GitGetCommittedBranchFilesSuccess, GitHubPrInfoPush, GitHubRepositoryInfoPush, GitOpDelta,
     GitOpError, GitPushRequest, GitPushResponse, GitStatusPush, HomeSkillMetadata, IndexCodebase,
-    Initialize, InitializeResponse, NavigatedToDirectory,
-    NavigatedToDirectoryResponse, OpenBuffer, OpenBufferResponse, ReadFileContextResponse,
-    RemoteAgentContextSnapshot, RemoteContextFileProto, RemoteSkillProto, ResolveConflict,
-    ResolveConflictResponse, ResolveConflictSuccess, ResyncCodebase, RipgrepSearchRequest,
-    RunCommandError, RunCommandErrorCode, RunCommandRequest, RunCommandResponse, RunCommandSuccess,
-    SaveBuffer, SaveBufferResponse, SaveBufferSuccess, ServerMessage, SessionBootstrapped,
-    TextEdit, UpdateGitHubPrInfo, UpdateGitHubRepoInfo, UpdateGitStatus, UploadHandoffSnapshot,
-    WriteFile, WriteFileResponse, WriteFileSuccess, client_message, delete_file_response,
+    Initialize, InitializeResponse, NavigatedToDirectory, NavigatedToDirectoryResponse, OpenBuffer,
+    OpenBufferResponse, ReadFileContextResponse, RemoteAgentContextSnapshot,
+    RemoteContextFileProto, RemoteSkillProto, ResolveConflict, ResolveConflictResponse,
+    ResolveConflictSuccess, ResyncCodebase, RipgrepSearchRequest, RunCommandError,
+    RunCommandErrorCode, RunCommandRequest, RunCommandResponse, RunCommandSuccess, SaveBuffer,
+    SaveBufferResponse, SaveBufferSuccess, ServerMessage, SessionBootstrapped, TextEdit,
+    UpdateGitHubPrInfo, UpdateGitHubRepoInfo, UpdateGitStatus, UploadHandoffSnapshot, WriteFile,
+    WriteFileResponse, WriteFileSuccess, client_message, delete_file_response,
     discard_files_response, get_diff_state_response, get_fragment_metadata_from_hash_response,
     git_commit_chain_response, git_create_pr_response, git_generate_commit_message_response,
     git_get_committed_branch_files_response, git_push_response, host_scoped_request, notification,
     remote_skill_proto, resolve_conflict_response, run_command_response, save_buffer_response,
     server_message, session_scoped_request, write_file_response,
 };
-use super::server_buffer_tracker::{PendingBufferRequestKind, ServerBufferTracker};
-use super::{diff_state_proto, ripgrep_search};
-use crate::code::global_buffer_model::{GlobalBufferModel, GlobalBufferModelEvent};
-use crate::code_review::diff_state::{CommitChainMode, DiffMode, FileStatusInfo};
-use crate::code_review::git_repo_model::{GitRepoModels, GitRepoStatusModel};
-use crate::code_review::github_repo_model::{GitHubRepoEvent, GitHubRepoModel};
-#[cfg(feature = "local_tty")]
-use crate::terminal::local_shell::LocalShellState;
-use crate::terminal::shell::ShellType;
-
 // Buffer-sync 相关:依赖 GlobalBufferModel,后者的 server-local 操作只在
 // `local_fs` 下可用,因此整套服务端 buffer 处理都按 `local_fs` 门控。
 // 这里只列 Zap 自有的远端文件浏览器 / 分块读写消息;上游 buffer 消息在上面
@@ -80,6 +69,15 @@ use super::proto::{
     create_directory_response, list_directory_response, read_file_chunk_response,
     resolve_path_response, write_file_chunk_response,
 };
+use super::server_buffer_tracker::{PendingBufferRequestKind, ServerBufferTracker};
+use super::{diff_state_proto, ripgrep_search};
+use crate::code::global_buffer_model::{GlobalBufferModel, GlobalBufferModelEvent};
+use crate::code_review::diff_state::{CommitChainMode, DiffMode, FileStatusInfo};
+use crate::code_review::git_repo_model::{GitRepoModels, GitRepoStatusModel};
+use crate::code_review::github_repo_model::{GitHubRepoEvent, GitHubRepoModel};
+#[cfg(feature = "local_tty")]
+use crate::terminal::local_shell::LocalShellState;
+use crate::terminal::shell::ShellType;
 
 /// How long the daemon waits with no connections before exiting.
 pub const GRACE_PERIOD: std::time::Duration = std::time::Duration::from_secs(10 * 60);

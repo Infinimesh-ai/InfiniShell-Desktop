@@ -26,26 +26,23 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use settings::Setting;
+use strum::IntoEnumIterator;
 use warpui::elements::{
     ChildView, Container, CornerRadius, CrossAxisAlignment, Expanded, Flex, MainAxisAlignment,
     MouseStateHandle, ParentElement, Radius, Text, Wrap,
 };
-use warpui::ui_components::{
-    button::ButtonVariant,
-    components::{Coords, UiComponent, UiComponentStyles},
-};
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{AppContext, Element, SingletonEntity, ViewContext, ViewHandle};
 
+use super::ai_page::{AISettingsPageAction, AISettingsPageView, ModelCapabilityKind};
+use super::settings_page::{HEADER_PADDING, SettingsWidget, build_sub_header};
 use crate::ai::agent_providers::AgentProviderSecrets;
 use crate::appearance::Appearance;
 use crate::editor::{
     EditorView, Event as EditorEvent, SingleLineEditorOptions, TextColors, TextOptions,
 };
 use crate::settings::{AISettings, AgentProvider, AgentProviderApiType, AgentProviderModel};
-use strum::IntoEnumIterator;
-
-use super::ai_page::{AISettingsPageAction, AISettingsPageView, ModelCapabilityKind};
-use super::settings_page::{build_sub_header, SettingsWidget, HEADER_PADDING};
 
 const CARD_BUTTON_PADDING: f32 = 6.0;
 const FIELD_LABEL_MARGIN_TOP: f32 = 6.0;

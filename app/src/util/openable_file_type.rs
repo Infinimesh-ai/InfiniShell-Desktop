@@ -272,10 +272,12 @@ pub fn resolve_file_target_with_editor_choice(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::path::Path;
+
     #[cfg(feature = "local_fs")]
     use settings::Setting as _;
-    use std::path::Path;
+
+    use super::*;
 
     #[test]
     fn test_binary_files_not_openable() {
@@ -290,10 +292,7 @@ mod tests {
     fn test_open_code_panels_file_editor_default_is_warp() {
         use crate::util::file::external_editor::settings::OpenCodePanelsFileEditor;
 
-        assert_eq!(
-            OpenCodePanelsFileEditor::default_value(),
-            EditorChoice::Zap
-        );
+        assert_eq!(OpenCodePanelsFileEditor::default_value(), EditorChoice::Zap);
     }
 
     #[test]

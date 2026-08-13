@@ -109,9 +109,10 @@ impl SshSecretStore for KeychainSecretStore {
 pub(crate) mod test_support {
     //! 进程内的内存 mock,绕开 OS keychain — CI / 单测用。
 
-    use super::*;
     use std::collections::HashMap;
     use std::sync::Mutex;
+
+    use super::*;
 
     #[derive(Default)]
     pub struct InMemorySecretStore {

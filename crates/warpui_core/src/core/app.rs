@@ -57,12 +57,11 @@ use crate::windowing::{self, WindowCallbacks, WindowManager};
 use crate::{
     AccessibilityData, Action, AddSingletonModel, AddWindowOptions, AnyModel, AnyModelHandle,
     ApplicationBundleInfo, Clipboard, CurrentRenderWindowGuard, CursorInfo, Effect, Element,
-    Entity, EntityId, EntityIdMap,
-    EntityIdSet, Event, GetSingletonModelHandle, ModelAsRef, ModelContext, ModelHandle,
-    NextNewWindowsHasThisWindowsBoundsUponClose, Presenter, ReadModel, ReadView, Scene,
-    SingletonEntity, SpawnedFuture, TaskId, TypedActionView, UpdateModel, UpdateView, View,
-    ViewAsRef, ViewContext, ViewHandle, WindowId, WindowInvalidation, ZoomFactor, assets,
-    rendering,
+    Entity, EntityId, EntityIdMap, EntityIdSet, Event, GetSingletonModelHandle, ModelAsRef,
+    ModelContext, ModelHandle, NextNewWindowsHasThisWindowsBoundsUponClose, Presenter, ReadModel,
+    ReadView, Scene, SingletonEntity, SpawnedFuture, TaskId, TypedActionView, UpdateModel,
+    UpdateView, View, ViewAsRef, ViewContext, ViewHandle, WindowId, WindowInvalidation, ZoomFactor,
+    assets, rendering,
 };
 
 #[cfg(feature = "tui")]

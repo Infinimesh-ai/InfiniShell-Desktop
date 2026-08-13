@@ -1,6 +1,5 @@
 use anyhow::{Result, anyhow};
 use url::Url;
-
 #[cfg(target_family = "wasm")]
 use warp_core::context_flag::ContextFlag;
 

@@ -416,8 +416,8 @@ fn fallback_font_path_handle(font: &font_kit::loaders::directwrite::Font) -> Opt
 #[cfg(test)]
 mod tests {
     use super::{
-        preferred_cjk_families_for_locale, JAPANESE_CJK_FAMILIES, KOREAN_CJK_FAMILIES,
-        SIMPLIFIED_CHINESE_CJK_FAMILIES, TRADITIONAL_CHINESE_CJK_FAMILIES,
+        JAPANESE_CJK_FAMILIES, KOREAN_CJK_FAMILIES, SIMPLIFIED_CHINESE_CJK_FAMILIES,
+        TRADITIONAL_CHINESE_CJK_FAMILIES, preferred_cjk_families_for_locale,
     };
 
     #[test]

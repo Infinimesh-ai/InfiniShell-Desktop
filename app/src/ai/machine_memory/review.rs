@@ -10,7 +10,7 @@ use warpui::{AppContext, EntityId, SingletonEntity as _, ViewContext};
 
 use crate::ai::agent::conversation::AIConversation;
 use crate::ai::agent_providers::oneshot::{
-    byop_oneshot_completion, resolve_active_ai_oneshot, OneshotConfig, OneshotOptions,
+    OneshotConfig, OneshotOptions, byop_oneshot_completion, resolve_active_ai_oneshot,
 };
 use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::settings::AISettings;

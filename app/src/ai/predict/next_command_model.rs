@@ -24,9 +24,13 @@ use super::generate_ai_input_suggestions::{
     GenerateAIInputSuggestionsRequest, GenerateAIInputSuggestionsResponseV2, NextCommandContext,
     create_generate_ai_input_suggestions_request, get_context_messages,
 };
+use crate::ai::agent::api::collect_user_rules;
+use crate::ai::agent_providers::active_ai::next_command as byop_next_command;
+use crate::ai::agent_providers::oneshot::OneshotConfig;
 use crate::ai::api_error::AIApiError;
 use crate::ai::block_context::BlockContext;
 use crate::ai_assistant::execution_context::WarpAiExecutionContext;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::completer::SessionContext;
 #[cfg(feature = "local_fs")]
 use crate::persistence::{database_file_path_for_current_scope, establish_ro_connection};
@@ -36,11 +40,6 @@ use crate::terminal::input::{CompleterData, IntelligentAutosuggestionResult};
 use crate::terminal::model::session::Sessions;
 use crate::terminal::{History, HistoryEntry, TerminalModel};
 use crate::workspaces::user_workspaces::UserWorkspaces;
-
-use crate::ai::agent::api::collect_user_rules;
-use crate::ai::agent_providers::active_ai::next_command as byop_next_command;
-use crate::ai::agent_providers::oneshot::OneshotConfig;
-use crate::cloud_object::model::persistence::ObjectStoreModel;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {

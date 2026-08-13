@@ -1,7 +1,8 @@
-use crate::ai::byop_readiness::BlockedByopReadinessError;
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use warp_errors::{AnyhowErrorExt, ErrorExt, register_error};
+
+use crate::ai::byop_readiness::BlockedByopReadinessError;
 
 const WARP_ERROR_CODE_HEADER: &str = "X-Zap-Error-Code";
 const WARP_ERROR_CODE_OUT_OF_CREDITS: &str = "OUT_OF_CREDITS";

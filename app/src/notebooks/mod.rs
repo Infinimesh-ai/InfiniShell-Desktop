@@ -13,19 +13,16 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use warpui::AppContext;
 
-use crate::{
-    ai::document::ai_document_model::AIDocumentId,
-    appearance::Appearance,
-    cloud_object::{GenericStoredObject, ObjectType, Owner, StoredObjectModel},
-    drive::{
-        items::{notebook::WarpDriveNotebook, WarpDriveItem},
-        ObjectTypeAndId,
-    },
-    persistence::ModelEvent,
-    server::ids::{ServerId, SyncId},
+use crate::ai::document::ai_document_model::AIDocumentId;
+use crate::appearance::Appearance;
+use crate::cloud_object::{
+    GenericStoredObject, ObjectType, Owner, SerializedModel, StoredObjectModel,
 };
-
-use crate::cloud_object::SerializedModel;
+use crate::drive::ObjectTypeAndId;
+use crate::drive::items::WarpDriveItem;
+use crate::drive::items::notebook::WarpDriveNotebook;
+use crate::persistence::ModelEvent;
+use crate::server::ids::{ServerId, SyncId};
 
 /// Serialized representation of a notebook stored in local object persistence.
 /// The AIDocumentID and ConversationID stay grouped with notebook content.

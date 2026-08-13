@@ -8,22 +8,20 @@ use futures::FutureExt;
 use itertools::Itertools as _;
 use persistence::model::AgentConversationRecord;
 
-use crate::ai::agent::api::ServerConversationToken;
-use crate::ai::agent::conversation::{
-    AIConversation, AIConversationId, ServerAIConversationMetadata,
-};
-use crate::persistence::model::{
-    AgentConversation, AgentConversationData, AgentConversationSummary,
-};
-use crate::terminal::model::block::SerializedBlock;
-
-#[cfg(feature = "local_fs")]
-use crate::persistence::agent::read_agent_conversation_by_id;
-
 use super::{
     AIConversationMetadata, BlocklistAIHistoryModel, MAX_HISTORICAL_CONVERSATIONS,
     agent_id_key_from_persisted_data,
 };
+use crate::ai::agent::api::ServerConversationToken;
+use crate::ai::agent::conversation::{
+    AIConversation, AIConversationId, ServerAIConversationMetadata,
+};
+#[cfg(feature = "local_fs")]
+use crate::persistence::agent::read_agent_conversation_by_id;
+use crate::persistence::model::{
+    AgentConversation, AgentConversationData, AgentConversationSummary,
+};
+use crate::terminal::model::block::SerializedBlock;
 
 /// A conversation transcript from a CLI agent harness (e.g. Claude Code).
 #[derive(Debug, Clone)]

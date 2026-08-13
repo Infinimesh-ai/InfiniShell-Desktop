@@ -11,7 +11,9 @@ use crate::ai::agent_sdk::driver::AgentDriverError;
 use crate::ai::agent_sdk::driver::harness::{
     harness_model_env_vars, remove_claude_externally_managed_listener_env_vars,
 };
-use crate::ai::agent_sdk::{ClaudeHarness, ThirdPartyHarness, task_env_vars, validate_cli_installed};
+use crate::ai::agent_sdk::{
+    ClaudeHarness, ThirdPartyHarness, task_env_vars, validate_cli_installed,
+};
 use crate::ai::ambient_agents::task::{
     HarnessConfig, HarnessModelConfig, normalize_orchestrator_agent_name,
 };

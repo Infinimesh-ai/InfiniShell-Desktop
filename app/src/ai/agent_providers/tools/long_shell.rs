@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use warp_multi_agent_api as api;
 
 use super::OpenAiTool;
@@ -56,8 +56,8 @@ fn write_parameters() -> Value {
 
 fn write_from_args(args: &str) -> Result<api::message::tool_call::Tool> {
     let parsed: WriteArgs = serde_json::from_str(args)?;
-    use api::message::tool_call::write_to_long_running_shell_command::mode::Mode as InnerMode;
     use api::message::tool_call::write_to_long_running_shell_command::Mode;
+    use api::message::tool_call::write_to_long_running_shell_command::mode::Mode as InnerMode;
     let is_raw = parsed.mode == "raw";
     let inner = match parsed.mode.as_str() {
         "raw" => InnerMode::Raw(()),

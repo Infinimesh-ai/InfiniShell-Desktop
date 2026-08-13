@@ -1,21 +1,18 @@
-use futures::{future::BoxFuture, FutureExt};
+use futures::FutureExt;
+use futures::future::BoxFuture;
 use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
-use crate::{
-    ai::{
-        agent::{
-            conversation::AIConversationId, AIAgentAction, AIAgentActionType,
-            CreateDocumentsRequest, CreateDocumentsResult, DocumentContext,
-        },
-        artifacts::Artifact,
-        blocklist::BlocklistAIHistoryModel,
-        document::ai_document_model::{AIDocumentModel, AIDocumentVersion},
-    },
-    notebooks::editor::model::FileLinkResolutionContext,
-    terminal::model::session::active_session::ActiveSession,
-};
-
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::{
+    AIAgentAction, AIAgentActionType, CreateDocumentsRequest, CreateDocumentsResult,
+    DocumentContext,
+};
+use crate::ai::artifacts::Artifact;
+use crate::ai::blocklist::BlocklistAIHistoryModel;
+use crate::ai::document::ai_document_model::{AIDocumentModel, AIDocumentVersion};
+use crate::notebooks::editor::model::FileLinkResolutionContext;
+use crate::terminal::model::session::active_session::ActiveSession;
 
 pub struct CreateDocumentsExecutor {
     active_session: ModelHandle<ActiveSession>,

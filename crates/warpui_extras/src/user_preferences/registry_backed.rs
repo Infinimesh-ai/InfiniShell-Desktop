@@ -58,7 +58,9 @@ impl RegistryBackedPreferences {
                 let key = CURRENT_USER
                     .create(self.app_key_path.clone())
                     .map_err(|e| {
-                        log::error!("unable to access InfiniShell app key in Windows Registry: {e:#}");
+                        log::error!(
+                            "unable to access InfiniShell app key in Windows Registry: {e:#}"
+                        );
                         super::Error::IoError(io::Error::from(e))
                     })?;
                 return f(&key);

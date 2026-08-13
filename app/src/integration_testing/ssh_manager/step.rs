@@ -6,15 +6,13 @@
 use std::sync::{Arc, Mutex};
 
 use warp_ssh_manager::{SshRepository, SshServerInfo};
-use warpui::SingletonEntity;
-use warpui::TypedActionView;
 use warpui::integration::TestStep;
 use warpui::windowing::WindowManager;
-
-use crate::ssh_manager::server_view::SshServerAction;
-use crate::workspace::{Workspace, WorkspaceAction};
+use warpui::{SingletonEntity, TypedActionView};
 
 use super::assertions::ssh_server_view;
+use crate::ssh_manager::server_view::SshServerAction;
+use crate::workspace::{Workspace, WorkspaceAction};
 
 /// 打开 SSH 管理器左侧面板。
 pub fn open_ssh_manager_panel() -> TestStep {

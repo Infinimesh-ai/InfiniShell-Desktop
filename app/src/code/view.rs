@@ -42,6 +42,11 @@ use crate::code::{EditorTabBarDropTargetData, ImmediateSaveError, SaveOutcome, S
 use crate::editor::InteractionState;
 use crate::input::Vector2F;
 use crate::menu::{MenuItem, MenuItemFields};
+// Read-only rendered Markdown preview for remote files reuses the notebook rich-text
+// machinery. `RichTextEditorView` is referenced by the always-present `TabData` field, so
+// it must be in scope unconditionally; the construction helpers are only used on the
+// `local_fs` toggle path.
+use crate::notebooks::editor::view::RichTextEditorView;
 use crate::notebooks::file::{MarkdownDisplayMode, renders_in_warp_notebook_viewer};
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view::header::components::{
@@ -71,12 +76,6 @@ use crate::view_components::{DismissibleToast, MarkdownToggleEvent, MarkdownTogg
 use crate::workspace::util::get_context_target_terminal_view;
 use crate::workspace::{ActiveSession, TabBarDropTargetData, ToastStack, WorkspaceAction};
 use crate::{TelemetryEvent, send_telemetry_from_ctx};
-
-// Read-only rendered Markdown preview for remote files reuses the notebook rich-text
-// machinery. `RichTextEditorView` is referenced by the always-present `TabData` field, so
-// it must be in scope unconditionally; the construction helpers are only used on the
-// `local_fs` toggle path.
-use crate::notebooks::editor::view::RichTextEditorView;
 #[cfg(feature = "local_fs")]
 use crate::{
     notebooks::{

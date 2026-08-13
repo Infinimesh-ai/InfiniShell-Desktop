@@ -2786,9 +2786,11 @@ fn render_blocked_action(props: BlockedActionProps<'_>, app: &AppContext) -> Box
 
 #[cfg(test)]
 mod tests {
+    use warpui::elements::SelectionBound;
+    use warpui::text::SelectionType;
+
     use super::*;
     use crate::ai::agent::{AIAgentOutputMessage, AgentOutputText, MessageId};
-    use warpui::{elements::SelectionBound, text::SelectionType};
 
     fn cli_subagent_test_text_output(
         message_id: &str,

@@ -17,17 +17,19 @@
 //!   * 25s timeout
 //!   * SSE 响应 → `result.content[0].text`
 
-use anyhow::{bail, Context, Result};
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
-use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, CONTENT_LENGTH, CONTENT_TYPE, USER_AGENT};
-use reqwest::redirect::Policy;
-use reqwest::StatusCode;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::Arc;
 use std::time::Duration;
+
+use anyhow::{Context, Result, bail};
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
+use reqwest::StatusCode;
+use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, CONTENT_LENGTH, CONTENT_TYPE, USER_AGENT};
+use reqwest::redirect::Policy;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 
 use super::exa;
 

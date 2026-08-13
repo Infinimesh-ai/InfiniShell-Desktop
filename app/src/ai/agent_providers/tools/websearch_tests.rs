@@ -1,7 +1,8 @@
 //! `web_runtime::run_websearch` 单测(mockito,无外网)。
 
-use super::*;
 use mockito::{Matcher, Server};
+
+use super::*;
 
 fn build_client() -> reqwest::Client {
     reqwest::Client::builder().build().expect("client")

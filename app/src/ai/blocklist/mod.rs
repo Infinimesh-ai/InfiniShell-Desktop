@@ -87,6 +87,9 @@ pub use controller::BlocklistAIController;
 pub use controller::input_context::{
     BLOCK_CONTEXT_ATTACHMENT_REGEX, DIFF_HUNK_ATTACHMENT_REGEX, DRIVE_OBJECT_ATTACHMENT_REGEX,
 };
+pub(crate) use controller::input_context::{
+    drive_object_attachment_for_reference, plan_attachment_for_reference,
+};
 #[cfg(test)]
 pub(crate) use controller::response_stream::ResponseStream;
 pub(crate) use controller::response_stream::ResponseStreamId;
@@ -119,9 +122,6 @@ pub(crate) use persistence::PersistedAIInputType;
 #[cfg_attr(target_family = "wasm", allow(unused))]
 pub use persistence::maybe_build_ai_query_upsert_event;
 pub(crate) use persistence::{PersistedAIInput, SerializedBlockListItem};
-pub(crate) use controller::input_context::{
-    drive_object_attachment_for_reference, plan_attachment_for_reference,
-};
 pub(crate) use queued_query::{
     AutofireAction, QueuedQuery, QueuedQueryId, QueuedQueryOrigin, is_lrc_auto_queue_active,
 };

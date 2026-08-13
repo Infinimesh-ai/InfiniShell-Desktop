@@ -10,8 +10,8 @@ pub mod project_view;
 pub mod session_router;
 
 pub use notifier::{ProjectsChangedEvent, ProjectsChangedNotifier};
-pub use session_router::{ProjectHostRouterEvent, ProjectHostSessionRouter};
 pub use panel::ProjectManagerPanel;
 // Re-exports for downstream UI consumers(详情 pane / workspace 接线)。
 #[allow(unused_imports)]
 pub use panel::{ProjectManagerPanelAction, ProjectManagerPanelEvent};
+pub use session_router::{ProjectHostRouterEvent, ProjectHostSessionRouter};

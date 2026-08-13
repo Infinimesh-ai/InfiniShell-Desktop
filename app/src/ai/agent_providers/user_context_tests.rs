@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
+use ai::agent::action_result::{AnyFileContent, FileContext};
+
 use super::*;
 use crate::ai::agent::ImageContext;
 use crate::ai::block_context::BlockContext;
-use ai::agent::action_result::{AnyFileContent, FileContext};
-use std::collections::HashMap;
 
 fn block(id: &str, command: &str, output: &str, exit_code: i32, auto: bool) -> BlockContext {
     BlockContext {

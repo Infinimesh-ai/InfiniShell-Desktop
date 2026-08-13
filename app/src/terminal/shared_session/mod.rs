@@ -6,7 +6,6 @@ use warpui::{AppContext, WindowId, id};
 
 pub mod protocol;
 pub use protocol::ParticipantId;
-
 // Zap:session-sharing-protocol crate 已剥离,改用本地 protocol 模块
 use protocol::{Role, Scrollback, ScrollbackBlock, SessionSourceType};
 

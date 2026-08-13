@@ -2,25 +2,23 @@
 //! `Image` element. Mirrors the markdown `FileNotebookView`, but without the rich-text editor,
 //! workflow, or link machinery — an image emits nothing and only needs to be displayed.
 
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+use warpui::accessibility::{AccessibilityContent, WarpA11yRole};
+use warpui::assets::asset_cache::{AssetCache, AssetSource, LocalFileContentVersion};
+use warpui::elements::{Align, CacheOption, DispatchEventResult, Empty, EventHandler, Image, Text};
+use warpui::image_cache::ImageType;
 use warpui::{
-    accessibility::{AccessibilityContent, WarpA11yRole},
-    assets::asset_cache::{AssetCache, AssetSource, LocalFileContentVersion},
-    elements::{Align, CacheOption, DispatchEventResult, Empty, EventHandler, Image, Text},
-    image_cache::ImageType,
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
-use crate::{
-    appearance::Appearance,
-    code::buffer_location::RemotePath,
-    pane_group::{focus_state::PaneFocusHandle, pane::view, BackingView, PaneConfiguration, PaneEvent},
-    terminal::model::session::Session,
-};
+use crate::appearance::Appearance;
+use crate::code::buffer_location::RemotePath;
+use crate::pane_group::focus_state::PaneFocusHandle;
+use crate::pane_group::pane::view;
+use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
+use crate::terminal::model::session::Session;
 
 /// View for a read-only image backed by a file.
 pub struct ImageViewerView {

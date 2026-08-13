@@ -10,19 +10,18 @@
 
 use std::path::{Path, PathBuf};
 
-use warp_core::ui::theme::color::internal_colors;
+use warp_core::ui::Icon;
+use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::WarpTheme;
-use warp_core::ui::{appearance::Appearance, Icon};
+use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{
-    ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment,
-    MainAxisSize, ParentElement, Shrinkable,
+    Border, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Fill, Flex,
+    MainAxisAlignment, MainAxisSize, ParentElement, Shrinkable,
 };
 use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{
-    elements::{Border, Fill},
-    AppContext, Element, Entity, SingletonEntity, View,
+    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
-use warpui::{TypedActionView, ViewContext, ViewHandle};
 
 use crate::settings::AISettings;
 #[cfg(feature = "local_fs")]

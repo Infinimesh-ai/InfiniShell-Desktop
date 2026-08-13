@@ -12,7 +12,8 @@ pub mod settings;
 pub mod sharing;
 pub mod workflows;
 
-use std::{cmp::Ordering, fmt};
+use std::cmp::Ordering;
+use std::fmt;
 
 pub use index::DriveIndexVariant;
 pub use panel::{DrivePanel, DrivePanelEvent};
@@ -20,15 +21,11 @@ use serde::{Deserialize, Serialize};
 use warp_core::user_preferences::GetUserPreferences as _;
 use warpui::AppContext;
 
-use crate::{
-    cloud_object::{
-        model::view::{ObjectStoreViewModel, UpdateTimestamp},
-        GenericStringObjectFormat, ObjectIdType, ObjectType, StoredObject,
-    },
-    server::ids::{HashedSqliteId, ObjectUid, ServerId, SyncId},
-    ui_components::icons::Icon,
-    workflows::WorkflowObject,
-};
+use crate::cloud_object::model::view::{ObjectStoreViewModel, UpdateTimestamp};
+use crate::cloud_object::{GenericStringObjectFormat, ObjectIdType, ObjectType, StoredObject};
+use crate::server::ids::{HashedSqliteId, ObjectUid, ServerId, SyncId};
+use crate::ui_components::icons::Icon;
+use crate::workflows::WorkflowObject;
 
 type SortByComparator<'a> = dyn FnMut(&&dyn StoredObject, &&dyn StoredObject) -> Ordering + 'a;
 

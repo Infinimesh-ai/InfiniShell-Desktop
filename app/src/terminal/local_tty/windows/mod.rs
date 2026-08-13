@@ -21,10 +21,17 @@ use warpui::{AppContext, SingletonEntity};
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::System::Console::{COORD, HPCON};
 use windows::Win32::System::Threading::{
-    CREATE_BREAKAWAY_FROM_JOB, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
-    EXTENDED_STARTUPINFO_PRESENT, PROCESS_CREATION_FLAGS, PROCESS_INFORMATION,
+    CREATE_BREAKAWAY_FROM_JOB,
+    CREATE_UNICODE_ENVIRONMENT,
+    CreateProcessW,
+    EXTENDED_STARTUPINFO_PRESENT,
+    PROCESS_CREATION_FLAGS,
+    PROCESS_INFORMATION,
     // Zap:STARTF_USESTDHANDLES 已移除(会让 CreateProcessW 返回 0x80070057),见 #215。
-    STARTUPINFOEXW, STARTUPINFOW, TerminateProcess, WaitForSingleObject,
+    STARTUPINFOEXW,
+    STARTUPINFOW,
+    TerminateProcess,
+    WaitForSingleObject,
 };
 use windows::core::{HSTRING, PCWSTR, PWSTR};
 

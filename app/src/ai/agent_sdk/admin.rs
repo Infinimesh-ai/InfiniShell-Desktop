@@ -3,10 +3,10 @@
 use anyhow::{Context, Result};
 use serde::Serialize;
 use warp_cli::agent::OutputFormat;
-use warpui::{platform::TerminationMode, AppContext, SingletonEntity};
+use warpui::platform::TerminationMode;
+use warpui::{AppContext, SingletonEntity};
 
-use crate::auth::AuthStateProvider;
-use crate::auth::PrincipalType;
+use crate::auth::{AuthStateProvider, PrincipalType};
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 #[derive(Serialize)]

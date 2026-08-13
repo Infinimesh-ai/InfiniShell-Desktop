@@ -30,8 +30,7 @@ use crate::util::openable_file_type::{
 #[path = "open_in_warp_tests.rs"]
 mod tests;
 
-const LEARN_MORE_MARKDOWN_URL: &str =
-    "";
+const LEARN_MORE_MARKDOWN_URL: &str = "";
 const LEARN_MORE_CODE_URL: &str = "";
 
 /// A path to a file that can be opened in Zap, along with its type.

@@ -2,7 +2,6 @@
 //!
 //! 作者：logic
 
-use super::*;
 use chrono::NaiveDateTime;
 use pathfinder_geometry::vector::vec2f;
 use warp_core::ui::appearance::Appearance;
@@ -11,6 +10,7 @@ use warpui::platform::WindowStyle;
 use warpui::units::IntoPixels;
 use warpui::{App, EntityIdSet, Presenter, WindowInvalidation};
 
+use super::*;
 use crate::test_util::settings::initialize_settings_for_tests;
 
 // --- 测试辅助 --------------------------------------------------------------

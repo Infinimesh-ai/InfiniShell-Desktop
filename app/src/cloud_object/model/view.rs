@@ -1,27 +1,21 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::cell::RefCell;
+use std::collections::HashMap;
 
 use chrono::{Duration, Utc};
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
-use crate::{
-    auth::{AuthStateProvider, UserUid},
-    cloud_object::{
-        update_manager::{
-            ObjectOperation, OperationSuccessType, UpdateManager, UpdateManagerEvent,
-        },
-        Space, StoredObject, StoredObjectLocation,
-    },
-    drive::{
-        folders::FolderObject,
-        sharing::{ContentEditability, SharingAccessLevel},
-    },
-    safe_info,
-    server::ids::{ObjectUid, SyncId},
-    server_time::ServerTimestamp,
-    workspaces::user_profiles::UserProfiles,
-};
-
 use super::persistence::{ObjectStoreEvent, ObjectStoreModel};
+use crate::auth::{AuthStateProvider, UserUid};
+use crate::cloud_object::update_manager::{
+    ObjectOperation, OperationSuccessType, UpdateManager, UpdateManagerEvent,
+};
+use crate::cloud_object::{Space, StoredObject, StoredObjectLocation};
+use crate::drive::folders::FolderObject;
+use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
+use crate::safe_info;
+use crate::server::ids::{ObjectUid, SyncId};
+use crate::server_time::ServerTimestamp;
+use crate::workspaces::user_profiles::UserProfiles;
 
 pub const EDITOR_TIMEOUT_DURATION_MINUTES: i64 = 15;
 

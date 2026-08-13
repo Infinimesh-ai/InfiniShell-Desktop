@@ -889,7 +889,10 @@ impl Display for RenderableAIError {
                 }
             }
             Self::ServerOverloaded => {
-                write!(f, "InfiniShell is currently overloaded. Please try again later.")
+                write!(
+                    f,
+                    "InfiniShell is currently overloaded. Please try again later."
+                )
             }
             Self::InternalWarpError => write!(f, "Internal InfiniShell error."),
             Self::ContextWindowExceeded(message) => {

@@ -3,12 +3,11 @@
 
 use std::collections::HashMap;
 
-use crate::ai::agent::CallMCPToolResult;
-
 use super::{
-    batch_outcome, build_host_rows, capped_host_rows, format_endpoint, host_row_text,
-    parse_batch_summary, BatchOutcome, HostEndpoint, HostRow, MAX_HOST_ROWS,
+    BatchOutcome, HostEndpoint, HostRow, MAX_HOST_ROWS, batch_outcome, build_host_rows,
+    capped_host_rows, format_endpoint, host_row_text, parse_batch_summary,
 };
+use crate::ai::agent::CallMCPToolResult;
 
 fn endpoint(username: &str, host: &str, port: u16) -> HostEndpoint {
     HostEndpoint {
@@ -117,7 +116,8 @@ fn capped_host_rows_truncates_over_limit() {
 
 #[test]
 fn parse_batch_summary_reads_ok_status_and_counts() {
-    let text = r#"{"status":"ok","canary_aborted":false,"results":[{"status":"ok"},{"status":"ok"}]}"#;
+    let text =
+        r#"{"status":"ok","canary_aborted":false,"results":[{"status":"ok"},{"status":"ok"}]}"#;
     assert_eq!(
         parse_batch_summary(text),
         BatchOutcome::Success {

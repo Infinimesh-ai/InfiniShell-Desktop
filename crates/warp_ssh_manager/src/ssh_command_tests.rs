@@ -12,8 +12,9 @@
 //! author: logic
 //! date: 2026-06-01
 
-use super::*;
 use zeroize::Zeroizing;
+
+use super::*;
 
 fn server() -> SshServerInfo {
     SshServerInfo {
@@ -98,10 +99,12 @@ fn test_connection_requires_password_for_password_auth() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let result = rt.block_on(test_connection(&s, None));
     assert_eq!(result.status, ConnectionStatus::Offline);
-    assert!(result
-        .error_message
-        .unwrap()
-        .contains("Password not provided"));
+    assert!(
+        result
+            .error_message
+            .unwrap()
+            .contains("Password not provided")
+    );
 }
 
 #[test]
@@ -111,10 +114,12 @@ fn test_connection_requires_password_for_onekey_auth() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let result = rt.block_on(test_connection(&s, None));
     assert_eq!(result.status, ConnectionStatus::Offline);
-    assert!(result
-        .error_message
-        .unwrap()
-        .contains("Password not provided"));
+    assert!(
+        result
+            .error_message
+            .unwrap()
+            .contains("Password not provided")
+    );
 }
 
 #[test]
@@ -383,6 +388,7 @@ fn windows_password_auth_uses_askpass_not_stdin() {
 fn windows_askpass_script_is_spawnable() {
     use std::os::windows::process::CommandExt as _;
     use std::process::Stdio;
+
     use zeroize::Zeroizing;
 
     let password: Zeroizing<String> = Zeroizing::new("dummy-pw-for-spawn-test".into());

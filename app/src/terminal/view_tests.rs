@@ -9328,8 +9328,7 @@ fn back_button_label_resolves_token_only_parent_linkage() {
 // 不需要构造 TerminalView / ctx。skim 算法的 Unicode 处理由 fuzzy_match
 // crate 负责,这里只验证我们在 view.rs 中对它的使用是否符合预期。
 
-use super::OnekeyMenuRows;
-use super::filter_and_sort_onekey_candidates;
+use super::{OnekeyMenuRows, filter_and_sort_onekey_candidates};
 
 fn rows_indices(rows: OnekeyMenuRows) -> Vec<usize> {
     match rows {

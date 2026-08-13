@@ -1,67 +1,26 @@
 use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 use pathfinder_geometry::vector::vec2f;
 use string_offset::CharOffset;
 use warp_core::ui::theme::Fill;
 use warp_editor::editor::NavigationKey;
-use warpui::elements::Clipped;
-use warpui::FocusContext;
-use warpui::{
-    clipboard::ClipboardContent,
-    elements::{
-        Align, Border, ChildAnchor, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
-        Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
-        MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds,
-        Radius, ScrollbarWidth, Shrinkable, Stack,
-    },
-    fonts::{FamilyId, Weight},
-    platform::Cursor,
-    presenter::ChildView,
-    ui_components::{
-        button::{ButtonVariant, TextAndIcon, TextAndIconAlignment},
-        components::{Coords, UiComponent, UiComponentStyles},
-    },
-    AppContext, Element, Entity, SingletonEntity, TypedActionView, UpdateView, View, ViewContext,
-    ViewHandle,
+use warpui::clipboard::ClipboardContent;
+use warpui::elements::{
+    Align, Border, ChildAnchor, Clipped, ClippedScrollStateHandle, ClippedScrollable,
+    ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisAlignment,
+    MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
+    ParentOffsetBounds, Radius, ScrollbarWidth, Shrinkable, Stack,
 };
-
-use crate::auth::UserUid;
-use crate::{
-    appearance::Appearance,
-    cloud_object::{
-        breadcrumbs::{ContainingObject, ContainingObjectKind},
-        model::persistence::{ObjectStoreEvent, ObjectStoreModel},
-        update_manager::UpdateManager,
-        ObjectType, Owner, Revision, StoredObject, StoredObjectEventEntrypoint,
-    },
-    drive::{
-        cloud_object_styling::warp_drive_icon_color, items::WarpDriveItemId, DriveObjectType,
-        ObjectTypeAndId,
-    },
-    editor::{
-        EditorOptions, EditorView, EnterAction, EnterSettings, Event as EditorEvent,
-        InteractionState, PlainTextEditorViewAction as EditorAction,
-        PropagateAndNoOpNavigationKeys, TextOptions, TextStyleOperation,
-    },
-    menu::{Event, Menu, MenuItem, MenuItemFields},
-    network::NetworkStatus,
-    server::ids::{ClientId, ServerId, SyncId},
-    themes::theme::AnsiColorIdentifier,
-    ui_components::{
-        blended_colors,
-        breadcrumb::{self, BreadcrumbState},
-        buttons::icon_button,
-        dialog::{dialog_styles, Dialog},
-        icons::{self, Icon, ICON_DIMENSIONS},
-        menu_button::{icon_button_with_context_menu, MenuDirection},
-    },
-    workflows::{
-        workflow::{Argument, Workflow},
-        WorkflowObject,
-    },
+use warpui::fonts::{FamilyId, Weight};
+use warpui::platform::Cursor;
+use warpui::presenter::ChildView;
+use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use warpui::{
+    AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, UpdateView, View,
+    ViewContext, ViewHandle,
 };
 
 use super::arguments::ArgumentsState;
@@ -70,6 +29,32 @@ use super::workflow_arg_selector::{
     WorkflowArgSelector, WorkflowArgSelectorEvent, WorkflowArgSelectorStyles,
 };
 use super::workflow_arg_type_helpers::{self, ArgumentEditorRowIndex};
+use crate::appearance::Appearance;
+use crate::auth::UserUid;
+use crate::cloud_object::breadcrumbs::{ContainingObject, ContainingObjectKind};
+use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
+use crate::cloud_object::update_manager::UpdateManager;
+use crate::cloud_object::{ObjectType, Owner, Revision, StoredObject, StoredObjectEventEntrypoint};
+use crate::drive::cloud_object_styling::warp_drive_icon_color;
+use crate::drive::items::WarpDriveItemId;
+use crate::drive::{DriveObjectType, ObjectTypeAndId};
+use crate::editor::{
+    EditorOptions, EditorView, EnterAction, EnterSettings, Event as EditorEvent, InteractionState,
+    PlainTextEditorViewAction as EditorAction, PropagateAndNoOpNavigationKeys, TextOptions,
+    TextStyleOperation,
+};
+use crate::menu::{Event, Menu, MenuItem, MenuItemFields};
+use crate::network::NetworkStatus;
+use crate::server::ids::{ClientId, ServerId, SyncId};
+use crate::themes::theme::AnsiColorIdentifier;
+use crate::ui_components::blended_colors;
+use crate::ui_components::breadcrumb::{self, BreadcrumbState};
+use crate::ui_components::buttons::icon_button;
+use crate::ui_components::dialog::{Dialog, dialog_styles};
+use crate::ui_components::icons::{self, ICON_DIMENSIONS, Icon};
+use crate::ui_components::menu_button::{MenuDirection, icon_button_with_context_menu};
+use crate::workflows::WorkflowObject;
+use crate::workflows::workflow::{Argument, Workflow};
 
 const BREADCRUMBS_VERTICAL_MARGIN: f32 = 6.;
 const MODAL_WIDTH: f32 = 900.;
@@ -96,8 +81,7 @@ const DIALOG_WIDTH: f32 = 460.;
 const AI_ASSIST_BUTTON_SIZE: f32 = 96.;
 const SCROLLBAR_WIDTH: ScrollbarWidth = ScrollbarWidth::Auto;
 
-const COMMAND_EDITOR_PLACEHOLDER_TEXT: &str =
-    "echo \"Hello {{your_name}}\" # insert arguments with curly braces\n# enter a single-line command or an entire shell script";
+const COMMAND_EDITOR_PLACEHOLDER_TEXT: &str = "echo \"Hello {{your_name}}\" # insert arguments with curly braces\n# enter a single-line command or an entire shell script";
 const DEFAULT_ARGUMENT_PREFIX: &str = "argument";
 
 #[derive(Default)]
@@ -732,7 +716,12 @@ impl WorkflowModal {
         match (self.workflow_id, self.owner) {
             (Some(workflow_id), None) => {
                 UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
-                    update_manager.update_workflow(workflow, workflow_id, self.revision_ts.clone(), ctx);
+                    update_manager.update_workflow(
+                        workflow,
+                        workflow_id,
+                        self.revision_ts.clone(),
+                        ctx,
+                    );
                 });
                 ctx.emit(WorkflowModalEvent::UpdatedWorkflow(workflow_id));
             }
@@ -749,7 +738,9 @@ impl WorkflowModal {
                     );
                 });
             }
-            _ => log::error!("Only one of a workflow ID or space can be specified for saving workflows, but both or neither were specified instead")
+            _ => log::error!(
+                "Only one of a workflow ID or space can be specified for saving workflows, but both or neither were specified instead"
+            ),
         }
 
         self.close(true, ctx);

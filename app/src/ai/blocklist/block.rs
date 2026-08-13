@@ -93,10 +93,11 @@ use crate::ai::agent::{
     AIAgentAction, AIAgentActionId, AIAgentActionResultType, AIAgentActionType, AIAgentAttachment,
     AIAgentCitation, AIAgentContext, AIAgentInput, AIAgentOutput, AIAgentOutputMessage,
     AIAgentOutputMessageType, AIAgentTextSection, AIIdentifiers, CancellationReason,
-    CreateDocumentsRequest, CreateDocumentsResult, DocumentToCreate, EditDocumentsResult, MessageId,
-    PassiveSuggestionTrigger, ProgrammingLanguage, RenderableAIError, RequestCommandOutputResult,
-    RequestFileEditsResult, ServerOutputId, SubagentCall, SubagentType, SuggestPromptRequest,
-    SuggestPromptResult, SuggestedLoggingId, SummarizationType, TodoOperation,
+    CreateDocumentsRequest, CreateDocumentsResult, DocumentToCreate, EditDocumentsResult,
+    MessageId, PassiveSuggestionTrigger, ProgrammingLanguage, RenderableAIError,
+    RequestCommandOutputResult, RequestFileEditsResult, ServerOutputId, SubagentCall, SubagentType,
+    SuggestPromptRequest, SuggestPromptResult, SuggestedLoggingId, SummarizationType,
+    TodoOperation,
 };
 use crate::ai::agent_conversations_model::{AgentConversationsModel, AgentConversationsModelEvent};
 use crate::ai::ambient_agents::AmbientAgentTaskId;

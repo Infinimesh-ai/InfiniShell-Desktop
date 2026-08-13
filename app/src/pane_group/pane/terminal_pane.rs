@@ -51,9 +51,9 @@ use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::general_settings::GeneralSettings;
 #[cfg(not(target_family = "wasm"))]
 use crate::terminal::shared_session::SharedSessionSource;
+use crate::terminal::shared_session::SharedSessionStatus;
 #[cfg(not(target_family = "wasm"))]
 use crate::terminal::shared_session::protocol::SessionSourceType;
-use crate::terminal::shared_session::SharedSessionStatus;
 use crate::terminal::view::Event;
 use crate::terminal::{TerminalManager, TerminalView};
 use crate::view_components::ToastFlavor;

@@ -742,7 +742,7 @@ fn fast_path_still_valid_when_nothing_changed() {
 #[cfg(feature = "local_fs")]
 #[test]
 fn fast_path_invalidated_when_rule_file_mtime_changes() {
-    use filetime::{set_file_mtime, FileTime};
+    use filetime::{FileTime, set_file_mtime};
 
     let tmp = tempfile::tempdir().unwrap();
     let cwd = tmp.path().canonicalize().unwrap();
@@ -762,7 +762,7 @@ fn fast_path_invalidated_when_rule_file_mtime_changes() {
 #[cfg(feature = "local_fs")]
 #[test]
 fn fast_path_invalidated_when_new_rule_file_appears_in_walked_dir() {
-    use filetime::{set_file_mtime, FileTime};
+    use filetime::{FileTime, set_file_mtime};
 
     let tmp = tempfile::tempdir().unwrap();
     let cwd = tmp.path().canonicalize().unwrap();

@@ -1,20 +1,15 @@
+use anyhow::Result;
 use chrono::{OutOfRangeError, Utc};
 use futures::stream::AbortHandle;
 use warp_core::user_preferences::GetUserPreferences as _;
 use warpui::{AppContext, Entity, ModelContext};
 
-use crate::{
-    ai::{RequestLimitInfo, RequestUsageInfo},
-    ai_assistant::utils::{AssistantTranscriptPart, TranscriptPartSubType},
-    send_telemetry_from_ctx,
-    server::telemetry::{TelemetryEvent, WarpAIRequestResult},
-};
-
-use super::{
-    execution_context::WarpAiExecutionContext,
-    utils::{markdown_segments_from_text, FormattedTranscriptMessage, TranscriptPart},
-};
-use anyhow::Result;
+use super::execution_context::WarpAiExecutionContext;
+use super::utils::{FormattedTranscriptMessage, TranscriptPart, markdown_segments_from_text};
+use crate::ai::{RequestLimitInfo, RequestUsageInfo};
+use crate::ai_assistant::utils::{AssistantTranscriptPart, TranscriptPartSubType};
+use crate::send_telemetry_from_ctx;
+use crate::server::telemetry::{TelemetryEvent, WarpAIRequestResult};
 
 /// The key for the corresponding entry in UserDefaults.
 /// Not wiring through Settings for now since this data is only needed by the panel view.

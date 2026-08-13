@@ -13,8 +13,7 @@
 
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
-use crate::auth::AuthStateProvider;
-use crate::auth::AuthManager;
+use crate::auth::{AuthManager, AuthStateProvider};
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// Plain, dependency-free snapshot of the current user and organization as

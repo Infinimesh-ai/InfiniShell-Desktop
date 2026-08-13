@@ -5,7 +5,8 @@
 use ai::diff_validation::DiffMatchFailures;
 use serde::Serialize;
 
-use crate::ai::{agent::AIIdentifiers, blocklist::RequestedEditResolution};
+use crate::ai::agent::AIIdentifiers;
+use crate::ai::blocklist::RequestedEditResolution;
 
 /// Telemetry events associated with the `RequestFileEdits` AI agent action.
 #[derive(Serialize, Debug)]

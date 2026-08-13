@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+use crate::cloud_object::model::generic_string_model::{
+    GenericStringModel, GenericStringObjectId, StringModel,
+};
+use crate::cloud_object::model::json_model::{JsonModel, JsonSerializer};
 use crate::cloud_object::{
-    model::{
-        generic_string_model::{GenericStringModel, GenericStringObjectId, StringModel},
-        json_model::{JsonModel, JsonSerializer},
-    },
     GenericStoredObject, GenericStringObjectFormat, GenericStringObjectUniqueKey, JsonObjectType,
 };
 

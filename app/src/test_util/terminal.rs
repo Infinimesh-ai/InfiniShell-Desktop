@@ -1,10 +1,11 @@
+use std::sync::Arc;
+
 #[cfg(feature = "local_fs")]
 use ai::skills::SKILL_PROVIDER_DEFINITIONS;
 #[cfg(feature = "local_fs")]
 use repo_metadata::RepoMetadataModel;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
-use std::sync::Arc;
 use warp_core::ui::appearance::Appearance;
 use warpui::platform::WindowStyle;
 use warpui::{App, ViewHandle, WindowId};
@@ -32,8 +33,7 @@ use crate::ai::pricing_promotion::PricingPromotionState;
 use crate::ai::restored_conversations::RestoredAgentConversations;
 use crate::ai::skills::SkillManager;
 use crate::ai::{AIRequestUsageModel, AgentTip};
-use crate::auth::AuthManager;
-use crate::auth::AuthStateProvider;
+use crate::auth::{AuthManager, AuthStateProvider};
 use crate::changelog_model::ChangelogModel;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::cloud_object::update_manager::UpdateManager;

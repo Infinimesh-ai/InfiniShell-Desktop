@@ -9,6 +9,7 @@ use warpui::r#async::Timer;
 use warpui::windowing::WindowManager;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, TypedActionView};
 
+use crate::GlobalResourceHandlesProvider;
 use crate::ai::agent::AIAgentExchangeId;
 use crate::ai::agent::conversation::AIConversationId;
 use crate::app_state::get_app_state;
@@ -20,7 +21,6 @@ use crate::terminal::general_settings::GeneralSettings;
 use crate::undo_close::UndoCloseStack;
 use crate::workspace::cross_window_tab_drag::CrossWindowTabDrag;
 use crate::workspace::{Workspace, WorkspaceAction};
-use crate::GlobalResourceHandlesProvider;
 
 /// Specifies where a forked conversation should be opened.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

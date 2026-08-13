@@ -15,6 +15,7 @@ use std::collections::{HashMap, HashSet};
 
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
+use warp_ssh_manager::{NodeKind, SshRepository, SshServerInfo};
 use warpui::elements::{
     Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Element, Empty, Fill as ElementFill, Flex, Hoverable, MainAxisSize,
@@ -24,8 +25,6 @@ use warpui::platform::Cursor;
 use warpui::text_layout::ClipConfig;
 use warpui::ui_components::components::UiComponent;
 use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
-
-use warp_ssh_manager::{NodeKind, SshRepository, SshServerInfo};
 use zap_projects::{Project, ProjectRepository};
 
 use crate::project_manager::{ProjectsChangedEvent, ProjectsChangedNotifier};

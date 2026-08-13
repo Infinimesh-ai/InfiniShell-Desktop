@@ -2,10 +2,9 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::Icon;
 use warp_core::ui::theme::color::internal_colors;
-use warp_core::{HostId, SessionId};
+use warp_core::{HostId, SessionId, send_telemetry_from_ctx};
 use warp_errors::report_error;
 use warp_util::path::LineAndColumnArg;
 use warpui::elements::{
@@ -40,11 +39,11 @@ use crate::pane_group::working_directories::WorkingDirectory;
 use crate::pane_group::{
     PaneGroup, WorkingDirectoriesEvent, WorkingDirectoriesModel, {self},
 };
+use crate::project_manager::{ProjectManagerPanel, ProjectManagerPanelEvent};
 #[cfg(feature = "local_fs")]
 use crate::server::telemetry::CodePanelsFileOpenEntrypoint;
 use crate::server::telemetry::{FileTreeSource, WarpDriveSource};
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
-use crate::project_manager::{ProjectManagerPanel, ProjectManagerPanelEvent};
 use crate::skill_manager::{SkillManagerPanel, SkillManagerPanelEvent};
 use crate::ssh_manager::SshManagerPanel;
 use crate::terminal::model::session::Session;
@@ -66,16 +65,14 @@ use crate::workspace::view::conversation_list::view::{
 use crate::workspace::view::global_search::view::{
     Event as GlobalSearchViewEvent, GlobalSearchEntryFocus, GlobalSearchView,
 };
-use crate::workspace::view::server_file_browser::{
-    ServerFileBrowserEvent, ServerFileBrowserView,
-};
+use crate::workspace::view::server_file_browser::{ServerFileBrowserEvent, ServerFileBrowserView};
 use crate::workspace::view::{
     LEFT_PANEL_AGENT_CONVERSATIONS_BINDING_NAME, LEFT_PANEL_GLOBAL_SEARCH_BINDING_NAME,
     LEFT_PANEL_PROJECT_EXPLORER_BINDING_NAME, LEFT_PANEL_PROJECTS_BINDING_NAME,
     LEFT_PANEL_SKILL_MANAGER_BINDING_NAME, LEFT_PANEL_SSH_MANAGER_BINDING_NAME,
-    LEFT_PANEL_WARP_DRIVE_BINDING_NAME,
-    OPEN_GLOBAL_SEARCH_BINDING_NAME, TOGGLE_CONVERSATION_LIST_VIEW_BINDING_NAME,
-    TOGGLE_PROJECT_EXPLORER_BINDING_NAME, TOGGLE_WARP_DRIVE_BINDING_NAME,
+    LEFT_PANEL_WARP_DRIVE_BINDING_NAME, OPEN_GLOBAL_SEARCH_BINDING_NAME,
+    TOGGLE_CONVERSATION_LIST_VIEW_BINDING_NAME, TOGGLE_PROJECT_EXPLORER_BINDING_NAME,
+    TOGGLE_WARP_DRIVE_BINDING_NAME,
 };
 
 #[derive(Default)]

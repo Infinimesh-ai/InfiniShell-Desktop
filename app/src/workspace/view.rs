@@ -11,7 +11,6 @@ pub(crate) mod launch_modal;
 pub(crate) mod left_panel;
 pub(crate) mod onboarding;
 pub(crate) mod orchestration_launch_modal;
-pub(crate) mod zap_launch_modal;
 pub(crate) mod right_panel;
 pub(crate) mod server_file_browser;
 mod startup_directory;
@@ -22,6 +21,7 @@ pub(crate) mod tests;
 mod vertical_tabs;
 #[cfg(target_family = "wasm")]
 mod wasm_view;
+pub(crate) mod zap_launch_modal;
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -161,7 +161,6 @@ use crate::ai::agent_conversations_model::AgentConversationsModelEvent;
 use crate::ai::agent_conversations_model::{
     AgentConversationNavigationSubject, AgentConversationsModel,
 };
-use crate::ai::conversation_navigation::ConversationNavigationData;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::agent_view::agent_input_footer::editor::AgentToolbarEditorMode;
@@ -181,6 +180,7 @@ use crate::ai::blocklist::{
 };
 #[cfg(target_family = "wasm")]
 use crate::ai::conversation_details_panel::ConversationDetailsPanel;
+use crate::ai::conversation_navigation::ConversationNavigationData;
 use crate::ai::conversation_utils;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentModel};
 use crate::ai::execution_profiles::ExecutionProfileId;
@@ -199,13 +199,11 @@ use crate::app_state::{
     TabSnapshot, TerminalPaneSnapshot, WindowSnapshot, WorkflowPaneSnapshot,
 };
 use crate::appearance::{Appearance, AppearanceManager};
-use crate::auth::AuthState;
-use crate::auth::AuthStateProvider;
-use crate::auth::{AuthManager, AuthManagerEvent};
 use crate::auth::{
-    AuthOverrideWarningModal, AuthOverrideWarningModalEvent, AuthOverrideWarningModalVariant,
+    AuthManager, AuthManagerEvent, AuthOverrideWarningModal, AuthOverrideWarningModalEvent,
+    AuthOverrideWarningModalVariant, AuthState, AuthStateProvider, AuthView, AuthViewEvent,
+    AuthViewVariant,
 };
-use crate::auth::{AuthView, AuthViewEvent, AuthViewVariant};
 use crate::autoupdate::{
     AutoupdateState, AutoupdateStateEvent, RelaunchModel, is_incoming_version_past_current,
 };
@@ -271,9 +269,9 @@ use crate::pane_group::FilePane;
 use crate::pane_group::pane::ActionOrigin;
 use crate::pane_group::{
     self, AIFactPane, AnyPaneContent, ChildAgentOrigin, CodeDiffPane, CodePane, CodeReviewPanelArg,
-    CustomRouterEditorPane, Direction as PaneGroupDirection, Direction,
-    ExecutionProfileEditorPane, ImagePane, NewTerminalOptions, PaneGroup, PaneId, PanesLayout,
-    TabBarHoverIndex, TerminalPaneId,
+    CustomRouterEditorPane, Direction as PaneGroupDirection, Direction, ExecutionProfileEditorPane,
+    ImagePane, NewTerminalOptions, PaneGroup, PaneId, PanesLayout, TabBarHoverIndex,
+    TerminalPaneId,
 };
 use crate::persistence::ModelEvent;
 use crate::projects::ProjectManagementModel;
@@ -305,17 +303,18 @@ use crate::server::ids::{ObjectUid, SyncId};
 use crate::server::telemetry::{
     AddTabWithShellSource, CloseTarget, EnvVarTelemetryMetadata, FileTreeSource,
     KnowledgePaneEntrypoint, LaunchConfigUiLocation, MCPServerCollectionPaneEntrypoint,
-    NotificationsTurnedOnSource, OpenedWarpAISource, PaletteSource, TabRenameEvent, WarpDriveSource,
+    NotificationsTurnedOnSource, OpenedWarpAISource, PaletteSource, TabRenameEvent,
+    WarpDriveSource,
 };
 use crate::server_time::ServerTime;
 use crate::session_management::{SessionNavigationData, SessionSource, TabNavigationData};
 use crate::settings::cloud_preferences::PreferencesSettings;
 use crate::settings::{
     AISettings, AISettingsChangedEvent, AccessibilitySettings, AliasExpansionSettings,
-    AppEditorSettings, BlockVisibilitySettings, CodeSettings,
-    CodeSettingsChangedEvent, CtrlTabBehavior, CursorBlink, DebugSettings, DefaultSessionMode,
-    FontSettings, GPUSettings, InputModeSettings, InputSettings, MonospaceFontSize, PaneSettings,
-    PrivacySettings, SelectionSettings, Settings, SshSettings, ThemeSettings, active_theme_kind,
+    AppEditorSettings, BlockVisibilitySettings, CodeSettings, CodeSettingsChangedEvent,
+    CtrlTabBehavior, CursorBlink, DebugSettings, DefaultSessionMode, FontSettings, GPUSettings,
+    InputModeSettings, InputSettings, MonospaceFontSize, PaneSettings, PrivacySettings,
+    SelectionSettings, Settings, SshSettings, ThemeSettings, active_theme_kind,
     respect_system_theme,
 };
 use crate::settings_view::handoff_environment_creation_modal::{
@@ -346,7 +345,6 @@ use crate::tab_configs::telemetry::{NewWorktreeConfigOpenSource, WorktreeBranchN
 use crate::tab_configs::{
     NewWorktreeModal, NewWorktreeModalEvent, TabConfigParamsModal, TabConfigParamsModalEvent,
 };
-use crate::terminal::CLIAgent;
 use crate::terminal::alt_screen_reporting::AltScreenReporting;
 use crate::terminal::available_shells::AvailableShell;
 #[cfg(target_os = "windows")]
@@ -392,7 +390,7 @@ use crate::terminal::view::{
     SyncInputType, TerminalAction,
 };
 use crate::terminal::warpify::settings::WarpifySettings;
-use crate::terminal::{self, BlockListSettings, SizeInfo, TerminalModel, TerminalView};
+use crate::terminal::{self, BlockListSettings, CLIAgent, SizeInfo, TerminalModel, TerminalView};
 use crate::themes::theme::{AnsiColorIdentifier, RespectSystemTheme, ThemeKind};
 use crate::themes::theme_chooser::{ThemeChooser, ThemeChooserEvent, ThemeChooserMode};
 use crate::themes::theme_creator_modal::{ThemeCreatorModal, ThemeCreatorModalEvent};
@@ -1520,11 +1518,7 @@ impl Workspace {
                     id_to_force_expand = Some(workflow.id);
                 }
                 if let Some(id) = id_to_force_expand {
-                    self.open_workflow_with_existing(
-                        id,
-                        &ZapDriveObjectSettings::default(),
-                        ctx,
-                    );
+                    self.open_workflow_with_existing(id, &ZapDriveObjectSettings::default(), ctx);
                     ObjectStoreModel::handle(ctx).update(ctx, |object_store_model, ctx| {
                         object_store_model.force_expand_object_and_ancestors(id, ctx);
                     });
@@ -6297,9 +6291,12 @@ impl Workspace {
 
         // Zap M4:注册 node_id → 终端视图,供项目批量执行路由器
         // (`run_command_on_hosts`)复用已打开的 SSH tab。
-        crate::project_manager::ProjectHostSessionRouter::handle(ctx).update(ctx, |router, _ctx| {
-            router.register_session(node_id, terminal_view.downgrade());
-        });
+        crate::project_manager::ProjectHostSessionRouter::handle(ctx).update(
+            ctx,
+            |router, _ctx| {
+                router.register_session(node_id, terminal_view.downgrade());
+            },
+        );
 
         Some(terminal_view)
     }
@@ -6590,6 +6587,7 @@ impl Workspace {
     #[cfg(not(target_family = "wasm"))]
     fn collect_log_bundle_extras(ctx: &AppContext) -> warp_logging::LogBundleExtras {
         use std::path::{Path, PathBuf};
+
         use warp_core::channel::ChannelState;
         use warp_core::execution_mode::AppExecutionMode;
         use warp_logging::{ExtraFile, InlineFile, LogBundleExtras};
@@ -7050,9 +7048,7 @@ impl Workspace {
                     open_in_active_window: false,
                 },
             ),
-            NewSessionMenuItem::OpenLaunchConfigDocs => {
-                ctx.open_url("")
-            }
+            NewSessionMenuItem::OpenLaunchConfigDocs => ctx.open_url(""),
             #[cfg(feature = "local_fs")]
             NewSessionMenuItem::CreateNewTabConfig => {
                 self.create_and_open_new_tab_config(ctx);
@@ -9003,7 +8999,6 @@ impl Workspace {
                 .add_pane_with_direction(direction, pane, true /* focus_new_pane */, ctx);
         });
     }
-
 
     pub(super) fn active_session_view(
         &self,
@@ -12353,9 +12348,7 @@ impl Workspace {
     }
 
     pub fn open_autoupdate_failure_link(&mut self, ctx: &mut ViewContext<Self>) {
-        ctx.open_url(
-            "",
-        );
+        ctx.open_url("");
     }
 
     pub fn add_terminal_tab(&mut self, hide_homepage: bool, ctx: &mut ViewContext<Self>) {
@@ -14061,9 +14054,9 @@ impl Workspace {
                         // Show a helpful toast if the user denied permissions.
                         let url = NOTIFICATIONS_TROUBLESHOOT_URL.to_string();
                         view.toast_stack.update(ctx, |toast_stack, ctx| {
-                            let toast = DismissibleToast::error(
-                                crate::t!("workspace-notification-permission-denied-toast"),
-                            )
+                            let toast = DismissibleToast::error(crate::t!(
+                                "workspace-notification-permission-denied-toast"
+                            ))
                             .with_link(
                                 ToastLink::new(crate::t!(
                                     "workspace-troubleshoot-notifications-link"
@@ -14948,11 +14941,7 @@ impl Workspace {
                 self.open_workflow_with_command(command.clone(), ctx)
             }
             pane_group::Event::OpenCloudWorkflowForEdit(workflow_id) => self
-                .open_workflow_with_existing(
-                    *workflow_id,
-                    &ZapDriveObjectSettings::default(),
-                    ctx,
-                ),
+                .open_workflow_with_existing(*workflow_id, &ZapDriveObjectSettings::default(), ctx),
             pane_group::Event::OpenWorkflowModalWithTemporary(workflow) => {
                 self.open_workflow_with_temporary(*workflow.clone(), ctx)
             }
@@ -15992,9 +15981,8 @@ impl Workspace {
                         code_review_view.expand_comment_list(ctx);
                     });
                 }
-            }
-            // Zap:云端 agent 容量弹窗随云端 agent 链路一并移除,`pane_group::Event`
-            // 没有 `ShowCloudAgentCapacityModal` variant。
+            } // Zap:云端 agent 容量弹窗随云端 agent 链路一并移除,`pane_group::Event`
+              // 没有 `ShowCloudAgentCapacityModal` variant。
         }
     }
 
@@ -16424,12 +16412,7 @@ impl Workspace {
                 );
             }
             DrivePanelEvent::OpenSearch => {
-                self.open_palette_action(
-                    PaletteMode::ZapDrive,
-                    PaletteSource::ZapDrive,
-                    None,
-                    ctx,
-                );
+                self.open_palette_action(PaletteMode::ZapDrive, PaletteSource::ZapDrive, None, ctx);
             }
             DrivePanelEvent::OpenNotebook(source) => {
                 self.open_notebook(source, &ZapDriveObjectSettings::default(), ctx, true)
@@ -16437,12 +16420,9 @@ impl Workspace {
             DrivePanelEvent::OpenEnvVarCollection(source) => {
                 self.open_env_var_collection(source, false, ctx)
             }
-            DrivePanelEvent::OpenWorkflowInPane(source, mode) => self.open_workflow_in_pane(
-                source,
-                &ZapDriveObjectSettings::default(),
-                *mode,
-                ctx,
-            ),
+            DrivePanelEvent::OpenWorkflowInPane(source, mode) => {
+                self.open_workflow_in_pane(source, &ZapDriveObjectSettings::default(), *mode, ctx)
+            }
             DrivePanelEvent::OpenAIFactCollection => {
                 self.open_ai_fact_collection_pane(None, None, ctx);
                 send_telemetry_from_ctx!(
@@ -16497,9 +16477,8 @@ impl Workspace {
         {
             let window_id = ctx.window_id();
             WorkspaceToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                let toast = DismissibleToast::default(crate::t!(
-                    "workspace-toast-plan-already-in-context"
-                ));
+                let toast =
+                    DismissibleToast::default(crate::t!("workspace-toast-plan-already-in-context"));
                 toast_stack.add_ephemeral_toast(toast, window_id, ctx);
             });
             return;
@@ -18398,7 +18377,8 @@ impl Workspace {
         let body = appearance
             .ui_builder()
             .wrappable_text(
-                "Ask InfiniShell AI to explain errors, suggest commands or write scripts.".to_owned(),
+                "Ask InfiniShell AI to explain errors, suggest commands or write scripts."
+                    .to_owned(),
                 true,
             )
             .with_style(UiComponentStyles {
@@ -19833,33 +19813,24 @@ impl Workspace {
             let icon = agent.icon().unwrap_or(icons::Icon::LayoutAlt01);
             let theme = appearance.theme();
             let icon_color = theme.sub_text_color(theme.background());
-            let button = icon_button_with_color(
-                appearance,
-                icon,
-                false,
-                handle.clone(),
-                icon_color,
-            )
-            .with_hovered_styles(UiComponentStyles {
-                font_color: Some(icon_color.into()),
-                background: Some(theme.surface_2().into()),
-                ..UiComponentStyles::default()
-            })
-            .with_clicked_styles(UiComponentStyles {
-                font_color: Some(icon_color.into()),
-                background: Some(theme.background().into()),
-                ..UiComponentStyles::default()
-            })
-            // 图标缩小到 14×14：padding 从 4 增大到 5.0，按钮外框 24×24 不变
-            .with_style(UiComponentStyles::default()
-                .set_padding(Coords::uniform(5.0))
-            );
+            let button =
+                icon_button_with_color(appearance, icon, false, handle.clone(), icon_color)
+                    .with_hovered_styles(UiComponentStyles {
+                        font_color: Some(icon_color.into()),
+                        background: Some(theme.surface_2().into()),
+                        ..UiComponentStyles::default()
+                    })
+                    .with_clicked_styles(UiComponentStyles {
+                        font_color: Some(icon_color.into()),
+                        background: Some(theme.background().into()),
+                        ..UiComponentStyles::default()
+                    })
+                    // 图标缩小到 14×14：padding 从 4 增大到 5.0，按钮外框 24×24 不变
+                    .with_style(UiComponentStyles::default().set_padding(Coords::uniform(5.0)));
 
             let agent_name = agent.display_name().to_string();
             let button = button
-                .with_tooltip(
-                    self.render_tab_bar_icon_button_tooltip(appearance, agent_name, None),
-                )
+                .with_tooltip(self.render_tab_bar_icon_button_tooltip(appearance, agent_name, None))
                 .build()
                 .on_click(move |ctx, _, _| {
                     ctx.dispatch_typed_action(WorkspaceAction::AddSpecificAgentTab(agent));
@@ -22264,7 +22235,8 @@ impl Workspace {
         if FeatureFlag::ZapProjects.is_enabled() {
             views.push(ToolPanelView::Projects);
         }
-        if FeatureFlag::ServerFileBrowser.is_enabled() && FeatureFlag::SshRemoteServer.is_enabled() {
+        if FeatureFlag::ServerFileBrowser.is_enabled() && FeatureFlag::SshRemoteServer.is_enabled()
+        {
             views.push(ToolPanelView::ServerFileBrowser);
         }
         // openWarp 独有:Skill 管理器,无 feature flag,local_fs 构建下默认显示。
@@ -23947,7 +23919,9 @@ impl TypedActionView for Workspace {
                         .did_check_to_trigger_zap_launch_modal
                         .set_value(false, ctx)
                     {
-                        log::warn!("Failed to reset InfiniShell launch modal dismissed setting: {e}");
+                        log::warn!(
+                            "Failed to reset InfiniShell launch modal dismissed setting: {e}"
+                        );
                     }
                 });
                 let new_value = *GeneralSettings::as_ref(ctx)
@@ -24417,9 +24391,8 @@ impl TypedActionView for Workspace {
             }
             SyncTrafficLights => {
                 self.sync_window_button_visibility(ctx);
-            }
-            // Zap:`OpenNewWindowForTeam` / `ShowTeamSwitcherMenu`(team/账号功能)
-            // 未引入 `WorkspaceAction`,对应分支一并移除。
+            } // Zap:`OpenNewWindowForTeam` / `ShowTeamSwitcherMenu`(team/账号功能)
+              // 未引入 `WorkspaceAction`,对应分支一并移除。
         };
         if action.should_save_app_state_on_action() {
             ctx.dispatch_global_action("workspace:save_app", ());

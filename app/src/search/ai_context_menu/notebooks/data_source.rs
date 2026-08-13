@@ -2,8 +2,8 @@ use fuzzy_match::FuzzyMatchResult;
 use warpui::{AppContext, SingletonEntity};
 
 use super::search_item::NotebookSearchItem;
-use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::cloud_object::StoredObjectModel;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::notebooks::manager::{NotebookManager, NotebookSource};
 use crate::search::ai_context_menu::mixer::AIContextMenuSearchableAction;
 use crate::search::data_source::{Query, QueryResult};

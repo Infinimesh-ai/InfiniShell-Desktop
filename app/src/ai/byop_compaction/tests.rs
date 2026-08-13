@@ -2,15 +2,16 @@
 //!
 //! Phase 3 (state + message_view) 落地后再补 e2e 集成测试。
 
-use super::algorithm::{prune_decisions, select, turns, MessageRef, Role, ToolOutputRef};
+use warp_multi_agent_api as api;
+
+use super::algorithm::{MessageRef, Role, ToolOutputRef, prune_decisions, select, turns};
 use super::commit::commit_summarization;
 use super::config::CompactionConfig;
 use super::consts::*;
-use super::overflow::{is_overflow, usable, ModelLimit, TokenCounts};
-use super::prompt::{build_continue_message, build_prompt, SUMMARY_TEMPLATE};
+use super::overflow::{ModelLimit, TokenCounts, is_overflow, usable};
+use super::prompt::{SUMMARY_TEMPLATE, build_continue_message, build_prompt};
 use super::token::estimate;
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
-use warp_multi_agent_api as api;
 
 // -- token ---------------------------------------------------------------
 

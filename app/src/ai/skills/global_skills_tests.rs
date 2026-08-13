@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use ai::skills::{ParsedSkill, SkillProvider, SkillScope, get_provider_for_path};
+// Zap:`crate::ai::cloud_environments` 未挂载,与生产代码一致直接取数据模型里的 `GithubRepo`。
+use cloud_object_models::cloud_environment::GithubRepo;
 use warp_cli::skill::SkillSpec;
 use warp_util::host_id::HostId;
 use warp_util::local_or_remote_path::LocalOrRemotePath;
@@ -9,8 +11,6 @@ use warp_util::remote_path::RemotePath;
 use warp_util::standardized_path::StandardizedPath;
 
 use super::{filter_skills_by_spec, resolve_skill_repos};
-// Zap:`crate::ai::cloud_environments` 未挂载,与生产代码一致直接取数据模型里的 `GithubRepo`。
-use cloud_object_models::cloud_environment::GithubRepo;
 
 #[test]
 fn resolve_skill_repos_returns_empty_for_empty_input() {

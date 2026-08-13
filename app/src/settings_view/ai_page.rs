@@ -1,5 +1,3 @@
-use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
-use crate::terminal::cli_agent::{CLIAgentInstallEvent, CLIAgentInstallModel};
 use ::ai::api_keys::{ApiKeyManager, ApiKeyManagerEvent, ApiKeys, CustomEndpointParams};
 #[cfg(not(target_family = "wasm"))]
 use ::ai::grok_subscription::oauth::{self, ManualCodeExchange};
@@ -75,6 +73,7 @@ use crate::ai::llms::{
 use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::ai::paths::host_native_absolute_path;
 use crate::cloud_object::GenericStringObjectFormat::Json;
+use crate::cloud_object::model::persistence::{ObjectStoreEvent, ObjectStoreModel};
 use crate::cloud_object::{JsonObjectType, ObjectType};
 use crate::editor::{EditorOptions, InteractionState, SingleLineEditorOptions, TextColors};
 use crate::modal::{Modal, ModalEvent, ModalViewState};
@@ -93,6 +92,7 @@ use crate::settings::{
     WarpDriveContextEnabled,
 };
 use crate::terminal::CLIAgent;
+use crate::terminal::cli_agent::{CLIAgentInstallEvent, CLIAgentInstallModel};
 use crate::terminal::session_settings::{SessionSettings, SessionSettingsChangedEvent};
 use crate::view_components::action_button::{
     ActionButton, ButtonSize, DangerSecondaryTheme, SecondaryTheme,
@@ -2928,7 +2928,9 @@ impl AISettingsPageView {
             Some(AISubpage::ThirdPartyCLIAgents) => Some("Third party CLI agents"),
             // Zap:BYOP 提供商子页由 `AgentProvidersWidget` 自己渲染 sub-header 标题,
             // 与 Warp Agent / Profiles 一样不需要页面级标题。
-            None | Some(AISubpage::WarpAgent) | Some(AISubpage::Profiles)
+            None
+            | Some(AISubpage::WarpAgent)
+            | Some(AISubpage::Profiles)
             | Some(AISubpage::Providers) => None,
         };
         PageType::new_uncategorized(widgets, title)

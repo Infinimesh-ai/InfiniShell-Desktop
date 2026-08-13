@@ -36,15 +36,13 @@ mod cache_stability_tests;
 // 其余符号(`OpenAiCompatibleError`/`OpenAiCompatibleModel`/`AgentProviderSecretsEvent`)
 // 仍可通过 `crate::ai::agent_providers::openai_compatible::*` 等完整路径访问,
 // 这里不再 re-export 以避免 `unused_imports` 告警。
-pub use openai_compatible::fetch_openai_compatible_models;
-pub use secrets::AgentProviderSecrets;
-
 // ---------------------------------------------------------------------------
 // LLMInfo 合成:把 settings 中配置的 agent_providers 转成 picker 可用的形态
 // ---------------------------------------------------------------------------
-
 use std::collections::HashMap;
 
+pub use openai_compatible::fetch_openai_compatible_models;
+pub use secrets::AgentProviderSecrets;
 use settings::Setting;
 use warpui::{AppContext, SingletonEntity};
 
