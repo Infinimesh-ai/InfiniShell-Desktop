@@ -82,6 +82,13 @@ cargo run            # 构建并运行 InfiniShell
 ./script/presubmit   # fmt、clippy 与测试
 ```
 
+### 配置 AI 提供商
+
+在 **设置 → AI → 提供商** 中可以连接 OpenAI 兼容服务,以及 Anthropic、Gemini、
+DeepSeek 和 Ollama 原生接口。使用 `/v1/responses` 的用户请参见
+[BYOP Responses API 配置指南](docs/ai-provider-responses.zh-CN.md),了解状态、
+WebSocket、上下文压缩、GPT-5.6 推理能力和常见兼容错误。
+
 ### 从 Warp 或 OpenWarp 迁移?
 
 参见 [docs/migrate-from-warp.zh-CN.md](docs/migrate-from-warp.zh-CN.md)。

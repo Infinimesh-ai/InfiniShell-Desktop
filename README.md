@@ -96,6 +96,15 @@ Before sending a change:
 ./script/presubmit   # fmt, clippy, and tests
 ```
 
+### Configure an AI provider
+
+Open **Settings → AI → Providers** to connect an OpenAI-compatible service or
+the native Anthropic, Gemini, DeepSeek, and Ollama APIs. If the provider uses
+`/v1/responses`, see the
+[BYOP Responses API configuration guide](docs/ai-provider-responses.md) for
+state, WebSocket, compaction, GPT-5.6 reasoning, and common compatibility
+errors.
+
 ### Coming from Warp or OpenWarp?
 
 See [docs/migrate-from-warp.md](docs/migrate-from-warp.md) to bring your
