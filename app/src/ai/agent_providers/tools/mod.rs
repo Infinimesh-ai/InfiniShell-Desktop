@@ -33,11 +33,16 @@ pub mod project_hosts;
 pub mod search;
 pub mod shell;
 pub mod skill;
+pub mod strict_schema;
 pub mod suggest;
 pub mod todowrite;
 pub mod web_runtime;
 pub mod webfetch;
 pub mod websearch;
+
+#[cfg(test)]
+#[path = "strict_schema_tests.rs"]
+mod strict_schema_tests;
 
 use anyhow::Result;
 use serde_json::Value;

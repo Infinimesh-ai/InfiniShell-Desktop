@@ -2787,9 +2787,14 @@ fn build_tools_array(
             } else {
                 t.description.to_owned()
             };
+            let schema = if strict_functions {
+                tools::strict_schema::normalize((t.parameters)())
+            } else {
+                (t.parameters)()
+            };
             let mut tool = GenaiTool::new(t.name)
                 .with_description(description)
-                .with_schema((t.parameters)());
+                .with_schema(schema);
             if strict_functions {
                 tool = tool.with_strict(true);
             }
@@ -4561,8 +4566,12 @@ pub async fn generate_byop_output(
         }
         unordered_tool_calls.sort_by(|a, b| a.call_id.cmp(&b.call_id));
         ordered_tool_calls.extend(unordered_tool_calls);
-        for call in ordered_tool_calls {
+        for mut call in ordered_tool_calls {
             log::info!("[byop] 收到结构化 tool call");
+
+            if api_type == AgentProviderApiType::OpenAiResp {
+                normalize_responses_tool_call_arguments(&mut call);
+            }
 
             // Zap BYOP todowrite 拦截:不映射到 protobuf executor,合成
             // `Message::UpdateTodos` 直接写 conversation.todo_lists 触发 chip + popup
@@ -5288,6 +5297,24 @@ fn parse_incoming_tool_call(
             log::warn!("[byop] tool 参数解析失败");
             Err(e)
         }
+    }
+}
+
+fn normalize_responses_tool_call_arguments(call: &mut ToolCall) {
+    let Some(tool) = tools::lookup(&call.fn_name) else {
+        return;
+    };
+    let args = if call.fn_arguments.is_string() {
+        call.fn_arguments.as_str().unwrap_or("").to_owned()
+    } else {
+        call.fn_arguments.to_string()
+    };
+    let schema = (tool.parameters)();
+    let Some(args) = tools::strict_schema::omit_optional_nulls(&args, &schema) else {
+        return;
+    };
+    if let Ok(arguments) = serde_json::from_str(&args) {
+        call.fn_arguments = arguments;
     }
 }
 

@@ -89,3 +89,51 @@ fn gpt56高级能力识别别名变体和快照() {
         assert!(!is_gpt56_model(model), "{model} 不应识别为 GPT-5.6 系列");
     }
 }
+
+#[test]
+fn responses出站工具使用规范化后的strict_schema() {
+    let params = RequestParams::new_for_test(Vec::new(), Vec::new());
+    let tools = build_tools_array(&params, false, true);
+    let shell = tools
+        .iter()
+        .find(|tool| tool.name == "run_shell_command".into())
+        .expect("应包含 run_shell_command");
+
+    assert_eq!(shell.strict, Some(true));
+    let schema = shell.schema.as_ref().expect("strict tool 应包含 schema");
+    assert_eq!(
+        schema["required"],
+        json!([
+            "command",
+            "is_read_only",
+            "is_risky",
+            "uses_pager",
+            "wait_until_complete"
+        ])
+    );
+    assert_eq!(
+        schema["properties"]["is_read_only"]["type"],
+        json!(["boolean", "null"])
+    );
+}
+
+#[test]
+fn responses工具调用在本地解析前删除可选null() {
+    let mut call = ToolCall {
+        call_id: "call_1".to_owned(),
+        fn_name: "run_shell_command".to_owned(),
+        fn_arguments: json!({
+            "command": "pwd",
+            "is_read_only": null,
+            "uses_pager": null,
+            "is_risky": null,
+            "wait_until_complete": null
+        }),
+        thought_signatures: None,
+    };
+
+    normalize_responses_tool_call_arguments(&mut call);
+
+    assert_eq!(call.fn_arguments, json!({"command": "pwd"}));
+    parse_incoming_tool_call(&call, None).expect("恢复缺省参数后应能转换为内部工具调用");
+}
