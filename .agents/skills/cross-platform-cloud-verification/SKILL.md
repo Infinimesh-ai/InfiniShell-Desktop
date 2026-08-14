@@ -114,7 +114,8 @@ Use `passed` only when every selected relevant platform passed. Use `failed` for
 
 ## Security and cost guardrails
 
-- Fork PRs must never execute on these persistent self-hosted runners.
+- The self-hosted workflow must not listen to `pull_request`; fork approval is not a security
+  boundary for persistent runners.
 - Do not add secrets or write permissions to the preflight workflow.
 - Do not modify source, commit, or push from a verification job.
 - Prefer focused checks; run the full workspace suite only when its additional coverage is warranted.

@@ -25,8 +25,8 @@ self-hosted runner 会直接执行仓库代码，因此两台服务器必须是�
 - 使用独立低权限系统账号，不保存个人 SSH key、云凭据或生产密钥。
 - 不挂载开发机目录，不与生产服务共享 Docker socket 或管理员会话。
 - workflow 的 `GITHUB_TOKEN` 只授予 `contents: read`，checkout 不保留凭据。
-- PR 自动触发只接受同仓库分支，并且必须由维护者添加 `self-hosted-ci` label；fork PR
-  不会进入自托管 runner。
+- self-hosted workflow 不监听 `pull_request`；外部 Fork 即使获得 Actions 审批也不会进入
+  这两台 runner。
 - 建议用 VM 快照定期重置。长期复用机器时，应监控剩余磁盘并及时更新 runner 程序。
 - 初始安装依赖可能需要管理员权限；runner 服务账号日常不应拥有免密 root/管理员权限。
 
@@ -137,8 +137,8 @@ gh workflow run cross-platform-preflight.yml \
 gh run list --workflow cross-platform-preflight.yml --limit 5
 ```
 
-内部 PR 需要维护者添加 `self-hosted-ci` label 才会自动运行。Fork PR 永远不会运行。
-每次 PR 更新会取消同一 PR 正在运行的旧任务并验证最新提交。
+组织成员通过 `ci/**` 分支或手动运行触发验证。Fork PR 永远不会进入 self-hosted runner；
+需要验证外部贡献时，应先完成代码审查，再由维护者把明确的提交放入受控分支。
 
 ## 6. 日常维护
 
