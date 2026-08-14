@@ -25,6 +25,16 @@ fn parses_top_level_error_event() {
 }
 
 #[test]
+fn parses_content_part_added_event() {
+	let event: RespStreamEvent = serde_json::from_str(
+		r#"{"type":"response.content_part.added","output_index":0,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}"#,
+	)
+	.unwrap();
+
+	assert!(matches!(event, RespStreamEvent::ContentPartAdded { .. }));
+}
+
+#[test]
 fn incomplete_response_is_a_terminal_error_with_recovery_metadata() {
 	let mut response = response_with_status("incomplete");
 	response.incomplete_details = Some(serde_json::json!({ "reason": "max_output_tokens" }));

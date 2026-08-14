@@ -37,9 +37,11 @@ enum RespStreamEvent {
 
 	#[serde(rename = "response.content_part.added")]
 	ContentPartAdded {
+		#[serde(rename = "output_index")]
 		_output_index: usize,
+		#[serde(rename = "content_index")]
 		_content_index: usize,
-		#[serde(default)]
+		#[serde(rename = "part", default)]
 		_part: Value,
 	},
 
