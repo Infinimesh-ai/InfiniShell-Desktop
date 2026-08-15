@@ -2,7 +2,6 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use warp_core::channel::ChannelState;
-use warp_core::telemetry::testing::MockTelemetryContextProvider;
 use warpui::{App, SingletonEntity};
 
 use super::telemetry::TuiOnboardingTelemetry;
@@ -115,8 +114,6 @@ fn explicit_start_device_login_preserves_pending_logout_on_retry() {
         app.add_singleton_model(|_| AuthStateProvider::new_for_test());
         app.add_singleton_model(AuthManager::new_for_test);
         app.add_singleton_model(|_| TuiLoginModel::signed_out_for_test());
-        app.update(MockTelemetryContextProvider::register);
-
         let phase_changed_events = Rc::new(Cell::new(0));
         let phase_changed_events_for_subscription = phase_changed_events.clone();
         app.update(|ctx| {
@@ -415,8 +412,6 @@ fn emits_logged_in_event_when_login_completes() {
 fn emits_logged_out_event_and_resets_login_details() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| login_model(TuiLoginPhase::LoggedIn));
-        app.update(MockTelemetryContextProvider::register);
-
         let logged_out_events = Rc::new(Cell::new(0));
         let logged_out_events_for_subscription = logged_out_events.clone();
         app.update(|ctx| {

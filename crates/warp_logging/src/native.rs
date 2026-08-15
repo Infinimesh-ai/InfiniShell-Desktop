@@ -543,12 +543,13 @@ fn sanitize_zip_entry_name(name: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
-/// 实际把日志 + extras 写入指定 zip 输出路径的核心实现。
+/// 实际把指定日志状态 + extras 写入指定 zip 输出路径的核心实现。
 /// 公开的 `create_log_bundle_zip` 与 `write_log_bundle_zip_to` 都委托到这里。
-fn write_log_bundle_zip_inner(zip_path: &Path, extras: &LogBundleExtras) -> Result<()> {
-    let state = LOG_STATE
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Logging not initialized"))?;
+fn write_log_bundle_zip_inner(
+    zip_path: &Path,
+    extras: &LogBundleExtras,
+    state: &LogState,
+) -> Result<()> {
     let log_files = collect_log_paths_in(&state.log_directory, &state.logfile_name)?;
 
     let zip_file = File::create(zip_path)?;
@@ -626,8 +627,10 @@ fn write_log_bundle_zip_inner(zip_path: &Path, extras: &LogBundleExtras) -> Resu
 /// 任何不存在或无法读取的额外文件都会被跳过并通过 `log::warn!` 记录,
 /// 不会让整个导出失败。
 pub fn create_log_bundle_zip(extras: LogBundleExtras) -> Result<PathBuf> {
-    let log_directory = log_directory()?;
-    let zip_path = log_directory.join(default_log_bundle_filename());
+    let state = LOG_STATE
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Logging not initialized"))?;
+    let zip_path = state.log_directory.join(default_log_bundle_filename());
     if zip_path.exists() {
         let error_message = format!(
             "New log zip path conflicts with an existing zip: {}",
@@ -635,7 +638,7 @@ pub fn create_log_bundle_zip(extras: LogBundleExtras) -> Result<PathBuf> {
         );
         return Err(anyhow::anyhow!("{error_message}"));
     }
-    write_log_bundle_zip_inner(&zip_path, &extras)?;
+    write_log_bundle_zip_inner(&zip_path, &extras, state)?;
     Ok(zip_path)
 }
 
@@ -648,7 +651,10 @@ pub fn write_log_bundle_zip_to(
     output_path: impl AsRef<Path>,
     extras: LogBundleExtras,
 ) -> Result<()> {
-    write_log_bundle_zip_inner(output_path.as_ref(), &extras)
+    let state = LOG_STATE
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Logging not initialized"))?;
+    write_log_bundle_zip_inner(output_path.as_ref(), &extras, state)
 }
 
 fn temp_log_file_path(log_directory: impl AsRef<Path>, channel_logfile_name: &str) -> PathBuf {

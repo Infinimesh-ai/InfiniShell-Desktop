@@ -152,6 +152,11 @@ fn every_host_scoped_request_has_a_response_disposition() {
             M::SaveBuffer(_) => "host_response::save_buffer_result",
             M::DeleteFile(_) => "host_response::delete_file_result",
             M::DiscardFiles(_) => "host_response::discard_files_result",
+            M::ListDirectory(_) => "client::list_directory",
+            M::ResolvePath(_) => "client::resolve_path",
+            M::CreateDirectory(_) => "client::create_directory",
+            M::ReadFileChunk(_) => "client::read_file_chunk",
+            M::WriteFileChunk(_) => "client::write_file_chunk",
             // Richer responses parsed at the manager call site.
             M::ReadFileContext(_) => "manager::read_file_context",
             M::GetFragmentMetadataFromHash(_) => "manager::get_fragment_metadata_from_hash",

@@ -348,7 +348,6 @@ fn test_block(
     request: &RunAgentsRequest,
 ) -> (ViewHandle<TuiOrchestrationBlock>, Rc<TestController>) {
     app.add_singleton_model(|_| Appearance::mock());
-    app.update(warp_core::telemetry::testing::MockTelemetryContextProvider::register);
     let action = AIAgentAction {
         id: AIAgentActionId::from("run-agents-1".to_string()),
         task_id: TaskId::new("task-1".to_string()),

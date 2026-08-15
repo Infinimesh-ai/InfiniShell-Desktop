@@ -64,7 +64,8 @@ fn tui_bundle_uses_resolved_state_and_ignores_legacy_oz_logs() {
     let legacy = tmp.path().join("oz");
     fs::create_dir(&legacy).unwrap();
     touch(&legacy, "warp_preview.log");
-    let zip_path = state.create_log_bundle_zip().unwrap();
+    let zip_path = state.log_directory.join("warp_preview-test.zip");
+    write_log_bundle_zip_inner(&zip_path, &LogBundleExtras::default(), &state).unwrap();
 
     assert_eq!(zip_path.parent(), Some(state.log_directory.as_path()));
     assert_eq!(

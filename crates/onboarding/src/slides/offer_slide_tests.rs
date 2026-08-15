@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use ai::LLMId;
-use warp_core::telemetry::testing::MockTelemetryContextProvider;
 use warp_core::ui::appearance::Appearance;
 use warpui_core::elements::Empty;
 use warpui_core::platform::WindowStyle;
@@ -227,7 +226,6 @@ fn subscribe_copy_drops_the_add_on_line_when_no_packs_are_shown() {
 fn subscribe_selects_the_plan_without_launching_upgrade() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
@@ -274,7 +272,6 @@ fn subscribe_selects_the_plan_without_launching_upgrade() {
 fn exactly_one_option_is_selected_at_a_time() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
@@ -337,7 +334,6 @@ fn exactly_one_option_is_selected_at_a_time() {
 fn changing_selection_after_checkout_clears_the_pending_state() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
@@ -380,7 +376,6 @@ fn changing_selection_after_checkout_clears_the_pending_state() {
 fn changing_denomination_after_checkout_allows_a_new_link() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
@@ -438,7 +433,6 @@ fn only_the_free_standard_offer_supports_credit_packs() {
 fn buy_credits_is_hidden_until_packs_are_available_and_on_the_head_start_offer() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
@@ -501,7 +495,6 @@ fn buy_credits_is_hidden_until_packs_are_available_and_on_the_head_start_offer()
 fn arrow_keys_move_through_all_three_options() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
@@ -539,7 +532,6 @@ fn arrow_keys_move_through_all_three_options() {
 fn get_warping_buys_credits_when_the_credit_option_is_selected() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
@@ -595,7 +587,6 @@ fn get_warping_buys_credits_when_the_credit_option_is_selected() {
 fn set_up_later_still_works_while_checkout_is_pending() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
@@ -638,7 +629,6 @@ fn set_up_later_still_works_while_checkout_is_pending() {
 fn packs_only_render_as_selected_while_the_credit_option_is_chosen() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
@@ -700,7 +690,6 @@ fn packs_only_render_as_selected_while_the_credit_option_is_chosen() {
 fn more_packs_than_the_render_cap_are_truncated() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
@@ -735,7 +724,6 @@ fn control_and_unassigned_arms_hide_credit_packs() {
     ] {
         App::test((), move |mut app| async move {
             app.add_singleton_model(|_| Appearance::mock());
-            app.update(MockTelemetryContextProvider::register);
             let onboarding_state = add_onboarding_state(&mut app);
             let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
                 let onboarding_state = onboarding_state.clone();
@@ -790,7 +778,6 @@ fn control_and_unassigned_arms_hide_credit_packs() {
 fn experiment_arm_with_packs_offers_buy_credits() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
@@ -828,7 +815,6 @@ fn experiment_arm_with_packs_offers_buy_credits() {
 fn experiment_arm_without_packs_falls_back_to_two_options() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|_| Appearance::mock());
-        app.update(MockTelemetryContextProvider::register);
         let onboarding_state = add_onboarding_state(&mut app);
         let (_, slide) = app.add_window(WindowStyle::NotStealFocus, {
             let onboarding_state = onboarding_state.clone();
