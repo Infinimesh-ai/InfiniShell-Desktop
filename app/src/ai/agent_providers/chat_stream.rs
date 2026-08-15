@@ -57,6 +57,7 @@ use instant::Instant;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
+use warp_core::features::FeatureFlag;
 use warp_multi_agent_api as api;
 
 // ---------------------------------------------------------------------------
@@ -84,7 +85,6 @@ use crate::ai::byop_readiness::{
     classify_projection,
 };
 use crate::settings::AgentProviderApiType;
-use warp_core::features::FeatureFlag;
 
 #[cfg(not(target_family = "wasm"))]
 type ProviderChatEventStream = Pin<

@@ -1,11 +1,11 @@
-use futures::{SinkExt, StreamExt};
-use serde_json::Value;
-use websocket::{Message, WebSocket, WebsocketMessage};
-
 #[cfg(not(target_family = "wasm"))]
 use std::collections::HashMap;
 #[cfg(not(target_family = "wasm"))]
 use std::sync::LazyLock;
+
+use futures::{SinkExt, StreamExt};
+use serde_json::Value;
+use websocket::{Message, WebSocket, WebsocketMessage};
 
 use super::{
     ResponseCreateRequest, ResponseItem, ResponseStreamEvent, ResponsesClient, ResponsesClientError,
