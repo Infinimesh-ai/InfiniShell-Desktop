@@ -3,9 +3,10 @@ pkgver=@@PKGVER@@
 pkgrel=@@RELEASE@@
 pkgdesc="InfiniShell, a community fork of the Rust-based Warp terminal"
 arch=('@@ARCH@@')
-url="https://github.com/zerx-lab/warp"
+url="https://github.com/Infinimesh-ai/InfiniShell-Desktop"
 license=('custom')
 depends=(
+	'alsa-lib'
 	'curl'
 	'default-cursors'
 	'fontconfig'
