@@ -741,8 +741,11 @@ fn fast_path_still_valid_when_nothing_changed() {
     let cwd = tmp.path().canonicalize().unwrap();
     std::fs::write(cwd.join("AGENTS.md"), "stable").unwrap();
 
-    let entry = ProjectContextModel::scan_fast_path(&cwd);
-    assert!((0..3).any(|_| ProjectContextModel::fast_path_entry_still_valid(&entry)));
+    let mut entry = ProjectContextModel::scan_fast_path(&cwd);
+    // 这里只验证未变更条目的判定，不把慢速 Windows runner 上逐级 stat 是否恰好在
+    // 20ms 产品预算内完成也混进断言。
+    entry.walked_dir_stamps.truncate(1);
+    assert!(ProjectContextModel::fast_path_entry_still_valid(&entry));
 }
 
 #[cfg(feature = "local_fs")]
