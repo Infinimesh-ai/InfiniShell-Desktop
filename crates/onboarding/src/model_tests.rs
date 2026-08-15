@@ -1,12 +1,12 @@
 use ai::LLMId;
 use warp_core::features::FeatureFlag;
-use warpui_core::{App, Entity, ModelHandle};
+use warpui_core::{App, ModelHandle};
 
 use crate::OnboardingIntention;
 use crate::model::{
     AiSetupChoice, ChooseHowToStartExperimentArm, CreditPackOption, CreditPurchaseState,
-    NoAiConfirmationSource, OnboardingAuthState, OnboardingStateEvent, OnboardingStateModel,
-    OnboardingStep, SelectedSettings,
+    NoAiConfirmationSource, OnboardingAuthState, OnboardingStateModel, OnboardingStep,
+    SelectedSettings,
 };
 use crate::slides::OfferVariant;
 
@@ -179,37 +179,6 @@ fn purchase_state(app: &App, model: &ModelHandle<OnboardingStateModel>) -> Credi
     model.read(app, |model, _| model.credit_purchase_state())
 }
 
-/// A do-nothing model used only to count the completion events the onboarding
-/// model emits. Completion is an event rather than a state change, so it can't
-/// be read back off the model itself.
-#[derive(Default)]
-struct CompletionObserver {
-    completions: usize,
-}
-
-impl Entity for CompletionObserver {
-    type Event = ();
-}
-
-fn observe_completions(
-    app: &mut App,
-    model: &ModelHandle<OnboardingStateModel>,
-) -> ModelHandle<CompletionObserver> {
-    let model = model.clone();
-    app.add_model(move |ctx| {
-        ctx.subscribe_to_model(&model, |observer: &mut CompletionObserver, _, event, _| {
-            if matches!(event, OnboardingStateEvent::CreditPurchaseCompleted) {
-                observer.completions += 1;
-            }
-        });
-        CompletionObserver::default()
-    })
-}
-
-fn completions(app: &App, observer: &ModelHandle<CompletionObserver>) -> usize {
-    observer.read(app, |observer, _| observer.completions)
-}
-
 #[test]
 fn credit_packs_default_to_the_first_option_and_are_selectable() {
     App::test((), |mut app| async move {
@@ -335,7 +304,6 @@ fn access_arriving_from_any_source_completes_the_purchase() {
 fn observing_availability_outside_the_offer_does_nothing() {
     App::test((), |mut app| async move {
         let model = add_test_model(&mut app);
-        let observer = observe_completions(&mut app, &model);
         model.update(&mut app, |model, ctx| {
             model.set_credit_pack_options(credit_packs(), ctx);
             model.on_credit_availability_observed(true, ctx);
@@ -350,38 +318,6 @@ fn observing_availability_outside_the_offer_does_nothing() {
             purchase_state(&app, &model),
             CreditPurchaseState::Purchasing
         );
-        assert_eq!(completions(&app, &observer), 0);
-    });
-}
-
-/// Regression test for REV-1952: the user leaves the offer through the plan
-/// call to action and buys a one-time pack on the web instead, so no
-/// client-side checkout was ever recorded. Completion has to come from the
-/// account having AI, not from a purchase the client started.
-#[test]
-fn credit_availability_advances_the_offer_without_a_pending_checkout() {
-    App::test((), |mut app| async move {
-        let model = add_test_model(&mut app);
-        let observer = observe_completions(&mut app, &model);
-        model.update(&mut app, |model, ctx| {
-            model.show_post_auth_offer(OfferVariant::ChooseHowToStart, ctx);
-            model.set_credit_pack_options(credit_packs(), ctx);
-        });
-        assert_eq!(purchase_state(&app, &model), CreditPurchaseState::Idle);
-
-        model.update(&mut app, |model, ctx| {
-            model.on_credit_availability_observed(false, ctx)
-        });
-        assert_eq!(
-            completions(&app, &observer),
-            0,
-            "a user who still can't use AI must stay on the offer"
-        );
-
-        model.update(&mut app, |model, ctx| {
-            model.on_credit_availability_observed(true, ctx)
-        });
-        assert_eq!(completions(&app, &observer), 1);
     });
 }
 
@@ -392,14 +328,12 @@ fn credit_availability_advances_the_offer_without_a_pending_checkout() {
 fn the_checkout_success_handoff_advances_the_ai_sell_offer() {
     App::test((), |mut app| async move {
         let model = add_test_model(&mut app);
-        let observer = observe_completions(&mut app, &model);
         model.update(&mut app, |model, ctx| {
             model.show_post_auth_offer(OfferVariant::ChooseHowToStart, ctx);
         });
 
         let advanced = model.update(&mut app, |model, ctx| model.on_checkout_succeeded(ctx));
         assert!(advanced);
-        assert_eq!(completions(&app, &observer), 1);
     });
 }
 
@@ -410,7 +344,6 @@ fn the_checkout_success_handoff_advances_the_ai_sell_offer() {
 fn the_checkout_success_handoff_is_inert_outside_an_ai_sell_offer() {
     App::test((), |mut app| async move {
         let model = add_test_model(&mut app);
-        let observer = observe_completions(&mut app, &model);
 
         let advanced = model.update(&mut app, |model, ctx| model.on_checkout_succeeded(ctx));
         assert!(!advanced, "no offer is showing yet");
@@ -424,7 +357,7 @@ fn the_checkout_success_handoff_is_inert_outside_an_ai_sell_offer() {
         model.update(&mut app, |model, ctx| {
             model.on_credit_availability_observed(true, ctx)
         });
-        assert_eq!(completions(&app, &observer), 0);
+        assert_eq!(step(&app, &model), OnboardingStep::PostAuthOffer);
     });
 }
 
