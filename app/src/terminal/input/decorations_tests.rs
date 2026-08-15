@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use warp_completer::completer::SuggestionTypeName;
 use warpui::App;
 use warpui::text_layout::TextStyle;
@@ -25,24 +27,14 @@ fn test_decorations_with_multibyte_chars() {
             .to_ansi_color(&terminal_colors_normal)
             .into();
 
-        let session_info = SessionInfo::new_for_test();
+        let session_info =
+            SessionInfo::new_for_test().with_builtins(HashSet::from(["echo".into()]));
         let session_id = session_info.session_id;
 
         let terminal =
             add_window_with_bootstrapped_terminal(&mut app, None, Some(session_info)).await;
         let input = terminal.read(&app, |view, _| view.input().clone());
         let editor = input.read(&app, |input, _| input.editor.clone());
-
-        let session_id = terminal.update(&mut app, |terminal_view, ctx| {
-            terminal_view
-                .sessions_model()
-                .update(ctx, |sessions, _ctx| {
-                    // Wait until external commands have been loaded.
-                    let session = sessions.get(session_id).expect("session should exist");
-                    warpui::r#async::block_on(session.load_external_commands());
-                });
-            session_id
-        });
 
         simulate_directory_for_completion(session_id, &terminal, &mut app, "/usr/bin");
 

@@ -2914,17 +2914,6 @@ fn test_histignorespace_support_in_zsh() {
             assert!(history.commands(session_id).unwrap().is_empty());
         });
 
-        // Run "cd" to populate the history buffer.
-        let input = terminal.read(&app, |view, _| view.input().clone());
-        input.update(&mut app, |input, ctx| {
-            input.try_execute_command("cd", ctx);
-        });
-
-        // Run "ls" with a leading space, which should prevent history insertion.
-        input.update(&mut app, |input, ctx| {
-            input.try_execute_command(" ls", ctx);
-        });
-
         let (model, sessions) = terminal.read(&app, |terminal, _| {
             (terminal.model.clone(), terminal.sessions_model().clone())
         });

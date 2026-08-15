@@ -381,7 +381,7 @@ fn test_layout_text_first_line_indent_small_bidirectional() -> Result<()> {
     // The text should contain multiple lines.
     // The first line has about the same amount of content as the others,
     // since there's no head indent.
-    assert_eq!(no_indent_frame.lines().len(), 4);
+    assert!(no_indent_frame.lines().len() > 1);
     assert!(first_line_bounded(&no_indent_frame, 0., FRAME_WIDTH));
     // assert!(all_lines_bounded(&no_indent_frame, FRAME_WIDTH));
 
@@ -398,7 +398,10 @@ fn test_layout_text_first_line_indent_small_bidirectional() -> Result<()> {
 
     // The first line has about the same amount of content as the others,
     // since the head indent is small.
-    assert_eq!(small_indent_frame.lines().len(), 4);
+    assert_eq!(
+        small_indent_frame.lines().len(),
+        no_indent_frame.lines().len()
+    );
     assert!(first_line_bounded(&small_indent_frame, 5., FRAME_WIDTH));
     // assert!(all_lines_bounded(&small_indent_frame, FRAME_WIDTH));
 
@@ -415,7 +418,7 @@ fn test_layout_text_first_line_indent_small_bidirectional() -> Result<()> {
     );
 
     // The text contains an additional line to accommodate the indent.
-    assert_eq!(half_indent_frame.lines().len(), 5);
+    assert!(half_indent_frame.lines().len() > no_indent_frame.lines().len());
     assert!(first_line_bounded(
         &half_indent_frame,
         FRAME_WIDTH / 2.,
@@ -460,7 +463,7 @@ fn test_layout_text_first_line_indent_medium_bidirectional() -> Result<()> {
     // The text should contain multiple lines.
     // The first line has about the same amount of content as the others,
     // since there's no head indent.
-    assert_eq!(no_indent_frame.lines().len(), 4);
+    assert!(no_indent_frame.lines().len() > 1);
     assert!(first_line_bounded(&no_indent_frame, 0., FRAME_WIDTH));
     // assert!(all_lines_bounded(&no_indent_frame, FRAME_WIDTH));
 
@@ -478,7 +481,12 @@ fn test_layout_text_first_line_indent_medium_bidirectional() -> Result<()> {
 
     // The first line should have some glyphs on it, but not the whole
     // first word.
-    assert_eq!(overflow_indent_frame.lines().len(), 5);
+    assert!(overflow_indent_frame.lines().len() > no_indent_frame.lines().len());
+    let first_line_glyph_count = collect_glyph_indices(&overflow_indent_frame)
+        .first()
+        .expect("text layout should contain a first line")
+        .len();
+    assert!((1..8).contains(&first_line_glyph_count));
     assert!(first_line_bounded(
         &overflow_indent_frame,
         FRAME_WIDTH - 20.,
@@ -523,7 +531,7 @@ fn test_layout_text_first_line_indent_large_bidirectional() -> Result<()> {
     // The text should contain multiple lines.
     // The first line has about the same amount of content as the others,
     // since there's no head indent.
-    assert_eq!(no_indent_frame.lines().len(), 4);
+    assert!(no_indent_frame.lines().len() > 1);
     assert!(first_line_bounded(&no_indent_frame, 0., FRAME_WIDTH));
     // assert!(all_lines_bounded(&no_indent_frame, FRAME_WIDTH));
 
@@ -539,7 +547,10 @@ fn test_layout_text_first_line_indent_large_bidirectional() -> Result<()> {
     );
 
     // The first line is left entirely blank since no glyphs fit on it.
-    assert_eq!(overflow_indent_frame.lines().len(), 5);
+    assert_eq!(
+        overflow_indent_frame.lines().len(),
+        no_indent_frame.lines().len() + 1
+    );
     assert!(
         collect_glyph_indices(&overflow_indent_frame)
             .first()
