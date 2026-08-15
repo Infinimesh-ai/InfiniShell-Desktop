@@ -473,10 +473,17 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             )
             .with_group(bindings::BindingGroup::WarpAi),
             ToggleSettingActionPair::custom(
-                SettingActionPairDescriptions::new(
-                    "Allow auto-approve to bypass command denylist",
-                    "Require approval for denylisted commands in auto-approve",
-                ),
+                if FeatureFlag::AgentApprovalModes.is_enabled() {
+                    SettingActionPairDescriptions::new(
+                        "Allow Full Access to bypass command denylist",
+                        "Require approval for denylisted commands in Full Access",
+                    )
+                } else {
+                    SettingActionPairDescriptions::new(
+                        "Allow auto-approve to bypass command denylist",
+                        "Require approval for denylisted commands in auto-approve",
+                    )
+                },
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleAutoApproveBypassesCommandDenylist,
                 )),
@@ -7081,7 +7088,7 @@ impl SettingsWidget for AIInputWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "oz agent ai input natural language detection autodetection prompt terminal command commands history shell executed execution queue interrupt submission submit auto-queue response while responding default long-running long running lrc auto-approve fast forward denylist permissions"
+        "oz agent ai input natural language detection autodetection prompt terminal command commands history shell executed execution queue interrupt submission submit auto-queue response while responding default long-running long running lrc auto-approve fast forward full access denylist permissions"
     }
 
     fn render(
@@ -7162,22 +7169,33 @@ impl SettingsWidget for AIInputWidget {
             app,
         ));
 
+        let (denylist_bypass_label, denylist_bypass_description) =
+            if FeatureFlag::AgentApprovalModes.is_enabled() {
+                (
+                    crate::t!("settings-ai-full-access-bypass-command-denylist"),
+                    crate::t!("settings-ai-full-access-bypass-command-denylist-description"),
+                )
+            } else {
+                (
+                    crate::t!("settings-ai-auto-approve-bypass-command-denylist"),
+                    crate::t!("settings-ai-auto-approve-bypass-command-denylist-description"),
+                )
+            };
         widget_children.push(
             Flex::column()
-                .with_child(render_ai_setting_toggle::<
-                    AutoApproveBypassesCommandDenylist,
-                >(
-                    "Allow auto-approve to bypass command denylist",
-                    AISettingsPageAction::ToggleAutoApproveBypassesCommandDenylist,
-                    *ai_settings.auto_approve_bypasses_command_denylist,
-                    is_any_ai_enabled,
-                    self.auto_approve_bypasses_command_denylist_toggle
-                        .clone(),
-                    &view.local_only_icon_tooltip_states,
-                    app,
-                ))
+                .with_child(
+                    render_ai_setting_toggle::<AutoApproveBypassesCommandDenylist>(
+                        denylist_bypass_label,
+                        AISettingsPageAction::ToggleAutoApproveBypassesCommandDenylist,
+                        *ai_settings.auto_approve_bypasses_command_denylist,
+                        is_any_ai_enabled,
+                        self.auto_approve_bypasses_command_denylist_toggle.clone(),
+                        &view.local_only_icon_tooltip_states,
+                        app,
+                    ),
+                )
                 .with_child(render_ai_setting_description(
-                    "When enabled, fast forward and auto-approve run denylisted commands without asking for confirmation.",
+                    denylist_bypass_description,
                     is_any_ai_enabled,
                     app,
                 ))

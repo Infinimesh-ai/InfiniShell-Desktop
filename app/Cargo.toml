@@ -512,6 +512,7 @@ default = [
     "file_retrieval_tools",
     "mcp_server",
     "fast_forward_autoexecute_button",
+    "agent_approval_modes",
     "image_as_context",
     "command_palette_file_search",
     "ai_context_menu",
@@ -809,6 +810,7 @@ ai_context_menu = []
 at_menu_outside_of_ai_mode = []
 agent_decides_command_execution = []
 fast_forward_autoexecute_button = []
+agent_approval_modes = []
 code_find_replace = []
 command_palette_file_search = []
 conversation_filter = []

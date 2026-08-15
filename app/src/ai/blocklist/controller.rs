@@ -1901,22 +1901,28 @@ impl BlocklistAIController {
         &self,
         ctx: &'a mut ModelContext<Self>,
     ) -> &'a AIConversation {
-        let is_autoexecute_override = self
+        let autoexecute_mode = self
             .context_model
             .as_ref(ctx)
-            .pending_query_autoexecute_override(ctx)
-            .is_autoexecute_any_action();
+            .pending_query_autoexecute_override(ctx);
         let history_model = BlocklistAIHistoryModel::handle(ctx);
         let id = history_model.update(ctx, |history_model, ctx| {
             // We don't mark passive conversations as "the active conversation" (at least when they first appear).
-            history_model.start_new_conversation(
+            let conversation_id = history_model.start_new_conversation(
                 self.terminal_view_id,
-                is_autoexecute_override,
+                false,
                 false,
                 // 不是 CLI agent transcript 会话。
                 false,
                 ctx,
-            )
+            );
+            history_model.set_autoexecute_override(
+                &conversation_id,
+                self.terminal_view_id,
+                autoexecute_mode,
+                ctx,
+            );
+            conversation_id
         });
         history_model
             .as_ref(ctx)
@@ -4243,3 +4249,7 @@ fn byop_get_running_command_for_lrc(terminal_model: &TerminalModel) -> Option<Ru
         is_alt_screen_active,
     })
 }
+
+#[cfg(test)]
+#[path = "controller_approval_mode_tests.rs"]
+mod approval_mode_tests;

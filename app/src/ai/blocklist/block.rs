@@ -86,7 +86,7 @@ use super::{
     BlocklistAIActionModel, BlocklistAIController, BlocklistAIHistoryEvent,
     BlocklistAIHistoryModel, BlocklistAIPermissions, ResponseStreamId,
 };
-use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::conversation::{AIConversationAutoexecuteMode, AIConversationId};
 use crate::ai::agent::redaction::redact_secrets;
 use crate::ai::agent::telemetry::ForTelemetry as _;
 use crate::ai::agent::{
@@ -2934,20 +2934,27 @@ impl AIBlock {
         })
     }
 
+    fn set_autoexecute_override(
+        &mut self,
+        mode: AIConversationAutoexecuteMode,
+        set_session_default: bool,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+            history.set_autoexecute_override(
+                &self.client_ids.conversation_id,
+                self.terminal_view_id,
+                mode,
+                ctx,
+            );
+            if set_session_default {
+                history.set_default_autoexecute_mode(self.terminal_view_id, mode);
+            }
+        });
+    }
+
     fn enable_autoexecute_override(&mut self, ctx: &mut ViewContext<Self>) {
-        let is_on: bool = BlocklistAIHistoryModel::as_ref(ctx)
-            .conversation(&self.client_ids.conversation_id)
-            .map(|c| c.autoexecute_any_action())
-            .unwrap_or(false);
-        if !is_on {
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                history.toggle_autoexecute_override(
-                    &self.client_ids.conversation_id,
-                    self.terminal_view_id,
-                    ctx,
-                );
-            });
-        }
+        self.set_autoexecute_override(AIConversationAutoexecuteMode::RunToCompletion, false, ctx);
     }
 
     fn mark_ask_user_question_speedbump_as_shown(ctx: &mut ViewContext<Self>) {
@@ -3360,8 +3367,11 @@ impl AIBlock {
                 self.yield_requested_action_focus_if_focused(&view, ctx);
                 ctx.notify();
             }
-            RequestedCommandViewEvent::EnableAutoexecuteMode => {
-                self.enable_autoexecute_override(ctx);
+            RequestedCommandViewEvent::SetAutoexecuteMode {
+                mode,
+                set_session_default,
+            } => {
+                self.set_autoexecute_override(*mode, *set_session_default, ctx);
             }
             RequestedCommandViewEvent::Rejected => {
                 self.cancel_action(action_id, ctx);
@@ -3532,8 +3542,11 @@ impl AIBlock {
                 // Actions within the editor should clear all other text selections
                 self.clear_other_selections(Some(view.id()), ctx.window_id(), ctx);
             }
-            RequestedCommandViewEvent::EnableAutoexecuteMode => {
-                self.enable_autoexecute_override(ctx);
+            RequestedCommandViewEvent::SetAutoexecuteMode {
+                mode,
+                set_session_default,
+            } => {
+                self.set_autoexecute_override(*mode, *set_session_default, ctx);
             }
             // There's nothing to do here for MCP tool calls; their expanded state
             // doesn't change the blocklist like it does for requested commands.

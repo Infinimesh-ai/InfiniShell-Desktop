@@ -1109,6 +1109,7 @@ pub enum PersistedAutoexecuteMode {
     #[default]
     RespectUserSettings,
     RunToCompletion,
+    FullAccess,
 }
 
 impl<'de> Deserialize<'de> for PersistedAutoexecuteMode {
@@ -1120,6 +1121,7 @@ impl<'de> Deserialize<'de> for PersistedAutoexecuteMode {
         Ok(match value.as_str() {
             "RespectUserSettings" => Self::RespectUserSettings,
             "RunToCompletion" => Self::RunToCompletion,
+            "FullAccess" => Self::FullAccess,
             _ => Self::default(),
         })
     }

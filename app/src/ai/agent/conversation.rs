@@ -3947,12 +3947,15 @@ impl AIConversation {
     }
 
     pub fn toggle_autoexecute_override(&mut self) {
-        self.autoexecute_override =
-            if self.autoexecute_override == AIConversationAutoexecuteMode::RespectUserSettings {
-                AIConversationAutoexecuteMode::RunToCompletion
-            } else {
-                AIConversationAutoexecuteMode::RespectUserSettings
-            };
+        self.autoexecute_override = if self.autoexecute_override.is_autoexecute_any_action() {
+            AIConversationAutoexecuteMode::RespectUserSettings
+        } else {
+            AIConversationAutoexecuteMode::RunToCompletion
+        };
+    }
+
+    pub fn set_autoexecute_override(&mut self, mode: AIConversationAutoexecuteMode) {
+        self.autoexecute_override = mode;
     }
 
     pub fn autoexecute_override(&self) -> AIConversationAutoexecuteMode {
@@ -5055,11 +5058,20 @@ pub enum AIConversationAutoexecuteMode {
     #[default]
     RespectUserSettings,
     RunToCompletion,
+    FullAccess,
 }
 
 impl AIConversationAutoexecuteMode {
     pub fn is_autoexecute_any_action(&self) -> bool {
-        matches!(self, AIConversationAutoexecuteMode::RunToCompletion)
+        matches!(
+            self,
+            AIConversationAutoexecuteMode::RunToCompletion
+                | AIConversationAutoexecuteMode::FullAccess
+        )
+    }
+
+    pub fn is_full_access(&self) -> bool {
+        matches!(self, AIConversationAutoexecuteMode::FullAccess)
     }
 }
 
@@ -5068,6 +5080,7 @@ impl From<PersistedAutoexecuteMode> for AIConversationAutoexecuteMode {
         match value {
             PersistedAutoexecuteMode::RespectUserSettings => Self::RespectUserSettings,
             PersistedAutoexecuteMode::RunToCompletion => Self::RunToCompletion,
+            PersistedAutoexecuteMode::FullAccess => Self::FullAccess,
         }
     }
 }
@@ -5077,6 +5090,7 @@ impl From<AIConversationAutoexecuteMode> for PersistedAutoexecuteMode {
         match value {
             AIConversationAutoexecuteMode::RespectUserSettings => Self::RespectUserSettings,
             AIConversationAutoexecuteMode::RunToCompletion => Self::RunToCompletion,
+            AIConversationAutoexecuteMode::FullAccess => Self::FullAccess,
         }
     }
 }

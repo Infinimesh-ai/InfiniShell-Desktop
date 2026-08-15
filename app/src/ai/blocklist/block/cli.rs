@@ -49,7 +49,7 @@ use super::view_impl::common::{
 };
 use super::view_impl::output::are_all_text_sections_empty;
 use super::{EmbeddedCodeEditorView, SecretRedactionState, TableSectionHandles};
-use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::conversation::{AIConversationAutoexecuteMode, AIConversationId};
 use crate::ai::agent::icons::yellow_stop_icon;
 use crate::ai::agent::task::TaskId;
 use crate::ai::agent::{
@@ -99,7 +99,7 @@ use crate::view_components::compactible_action_button::{
 use crate::view_components::compactible_split_action_button::CompactibleSplitActionButton;
 use crate::workspace::WorkspaceAction;
 use crate::{BlocklistAIHistoryModel, ToastStack, send_telemetry_from_ctx};
-const MENU_WIDTH: f32 = 200.0;
+const MENU_WIDTH: f32 = 240.0;
 const MAX_HEIGHT: f32 = 320.0;
 // CLI agent 浮窗的最小宽度，避免内容被拖到不可读；外层布局也复用该值保持约束一致。
 pub(crate) const CLI_SUBAGENT_MIN_RESIZABLE_WIDTH: f32 = 360.0;
@@ -583,19 +583,40 @@ impl CLISubagentView {
                 .prevent_interaction_with_other_elements()
         });
         allow_menu.update(ctx, |menu, ctx| {
-            menu.set_items(
-                vec![
-                    MenuItemFields::new(crate::t!("ai-block-accept"))
-                        .with_key_shortcut_label(Some(ACCEPT_KEYSTROKE.displayed()))
-                        .with_on_select_action(CLISubagentAction::ExecuteBlockedAction)
+            let mut items = vec![
+                MenuItemFields::new(crate::t!("ai-block-accept"))
+                    .with_key_shortcut_label(Some(ACCEPT_KEYSTROKE.displayed()))
+                    .with_on_select_action(CLISubagentAction::ExecuteBlockedAction)
+                    .into_item(),
+                MenuItemFields::new(if FeatureFlag::AgentApprovalModes.is_enabled() {
+                    crate::t!("ai-block-auto-approve-this-task")
+                } else {
+                    crate::t!("ai-block-auto-approve")
+                })
+                .with_key_shortcut_label(Some(AUTO_APPROVE_KEYSTROKE.displayed()))
+                .with_on_select_action(CLISubagentAction::ExecuteAndAutoApprove)
+                .into_item(),
+            ];
+            if FeatureFlag::AgentApprovalModes.is_enabled() {
+                items.push(
+                    MenuItemFields::new(crate::t!("ai-block-full-access-this-task"))
+                        .with_tooltip(crate::t!("ai-block-full-access-tooltip"))
+                        .with_on_select_action(CLISubagentAction::ExecuteAndFullAccess)
                         .into_item(),
-                    MenuItemFields::new(crate::t!("ai-block-auto-approve"))
-                        .with_key_shortcut_label(Some(AUTO_APPROVE_KEYSTROKE.displayed()))
-                        .with_on_select_action(CLISubagentAction::ExecuteAndAutoApprove)
+                );
+                items.push(
+                    MenuItemFields::new(crate::t!("ai-block-auto-approve-this-session"))
+                        .with_on_select_action(CLISubagentAction::ExecuteAndAutoApproveForSession)
                         .into_item(),
-                ],
-                ctx,
-            );
+                );
+                items.push(
+                    MenuItemFields::new(crate::t!("ai-block-full-access-this-session"))
+                        .with_tooltip(crate::t!("ai-block-full-access-tooltip"))
+                        .with_on_select_action(CLISubagentAction::ExecuteAndFullAccessForSession)
+                        .into_item(),
+                );
+            }
+            menu.set_items(items, ctx);
         });
         ctx.subscribe_to_view(&allow_menu, |me, _menu, event, ctx| match event {
             MenuEvent::Close { .. } => {
@@ -940,13 +961,16 @@ impl CLISubagentView {
 
     fn handle_execute_blocked_action(
         &mut self,
-        is_autoexecuted: bool,
+        autoexecute_mode: Option<AIConversationAutoexecuteMode>,
+        set_session_default: bool,
         ctx: &mut ViewContext<Self>,
     ) {
         self.execute_pending_action(ctx);
-        if is_autoexecuted {
-            self.enable_autoexecute_override(ctx);
+        if let Some(mode) = autoexecute_mode {
+            self.enable_autoexecute_override(mode, set_session_default, ctx);
         }
+
+        let is_autoexecuted = autoexecute_mode.is_some();
 
         send_telemetry_from_ctx!(
             TelemetryEvent::CLISubagentActionExecuted {
@@ -977,7 +1001,7 @@ impl CLISubagentView {
 
     fn take_control_of_running_command(&mut self, ctx: &mut ViewContext<Self>) {
         if self.has_pending_transfer_control_action(ctx) {
-            self.handle_execute_blocked_action(false, ctx);
+            self.handle_execute_blocked_action(None, false, ctx);
         } else {
             self.handle_reject_blocked_action(true, ctx);
         }
@@ -1006,21 +1030,23 @@ impl CLISubagentView {
         self.maybe_update_speedbump(&blocked_action.action, ctx);
     }
 
-    fn enable_autoexecute_override(&mut self, ctx: &mut ViewContext<Self>) {
-        let Some(conversation) =
-            BlocklistAIHistoryModel::as_ref(ctx).conversation(&self.conversation_id)
-        else {
-            return;
-        };
-        if !conversation.autoexecute_any_action() {
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                history.toggle_autoexecute_override(
-                    &self.conversation_id,
-                    self.terminal_view_id,
-                    ctx,
-                );
-            });
-        }
+    fn enable_autoexecute_override(
+        &mut self,
+        mode: AIConversationAutoexecuteMode,
+        set_session_default: bool,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+            history.set_autoexecute_override(
+                &self.conversation_id,
+                self.terminal_view_id,
+                mode,
+                ctx,
+            );
+            if set_session_default {
+                history.set_default_autoexecute_mode(self.terminal_view_id, mode);
+            }
+        });
     }
     fn toggle_allow_menu(&mut self, ctx: &mut ViewContext<Self>) {
         self.is_allow_menu_open = !self.is_allow_menu_open;
@@ -2068,6 +2094,9 @@ pub enum CLISubagentAction {
     OpenCodeBlock(CodeSource),
     ExecuteBlockedAction,
     ExecuteAndAutoApprove,
+    ExecuteAndFullAccess,
+    ExecuteAndAutoApproveForSession,
+    ExecuteAndFullAccessForSession,
     RejectBlockedAction { should_user_take_over: bool },
     TakeControlOfRunningCommand,
     ToggleAllowMenu,
@@ -2107,13 +2136,47 @@ impl TypedActionView for CLISubagentView {
                 if is_restored_read_only {
                     return;
                 }
-                self.handle_execute_blocked_action(false, ctx);
+                self.handle_execute_blocked_action(None, false, ctx);
             }
             CLISubagentAction::ExecuteAndAutoApprove => {
                 if is_restored_read_only {
                     return;
                 }
-                self.handle_execute_blocked_action(true, ctx);
+                self.handle_execute_blocked_action(
+                    Some(AIConversationAutoexecuteMode::RunToCompletion),
+                    false,
+                    ctx,
+                );
+            }
+            CLISubagentAction::ExecuteAndFullAccess => {
+                if is_restored_read_only {
+                    return;
+                }
+                self.handle_execute_blocked_action(
+                    Some(AIConversationAutoexecuteMode::FullAccess),
+                    false,
+                    ctx,
+                );
+            }
+            CLISubagentAction::ExecuteAndAutoApproveForSession => {
+                if is_restored_read_only {
+                    return;
+                }
+                self.handle_execute_blocked_action(
+                    Some(AIConversationAutoexecuteMode::RunToCompletion),
+                    true,
+                    ctx,
+                );
+            }
+            CLISubagentAction::ExecuteAndFullAccessForSession => {
+                if is_restored_read_only {
+                    return;
+                }
+                self.handle_execute_blocked_action(
+                    Some(AIConversationAutoexecuteMode::FullAccess),
+                    true,
+                    ctx,
+                );
             }
             CLISubagentAction::RejectBlockedAction {
                 should_user_take_over,

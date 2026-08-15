@@ -296,6 +296,9 @@ pub enum FeatureFlag {
     /// Enables the fast-forward autoexecute button
     FastForwardAutoexecuteButton,
 
+    /// 启用任务级 Auto Approve 与 Full Access 审批模式。
+    AgentApprovalModes,
+
     /// Remembers the per-conversation fast-forward state across local session restoration.
     RememberFastForwardState,
 

@@ -1024,6 +1024,16 @@ impl BlocklistAIContextModel {
         });
     }
 
+    pub fn set_pending_query_autoexecute_override(
+        &mut self,
+        mode: AIConversationAutoexecuteMode,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        self.conversation_selection.update(ctx, |selection, ctx| {
+            selection.set_pending_query_autoexecute_override(mode, ctx);
+        });
+    }
+
     /// Returns true if the pending query targets an existing conversation
     /// (as opposed to starting a new one).
     pub fn is_targeting_existing_conversation(&self, ctx: &AppContext) -> bool {

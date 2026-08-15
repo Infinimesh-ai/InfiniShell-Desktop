@@ -59,6 +59,19 @@ fn provider_api_key_help_lists_supported_providers() {
         assert!(help.contains(&expected));
     }
     assert!(help.contains("--auto-approve"));
+    assert!(help.contains("--full-access"));
+}
+
+#[test]
+fn parses_full_access_and_rejects_conflicting_approval_modes() {
+    let args = TuiArgs::try_parse_from(["warp", "--full-access"])
+        .expect("full-access arguments should parse");
+    assert!(args.full_access);
+    assert!(!args.auto_approve);
+
+    let error = TuiArgs::try_parse_from(["warp", "--auto-approve", "--full-access"])
+        .expect_err("approval mode arguments should conflict");
+    assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict);
 }
 
 #[test]
@@ -130,6 +143,7 @@ fn accepts_startup_without_resume() {
 
     assert_eq!(args.resume, None);
     assert!(!args.auto_approve);
+    assert!(!args.full_access);
     assert_eq!(args.api_key, None);
     assert_eq!(args.set_provider_api_key, None);
     assert_eq!(args.clear_provider_api_key, None);

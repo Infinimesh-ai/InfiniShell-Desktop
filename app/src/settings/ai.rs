@@ -2532,7 +2532,7 @@ define_settings_group!(AISettings, settings: [
         description: "Whether agent-executed commands are included in command history.",
     }
 
-    // Whether fast forward / auto-approve can run commands that match the command denylist.
+    // 控制高权限审批模式是否可运行命中本地命令拒绝列表的命令。
     auto_approve_bypasses_command_denylist: AutoApproveBypassesCommandDenylist {
         type: bool,
         default: true,
@@ -2541,7 +2541,7 @@ define_settings_group!(AISettings, settings: [
         surface: settings::SettingSurfaces::ALL,
         private: false,
         toml_path: "agents.warp_agent.other.auto_approve_bypasses_command_denylist",
-        description: "Whether auto-approve bypasses the command denylist.",
+        description: "Whether Full Access (or legacy auto-approve) bypasses the local command denylist.",
     }
 
     // Controls whether the conversation history view appears in the tools panel.

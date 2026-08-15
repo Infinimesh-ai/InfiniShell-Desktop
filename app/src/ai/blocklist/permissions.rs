@@ -13,7 +13,7 @@ use warp_util::path::EscapeChar;
 use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 
 use super::BlocklistAIHistoryModel;
-use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::conversation::{AIConversationAutoexecuteMode, AIConversationId};
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::execution_profiles::{
     AIExecutionProfile, ActionPermission, AskUserQuestionPermission, ExecutionProfileId,
@@ -140,6 +140,21 @@ pub struct BlocklistAIPermissions {
 }
 
 impl BlocklistAIPermissions {
+    fn approval_mode(
+        conversation_id: &AIConversationId,
+        ctx: &AppContext,
+    ) -> AIConversationAutoexecuteMode {
+        let mode = BlocklistAIHistoryModel::as_ref(ctx)
+            .conversation(conversation_id)
+            .map(|conversation| conversation.autoexecute_override())
+            .unwrap_or_default();
+        if FeatureFlag::AgentApprovalModes.is_enabled() || !mode.is_full_access() {
+            mode
+        } else {
+            AIConversationAutoexecuteMode::RunToCompletion
+        }
+    }
+
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
         // Migrate the old `AgentModeAutoReadFiles` setting to the new [`AgentModeCodingPermissionsType`].
         if let Some(can_read_files) = ctx
@@ -480,9 +495,10 @@ impl BlocklistAIPermissions {
         terminal_view_id: Option<EntityId>,
         ctx: &AppContext,
     ) -> WriteToPtyPermission {
-        if BlocklistAIHistoryModel::as_ref(ctx)
-            .conversation(conversation_id)
-            .is_some_and(|convo| convo.autoexecute_any_action())
+        if Self::approval_mode(conversation_id, ctx).is_autoexecute_any_action()
+            && Self::workspace_autonomy_settings(ctx)
+                .write_to_pty_setting
+                .is_none()
         {
             return WriteToPtyPermission::AlwaysAllow;
         }
@@ -671,9 +687,10 @@ impl BlocklistAIPermissions {
         terminal_view_id: Option<EntityId>,
         ctx: &AppContext,
     ) -> FileReadPermission {
-        if BlocklistAIHistoryModel::as_ref(ctx)
-            .conversation(conversation_id)
-            .is_some_and(|convo| convo.autoexecute_any_action())
+        if Self::approval_mode(conversation_id, ctx).is_autoexecute_any_action()
+            && Self::workspace_autonomy_settings(ctx)
+                .read_files_setting
+                .is_none()
         {
             return FileReadPermission::Allowed(FileReadPermissionAllowedReason::RunToCompletion);
         }
@@ -747,9 +764,10 @@ impl BlocklistAIPermissions {
             return denied;
         }
 
-        if BlocklistAIHistoryModel::as_ref(ctx)
-            .conversation(conversation_id)
-            .is_some_and(|convo| convo.autoexecute_any_action())
+        if Self::approval_mode(conversation_id, ctx).is_autoexecute_any_action()
+            && Self::workspace_autonomy_settings(ctx)
+                .apply_code_diffs_setting
+                .is_none()
         {
             return FileWritePermission::Allowed(FileWritePermissionAllowedReason::RunToCompletion);
         }
@@ -831,17 +849,22 @@ impl BlocklistAIPermissions {
         terminal_view_id: Option<EntityId>,
         ctx: &AppContext,
     ) -> bool {
-        if BlocklistAIHistoryModel::as_ref(ctx)
-            .conversation(conversation_id)
-            .is_some_and(|convo| convo.autoexecute_any_action())
-        {
-            return true;
-        }
-
         let allowlisted = uuid_of_mcp_server
             .is_some_and(|uid| self.get_mcp_allowlist(ctx, terminal_view_id).contains(&uid));
         let denylisted = uuid_of_mcp_server
             .is_some_and(|uid| self.get_mcp_denylist(ctx, terminal_view_id).contains(&uid));
+
+        let approval_mode = Self::approval_mode(conversation_id, ctx);
+        if !FeatureFlag::AgentApprovalModes.is_enabled()
+            && approval_mode.is_autoexecute_any_action()
+        {
+            return true;
+        }
+        match approval_mode {
+            AIConversationAutoexecuteMode::RespectUserSettings => {}
+            AIConversationAutoexecuteMode::RunToCompletion => return !denylisted,
+            AIConversationAutoexecuteMode::FullAccess => return true,
+        }
 
         match self.get_mcp_permissions_setting(ctx, terminal_view_id) {
             ActionPermission::AgentDecides | ActionPermission::Unknown => {
@@ -898,15 +921,22 @@ impl BlocklistAIPermissions {
             .map(|command| command_for_execution_predicates(command, escape_char))
             .collect::<Vec<_>>();
 
-        // Local auto-approve may bypass the user-configured denylist, but workspace policy must
-        // always be evaluated. Sandboxed processes use a separate organization-managed denylist
-        // that cannot be bypassed.
-        let auto_approve_enabled = BlocklistAIHistoryModel::as_ref(ctx)
-            .conversation(conversation_id)
-            .is_some_and(|convo| convo.autoexecute_any_action());
-        let bypass_user_denylist = auto_approve_enabled
-            && !AppExecutionMode::as_ref(ctx).is_sandboxed()
-            && *AISettings::as_ref(ctx).auto_approve_bypasses_command_denylist;
+        // Auto Approve 保留本地 denylist；只有 Full Access 可跳过本地规则。
+        // 组织 denylist、沙箱 denylist 和组织审批策略始终优先。
+        let approval_mode = Self::approval_mode(conversation_id, ctx);
+        let workspace_execute_commands_setting =
+            Self::workspace_autonomy_settings(ctx).execute_commands_setting;
+        let auto_approve_enabled = approval_mode.is_autoexecute_any_action()
+            && workspace_execute_commands_setting.is_none();
+        let bypass_user_denylist = if FeatureFlag::AgentApprovalModes.is_enabled() {
+            approval_mode.is_full_access()
+                && !AppExecutionMode::as_ref(ctx).is_sandboxed()
+                && *AISettings::as_ref(ctx).auto_approve_bypasses_command_denylist
+        } else {
+            approval_mode.is_autoexecute_any_action()
+                && !AppExecutionMode::as_ref(ctx).is_sandboxed()
+                && *AISettings::as_ref(ctx).auto_approve_bypasses_command_denylist
+        };
 
         // The denylist takes precedence over the remaining conditions.
         let denylist = if bypass_user_denylist {

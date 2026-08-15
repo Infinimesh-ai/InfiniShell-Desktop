@@ -142,6 +142,23 @@ impl ConversationSelection for TestConversationSelection {
             .unwrap_or_default()
     }
 
+    fn set_pending_query_autoexecute_override(
+        &mut self,
+        mode: crate::ai::agent::conversation::AIConversationAutoexecuteMode,
+        ctx: &mut warpui::ModelContext<Box<dyn ConversationSelection>>,
+    ) {
+        if let Some(conversation_id) = self.selected_conversation_id {
+            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                history.set_autoexecute_override(
+                    &conversation_id,
+                    self.terminal_surface_id,
+                    mode,
+                    ctx,
+                );
+            });
+        }
+    }
+
     fn toggle_pending_query_autoexecute(
         &mut self,
         ctx: &mut warpui::ModelContext<Box<dyn ConversationSelection>>,

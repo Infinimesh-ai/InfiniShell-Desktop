@@ -11,6 +11,7 @@ use std::sync::atomic::{self, AtomicBool};
 use toolbar_item::AgentToolbarItemKind;
 
 use crate::ai::AIRequestUsageModel;
+use crate::ai::agent::conversation::AIConversationAutoexecuteMode;
 use crate::ai::blocklist::BlocklistAIInputModel;
 use crate::ai::blocklist::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use crate::ai::blocklist::prompt::prompt_alert::PromptAlertView;
@@ -1685,19 +1686,26 @@ impl AgentInputFooter {
     fn sync_fast_forward_button(&self, ctx: &mut ViewContext<Self>) {
         // Read directly from the conversation, same data source as the warping
         // indicator footer's auto-approve chip.
-        let is_active = BlocklistAIHistoryModel::as_ref(ctx)
+        let mode = BlocklistAIHistoryModel::as_ref(ctx)
             .active_conversation(self.terminal_view_id)
-            .map(|c| c.autoexecute_any_action())
-            .unwrap_or(false);
-        let icon = if is_active {
-            Icon::FastForwardFilled
-        } else {
-            Icon::FastForward
-        };
-        let tooltip = if is_active {
-            crate::t!("ai-footer-turn-off-auto-approve-agent-actions")
-        } else {
-            crate::t!("ai-footer-auto-approve-agent-actions-for-task")
+            .map(|conversation| conversation.autoexecute_override())
+            .unwrap_or_default();
+        let (icon, tooltip, is_active) = match mode {
+            AIConversationAutoexecuteMode::RespectUserSettings => (
+                Icon::FastForward,
+                crate::t!("ai-footer-auto-approve-agent-actions-for-task"),
+                false,
+            ),
+            AIConversationAutoexecuteMode::RunToCompletion => (
+                Icon::FastForwardFilled,
+                crate::t!("ai-footer-turn-off-auto-approve-agent-actions"),
+                true,
+            ),
+            AIConversationAutoexecuteMode::FullAccess => (
+                Icon::FastForwardFilled,
+                crate::t!("ai-footer-turn-off-full-access"),
+                true,
+            ),
         };
         self.fast_forward_button.update(ctx, |button, ctx| {
             button.set_icon(Some(icon), ctx);

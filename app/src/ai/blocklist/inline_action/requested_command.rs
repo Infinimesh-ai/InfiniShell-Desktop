@@ -30,7 +30,7 @@ use warpui::{
 };
 
 use super::inline_action_icons::{self, icon_size};
-use crate::ai::agent::conversation::ConversationStatus;
+use crate::ai::agent::conversation::{AIConversationAutoexecuteMode, ConversationStatus};
 use crate::ai::agent::{
     AIAgentActionId, AIAgentActionResult, AIAgentActionResultType, AIAgentActionType,
     AIAgentCitation, AIAgentOutputMessageType, CallMCPToolResult, RequestCommandOutputResult,
@@ -253,9 +253,14 @@ impl RequestedActionViewType {
 #[derive(Debug, Clone)]
 pub enum RequestedCommandViewEvent {
     Accepted,
-    EnableAutoexecuteMode,
+    SetAutoexecuteMode {
+        mode: AIConversationAutoexecuteMode,
+        set_session_default: bool,
+    },
     Rejected,
-    UpdatedExpansionState { is_expanded: bool },
+    UpdatedExpansionState {
+        is_expanded: bool,
+    },
     TextSelected,
     CopiedEmptyText,
     EditorFocused,
@@ -266,6 +271,9 @@ pub enum RequestedCommandViewEvent {
 pub enum RequestedCommandViewAction {
     Accept,
     AcceptAndAutoExecute,
+    AcceptAndFullAccess,
+    AcceptAndAutoExecuteForSession,
+    AcceptAndFullAccessForSession,
     ToggleAcceptMenu,
     Reject,
     OpenEditMode,
@@ -564,6 +572,7 @@ impl RequestedCommandView {
         let accept_menu = ctx.add_typed_action_view(|ctx| {
             let theme = Appearance::as_ref(ctx).theme();
             Menu::new()
+                .with_width(240.)
                 .with_menu_variant(MenuVariant::Fixed)
                 .with_border(Border::all(1.).with_border_fill(theme.outline()))
                 .prevent_interaction_with_other_elements()
@@ -756,12 +765,53 @@ impl RequestedCommandView {
             .with_on_select_action(RequestedCommandViewAction::Accept)
             .into_item();
 
-            let auto_item = MenuItemFields::new_with_label("Auto-approve", auto_keystroke.as_str())
-                .with_on_select_action(RequestedCommandViewAction::AcceptAndAutoExecute)
-                .into_item();
+            let auto_item = MenuItemFields::new_with_label(
+                if FeatureFlag::AgentApprovalModes.is_enabled() {
+                    crate::t!("ai-block-auto-approve-this-task")
+                } else {
+                    crate::t!("ai-block-auto-approve")
+                },
+                auto_keystroke,
+            )
+            .with_on_select_action(RequestedCommandViewAction::AcceptAndAutoExecute)
+            .into_item();
+
+            let mut items = vec![accept_item, auto_item];
+            if FeatureFlag::AgentApprovalModes.is_enabled() {
+                items.push(
+                    MenuItemFields::new_with_label(
+                        crate::t!("ai-block-full-access-this-task"),
+                        String::new(),
+                    )
+                    .with_tooltip(crate::t!("ai-block-full-access-tooltip"))
+                    .with_on_select_action(RequestedCommandViewAction::AcceptAndFullAccess)
+                    .into_item(),
+                );
+                items.push(
+                    MenuItemFields::new_with_label(
+                        crate::t!("ai-block-auto-approve-this-session"),
+                        String::new(),
+                    )
+                    .with_on_select_action(
+                        RequestedCommandViewAction::AcceptAndAutoExecuteForSession,
+                    )
+                    .into_item(),
+                );
+                items.push(
+                    MenuItemFields::new_with_label(
+                        crate::t!("ai-block-full-access-this-session"),
+                        String::new(),
+                    )
+                    .with_tooltip(crate::t!("ai-block-full-access-tooltip"))
+                    .with_on_select_action(
+                        RequestedCommandViewAction::AcceptAndFullAccessForSession,
+                    )
+                    .into_item(),
+                );
+            }
 
             self.accept_split_button_menu.update(ctx, |menu, ctx| {
-                menu.set_items(vec![accept_item, auto_item], ctx);
+                menu.set_items(items, ctx);
             });
             self.accept_split_button_menu
                 .update(ctx, |menu, ctx| menu.set_selected_by_index(0, ctx));
@@ -2082,7 +2132,34 @@ impl TypedActionView for RequestedCommandView {
             RequestedCommandViewAction::AcceptAndAutoExecute => {
                 self.commit_editor_contents(ctx);
                 ctx.emit(RequestedCommandViewEvent::Accepted);
-                ctx.emit(RequestedCommandViewEvent::EnableAutoexecuteMode);
+                ctx.emit(RequestedCommandViewEvent::SetAutoexecuteMode {
+                    mode: AIConversationAutoexecuteMode::RunToCompletion,
+                    set_session_default: false,
+                });
+            }
+            RequestedCommandViewAction::AcceptAndFullAccess => {
+                self.commit_editor_contents(ctx);
+                ctx.emit(RequestedCommandViewEvent::Accepted);
+                ctx.emit(RequestedCommandViewEvent::SetAutoexecuteMode {
+                    mode: AIConversationAutoexecuteMode::FullAccess,
+                    set_session_default: false,
+                });
+            }
+            RequestedCommandViewAction::AcceptAndAutoExecuteForSession => {
+                self.commit_editor_contents(ctx);
+                ctx.emit(RequestedCommandViewEvent::Accepted);
+                ctx.emit(RequestedCommandViewEvent::SetAutoexecuteMode {
+                    mode: AIConversationAutoexecuteMode::RunToCompletion,
+                    set_session_default: true,
+                });
+            }
+            RequestedCommandViewAction::AcceptAndFullAccessForSession => {
+                self.commit_editor_contents(ctx);
+                ctx.emit(RequestedCommandViewEvent::Accepted);
+                ctx.emit(RequestedCommandViewEvent::SetAutoexecuteMode {
+                    mode: AIConversationAutoexecuteMode::FullAccess,
+                    set_session_default: true,
+                });
             }
             RequestedCommandViewAction::ToggleAcceptMenu => {
                 self.toggle_accept_split_button_menu(ctx)

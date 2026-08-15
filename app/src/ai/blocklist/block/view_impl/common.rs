@@ -190,6 +190,7 @@ pub struct AutoExecuteButtonProps<'a> {
     pub button_handle: &'a MouseStateHandle,
     pub keystroke: Option<&'a Keystroke>,
     pub is_active: bool,
+    pub is_full_access: bool,
     pub is_locked: bool,
 }
 
@@ -914,11 +915,13 @@ fn render_auto_approve_button(
     .finish();
 
     let tooltip_text = if props.is_locked {
-        "Fast forward is always enabled for cloud agent conversations"
+        "Fast forward is always enabled for cloud agent conversations".to_owned()
+    } else if props.is_full_access {
+        crate::t!("ai-footer-turn-off-full-access")
     } else if is_active {
-        "Turn off auto-approve all agent actions"
+        "Turn off auto-approve all agent actions".to_owned()
     } else {
-        "Auto-approve all agent actions for this task"
+        "Auto-approve all agent actions for this task".to_owned()
     };
 
     render_warping_indicator_button(
@@ -926,7 +929,7 @@ fn render_auto_approve_button(
         appearance,
         icon,
         props.keystroke,
-        tooltip_text.to_string(),
+        tooltip_text,
         is_active,
         props.is_locked,
         move |ctx| {

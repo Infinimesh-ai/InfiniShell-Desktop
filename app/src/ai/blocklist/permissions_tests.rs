@@ -2,13 +2,14 @@ use std::path::PathBuf;
 
 use uuid::Uuid;
 use warp_core::execution_mode::ExecutionMode;
+use warp_core::features::FeatureFlag;
 use warp_core::settings::Setting as _;
 use warp_util::path::EscapeChar;
 use warpui::{App, EntityId, ModelHandle, SingletonEntity};
 
 use super::{BlocklistAIHistoryModel, BlocklistAIPermissions};
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
-use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::conversation::{AIConversationAutoexecuteMode, AIConversationId};
 use crate::ai::blocklist::CommandExecutionPermissionAllowedReason;
 use crate::ai::blocklist::permissions::{
     CommandExecutionPermission, CommandExecutionPermissionDeniedReason, FileReadPermission,
@@ -447,10 +448,12 @@ fn test_can_write_files_workspace_settings_override_profile() {
 #[test]
 fn test_can_write_files_mcp_config_always_denied() {
     App::test((), |mut app| async move {
+        let _flag = FeatureFlag::AgentApprovalModes.override_enabled(true);
         let PermissionsTestState {
             terminal_view_id,
             convo_id,
             permissions,
+            history,
             profile_model,
             ..
         } = initialize_permissions_test(&mut app);
@@ -460,6 +463,14 @@ fn test_can_write_files_mcp_config_always_denied() {
             model.set_apply_code_diffs(
                 model.active_profile(Some(terminal_view_id), ctx).id(),
                 &ActionPermission::AlwaysAllow,
+                ctx,
+            );
+        });
+        history.update(&mut app, |history, ctx| {
+            history.set_autoexecute_override(
+                &convo_id,
+                terminal_view_id,
+                AIConversationAutoexecuteMode::FullAccess,
                 ctx,
             );
         });
@@ -929,6 +940,161 @@ fn test_can_autoexecute_command_auto_approve_bypasses_user_denylist_but_not_work
 }
 
 #[test]
+fn test_approval_modes_distinguish_auto_approve_from_full_access() {
+    App::test((), |mut app| async move {
+        let _flag = FeatureFlag::AgentApprovalModes.override_enabled(true);
+        let PermissionsTestState {
+            convo_id,
+            permissions,
+            history,
+            profile_model,
+            terminal_view_id,
+            user_workspaces,
+            ..
+        } = initialize_permissions_test(&mut app);
+
+        profile_model.update(&mut app, |model, ctx| {
+            model.add_to_command_denylist(
+                model.active_profile(Some(terminal_view_id), ctx).id(),
+                &AgentModeCommandExecutionPredicate::new_regex("rm .*").unwrap(),
+                ctx,
+            );
+        });
+        user_workspaces.update(&mut app, |model, ctx| {
+            model.setup_test_workspace(ctx);
+            model.update_ai_autonomy_settings(
+                |settings| {
+                    settings.execute_commands_denylist = Some(vec![
+                        AgentModeCommandExecutionPredicate::new_regex("git .*").unwrap(),
+                    ]);
+                },
+                ctx,
+            );
+        });
+        history.update(&mut app, |history, ctx| {
+            history.set_autoexecute_override(
+                &convo_id,
+                terminal_view_id,
+                AIConversationAutoexecuteMode::RunToCompletion,
+                ctx,
+            );
+        });
+
+        permissions.read(&app, |model, ctx| {
+            let denied = model.can_autoexecute_command(
+                &convo_id,
+                "rm important.txt",
+                EscapeChar::Backslash,
+                false,
+                None,
+                Some(terminal_view_id),
+                ctx,
+            );
+            assert!(matches!(
+                denied,
+                CommandExecutionPermission::Denied(
+                    CommandExecutionPermissionDeniedReason::ExplicitlyDenylisted
+                )
+            ));
+        });
+
+        history.update(&mut app, |history, ctx| {
+            history.set_autoexecute_override(
+                &convo_id,
+                terminal_view_id,
+                AIConversationAutoexecuteMode::FullAccess,
+                ctx,
+            );
+        });
+        permissions.read(&app, |model, ctx| {
+            let locally_denied = model.can_autoexecute_command(
+                &convo_id,
+                "rm important.txt",
+                EscapeChar::Backslash,
+                false,
+                None,
+                Some(terminal_view_id),
+                ctx,
+            );
+            assert!(matches!(
+                locally_denied,
+                CommandExecutionPermission::Allowed(
+                    CommandExecutionPermissionAllowedReason::RunToCompletion
+                )
+            ));
+
+            let organization_denied = model.can_autoexecute_command(
+                &convo_id,
+                "git status",
+                EscapeChar::Backslash,
+                false,
+                None,
+                Some(terminal_view_id),
+                ctx,
+            );
+            assert!(matches!(
+                organization_denied,
+                CommandExecutionPermission::Denied(
+                    CommandExecutionPermissionDeniedReason::ExplicitlyDenylisted
+                )
+            ));
+        });
+
+        app.update(|ctx| {
+            AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                settings
+                    .auto_approve_bypasses_command_denylist
+                    .set_value(false, ctx)
+                    .expect("setting should update");
+            });
+        });
+        permissions.read(&app, |model, ctx| {
+            let locally_denied = model.can_autoexecute_command(
+                &convo_id,
+                "rm important.txt",
+                EscapeChar::Backslash,
+                false,
+                None,
+                Some(terminal_view_id),
+                ctx,
+            );
+            assert!(matches!(
+                locally_denied,
+                CommandExecutionPermission::Denied(
+                    CommandExecutionPermissionDeniedReason::ExplicitlyDenylisted
+                )
+            ));
+        });
+
+        user_workspaces.update(&mut app, |model, ctx| {
+            model.update_ai_autonomy_settings(
+                |settings| {
+                    settings.execute_commands_setting = Some(ActionPermission::AlwaysAsk);
+                },
+                ctx,
+            );
+        });
+        permissions.read(&app, |model, ctx| {
+            let organization_approval_required = model.can_autoexecute_command(
+                &convo_id,
+                "echo hello",
+                EscapeChar::Backslash,
+                false,
+                None,
+                Some(terminal_view_id),
+                ctx,
+            );
+            assert!(matches!(
+                organization_approval_required,
+                CommandExecutionPermission::Denied(
+                    CommandExecutionPermissionDeniedReason::AlwaysAskEnabled
+                )
+            ));
+        });
+    })
+}
+
+#[test]
 fn test_can_autoexecute_command_auto_approve_respects_local_denylist_when_bypass_disabled() {
     App::test((), |mut app| async move {
         let PermissionsTestState {
@@ -1155,6 +1321,69 @@ fn test_can_use_mcp_server_always_allow_with_denylist() {
                 Some(other_uuid),
                 Some(terminal_view_id),
                 ctx
+            ));
+        });
+    })
+}
+
+#[test]
+fn test_approval_modes_distinguish_mcp_denylist() {
+    App::test((), |mut app| async move {
+        let _flag = FeatureFlag::AgentApprovalModes.override_enabled(true);
+        let PermissionsTestState {
+            convo_id,
+            history,
+            permissions,
+            profile_model,
+            terminal_view_id,
+            ..
+        } = initialize_permissions_test(&mut app);
+
+        let server_uuid = Uuid::new_v4();
+        profile_model.update(&mut app, |model, ctx| {
+            model.set_mcp_permissions(
+                model.active_profile(Some(terminal_view_id), ctx).id(),
+                &ActionPermission::AlwaysAllow,
+                ctx,
+            );
+            model.add_to_mcp_denylist(
+                model.active_profile(Some(terminal_view_id), ctx).id(),
+                &server_uuid,
+                ctx,
+            );
+        });
+
+        history.update(&mut app, |history, ctx| {
+            history.set_autoexecute_override(
+                &convo_id,
+                terminal_view_id,
+                AIConversationAutoexecuteMode::RunToCompletion,
+                ctx,
+            );
+        });
+        permissions.read(&app, |model, ctx| {
+            assert!(!model.can_use_mcp_server(
+                &convo_id,
+                Some(server_uuid),
+                Some(terminal_view_id),
+                ctx,
+            ));
+        });
+
+        history.update(&mut app, |history, ctx| {
+            history.set_autoexecute_override(
+                &convo_id,
+                terminal_view_id,
+                AIConversationAutoexecuteMode::FullAccess,
+                ctx,
+            );
+        });
+        permissions.read(&app, |model, ctx| {
+            assert!(model.can_use_mcp_server(
+                &convo_id,
+                Some(server_uuid),
+                Some(terminal_view_id),
+                ctx,
             ));
         });
     })

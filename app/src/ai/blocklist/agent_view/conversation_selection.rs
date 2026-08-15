@@ -177,20 +177,43 @@ impl ConversationSelection for AgentViewConversationSelection {
                 BlocklistAIHistoryModel::as_ref(app).conversation(conversation_id)
             })
             .map(|conversation| conversation.autoexecute_override())
-            .unwrap_or_default()
+            .unwrap_or_else(|| {
+                BlocklistAIHistoryModel::as_ref(app)
+                    .default_autoexecute_mode(self.terminal_surface_id)
+            })
+    }
+
+    fn set_pending_query_autoexecute_override(
+        &mut self,
+        mode: AIConversationAutoexecuteMode,
+        ctx: &mut ModelContext<Box<dyn ConversationSelection>>,
+    ) {
+        if let Some(conversation_id) = self.selected_conversation_id(ctx) {
+            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                history.set_autoexecute_override(
+                    &conversation_id,
+                    self.terminal_surface_id,
+                    mode,
+                    ctx,
+                );
+            });
+        }
     }
 
     fn toggle_pending_query_autoexecute(
         &mut self,
         ctx: &mut ModelContext<Box<dyn ConversationSelection>>,
     ) {
-        if let Some(conversation_id) = self.selected_conversation_id(ctx) {
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                history.toggle_autoexecute_override(
-                    &conversation_id,
-                    self.terminal_surface_id,
-                    ctx,
-                );
+        let current = self.pending_query_autoexecute_override(ctx);
+        let mode = if current.is_autoexecute_any_action() {
+            AIConversationAutoexecuteMode::RespectUserSettings
+        } else {
+            AIConversationAutoexecuteMode::RunToCompletion
+        };
+        self.set_pending_query_autoexecute_override(mode, ctx);
+        if mode == AIConversationAutoexecuteMode::RespectUserSettings {
+            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, _| {
+                history.set_default_autoexecute_mode(self.terminal_surface_id, mode);
             });
         }
     }

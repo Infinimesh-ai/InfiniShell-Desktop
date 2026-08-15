@@ -3554,11 +3554,11 @@ impl TuiTerminalSessionView {
             .warping_auto_approve_mouse
             .lock()
             .is_ok_and(|state| state.is_hovered());
-        let enabled = self
+        let mode = self
             .conversation_selection
             .as_ref(ctx)
-            .pending_query_autoexecute_override(ctx)
-            .is_autoexecute_any_action();
+            .pending_query_autoexecute_override(ctx);
+        let enabled = mode.is_autoexecute_any_action();
         let mut style = if enabled {
             builder.success_glyph_style()
         } else {
@@ -3569,10 +3569,13 @@ impl TuiTerminalSessionView {
         }
         let auto_approve = TuiHoverable::new(
             self.warping_auto_approve_mouse.clone(),
-            TuiText::new(format!(
-                "▶▶ Auto approve {}",
-                if enabled { "on" } else { "off" }
-            ))
+            TuiText::new(match mode {
+                AIConversationAutoexecuteMode::RespectUserSettings => {
+                    "▶▶ Auto approve off".to_owned()
+                }
+                AIConversationAutoexecuteMode::RunToCompletion => "▶▶ Auto approve on".to_owned(),
+                AIConversationAutoexecuteMode::FullAccess => "▶▶ Full access on".to_owned(),
+            })
             .with_style(style)
             .truncate()
             .finish(),

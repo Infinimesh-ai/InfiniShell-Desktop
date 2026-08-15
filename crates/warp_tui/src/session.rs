@@ -58,6 +58,10 @@ struct TuiArgs {
     #[arg(long)]
     auto_approve: bool,
 
+    /// Use Full Access for new conversations, subject to organization and sandbox policy.
+    #[arg(long, conflicts_with = "auto_approve")]
+    full_access: bool,
+
     /// API key for non-interactive authentication.
     #[arg(long, env = "WARP_API_KEY")]
     api_key: Option<String>,
@@ -190,7 +194,9 @@ pub fn run() -> Result<()> {
         }));
     }
     let resume_token = args.resume.map(parse_resume_token).transpose()?;
-    let default_autoexecute_mode = if args.auto_approve {
+    let default_autoexecute_mode = if args.full_access {
+        AIConversationAutoexecuteMode::FullAccess
+    } else if args.auto_approve {
         AIConversationAutoexecuteMode::RunToCompletion
     } else {
         AIConversationAutoexecuteMode::RespectUserSettings

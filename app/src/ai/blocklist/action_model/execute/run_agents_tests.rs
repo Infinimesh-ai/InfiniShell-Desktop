@@ -8,6 +8,7 @@ use warpui::{App, Entity, EntityId, ModelHandle};
 
 use super::*;
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
+use crate::ai::agent::conversation::AIConversationAutoexecuteMode;
 use crate::ai::agent::task::TaskId;
 use crate::ai::blocklist::{
     BlocklistAIHistoryModel, BlocklistAIPermissions, StartAgentExecutorEvent, StartAgentRequest,
@@ -536,6 +537,46 @@ fn should_not_autoexecute_without_approved_plan_or_always_allow_profile() {
             )
         });
 
+        assert!(!should_autoexecute);
+    });
+}
+
+#[test]
+fn approval_mode_autoexecutes_run_agents_unless_the_capability_is_disabled() {
+    let _flag = FeatureFlag::AgentApprovalModes.override_enabled(true);
+    App::test((), |mut app| async move {
+        let state = initialize_run_agents_test(&mut app, ExecutionMode::App);
+        BlocklistAIHistoryModel::handle(&app).update(&mut app, |history, ctx| {
+            history.set_autoexecute_override(
+                &state.conversation_id,
+                EntityId::new(),
+                AIConversationAutoexecuteMode::RunToCompletion,
+                ctx,
+            );
+        });
+        let action = remote_run_agents_action("oz");
+
+        let should_autoexecute = state.executor.update(&mut app, |executor, ctx| {
+            executor.should_autoexecute(
+                ExecuteActionInput {
+                    action: &action,
+                    conversation_id: state.conversation_id,
+                },
+                ctx,
+            )
+        });
+        assert!(should_autoexecute);
+
+        set_run_agents_permission(&mut app, RunAgentsPermission::NeverAllow);
+        let should_autoexecute = state.executor.update(&mut app, |executor, ctx| {
+            executor.should_autoexecute(
+                ExecuteActionInput {
+                    action: &action,
+                    conversation_id: state.conversation_id,
+                },
+                ctx,
+            )
+        });
         assert!(!should_autoexecute);
     });
 }

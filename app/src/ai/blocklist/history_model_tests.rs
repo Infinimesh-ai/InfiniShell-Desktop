@@ -17,7 +17,7 @@ use super::{
 };
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{
-    AIConversation, AIConversationId, ConversationStatus, TodoStatus,
+    AIConversation, AIConversationAutoexecuteMode, AIConversationId, ConversationStatus, TodoStatus,
 };
 use crate::ai::agent::task::helper::MessageExt;
 use crate::ai::agent::todos::AIAgentTodoList;
@@ -2174,6 +2174,76 @@ fn test_all_cleared_conversations_includes_terminal_view_id() {
         });
 
         assert!(has_cleared);
+    });
+}
+
+#[test]
+fn test_session_default_autoexecute_mode_applies_only_to_new_conversations() {
+    App::test((), |mut app| async move {
+        let history_model = app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
+        let terminal_view_id = EntityId::new();
+
+        let (current_task_id, inherited_task_id, approval_id) =
+            history_model.update(&mut app, |history_model, ctx| {
+                history_model.set_default_autoexecute_mode(
+                    terminal_view_id,
+                    AIConversationAutoexecuteMode::FullAccess,
+                );
+                let current_task_id = history_model.start_new_conversation(
+                    terminal_view_id,
+                    false,
+                    false,
+                    false,
+                    ctx,
+                );
+                history_model
+                    .conversation_mut(&current_task_id)
+                    .expect("current conversation should exist")
+                    .set_autoexecute_override(AIConversationAutoexecuteMode::RespectUserSettings);
+                let inherited_task_id = history_model.start_new_conversation(
+                    terminal_view_id,
+                    false,
+                    false,
+                    false,
+                    ctx,
+                );
+                history_model.set_default_autoexecute_mode(
+                    terminal_view_id,
+                    AIConversationAutoexecuteMode::RespectUserSettings,
+                );
+                let approval_id = history_model.start_new_conversation(
+                    terminal_view_id,
+                    false,
+                    false,
+                    false,
+                    ctx,
+                );
+                (current_task_id, inherited_task_id, approval_id)
+            });
+
+        history_model.read(&app, |history_model, _| {
+            assert_eq!(
+                history_model
+                    .conversation(&current_task_id)
+                    .expect("current conversation should exist")
+                    .autoexecute_override(),
+                AIConversationAutoexecuteMode::RespectUserSettings
+            );
+            assert_eq!(
+                history_model
+                    .conversation(&inherited_task_id)
+                    .expect("inherited conversation should exist")
+                    .autoexecute_override(),
+                AIConversationAutoexecuteMode::FullAccess
+            );
+            assert_eq!(
+                history_model
+                    .conversation(&approval_id)
+                    .expect("approval conversation should exist")
+                    .autoexecute_override(),
+                AIConversationAutoexecuteMode::RespectUserSettings
+            );
+        });
     });
 }
 

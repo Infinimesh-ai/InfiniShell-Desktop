@@ -25,11 +25,8 @@ impl TuiConversationSelection {
         default_autoexecute_mode: AIConversationAutoexecuteMode,
         ctx: &mut ModelContext<Box<dyn ConversationSelection>>,
     ) -> Self {
-        let conversation_id = Self::start_new_conversation(
-            terminal_surface_id,
-            default_autoexecute_mode.is_autoexecute_any_action(),
-            ctx,
-        );
+        let conversation_id =
+            Self::start_new_conversation(terminal_surface_id, default_autoexecute_mode, ctx);
 
         terminal_model
             .lock()
@@ -50,15 +47,16 @@ impl TuiConversationSelection {
     /// Creates an empty conversation for a TUI terminal surface.
     fn start_new_conversation(
         terminal_surface_id: EntityId,
-        is_autoexecute_override: bool,
+        autoexecute_mode: AIConversationAutoexecuteMode,
         ctx: &mut ModelContext<Box<dyn ConversationSelection>>,
     ) -> AIConversationId {
         BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-            let conversation_id = history.start_new_conversation(
+            let conversation_id =
+                history.start_new_conversation(terminal_surface_id, false, false, false, ctx);
+            history.set_autoexecute_override(
+                &conversation_id,
                 terminal_surface_id,
-                is_autoexecute_override,
-                false,
-                false,
+                autoexecute_mode,
                 ctx,
             );
             history.set_active_conversation_id(conversation_id, terminal_surface_id, ctx);
@@ -260,11 +258,14 @@ impl ConversationSelection for TuiConversationSelection {
         if let Some(previous_conversation_id) = previous_conversation_id {
             Self::emit_deactivated(previous_conversation_id, true, ctx);
         }
-        let conversation_id = Self::start_new_conversation(
-            self.terminal_surface_id,
-            self.default_autoexecute_mode.is_autoexecute_any_action(),
-            ctx,
-        );
+        let autoexecute_mode = match self.pending_query_state {
+            PendingQueryState::New {
+                autoexecute_override,
+            } => autoexecute_override,
+            PendingQueryState::Existing { .. } => self.default_autoexecute_mode,
+        };
+        let conversation_id =
+            Self::start_new_conversation(self.terminal_surface_id, autoexecute_mode, ctx);
         self.set_terminal_conversation_context(Some(conversation_id));
         self.set_pending_query_state(PendingQueryState::Existing { conversation_id }, ctx);
         Self::emit_activated(origin, ctx);
@@ -300,28 +301,37 @@ impl ConversationSelection for TuiConversationSelection {
         &mut self,
         ctx: &mut ModelContext<Box<dyn ConversationSelection>>,
     ) {
+        let current = self.pending_query_autoexecute_override(ctx);
+        let mode = if current.is_autoexecute_any_action() {
+            AIConversationAutoexecuteMode::RespectUserSettings
+        } else {
+            AIConversationAutoexecuteMode::RunToCompletion
+        };
+        self.set_pending_query_autoexecute_override(mode, ctx);
+    }
+
+    fn set_pending_query_autoexecute_override(
+        &mut self,
+        mode: AIConversationAutoexecuteMode,
+        ctx: &mut ModelContext<Box<dyn ConversationSelection>>,
+    ) {
         match self.pending_query_state.clone() {
             PendingQueryState::New {
-                autoexecute_override,
+                autoexecute_override: _,
             } => {
-                let autoexecute_override =
-                    if autoexecute_override == AIConversationAutoexecuteMode::RespectUserSettings {
-                        AIConversationAutoexecuteMode::RunToCompletion
-                    } else {
-                        AIConversationAutoexecuteMode::RespectUserSettings
-                    };
                 self.set_pending_query_state(
                     PendingQueryState::New {
-                        autoexecute_override,
+                        autoexecute_override: mode,
                     },
                     ctx,
                 );
             }
             PendingQueryState::Existing { conversation_id } => {
                 BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                    history.toggle_autoexecute_override(
+                    history.set_autoexecute_override(
                         &conversation_id,
                         self.terminal_surface_id,
+                        mode,
                         ctx,
                     );
                 });
@@ -365,20 +375,14 @@ impl ConversationSelection for TuiConversationSelection {
                 new_conversation_id,
                 ..
             } if self.selected_id() == Some(*old_conversation_id) => {
-                if self.default_autoexecute_mode.is_autoexecute_any_action() {
-                    BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                        if history
-                            .conversation(new_conversation_id)
-                            .is_some_and(|conversation| !conversation.autoexecute_any_action())
-                        {
-                            history.toggle_autoexecute_override(
-                                new_conversation_id,
-                                self.terminal_surface_id,
-                                ctx,
-                            );
-                        }
-                    });
-                }
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    history.set_autoexecute_override(
+                        new_conversation_id,
+                        self.terminal_surface_id,
+                        self.default_autoexecute_mode,
+                        ctx,
+                    );
+                });
                 self.select_existing_conversation(
                     *new_conversation_id,
                     AgentViewEntryOrigin::AgentRequestedNewConversation,

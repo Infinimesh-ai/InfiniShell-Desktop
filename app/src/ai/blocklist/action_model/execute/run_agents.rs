@@ -448,6 +448,16 @@ impl RunAgentsExecutor {
         {
             return true;
         }
+        if FeatureFlag::AgentApprovalModes.is_enabled()
+            && BlocklistAIHistoryModel::as_ref(ctx)
+                .conversation(&input.conversation_id)
+                .is_some_and(|conversation| conversation.autoexecute_any_action())
+            && !BlocklistAIPermissions::as_ref(ctx)
+                .get_run_agents_setting(ctx, Some(self.terminal_view_id))
+                .is_never_allow()
+        {
+            return true;
+        }
         let mut resolved_request = request.clone();
         resolve_request_from_approved_config(&mut resolved_request, input.conversation_id, ctx);
         populate_default_auth_secret_for_execution(&mut resolved_request, ctx);

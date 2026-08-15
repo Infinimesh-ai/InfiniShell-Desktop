@@ -1205,6 +1205,22 @@ fn restored_conversation_uses_persisted_autoexecute_override_when_enabled() {
 }
 
 #[test]
+fn restored_conversation_uses_persisted_full_access_when_enabled() {
+    let _flag = FeatureFlag::RememberFastForwardState.override_enabled(true);
+    let conversation_data: AgentConversationData = serde_json::from_str(
+        r#"{"server_conversation_token":null,"autoexecute_override":"FullAccess"}"#,
+    )
+    .unwrap();
+
+    let conversation = restored_conversation(Some(conversation_data));
+
+    assert_eq!(
+        conversation.autoexecute_override(),
+        AIConversationAutoexecuteMode::FullAccess
+    );
+}
+
+#[test]
 fn restored_conversation_ignores_persisted_autoexecute_override_when_disabled() {
     let _flag = FeatureFlag::RememberFastForwardState.override_enabled(false);
     let conversation_data: AgentConversationData = serde_json::from_str(

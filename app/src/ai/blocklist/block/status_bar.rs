@@ -857,6 +857,9 @@ impl BlocklistAIStatusBar {
                             .conversation(app)
                             .map(|c| c.autoexecute_any_action())
                             .unwrap_or(false),
+                        is_full_access: model.conversation(app).is_some_and(|conversation| {
+                            conversation.autoexecute_override().is_full_access()
+                        }),
                         is_locked: is_in_cloud_context(&terminal_model),
                     },
                 ),
