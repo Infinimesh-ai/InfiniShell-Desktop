@@ -30,9 +30,9 @@ use warp::tui_export::{
     TranscriptScope, TuiMcpAction, TuiMcpServerId, TuiOnboardingMarker, TuiOnboardingMarkers,
     TuiUpArrowHistoryItemKind, UserTakeOverReason, WarpConfig, WarpConfigUpdateEvent,
     export_conversation_markdown, forkable_tui_conversation_for_test, queue_tui_permission_action,
-    register_tui_session_view_test_singletons, set_tui_default_team_admin_for_test, slash_commands,
+    register_tui_session_view_test_singletons, slash_commands,
 };
-use warp_core::channel::{Channel, ChannelState};
+use warp_core::channel::Channel;
 use warp_core::features::FeatureFlag;
 use warp_core::settings::Setting as _;
 use warp_editor::model::CoreEditorModel;
@@ -280,85 +280,6 @@ fn upgrade_slash_command_is_always_available_and_opens_the_upgrade_page() {
         });
     });
 }
-#[test]
-fn manage_billing_slash_command_opens_the_default_team_billing_page_for_admins() {
-    App::test((), |mut app| async move {
-        let fixture = focus_test_fixture(&mut app);
-        let (view, _) = add_focus_test_session(&mut app, &fixture, true);
-        view.read(&app, |view, ctx| {
-            assert!(!matches!(
-                view.slash_commands_source
-                    .as_ref(ctx)
-                    .parse_input("/manage-billing", ctx),
-                ParsedSlashCommandInput::SlashCommand(_)
-            ));
-        });
-        app.update(set_tui_default_team_admin_for_test);
-        let opened_urls = Rc::new(RefCell::new(Vec::new()));
-        let opened_urls_for_callback = opened_urls.clone();
-        app.update(|ctx| {
-            ctx.set_before_open_url(move |url, _| {
-                opened_urls_for_callback.borrow_mut().push(url.to_owned());
-                url.to_owned()
-            });
-        });
-
-        view.update(&mut app, |view, ctx| {
-            assert!(matches!(
-                view.slash_commands_source
-                    .as_ref(ctx)
-                    .parse_input("/manage-billing", ctx),
-                ParsedSlashCommandInput::SlashCommand(_)
-            ));
-            view.execute_tui_slash_command(&slash_commands::MANAGE_BILLING, None, ctx);
-        });
-
-        assert_eq!(
-            opened_urls.borrow().as_slice(),
-            &[format!(
-                "{}/admin/tui-test-team-00000000/billing",
-                ChannelState::server_root_url().trim_end_matches('/')
-            )]
-        );
-    });
-}
-
-#[test]
-fn manage_billing_slash_command_rejects_users_without_an_admin_team() {
-    App::test((), |mut app| async move {
-        let fixture = focus_test_fixture(&mut app);
-        let (view, _) = add_focus_test_session(&mut app, &fixture, true);
-        let opened_urls = Rc::new(RefCell::new(Vec::new()));
-        let opened_urls_for_callback = opened_urls.clone();
-        app.update(|ctx| {
-            ctx.set_before_open_url(move |url, _| {
-                opened_urls_for_callback.borrow_mut().push(url.to_owned());
-                url.to_owned()
-            });
-        });
-
-        view.update(&mut app, |view, ctx| {
-            assert!(!matches!(
-                view.slash_commands_source
-                    .as_ref(ctx)
-                    .parse_input("/manage-billing", ctx),
-                ParsedSlashCommandInput::SlashCommand(_)
-            ));
-            view.execute_tui_slash_command(&slash_commands::MANAGE_BILLING, None, ctx);
-        });
-
-        assert!(opened_urls.borrow().is_empty());
-        assert_eq!(
-            view.read(&app, |view, _| {
-                view.transient_hint
-                    .current()
-                    .map(|(text, _)| text.to_owned())
-            }),
-            Some("Billing management is only available to team admins".to_owned())
-        );
-    });
-}
-
 #[test]
 fn mcp_menu_footer_hides_unavailable_primary_control() {
     App::test((), |mut app| async move {
@@ -3127,7 +3048,7 @@ fn status_slash_command_opens_dedicated_status_menu_via_shared_structure() {
             "/status must NOT open the shortcuts panel (Shortcuts mode)"
         );
 
-        // The full session render must show the six status fields through the
+        // The full session render must show the four local status fields through the
         // shared read-only panel structure.
         let rendered = render_session(&mut app, &view, 80, 24).join("\n");
         assert!(
@@ -3144,22 +3065,17 @@ fn status_slash_command_opens_dedicated_status_menu_via_shared_structure() {
             rendered.contains("Working directory"),
             "Working directory row:\n{rendered}"
         );
-        assert!(rendered.contains("Org"), "Org row:\n{rendered}");
-        assert!(rendered.contains("Email"), "Email row:\n{rendered}");
+        assert!(
+            !rendered.contains("Org"),
+            "Org row must be absent:\n{rendered}"
+        );
+        assert!(
+            !rendered.contains("Email"),
+            "Email row must be absent:\n{rendered}"
+        );
 
-        // The fixture signs in as the test user, so the panel surfaces that
-        // email. No workspace is loaded (Org degrades to the em-dash placeholder)
-        // and there is no conversation yet (Session falls back to "Untitled").
-        assert!(
-            rendered.contains("test_user@warp.dev"),
-            "Email value:\n{rendered}"
-        );
+        // There is no conversation yet, so Session falls back to "Untitled".
         assert!(rendered.contains("Untitled"), "Session value:\n{rendered}");
-        // Em dash (—) appears as the Org placeholder.
-        assert!(
-            rendered.contains("\u{2014}"),
-            "Org placeholder (em dash):\n{rendered}"
-        );
 
         // The dedicated status menu does NOT include keyboard shortcut rows.
         assert!(
@@ -3196,16 +3112,6 @@ fn status_conversation_id_uses_the_selected_id_or_none() {
     assert_eq!(super::format_status_conversation_id(None), "None");
 }
 
-#[test]
-fn user_info_updates_only_require_an_open_status_menu_repaint() {
-    assert!(!super::status_menu_is_open(TuiInputSuggestionsMode::Closed));
-    assert!(!super::status_menu_is_open(
-        TuiInputSuggestionsMode::ReadOnlyMenu(TuiReadOnlyMenuKind::Shortcuts)
-    ));
-    assert!(super::status_menu_is_open(
-        TuiInputSuggestionsMode::ReadOnlyMenu(TuiReadOnlyMenuKind::Status)
-    ));
-}
 #[test]
 fn bootstrap_renders_starting_shell_above_input() {
     App::test((), |mut app| async move {
@@ -6900,60 +6806,6 @@ fn killing_child_does_not_exit_tui_parent_session_remains_alive() {
             );
         });
     });
-}
-
-#[test]
-fn status_email_fallback_chain_requires_a_validated_identity() {
-    // Arm 1: non-empty email wins regardless of username.
-    assert_eq!(
-        super::resolve_status_email(
-            Some("user@example.com".to_owned()),
-            Some("display_name".to_owned()),
-            Some("user-123".to_owned()),
-            true,
-        ),
-        "user@example.com"
-    );
-    // Arm 2a: empty email falls back to a non-empty username.
-    assert_eq!(
-        super::resolve_status_email(
-            Some(String::new()),
-            Some("display_name".to_owned()),
-            Some("user-123".to_owned()),
-            true,
-        ),
-        "display_name"
-    );
-    // Arm 2b: None email falls back to a non-empty username.
-    assert_eq!(
-        super::resolve_status_email(
-            None,
-            Some("display_name".to_owned()),
-            Some("user-123".to_owned()),
-            true,
-        ),
-        "display_name"
-    );
-    // Arm 3: user ID is the final validated identity fallback.
-    assert_eq!(
-        super::resolve_status_email(None, None, Some("user-123".to_owned()), true),
-        "user-123"
-    );
-    // Arm 4: a missing identity never degrades to bare "Signed in".
-    assert_eq!(
-        super::resolve_status_email(Some(String::new()), Some(String::new()), None, true),
-        super::STATUS_NOT_SIGNED_IN
-    );
-    // Arm 5: an identity is ignored unless auth has been validated.
-    assert_eq!(
-        super::resolve_status_email(
-            Some("user@example.com".to_owned()),
-            Some("display_name".to_owned()),
-            Some("user-123".to_owned()),
-            false,
-        ),
-        super::STATUS_NOT_SIGNED_IN
-    );
 }
 
 #[test]

@@ -17,8 +17,7 @@ use ai::project_context::model::{
 use warp::settings::{TuiZeroStateSettings, TuiZeroStateSettingsChangedEvent};
 use warp::tui_export::{
     ActiveSession, ActiveSessionEvent, ChangelogModel, ChangelogModelEvent, ChangelogState,
-    SkillManager, SkillManagerEvent, TuiMcpManager, TuiMcpServerStatus, TuiUserInfoManager,
-    TuiUserInfoManagerEvent, TuiUserInfoSnapshot,
+    SkillManager, SkillManagerEvent, TuiMcpManager, TuiMcpServerStatus,
 };
 use warp_core::channel::ChannelState;
 use warp_core::settings::Setting;
@@ -64,7 +63,6 @@ enum ZeroStateVariant {
 
 #[derive(Clone, Copy)]
 struct ZeroStateSectionVisibility {
-    signed_in_user: bool,
     changelog: bool,
     project_info: bool,
     mcp: bool,
@@ -74,7 +72,6 @@ struct ZeroStateSectionVisibility {
 impl Default for ZeroStateSectionVisibility {
     fn default() -> Self {
         Self {
-            signed_in_user: true,
             changelog: true,
             project_info: true,
             mcp: true,
@@ -90,7 +87,6 @@ impl ZeroStateSectionVisibility {
         }
         let settings = TuiZeroStateSettings::as_ref(ctx);
         Self {
-            signed_in_user: *settings.show_signed_in_user.value(),
             changelog: *settings.show_changelog.value(),
             project_info: *settings.show_project_info.value(),
             mcp: *settings.show_mcp.value(),
@@ -151,10 +147,6 @@ impl TuiZeroStateView {
             }
         });
         ctx.subscribe_to_model(&TuiMcpManager::handle(ctx), |_, _, _, ctx| ctx.notify());
-        ctx.subscribe_to_model(&TuiUserInfoManager::handle(ctx), |_, _, event, ctx| {
-            let TuiUserInfoManagerEvent::Updated = event;
-            ctx.notify();
-        });
         ctx.subscribe_to_model(&active_session, |_, _, event, ctx| {
             let ActiveSessionEvent::UpdatedPwd = event else {
                 return;
@@ -176,10 +168,7 @@ impl TuiZeroStateView {
         if ctx.has_singleton_model::<TuiZeroStateSettings>() {
             ctx.subscribe_to_model(&TuiZeroStateSettings::handle(ctx), |view, _, event, ctx| {
                 match event {
-                    TuiZeroStateSettingsChangedEvent::TuiZeroStateShowSignedInUserSetting {
-                        ..
-                    }
-                    | TuiZeroStateSettingsChangedEvent::TuiZeroStateShowChangelogSetting {
+                    TuiZeroStateSettingsChangedEvent::TuiZeroStateShowChangelogSetting {
                         ..
                     }
                     | TuiZeroStateSettingsChangedEvent::TuiZeroStateShowProjectInfoSetting {
@@ -631,7 +620,7 @@ fn render_top_section(
 ) -> TuiFlex {
     match variant {
         ZeroStateVariant::Standard => render_standard_top_section(builder, visibility, app),
-        ZeroStateVariant::FirstRun => render_first_run_top_section(builder, visibility, app),
+        ZeroStateVariant::FirstRun => render_first_run_top_section(builder, app),
     }
 }
 
@@ -652,9 +641,6 @@ fn render_standard_top_section(
                 .finish(),
         )
         .child(render_version_line(builder, app));
-    if visibility.signed_in_user {
-        column = column.child(render_login_line(builder, app));
-    }
 
     let bullets = if visibility.changelog {
         changelog_bullets(app)
@@ -682,17 +668,10 @@ fn render_standard_top_section(
     column
 }
 
-fn render_first_run_top_section(
-    builder: &TuiUiBuilder,
-    visibility: ZeroStateSectionVisibility,
-    app: &AppContext,
-) -> TuiFlex {
+fn render_first_run_top_section(builder: &TuiUiBuilder, app: &AppContext) -> TuiFlex {
     let mut column = TuiFlex::column()
         .child(render_welcome_title(builder))
         .child(render_version_line(builder, app));
-    if visibility.signed_in_user {
-        column = column.child(render_login_line_with_prefix("logged in as", builder, app));
-    }
     column = column.child(blank_row()).child(blank_row());
     column = append_welcome_capability_section(column, builder);
     column.child(blank_row())
@@ -831,42 +810,6 @@ fn mcp_status_label(snapshot: &warp::tui_export::TuiMcpSnapshot) -> (String, boo
         format!("{} · /mcp", parts.join(" · ")),
         !snapshot.diagnostics.is_empty(),
     )
-}
-
-/// The login-info line: the signed-in account (email, falling back to the
-/// display name) when authenticated, or a graceful "Not signed in" state when
-/// not. The zero state is normally only shown after login, but the unauthenticated
-/// branch keeps the surface honest if it is ever rendered before auth completes.
-fn render_login_line(builder: &TuiUiBuilder, app: &AppContext) -> Box<dyn TuiElement> {
-    render_login_line_with_prefix("Signed in as", builder, app)
-}
-
-fn render_login_line_with_prefix(
-    signed_in_prefix: &str,
-    builder: &TuiUiBuilder,
-    app: &AppContext,
-) -> Box<dyn TuiElement> {
-    let muted = builder.muted_text_style();
-    let dim = builder.dim_text_style();
-    let user_info = TuiUserInfoManager::as_ref(app).snapshot(app);
-    let (label, style) = if let Some(label) = login_line_label(signed_in_prefix, user_info) {
-        (label, muted)
-    } else {
-        ("Not signed in".to_owned(), dim)
-    };
-    TuiText::new(label).with_style(style).truncate().finish()
-}
-
-fn login_line_label(signed_in_prefix: &str, user_info: TuiUserInfoSnapshot) -> Option<String> {
-    if !user_info.is_logged_in {
-        return None;
-    }
-    user_info
-        .email
-        .filter(|email| !email.is_empty())
-        .or(user_info.username.filter(|username| !username.is_empty()))
-        .or(user_info.user_id.filter(|user_id| !user_id.is_empty()))
-        .map(|display| format!("{signed_in_prefix} {display}"))
 }
 
 /// User-facing copy for each visible background updater status.

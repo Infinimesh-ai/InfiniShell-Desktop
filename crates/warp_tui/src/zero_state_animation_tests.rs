@@ -11,7 +11,7 @@ use warp::settings::{
     TuiZeroStateObject, TuiZeroStateObjectSetting, TuiZeroStateRotationPeriodSeconds,
     TuiZeroStateRotationPeriodSecondsSetting, TuiZeroStateSettings,
     TuiZeroStateShowAnimationSetting, TuiZeroStateShowChangelogSetting, TuiZeroStateShowMcpSetting,
-    TuiZeroStateShowProjectInfoSetting, TuiZeroStateShowSignedInUserSetting,
+    TuiZeroStateShowProjectInfoSetting,
 };
 use warp_core::settings::Setting as _;
 use warpui::{EntityIdMap, SingletonEntity as _};
@@ -611,7 +611,6 @@ fn settings_model_reloads_only_object_changes() {
                 })),
                 rotation_period_seconds: TuiZeroStateRotationPeriodSecondsSetting::new(None),
                 extrusion_depth: TuiZeroStateExtrusionDepthSetting::new(None),
-                show_signed_in_user: TuiZeroStateShowSignedInUserSetting::new(None),
                 show_changelog: TuiZeroStateShowChangelogSetting::new(None),
                 show_project_info: TuiZeroStateShowProjectInfoSetting::new(None),
                 show_mcp: TuiZeroStateShowMcpSetting::new(None),

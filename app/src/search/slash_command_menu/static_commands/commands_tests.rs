@@ -161,25 +161,6 @@ fn connect_grok_command_is_tui_only_and_has_no_arguments() {
 }
 
 #[test]
-fn manage_billing_command_is_always_available_only_in_tui_mode() {
-    let command = all_commands(settings::SettingsMode::Tui)
-        .into_iter()
-        .find(|command| command.kind == SlashCommandKind::ManageBilling)
-        .expect("expected /manage-billing to be registered in TUI mode");
-
-    assert_eq!(command, MANAGE_BILLING);
-    assert_eq!(command.availability, Availability::ALWAYS);
-    assert_eq!(command.supported_surfaces, SlashCommandSurfaces::TuiOnly);
-    assert!(!command.auto_enter_ai_mode);
-    assert!(command.argument.is_none());
-    assert!(
-        all_commands(settings::SettingsMode::Gui)
-            .iter()
-            .all(|command| command.kind != SlashCommandKind::ManageBilling)
-    );
-}
-
-#[test]
 fn upgrade_command_is_always_available_only_in_tui_mode() {
     let command = all_commands(settings::SettingsMode::Tui)
         .into_iter()
@@ -270,20 +251,6 @@ fn reset_statusline_command_is_always_available_only_in_tui_mode() {
             .all(|command| command.kind != SlashCommandKind::ResetStatusline)
     );
 }
-#[test]
-fn logout_command_is_registered_only_for_tui_mode() {
-    assert!(
-        all_commands(settings::SettingsMode::Tui)
-            .iter()
-            .any(|command| command == &LOGOUT)
-    );
-    assert!(
-        !all_commands(settings::SettingsMode::Gui)
-            .iter()
-            .any(|command| command == &LOGOUT)
-    );
-}
-
 #[test]
 fn version_command_is_not_registered() {
     for settings_mode in [settings::SettingsMode::Gui, settings::SettingsMode::Tui] {

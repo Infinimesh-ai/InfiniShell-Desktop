@@ -428,17 +428,6 @@ impl ZeroStateInteractionState {
 pub(crate) struct ZeroStateInteractionHandle(Arc<Mutex<ZeroStateInteractionState>>);
 
 impl ZeroStateInteractionHandle {
-    /// A handle for surfaces that render the object as pure decoration, such as
-    /// the login screen. It is permanently hidden, so those surfaces keep the
-    /// ordinary idle animation and keep forwarding mouse events to their own
-    /// handlers instead of becoming a drag target.
-    pub(crate) fn non_interactive() -> Self {
-        Self(Arc::new(Mutex::new(ZeroStateInteractionState {
-            visible: false,
-            ..Default::default()
-        })))
-    }
-
     pub(crate) fn set_visible(&self, visible: bool) {
         let mut state = self.0.lock().expect("zero-state interaction lock poisoned");
         if state.visible && !visible {

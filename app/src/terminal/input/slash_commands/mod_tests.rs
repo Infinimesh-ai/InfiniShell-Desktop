@@ -83,7 +83,6 @@ fn tui_commands_have_typed_identities_and_explicit_surface_support() {
         (&commands::AUTO_APPROVE, SlashCommandKind::AutoApprove),
         (&commands::MCP, SlashCommandKind::Mcp),
         (&commands::EXIT, SlashCommandKind::Exit),
-        (&commands::LOGOUT, SlashCommandKind::Logout),
         (&commands::VIEW_LOGS, SlashCommandKind::ViewLogs),
         (&commands::VOICE, SlashCommandKind::Voice),
         (&commands::THEME, SlashCommandKind::Theme),
@@ -121,20 +120,6 @@ fn exit_command_executes_immediately_and_takes_no_argument() {
         SlashCommandSelectionBehavior::Execute
     );
     assert_eq!(commands::EXIT.availability, Availability::ALWAYS);
-}
-
-#[test]
-fn logout_command_executes_immediately_and_takes_no_argument() {
-    use super::{SlashCommandSelectionBehavior, slash_command_selection_behavior};
-
-    assert_eq!(commands::LOGOUT.kind, SlashCommandKind::Logout);
-    assert!(commands::LOGOUT.argument.is_none());
-    assert!(!slash_command_is_submitted_as_prompt(&commands::LOGOUT));
-    assert_eq!(
-        slash_command_selection_behavior(&commands::LOGOUT),
-        SlashCommandSelectionBehavior::Execute
-    );
-    assert_eq!(commands::LOGOUT.availability, Availability::ALWAYS);
 }
 
 #[test]

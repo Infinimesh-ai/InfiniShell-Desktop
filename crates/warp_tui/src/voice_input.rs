@@ -6,8 +6,7 @@ use warp::settings::{AISettings, TuiVoiceSettings};
 pub(crate) use warp::tui_export::VoiceInputLifecycleState as TuiVoiceInputState;
 use warp::tui_export::{
     AIRequestUsageModel, BlocklistAIInputModel, StartListeningError, TelemetryEvent,
-    TranscribeError, UserWorkspaces, VoiceInput, VoiceInputToggledFrom, VoiceSessionResult,
-    VoiceTranscriber,
+    TranscribeError, VoiceInput, VoiceInputToggledFrom, VoiceSessionResult, VoiceTranscriber,
 };
 use warp_core::settings::Setting as _;
 use warp_errors::report_error;
@@ -127,7 +126,6 @@ impl TuiVoiceInputModel {
 
         let available = local_skills_available
             && AISettings::as_ref(ctx).is_voice_input_enabled(ctx)
-            && UserWorkspaces::as_ref(ctx).is_voice_enabled()
             && AIRequestUsageModel::as_ref(ctx).can_request_voice();
         if !available {
             ctx.emit(TuiVoiceInputEvent::Failed(

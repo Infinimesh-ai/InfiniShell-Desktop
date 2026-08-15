@@ -226,8 +226,7 @@ pub use crate::tui::{
     TuiMcpAction, TuiMcpConfigDiagnostic, TuiMcpFileScope, TuiMcpFileSource, TuiMcpInstallRequest,
     TuiMcpManager, TuiMcpManagerEvent, TuiMcpServerId, TuiMcpServerSnapshot, TuiMcpServerSource,
     TuiMcpServerStatus, TuiMcpSnapshot, TuiMcpSyncedTemplateProvenance, TuiMcpTemplateVariable,
-    TuiMcpTransport, TuiMcpVariableValue, TuiUserInfoManager, TuiUserInfoManagerEvent,
-    TuiUserInfoSnapshot, log_out_tui,
+    TuiMcpTransport, TuiMcpVariableValue,
 };
 pub use crate::tui_onboarding_markers::{
     TuiOnboardingMarker, TuiOnboardingMarkers, TuiOnboardingMarkersEvent,
@@ -237,7 +236,7 @@ pub use crate::tui_test_support::{
     add_tui_history_test_models, append_tui_history_test_command,
     blocklist_ai_history_model_with_queries, forkable_tui_conversation_for_test,
     queue_tui_permission_action, register_tui_input_mode_test_settings,
-    register_tui_session_view_test_singletons, set_tui_default_team_admin_for_test,
+    register_tui_session_view_test_singletons,
 };
 pub use crate::user_config::{WarpConfig, WarpConfigUpdateEvent};
 pub use crate::util::image::{

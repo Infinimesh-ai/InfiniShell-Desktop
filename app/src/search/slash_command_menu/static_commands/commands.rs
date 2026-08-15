@@ -138,15 +138,6 @@ pub const CONNECT_GROK: StaticCommand = StaticCommand {
     argument: None,
 };
 
-pub const MANAGE_BILLING: StaticCommand = StaticCommand {
-    name: "/manage-billing",
-    description: "Open the team billing page in your browser",
-    kind: SlashCommandKind::ManageBilling,
-    supported_surfaces: SlashCommandSurfaces::TuiOnly,
-    availability: Availability::ALWAYS,
-    auto_enter_ai_mode: false,
-    argument: None,
-};
 pub const UPGRADE: StaticCommand = StaticCommand {
     name: "/upgrade",
     description: "Open the Warp upgrade page in your browser",
@@ -182,18 +173,8 @@ pub const EXIT: StaticCommand = StaticCommand {
 
 pub const STATUS: StaticCommand = StaticCommand {
     name: "/status",
-    description: "Show session and account status",
+    description: "Show local session status",
     kind: SlashCommandKind::Status,
-    supported_surfaces: SlashCommandSurfaces::TuiOnly,
-    availability: Availability::ALWAYS,
-    auto_enter_ai_mode: false,
-    argument: None,
-};
-
-pub const LOGOUT: StaticCommand = StaticCommand {
-    name: "/logout",
-    description: "Log out of Warp",
-    kind: SlashCommandKind::Logout,
     supported_surfaces: SlashCommandSurfaces::TuiOnly,
     availability: Availability::ALWAYS,
     auto_enter_ai_mode: false,
@@ -984,8 +965,6 @@ fn all_commands_for_all_surfaces() -> Vec<StaticCommand> {
         API_KEYS,
         CONNECT_GROK,
         UPGRADE,
-        MANAGE_BILLING,
-        LOGOUT,
         MCP,
         OPEN_PROJECT_RULES,
         OPEN_MCP_SERVERS,

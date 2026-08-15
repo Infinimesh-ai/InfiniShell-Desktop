@@ -5,14 +5,12 @@ use crate::read_only_menu::{
 };
 use crate::tui_builder::TuiUiBuilder;
 
-/// Session and account information displayed by the `/status` menu.
+/// Local session information displayed by the `/status` menu.
 pub(super) struct TuiStatusInfo {
     pub version: String,
     pub session: String,
     pub conversation_id: String,
     pub working_directory: String,
-    pub org: String,
-    pub email: String,
 }
 
 fn field_row(label: &str, value: &str, builder: &TuiUiBuilder) -> TuiReadOnlyMenuRow {
@@ -29,8 +27,6 @@ pub(super) fn menu(status_info: TuiStatusInfo, builder: &TuiUiBuilder) -> TuiRea
         ("Session", status_info.session.as_str()),
         ("Conversation ID", status_info.conversation_id.as_str()),
         ("Working directory", status_info.working_directory.as_str()),
-        ("Org", status_info.org.as_str()),
-        ("Email", status_info.email.as_str()),
     ]
     .into_iter()
     .map(|(label, value)| field_row(label, value, builder))

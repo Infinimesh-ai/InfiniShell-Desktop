@@ -166,16 +166,6 @@ define_settings_group!(TuiZeroStateSettings, settings: [
     // Per-section visibility toggles. Each defaults to true so the zero state
     // keeps rendering every section unless a section is explicitly turned off.
     // The title and version lines are always shown and have no toggle.
-    show_signed_in_user: TuiZeroStateShowSignedInUserSetting {
-        type: bool,
-        default: true,
-        supported_platforms: SupportedPlatforms::DESKTOP,
-        sync_to_cloud: SyncToCloud::Never,
-        surface: settings::SettingSurfaces::TUI,
-        private: false,
-        toml_path: "appearance.zero_state.show_signed_in_user",
-        description: "Whether the Warp Agent CLI zero state shows the signed-in account line.",
-    },
     show_changelog: TuiZeroStateShowChangelogSetting {
         type: bool,
         default: true,

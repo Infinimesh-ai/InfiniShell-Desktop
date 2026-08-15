@@ -73,7 +73,7 @@ impl TuiMcpServerSource {
             } => creator
                 .as_ref()
                 .map(|creator| format!("shared by {creator}"))
-                .unwrap_or_else(|| "shared by a team member".to_owned()),
+                .unwrap_or_else(|| "shared template".to_owned()),
             Self::Gallery => "shared by Warp".to_owned(),
             Self::FileBased { sources } => {
                 let labels = sources

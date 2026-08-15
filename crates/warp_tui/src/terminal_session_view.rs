@@ -42,13 +42,12 @@ use warp::tui_export::{
     TelemetryEvent, TerminalModel, TerminalSurface, TerminalSurfaceInit, TranscriptScope,
     TuiMcpAction, TuiMcpManager, TuiMcpServerId, TuiMcpVariableValue, TuiOnboardingMarker,
     TuiOnboardingMarkers, TuiOnboardingMarkersEvent, TuiSlashCommandDataSource,
-    TuiSlashCommandDataSourceArgs, TuiUpArrowHistoryItemKind, TuiUserInfoManager,
-    TuiUserInfoManagerEvent, TuiZeroStateDataSource, UserTakeOverReason, WAKEUP_THROTTLE_PERIOD,
-    WarpConfig, WarpConfigUpdateEvent, block_context_from_terminal_model,
-    build_slash_command_mixer, detect_possible_git_repo, export_conversation_markdown, log_out_tui,
-    maybe_build_ai_query_upsert_event, prepare_conversation_block_restoration,
-    record_autodetection_toggle_from_slash_command, record_saved_prompt_accepted,
-    record_static_slash_command_accepted, saved_prompt_text_for_id,
+    TuiSlashCommandDataSourceArgs, TuiUpArrowHistoryItemKind, TuiZeroStateDataSource,
+    UserTakeOverReason, WAKEUP_THROTTLE_PERIOD, WarpConfig, WarpConfigUpdateEvent,
+    block_context_from_terminal_model, build_slash_command_mixer, detect_possible_git_repo,
+    export_conversation_markdown, maybe_build_ai_query_upsert_event,
+    prepare_conversation_block_restoration, record_autodetection_toggle_from_slash_command,
+    record_saved_prompt_accepted, record_static_slash_command_accepted, saved_prompt_text_for_id,
     slash_command_selection_behavior, throttle,
 };
 use warp_core::channel::{Channel, ChannelState};
@@ -209,14 +208,6 @@ fn settings_file_error_hint(error: &SettingsFileError) -> &'static str {
 const STATUS_UNAVAILABLE: &str = "\u{2014}"; // em dash
 const STATUS_UNTITLED_SESSION: &str = "Untitled";
 const STATUS_DEV_BUILD: &str = "dev build";
-const STATUS_NOT_SIGNED_IN: &str = "Not signed in";
-
-fn status_menu_is_open(mode: TuiInputSuggestionsMode) -> bool {
-    matches!(
-        mode,
-        TuiInputSuggestionsMode::ReadOnlyMenu(TuiReadOnlyMenuKind::Status)
-    )
-}
 fn todo_menu_is_open(mode: TuiInputSuggestionsMode) -> bool {
     matches!(
         mode,
@@ -551,28 +542,6 @@ fn export_file_success_message(export: &ConversationFileExport) -> String {
     } else {
         format!("Conversation exported to {path}")
     }
-}
-
-/// Resolves the Email field for the `/status` menu using the same fallback
-/// chain as `render_login_line`:
-/// 1. `email` when non-empty
-/// 2. `username` when non-empty (display name or email fallback from auth)
-/// 3. `user_id` when non-empty
-/// 4. `STATUS_NOT_SIGNED_IN` when no validated identity is available
-fn resolve_status_email(
-    email: Option<String>,
-    username: Option<String>,
-    user_id: Option<String>,
-    is_logged_in: bool,
-) -> String {
-    if !is_logged_in {
-        return STATUS_NOT_SIGNED_IN.to_owned();
-    }
-    email
-        .filter(|e| !e.is_empty())
-        .or_else(|| username.filter(|u| !u.is_empty()))
-        .or_else(|| user_id.filter(|id| !id.is_empty()))
-        .unwrap_or_else(|| STATUS_NOT_SIGNED_IN.to_owned())
 }
 
 fn format_status_conversation_id(conversation_id: Option<AIConversationId>) -> String {
@@ -1599,13 +1568,6 @@ impl TuiTerminalSessionView {
         let input_editor_model =
             ctx.add_model(|ctx| CodeEditorModel::new_tui(INITIAL_INPUT_WIDTH, ctx));
         let suggestions_mode = ctx.add_model(|_| TuiInputSuggestionsModeModel::new());
-        let suggestions_mode_for_user_info = suggestions_mode.clone();
-        ctx.subscribe_to_model(&TuiUserInfoManager::handle(ctx), move |_, _, event, ctx| {
-            let TuiUserInfoManagerEvent::Updated = event;
-            if status_menu_is_open(suggestions_mode_for_user_info.as_ref(ctx).mode()) {
-                ctx.notify();
-            }
-        });
         let read_only_menu_selection = TuiSelectionHandle::default();
         let read_only_menu_viewport = TuiViewportedListState::new_at_end();
         read_only_menu_viewport.scroll_to_rows_from_top(0);
@@ -2757,12 +2719,8 @@ impl TuiTerminalSessionView {
         ctx.notify();
     }
 
-    /// Computes the current session and account status fields for the dedicated
-    /// status menu (opened by the `/status` slash command). Always returns a
-    /// complete set of fields; individual fields fall back to their `STATUS_*`
-    /// placeholder constants when the underlying data is unavailable.
+    /// Computes the current local session fields for the dedicated status menu.
     fn compute_status_info(&self, ctx: &AppContext) -> status_menu::TuiStatusInfo {
-        let user_info = TuiUserInfoManager::as_ref(ctx).snapshot(ctx);
         let cwd = self
             .active_session
             .as_ref(ctx)
@@ -2786,22 +2744,11 @@ impl TuiTerminalSessionView {
         let version = ChannelState::app_version()
             .map(ToOwned::to_owned)
             .unwrap_or_else(|| STATUS_DEV_BUILD.to_owned());
-        let org = user_info
-            .org
-            .unwrap_or_else(|| STATUS_UNAVAILABLE.to_owned());
-        let email = resolve_status_email(
-            user_info.email,
-            user_info.username,
-            user_info.user_id,
-            user_info.is_logged_in,
-        );
         status_menu::TuiStatusInfo {
             version,
             session: session_name,
             conversation_id: format_status_conversation_id(conversation_id),
             working_directory: cwd.unwrap_or_else(|| STATUS_UNAVAILABLE.to_owned()),
-            org,
-            email,
         }
     }
 
@@ -4487,22 +4434,6 @@ impl TuiTerminalSessionView {
                 ctx.open_url(&upgrade_url(ctx));
                 record_static_slash_command_accepted(command.name, true, ctx);
             }
-            SlashCommandKind::ManageBilling => {
-                self.input_view.update(ctx, |input, ctx| input.clear(ctx));
-                let Some(url) = self
-                    .slash_commands_source
-                    .as_ref(ctx)
-                    .manage_billing_url(ctx)
-                else {
-                    self.show_error_hint(
-                        "Billing management is only available to team admins".to_owned(),
-                        ctx,
-                    );
-                    return;
-                };
-                ctx.open_url(&url);
-                record_static_slash_command_accepted(command.name, true, ctx);
-            }
             SlashCommandKind::Cost => {
                 self.input_view.update(ctx, |input, ctx| input.clear(ctx));
                 ctx.dispatch_typed_action_deferred(
@@ -4538,10 +4469,6 @@ impl TuiTerminalSessionView {
             SlashCommandKind::Exit => {
                 record_static_slash_command_accepted(command.name, true, ctx);
                 ctx.terminate_app(TerminationMode::ForceTerminate, None);
-            }
-            SlashCommandKind::Logout => {
-                record_static_slash_command_accepted(command.name, true, ctx);
-                log_out_tui(ctx);
             }
             SlashCommandKind::ViewLogs => {
                 self.input_view.update(ctx, |input, ctx| input.clear(ctx));

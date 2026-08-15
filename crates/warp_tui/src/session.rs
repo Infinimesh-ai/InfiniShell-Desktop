@@ -2,8 +2,7 @@
 //!
 //! [`run`] boots the real headless Warp app via [`warp::run_tui`]. Once shared
 //! initialization is done, the mount built here starts the TUI driver and
-//! creates the first terminal session once browser authentication starts, while
-//! allowing authentication to complete in the background.
+//! creates the first local terminal session immediately.
 
 use std::io::{self, IsTerminal as _, Read as _};
 
@@ -17,7 +16,6 @@ use warp::settings::{TuiThemeSettings, TuiZeroStateSettings, TuiZeroStateSetting
 #[cfg(feature = "voice_input")]
 use warp::settings::{TuiVoiceSettings, TuiVoiceSettingsChangedEvent};
 use warp::tui_export::{AIConversationAutoexecuteMode, Appearance, ServerConversationToken};
-use warp::{TuiLoginEvent, TuiLoginModel, TuiLoginPhase};
 use warp_core::channel::ChannelState;
 use warp_core::settings::Setting as _;
 use warp_errors::report_error;
@@ -26,7 +24,6 @@ use warpui_core::platform::{TerminationMode, WindowStyle};
 use warpui_core::runtime::spawn_tui_driver;
 use warpui_core::{AddWindowOptions, AppContext, ModelHandle, ViewHandle};
 
-use crate::clipboard::copy_to_clipboard;
 use crate::orchestration_model::TuiOrchestrationModel;
 use crate::resume::TuiExitSummaryHandle;
 use crate::root_view::RootTuiView;
@@ -224,7 +221,7 @@ pub fn run() -> Result<()> {
     result
 }
 
-/// Creates the login-gated root and starts the headless draw and input driver.
+/// Creates the local session root and starts the headless draw and input driver.
 fn init(
     resume_token: Option<ServerConversationToken>,
     default_autoexecute_mode: AIConversationAutoexecuteMode,
@@ -319,27 +316,7 @@ fn init(
             });
             let orchestration = TuiOrchestrationModel::register(ctx);
             TuiSessions::wire_orchestration(&sessions, &orchestration, ctx);
-            let sessions_for_login = sessions.clone();
-            let root_for_login = root.clone();
-            let login_model = TuiLoginModel::handle(ctx);
-            ctx.subscribe_to_model(&login_model, move |_, event, ctx| match event {
-                TuiLoginEvent::PhaseChanged => {
-                    root_for_login.update(ctx, |root, ctx| {
-                        root.handle_login_phase_changed(ctx, copy_to_clipboard);
-                    });
-                }
-                TuiLoginEvent::LoggedIn => {
-                    ensure_terminal_session(&sessions_for_login, &root_for_login, ctx)
-                }
-                TuiLoginEvent::LoggedOut => {
-                    root_for_login.update(ctx, |root, ctx| root.show_auth(ctx));
-                    sessions_for_login.update(ctx, |sessions, ctx| sessions.clear(ctx));
-                }
-            });
-            if matches!(TuiLoginModel::as_ref(ctx).phase(), TuiLoginPhase::LoggedIn) {
-                // Already authenticated at mount: create the first session now.
-                ensure_terminal_session(&sessions, &root, ctx);
-            }
+            ensure_terminal_session(&sessions, &root, ctx);
         }
         Err(error) => {
             let error = anyhow::Error::new(error);
@@ -382,8 +359,6 @@ fn ensure_terminal_session(
             );
         });
     }
-    root.update(ctx, |root, ctx| root.show_terminal(ctx));
-    TuiLoginModel::record_terminal_shown(ctx);
 }
 
 #[cfg(test)]

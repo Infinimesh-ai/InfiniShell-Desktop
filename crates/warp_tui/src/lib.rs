@@ -2,7 +2,7 @@
 //!
 //! This crate contains:
 //! - [`input`] — the editor-backed TUI input view (`TuiEditorModel` + `TuiInputView`).
-//! - [`root_view`] — [`RootTuiView`], the login-gated transcript root view.
+//! - [`root_view`] — [`RootTuiView`], the local transcript root view.
 //! - [`session`] — [`run`], the binary entry point that boots the headless app
 //!   and starts the transcript-capable TUI draw + input driver.
 //! - Binary entry points under `src/bin/`.
