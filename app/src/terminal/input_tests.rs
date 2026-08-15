@@ -2905,7 +2905,7 @@ fn test_histignorespace_support_in_zsh() {
         let terminal = add_window_with_bootstrapped_terminal(
             &mut app,
             None, /* history_file_commands */
-            Some(session_info),
+            Some(session_info.clone()),
         )
         .await;
 
@@ -2916,6 +2916,12 @@ fn test_histignorespace_support_in_zsh() {
 
         let (model, sessions) = terminal.read(&app, |terminal, _| {
             (terminal.model.clone(), terminal.sessions_model().clone())
+        });
+
+        // 公共 bootstrap helper 会把 shell 统一为宿主机默认值。
+        // 测试历史过滤前，恢复这里显式配置的 Zsh 选项。
+        sessions.update(&mut app, |sessions, _| {
+            sessions.register_session_for_test(session_info);
         });
 
         app.update(|ctx| {
