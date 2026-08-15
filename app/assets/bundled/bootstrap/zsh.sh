@@ -17,5 +17,6 @@
  # rather than on its own line after the HEREDOC.  This seems to work around a bug in zsh
  # where the buffer was getting messed up after processing the heredoc about 1/50 of the time.
  read -r -d '' WARP_BOOTSTRAP_VAR << 'EOM'; eval "$WARP_BOOTSTRAP_VAR"; unset WARP_BOOTSTRAP_VAR
+#include bundled/bootstrap/ssh_remote_shell_probe.sh
 #include bundled/bootstrap/zsh_body.sh
 EOM

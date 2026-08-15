@@ -683,6 +683,42 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"
             end
         end
 
+        # 发送 POSIX bootstrap 命令前先探测远端登录 shell。这里使用 `echo`,因为它在
+        # POSIX shell、cmd.exe 和 PowerShell 中均无副作用。对于 InfiniShell 创建的
+        # ControlMaster,ControlPersist 会保留已认证连接,后续交互会话无需再次认证。
+        set -l remote_shell_probe_output (command ssh -o ControlMaster=$control_master_mode \
+            -o ControlPersist=60 -o ControlPath="$control_path" $argv \
+            'echo __WARP_REMOTE_SHELL__$SHELL')
+        set -l remote_shell_probe_status $status
+        if test $remote_shell_probe_status -ne 0
+            # 远端命令失败但主连接仍存活时继续走普通 SSH;只有连接本身失败才返回。
+            if not command ssh -O check -o ControlPath="$control_path" $argv >/dev/null 2>&1
+                return $remote_shell_probe_status
+            end
+        end
+
+        set -l remote_shell
+        for line in $remote_shell_probe_output
+            if string match --quiet '__WARP_REMOTE_SHELL__*' -- $line
+                set remote_shell (string replace '__WARP_REMOTE_SHELL__' '' -- $line | string trim)
+            end
+        end
+
+        switch "$remote_shell"
+            case bash '*/bash' zsh '*/zsh'
+                # 探测阶段已经创建了 InfiniShell 自有的 ControlMaster;增强会话需作为
+                # slave 接入,以复用该已认证连接。
+                set control_master_mode "no"
+            case '*'
+                printf '%s\n' "InfiniShell shell integration is unavailable for this remote shell; continuing with standard SSH."
+                command ssh -o ControlMaster=no -o ControlPath="$control_path" -t $argv
+                set -l ssh_status $status
+                if test "$external_control_master" = "false"
+                    command ssh -O exit -o ControlPath="$control_path" $argv >/dev/null 2>&1
+                end
+                return $ssh_status
+        end
+
         # Note that in this command, we're passing a string to the remote shell. Any variable expansions need to be
         # escaped with "''" to avoid the local shell from expanding them before they're passed to the remote shell.
         # We check the SHELL env var and use shell string manipulation to get the contents after the last slash to

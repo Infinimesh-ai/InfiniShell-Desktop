@@ -1024,6 +1024,36 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
               esac
           fi
 
+          # 发送 POSIX bootstrap 命令前先探测远端登录 shell。这里使用 `echo`,因为它在
+          # POSIX shell、cmd.exe 和 PowerShell 中均无副作用。对于 InfiniShell 创建的
+          # ControlMaster,ControlPersist 会保留已认证连接,后续交互会话无需再次认证。
+          local remote_shell_probe_output
+          remote_shell_probe_output=$(command ssh -o ControlMaster=$control_master_mode \
+              -o ControlPersist=60 -o ControlPath="$control_path" "${@:1}" \
+              'echo __WARP_REMOTE_SHELL__$SHELL')
+          local remote_shell_probe_status=$?
+          if [[ $remote_shell_probe_status -ne 0 ]]; then
+              # 远端命令失败但主连接仍存活时继续走普通 SSH;只有连接本身失败才返回。
+              if ! command ssh -O check -o ControlPath="$control_path" "${@:1}" >/dev/null 2>&1; then
+                  return $remote_shell_probe_status
+              fi
+          fi
+
+          local remote_shell=$(warp_remote_shell_from_probe_output "$remote_shell_probe_output")
+          if ! warp_remote_shell_supports_bootstrap "$remote_shell"; then
+              printf '%s\n' "InfiniShell shell integration is unavailable for this remote shell; continuing with standard SSH."
+              command ssh -o ControlMaster=no -o ControlPath="$control_path" -t "${@:1}"
+              local ssh_status=$?
+              if [[ "$external_control_master" == "false" ]]; then
+                  command ssh -O exit -o ControlPath="$control_path" "${@:1}" >/dev/null 2>&1
+              fi
+              return $ssh_status
+          fi
+
+          # 探测阶段已经创建了 InfiniShell 自有的 ControlMaster;增强会话需作为 slave
+          # 接入,以复用该已认证连接。
+          control_master_mode="no"
+
           # Keep remote commands up-to-date with shell.rs & bash.sh.
           # Note that in this command, we're passing a string to the remote shell. Any variable expansions need to be
           # escaped with "''" to avoid the local shell from expanding them before they're passed to the remote shell.
