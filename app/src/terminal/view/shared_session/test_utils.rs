@@ -9,6 +9,7 @@ use crate::auth::UserUid;
 use crate::editor::ReplicaId;
 use crate::pane_group::{NewTerminalOptions, PaneGroup, PanesLayout};
 use crate::terminal::TerminalView;
+use crate::terminal::shared_session::SharedSessionStatus;
 use crate::terminal::shared_session::protocol::{
     ParticipantId, ParticipantList, SessionId, SessionSourceType,
 };
@@ -48,6 +49,9 @@ pub fn terminal_view_for_viewer(app: &mut App) -> ViewHandle<TerminalView> {
 
     let user_uid = UserUid::new("mock_user_uid");
     terminal.update(app, |view, ctx| {
+        view.model
+            .lock()
+            .set_shared_session_status(SharedSessionStatus::ViewPending);
         view.on_session_share_joined(
             ParticipantId::new(),
             user_uid,

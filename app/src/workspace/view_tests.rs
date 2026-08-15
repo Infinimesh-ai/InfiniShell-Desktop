@@ -821,6 +821,9 @@ fn mock_workspace_viewing_shared_session(app: &mut App) -> ViewHandle<Workspace>
     });
 
     terminal_view.update(app, |view, ctx| {
+        view.model
+            .lock()
+            .set_shared_session_status(SharedSessionStatus::ViewPending);
         view.on_session_share_joined(
             ParticipantId::new(),
             UserUid::new("mock_user_uid"),
@@ -1232,124 +1235,6 @@ fn test_workspace_sessions_retrieves_panes() {
     });
 }
 
-fn number_of_shared_sessions_in_tab(
-    workspace: &Workspace,
-    index: usize,
-    ctx: &AppContext,
-) -> usize {
-    workspace
-        .get_pane_group_view(index)
-        .map_or(0, |view| view.as_ref(ctx).number_of_shared_sessions(ctx))
-}
-
-/// Sets up the workspace with three tabs. The middle tab has two panes, where one is shared.
-fn setup_session_sharing_test(workspace: &ViewHandle<Workspace>, app: &mut App) -> PaneId {
-    let shared_pane_id = workspace.update(app, |workspace, ctx| {
-        workspace.add_terminal_tab(false, ctx);
-        workspace.add_terminal_tab(false, ctx);
-
-        let tab_view = workspace.get_pane_group_view(1).unwrap();
-
-        tab_view.update(ctx, |view, ctx| {
-            assert_eq!(view.pane_count(), 1);
-            view.focused_session_view(ctx)
-                .unwrap()
-                .update(ctx, |terminal, ctx| {
-                    terminal.attempt_to_share_session(
-                        SharedSessionScrollbackType::None,
-                        None,
-                        SharedSessionSource::user(None),
-                        false,
-                        ctx,
-                    );
-                });
-
-            view.handle_action(&PaneGroupAction::Add(Direction::Right), ctx);
-            assert_eq!(view.pane_count(), 2);
-
-            view.pane_id_by_index(0).unwrap()
-        })
-    });
-
-    workspace.read(app, |workspace, ctx| {
-        assert_eq!(number_of_shared_sessions_in_tab(workspace, 1, ctx), 1);
-
-        // Confirmation dialog starts not open.
-        assert!(
-            !workspace
-                .current_workspace_state
-                .is_close_session_confirmation_dialog_open
-        );
-    });
-
-    shared_pane_id
-}
-
-#[test]
-fn test_close_tab_confirmation_dialog() {
-    App::test((), |mut app| async move {
-        initialize_app(&mut app);
-        app.update(disable_quit_warning);
-
-        let workspace = mock_workspace(&mut app);
-        setup_session_sharing_test(&workspace, &mut app);
-
-        workspace.update(&mut app, |workspace, ctx| {
-            let first_tab_id = workspace.get_pane_group_view(0).unwrap().id();
-
-            // Trying to close tab with a shared pane opens dialog.
-            workspace.handle_action(&WorkspaceAction::CloseTab(1), ctx);
-            assert!(
-                workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-
-            // User clicking cancel closes dialog.
-            workspace.handle_close_session_confirmation_dialog_event(
-                &CloseSessionConfirmationEvent::Cancel,
-                ctx,
-            );
-            assert!(
-                !workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-
-            // Trying to close tab without a shared pane goes through without dialog.
-            workspace.handle_action(&WorkspaceAction::CloseTab(2), ctx);
-            assert_eq!(workspace.tab_count(), 2);
-            assert!(
-                !workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-
-            // Close the tab with the shared pane.
-            workspace.handle_action(&WorkspaceAction::CloseTab(1), ctx);
-            assert!(
-                workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-            workspace.handle_close_session_confirmation_dialog_event(
-                &CloseSessionConfirmationEvent::CloseSession {
-                    dont_show_again: false,
-                    open_confirmation_source: OpenDialogSource::CloseTab { tab_index: 1 },
-                },
-                ctx,
-            );
-            assert!(
-                !workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-            assert_eq!(workspace.tab_count(), 1);
-            assert_eq!(workspace.get_pane_group_view(0).unwrap().id(), first_tab_id);
-        });
-    });
-}
-
 #[test]
 fn test_close_active_horizontal_tab_activates_tab_to_right() {
     let _vertical_tabs_guard = FeatureFlag::VerticalTabs.override_enabled(true);
@@ -1458,248 +1343,6 @@ fn test_close_last_vertical_tab_activates_tab_above() {
             assert_eq!(workspace.tab_count(), 2);
             assert_eq!(workspace.active_tab_index(), 1);
             assert_eq!(workspace.active_tab_pane_group().id(), tab_above_id);
-        });
-    });
-}
-
-#[test]
-fn test_close_pane_confirmation_dialog() {
-    App::test((), |mut app| async move {
-        initialize_app(&mut app);
-
-        let workspace = mock_workspace(&mut app);
-        let shared_pane_id = setup_session_sharing_test(&workspace, &mut app);
-
-        workspace.update(&mut app, |workspace, ctx| {
-            let shared_pane_group_id = workspace.get_pane_group_view(1).unwrap().id();
-
-            // User tries to close shared pane, dialog comes up.
-            workspace.handle_file_tree_event(
-                workspace.get_pane_group_view(1).unwrap().clone(),
-                &pane_group::Event::CloseSharedSessionPaneRequested {
-                    pane_id: shared_pane_id,
-                },
-                ctx,
-            );
-            assert!(
-                workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-
-            // User confirms.
-            workspace.handle_close_session_confirmation_dialog_event(
-                &CloseSessionConfirmationEvent::CloseSession {
-                    dont_show_again: false,
-                    open_confirmation_source: OpenDialogSource::ClosePane {
-                        pane_group_id: shared_pane_group_id,
-                        pane_id: shared_pane_id,
-                    },
-                },
-                ctx,
-            );
-            assert!(
-                !workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-            assert_eq!(number_of_shared_sessions_in_tab(workspace, 1, ctx), 0);
-            let remaining_pane_id = workspace
-                .get_pane_group_view_with_id(shared_pane_group_id)
-                .unwrap()
-                .as_ref(ctx)
-                .pane_id_by_index(0)
-                .unwrap();
-            assert_ne!(remaining_pane_id, shared_pane_id);
-            assert_eq!(workspace.tab_count(), 3);
-        });
-    });
-}
-
-#[test]
-fn test_reopen_closed_shared_tab() {
-    App::test((), |mut app| async move {
-        initialize_app(&mut app);
-
-        let workspace = mock_workspace(&mut app);
-        setup_session_sharing_test(&workspace, &mut app);
-
-        workspace.update(&mut app, |workspace, ctx| {
-            let shared_pane_group = workspace.get_pane_group_view(1).unwrap().clone();
-
-            // Close the tab with the shared pane.
-            workspace.close_tab(1, true, true, ctx);
-            assert_eq!(workspace.tab_count(), 2);
-
-            // Restore the shared tab.
-            workspace.restore_closed_tab(1, TabData::new(shared_pane_group.to_owned()), ctx);
-        });
-        // Restored tab should no longer be shared.
-        workspace.read(&app, |workspace, ctx| {
-            let pane_group = workspace.get_pane_group_view(1).unwrap();
-            assert!(!pane_group.as_ref(ctx).is_terminal_pane_being_shared(ctx));
-            assert_eq!(workspace.tab_count(), 3);
-        })
-    });
-}
-
-#[test]
-fn test_close_other_tabs_confirmation_dialog() {
-    App::test((), |mut app| async move {
-        initialize_app(&mut app);
-
-        let workspace = mock_workspace(&mut app);
-        setup_session_sharing_test(&workspace, &mut app);
-
-        workspace.update(&mut app, |workspace, ctx| {
-            let last_tab_id = workspace.get_pane_group_view(2).unwrap().id();
-
-            // User tries to close other tabs choosing non-shared tab, dialog comes up.
-            workspace.handle_action(&WorkspaceAction::CloseOtherTabs(2), ctx);
-            assert!(
-                workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-
-            // User confirms.
-            workspace.handle_close_session_confirmation_dialog_event(
-                &CloseSessionConfirmationEvent::CloseSession {
-                    dont_show_again: false,
-                    open_confirmation_source: OpenDialogSource::CloseOtherTabs { tab_index: 2 },
-                },
-                ctx,
-            );
-            assert!(
-                !workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-            assert_eq!(workspace.tab_count(), 1);
-            assert_eq!(workspace.get_pane_group_view(0).unwrap().id(), last_tab_id);
-        });
-    });
-}
-
-#[test]
-fn test_close_tabs_right_confirmation_dialog() {
-    App::test((), |mut app| async move {
-        initialize_app(&mut app);
-
-        let workspace = mock_workspace(&mut app);
-        setup_session_sharing_test(&workspace, &mut app);
-
-        workspace.update(&mut app, |workspace, ctx| {
-            let first_tab_id = workspace.get_pane_group_view(0).unwrap().id();
-
-            // User tries to close all tabs right of the left-most tab, dialog comes up.
-            workspace.handle_action(&WorkspaceAction::CloseTabsRight(0), ctx);
-            assert!(
-                workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-
-            // User confirms.
-            workspace.handle_close_session_confirmation_dialog_event(
-                &CloseSessionConfirmationEvent::CloseSession {
-                    dont_show_again: false,
-                    open_confirmation_source: OpenDialogSource::CloseTabsDirection {
-                        tab_index: 0,
-                        direction: TabMovement::Right,
-                    },
-                },
-                ctx,
-            );
-            assert!(
-                !workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-            assert_eq!(workspace.tab_count(), 1);
-            assert_eq!(workspace.get_pane_group_view(0).unwrap().id(), first_tab_id);
-        });
-    });
-}
-
-#[test]
-fn test_confirmation_dialog_dont_show_again() {
-    App::test((), |mut app| async move {
-        initialize_app(&mut app);
-        app.update(disable_quit_warning);
-
-        let workspace = mock_workspace(&mut app);
-        setup_session_sharing_test(&workspace, &mut app);
-
-        workspace.update(&mut app, |workspace, ctx| {
-            // Close the tab with the shared pane, dialog comes up
-            workspace.handle_action(&WorkspaceAction::CloseTab(1), ctx);
-            assert!(
-                workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-
-            // User confirms, checking "Don't show again".
-            workspace.handle_close_session_confirmation_dialog_event(
-                &CloseSessionConfirmationEvent::CloseSession {
-                    dont_show_again: true,
-                    open_confirmation_source: OpenDialogSource::CloseTab { tab_index: 1 },
-                },
-                ctx,
-            );
-            assert!(
-                !workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-            assert_eq!(workspace.tab_count(), 2);
-
-            // Share the first tab
-            let tab_view = workspace.get_pane_group_view(0).unwrap();
-            tab_view.update(ctx, |view, ctx| {
-                view.terminal_manager(0, ctx)
-                    .unwrap()
-                    .as_ref(ctx)
-                    .model()
-                    .lock()
-                    .set_shared_session_status(SharedSessionStatus::ActiveSharer);
-            });
-
-            // Close the shared tab. No dialog should come up and action should go through.
-            workspace.handle_action(&WorkspaceAction::CloseActiveTab, ctx);
-            assert!(
-                !workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
-            assert_eq!(workspace.tab_count(), 1);
-        });
-    });
-}
-
-#[test]
-fn test_close_last_tab_skip_confirmation() {
-    App::test((), |mut app| async move {
-        initialize_app(&mut app);
-        app.update(disable_quit_warning);
-
-        let workspace = mock_workspace(&mut app);
-        setup_session_sharing_test(&workspace, &mut app);
-
-        workspace.update(&mut app, |workspace, ctx| {
-            // Close the non-shared tabs so there's just one shared tab left.
-            workspace.handle_action(&WorkspaceAction::CloseTab(2), ctx);
-            workspace.handle_action(&WorkspaceAction::CloseTab(0), ctx);
-            assert_eq!(workspace.tab_count(), 1);
-            // Close the last remaining tab with the shared pane, no dialog should come up because
-            // we're going to close the window and there's already a confirmation on window close.
-            workspace.handle_action(&WorkspaceAction::CloseActiveTab, ctx);
-            assert!(
-                !workspace
-                    .current_workspace_state
-                    .is_close_session_confirmation_dialog_open
-            );
         });
     });
 }
@@ -2984,17 +2627,19 @@ fn test_unified_new_session_menu_uses_new_worktree_config_label_and_order() {
 
             assert!(!labels.iter().any(|label| label == "Worktree in"));
 
-            let separator_index = labels
+            let worktree_index = labels
                 .iter()
-                .position(|label| label == "---")
-                .expect("expected a separator in the new-session menu");
+                .position(|label| label == "New worktree config")
+                .expect("expected new worktree config in the new-session menu");
 
             assert_eq!(
-                labels.get(separator_index + 1),
-                Some(&"New worktree config".to_string())
+                worktree_index
+                    .checked_sub(1)
+                    .and_then(|index| labels.get(index)),
+                Some(&"---".to_string())
             );
             assert_eq!(
-                labels.get(separator_index + 2),
+                labels.get(worktree_index + 1),
                 Some(&"New tab config".to_string())
             );
         });

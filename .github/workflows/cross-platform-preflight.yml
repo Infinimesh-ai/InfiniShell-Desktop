@@ -17,7 +17,7 @@ on:
         default: true
         type: boolean
       full_workspace_tests:
-        description: Run the desktop workspace nextest suite after focused checks
+        description: Compile GUI integration tests and run the desktop workspace unit suite
         required: true
         default: false
         type: boolean
@@ -70,11 +70,17 @@ jobs:
         shell: bash
         run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 
-      - name: Run desktop workspace tests
+      - name: Compile GUI integration tests
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        shell: bash
+        run: cargo nextest run --no-run -p integration
+
+      - name: Run desktop workspace unit tests
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
         shell: bash
         # warp_tui 仍依赖已移除的 Warp 云 API，也不属于桌面版发布产物。
-        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude warp_tui
+        # integration 需要专用图形会话，此处完成跨平台编译后交由 GUI 测试流程执行。
+        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
 
   windows:
     name: Windows x64
@@ -132,8 +138,14 @@ jobs:
         shell: pwsh
         run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 
-      - name: Run desktop workspace tests
+      - name: Compile GUI integration tests
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        shell: pwsh
+        run: cargo nextest run --no-run -p integration
+
+      - name: Run desktop workspace unit tests
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
         shell: pwsh
         # warp_tui 仍依赖已移除的 Warp 云 API，也不属于桌面版发布产物。
-        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude warp_tui
+        # integration 需要专用图形会话，此处完成跨平台编译后交由 GUI 测试流程执行。
+        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui

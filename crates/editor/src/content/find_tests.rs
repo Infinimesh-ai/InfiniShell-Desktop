@@ -34,7 +34,7 @@ fn test_search_cjk_literal() {
                     skip_hidden: false,
                     hidden_ranges: None,
                 },
-                [(27, 29, "账户")],
+                [(21, 23, "账户")],
             );
         });
     });

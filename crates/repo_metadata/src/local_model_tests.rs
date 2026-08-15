@@ -3707,6 +3707,7 @@ fn test_index_lazy_loaded_home_dir_succeeds() {
                 "index_lazy_loaded_path for home dir must succeed, got: {result:?}"
             );
         });
+        await_build_tasks_for_repo(&mut app, &model_handle, &home_std).await;
         model_handle.read(&app, |model, _ctx| {
             assert!(
                 model.is_lazy_loaded_path(&home_std),

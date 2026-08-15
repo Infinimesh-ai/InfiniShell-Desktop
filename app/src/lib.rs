@@ -2786,7 +2786,7 @@ fn launch(ctx: &mut warpui::AppContext, app_state: Option<AppState>, launch_mode
     }
 }
 
-/// Initializes the logger before running tests.
+/// 在运行测试前初始化共享运行时状态。
 ///
 /// The `ctor` attribute here means that this runs BEFORE main(), whenever the
 /// binary is executed. For this reason, we need to ensure that this function
@@ -2798,9 +2798,11 @@ fn launch(ctx: &mut warpui::AppContext, app_state: Option<AppState>, launch_mode
 /// is why we're not simply calling the init() function above.)
 #[ctor::ctor]
 #[cfg(test)]
-fn init_logging_for_unit_tests_glue() {
+fn init_unit_test_runtime_glue() {
     // Initialize terminal-friendly logging for tests from the shared logger crate.
     warp_logging::init_logging_for_unit_tests();
+    // 生产启动路径会在构建 UI 前初始化本地化；单元测试同样固定为英文，避免文案断言拿到 key。
+    i18n::init(Some("en"));
 }
 
 #[cfg(test)]

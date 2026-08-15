@@ -6903,8 +6903,9 @@ fn cli_agent_rich_input_hint_text_mentions_active_cli_agent() {
                     .as_ref(ctx)
                     .editor()
                     .as_ref(ctx)
-                    .placeholder_text("");
-                assert_eq!(placeholder_text, Some(expected_hint_text));
+                    .placeholder_text("")
+                    .map(|text| text.replace(['\u{2068}', '\u{2069}'], ""));
+                assert_eq!(placeholder_text.as_deref(), Some(expected_hint_text));
             });
         }
     })
