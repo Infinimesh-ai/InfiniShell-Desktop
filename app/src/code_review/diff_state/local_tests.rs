@@ -305,6 +305,33 @@ async fn untracked_directory_diff_is_empty_and_non_binary() {
 }
 
 #[tokio::test]
+async fn oversized_untracked_file_skips_diff_parsing() {
+    let repo_dir = tempfile::tempdir().expect("create temp repo dir");
+    std::fs::write(
+        repo_dir.path().join("oversized.txt"),
+        vec![b'a'; MAX_DIFF_SIZE],
+    )
+    .expect("write oversized file");
+
+    let diff = LocalDiffStateModel::get_file_diff(
+        repo_dir.path(),
+        "oversized.txt",
+        &GitFileStatus::Untracked,
+        false,
+        None,
+    )
+    .await
+    .expect("get oversized untracked diff");
+
+    assert_eq!(
+        diff.size,
+        DiffSize::Unrenderable(UnrenderableReason::DiffTooLarge)
+    );
+    assert!(diff.hunks.is_empty());
+    assert!(!diff.is_binary);
+}
+
+#[tokio::test]
 async fn untracked_directory_has_no_baseline_content() {
     let repo_dir = tempfile::tempdir().expect("create temp repo dir");
     std::fs::create_dir(repo_dir.path().join("nested-repo")).expect("create nested dir");

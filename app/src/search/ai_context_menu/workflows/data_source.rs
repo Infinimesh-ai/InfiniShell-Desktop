@@ -5,6 +5,7 @@ use super::search_item::WorkflowSearchItem;
 use crate::cloud_object::StoredObjectModel;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::search::ai_context_menu::mixer::AIContextMenuSearchableAction;
+use crate::search::ai_context_menu::safe_truncate;
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::{DataSourceRunErrorWrapper, SyncDataSource};
 use crate::workspaces::user_workspaces::UserWorkspaces;
@@ -13,6 +14,21 @@ const MAX_RESULTS: usize = 50;
 /// Base score for zero-state results. Each item gets an additional bonus based on
 /// recency so the mixer's score-based ordering places more recent items higher.
 const ZERO_STATE_BASE_SCORE: i64 = 1000;
+
+fn workflow_description(workflow_content: &str) -> Option<String> {
+    let content_lines: Vec<&str> = workflow_content.lines().take(3).collect();
+    let mut content_preview = content_lines.join("\n");
+    if content_preview.is_empty() {
+        return None;
+    }
+
+    if content_preview.len() > 200 {
+        safe_truncate(&mut content_preview, 197);
+        content_preview.push_str("...");
+    }
+
+    Some(content_preview)
+}
 
 pub struct WorkflowDataSource;
 
@@ -60,17 +76,7 @@ impl SyncDataSource for WorkflowDataSource {
             let workflow_name = workflow.model().display_name();
             // Use workflow content for hover details, with first few lines as preview
             let workflow_content = workflow.model().data.content();
-            let content_lines: Vec<&str> = workflow_content.lines().take(3).collect();
-            let content_preview = content_lines.join("\n");
-            let workflow_description = if content_preview.is_empty() {
-                None
-            } else {
-                Some(if content_preview.len() > 200 {
-                    format!("{}...", &content_preview[..197])
-                } else {
-                    content_preview
-                })
-            };
+            let workflow_description = workflow_description(workflow_content);
             let workflow_uid = workflow.id.uid();
             let recency_bonus = (30 * (index + 1) / total_workflows) as i64;
 
@@ -129,3 +135,7 @@ impl SyncDataSource for WorkflowDataSource {
 impl warpui::Entity for WorkflowDataSource {
     type Event = ();
 }
+
+#[cfg(test)]
+#[path = "data_source_tests.rs"]
+mod tests;

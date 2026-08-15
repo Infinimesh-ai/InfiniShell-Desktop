@@ -224,12 +224,21 @@ impl SystemInfo {
             .with_cpu()
     }
 
+    /// 枚举整个进程表时不采样 CPU 或内存。
+    ///
+    /// Windows 的逐进程 CPU 采样会对每个进程触发跨核心写缓冲刷新，高核心数机器上可能
+    /// 长时间占用 DISPATCH_LEVEL 并触发 DPC watchdog。
+    #[cfg_attr(not(windows), allow(dead_code))]
+    fn all_processes_refresh_kind() -> sysinfo::ProcessRefreshKind {
+        sysinfo::ProcessRefreshKind::nothing()
+    }
+
     #[cfg_attr(not(windows), allow(dead_code))]
     pub fn refresh_all_processes(&mut self) {
         self.system.refresh_processes_specifics(
             ProcessesToUpdate::All,
             true, /* remove_dead_processes */
-            Self::refresh_kind(),
+            Self::all_processes_refresh_kind(),
         );
     }
 
