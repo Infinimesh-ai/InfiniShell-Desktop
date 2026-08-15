@@ -44,6 +44,7 @@ warp_core.workspace = true
 warp-command-signatures.workspace = true
 warp_multi_agent_api.workspace = true
 warp-workflows.workspace = true
+warpui = { workspace = true, features = ["integration_tests"] }
 warpui_core.workspace = true
 warpui_extras = { workspace = true, features = [
     "user_preferences-file",
@@ -52,7 +53,6 @@ whoami = "1.5.2"
 
 [dev-dependencies]
 command = { workspace = true, features = ["test-util"] }
-warpui = { workspace = true, features = ["integration_tests"] }
 warp_core = { workspace = true, features = ["test-util"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]

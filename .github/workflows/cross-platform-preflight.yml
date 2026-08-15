@@ -17,7 +17,7 @@ on:
         default: true
         type: boolean
       full_workspace_tests:
-        description: Run the full workspace nextest suite after focused checks
+        description: Run the desktop workspace nextest suite after focused checks
         required: true
         default: false
         type: boolean
@@ -70,10 +70,11 @@ jobs:
         shell: bash
         run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 
-      - name: Run full workspace tests
+      - name: Run desktop workspace tests
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
         shell: bash
-        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2
+        # warp_tui 仍依赖已移除的 Warp 云 API，也不属于桌面版发布产物。
+        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude warp_tui
 
   windows:
     name: Windows x64
@@ -131,7 +132,8 @@ jobs:
         shell: pwsh
         run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 
-      - name: Run full workspace tests
+      - name: Run desktop workspace tests
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
         shell: pwsh
-        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2
+        # warp_tui 仍依赖已移除的 Warp 云 API，也不属于桌面版发布产物。
+        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude warp_tui

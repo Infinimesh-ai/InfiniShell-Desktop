@@ -1156,10 +1156,9 @@ pub fn assert_conversation_was_summarized() -> AssertionCallback {
     })
 }
 
-/// Assert that the active conversation did not use prior-conversation
-/// context. From the LLM's perspective this is the `search_conversation_history`
-/// tool; on the client it materializes as a `FetchConversation` action followed
-/// by regular file tools pointed at `/tmp/warp_conversation_search`.
+/// 断言当前对话没有使用历史对话上下文。InfiniShell 不包含云端
+/// `FetchConversation` 动作，但仍可通过指向
+/// `/tmp/warp_conversation_search` 的文件工具识别物化后的历史上下文。
 pub fn assert_no_prior_conversation_context_usage() -> AssertionCallback {
     Box::new(|app, window_id| {
         let terminal_view = terminal_view(app, window_id, 0, 0);
@@ -1177,12 +1176,6 @@ pub fn assert_no_prior_conversation_context_usage() -> AssertionCallback {
                 };
 
                 for action in output.get().actions() {
-                    if matches!(action.action, AIAgentActionType::FetchConversation { .. }) {
-                        return AssertionOutcome::immediate_failure(format!(
-                            "Implementation conversation used prior-conversation context via search_conversation_history in exchange {exchange_index}: {action}"
-                        ));
-                    }
-
                     let action_text = action.to_string();
                     if action_text.contains("/tmp/warp_conversation_search") {
                         return AssertionOutcome::immediate_failure(format!(
