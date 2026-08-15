@@ -9,10 +9,10 @@ use std::path::PathBuf;
 
 use pathfinder_geometry::vector::Vector2F;
 use warp::tui_export::{
-    AIConversation, AIConversationAutoexecuteMode, AIConversationId, AmbientAgentTaskId,
-    BannerState, BlocklistAIHistoryModel, GlobalResourceHandlesProvider, IsSharedSessionCreator,
+    AIConversation, AIConversationAutoexecuteMode, AIConversationId, BannerState,
+    BlocklistAIHistoryModel, GlobalResourceHandlesProvider, IsSharedSessionCreator,
     LocalTtyTerminalManager, PersistenceWriter, ServerConversationToken, TerminalManagerTrait,
-    TerminalSurfaceResult, oz_run_url,
+    TerminalSurfaceResult,
 };
 use warpui::SingletonEntity;
 use warpui_core::runtime::TuiDriverHandle;
@@ -284,33 +284,6 @@ impl TuiSessions {
         (session_id, surface)
     }
 
-    /// Creates an unfocused lightweight cloud session for a restored remote
-    /// child and associates its conversation with that cloud surface so it is
-    /// discoverable in the orchestration snapshot. The session starts in the
-    /// spawned state from the persisted task/run identity; no new task is
-    /// created.
-    pub(crate) fn create_restored_remote_child_session(
-        sessions: &ModelHandle<Self>,
-        window_id: WindowId,
-        conversation: AIConversation,
-        task_id: AmbientAgentTaskId,
-        run_id: String,
-        ctx: &mut AppContext,
-    ) -> TuiSessionId {
-        let conversation_id = conversation.id();
-        let run_url = oz_run_url(&run_id);
-        let cloud_run_state = ctx.add_model(|_| {
-            TuiCloudRunState::new_restored(conversation_id, task_id, run_id, run_url)
-        });
-        let (session_id, _surface) =
-            Self::create_cloud_run_session(sessions, window_id, cloud_run_state, false, ctx);
-        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-            history.restore_conversations(session_id.surface_id(), vec![conversation], ctx);
-            history.set_active_conversation_id(conversation_id, session_id.surface_id(), ctx);
-        });
-        session_id
-    }
-
     /// Wires a session view to orchestration before registering it.
     pub(crate) fn register_session(
         sessions: &ModelHandle<Self>,
@@ -519,7 +492,6 @@ impl TuiSessions {
                     sessions.remove_session(*session_id, ctx);
                 });
             }
-            TuiOrchestrationEvent::RestoredRemoteChildStatusUpdated { .. } => {}
         });
     }
 

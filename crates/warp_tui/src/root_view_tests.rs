@@ -1,6 +1,6 @@
 use warp::tui_export::register_tui_session_view_test_singletons;
 use warpui::platform::WindowStyle;
-use warpui::{AddWindowOptions, UpdateModel};
+use warpui::{AddWindowOptions, ReadModel, UpdateModel};
 use warpui_core::{App, TuiView as _, WindowId};
 
 use super::RootTuiView;
@@ -87,5 +87,47 @@ fn root_projects_only_the_focused_retained_session_view() {
             assert_eq!(root.as_ref(ctx).child_view_ids(ctx), vec![cloud_view.id()]);
             assert!(ctx.check_view_or_child_focused(window_id, &cloud_view.id()));
         });
+    });
+}
+
+#[test]
+fn terminal_root_focus_delegates_to_the_selected_session() {
+    App::test((), |mut app| async move {
+        register_tui_session_view_test_singletons(&mut app);
+        add_test_semantic_selection(&mut app);
+        app.update(crate::autoupdate::TuiAutoupdater::register);
+        let (window_id, root) = add_root(&mut app);
+        let sessions = app.add_singleton_model(|_| TuiSessions::new_for_test());
+        let (foreground, foreground_manager) = add_test_terminal_session(&mut app, window_id);
+        let foreground_id = app.update(|ctx| {
+            TuiSessions::register_session(
+                &sessions,
+                foreground.clone(),
+                foreground_manager,
+                true,
+                ctx,
+            )
+        });
+        let (background, background_manager) = add_test_terminal_session(&mut app, window_id);
+        app.update(|ctx| {
+            TuiSessions::register_session(
+                &sessions,
+                background.clone(),
+                background_manager,
+                false,
+                ctx,
+            );
+        });
+
+        background.update(&mut app, |background, ctx| background.activate(ctx));
+        assert!(app.read(|ctx| { ctx.check_view_or_child_focused(window_id, &background.id()) }));
+        assert_eq!(
+            app.read_model(&sessions, |sessions, _| sessions.focused_session_id()),
+            Some(foreground_id)
+        );
+
+        root.update(&mut app, |_, ctx| ctx.focus_self());
+
+        assert!(app.read(|ctx| { ctx.check_view_or_child_focused(window_id, &foreground.id()) }));
     });
 }
