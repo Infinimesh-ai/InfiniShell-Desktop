@@ -823,6 +823,11 @@ impl<'c> oauth2::AsyncHttpClient<'c> for Client {
     }
 }
 
+#[cfg(all(test, not(target_family = "wasm")))]
+fn install_test_crypto_provider() {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+}
+
 #[cfg(test)]
 mod origin_tests {
     use super::*;

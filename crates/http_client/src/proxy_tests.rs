@@ -1,6 +1,6 @@
 //! `proxy` 模块的单元测试。
 //!
-//! reqwest 0.12 没有公开 API 让我们查询 `ClientBuilder` 上已注册的 `Proxy`,
+//! reqwest 没有公开 API 让我们查询 `ClientBuilder` 上已注册的 `Proxy`,
 //! 因此这里只能从可观察行为(`apply` 之后构造出的 `Client` 是否成功)上做最小验证。
 //! 更细的"实际是否走代理"留给集成测试(需要本地起 mitm)。
 //!
@@ -8,25 +8,12 @@
 //! `.build()` 需要一个全局 crypto provider 已安装,否则 panic。生产代码由
 //! `app/src/lib.rs::init_common` 安装,单测进程里需要我们自己装上。
 
-use std::sync::Once;
-
 use super::*;
-
-static INSTALL_CRYPTO_PROVIDER: Once = Once::new();
-
-/// 在运行 reqwest `.build()` 的测试前调用,仅第一次生效。
-fn ensure_crypto_provider() {
-    INSTALL_CRYPTO_PROVIDER.call_once(|| {
-        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-    });
-}
 
 /// 构造一个关闭原生 CA 加载的 builder,避免在难拿到系统证书的环境里 build 失败。
 fn test_builder() -> reqwest::ClientBuilder {
-    ensure_crypto_provider();
-    reqwest::ClientBuilder::new()
-        .tls_built_in_native_certs(false)
-        .tls_built_in_root_certs(false)
+    crate::install_test_crypto_provider();
+    reqwest::ClientBuilder::new().tls_certs_only(std::iter::empty::<reqwest::Certificate>())
 }
 
 #[test]

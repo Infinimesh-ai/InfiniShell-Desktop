@@ -60,6 +60,7 @@ fn request_carries_trace_link_header_on_warp_header_path() {
     // The header rides the same `include_warp_http_headers` gate as every other
     // X-Warp-* header (added only inside `add_warp_http_headers`), so building a
     // request through the client while a span is active carries it.
+    install_test_crypto_provider();
     let value = with_active_span(|| {
         let client = Client::new();
         let request = client
