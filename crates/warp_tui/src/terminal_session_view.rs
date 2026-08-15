@@ -23,20 +23,21 @@ use warp::tui_export::{
     AIConversationAutoexecuteMode, AIConversationId, AcceptSlashCommandOrSavedPrompt,
     ActiveSession, ActiveSessionEvent, AfterBlockCompletedEvent, AgentConversationEntryId,
     AgentConversationListEntryState, AgentConversationsModel, AgentInteractionMetadata,
-    AgentViewEntryOrigin, Appearance, BlockId, BlockType, BlocklistAIActionEvent,
-    BlocklistAIActionModel, BlocklistAIContextModel, BlocklistAIController,
-    BlocklistAIHistoryEvent, BlocklistAIHistoryModel, BlocklistAIInputModel,
+    AgentViewController, AgentViewEntryOrigin, AmbientAgentViewModel, Appearance, BlockId,
+    BlockType, BlocklistAIActionEvent, BlocklistAIActionModel, BlocklistAIContextModel,
+    BlocklistAIController, BlocklistAIHistoryEvent, BlocklistAIHistoryModel, BlocklistAIInputModel,
     BlocklistOrchestrationTelemetryEvent, CLISubagentController, CLISubagentEvent,
     CLISubagentTarget, COMMAND_REGISTRY, CancellationReason, ChangelogModel, ChangelogRequestType,
-    CloudConversationData, CommandExecutionSource, ConversationFileExport, ConversationSelection,
-    ConversationSelectionHandle, ExecuteCommandEvent, FORK_PREFIX, ForkConversationError,
-    GetRelevantFilesController, GitHubRepoModel, GitRepoStatusModel, LLMId, LLMPreferences,
+    CommandExecutionSource, ConversationFileExport, ConversationSelection,
+    ConversationSelectionHandle, EphemeralMessageModel, ExecuteCommandEvent, FORK_PREFIX,
+    ForkConversationError, GitHubRepoModel, GitRepoStatusModel, LLMId, LLMPreferences,
     LLMPreferencesEvent, LOCAL_SKILLS_REMOTE_EXECUTION_ERROR_MESSAGE, LinkedWorkflowData,
-    ModelEvent, ParsedSlashCommandInput, PersistenceWriter, PillBarActionKind,
-    PillBarInteractionEvent, PillBarPillKind, PillSwitchOutcome, PtyIntent, PtyIntentEvent,
-    QueuedQueryEvent, QueuedQueryModel, RepoDetectionSessionType, RepoDetectionSource,
-    ServerConversationToken, SessionSettings, Sessions, SessionsEvent, ShellCommandExecutorEvent,
-    SizeInfo, SizeUpdate, SkillReference, SlashCommandDataSource as _, SlashCommandKind,
+    LoadedConversationData, ModelEvent, ParsedSlashCommandInput, PersistenceWriter,
+    PillBarActionKind, PillBarInteractionEvent, PillBarPillKind, PillSwitchOutcome, PtyIntent,
+    PtyIntentEvent, QueuedQueryEvent, QueuedQueryModel, RepoDetectionSessionType,
+    RepoDetectionSource, ServerConversationToken, SessionSettings, Sessions, SessionsEvent,
+    ShellCommandExecutorEvent, SizeInfo, SizeUpdate, SkillManager, SkillReference,
+    SlashCommandDataSource as _, SlashCommandKind, SlashCommandRequest,
     SlashCommandSelectionBehavior, StartAgentExecutorEvent, StartAgentRequest, StaticCommand,
     TelemetryEvent, TerminalModel, TerminalSurface, TerminalSurfaceInit, TranscriptScope,
     TuiMcpAction, TuiMcpManager, TuiMcpServerId, TuiMcpVariableValue, TuiOnboardingMarker,
@@ -1426,25 +1427,15 @@ impl TuiTerminalSessionView {
         let prompt = prompt.to_owned();
         let block_id = target.block_id;
         let conversation_id = target.conversation_id;
-        let previous_instruction = self.cli_subagent_controller.update(ctx, |controller, ctx| {
+        self.cli_subagent_controller.update(ctx, |controller, ctx| {
             controller.set_latest_instruction(block_id.clone(), prompt.clone(), ctx)
         });
         self.input_view.update(ctx, |input, ctx| input.clear(ctx));
         ctx.notify();
 
-        let dispatched = self.ai_controller.update(ctx, |controller, ctx| {
+        self.ai_controller.update(ctx, |controller, ctx| {
             controller.send_user_query_in_conversation(prompt.clone(), conversation_id, None, ctx)
         });
-        if !dispatched {
-            self.cli_subagent_controller.update(ctx, |controller, ctx| {
-                controller.restore_latest_instruction(block_id, previous_instruction, ctx);
-            });
-            if self.input_view.as_ref(ctx).is_empty(ctx) {
-                self.input_view.update(ctx, |input, ctx| {
-                    input.set_text(&prompt, ctx);
-                });
-            }
-        }
         true
     }
 
@@ -1478,6 +1469,18 @@ impl TuiTerminalSessionView {
         });
 
         let terminal_surface_id: EntityId = ctx.view_id();
+        let ambient_agent_view_model =
+            ctx.add_model(|ctx| AmbientAgentViewModel::new(terminal_surface_id, false, ctx));
+        let ephemeral_message_model = ctx.add_model(|_| EphemeralMessageModel::new());
+        let agent_view_controller = ctx.add_model(|ctx| {
+            AgentViewController::new(
+                model.clone(),
+                terminal_surface_id,
+                ambient_agent_view_model,
+                ephemeral_message_model,
+                ctx,
+            )
+        });
         let active_session =
             ctx.add_model(|ctx| ActiveSession::new(sessions.clone(), model_events.clone(), ctx));
         let zero_state_animation_config = ZeroStateAnimationConfig::handle(ctx);
@@ -1522,13 +1525,11 @@ impl TuiTerminalSessionView {
                 ctx,
             )
         });
-        let get_relevant_files_controller = ctx.add_model(GetRelevantFilesController::new);
         let action_model = ctx.add_model(|ctx| {
             BlocklistAIActionModel::new(
                 model.clone(),
                 active_session.clone(),
                 &model_events,
-                get_relevant_files_controller,
                 terminal_surface_id,
                 ctx,
             )
@@ -1552,9 +1553,9 @@ impl TuiTerminalSessionView {
             BlocklistAIController::new(
                 ai_input_model.clone(),
                 context_model.clone(),
-                conversation_selection.clone(),
                 action_model.clone(),
                 active_session.clone(),
+                agent_view_controller,
                 model.clone(),
                 terminal_surface_id,
                 ctx,
@@ -1592,7 +1593,6 @@ impl TuiTerminalSessionView {
                 view.reconcile_focus(ctx);
             }
             BlocklistAIActionEvent::QueuedAction(_)
-            | BlocklistAIActionEvent::InitProject(_)
             | BlocklistAIActionEvent::ToggleCodeReview(_)
             | BlocklistAIActionEvent::InsertCodeReviewComments { .. } => {}
         });
@@ -2842,15 +2842,14 @@ impl TuiTerminalSessionView {
         }
 
         ctx.notify();
-        let future =
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| match &target {
-                TuiConversationRestoreTarget::Local(conversation_id) => {
-                    history.load_conversation_data(*conversation_id, ctx)
-                }
-                TuiConversationRestoreTarget::Server(server_token) => {
-                    history.load_conversation_by_server_token(server_token, ctx)
-                }
-            });
+        let future = BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, _| match &target {
+            TuiConversationRestoreTarget::Local(conversation_id) => {
+                history.load_conversation_data(*conversation_id)
+            }
+            TuiConversationRestoreTarget::Server(server_token) => {
+                history.load_conversation_by_server_token(server_token)
+            }
+        });
 
         let future_handle = ctx.spawn(future, move |view, result, ctx| {
             view.handle_conversation_restore_result(target, origin, request_id, result, ctx);
@@ -2875,7 +2874,7 @@ impl TuiTerminalSessionView {
         target: TuiConversationRestoreTarget,
         origin: TuiConversationRestoreOrigin,
         request_id: u64,
-        result: Option<CloudConversationData>,
+        result: Option<LoadedConversationData>,
         ctx: &mut ViewContext<Self>,
     ) {
         if !self.is_current_restore_request(request_id) {
@@ -2883,8 +2882,8 @@ impl TuiTerminalSessionView {
         }
 
         let conversation = match result {
-            Some(CloudConversationData::Oz(conversation)) => conversation,
-            Some(CloudConversationData::CLIAgent(_)) => {
+            Some(LoadedConversationData::Oz(conversation)) => conversation,
+            Some(LoadedConversationData::CLIAgent(_)) => {
                 self.fail_conversation_restore(
                     request_id,
                     "Warp Agent CLI only supports Oz/Warp conversations.".to_owned(),
@@ -3895,22 +3894,20 @@ impl TuiTerminalSessionView {
             report_error!("TUI prompt submitted without an eagerly selected conversation");
             return;
         };
-        let dispatched = self.ai_controller.update(ctx, |controller, ctx| {
+        self.ai_controller.update(ctx, |controller, ctx| {
             controller.send_user_query_in_conversation(prompt.clone(), conversation_id, None, ctx)
         });
-        if dispatched && let Some(publisher) = &self.cli_agent_osc_event_publisher {
+        if let Some(publisher) = &self.cli_agent_osc_event_publisher {
             publisher
                 .as_ref(ctx)
                 .publish_prompt_submit(prompt.clone(), ctx);
         }
-        if dispatched && let Some(block_id) = active_long_running_block_id {
+        if let Some(block_id) = active_long_running_block_id {
             self.cli_subagent_controller.update(ctx, |controller, ctx| {
                 controller.set_latest_instruction(block_id, prompt, ctx);
             });
         }
-        if dispatched {
-            self.emit_input_buffer_submitted_telemetry(ctx);
-        }
+        self.emit_input_buffer_submitted_telemetry(ctx);
     }
 
     /// Wraps the rendered session tree in the hold-to-talk modifier handler.
@@ -4081,7 +4078,16 @@ impl TuiTerminalSessionView {
             return;
         }
         let result = self.ai_controller.update(ctx, |controller, ctx| {
-            controller.send_invoke_skill_request(reference, user_query, ctx)
+            let path_origin = controller.skill_path_origin(ctx);
+            let skill = SkillManager::as_ref(ctx)
+                .active_skill_by_reference_with_origin(&reference, &path_origin, ctx)
+                .cloned()
+                .map_err(|error| error.to_string())?;
+            controller.send_slash_command_request(
+                SlashCommandRequest::InvokeSkill { skill, user_query },
+                ctx,
+            );
+            Ok::<(), String>(())
         });
         match result {
             Ok(()) => {
@@ -4542,7 +4548,9 @@ impl TuiTerminalSessionView {
                 ctx.spawn(
                     async move {
                         tokio::task::spawn_blocking(|| {
-                            let path = warp_logging::create_log_bundle_zip()?;
+                            let path = warp_logging::create_log_bundle_zip(
+                                warp_logging::LogBundleExtras::default(),
+                            )?;
                             reveal_path_in_file_manager(&path);
                             Ok::<_, anyhow::Error>(path)
                         })
@@ -4590,7 +4598,12 @@ impl TuiTerminalSessionView {
                     return;
                 };
                 self.ai_controller.update(ctx, |controller, ctx| {
-                    controller.send_create_new_project_request(query.to_owned(), ctx);
+                    controller.send_slash_command_request(
+                        SlashCommandRequest::CreateNewProject {
+                            query: query.to_owned(),
+                        },
+                        ctx,
+                    );
                 });
                 self.input_view.update(ctx, |input, ctx| input.clear(ctx));
                 record_static_slash_command_accepted(command.name, true, ctx);
@@ -5583,9 +5596,6 @@ impl TerminalSurface for TuiTerminalSessionView {
     }
 }
 
-#[cfg(test)]
-#[path = "handoff/tests.rs"]
-mod handoff_tests;
 #[cfg(test)]
 #[path = "terminal_session_view_tests.rs"]
 mod tests;

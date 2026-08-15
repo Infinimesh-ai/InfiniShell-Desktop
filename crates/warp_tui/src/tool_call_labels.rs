@@ -7,8 +7,8 @@ use ai::agent::action_result::RunAgentsAgentOutcome;
 use warp::tui_export::{
     AIActionStatus, AIAgentAction, AIAgentActionResultType, AIAgentActionType,
     AskUserQuestionResult, FileGlobV2Result, GrepResult, RequestCommandOutputResult,
-    RunAgentsAgentOutcomeKind, RunAgentsResult, SearchCodebaseFailureReason, SearchCodebaseResult,
-    StopRecordingResult, SuggestNewConversationResult, mcp_server_name_for_id,
+    RunAgentsAgentOutcomeKind, RunAgentsResult, SuggestNewConversationResult,
+    mcp_server_name_for_id,
 };
 use warp_core::command::ExitCode;
 use warpui_core::AppContext;
@@ -290,58 +290,6 @@ fn label_for_action(
                 State::Cancelled => format!("Cancelled reading {files}"),
             }
         }
-        AIAgentActionType::UploadArtifact(request) => {
-            let file = single_line(&request.file_path);
-            match state {
-                State::Constructing => "Preparing upload…".to_owned(),
-                State::Pending | State::Blocked => format!("Upload {file}"),
-                State::Running => format!("Uploading {file}"),
-                State::Succeeded => format!("Uploaded {file}"),
-                State::Failed => format!("Upload of {file} failed"),
-                State::Cancelled => format!("Upload of {file} cancelled"),
-            }
-        }
-        AIAgentActionType::SearchCodebase(request) => {
-            let query = single_line(&request.query);
-            let scope = request
-                .codebase_path
-                .as_deref()
-                .map(|path| format!(" in {}", base_name(path)))
-                .unwrap_or_default();
-            match state {
-                State::Constructing => "Searching codebase…".to_owned(),
-                State::Pending | State::Blocked => {
-                    format!("Search for \"{query}\"{scope}")
-                }
-                State::Running => format!("Searching for \"{query}\"{scope}"),
-                State::Succeeded => match result {
-                    Some(AIAgentActionResultType::SearchCodebase(
-                        SearchCodebaseResult::Success { files },
-                    )) if files.is_empty() => {
-                        format!("Searched for \"{query}\"{scope}, no results")
-                    }
-                    Some(AIAgentActionResultType::SearchCodebase(
-                        SearchCodebaseResult::Success { files },
-                    )) => format!(
-                        "Searched for \"{query}\"{scope}, {}",
-                        count_label(files.len(), "result", "results")
-                    ),
-                    _ => format!("Searched for \"{query}\"{scope}"),
-                },
-                State::Failed => match result {
-                    Some(AIAgentActionResultType::SearchCodebase(
-                        SearchCodebaseResult::Failed {
-                            reason: SearchCodebaseFailureReason::CodebaseNotIndexed,
-                            ..
-                        },
-                    )) => format!(
-                        "Search for \"{query}\"{scope} failed because the codebase isn't indexed"
-                    ),
-                    _ => format!("Search for \"{query}\"{scope} failed"),
-                },
-                State::Cancelled => format!("Search for \"{query}\"{scope} cancelled"),
-            }
-        }
         // Rendered by its own stateful child view (`TuiFileEditsView`); the
         // label path should never be reached for it.
         AIAgentActionType::RequestFileEdits { .. } => {
@@ -436,9 +384,9 @@ fn label_for_action(
             },
             State::Cancelled => "New conversation suggestion cancelled".to_owned(),
         },
-        AIAgentActionType::SuggestPrompt(_)
-        | AIAgentActionType::InitProject
-        | AIAgentActionType::OpenCodeReview => fallback_label(action, state),
+        AIAgentActionType::SuggestPrompt(_) | AIAgentActionType::OpenCodeReview => {
+            fallback_label(action, state)
+        }
         AIAgentActionType::ReadDocuments(request) => {
             let documents = count_label(request.document_ids.len(), "document", "documents");
             match state {
@@ -481,7 +429,6 @@ fn label_for_action(
             State::Failed => "Failed to read command output".to_owned(),
             State::Cancelled => "Read command output cancelled".to_owned(),
         },
-        AIAgentActionType::UseComputer(request) => summary_label(&request.action_summary, state),
         AIAgentActionType::InsertCodeReviewComments { comments, .. } => {
             let comments = count_label(comments.len(), "review comment", "review comments");
             match state {
@@ -493,28 +440,6 @@ fn label_for_action(
                 State::Cancelled => "Insert review comments cancelled".to_owned(),
             }
         }
-        AIAgentActionType::RequestComputerUse(request) => {
-            summary_label(&request.task_summary, state)
-        }
-        AIAgentActionType::StartRecording { .. } => match state {
-            State::Pending | State::Blocked => "Start recording".to_owned(),
-            State::Constructing | State::Running => "Starting recording…".to_owned(),
-            State::Succeeded => "Started screen recording".to_owned(),
-            State::Failed => "Recording failed to start".to_owned(),
-            State::Cancelled => "Start recording cancelled".to_owned(),
-        },
-        AIAgentActionType::StopRecording { .. } => match state {
-            State::Pending | State::Blocked => "Stop recording".to_owned(),
-            State::Constructing | State::Running => "Stopping recording…".to_owned(),
-            State::Succeeded => match result {
-                Some(AIAgentActionResultType::StopRecording(StopRecordingResult::Discarded)) => {
-                    "Discarded screen recording".to_owned()
-                }
-                _ => "Saved screen recording".to_owned(),
-            },
-            State::Failed => "Failed to save recording".to_owned(),
-            State::Cancelled => "Stop recording cancelled".to_owned(),
-        },
         AIAgentActionType::ReadSkill(request) => {
             let skill = single_line(&request.skill.display_label());
             match state {
@@ -525,29 +450,6 @@ fn label_for_action(
                 State::Running => format!("Reading skill {skill}"),
                 State::Failed => format!("Failed to read skill {skill}"),
                 State::Cancelled => format!("Cancelled reading skill {skill}"),
-            }
-        }
-        AIAgentActionType::FetchConversation { .. } => match state {
-            State::Pending | State::Blocked => "Fetch conversation".to_owned(),
-            State::Constructing | State::Running => "Fetching conversation…".to_owned(),
-            State::Succeeded => "Fetched conversation".to_owned(),
-            State::Failed => "Fetch conversation failed".to_owned(),
-            State::Cancelled => "Fetch conversation cancelled".to_owned(),
-        },
-        AIAgentActionType::SendMessageToAgent {
-            addresses, subject, ..
-        } => {
-            let subject = single_line(subject);
-            match state {
-                State::Constructing => "Composing message…".to_owned(),
-                State::Pending | State::Blocked => format!("Send message: {subject}"),
-                State::Running => format!(
-                    "Sending message to {}: {subject}",
-                    count_label(addresses.len(), "agent", "agents")
-                ),
-                State::Succeeded => format!("Sent message: {subject}"),
-                State::Failed => format!("Failed to send message: {subject}"),
-                State::Cancelled => "Send message cancelled".to_owned(),
             }
         }
         AIAgentActionType::TransferShellCommandControlToUser { reason } => match state {
@@ -673,19 +575,6 @@ fn file_glob_label(
         },
         State::Failed => format!("File search for {patterns} failed"),
         State::Cancelled => format!("File search for {patterns} cancelled"),
-    }
-}
-
-/// Labels computer-use calls with their agent-supplied summary, marking only
-/// terminal non-success states (matching the GUI, which shows the summary
-/// verbatim).
-fn summary_label(summary: &str, state: State) -> String {
-    let summary = single_line(summary);
-    match state {
-        State::Constructing => "Preparing computer use…".to_owned(),
-        State::Pending | State::Blocked | State::Running | State::Succeeded => summary,
-        State::Failed => format!("{summary} — failed"),
-        State::Cancelled => format!("{summary} — cancelled"),
     }
 }
 

@@ -83,7 +83,6 @@ pub use context_model::{
     AttachmentType, BlocklistAIContextEvent, BlocklistAIContextModel, PendingAttachment,
     PendingFile,
 };
-pub use controller::BlocklistAIController;
 pub use controller::input_context::{
     BLOCK_CONTEXT_ATTACHMENT_REGEX, DIFF_HUNK_ATTACHMENT_REGEX, DRIVE_OBJECT_ATTACHMENT_REGEX,
 };
@@ -93,9 +92,8 @@ pub(crate) use controller::input_context::{
 #[cfg(test)]
 pub(crate) use controller::response_stream::ResponseStream;
 pub(crate) use controller::response_stream::ResponseStreamId;
-pub(crate) use controller::{
-    BlocklistAIControllerEvent, ClientIdentifiers, SessionContext, SlashCommandRequest,
-};
+pub use controller::{BlocklistAIController, SlashCommandRequest};
+pub(crate) use controller::{BlocklistAIControllerEvent, ClientIdentifiers, SessionContext};
 pub(crate) use conversation_selection::{
     ConversationSelection, ConversationSelectionEvent, ConversationSelectionHandle,
     PendingQueryState,

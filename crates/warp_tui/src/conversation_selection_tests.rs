@@ -377,7 +377,7 @@ fn tui_selection_eagerly_owns_session_conversation() {
         assert_eq!(restored_conversation_id, Some(conversation_id));
 
         selection.update(&mut app, |selection, ctx| {
-            selection.select_new_conversation(AgentViewEntryOrigin::Cli, ctx);
+            selection.select_new_conversation(AgentViewEntryOrigin::Tui, ctx);
         });
         let new_conversation_id = selection
             .read(&app, |selection, ctx| {
@@ -425,7 +425,7 @@ fn tui_selection_creates_and_selects_terminal_surface_scoped_conversation() {
 
         let conversation_id = selection
             .update(&mut app, |selection, ctx| {
-                selection.try_start_new_conversation(AgentViewEntryOrigin::Cli, ctx)
+                selection.try_start_new_conversation(AgentViewEntryOrigin::Tui, ctx)
             })
             .expect("TUI conversation creation should succeed");
 
@@ -449,7 +449,7 @@ fn tui_selection_creates_and_selects_terminal_surface_scoped_conversation() {
 #[test]
 fn tui_selection_reconciles_split_and_removed_selection() {
     App::test((), |mut app| async move {
-        let (history, selection, terminal_surface_id, _) = build_tui_selection_with_default(
+        let (history, selection, terminal_surface_id, _) = build_tui_selection_with_full_fixture(
             &mut app,
             AIConversationAutoexecuteMode::RunToCompletion,
         );
@@ -459,7 +459,7 @@ fn tui_selection_reconciles_split_and_removed_selection() {
         selection.update(&mut app, |selection, ctx| {
             selection.select_existing_conversation(
                 old_conversation_id,
-                AgentViewEntryOrigin::Cli,
+                AgentViewEntryOrigin::Tui,
                 ctx,
             );
         });
@@ -590,7 +590,7 @@ fn tui_new_conversations_respect_the_active_execution_profile() {
 
         let conversation_id = selection
             .update(&mut app, |selection, ctx| {
-                selection.try_start_new_conversation(AgentViewEntryOrigin::Cli, ctx)
+                selection.try_start_new_conversation(AgentViewEntryOrigin::Tui, ctx)
             })
             .expect("TUI conversation creation should succeed");
 

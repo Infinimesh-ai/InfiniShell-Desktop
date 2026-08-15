@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 use warp_core::AppId;
-use warp_core::channel::{Channel, ChannelConfig, ChannelState, OzConfig, WarpServerConfig};
+use warp_core::channel::{Channel, ChannelConfig, ChannelState};
 
 fn main() -> Result<()> {
     let mut state = ChannelState::new(
@@ -16,10 +16,6 @@ fn main() -> Result<()> {
         ChannelConfig {
             app_id: AppId::new("dev", "warp", "WarpTui"),
             logfile_name: "warp-tui.log".into(),
-            server_config: WarpServerConfig::production(),
-            oz_config: OzConfig::production(),
-            telemetry_config: None,
-            crash_reporting_config: None,
             autoupdate_config: None,
             mcp_static_config: None,
         },

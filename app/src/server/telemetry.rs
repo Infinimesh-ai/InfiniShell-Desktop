@@ -1079,6 +1079,7 @@ impl From<AgentViewEntryOrigin> for TelemetryAgentViewEntryOrigin {
             AgentViewEntryOrigin::AmbientAgent => Self::AmbientAgent,
             AgentViewEntryOrigin::ExternalAmbientAgent => Self::ThirdPartyAmbientAgent,
             AgentViewEntryOrigin::Cli => Self::Cli,
+            AgentViewEntryOrigin::Tui => Self::Tui,
             AgentViewEntryOrigin::ImageAdded => Self::ImageAdded,
             AgentViewEntryOrigin::SlashCommand { .. } => Self::SlashCommand,
             AgentViewEntryOrigin::CodeReviewContext => Self::CodeReviewContext,
@@ -1100,8 +1101,8 @@ impl From<AgentViewEntryOrigin> for TelemetryAgentViewEntryOrigin {
             AgentViewEntryOrigin::DefaultSessionMode => Self::DefaultSessionMode,
             AgentViewEntryOrigin::ChildAgent => Self::ChildAgent,
             AgentViewEntryOrigin::LinearDeepLink => Self::LinearDeepLink,
-            // Zap:`AgentViewEntryOrigin` 没有 `Tui` / `OrchestrationPillBar` /
-            // `JumpToLatestAgentMessage` 三个入口(见 `agent_view/controller.rs`),
+            // Zap:`AgentViewEntryOrigin` 没有 `OrchestrationPillBar` /
+            // `JumpToLatestAgentMessage` 两个入口(见 `agent_view/controller.rs`),
             // 对应映射分支一并移除;遥测侧的同名壳 variant 保留以免影响其它调用点。
         }
     }

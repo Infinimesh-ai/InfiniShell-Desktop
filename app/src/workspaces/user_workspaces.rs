@@ -95,7 +95,7 @@ pub struct CreateTeamResponse {
 }
 
 impl UserWorkspaces {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-util"))]
     pub fn mock(cached_workspaces: Vec<Workspace>, _ctx: &mut ModelContext<Self>) -> Self {
         Self {
             current_workspace_uid: cached_workspaces.first().map(|w| w.uid).into(),
@@ -105,7 +105,7 @@ impl UserWorkspaces {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-util"))]
     pub fn default_mock(ctx: &mut ModelContext<Self>) -> Self {
         Self::mock(vec![], ctx)
     }
@@ -169,8 +169,8 @@ impl UserWorkspaces {
     }
 
     pub fn team_from_uid(&self, team_uid: ServerId) -> Option<&Team> {
-        let _ = team_uid;
-        None
+        self.current_workspace()
+            .and_then(|workspace| workspace.teams.iter().find(|team| team.uid == team_uid))
     }
 
     pub fn register_window(

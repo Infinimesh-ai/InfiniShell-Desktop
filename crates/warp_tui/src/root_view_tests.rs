@@ -25,7 +25,7 @@ fn add_root(app: &mut App) -> (WindowId, warpui_core::ViewHandle<RootTuiView>) {
     })
 }
 #[test]
-fn start_device_login_action_retries_from_failure() {
+fn start_device_login_action_enters_local_session_from_failure() {
     App::test((), |mut app| async move {
         register_tui_session_view_test_singletons(&mut app);
         app.add_singleton_model(|_| {
@@ -45,7 +45,7 @@ fn start_device_login_action_retries_from_failure() {
         app.read(|ctx| {
             assert!(matches!(
                 TuiLoginModel::as_ref(ctx).phase(),
-                TuiLoginPhase::AwaitingLogin { browser_url: None }
+                TuiLoginPhase::LoggedIn
             ));
             assert!(!root.as_ref(ctx).copy_login_url_when_available);
             assert!(root.as_ref(ctx).login_copy_hint.current().is_none());
@@ -74,7 +74,7 @@ fn pending_copy_clears_on_failure_before_url_generation() {
 }
 
 #[test]
-fn start_and_copy_action_waits_for_generated_url() {
+fn start_and_copy_action_enters_local_session_without_remote_url() {
     App::test((), |mut app| async move {
         register_tui_session_view_test_singletons(&mut app);
         app.add_singleton_model(|_| TuiLoginModel::signed_out_for_test());
@@ -83,13 +83,18 @@ fn start_and_copy_action_waits_for_generated_url() {
         root.update(&mut app, |root, ctx| {
             root.handle_action(&RootTuiAction::StartDeviceLoginAndCopyUrl, ctx);
         });
+        root.update(&mut app, |root, ctx| {
+            root.handle_login_phase_changed(ctx, |_| -> Result<()> {
+                panic!("local login has no URL to copy")
+            });
+        });
 
         app.read(|ctx| {
             assert!(matches!(
                 TuiLoginModel::as_ref(ctx).phase(),
-                TuiLoginPhase::AwaitingLogin { browser_url: None }
+                TuiLoginPhase::LoggedIn
             ));
-            assert!(root.as_ref(ctx).copy_login_url_when_available);
+            assert!(!root.as_ref(ctx).copy_login_url_when_available);
         });
     });
 }
@@ -148,7 +153,7 @@ fn pending_copy_waits_without_url() {
 }
 
 #[test]
-fn start_device_login_action_transitions_from_welcome() {
+fn start_device_login_action_enters_local_session_from_welcome() {
     App::test((), |mut app| async move {
         register_tui_session_view_test_singletons(&mut app);
         app.add_singleton_model(|_| TuiLoginModel::signed_out_for_test());
@@ -161,7 +166,7 @@ fn start_device_login_action_transitions_from_welcome() {
         app.read(|ctx| {
             assert!(matches!(
                 TuiLoginModel::as_ref(ctx).phase(),
-                TuiLoginPhase::AwaitingLogin { browser_url: None }
+                TuiLoginPhase::LoggedIn
             ));
         });
     });

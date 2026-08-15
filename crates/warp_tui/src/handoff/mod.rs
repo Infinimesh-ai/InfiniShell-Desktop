@@ -1,7 +1,5 @@
-//! TUI local-to-cloud handoff state, presentation, and session integration.
+//! 本地版本不提供云端 handoff；保留空视图类型以维持 transcript 的类型边界。
 
 mod block;
-mod model;
 
 pub(crate) use block::{TuiHandoffBlock, TuiHandoffBlockEvent, init};
-pub(crate) use model::{TuiHandoffModel, TuiHandoffModelEvent};

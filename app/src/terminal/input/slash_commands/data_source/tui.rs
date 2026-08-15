@@ -10,17 +10,21 @@ use super::{
     InlineItem, SlashCommandDataSource, SlashCommandDataSourceState, UpdatedActiveCommands,
 };
 use crate::ai::blocklist::block::cli_controller::CLISubagentController;
+#[cfg(feature = "voice_input")]
+use crate::ai::{AIRequestUsageModel, AIRequestUsageModelEvent};
 use crate::auth::AuthStateProvider;
 use crate::search::SyncDataSource;
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::DataSourceRunErrorWrapper;
-use crate::search::slash_command_menu::static_commands::Availability;
-use crate::search::slash_command_menu::static_commands::commands::COMMAND_REGISTRY;
+use crate::search::slash_command_menu::static_commands::commands::{COMMAND_REGISTRY, VOICE};
+use crate::search::slash_command_menu::static_commands::{Availability, SlashCommandKind};
+#[cfg(feature = "voice_input")]
+use crate::settings::{AISettings, AISettingsChangedEvent};
 use crate::terminal::TerminalModel;
 use crate::terminal::input::slash_commands::AcceptSlashCommandOrSavedPrompt;
 use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::view::resolve_ai_query_routing;
-use crate::workspaces::user_workspaces::UserWorkspaces;
+use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 
 pub struct TuiDataSourceArgs {
     pub active_session: ModelHandle<ActiveSession>,
@@ -50,11 +54,28 @@ impl TuiSlashCommandDataSource {
             Self::recompute_active_commands,
             ctx,
         );
+        ctx.subscribe_to_model(&UserWorkspaces::handle(ctx), |me, _, event, ctx| {
+            if matches!(
+                event,
+                UserWorkspacesEvent::TeamsChanged | UserWorkspacesEvent::CurrentWorkspaceChanged
+            ) {
+                me.recompute_active_commands(ctx);
+            }
+        });
 
-        // Zap:上游在 `voice_input` feature 下订阅 `AISettingsChangedEvent::VoiceInputEnabled`
-        // 与 `AIRequestUsageModelEvent::RequestUsageUpdated`,用来让 `/voice` 命令随开关出现。
-        // 我方命令注册表没有 `/voice` 静态命令(语音输入通过输入框自身的入口触发),重算不依赖
-        // 这两个事件,故不订阅。
+        #[cfg(feature = "voice_input")]
+        {
+            ctx.subscribe_to_model(&AISettings::handle(ctx), |me, _, event, ctx| {
+                if matches!(event, AISettingsChangedEvent::VoiceInputEnabled { .. }) {
+                    me.recompute_active_commands(ctx);
+                }
+            });
+            ctx.subscribe_to_model(&AIRequestUsageModel::handle(ctx), |me, _, event, ctx| {
+                if matches!(event, AIRequestUsageModelEvent::RequestUsageUpdated) {
+                    me.recompute_active_commands(ctx);
+                }
+            });
+        }
 
         let mut me = Self {
             state: SlashCommandDataSourceState::new(
@@ -91,18 +112,25 @@ impl TuiSlashCommandDataSource {
         }
     }
 
-    /// Zap:上游在这里还有三重过滤——`StaticCommand::supports_tui()`(按 surface 分流)、
-    /// `/voice` 的可用性判定,以及 `SlashCommandKind::ManageBilling` 的账单链接判定。
-    /// 我方命令注册表尚未随上游拆出 `SlashCommandSurfaces` / `SlashCommandKind`,注册表里
-    /// 既没有 `/voice` 也没有 `/manage-billing`,这三个过滤在此无对应物,故剥离。
     fn recompute_active_commands(&mut self, ctx: &mut ModelContext<Self>) {
         let availability = self.availability(ctx);
         let gates = self.common_command_gates(ctx);
+        #[cfg(feature = "voice_input")]
+        let voice_command_is_available = AISettings::as_ref(ctx).is_voice_input_enabled(ctx)
+            && UserWorkspaces::as_ref(ctx).is_voice_enabled()
+            && AIRequestUsageModel::as_ref(ctx).can_request_voice()
+            && self.local_skills_available(ctx);
+        #[cfg(not(feature = "voice_input"))]
+        let voice_command_is_available = false;
         let commands = HashMap::from_iter(
             COMMAND_REGISTRY
                 .all_commands_by_id()
                 .filter(|(_, command)| {
-                    self.command_passes_common_gates(command, availability, &gates)
+                    command.supports_tui()
+                        && (command.name != VOICE.name || voice_command_is_available)
+                        && (command.kind != SlashCommandKind::ManageBilling
+                            || self.manage_billing_url(ctx).is_some())
+                        && self.command_passes_common_gates(command, availability, &gates)
                 })
                 .map(|(id, command)| (id, command.clone())),
         );
@@ -111,10 +139,11 @@ impl TuiSlashCommandDataSource {
         }
     }
 
-    /// Zap:上游还会补 `Availability::NOT_CLOUD_AGENT`。本地优先分支的 `Availability`
-    /// 没有 cloud agent 相关位,故省略。
     fn availability(&self, ctx: &AppContext) -> Availability {
-        self.base_availability(ctx) | Availability::AGENT_VIEW | Availability::ACTIVE_CONVERSATION
+        self.base_availability(ctx)
+            | Availability::AGENT_VIEW
+            | Availability::ACTIVE_CONVERSATION
+            | Availability::NOT_CLOUD_AGENT
     }
 }
 

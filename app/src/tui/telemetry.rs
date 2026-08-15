@@ -1,10 +1,7 @@
 use instant::Instant;
-use serde_json::{Value, json};
-use strum_macros::{EnumDiscriminants, EnumIter};
-use warp_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 
 use super::TuiLoginPhase;
-use crate::server::server_api::auth::UserAuthenticationError;
+use crate::auth::UserAuthenticationError;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum AuthenticationEntrypoint {
@@ -119,13 +116,10 @@ pub(super) enum AuthenticationFailureReason {
 impl AuthenticationFailureReason {
     fn from_error(error: &UserAuthenticationError) -> Self {
         match error {
-            UserAuthenticationError::DeniedAccessToken(_) => Self::DeniedAccessToken,
-            UserAuthenticationError::UserAccountDisabled(_) => Self::UserAccountDisabled,
+            UserAuthenticationError::DeniedAccessToken => Self::DeniedAccessToken,
+            UserAuthenticationError::UserAccountDisabled => Self::UserAccountDisabled,
             UserAuthenticationError::InvalidStateParameter => Self::InvalidState,
             UserAuthenticationError::MissingStateParameter => Self::MissingState,
-            UserAuthenticationError::DeviceCodeRequestTimedOut { .. } => {
-                Self::DeviceCodeRequestTimeout
-            }
             UserAuthenticationError::Unexpected(_) => Self::Unexpected,
         }
     }
@@ -176,8 +170,7 @@ impl AbandonmentPhase {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, EnumDiscriminants)]
-#[strum_discriminants(derive(EnumIter))]
+#[derive(Debug, PartialEq, Eq)]
 pub(super) enum TuiOnboardingTelemetryEvent {
     AuthenticationStarted {
         journey: Journey,
@@ -209,114 +202,6 @@ pub(super) enum TuiOnboardingTelemetryEvent {
         duration_ms: u64,
     },
 }
-
-impl TelemetryEvent for TuiOnboardingTelemetryEvent {
-    fn name(&self) -> &'static str {
-        TuiOnboardingTelemetryEventDiscriminants::from(self).name()
-    }
-
-    fn payload(&self) -> Option<Value> {
-        match self {
-            Self::AuthenticationStarted {
-                journey,
-                entrypoint,
-                attempt,
-            } => Some(json!({
-                "journey": journey.as_str(),
-                "entrypoint": entrypoint.as_str(),
-                "attempt": attempt.as_str(),
-            })),
-            Self::DeviceAuthorizationReady => None,
-            Self::BrowserLaunch {
-                journey,
-                trigger,
-                outcome,
-            } => Some(json!({
-                "journey": journey.as_str(),
-                "trigger": trigger.as_str(),
-                "outcome": outcome.as_str(),
-            })),
-            Self::LoginUrlCopied { outcome } => Some(json!({
-                "outcome": outcome.as_str(),
-            })),
-            Self::AuthenticationFailed {
-                journey,
-                stage,
-                reason,
-                duration_ms,
-            } => Some(json!({
-                "journey": journey.as_str(),
-                "stage": stage.as_str(),
-                "reason": reason.as_str(),
-                "duration_ms": duration_ms,
-            })),
-            Self::Abandoned {
-                journey,
-                phase,
-                duration_ms,
-            } => Some(json!({
-                "journey": journey.as_str(),
-                "phase": phase.as_str(),
-                "duration_ms": duration_ms,
-            })),
-            Self::Completed {
-                journey,
-                duration_ms,
-            } => Some(json!({
-                "journey": journey.as_str(),
-                "duration_ms": duration_ms,
-            })),
-        }
-    }
-
-    fn description(&self) -> &'static str {
-        TuiOnboardingTelemetryEventDiscriminants::from(self).description()
-    }
-
-    fn enablement_state(&self) -> EnablementState {
-        TuiOnboardingTelemetryEventDiscriminants::from(self).enablement_state()
-    }
-
-    fn contains_ugc(&self) -> bool {
-        false
-    }
-
-    fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        warp_core::telemetry::enum_events::<Self>()
-    }
-}
-
-impl TelemetryEventDesc for TuiOnboardingTelemetryEventDiscriminants {
-    fn name(&self) -> &'static str {
-        match self {
-            Self::AuthenticationStarted => "TUI.Onboarding.AuthenticationStarted",
-            Self::DeviceAuthorizationReady => "TUI.Onboarding.DeviceAuthorizationReady",
-            Self::BrowserLaunch => "TUI.Onboarding.BrowserLaunch",
-            Self::LoginUrlCopied => "TUI.Onboarding.LoginUrlCopied",
-            Self::AuthenticationFailed => "TUI.Onboarding.AuthenticationFailed",
-            Self::Abandoned => "TUI.Onboarding.Abandoned",
-            Self::Completed => "TUI.Onboarding.Completed",
-        }
-    }
-
-    fn description(&self) -> &'static str {
-        match self {
-            Self::AuthenticationStarted => "TUI browser authentication started",
-            Self::DeviceAuthorizationReady => "TUI device authorization URL became available",
-            Self::BrowserLaunch => "TUI attempted to launch the authentication browser",
-            Self::LoginUrlCopied => "TUI attempted to copy the authentication URL",
-            Self::AuthenticationFailed => "TUI authentication failed",
-            Self::Abandoned => "User exited while the TUI authentication UI was visible",
-            Self::Completed => "TUI displayed the terminal after interactive authentication",
-        }
-    }
-
-    fn enablement_state(&self) -> EnablementState {
-        EnablementState::Always
-    }
-}
-
-warp_core::register_telemetry_event!(TuiOnboardingTelemetryEvent);
 
 struct ActiveFlow {
     journey: Journey,

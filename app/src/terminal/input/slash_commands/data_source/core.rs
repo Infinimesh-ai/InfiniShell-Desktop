@@ -520,7 +520,7 @@ pub trait SlashCommandDataSource {
         // 命令注册表里没有该常量,故从优先列表中剥离。
         let prioritized_commands = vec![
             &*commands::EDIT,
-            &*commands::CONVERSATIONS,
+            &commands::CONVERSATIONS,
             &*commands::PROMPTS,
             &*commands::PLAN,
             &*commands::AGENT,
@@ -601,10 +601,7 @@ impl InlineItem {
         let appearance = Appearance::as_ref(app);
         Self {
             action: AcceptSlashCommandOrSavedPrompt::SlashCommand { id: *command_id },
-            // Zap:上游把图标挪到了 `SlashCommandSurfaces::{GuiOnly, GuiAndTui}` 上,以此区分
-            // GUI/TUI 命令。我方 `StaticCommand` 仍是单一的 `icon_path` 字段(命令注册表未随
-            // 上游拆分 surface),这里直接包一层 `Some` 保持 `InlineItem` 的上游形状。
-            icon_path: Some(command.icon_path),
+            icon_path: command.supported_surfaces.gui_icon_path(),
             name: command.name.to_owned(),
             description: Some(command.description.to_owned()),
             font_family: appearance.monospace_font_family(),

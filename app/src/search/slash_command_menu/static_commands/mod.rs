@@ -3,6 +3,7 @@ pub mod commands;
 
 use bitflags::bitflags;
 pub use commands::SlashCommandId;
+use settings::SettingsMode;
 
 bitflags! {
     /// Specifies the requirements for a slash command to be available.
@@ -15,7 +16,7 @@ bitflags! {
     ///   A command should *not* set both flags to be available in both modes - this results in requirements that cannot be satisfied.
     /// * Most `/fork`-like slash commands require [`Self::NO_LRC_CONTROL`] and [`Self::ACTIVE_CONVERSATION`]
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct Availability: u8 {
+    pub struct Availability: u16 {
         /// No requirements — always available.
         const ALWAYS = 0;
         /// Requires the agent view.
@@ -30,8 +31,124 @@ bitflags! {
         const NO_LRC_CONTROL = 1 << 4;
         /// Requires an active AI conversation.
         const ACTIVE_CONVERSATION = 1 << 5;
+        /// 要求已启用代码库上下文。
+        const CODEBASE_CONTEXT = 1 << 6;
         /// Requires AI to be globally enabled.
         const AI_ENABLED = 1 << 7;
+        /// 要求当前不是云端 Agent 上下文。
+        const NOT_CLOUD_AGENT = 1 << 8;
+        /// 要求当前是云端 Agent 上下文。
+        const CLOUD_AGENT = 1 << 9;
+        /// 仅当斜杠命令数据源通过 `SlashCommandDataSource::for_cloud_mode_v2` 构造，
+        /// 且启用了 `FeatureFlag::CloudModeInputV2` 时，才在会话上下文中设置。
+        /// 依赖该位的命令只会出现在 V2 云模式的输入框中。
+        const CLOUD_MODE_V2_COMPOSER = 1 << 10;
+    }
+}
+/// 静态斜杠命令的稳定标识。
+///
+/// 前端根据该值分发命令，不再匹配命令名称字符串。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SlashCommandKind {
+    Agent,
+    CloudAgent,
+    AddMcp,
+    ApiKeys,
+    ConnectGrok,
+    Upgrade,
+    ManageBilling,
+    AutoApprove,
+    Statusline,
+    ResetStatusline,
+    Mcp,
+    ViewLogs,
+    Voice,
+    NaturalLanguageDetection,
+    Theme,
+    Exit,
+    Logout,
+    CreateEnvironment,
+    CreateDockerSandbox,
+    CreateNewProject,
+    EditSkill,
+    InvokeSkill,
+    AddPrompt,
+    AddRule,
+    Edit,
+    RenameTab,
+    RenameConversation,
+    SetTabColor,
+    Fork,
+    MoveToCloud,
+    OpenCodeReview,
+    Index,
+    Init,
+    OpenProjectRules,
+    OpenMcpServers,
+    OpenSettingsFile,
+    Changelog,
+    Feedback,
+    OpenRepo,
+    OpenRules,
+    New,
+    Clear,
+    Model,
+    Host,
+    Harness,
+    Environment,
+    Profile,
+    Plan,
+    Orchestrate,
+    Compact,
+    CompactAnd,
+    Queue,
+    ForkAndCompact,
+    ForkFrom,
+    ContinueLocally,
+    Usage,
+    RemoteControl,
+    Cost,
+    Conversations,
+    Prompts,
+    Rewind,
+    ExportToClipboard,
+    ExportToFile,
+    VimMode,
+    Status,
+    CopyDebuggingId,
+}
+
+/// 静态斜杠命令所支持的应用界面。
+///
+/// 每个 [`StaticCommand`] 都必须显式声明仅支持 GUI、仅支持 TUI，或两者共享。
+/// 支持 GUI 的变体还必须提供菜单渲染所需的图标路径。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SlashCommandSurfaces {
+    GuiOnly { icon_path: &'static str },
+    TuiOnly,
+    GuiAndTui { icon_path: &'static str },
+}
+
+impl SlashCommandSurfaces {
+    pub fn supports_gui(self) -> bool {
+        matches!(self, Self::GuiOnly { .. } | Self::GuiAndTui { .. })
+    }
+
+    pub fn supports_tui(self) -> bool {
+        matches!(self, Self::TuiOnly | Self::GuiAndTui { .. })
+    }
+
+    pub fn gui_icon_path(self) -> Option<&'static str> {
+        match self {
+            Self::GuiOnly { icon_path } | Self::GuiAndTui { icon_path } => Some(icon_path),
+            Self::TuiOnly => None,
+        }
+    }
+    pub fn includes(self, settings_mode: SettingsMode) -> bool {
+        match settings_mode {
+            SettingsMode::Gui => self.supports_gui(),
+            SettingsMode::Tui => self.supports_tui(),
+        }
     }
 }
 
@@ -78,9 +195,10 @@ impl Argument {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StaticCommand {
+    pub kind: SlashCommandKind,
     pub name: &'static str,
     pub description: &'static str,
-    pub icon_path: &'static str,
+    pub supported_surfaces: SlashCommandSurfaces,
     /// Specifies the requirements for this command to be available. See [`Availability`].
     pub availability: Availability,
     /// Whether this command requires AI mode when executed.
@@ -88,8 +206,24 @@ pub struct StaticCommand {
     pub auto_enter_ai_mode: bool,
     pub argument: Option<Argument>,
 }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SlashCommandArgumentHint {
+    pub input_prefix: String,
+    pub text: &'static str,
+}
 
 impl StaticCommand {
+    pub fn supports_gui(&self) -> bool {
+        self.supported_surfaces.supports_gui()
+    }
+
+    pub fn supports_tui(&self) -> bool {
+        self.supported_surfaces.supports_tui()
+    }
+    pub fn supports_surface(&self, settings_mode: SettingsMode) -> bool {
+        self.supported_surfaces.includes(settings_mode)
+    }
+
     pub fn matches_filter(&self, filter_text: &str) -> bool {
         if filter_text.is_empty() {
             return true;
@@ -105,6 +239,14 @@ impl StaticCommand {
 
     pub fn is_active(&self, session_context: Availability) -> bool {
         session_context.contains(self.availability)
+    }
+
+    pub fn argument_hint(&self) -> Option<SlashCommandArgumentHint> {
+        let text = self.argument.as_ref()?.hint_text?;
+        Some(SlashCommandArgumentHint {
+            input_prefix: format!("{} ", self.name),
+            text,
+        })
     }
 }
 

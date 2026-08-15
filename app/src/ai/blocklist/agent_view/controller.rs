@@ -134,6 +134,8 @@ pub enum AgentViewEntryOrigin {
     ExternalAmbientAgent,
     /// Entered agent view via the CLI (e.g. `warp agent run`).
     Cli,
+    /// 从无界面 TUI 前端进入 Agent 视图。
+    Tui,
     /// Entered agent view by adding an image (drag-and-drop or paste).
     ImageAdded,
     /// Entered agent view by executing a slash command that requires agent mode.

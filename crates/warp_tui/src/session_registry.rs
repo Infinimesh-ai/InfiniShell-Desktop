@@ -461,21 +461,6 @@ impl TuiSessions {
                     );
                 });
             }
-            TuiOrchestrationEvent::CreateRemoteChildSession {
-                parent_session_id,
-                request,
-                prepared,
-            } => {
-                let child = Self::create_remote_child_session(&sessions, *parent_session_id, ctx);
-                orchestration_for_events.update(ctx, |orchestration, ctx| {
-                    orchestration.register_remote_child_session(
-                        child,
-                        (**request).clone(),
-                        (**prepared).clone(),
-                        ctx,
-                    );
-                });
-            }
             TuiOrchestrationEvent::KillLocalChildSession {
                 session_id,
                 conversation_id,
@@ -525,37 +510,6 @@ impl TuiSessions {
                     orchestration.register_restored_local_oz_child_session(
                         session_id,
                         conversation_id,
-                        ctx,
-                    );
-                });
-            }
-            TuiOrchestrationEvent::RestoreRemoteChildSession {
-                root_session_id,
-                conversation,
-                task_id,
-                run_id,
-            } => {
-                let Some(window_id) = sessions
-                    .as_ref(ctx)
-                    .session(*root_session_id)
-                    .map(|session| session.view().window_id(ctx))
-                else {
-                    return;
-                };
-                let conversation_id = conversation.id();
-                let session_id = Self::create_restored_remote_child_session(
-                    &sessions,
-                    window_id,
-                    (**conversation).clone(),
-                    *task_id,
-                    run_id.clone(),
-                    ctx,
-                );
-                orchestration_for_events.update(ctx, |orchestration, ctx| {
-                    orchestration.register_restored_remote_child_session(
-                        session_id,
-                        conversation_id,
-                        *task_id,
                         ctx,
                     );
                 });

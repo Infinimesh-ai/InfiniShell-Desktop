@@ -118,23 +118,6 @@ fn blocked_action_presentation(action: &AIAgentActionType) -> BlockedActionPrese
                     .join("\n"),
             ),
         ),
-        AIAgentActionType::SearchCodebase(request) => {
-            let mut detail = format!("Query: {}", request.query);
-            if let Some(path) = request.codebase_path.as_deref() {
-                detail.push_str(&format!("\nPath: {path}"));
-            }
-            if let Some(paths) = request
-                .partial_paths
-                .as_ref()
-                .filter(|paths| !paths.is_empty())
-            {
-                detail.push_str(&format!("\nFiles: {}", paths.join(", ")));
-            }
-            (
-                "Agent wants to search the codebase".to_owned(),
-                Some(detail),
-            )
-        }
         AIAgentActionType::Grep { queries, path } => (
             "Agent wants to search file contents".to_owned(),
             Some(format!("Patterns: {}\nPath: {path}", queries.join(", "))),

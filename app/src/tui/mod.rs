@@ -20,12 +20,11 @@ use telemetry::{
 };
 use url::Url;
 pub use user_info::{TuiUserInfoManager, TuiUserInfoManagerEvent, TuiUserInfoSnapshot};
-use warp_core::telemetry::TelemetryEvent as _;
 use warpui::{AppContext, Entity, SingletonEntity};
 
 use crate::TuiMountFn;
 use crate::ai::mcp::FileBasedMCPManager;
-use crate::auth::{self, AuthManager, AuthManagerEvent, AuthState, AuthStateProvider};
+use crate::auth::{AuthManager, AuthManagerEvent, AuthState, AuthStateProvider};
 use crate::tui_onboarding_markers::TuiOnboardingMarkers;
 
 /// Login state of the headless TUI, observed by the `warp_tui` root view to
@@ -249,44 +248,7 @@ fn initial_login_phase(auth_state: &AuthState) -> TuiLoginPhase {
 
 fn handle_auth_manager_event(event: &AuthManagerEvent, ctx: &mut AppContext) {
     match event {
-        AuthManagerEvent::ReceivedDeviceAuthorizationCode {
-            verification_url,
-            verification_url_complete,
-            user_code,
-        } => {
-            let event = TuiLoginModel::handle(ctx)
-                .update(ctx, |model, _| model.telemetry.device_authorization_ready());
-            send_tui_onboarding_event(event, ctx);
-            // Prefer the "complete" URL (device code pre-filled) for opening.
-            let url_to_open = verification_url_complete
-                .as_deref()
-                .unwrap_or(verification_url.as_str());
-            let verification_url = tui_verification_url(url_to_open, user_code);
-            let url_to_open =
-                TuiLoginModel::handle(ctx).update(ctx, |model, _| match model.browser_flow {
-                    TuiAuthBrowserFlow::DirectDeviceAuthorization => Some(verification_url.clone()),
-                    TuiAuthBrowserFlow::LogoutThenDeviceAuthorizationPending => {
-                        model.browser_flow =
-                            TuiAuthBrowserFlow::LogoutThenDeviceAuthorizationOpened;
-                        Some(
-                            auth::web_logout_url_with_continue(&verification_url)
-                                .unwrap_or_else(auth::web_logout_url),
-                        )
-                    }
-                    TuiAuthBrowserFlow::LogoutThenDeviceAuthorizationOpened => None,
-                });
-            let Some(url_to_open) = url_to_open else {
-                return;
-            };
-            set_login_phase(
-                ctx,
-                TuiLoginPhase::AwaitingLogin {
-                    browser_url: Some(url_to_open.clone()),
-                },
-            );
-            TuiLoginModel::open_login_url(&url_to_open, ctx);
-        }
-        AuthManagerEvent::AuthComplete => {
+        AuthManagerEvent::AuthComplete | AuthManagerEvent::SkippedLogin => {
             set_login_phase(ctx, TuiLoginPhase::LoggedIn);
             TuiOnboardingMarkers::handle(ctx).update(ctx, |markers, ctx| {
                 markers.load_current_account(ctx);
@@ -297,23 +259,8 @@ fn handle_auth_manager_event(event: &AuthManagerEvent, ctx: &mut AppContext) {
             let event = TuiLoginModel::handle(ctx)
                 .update(ctx, |model, _| model.telemetry.authentication_failed(err));
             send_tui_onboarding_event(event, ctx);
-            let should_finish_web_logout = matches!(
-                TuiLoginModel::as_ref(ctx).browser_flow,
-                TuiAuthBrowserFlow::LogoutThenDeviceAuthorizationPending
-            );
-            let browser_flow = if should_finish_web_logout {
-                let logout_url = auth::web_logout_url();
-                if ctx.try_open_url(&logout_url) {
-                    TuiAuthBrowserFlow::DirectDeviceAuthorization
-                } else {
-                    log::warn!("Unable to open the logout URL in the default browser");
-                    TuiAuthBrowserFlow::LogoutThenDeviceAuthorizationPending
-                }
-            } else {
-                TuiAuthBrowserFlow::DirectDeviceAuthorization
-            };
             TuiLoginModel::handle(ctx).update(ctx, |model, _| {
-                model.browser_flow = browser_flow;
+                model.browser_flow = TuiAuthBrowserFlow::DirectDeviceAuthorization;
             });
             set_login_phase(
                 ctx,
@@ -322,14 +269,22 @@ fn handle_auth_manager_event(event: &AuthManagerEvent, ctx: &mut AppContext) {
                 },
             );
         }
-        _ => {}
+        AuthManagerEvent::NeedsReauth => {
+            // Zap 的身份始终是本地占位用户，不进入浏览器重新认证流程。
+            set_login_phase(ctx, TuiLoginPhase::LoggedIn);
+        }
+        AuthManagerEvent::AttemptedLoginGatedFeature { .. }
+        | AuthManagerEvent::CreateAnonymousUserFailed => {}
     }
 }
 
 fn authorize_device(ctx: &mut AppContext) {
-    AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-        auth_manager.authorize_device(ctx);
+    // Zap 没有远端设备认证；本地身份已经在启动时完成初始化。
+    set_login_phase(ctx, TuiLoginPhase::LoggedIn);
+    TuiOnboardingMarkers::handle(ctx).update(ctx, |markers, ctx| {
+        markers.load_current_account(ctx);
     });
+    activate_global_mcp_servers(ctx);
 }
 
 fn tui_verification_url(verification_url: &str, user_code: &str) -> String {
@@ -386,12 +341,11 @@ fn start_tui_device_login_with_entrypoint(
 }
 /// Logs out the current TUI user and sends them to Warp web's logged-out flow.
 pub fn log_out_tui(ctx: &mut AppContext) {
-    auth::log_out(ctx);
-    TuiOnboardingMarkers::handle(ctx).update(ctx, |markers, ctx| {
-        markers.reset_for_account_transition(ctx);
+    AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
+        auth_manager.log_out(ctx);
     });
-    set_logged_out_phase(ctx);
-    authorize_device(ctx);
+    // 本地版本没有可退出的远端账号，重置后仍保持可用状态。
+    set_login_phase(ctx, TuiLoginPhase::LoggedIn);
 }
 
 fn set_logged_out_phase(ctx: &mut AppContext) {

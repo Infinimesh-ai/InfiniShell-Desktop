@@ -4,7 +4,6 @@ use std::future::Future;
 use std::sync::Arc;
 
 use ai::api_keys::ApiKeyManager;
-use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
 use chrono::{Duration, Local};
 use warp_core::SessionId;
 use warp_core::execution_mode::{AppExecutionMode, ExecutionMode};
@@ -15,31 +14,27 @@ use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
 use crate::ai::agent::{AIAgentAction, AIAgentExchangeId};
 use crate::ai::agent_conversations_model::AgentConversationsModel;
+use crate::ai::agent_providers::AgentProviderSecrets;
 use crate::ai::blocklist::history_model::AIQueryHistoryOutputStatus;
-use crate::ai::blocklist::local_agent_task_sync_model::LocalAgentTaskSyncModel;
-use crate::ai::blocklist::orchestration_event_streamer::OrchestrationEventStreamer;
 use crate::ai::blocklist::orchestration_events::OrchestrationEventService;
 use crate::ai::blocklist::{
     BlocklistAIActionModel, BlocklistAIHistoryModel, BlocklistAIPermissions, PersistedAIInput,
     PersistedAIInputType, QueuedQueryModel,
 };
-use crate::ai::cloud_agent_settings::CloudAgentSettings;
-use crate::ai::cloud_environments::CloudEnvironmentCatalog;
 use crate::ai::connected_self_hosted_workers::ConnectedSelfHostedWorkersModel;
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::harness_availability::HarnessAvailabilityModel;
 use crate::ai::llms::{LLMId, LLMPreferences};
 use crate::ai::mcp::templatable_manager::TemplatableMCPServerManager;
+use crate::ai::mcp::{FileBasedMCPManager, FileMCPWatcher};
 #[cfg(feature = "voice_input")]
 use crate::ai::request_usage_model::AIRequestUsageModel;
 use crate::auth::{AuthManager, AuthStateProvider};
-use crate::cloud_object::model::persistence::CloudModel;
+use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::code_review::git_repo_model::GitRepoModels;
 use crate::network::NetworkStatus;
 use crate::persistence::PersistenceWriter;
 use crate::server::experiments::ServerExperiments;
-use crate::server::server_api::ServerApiProvider;
-use crate::server::sync_queue::SyncQueue;
 #[cfg(feature = "voice_input")]
 use crate::server::voice_transcriber::ServerVoiceTranscriber;
 use crate::settings::manager::SettingsManager;
@@ -252,25 +247,22 @@ pub fn register_tui_input_mode_test_settings(ctx: &mut AppContext) {
     ctx.add_singleton_model(|_| SettingsManager::default());
     ctx.add_singleton_model(WarpConfig::mock);
     warpui_extras::secure_storage::register_noop("test", ctx);
-    ctx.add_singleton_model(|_| ServerApiProvider::new_for_test());
     ctx.add_singleton_model(|_| AuthStateProvider::new_for_test());
     AISettings::register_and_subscribe_to_events(ctx);
-    ctx.add_singleton_model(|ctx| {
-        let provider = ServerApiProvider::as_ref(ctx);
-        UserWorkspaces::mock(
-            provider.get_team_client(),
-            provider.get_workspace_client(),
-            Vec::new(),
-            ctx,
-        )
-    });
+    ctx.add_singleton_model(|ctx| UserWorkspaces::mock(Vec::new(), ctx));
 }
 
 pub fn set_tui_default_team_admin_for_test(ctx: &mut AppContext) {
     let auth = AuthStateProvider::as_ref(ctx).get();
     let user_uid = auth.user_id().expect("test user should have an id");
     let user_email = auth.user_email().expect("test user should have an email");
-    let mut team = Team::from_local_cache(123.into(), "test team".to_owned(), None, None, None);
+    let mut team = Team::from_local_cache(
+        crate::server::ids::ServerId::from_string_lossy("tui-test-team-00000000"),
+        "test team".to_owned(),
+        None,
+        None,
+        None,
+    );
     team.members.push(TeamMember {
         uid: user_uid,
         email: user_email,
@@ -311,28 +303,19 @@ pub fn register_tui_session_view_test_singletons(app: &mut warpui::App) {
     });
     app.update(AISettings::register_and_subscribe_to_events);
     app.update(TuiVoiceSettings::register);
-    CloudAgentSettings::register(app);
     app.add_singleton_model(ApiKeyManager::new);
 
     app.add_singleton_model(|_| NetworkStatus::new());
-    app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| AuthStateProvider::new_for_test());
     app.add_singleton_model(AuthManager::new_for_test);
     app.add_singleton_model(|_| TuiOnboardingMarkers::new_ready_for_test(false, false));
     app.add_singleton_model(PrivacySettings::mock);
-    app.add_singleton_model(|ctx| {
-        let (team_client, workspace_client) = {
-            let provider = ServerApiProvider::as_ref(ctx);
-            (provider.get_team_client(), provider.get_workspace_client())
-        };
-        UserWorkspaces::mock(team_client, workspace_client, vec![], ctx)
-    });
-    app.add_singleton_model(SyncQueue::mock);
-    app.add_singleton_model(CloudModel::mock);
-    app.add_singleton_model(CloudEnvironmentCatalog::new);
+    app.add_singleton_model(|ctx| UserWorkspaces::mock(Vec::new(), ctx));
     app.add_singleton_model(|_| crate::appearance::Appearance::mock());
 
     app.add_singleton_model(|_| TemplatableMCPServerManager::default());
+    app.add_singleton_model(AgentProviderSecrets::new);
+    app.add_singleton_model(|_| ObjectStoreModel::new(None, Vec::new(), None));
     app.add_singleton_model(LLMPreferences::new);
     app.add_singleton_model(HarnessAvailabilityModel::new);
     app.add_singleton_model(ConnectedSelfHostedWorkersModel::new);
@@ -342,15 +325,8 @@ pub fn register_tui_session_view_test_singletons(app: &mut warpui::App) {
     });
     #[cfg(feature = "voice_input")]
     {
-        app.add_singleton_model(|ctx| {
-            AIRequestUsageModel::new(ServerApiProvider::as_ref(ctx).get_ai_client(), ctx)
-        });
+        app.add_singleton_model(AIRequestUsageModel::new);
         app.add_singleton_model(voice_input::VoiceInput::new);
-        app.add_singleton_model(|ctx| {
-            VoiceTranscriber::new(Arc::new(ServerVoiceTranscriber::new(
-                ServerApiProvider::as_ref(ctx).get(),
-            )))
-        });
     }
     app.add_singleton_model(|_| {
         crate::ai::document::ai_document_model::AIDocumentModel::new_for_test()
@@ -362,13 +338,8 @@ pub fn register_tui_session_view_test_singletons(app: &mut warpui::App) {
     app.add_singleton_model(QueuedQueryModel::new);
     app.add_singleton_model(|_| CLIAgentSessionsModel::new());
     app.add_singleton_model(OrchestrationEventService::new);
-    app.add_singleton_model(LocalAgentTaskSyncModel::new);
-    app.add_singleton_model(OrchestrationEventStreamer::new);
     app.add_singleton_model(|_| ActiveAgentViewsModel::new());
     app.add_singleton_model(|_| GitRepoModels::new());
-    app.add_singleton_model(|ctx| {
-        CodebaseIndexManager::new_for_test(ServerApiProvider::as_ref(ctx).get(), ctx)
-    });
     app.add_singleton_model(AgentConversationsModel::new);
     let global_resources = crate::GlobalResourceHandles::mock(app);
     app.add_singleton_model(|_| {
@@ -378,8 +349,8 @@ pub fn register_tui_session_view_test_singletons(app: &mut warpui::App) {
 
     app.add_singleton_model(crate::tui::TuiMcpManager::new_for_test);
     app.add_singleton_model(crate::tui::TuiUserInfoManager::new_for_test);
-    app.add_singleton_model(|ctx| {
-        crate::changelog_model::ChangelogModel::new(ServerApiProvider::as_ref(ctx).get())
+    app.add_singleton_model(|_| {
+        crate::changelog_model::ChangelogModel::new(Arc::new(http_client::Client::new_for_test()))
     });
     app.add_singleton_model(|_| ai::project_context::model::ProjectContextModel::default());
     app.update(crate::settings::TuiAutoupdateSettings::register);
@@ -403,6 +374,8 @@ pub fn register_tui_session_view_test_singletons(app: &mut warpui::App) {
     app.add_singleton_model(
         crate::warp_managed_paths_watcher::WarpManagedPathsWatcher::new_for_testing,
     );
+    app.add_singleton_model(FileMCPWatcher::new);
+    app.add_singleton_model(FileBasedMCPManager::new);
     app.add_singleton_model(crate::workflows::local_workflows::LocalWorkflows::new);
     app.add_singleton_model(crate::ai::skills::SkillManager::new);
 }

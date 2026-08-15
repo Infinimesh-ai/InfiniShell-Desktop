@@ -12,8 +12,9 @@ use warp::appearance::Appearance;
 #[cfg(feature = "voice_input")]
 use warp::settings::TuiVoiceSettings;
 use warp::settings::{
-    AISettings, SettingsFileError, TuiStatuslineConfig, TuiStatuslineItem, TuiTheme,
-    TuiThemeSettings, TuiUsageDisplayMode, TuiVoiceInputHoldKey, TuiZeroStateObject,
+    AISettings, AgentProvider, AgentProviderApiType, AgentProviderModel, SettingsFileError,
+    TuiStatuslineConfig, TuiStatuslineItem, TuiTheme, TuiThemeSettings, TuiUsageDisplayMode,
+    TuiVoiceInputHoldKey, TuiZeroStateObject,
 };
 use warp::terminal::model::ansi::{Handler, InputBufferValue, Mode};
 use warp::tui_export::{
@@ -52,7 +53,6 @@ use warpui_core::event::ModifiersState;
 use warpui_core::keymap::{Context, DescriptionContext, Keystroke, Trigger};
 use warpui_core::platform::keyboard::KeyCode;
 use warpui_core::presenter::tui::{TuiFrame, TuiPresenter};
-use warpui_core::telemetry::{EventPayload, flush_events};
 use warpui_core::{App, AppContext, TuiView, TypedActionView, ViewContext, WindowInvalidation};
 
 use super::statusline::{
@@ -316,7 +316,7 @@ fn manage_billing_slash_command_opens_the_default_team_billing_page_for_admins()
         assert_eq!(
             opened_urls.borrow().as_slice(),
             &[format!(
-                "{}/admin/test_uid00000000000123/billing",
+                "{}/admin/tui-test-team-00000000/billing",
                 ChannelState::server_root_url().trim_end_matches('/')
             )]
         );
@@ -1610,30 +1610,38 @@ fn toggle_model_menu_action_opens_and_closes_the_inline_model_menu() {
 }
 
 #[test]
-fn accepted_model_only_changes_the_current_session() {
+fn accepted_model_becomes_the_byop_default_for_unpinned_sessions() {
     App::test((), |mut app| async move {
         let fixture = focus_test_fixture(&mut app);
-        LLMPreferences::handle(&app).update(&mut app, |preferences, ctx| {
-            let mut alternate = preferences.get_default_base_model(ctx).clone();
-            alternate.id = "tui-session-override".into();
-            alternate.display_name = "TUI session override".to_owned();
-            preferences.add_agent_mode_model_for_test(alternate);
+        let provider_id = "tui-session-models";
+        let profile_default_id = LLMId::from(format!("byop:{provider_id}:default-model"));
+        let alternate_id = LLMId::from(format!("byop:{provider_id}:alternate-model"));
+        AISettings::handle(&app).update(&mut app, |settings, ctx| {
+            let _ = settings.agent_providers.set_value(
+                vec![AgentProvider {
+                    id: provider_id.to_owned(),
+                    name: "TUI test provider".to_owned(),
+                    kind: Default::default(),
+                    api_type: AgentProviderApiType::Ollama,
+                    base_url: "http://localhost:11434".to_owned(),
+                    models: vec![
+                        AgentProviderModel::from_id("default-model".to_owned()),
+                        AgentProviderModel::from_id("alternate-model".to_owned()),
+                    ],
+                    extra_headers: Vec::new(),
+                    responses: Default::default(),
+                }],
+                ctx,
+            );
         });
         let (first_view, _) = add_focus_test_session(&mut app, &fixture, true);
         let (second_view, _) = add_focus_test_session(&mut app, &fixture, false);
-        let (profile_default_id, alternate_id) = app.read(|ctx| {
+        app.read(|ctx| {
             let preferences = LLMPreferences::as_ref(ctx);
-            let profile_default_id = preferences
-                .get_active_profile_base_model(ctx, None)
-                .id
-                .clone();
-            let alternate_id = preferences
-                .get_base_llm_choices_for_agent_mode(ctx)
-                .find(|model| model.id != profile_default_id && model.disable_reason.is_none())
-                .expect("test model catalog should include an alternate model")
-                .id
-                .clone();
-            (profile_default_id, alternate_id)
+            assert_eq!(
+                preferences.get_active_profile_base_model(ctx, None).id,
+                profile_default_id
+            );
         });
 
         first_view.update(&mut app, |view, ctx| {
@@ -1654,7 +1662,7 @@ fn accepted_model_only_changes_the_current_session() {
                 preferences
                     .get_active_base_model(ctx, Some(second_surface_id))
                     .id,
-                profile_default_id
+                alternate_id
             );
             assert_eq!(
                 preferences
@@ -2814,6 +2822,19 @@ fn first_visible_column(line: &str) -> usize {
         .position(|character| !character.is_whitespace())
         .unwrap_or_else(|| panic!("line must contain visible content: {line:?}"))
 }
+
+fn active_model_display_name(
+    app: &App,
+    view: &ViewHandle<super::TuiTerminalSessionView>,
+) -> String {
+    app.read(|ctx| {
+        LLMPreferences::as_ref(ctx)
+            .get_active_base_model(ctx, Some(view.as_ref(ctx).terminal_surface_id))
+            .display_name
+            .clone()
+    })
+}
+
 #[test]
 fn input_adjacent_surfaces_follow_figma_outer_edge_alignment() {
     App::test((), |mut app| async move {
@@ -2827,9 +2848,10 @@ fn input_adjacent_surfaces_follow_figma_outer_edge_alignment() {
             .find(|line| line.contains('▏'))
             .map(|line| first_visible_column(line))
             .unwrap_or_else(|| panic!("input border must render:\n{}", lines.join("\n")));
+        let active_model_display_name = active_model_display_name(&app, &view);
         let statusline_column = lines
             .iter()
-            .find(|line| line.contains("auto (cost-efficient)"))
+            .find(|line| line.contains(&active_model_display_name))
             .map(|line| first_visible_column(line))
             .unwrap_or_else(|| panic!("statusline must render:\n{}", lines.join("\n")));
         assert_eq!(
@@ -3012,13 +3034,11 @@ fn empty_typeahead_event_leaves_the_tui_input_unchanged() {
 }
 
 #[test]
-fn nld_slash_command_toggles_and_reports_its_effects() {
+fn nld_slash_command_toggles_its_state_and_hint() {
     App::test((), |mut app| async move {
         let _agent_mode = warp_core::features::FeatureFlag::AgentMode.override_enabled(true);
         let fixture = focus_test_fixture(&mut app);
         let (view, _) = add_focus_test_session(&mut app, &fixture, true);
-        flush_events();
-
         view.update(&mut app, |view, ctx| {
             view.input_view.update(ctx, |input, ctx| {
                 input.set_text("/natural-language-detection", ctx);
@@ -3068,42 +3088,6 @@ fn nld_slash_command_toggles_and_reports_its_effects() {
                 "Natural language detection disabled.".to_owned(),
                 TransientHintTone::Success
             ))
-        );
-
-        let deadline = Instant::now() + Duration::from_secs(5);
-        let mut toggles = Vec::new();
-        while toggles.len() < 2 {
-            toggles.extend(
-                flush_events()
-                    .into_iter()
-                    .filter_map(|event| match event.payload {
-                        EventPayload::NamedEvent {
-                            name,
-                            value: Some(value),
-                            ..
-                        } if name == "AgentMode.ToggleAutoDetectionSetting" => Some(value),
-                        _ => None,
-                    }),
-            );
-            if toggles.len() >= 2 || Instant::now() >= deadline {
-                break;
-            }
-            Timer::after(Duration::from_millis(10)).await;
-        }
-        assert_eq!(toggles.len(), 2);
-        assert_eq!(
-            toggles[0],
-            serde_json::json!({
-                "is_autodetection_enabled": true,
-                "origin": "slash_command",
-            })
-        );
-        assert_eq!(
-            toggles[1],
-            serde_json::json!({
-                "is_autodetection_enabled": false,
-                "origin": "slash_command",
-            })
         );
     });
 }
@@ -3888,6 +3872,7 @@ fn agent_controlled_alt_screen_keeps_output_and_composer_visible() {
             view.input_target().agent_editor_owns_input()
         }));
         let lines = render_session(&mut app, &view, 80, 12);
+        let active_model_display_name = active_model_display_name(&app, &view);
         let compact_output = lines
             .iter()
             .flat_map(|line| line.chars())
@@ -3914,7 +3899,7 @@ fn agent_controlled_alt_screen_keeps_output_and_composer_visible() {
         assert!(
             lines
                 .iter()
-                .any(|line| line.contains("auto (cost-efficient)")),
+                .any(|line| line.contains(&active_model_display_name)),
             "the normal agent footer should remain visible:\n{}",
             lines.join("\n")
         );
@@ -3940,6 +3925,7 @@ fn user_controlled_alt_screen_keeps_full_session_input_on_the_pty() {
 
         assert!(view.read(&app, |view, _| view.input_target().pty_owns_input()));
         let lines = render_session(&mut app, &view, 80, 12);
+        let active_model_display_name = active_model_display_name(&app, &view);
         let compact_output = lines
             .iter()
             .flat_map(|line| line.chars())
@@ -3953,7 +3939,7 @@ fn user_controlled_alt_screen_keeps_full_session_input_on_the_pty() {
         assert!(
             !lines.iter().any(|line| {
                 line.chars().any(|glyph| "┌┐└┘─│▁▏▕▔".contains(glyph))
-                    || line.contains("auto (cost-efficient)")
+                    || line.contains(&active_model_display_name)
             }),
             "user-controlled alternate screen should not render the agent composer:\n{}",
             lines.join("\n")
@@ -5079,6 +5065,7 @@ fn footer_conversations_callout_no_longer_renders() {
         // branch are removed, not merely unreachable).
         let lines = render_footer_lines(&mut app, &view, 80);
         let row = lines.join("\n");
+        let active_model_display_name = active_model_display_name(&app, &view);
         assert!(
             !row.contains("← for conversations"),
             "the conversations callout must not render: {row}"
@@ -5088,7 +5075,7 @@ fn footer_conversations_callout_no_longer_renders() {
             "no conversations-callout glyph remains: {row}"
         );
         assert!(
-            row.contains("auto (cost-efficient)"),
+            row.contains(&active_model_display_name),
             "the configured status row renders in place of the callout: {row}"
         );
     });
@@ -5792,7 +5779,7 @@ fn foreground_session_focuses_an_already_blocked_permission_when_materialized() 
         let action = AIAgentAction {
             id: AIAgentActionId::from("late-permission".to_owned()),
             task_id: TaskId::new("task".to_owned()),
-            action: AIAgentActionType::InitProject,
+            action: AIAgentActionType::OpenCodeReview,
             requires_result: true,
         };
 

@@ -15,11 +15,11 @@ use warp::tui_export::{
     AIAgentOutputMessageType, AIAgentText, AIAgentTextSection, AIAgentTodo, AIAgentTodoList,
     AIBlockModel, AIBlockOutputStatus, AIConversationId, AIRequestType, ActiveSession,
     AgentOutputImage, AgentOutputImageLayout, AgentOutputMermaidDiagram, AgentOutputTable,
-    Appearance, AuthStateProvider, BlocklistAIActionModel, FailedOutputPresentation,
-    GetRelevantFilesController, LLMId, MessageId, ModelEventDispatcher, OutputStatusUpdateCallback,
-    ReceivedMessageDisplay, RenderableAIError, RequestCommandOutputResult, ServerOutputId,
-    Sessions, Shared, SummarizationType, TaskId, TerminalModel, TodoOperation, TodoStatus,
-    TuiOnboardingMarker, TuiOnboardingMarkers, UserQueryMode, queue_tui_permission_action,
+    Appearance, AuthStateProvider, BlocklistAIActionModel, FailedOutputPresentation, LLMId,
+    MessageId, ModelEventDispatcher, OutputStatusUpdateCallback, ReceivedMessageDisplay,
+    RenderableAIError, RequestCommandOutputResult, ServerOutputId, Sessions, Shared,
+    SummarizationType, TaskId, TerminalModel, TodoOperation, TodoStatus, TuiOnboardingMarker,
+    TuiOnboardingMarkers, UserQueryMode, queue_tui_permission_action,
     register_tui_session_view_test_singletons, should_show_failed_output_usage_notice,
 };
 use warp_core::ui::color::blend::Blend;
@@ -715,7 +715,7 @@ fn agent_block_renders_tool_calls_in_message_order() {
                     .into_iter()
                     .map(|line| line.trim_end().to_owned())
                     .collect::<Vec<_>>(),
-                vec!["", "before", "", "○ Init project", "", "after"],
+                vec!["", "before", "", "○ Open code review", "", "after"],
             );
             // A pending tool call keeps its dim grey glyph, but renders the
             // action in bold foreground and its details in regular neutral_7.
@@ -783,7 +783,7 @@ fn agent_block_renders_multiple_tool_calls_in_order() {
                     .into_iter()
                     .map(|line| line.trim_end().to_owned())
                     .collect::<Vec<_>>(),
-                vec!["", "○ Init project", "", "○ Init project"],
+                vec!["", "○ Open code review", "", "○ Open code review"],
             );
         });
     });
@@ -906,11 +906,11 @@ fn tool_call_row_glyph_and_colors_reflect_state() {
 
             // Succeeded: green check in the gutter, normal-foreground label.
             let action = test_action("action-1");
-            let succeeded = finished_status(&action, AIAgentActionResultType::InitProject);
+            let succeeded = finished_status(&action, AIAgentActionResultType::OpenCodeReview);
             let frame = render(&action, Some(&succeeded));
             assert_eq!(
                 frame.buffer.to_lines()[0].trim_end(),
-                "✓ Init project — done"
+                "✓ Open code review — done"
             );
             assert_eq!(frame.buffer[(0, 0)].fg, green);
             assert_eq!(frame.buffer[(2, 0)].fg, primary);
@@ -918,7 +918,7 @@ fn tool_call_row_glyph_and_colors_reflect_state() {
 
             // Running: yellow dot.
             let frame = render(&action, Some(&AIActionStatus::RunningAsync));
-            assert_eq!(frame.buffer.to_lines()[0].trim_end(), "● Init project…");
+            assert_eq!(frame.buffer.to_lines()[0].trim_end(), "● Open code review…");
             assert_eq!(frame.buffer[(0, 0)].fg, yellow);
             assert_eq!(frame.buffer[(2, 0)].fg, primary);
 
@@ -2401,13 +2401,11 @@ fn test_agent_block_with_registered_singletons(
         app.add_model(|ctx| ModelEventDispatcher::new(model_events_rx, sessions.clone(), ctx));
     let active_session =
         app.add_model(|ctx| ActiveSession::new(sessions, model_events.clone(), ctx));
-    let get_relevant_files = app.add_model(|_| GetRelevantFilesController::default());
     let action_model = app.add_model(|ctx| {
         BlocklistAIActionModel::new(
             action_terminal_model,
             active_session,
             &model_events,
-            get_relevant_files,
             EntityId::new(),
             ctx,
         )
@@ -2595,7 +2593,7 @@ fn test_action(id: &str) -> AIAgentAction {
     AIAgentAction {
         id: AIAgentActionId::from(id.to_owned()),
         task_id: TaskId::new("task-1".to_owned()),
-        action: AIAgentActionType::InitProject,
+        action: AIAgentActionType::OpenCodeReview,
         requires_result: true,
     }
 }

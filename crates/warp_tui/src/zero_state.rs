@@ -145,10 +145,11 @@ impl TuiZeroStateView {
                 }
             },
         );
-        ctx.subscribe_to_model(
-            &SkillManager::handle(ctx),
-            |_, _, SkillManagerEvent::SkillsChanged { .. }, ctx| ctx.notify(),
-        );
+        ctx.subscribe_to_model(&SkillManager::handle(ctx), |_, _, event, ctx| match event {
+            SkillManagerEvent::SkillsChanged { .. } | SkillManagerEvent::InventoryChanged => {
+                ctx.notify();
+            }
+        });
         ctx.subscribe_to_model(&TuiMcpManager::handle(ctx), |_, _, _, ctx| ctx.notify());
         ctx.subscribe_to_model(&TuiUserInfoManager::handle(ctx), |_, _, event, ctx| {
             let TuiUserInfoManagerEvent::Updated = event;

@@ -156,7 +156,6 @@ impl CliAgentOscEventPublisher {
             }
             BlocklistAIActionEvent::QueuedAction(_)
             | BlocklistAIActionEvent::ExecutingAction(_)
-            | BlocklistAIActionEvent::InitProject(_)
             | BlocklistAIActionEvent::ToggleCodeReview(_)
             | BlocklistAIActionEvent::InsertCodeReviewComments { .. } => {}
         }

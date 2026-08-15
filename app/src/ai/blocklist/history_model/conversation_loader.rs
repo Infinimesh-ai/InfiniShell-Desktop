@@ -156,6 +156,17 @@ impl BlocklistAIHistoryModel {
         }
     }
 
+    /// 按历史服务端 token 查找本地已知会话，不发起任何云端请求。
+    pub fn load_conversation_by_server_token(
+        &self,
+        server_token: &ServerConversationToken,
+    ) -> warpui::r#async::BoxFuture<'static, Option<LoadedConversationData>> {
+        let Some(conversation_id) = self.find_conversation_id_by_server_token(server_token) else {
+            return box_future(futures::future::ready(None));
+        };
+        self.load_conversation_data(conversation_id)
+    }
+
     /// Loads a conversation from local DB and returns it.
     /// This is a private helper method. Use `get_load_conversation_data_future` instead.
     ///

@@ -38,9 +38,8 @@ pub use crate::ai::agent::{
     AgentOutputMermaidDiagram, AgentOutputTable, AskUserQuestionResult, CancellationReason,
     FileGlobV2Result, GrepResult, ImageContext, MessageId, ReceivedMessageDisplay,
     RenderableAIError, RequestCommandOutputResult, RunAgentsAgentOutcomeKind, RunAgentsResult,
-    SearchCodebaseFailureReason, SearchCodebaseResult, ServerOutputId, Shared, ShellCommandDelay,
-    StartAgentExecutionMode, StopRecordingResult, SuggestNewConversationResult, SummarizationType,
-    TodoOperation, UserQueryMode,
+    ServerOutputId, Shared, ShellCommandDelay, StartAgentExecutionMode,
+    SuggestNewConversationResult, SummarizationType, TodoOperation, UserQueryMode,
 };
 pub use crate::ai::agent_conversations_model::{
     AgentConversationEntry, AgentConversationEntryId, AgentConversationListEntryState,
@@ -49,9 +48,6 @@ pub use crate::ai::agent_conversations_model::{
     query_conversation_entries,
 };
 pub use crate::ai::ambient_agents::AmbientAgentTaskId;
-pub use crate::ai::ambient_agents::telemetry::{
-    CloudAgentTelemetryEvent, HandoffEntryPoint, HandoffSurface,
-};
 pub use crate::ai::blocklist::agent_view::{
     AgentViewController, AgentViewDisplayMode, AgentViewEntryOrigin, EnterAgentViewError,
     EphemeralMessageModel,
@@ -73,23 +69,11 @@ pub use crate::ai::blocklist::diff_storage::{
     UpdatedFileState,
 };
 pub use crate::ai::blocklist::diff_types::{DiffSessionType, FileDiff, changed_lines_from_op};
-#[cfg(feature = "local_fs")]
-pub use crate::ai::blocklist::handoff::{
-    HandoffCommitFailure, HandoffCommitOutcome, HandoffCreated, HandoffLaunchAttachments,
-    HandoffPrepareError, HandoffPrepareInput, HandoffPresentationSnapshot, HandoffRestoration,
-    HandoffTargetMaterialization, MaterializeHandoffTarget, PendingCloudLaunch, PendingHandoff,
-    SnapshotUploadTarget, execute_handoff, handoff_dispatch_error, prepare_handoff,
-    suggest_handoff_environment,
-};
 pub use crate::ai::blocklist::history_model::{
-    AIQueryHistory, BlocklistAIHistoryEvent, BlocklistAIHistoryModel, CloudConversationData,
-    ConversationStatusUpdate, FORK_PREFIX, ForkConversationError,
+    AIQueryHistory, BlocklistAIHistoryEvent, BlocklistAIHistoryModel, ConversationStatusUpdate,
+    FORK_PREFIX, ForkConversationError, LoadedConversationData,
 };
 pub use crate::ai::blocklist::inline_action::code_diff_view::convert_file_edits_to_file_diffs;
-pub use crate::ai::blocklist::orchestration_event_streamer::{
-    OrchestrationEventStreamer, OrchestrationEventStreamerEvent, register_agent_event_consumer,
-    unregister_agent_event_consumer,
-};
 pub use crate::ai::blocklist::orchestration_topology::{
     OrchestrationParticipantKind, OrderedOrchestrationDescendant, ResolvedOrchestrationParticipant,
     descendant_conversation_ids_in_spawn_order, descendant_conversations_in_pill_order,
@@ -112,17 +96,14 @@ pub use crate::ai::blocklist::{
     InputModePolicyHandle, InputType, InputTypeAutoDetectionSource, NewConversationDecision,
     PendingAttachment, PendingAttachmentSummary, PolicyConfigUpdate, QueuedQueryEvent,
     QueuedQueryModel, RequestFileEditsExecutor, RunAgentsExecutor, RunAgentsExecutorEvent,
-    RunAgentsSpawningSnapshot, ShellCommandExecutor, ShellCommandExecutorEvent, StartAgentExecutor,
-    StartAgentExecutorEvent, StartAgentOutcome, StartAgentRequest, StartAgentRequestId,
-    block_context_from_terminal_model, inherit_child_agent_settings,
-    maybe_build_ai_query_upsert_event,
+    RunAgentsSpawningSnapshot, ShellCommandExecutor, ShellCommandExecutorEvent,
+    SlashCommandRequest, StartAgentExecutor, StartAgentExecutorEvent, StartAgentOutcome,
+    StartAgentRequest, StartAgentRequestId, block_context_from_terminal_model,
+    inherit_child_agent_settings, maybe_build_ai_query_upsert_event,
 };
 #[cfg(not(target_family = "wasm"))]
 pub use crate::ai::blocklist::{
     PreparedLocalOzChildLaunch, apply_child_agent_model_override, prepare_local_oz_child_launch,
-};
-pub use crate::ai::cloud_environments::{
-    CloudEnvironment, CloudEnvironmentCatalog, CloudEnvironmentCatalogEvent, OZ_ENVIRONMENTS_URL,
 };
 pub use crate::ai::connected_self_hosted_workers::{
     ConnectedSelfHostedWorkersEvent, ConnectedSelfHostedWorkersModel,
@@ -181,12 +162,6 @@ pub use crate::search::slash_command_menu::static_commands::{
 };
 pub use crate::search::slash_command_menu::{SlashCommandId, StaticCommand};
 pub use crate::server::ids::SyncId;
-pub use crate::server::server_api::ServerApiProvider;
-#[cfg(feature = "voice_input")]
-pub use crate::server::server_api::TranscribeError;
-pub use crate::server::server_api::ai::{
-    AIClient, AgentConfigSnapshot, AttachmentInput, SpawnAgentRequest, SpawnAgentResponse,
-};
 pub use crate::server::telemetry::{SlashMenuSource, TelemetryEvent};
 pub use crate::settings::{AISettingsChangedEvent, InputSettings};
 pub use crate::terminal::alt_screen::{should_intercept_mouse, should_intercept_scroll};
@@ -237,6 +212,7 @@ pub use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
 pub use crate::terminal::session_settings::SessionSettings;
 pub use crate::terminal::shared_session::IsSharedSessionCreator;
 pub use crate::terminal::terminal_manager::BlockSpacing;
+pub use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
 pub use crate::terminal::view::blocklist_filter::should_show_task_in_blocklist;
 pub use crate::terminal::view::{ExecuteCommandEvent, WAKEUP_THROTTLE_PERIOD};
 pub use crate::terminal::{

@@ -334,7 +334,7 @@ fn pending_action(prompt: &TuiPermissionPrompt) -> AIAgentAction {
     AIAgentAction {
         id: prompt.action_id.clone(),
         task_id: TaskId::new("task".to_owned()),
-        action: AIAgentActionType::InitProject,
+        action: AIAgentActionType::OpenCodeReview,
         requires_result: true,
     }
 }

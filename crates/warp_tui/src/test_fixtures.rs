@@ -8,8 +8,8 @@ use warp::settings::SettingsFileError;
 use warp::tui_export::{
     AIConversationAutoexecuteMode, ActiveSession, Appearance, BlocklistAIActionModel,
     BlocklistAIHistoryModel, ConversationSelection, ConversationSelectionHandle,
-    GetRelevantFilesController, ModelEventDispatcher, Sessions, TerminalManagerTrait,
-    TerminalModel, TerminalSurfaceInit, TranscriptScope, TuiOnboardingMarkers,
+    ModelEventDispatcher, Sessions, TerminalManagerTrait, TerminalModel, TerminalSurfaceInit,
+    TranscriptScope, TuiOnboardingMarkers,
 };
 use warp_core::execution_mode::{AppExecutionMode, ExecutionMode};
 use warp_core::semantic_selection::SemanticSelection;
@@ -117,16 +117,12 @@ pub(crate) fn add_test_action_model_and_events(
         app.add_model(|ctx| ModelEventDispatcher::new(model_events_rx, sessions.clone(), ctx));
     let active_session =
         app.add_model(|ctx| ActiveSession::new(sessions.clone(), dispatcher.clone(), ctx));
-    // `GetRelevantFilesController::new` subscribes to the `CodebaseIndexManager`
-    // singleton, which these tests don't register; `default` skips it.
-    let get_relevant_files = app.add_model(|_| GetRelevantFilesController::default());
     let terminal_surface_id = EntityId::new();
     let action_model = app.add_model(|ctx| {
         BlocklistAIActionModel::new(
             terminal_model,
             active_session,
             &dispatcher,
-            get_relevant_files,
             terminal_surface_id,
             ctx,
         )
