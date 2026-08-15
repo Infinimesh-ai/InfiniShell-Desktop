@@ -61,10 +61,10 @@ use crate::tui_plan_view::{TuiPlanView, TuiPlanViewEvent};
 use crate::tui_review_comments::render_review_comments_tool_call;
 const OUT_OF_CREDITS_TITLE: &str = "I’m sorry, I couldn’t complete that request.";
 const OUT_OF_CREDITS_DETAIL: &str =
-    "In order to use Warp’s AI features, subscribe to a Warp plan or buy packs of credits.";
+    "In order to use InfiniShell’s AI features, subscribe to a Warp plan or buy packs of credits.";
 const OUT_OF_CREDITS_ACTION_LABEL: &str = "Get started with AI";
 const OUT_OF_CREDITS_ACTION_HINT: &str = "(ctrl+o)";
-const FIRST_CREDIT_GATE_TITLE: &str = "You need AI credits in order to use Warp’s agent.";
+const FIRST_CREDIT_GATE_TITLE: &str = "You need AI credits in order to use InfiniShell TUI.";
 const FIRST_CREDIT_GATE_ACTION_LABEL: &str = "Start using AI";
 const FIRST_CREDIT_GATE_ACTION_HINT: &str = "(ctrl+o).";
 const FAILURE_WARNING_PREFIX: &str = "⚠ ";

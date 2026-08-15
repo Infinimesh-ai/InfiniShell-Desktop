@@ -1,6 +1,6 @@
 ---
 name: tui-testing
-description: Write and run unit tests for Warp TUI (crates/warp_tui) elements/screens by rendering to text lines. Use for TUI test work.
+description: Write and run unit tests for InfiniShell TUI (crates/warp_tui) elements/screens by rendering to text lines. Use for TUI test work.
 ---
 
 # tui-testing
@@ -88,7 +88,7 @@ Views that resolve theme styles (via `TuiUiBuilder::from_app`) need an `Appearan
 
 ## Process-level tests (no integration harness)
 
-The TUI has **no** GUI-style integration harness: the real-display, synthetic-event framework in `crates/integration` (see `gui-integration-test`) is GUI-only and does not drive the TUI. Besides render-to-lines unit tests, binary-level behavior is covered by a process-level test that spawns the built binary and asserts on its output/exit — see `crates/warp_tui/tests/worker_dispatch.rs` (it runs `CARGO_BIN_EXE_warp-tui-oss` and checks that a worker invocation dispatches without launching the TUI frontend). Use that pattern for process/CLI-level behavior, and render-to-lines unit tests for element/screen rendering. There is no separate TUI integration-test skill because there is no such framework today.
+The TUI has **no** GUI-style integration harness: the real-display, synthetic-event framework in `crates/integration` (see `gui-integration-test`) is GUI-only and does not drive the TUI. Besides render-to-lines unit tests, binary-level behavior is covered by a process-level test that spawns the built binary and asserts on its output/exit — see `crates/warp_tui/tests/worker_dispatch.rs` (it runs `CARGO_BIN_EXE_infinishell-tui` and checks that a worker invocation dispatches without launching the TUI frontend). Use that pattern for process/CLI-level behavior, and render-to-lines unit tests for element/screen rendering. There is no separate TUI integration-test skill because there is no such framework today.
 
 ## Running
 

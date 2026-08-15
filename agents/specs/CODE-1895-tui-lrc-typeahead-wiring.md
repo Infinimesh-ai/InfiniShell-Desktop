@@ -7,7 +7,7 @@ All code references below are commit-pinned to `abea51cd1e102b363935f1b25ef03d33
 
 == PRODUCT ==
 
-*Summary:* In the Warp TUI (`crates/warp_tui`), characters typed while a
+*Summary:* In InfiniShell TUI (`crates/warp_tui`), characters typed while a
 user-controlled long-running command (LRC) is running (e.g. `sleep 5`) are
 currently discarded when the command finishes. They should instead be inserted
 into the TUI input editor when the LRC completes — matching the Warp GUI and

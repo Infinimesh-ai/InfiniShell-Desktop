@@ -510,9 +510,8 @@ elif [[ "$ARTIFACT" == tui ]]; then
   UNIVERSAL_BINARY=false
   OPEN_AFTER_BUNDLE=false
   case "$RELEASE_CHANNEL" in
-    local) WARP_BIN="warp-tui" ;;
-    oss) WARP_BIN="warp-tui-oss" ;;
-    *) WARP_BIN="warp-tui-$RELEASE_CHANNEL" ;;
+    oss) WARP_BIN="infinishell-tui" ;;
+    *) WARP_BIN="infinishell-tui-$RELEASE_CHANNEL" ;;
   esac
   WARP_TUI_FEATURES="release_bundle,standalone,voice_input"
   if [[ "$RELEASE_CHANNEL" != "oss" ]]; then

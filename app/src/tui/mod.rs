@@ -1,4 +1,4 @@
-//! The headless `warp-tui` front-end's app-side entry point.
+//! The headless `infinishell-tui` front-end's app-side entry point.
 //!
 //! `warp_tui` boots the local app via [`crate::run_tui`]. Once shared
 //! initialization is done, [`init`] registers the TUI-facing managers and

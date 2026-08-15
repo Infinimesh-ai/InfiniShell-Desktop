@@ -141,7 +141,7 @@ define_settings_group!(TuiZeroStateSettings, settings: [
         private: false,
         toml_path: "appearance.zero_state.object",
         max_table_depth: 0,
-        description: "The object rotated in the Warp Agent CLI zero state. Use built_in or an ascii_file path relative to the Warp Agent CLI settings directory. Changing this setting reloads the object; editing the linked file requires a restart.",
+        description: "The object rotated in the InfiniShell TUI zero state. Use built_in or an ascii_file path relative to the InfiniShell TUI settings directory. Changing this setting reloads the object; editing the linked file requires a restart.",
     },
     rotation_period_seconds: TuiZeroStateRotationPeriodSecondsSetting {
         type: TuiZeroStateRotationPeriodSeconds,
@@ -151,7 +151,7 @@ define_settings_group!(TuiZeroStateSettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "appearance.zero_state.rotation_period_seconds",
-        description: "Seconds per Warp Agent CLI zero-state object rotation, from 1 through 60.",
+        description: "Seconds per InfiniShell TUI zero-state object rotation, from 1 through 60.",
     },
     extrusion_depth: TuiZeroStateExtrusionDepthSetting {
         type: TuiZeroStateExtrusionDepth,
@@ -161,7 +161,7 @@ define_settings_group!(TuiZeroStateSettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "appearance.zero_state.extrusion_depth",
-        description: "Normalized half-depth of the extruded Warp Agent CLI zero-state object, from 0.02 through 0.5.",
+        description: "Normalized half-depth of the extruded InfiniShell TUI zero-state object, from 0.02 through 0.5.",
     },
     // Per-section visibility toggles. Each defaults to true so the zero state
     // keeps rendering every section unless a section is explicitly turned off.
@@ -174,7 +174,7 @@ define_settings_group!(TuiZeroStateSettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "appearance.zero_state.show_changelog",
-        description: "Whether the Warp Agent CLI zero state shows the \"What's new\" changelog section.",
+        description: "Whether the InfiniShell TUI zero state shows the \"What's new\" changelog section.",
     },
     show_project_info: TuiZeroStateShowProjectInfoSetting {
         type: bool,
@@ -184,7 +184,7 @@ define_settings_group!(TuiZeroStateSettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "appearance.zero_state.show_project_info",
-        description: "Whether the Warp Agent CLI zero state shows the project path and its discovered rules and skills.",
+        description: "Whether the InfiniShell TUI zero state shows the project path and its discovered rules and skills.",
     },
     show_mcp: TuiZeroStateShowMcpSetting {
         type: bool,
@@ -194,7 +194,7 @@ define_settings_group!(TuiZeroStateSettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "appearance.zero_state.show_mcp",
-        description: "Whether the Warp Agent CLI zero state shows the MCP section.",
+        description: "Whether the InfiniShell TUI zero state shows the MCP section.",
     },
     show_animation: TuiZeroStateShowAnimationSetting {
         type: bool,
@@ -204,7 +204,7 @@ define_settings_group!(TuiZeroStateSettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "appearance.zero_state.show_animation",
-        description: "Whether the Warp Agent CLI zero state shows the rotating object and its starfield.",
+        description: "Whether the InfiniShell TUI zero state shows the rotating object and its starfield.",
     },
     freeze_animation_when_unfocused: TuiZeroStateFreezeAnimationWhenUnfocusedSetting {
         type: bool,
@@ -214,7 +214,7 @@ define_settings_group!(TuiZeroStateSettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "appearance.zero_state.freeze_animation_when_unfocused",
-        description: "Whether the Warp Agent CLI zero-state animation stops repainting while the terminal is unfocused.",
+        description: "Whether the InfiniShell TUI zero-state animation stops repainting while the terminal is unfocused.",
     },
 ]);
 

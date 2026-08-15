@@ -26,13 +26,13 @@ function Build-FixtureInstaller {
     $arguments = @(
         (Join-Path $PSScriptRoot 'tui-installer.iss'),
         '/DReleaseChannel=dev',
-        '/DMyAppExeName=warp-tui-dev.exe',
+        '/DMyAppExeName=infinishell-tui-dev.exe',
         "/DTargetProfileDir=$InputDir",
-        '/DMyAppName=WarpAgentCLIDev',
+        '/DMyAppName=InfiniShellTUIDev',
         "/DMyAppVersion=$Version",
         '/DArch=x64',
         "/DWindowsAssetsDir=$AssetsDir",
-        '/DCLIName=warp-dev',
+        '/DCLIName=infinishell-tui-dev',
         '/DInstallDirName=tui-dev',
         "/DOutputName=$OutputName",
         "/O$OutputDir"
@@ -54,12 +54,12 @@ function Invoke-Installer {
 
     $arguments = @('/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART')
     if ($Uninstall) {
-        $arguments += "/warp_bin_dir=`"$BinDir`""
+        $arguments += "/infinishell_tui_bin_dir=`"$BinDir`""
     } else {
         $arguments += @(
             '/CURRENTUSER',
             "/DIR=`"$InstallDir`"",
-            "/warp_bin_dir=`"$BinDir`"",
+            "/infinishell_tui_bin_dir=`"$BinDir`"",
             '/skip_path_update=1'
         )
     }
@@ -73,7 +73,7 @@ if (-not (Get-Command ISCC -ErrorAction SilentlyContinue)) {
     throw 'ISCC is required to test the Windows TUI installer'
 }
 
-$testRoot = Join-Path ([System.IO.Path]::GetTempPath()) "warp tui installer $([guid]::NewGuid())"
+$testRoot = Join-Path ([System.IO.Path]::GetTempPath()) "infinishell tui installer $([guid]::NewGuid())"
 $inputDir = Join-Path $testRoot 'input'
 $assetsDir = Join-Path $testRoot 'assets'
 $outputDir = Join-Path $testRoot 'output'
@@ -85,7 +85,7 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $inputDir 'resources') -Force | Out-Null
     New-Item -ItemType Directory -Path $assetsDir -Force | Out-Null
     Copy-Item "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" (
-        Join-Path $inputDir 'warp-tui-dev.exe'
+        Join-Path $inputDir 'infinishell-tui-dev.exe'
     )
     Write-FixtureFile (Join-Path $inputDir 'resources\marker.txt') 'fixture'
     foreach ($asset in @(
@@ -100,24 +100,24 @@ try {
 
     $version1 = 'v0.2026.07.29.00.00.dev_01'
     $version2 = 'v0.2026.07.29.00.00.dev_02'
-    $installer1 = Build-FixtureInstaller $version1 'WarpAgentCLIDevSetup-v1' `
+    $installer1 = Build-FixtureInstaller $version1 'InfiniShellTUIDevSetup-v1' `
         $inputDir $assetsDir $outputDir
-    $installer2 = Build-FixtureInstaller $version2 'WarpAgentCLIDevSetup-v2' `
+    $installer2 = Build-FixtureInstaller $version2 'InfiniShellTUIDevSetup-v2' `
         $inputDir $assetsDir $outputDir
 
     Invoke-Installer $installer1 $installDir $binDir
     if ((Get-Content (Join-Path $installDir 'current') -Raw).Trim() -cne $version1) {
         throw 'The first install did not activate v1'
     }
-    $launcherPath = Join-Path $binDir 'warp-dev.cmd'
+    $launcherPath = Join-Path $binDir 'infinishell-tui-dev.cmd'
     if (-not (Test-Path -LiteralPath $launcherPath -PathType Leaf)) {
         throw 'The installer did not create the channel launcher'
     }
     if (-not (Test-Path -LiteralPath (Join-Path $installDir 'icon.ico') -PathType Leaf)) {
-        throw 'The installer did not install the Warp icon'
+        throw 'The installer did not install the InfiniShell icon'
     }
 
-    $version1Binary = Join-Path $installDir "versions\$version1\warp-tui-dev.exe"
+    $version1Binary = Join-Path $installDir "versions\$version1\infinishell-tui-dev.exe"
     $runningProcess = Start-Process -FilePath $version1Binary -ArgumentList @(
         '-NoLogo',
         '-NoProfile',
@@ -143,13 +143,13 @@ try {
         throw 'The upgrade removed the running v1 payload'
     }
 
-    $registryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\warp-agent-cli-dev_is1'
+    $registryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\infinishell-tui-dev_is1'
     $registration = Get-ItemProperty -LiteralPath $registryPath
     $registeredVersion = $registration.DisplayVersion
     if ($registeredVersion -cne $version2) {
         throw "ARP registered '$registeredVersion', expected '$version2'"
     }
-    if ($registration.DisplayName -cne "WarpAgentCLIDev $version2") {
+    if ($registration.DisplayName -cne "InfiniShellTUIDev $version2") {
         throw "ARP registered unexpected display name '$($registration.DisplayName)'"
     }
 
@@ -157,7 +157,7 @@ try {
     $runningProcess.WaitForExit()
     $runningProcess = $null
     $untrustedBinDir = Join-Path $testRoot 'untrusted command root'
-    $untrustedLauncher = Join-Path $untrustedBinDir 'warp-dev.cmd'
+    $untrustedLauncher = Join-Path $untrustedBinDir 'infinishell-tui-dev.cmd'
     Write-FixtureFile $untrustedLauncher 'must remain'
     Invoke-Installer (Join-Path $installDir 'unins000.exe') $installDir $untrustedBinDir -Uninstall
     if (Test-Path -LiteralPath $launcherPath) {

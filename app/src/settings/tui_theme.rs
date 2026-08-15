@@ -9,7 +9,7 @@ use warpui_core::runtime::BackgroundLuminance;
 #[cfg(feature = "tui")]
 use crate::themes::default_themes::{dark_theme, light_theme};
 
-/// The color theme selection used by Warp Agent CLI.
+/// The color theme selection used by InfiniShell TUI.
 #[derive(
     Clone,
     Copy,
@@ -23,7 +23,7 @@ use crate::themes::default_themes::{dark_theme, light_theme};
     settings_value::SettingsValue,
 )]
 #[schemars(
-    description = "The color theme used by Warp Agent CLI.",
+    description = "The color theme used by InfiniShell TUI.",
     rename_all = "snake_case"
 )]
 pub enum TuiTheme {
@@ -89,7 +89,7 @@ define_settings_group!(TuiThemeSettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "appearance.theme",
-        description: "The Warp Agent CLI color theme. Auto matches the host terminal background.",
+        description: "The InfiniShell TUI color theme. Auto matches the host terminal background.",
     },
 ]);
 

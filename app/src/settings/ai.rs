@@ -632,7 +632,7 @@ settings::macros::implement_setting_for_enum!(
     description: "Controls how child-agent messages are displayed.",
 );
 
-/// Which unit the usage entry displays in Warp Agent CLI.
+/// Which unit the usage entry displays in InfiniShell TUI.
 #[derive(
     Default,
     Debug,
@@ -646,7 +646,7 @@ settings::macros::implement_setting_for_enum!(
     settings_value::SettingsValue,
 )]
 #[schemars(
-    description = "Which unit the usage entry displays in Warp Agent CLI.",
+    description = "Which unit the usage entry displays in InfiniShell TUI.",
     rename_all = "snake_case"
 )]
 pub enum TuiUsageDisplayMode {
@@ -665,9 +665,9 @@ settings::macros::implement_setting_for_enum!(
     surface: settings::SettingSurfaces::TUI,
     private: false,
     toml_path: "agents.usage_display_mode",
-    description: "Which unit the usage entry displays in Warp Agent CLI: credits or provider cost.",
+    description: "Which unit the usage entry displays in InfiniShell TUI: credits or provider cost.",
 );
-/// One configurable item in the Warp Agent CLI statusline.
+/// One configurable item in the InfiniShell TUI statusline.
 #[derive(
     Debug,
     serde::Serialize,
@@ -681,7 +681,7 @@ settings::macros::implement_setting_for_enum!(
     settings_value::SettingsValue,
 )]
 #[schemars(
-    description = "A configurable item in the Warp Agent CLI statusline.",
+    description = "A configurable item in the InfiniShell TUI statusline.",
     rename_all = "snake_case"
 )]
 #[serde(rename_all = "snake_case")]
@@ -746,7 +746,7 @@ impl TuiStatuslineItem {
     }
 }
 
-/// Ordered and enabled items in the Warp Agent CLI statusline.
+/// Ordered and enabled items in the InfiniShell TUI statusline.
 #[derive(
     Debug,
     serde::Serialize,
@@ -2052,7 +2052,7 @@ define_settings_group!(AISettings, settings: [
         surface: settings::SettingSurfaces::TUI,
         private: false,
         toml_path: "agents.statusline",
-        description: "Controls the order and visibility of Warp Agent CLI statusline items.",
+        description: "Controls the order and visibility of InfiniShell TUI statusline items.",
     },
     // Whether or not the profile-level command autoexecution speedbump has been shown.
     //
@@ -2297,7 +2297,7 @@ define_settings_group!(AISettings, settings: [
     }
 
     // This is not a user-visible setting - it's merely a one-time flag to track if the
-    // Warp Agent CLI launch modal has been shown to the user.
+    // InfiniShell TUI launch modal has been shown to the user.
     //
     // We model it as a setting so it's only shown once to a given user regardless of the number of
     // devices they use.

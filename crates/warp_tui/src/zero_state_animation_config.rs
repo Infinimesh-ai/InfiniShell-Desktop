@@ -279,10 +279,10 @@ impl ZeroStateAnimationConfig {
             Err((path, error)) => {
                 safe_warn!(
                     safe: (
-                        "Could not load custom Warp Agent CLI zero-state ASCII art; using the built-in Warp logo"
+                        "Could not load custom InfiniShell TUI zero-state ASCII art; using the built-in logo"
                     ),
                     full: (
-                        "Could not load custom Warp Agent CLI zero-state ASCII art; using the built-in Warp logo: path={} error={error}",
+                        "Could not load custom InfiniShell TUI zero-state ASCII art; using the built-in logo: path={} error={error}",
                         path.display()
                     )
                 );
@@ -326,10 +326,10 @@ impl ZeroStateAnimationConfig {
             Err((path, error)) => {
                 safe_warn!(
                     safe: (
-                        "Could not reload custom Warp Agent CLI zero-state ASCII art; keeping the current object"
+                        "Could not reload custom InfiniShell TUI zero-state ASCII art; keeping the current object"
                     ),
                     full: (
-                        "Could not reload custom Warp Agent CLI zero-state ASCII art; keeping the current object: path={} error={error}",
+                        "Could not reload custom InfiniShell TUI zero-state ASCII art; keeping the current object: path={} error={error}",
                         path.display()
                     )
                 );

@@ -219,13 +219,13 @@ pub fn init(app: &mut AppContext) {
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
                     "workspace:open_agent_cli_launch_modal",
-                    "[Debug] Open Warp Agent CLI Launch Modal",
+                    "[Debug] Open InfiniShell TUI Launch Modal",
                     WorkspaceAction::OpenAgentCliLaunchModal,
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
                     "workspace:reset_agent_cli_launch_modal_state",
-                    "[Debug] Reset Warp Agent CLI Launch Modal State",
+                    "[Debug] Reset InfiniShell TUI Launch Modal State",
                     WorkspaceAction::ResetAgentCliLaunchModalState,
                 )
                 .with_context_predicate(id!("Workspace")),

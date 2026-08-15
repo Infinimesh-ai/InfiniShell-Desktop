@@ -172,7 +172,7 @@ For each unmarked PR, produce a classification:
 - PRs that only touch CI, tests, docs, or internal tooling → `include: false`
 - PRs behind dogfood-only feature flags → `include: false` for stable channel
 - PRs behind preview flags → `include: false` for stable, `include: true` for preview
-- Set `impacts_tui: true` when Warp Agent CLI users observe the change, including shared Agent capabilities such as tool-call or edit-file behavior
+- Set `impacts_tui: true` when InfiniShell TUI users observe the change, including shared Agent capabilities such as tool-call or edit-file behavior
 - When in doubt, set `needs_review: true` and `confidence: "low"`
 - Bot PRs (dependabot, renovate, etc.) → `include: false`
 
@@ -218,7 +218,7 @@ Write two files to `output_dir`:
 - Fixed crash on startup ([#1236](https://github.com/warpdotdev/warp/pull/1236))
 
 ## TUI Updates
-- Added inline command menus to Warp Agent CLI ([#1238](https://github.com/warpdotdev/warp/pull/1238))
+- Added inline command menus to InfiniShell TUI ([#1238](https://github.com/warpdotdev/warp/pull/1238))
 
 ## Oz Updates
 - Improved agent memory ([#1237](https://github.com/warpdotdev/warp/pull/1237))

@@ -22,7 +22,7 @@ The TUI runtime introduces a parallel rendering path — ratatui + crossterm ins
 
 **Key architectural decision**: rather than build a parallel `TuiRenderState` or a bespoke `TuiInputModel`, the TUI input view reuses the existing `CodeEditorModel` (the app's plain-text editor model) in a new **char-cell layout mode**. `RenderState` gains a `LayoutMode` enum; in `LayoutMode::CharCell` it skips the font engine and computes soft-wrap positions with monospace character-count arithmetic. `SelectionModel` stays non-generic (it still holds `ModelHandle<RenderState>`). This makes the full editing model — vim-capable navigation, syntax, diff, hidden lines — reusable by the TUI for free, and positions `RenderState` to handle future TUI rich-text content by extending the `CharCell` branch rather than building a separate layout system.
 
-**Scope of this milestone**: a functional multi-line, selectable editor with Emacs/readline keybindings, living in the `warp_tui` crate and exercised by unit tests and an interactive example. Wiring it into the `warp-tui` binary's runtime, input-mode switching, slash-command detection, and history navigation are explicitly deferred (see Follow-ups).
+**Scope of this milestone**: a functional multi-line, selectable editor with Emacs/readline keybindings, living in the `warp_tui` crate and exercised by unit tests and an interactive example. Wiring it into the `infinishell-tui` binary's runtime, input-mode switching, slash-command detection, and history navigation are explicitly deferred (see Follow-ups).
 
 ## Proposed Changes
 
@@ -145,7 +145,7 @@ crates/warp_tui/src/
         kill_buffer.rs  — KillBuffer (single-entry for M1)
 ```
 
-The editor-crate refactor is additive to existing files (`render/model/mod.rs`, `selection.rs`). The `new_tui` constructor lives on the existing `CodeEditorModel` in `app/src/code/editor/model.rs`. `app/src/tui/mod.rs` remains the auth-only headless entry point; the input view is not yet wired into the `warp-tui` runtime (next step).
+The editor-crate refactor is additive to existing files (`render/model/mod.rs`, `selection.rs`). The `new_tui` constructor lives on the existing `CodeEditorModel` in `app/src/code/editor/model.rs`. `app/src/tui/mod.rs` remains the auth-only headless entry point; the input view is not yet wired into the `infinishell-tui` runtime (next step).
 
 **Framework change (resize)**: `TuiElement::layout` takes an `app: &AppContext` parameter (mirroring the GUI `Element::layout`), threaded through the presenter and every element impl. This lets an element refresh viewport-dependent model state during layout, so terminal resizes flow through the normal layout pass — no `TuiView::on_resize` hook is needed. `TuiRuntime::draw_if_dirty` marks the window dirty on a size change; the presenter then lays out against the new size, and each element's `layout` sees it.
 
@@ -194,7 +194,7 @@ TuiInputView : TuiView + TypedActionView
 **`TuiInputView` tests** (`crates/warp_tui/src/input/view_tests.rs` — 14 tests): drive a real `CodeEditorModel` (char-cell) behind a real `TuiInputView` (registering `Appearance::mock()`), covering cursor placement on empty/multi-line buffers, empty-line handling, up/down navigation across blank lines, selection text, `Ctrl+K` / `Ctrl+U` / `Ctrl+Y` kill-yank behaviour, and display-width cursor positioning for wide (CJK) and zero-width characters.
 
 **Examples (manual smoke)**:
-- `crates/warp_tui/examples/tui_input_demo.rs` — interactive editor-backed input demo. (Since removed — the input view is exercised by the real `warp-tui` binary via `./script/run-tui`.)
+- `crates/warp_tui/examples/tui_input_demo.rs` — interactive editor-backed input demo. (Since removed — the input view is exercised by the real `infinishell-tui` binary via `./script/run-tui`.)
 - `crates/warpui_core/examples/tui_file_viewer.rs` — validates the TUI runtime/rendering pipeline independently (scrollable file viewer, no editor dependency). Run: `cargo run -p warpui_core --example tui_file_viewer --features tui -- <path>`.
 
 ## Risks and Mitigations
@@ -207,13 +207,13 @@ TuiInputView : TuiView + TypedActionView
 
 **Selection rendering**: ratatui has no selection-highlight primitive, so `TuiInputElement` applies `Modifier::REVERSED` to selected cell spans manually. Tested with empty and non-empty selections.
 
-**`Appearance` dependency**: `new_tui` reads syntax colours from the `Appearance` singleton (shared with the GUI). Contexts that build the model must register one — a real `Appearance` at runtime, `Appearance::mock()` in tests/examples. When the input view is wired into the `warp-tui` runtime, that runtime will need to register `Appearance`.
+**`Appearance` dependency**: `new_tui` reads syntax colours from the `Appearance` singleton (shared with the GUI). Contexts that build the model must register one — a real `Appearance` at runtime, `Appearance::mock()` in tests/examples. When the input view is wired into the `infinishell-tui` runtime, that runtime will need to register `Appearance`.
 
 ## Follow-ups
 
 Intentionally out of scope for M1; each should become its own task:
 
-- **Wire into the `warp-tui` runtime**: render `TuiInputView` in the `warp_tui` binary (today only auth runs in `app/src/tui/mod.rs`); register `Appearance` there. (Resize is already handled through the layout pass — `TuiElement::layout` receives the `AppContext` — so this remaining item is just mounting the view in the binary.)
+- **Wire into the `infinishell-tui` runtime**: render `TuiInputView` in the `warp_tui` binary (today only auth runs in `app/src/tui/mod.rs`); register `Appearance` there. (Resize is already handled through the layout pass — `TuiElement::layout` receives the `AppContext` — so this remaining item is just mounting the view in the binary.)
 - **Input mode (Agent / Shell)**: wire `BlocklistAIInputModel`; placeholder text and submit routing per mode.
 - **Slash command menu**: render an overlay on the `Composing` state.
 - **History (up-arrow)**: open a TUI history overlay; add an "is cursor on first visual row" trigger.

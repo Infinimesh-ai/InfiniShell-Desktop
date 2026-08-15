@@ -2,7 +2,7 @@
 Linear: [CODE-1822 — Orchestration](https://linear.app/warpdotdev/issue/CODE-1822/orchestration)
 
 ## Summary
-The Warp TUI gains an interactive permission card for an active `RunAgents` request. A user can review the proposed agents and run-wide configuration, accept or reject the request, or edit its configuration using the keyboard or mouse without leaving the TUI.
+The InfiniShell TUI gains an interactive permission card for an active `RunAgents` request. A user can review the proposed agents and run-wide configuration, accept or reject the request, or edit its configuration using the keyboard or mouse without leaving the TUI.
 
 ## Figma
 - Initial acceptance card: https://www.figma.com/design/yg5nbPZuGoAszHS3Rhvehu/TUI?node-id=766-18419&m=dev

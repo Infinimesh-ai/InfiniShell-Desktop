@@ -1,8 +1,8 @@
-# PRODUCT: Warp TUI Conversation Resume and Restoration (CODE-1820)
+# PRODUCT: InfiniShell TUI Conversation Resume and Restoration (CODE-1820)
 
 ## Summary
 
-The Warp TUI prints a resumable server conversation token when the user exits with a non-empty selected conversation and accepts that token through `--resume` on a later launch. Resuming restores the selected Oz/Warp conversation into the TUI's single conversation surface, including its transcript and conversation-derived command history, so the next prompt continues the same conversation.
+The InfiniShell TUI prints a resumable server conversation token when the user exits with a non-empty selected conversation and accepts that token through `--resume` on a later launch. Resuming restores the selected Oz/Warp conversation into the TUI's single conversation surface, including its transcript and conversation-derived command history, so the next prompt continues the same conversation.
 
 ## Figma
 
@@ -17,7 +17,7 @@ Figma: none provided.
 ## Non-goals
 
 - Restoring agent orchestration subscriptions, child-agent event delivery, or other orchestration runtime state.
-- Restoring or continuing conversations created by Claude Code, Gemini, Codex, or any non-Oz harness. The Warp TUI supports only Oz/Warp conversations.
+- Restoring or continuing conversations created by Claude Code, Gemini, Codex, or any non-Oz harness. The InfiniShell TUI supports only Oz/Warp conversations.
 - Restoring the previous TUI process, PTY, or shell session. Conversation-derived command blocks are restored as transcript history, but no command is restarted and no prior shell process is recreated.
 - Adding the inline conversation list itself.
 - Supporting multiple simultaneous TUI conversation surfaces.
@@ -80,7 +80,7 @@ Figma: none provided.
 
 22. A restoration error never silently falls back to a new conversation and never sends a prompt.
 
-23. A non-Oz token produces an explicit message that the Warp TUI only supports Oz/Warp conversations.
+23. A non-Oz token produces an explicit message that the InfiniShell TUI only supports Oz/Warp conversations.
 
 24. While startup restoration is loading, Escape or Ctrl-C cancels the restore and continues into the provisional new TUI session as though `--resume` had not been supplied.
     - The loading screen shows `Esc or Ctrl-C to cancel and start a new session`.
@@ -93,7 +93,7 @@ Figma: none provided.
 25. When the TUI exits successfully with a selected conversation that contains at least one exchange, it prints a single resume instruction after leaving the full-screen TUI and restoring the host terminal.
 
 26. The instruction contains the selected conversation's server token in the form:
-    `warp-tui --resume <server-conversation-token>`
+    `infinishell-tui --resume <server-conversation-token>`
 
 27. The hint is based only on the selected conversation. The TUI does not fall back to another active or recently streamed conversation.
 

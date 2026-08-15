@@ -388,11 +388,11 @@ fn log_bundle_success_message(path: &Path) -> String {
 fn tui_cli_shell_command(channel: Channel, arguments: &str) -> String {
     let launcher = match channel {
         Channel::Local => "./script/run-tui --",
-        Channel::Stable => "warp",
-        Channel::Dev => "warp-dev",
-        Channel::Preview => "warp-preview",
-        Channel::Oss => "warp-oss",
-        Channel::Integration => "warp-integration",
+        Channel::Stable => "infinishell-tui-stable",
+        Channel::Dev => "infinishell-tui-dev",
+        Channel::Preview => "infinishell-tui-preview",
+        Channel::Oss => "infinishell-tui",
+        Channel::Integration => "infinishell-tui-integration",
     };
     format!("{launcher} {arguments}")
 }
@@ -2833,7 +2833,7 @@ impl TuiTerminalSessionView {
             Some(LoadedConversationData::CLIAgent(_)) => {
                 self.fail_conversation_restore(
                     request_id,
-                    "Warp Agent CLI only supports Oz/Warp conversations.".to_owned(),
+                    "InfiniShell TUI only supports Oz/Warp conversations.".to_owned(),
                     ctx,
                 );
                 return;

@@ -1,21 +1,21 @@
 #include "environment.iss"
 
-#define MyAppPublisher "Denver Technologies, Inc."
-#define MyAppURL "https://www.warp.dev/"
+#define MyAppPublisher "InfiniShell"
+#define MyAppURL "https://zap.zerx.dev/"
 #ifndef MyAppName
-  #define MyAppName "WarpAgentCLIDev"
+  #define MyAppName "InfiniShellTUIDev"
 #endif
 #ifndef MyAppVersion
   #define MyAppVersion "0.1.0"
 #endif
 #ifndef MyAppExeName
-  #define MyAppExeName "warp-tui-dev.exe"
+  #define MyAppExeName "infinishell-tui-dev.exe"
 #endif
 #ifndef ReleaseChannel
   #define ReleaseChannel "dev"
 #endif
 #ifndef CLIName
-  #define CLIName "warp-dev"
+  #define CLIName "infinishell-tui-dev"
 #endif
 #ifndef InstallDirName
   #define InstallDirName "tui-dev"
@@ -27,10 +27,14 @@
   #define WindowsAssetsDir "..\..\app\assets\windows\x64"
 #endif
 
-#define ProductRegistryKey "SOFTWARE\Warp.dev\WarpAgentCLI\" + ReleaseChannel
+#ifndef InnoAppId
+  #define InnoAppId "infinishell-tui-" + ReleaseChannel
+#endif
+
+#define ProductRegistryKey "SOFTWARE\InfiniShell\TUI\" + ReleaseChannel
 
 [Setup]
-AppId=warp-agent-cli-{#ReleaseChannel}
+AppId={#InnoAppId}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
@@ -59,7 +63,7 @@ WizardImageFile="installer-images\warp-banner.bmp"
 SetupIconFile="..\..\app\channels\{#ReleaseChannel}\icon\no-padding\icon.ico"
 CloseApplications=no
 RestartApplications=no
-SetupMutex=Local\WarpAgentCLI{#ReleaseChannel}Setup
+SetupMutex=Local\InfiniShellTUI{#ReleaseChannel}Setup
 MinVersion=10.0.18362
 ChangesEnvironment=true
 RedirectionGuard=no
@@ -119,17 +123,17 @@ end;
 function GetDefaultInstallDir(Param: string): string;
 begin
   if IsAdminInstallMode then
-    Result := ExpandConstant('{commonappdata}\Warp\{#InstallDirName}')
+    Result := ExpandConstant('{commonappdata}\InfiniShell\{#InstallDirName}')
   else
-    Result := ExpandConstant('{localappdata}\Warp\{#InstallDirName}');
+    Result := ExpandConstant('{localappdata}\InfiniShell\{#InstallDirName}');
 end;
 
 function GetDefaultBinDir(): string;
 begin
   if IsAdminInstallMode then
-    Result := ExpandConstant('{commonappdata}\Warp\bin')
+    Result := ExpandConstant('{commonappdata}\InfiniShell\bin')
   else
-    Result := ExpandConstant('{localappdata}\Warp\bin');
+    Result := ExpandConstant('{localappdata}\InfiniShell\bin');
 end;
 function GetRegisteredBinDir(var BinDir: string): Boolean;
 begin
@@ -145,7 +149,7 @@ function GetBinDir(Param: string): string;
 var
   RequestedBinDir: string;
 begin
-  RequestedBinDir := ExpandConstant('{param:warp_bin_dir|}');
+  RequestedBinDir := ExpandConstant('{param:infinishell_tui_bin_dir|}');
   if RequestedBinDir <> '' then
   begin
     Result := RequestedBinDir;
@@ -267,9 +271,9 @@ begin
   LauncherContents :=
     '@echo off' + #13#10 +
     'setlocal' + #13#10 +
-    'set "WARP_TUI_MANAGED_ROOT=' + ManagedRoot + '"' + #13#10 +
-    'set /p WARP_TUI_ACTIVE_VERSION=<"%WARP_TUI_MANAGED_ROOT%\current"' + #13#10 +
-    '"%WARP_TUI_MANAGED_ROOT%\versions\%WARP_TUI_ACTIVE_VERSION%\{#MyAppExeName}" %*' + #13#10;
+    'set "INFINISHELL_TUI_MANAGED_ROOT=' + ManagedRoot + '"' + #13#10 +
+    'set /p INFINISHELL_TUI_ACTIVE_VERSION=<"%INFINISHELL_TUI_MANAGED_ROOT%\current"' + #13#10 +
+    '"%INFINISHELL_TUI_MANAGED_ROOT%\versions\%INFINISHELL_TUI_ACTIVE_VERSION%\{#MyAppExeName}" %*' + #13#10;
   WriteAtomicTextFile(LauncherPath, LauncherContents);
 end;
 
@@ -295,7 +299,7 @@ begin
     not AllowDowngrade() then
   begin
     Result :=
-      'Warp Agent CLI ' + CurrentVersion +
+      'InfiniShell TUI ' + CurrentVersion +
       ' is newer than {#MyAppVersion}. Pass /allow_downgrade=1 to install an older version.';
     exit;
   end;
@@ -322,7 +326,7 @@ begin
     exit;
 
   if not IsCompleteVersionDir(VersionDir(ExpandConstant('{app}'), '{#MyAppVersion}')) then
-    RaiseException('The installed Warp Agent CLI payload is incomplete');
+    RaiseException('The installed InfiniShell TUI payload is incomplete');
 
   BinDir := GetBinDir('');
   if (PreviousBinDir <> '') and

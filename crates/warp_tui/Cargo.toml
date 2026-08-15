@@ -1,35 +1,35 @@
 [package]
 name = "warp_tui"
 edition = "2024"
-description = "Warp Agent CLI"
+description = "InfiniShell TUI"
 authors.workspace = true
 publish.workspace = true
 license.workspace = true
 autobins = false
-default-run = "warp-tui-oss"
+default-run = "infinishell-tui"
 
 # One binary per channel, mirroring the GUI app's `app/src/bin/*` layout. The
 # OSS bin is the `default-run` so bare `cargo run -p warp_tui` builds without
 # the internal `warp-channel-config` generator; `./script/run-tui` selects the
 # local bin when the generator is available.
 [[bin]]
-name = "warp-tui-oss"
+name = "infinishell-tui"
 path = "src/bin/oss.rs"
 
 [[bin]]
-name = "warp-tui"
+name = "infinishell-tui-local"
 path = "src/bin/local.rs"
 
 [[bin]]
-name = "warp-tui-dev"
+name = "infinishell-tui-dev"
 path = "src/bin/dev.rs"
 
 [[bin]]
-name = "warp-tui-preview"
+name = "infinishell-tui-preview"
 path = "src/bin/preview.rs"
 
 [[bin]]
-name = "warp-tui-stable"
+name = "infinishell-tui-stable"
 path = "src/bin/stable.rs"
 
 [dependencies]

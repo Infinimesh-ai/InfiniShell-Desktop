@@ -263,9 +263,8 @@ elif [[ "$ARTIFACT" == "warpctrl" ]]; then
   PACKAGES=()
 elif [[ "$ARTIFACT" == "tui" ]]; then
   case "$RELEASE_CHANNEL" in
-    local) WARP_BIN="warp-tui" ;;
-    oss) WARP_BIN="warp-tui-oss" ;;
-    *) WARP_BIN="warp-tui-$RELEASE_CHANNEL" ;;
+    oss) WARP_BIN="infinishell-tui" ;;
+    *) WARP_BIN="infinishell-tui-$RELEASE_CHANNEL" ;;
   esac
   BINARY_NAME="$WARP_BIN"
   PACKAGES=()

@@ -3,7 +3,7 @@
 ## Product
 
 ### Summary
-Make the spinning object in the Warp Agent CLI zero state respond to left-mouse dragging. A horizontal drag directly scrubs the object in either direction with deliberately low sensitivity; releasing it uses recent signed pointer velocity to produce a momentum flick, which then settles to the configured idle speed while keeping the direction the flick established. The interaction is an undisclosed easter egg: the screen gains no hint, hover treatment, setting, or unsupported-terminal warning.
+Make the spinning object in the InfiniShell TUI zero state respond to left-mouse dragging. A horizontal drag directly scrubs the object in either direction with deliberately low sensitivity; releasing it uses recent signed pointer velocity to produce a momentum flick, which then settles to the configured idle speed while keeping the direction the flick established. The interaction is an undisclosed easter egg: the screen gains no hint, hover treatment, setting, or unsupported-terminal warning.
 
 ### Key design choices
 - Reuse the TUI's existing session-wide mouse capture and `LeftMouseDown` / `LeftMouseDragged` / `LeftMouseUp` event path; do not change terminal mouse mode.
@@ -141,7 +141,7 @@ All criteria must pass before merge.
     - `cargo clippy --workspace --exclude warp_completer --all-targets --tests -- -D warnings`
     - `cargo clippy -p warp --all-targets --tests -- -D warnings`
     - `cargo clippy -p warp_completer --all-targets --tests -- -D warnings`
-    - `CARGO_BUILD_JOBS=2 cargo build -p warp_tui --bin warp-tui-oss`
+    - `CARGO_BUILD_JOBS=2 cargo build -p warp_tui --bin infinishell-tui`
     The PR's CI is the full-suite backstop for this bounded TUI change.
 14. **The running TUI proves the complete gesture.** After the build passes, launch the authenticated zero state with `./script/run-tui` in a real terminal and use computer use to perform and durably record: a no-input idle baseline, valid press with no angle jump, a modest short forward drag, a longer faster forward flick, a reverse drag/flick, the gradual 3-second settle into steady reverse idle, a later forward flick turning it back around, drag continuation outside the object, and resize during momentum. Show the pointer and contrast interaction segments against baseline so gesture-driven motion is distinguishable from the five-second idle loop.
 15. **Live edge cases are checked.** In the same running-TUI verification, confirm a press on stars/blank space does nothing, a click without drag does nothing, vertical-only drag does not freeze or drive the object, the high clamp remains legible without visible flicker, and leaving/re-entering the zero state removes prior momentum and restores forward idle. Attach durable video and representative screenshots to the PR, and state plainly which criteria remain deterministic-test-only if the capture cannot establish them visually.

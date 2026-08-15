@@ -1,4 +1,4 @@
-# TECH: Warp TUI Conversation Resume and Restoration (CODE-1820)
+# TECH: InfiniShell TUI Conversation Resume and Restoration (CODE-1820)
 
 Implements the behavior in [`PRODUCT.md`](./PRODUCT.md). Historical context links remain pinned to commit `1eb3698892bdcc9e038a9b0ea8b0eb34ffadfde0`; implementation references below use current branch paths.
 

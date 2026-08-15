@@ -33,7 +33,7 @@ pub struct OneTimeModalModel {
     /// Whether the Zap launch modal is currently being shown.
     is_zap_launch_modal_open: bool,
     is_orchestration_launch_modal_open: bool,
-    /// Whether the Warp Agent CLI launch modal is currently being shown.
+    /// Whether the InfiniShell TUI launch modal is currently being shown.
     is_agent_cli_launch_modal_open: bool,
     /// Whether the auto-handoff sleep discoverability modal is currently being shown.
     is_auto_handoff_sleep_modal_open: bool,
@@ -110,7 +110,7 @@ impl OneTimeModalModel {
                         .did_check_to_trigger_agent_cli_launch_modal
                         .set_value(true, ctx)
                     {
-                        log::warn!("Failed to mark Warp Agent CLI launch modal as dismissed: {e}");
+                        log::warn!("Failed to mark InfiniShell TUI launch modal as dismissed: {e}");
                     }
                     // New signups shouldn't see feature-intro popovers on their second
                     // startup, so pre-mark every registered feature intro as seen.
@@ -639,7 +639,7 @@ impl OneTimeModalModel {
                 .did_check_to_trigger_agent_cli_launch_modal
                 .set_value(true, ctx)
             {
-                log::warn!("Failed to mark Warp Agent CLI launch modal as dismissed: {e}");
+                log::warn!("Failed to mark InfiniShell TUI launch modal as dismissed: {e}");
             }
         });
 

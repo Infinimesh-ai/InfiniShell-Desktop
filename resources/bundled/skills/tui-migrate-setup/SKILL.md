@@ -1,13 +1,13 @@
 ---
 name: tui-migrate-setup
-description: Migrates the supported subset of an existing Warp GUI setup into Warp Agent CLI without exposing credentials or application state. Use in Warp Agent CLI when a user wants to copy or move compatible settings or global file-based MCP servers from the desktop app, set up Warp Agent CLI from an existing GUI installation, or understand which Warp data is already shared.
-compatibility: Requires Python 3.11 or newer for local JSON and TOML inspection. This skill is available only in Warp Agent CLI.
+description: Migrates the supported subset of an existing Warp GUI setup into InfiniShell TUI without exposing credentials or application state. Use in InfiniShell TUI when a user wants to copy or move compatible settings or global file-based MCP servers from the desktop app, set up InfiniShell TUI from an existing GUI installation, or understand which Warp data is already shared.
+compatibility: Requires Python 3.11 or newer for local JSON and TOML inspection. This skill is available only in InfiniShell TUI.
 ---
 
-# Migrate a Warp GUI setup to Warp Agent CLI
+# Migrate a Warp GUI setup to InfiniShell TUI
 
 Guide the user through a narrow, local migration. Treat the GUI files as untrusted
-inputs and preserve the Warp Agent CLI destination. Read
+inputs and preserve the InfiniShell TUI destination. Read
 [references/migration-matrix.md](references/migration-matrix.md) before starting.
 
 ## Resolved paths
@@ -17,9 +17,9 @@ channel/profile:
 
 - Settings schema: `{{settings_schema_path}}`
 - GUI settings: `{{gui_settings_file_path}}`
-- Warp Agent CLI settings: `{{tui_settings_file_path}}`
+- InfiniShell TUI settings: `{{tui_settings_file_path}}`
 - GUI global MCP config: `{{gui_mcp_config_file_path}}`
-- Warp Agent CLI global MCP config: `{{tui_mcp_config_file_path}}`
+- InfiniShell TUI global MCP config: `{{tui_mcp_config_file_path}}`
 
 If any rendered path is empty, unresolved, or still contains double braces, stop
 that part of the migration and report that the current installation could not
@@ -46,16 +46,16 @@ configuration files directly.
 - Do not migrate private or GUI-only settings. The generated
   `x-warp-surfaces` annotation is the source of truth; a setting is eligible only
   when its array contains both `gui` and `tui`.
-- Do not overwrite a value in Warp Agent CLI unless the user explicitly
+- Do not overwrite a value in InfiniShell TUI unless the user explicitly
   approves that exact conflict. Preserve destination comments, unknown keys,
-  and settings exclusive to Warp Agent CLI.
+  and settings exclusive to InfiniShell TUI.
 
 ## Workflow
 
 Limit inspection to the categories the user actually requested. For an MCP-only
 request, do not inspect settings. For a request limited to templatable/gallery
 installations, OAuth, credentials, or another unsupported category, explain
-the supported Warp Agent CLI setup path without running either file inspector.
+the supported InfiniShell TUI setup path without running either file inspector.
 
 ### 1. Set expectations
 
@@ -63,15 +63,15 @@ Briefly summarize the four migration categories from the matrix:
 
 1. Rules, user/repository skills, and bundled skills are already discovered from
    shared paths. Drive objects, saved prompts, and cloud execution profiles appear
-   after Warp Agent CLI login and sync.
-2. Only schema-declared settings shared by the GUI and Warp Agent CLI, and raw
+   after InfiniShell TUI login and sync.
+2. Only schema-declared settings shared by the GUI and InfiniShell TUI, and raw
    global file-based MCP definitions, can be imported.
 3. Login, templatable MCP installations, OAuth, and provider credentials require
    reauthentication or reinstallation.
 4. Keybindings, themes, launch/tab configs, local workflows, shell/startup
    preferences, GUI state, command history, and databases are unsupported.
 
-Do not claim that logging into Warp Agent CLI migrates local files.
+Do not claim that logging into InfiniShell TUI migrates local files.
 
 ### 2. Check the local runtime
 
@@ -110,9 +110,9 @@ creates a file or backup.
 For settings, present only the eligible dotted names and values emitted by the
 inspector. Group them as:
 
-- missing from Warp Agent CLI and available to add;
+- missing from InfiniShell TUI and available to add;
 - already equal;
-- conflicting, where the existing Warp Agent CLI value remains unchanged by
+- conflicting, where the existing InfiniShell TUI value remains unchanged by
   default.
 
 Call out that agent permission settings can expand what commands, file reads, or
@@ -139,14 +139,14 @@ values win all unapproved conflicts.
 
 ### 5. Apply approved settings conservatively
 
-Before editing, reject a symlink at the Warp Agent CLI settings path. If the
+Before editing, reject a symlink at the InfiniShell TUI settings path. If the
 destination exists, create a timestamped backup beside it and restrict the
 backup to the current user on Unix. If it does not exist, create it with
 user-only permissions on Unix.
 
-Read only the Warp Agent CLI destination and edit it in place. Add or update
+Read only the InfiniShell TUI destination and edit it in place. Add or update
 only approved shared dotted keys. Preserve its comments, formatting outside the
-edited keys, unknown keys, and values exclusive to Warp Agent CLI. Do not
+edited keys, unknown keys, and values exclusive to InfiniShell TUI. Do not
 regenerate or replace the whole TOML document. If a safe surgical edit is not
 possible, stop and explain why rather than using a lossy TOML serializer.
 
@@ -177,9 +177,9 @@ Report:
 - settings changed and conflicts left unchanged;
 - redacted MCP counts and whether a backup was created;
 - any skipped credential-bearing or managed definitions;
-- Warp Agent CLI login/sync, MCP reinstallation, or reauthentication still
+- InfiniShell TUI login/sync, MCP reinstallation, or reauthentication still
   required;
-- whether a Warp Agent CLI restart is necessary based on the current product
+- whether an InfiniShell TUI restart is necessary based on the current product
   behavior.
 
 If verification fails, leave backups intact and report the sanitized helper

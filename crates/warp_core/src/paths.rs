@@ -134,8 +134,8 @@ pub fn data_dir() -> PathBuf {
 /// Returns the GUI application ID for the current channel.
 ///
 /// Most TUI channel binaries use the same application ID as the GUI. The OSS
-/// TUI is the exception: it uses `WarpTui`, while the corresponding GUI uses
-/// the InfiniShell application ID registered by `bin/infinishell.rs`.
+/// TUI is the exception: it uses `InfiniShellTUI`, while the corresponding GUI
+/// uses the InfiniShell application ID registered by `bin/infinishell.rs`.
 #[cfg(any(not(target_os = "macos"), test))]
 fn gui_app_id_for_channel(channel: Channel, current_app_id: AppId) -> AppId {
     match channel {
@@ -206,7 +206,7 @@ pub fn gui_mcp_config_file_path() -> Option<PathBuf> {
     warp_home_mcp_config_file_path()
 }
 
-/// Returns the macOS config directory name for the TUI front-end (`warp-tui`)
+/// Returns the macOS config directory name for the TUI front-end (`infinishell-tui`)
 /// for the current channel.
 ///
 /// This mirrors [`macos_config_dir_name`] but uses a CLI-specific sibling directory
@@ -227,7 +227,7 @@ fn macos_tui_config_dir_name() -> String {
 }
 
 /// Returns the path to the directory where non-portable configuration files for
-/// the TUI front-end (`warp-tui`) should be stored.
+/// the TUI front-end (`infinishell-tui`) should be stored.
 ///
 /// This is intentionally distinct from [`config_local_dir`] so the GUI and the
 /// TUI never share (and clobber) a settings file. On macOS it is a sibling
@@ -306,7 +306,7 @@ pub fn secure_state_dir() -> Option<PathBuf> {
 }
 
 /// Returns the path to the directory where non-portable application state
-/// data for the TUI front-end (`warp-tui`) should be stored.
+/// data for the TUI front-end (`infinishell-tui`) should be stored.
 ///
 /// This is intentionally distinct from the GUI's state directory (see
 /// [`state_dir`] / [`secure_state_dir`]) so the two front-ends never share a

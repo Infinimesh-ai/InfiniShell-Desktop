@@ -1,6 +1,6 @@
 ---
 name: tui-ui-guidelines
-description: Guidelines for writing Warp headless TUI (crates/warp_tui) UI code with the cell-grid TuiElement library. Read before any TUI UI work.
+description: Guidelines for writing the InfiniShell TUI (crates/warp_tui) UI code with the cell-grid TuiElement library. Read before any TUI UI work.
 ---
 
 # tui-ui-guidelines
@@ -62,7 +62,7 @@ let muted = builder.muted_text_style();
 
 let column = TuiFlex::column()
     .child(
-        TuiText::new("Warp Agent")
+        TuiText::new("InfiniShell TUI")
             .with_style(title_style)
             .truncate()
             .finish(),

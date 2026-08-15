@@ -2,7 +2,7 @@
 
 ## Summary
 
-Warp’s headless TUI lets users fork a local Oz conversation into an Oz cloud run with `/handoff [prompt]`. Handoff preserves the local transcript, gathers the required cloud configuration in a blocking card, transfers applicable local context, and leaves the user with explicit choices to open the cloud run, continue locally, or start a new conversation.
+InfiniShell TUI lets users fork a local Oz conversation into an Oz cloud run with `/handoff [prompt]`. Handoff preserves the local transcript, gathers the required cloud configuration in a blocking card, transfers applicable local context, and leaves the user with explicit choices to open the cloud run, continue locally, or start a new conversation.
 
 ## Problem
 

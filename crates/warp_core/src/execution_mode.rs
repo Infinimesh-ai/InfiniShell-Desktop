@@ -24,6 +24,7 @@ impl ExecutionMode {
     pub fn client_id(&self) -> &'static str {
         match self {
             ExecutionMode::App => "warp-app",
+            // 服务端契约要求保留旧 client_id，不随公开命令改名。
             ExecutionMode::Tui => "warp-tui",
             ExecutionMode::Sdk => "warp-cli",
             ExecutionMode::RemoteServerDaemon => "warp-remote-server-daemon",

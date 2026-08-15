@@ -1,4 +1,4 @@
-//! Dev-channel `warp-tui` binary (internal nightly builds).
+//! Dev-channel `infinishell-tui-dev` binary (internal nightly builds).
 //!
 //! Mirrors `app/src/bin/dev.rs`: loads the internal `dev` channel config and
 //! layers the dev feature flags, then hands off to the shared TUI entry point.

@@ -1045,23 +1045,23 @@ fn tui_cli_shell_command_uses_channel_entry_points() {
     );
     assert_eq!(
         super::tui_cli_shell_command(Channel::Stable, "--version"),
-        "warp --version"
+        "infinishell-tui-stable --version"
     );
     assert_eq!(
         super::tui_cli_shell_command(Channel::Dev, "--version"),
-        "warp-dev --version"
+        "infinishell-tui-dev --version"
     );
     assert_eq!(
         super::tui_cli_shell_command(Channel::Preview, "--version"),
-        "warp-preview --version"
+        "infinishell-tui-preview --version"
     );
     assert_eq!(
         super::tui_cli_shell_command(Channel::Oss, "--version"),
-        "warp-oss --version"
+        "infinishell-tui --version"
     );
     assert_eq!(
         super::tui_cli_shell_command(Channel::Integration, "--version"),
-        "warp-integration --version"
+        "infinishell-tui-integration --version"
     );
 }
 
@@ -3167,7 +3167,7 @@ fn zero_state_position_stays_stable_across_shell_bootstrap() {
         let title_row = |lines: &[String]| {
             lines
                 .iter()
-                .position(|line| line.contains("Warp Agent CLI"))
+                .position(|line| line.contains("InfiniShell TUI"))
                 .unwrap_or_else(|| panic!("zero-state title should render:\n{}", lines.join("\n")))
         };
         assert_eq!(
@@ -3464,7 +3464,7 @@ fn zero_state_running_command_hint_shows_attachment() {
 
         let lines = render_session(&mut app, &view, 80, 40);
         assert!(
-            lines.iter().any(|line| line.contains("Warp Agent CLI")),
+            lines.iter().any(|line| line.contains("InfiniShell TUI")),
             "zero state should remain visible:\n{}",
             lines.join("\n")
         );
@@ -4028,8 +4028,8 @@ fn zero_state_renders_with_only_zero_height_bootstrap_blocks() {
         let lines = frame.buffer.to_lines();
         let title_row = lines
             .iter()
-            .position(|line| line.contains("Warp Agent CLI"))
-            .expect("zero state should render the Warp Agent CLI title");
+            .position(|line| line.contains("InfiniShell TUI"))
+            .expect("zero state should render the InfiniShell TUI title");
         assert!(
             title_row < 28,
             "zero-state title should render in the transcript area:\n{}",
@@ -4080,7 +4080,7 @@ fn first_zero_state_stays_hidden_while_markers_load_and_reconciles_without_repla
             );
         });
         let lines = render_session(&mut app, &view, 100, 24);
-        assert!(lines.iter().any(|line| line.contains("Warp Agent CLI")));
+        assert!(lines.iter().any(|line| line.contains("InfiniShell TUI")));
         assert!(
             lines
                 .iter()
@@ -4200,11 +4200,15 @@ fn background_session_does_not_receive_first_run_onboarding() {
             );
         });
         let lines = render_session(&mut app, &onboarding_view, 100, 24);
-        assert!(lines.iter().any(|line| line.contains("Welcome to Warp")));
         assert!(
             lines
                 .iter()
-                .any(|line| line.contains("What’s different about Warp"))
+                .any(|line| line.contains("Welcome to InfiniShell TUI"))
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains("What’s different about InfiniShell TUI"))
         );
     });
 }
@@ -6816,6 +6820,22 @@ fn resume_shell_commands_use_shared_tui_launcher() {
     );
     assert_eq!(
         super::tui_resume_shell_command(Channel::Preview, "conversation-token"),
-        "warp-preview --resume conversation-token"
+        "infinishell-tui-preview --resume conversation-token"
+    );
+    assert_eq!(
+        super::tui_resume_shell_command(Channel::Oss, "conversation-token"),
+        "infinishell-tui --resume conversation-token"
+    );
+    assert_eq!(
+        super::tui_resume_shell_command(Channel::Stable, "conversation-token"),
+        "infinishell-tui-stable --resume conversation-token"
+    );
+    assert_eq!(
+        super::tui_resume_shell_command(Channel::Dev, "conversation-token"),
+        "infinishell-tui-dev --resume conversation-token"
+    );
+    assert_eq!(
+        super::tui_resume_shell_command(Channel::Integration, "conversation-token"),
+        "infinishell-tui-integration --resume conversation-token"
     );
 }

@@ -1,4 +1,4 @@
-# TECH: Warp TUI Conversation Management (CODE-1821)
+# TECH: InfiniShell TUI Conversation Management (CODE-1821)
 
 Implements [`PRODUCT.md`](./PRODUCT.md) for [CODE-1821](https://linear.app/warpdotdev/issue/CODE-1821/conversation-management).
 

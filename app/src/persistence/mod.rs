@@ -65,7 +65,7 @@ use crate::workspaces::workspace::{Workspace as WorkspaceMetadata, WorkspaceUid}
 pub enum PersistenceScope {
     /// The GUI app (and other launch modes that share its database).
     App,
-    /// The `warp-tui` front-end, which keeps its own database so GUI/TUI
+    /// The `infinishell-tui` front-end, which keeps its own database so GUI/TUI
     /// version skew can never migrate a shared database out from under the
     /// older binary. Cloud sync is the cross-front-end sharing mechanism.
     Tui,
@@ -103,7 +103,7 @@ pub enum PersistedDataScope {
     /// The GUI app: everything, including window/tab/block session
     /// restoration and command history.
     Full,
-    /// The `warp-tui` front-end: command history, cloud objects, user profiles,
+    /// The `infinishell-tui` front-end: command history, cloud objects, user profiles,
     /// and agent/conversation state, but no GUI session restoration or pending
     /// object actions.
     TuiFrontend,

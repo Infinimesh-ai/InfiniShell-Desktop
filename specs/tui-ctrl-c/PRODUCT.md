@@ -2,7 +2,7 @@
 
 ## Summary
 
-Match the ctrl-c behavior of peer agent CLIs (Claude Code, Amp) in the Warp TUI: a single ctrl-c performs one contextual action — cancel the streaming agent response, or clear the input — and a second ctrl-c within a short window fully exits the TUI. A footer hint line below the input shows "ctrl-c again to exit" while the exit confirmation is armed.
+Match the ctrl-c behavior of peer agent CLIs (Claude Code, Amp) in the InfiniShell TUI: a single ctrl-c performs one contextual action — cancel the streaming agent response, or clear the input — and a second ctrl-c within a short window fully exits the TUI. A footer hint line below the input shows "ctrl-c again to exit" while the exit confirmation is armed.
 
 ## Problem
 

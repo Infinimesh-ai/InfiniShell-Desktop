@@ -246,7 +246,7 @@ pub use crate::util::image::{
 pub use crate::util::repo_detection::{RepoDetectionSessionType, detect_possible_git_repo};
 pub use crate::util::time_format::format_elapsed_seconds;
 #[cfg(feature = "voice_input")]
-pub use crate::voice::transcriber::{Transcriber, VoiceTranscriber};
+pub use crate::voice::transcriber::{TranscribeError, Transcriber, VoiceTranscriber};
 pub use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 
 /// Builds the live-shell completion context used to parse TUI input for NLD.

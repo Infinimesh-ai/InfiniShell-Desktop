@@ -1,4 +1,4 @@
-//! OSS-channel `warp-tui` binary and `default-run` target.
+//! OSS-channel `infinishell-tui` binary and `default-run` target.
 //!
 //! This is what bare `cargo run -p warp_tui` builds, so it hand-builds a
 //! production config and needs no internal `warp-channel-config` generator
@@ -14,8 +14,8 @@ fn main() -> Result<()> {
     let mut state = ChannelState::new(
         Channel::Oss,
         ChannelConfig {
-            app_id: AppId::new("dev", "warp", "WarpTui"),
-            logfile_name: "warp-tui.log".into(),
+            app_id: AppId::new("dev", "infinishell", "InfiniShellTUI"),
+            logfile_name: "infinishell-tui.log".into(),
             autoupdate_config: None,
             mcp_static_config: None,
         },

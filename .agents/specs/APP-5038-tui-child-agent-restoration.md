@@ -2,7 +2,7 @@
 
 == PRODUCT ==
 
-*Summary:* Restoring an orchestration conversation in Warp Agent CLI currently restores only the selected parent conversation. Its child-agent conversations remain absent from the retained TUI session registry, so the existing orchestration tab bar cannot display or navigate to them. Restore every locally known, TUI-displayable descendant when the parent is restored through either `--resume` or the conversations menu, while preserving the current GUI and TUI presentation.
+*Summary:* Restoring an orchestration conversation in InfiniShell TUI currently restores only the selected parent conversation. Its child-agent conversations remain absent from the retained TUI session registry, so the existing orchestration tab bar cannot display or navigate to them. Restore every locally known, TUI-displayable descendant when the parent is restored through either `--resume` or the conversations menu, while preserving the current GUI and TUI presentation.
 
 *Key design choices:*
 - Reuse the existing frontend-neutral history loaders, `AIConversation` metadata methods, topology walker, and block-restoration plan directly. Add only the missing TUI session materializer; do not introduce a new cross-frontend child descriptor/resolver or coordinator.

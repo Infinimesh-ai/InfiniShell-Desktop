@@ -1,4 +1,4 @@
-//! The headless `warp-tui` front-end's session bootstrap.
+//! The headless `infinishell-tui` front-end's session bootstrap.
 //!
 //! [`run`] boots the real headless Warp app via [`warp::run_tui`]. Once shared
 //! initialization is done, the mount built here starts the TUI driver and
@@ -44,7 +44,7 @@ const CLI_VERSION: &str = match option_env!("GIT_RELEASE_TAG") {
 };
 
 #[derive(Debug, Parser)]
-#[command(name = "warp", version = CLI_VERSION)]
+#[command(name = "infinishell-tui", version = CLI_VERSION)]
 struct TuiArgs {
     /// Resume an Oz/Warp conversation by server token.
     #[arg(long)]
@@ -62,7 +62,7 @@ struct TuiArgs {
     #[arg(long, env = "WARP_API_KEY")]
     api_key: Option<String>,
 
-    /// Securely store a model-provider API key for Warp Agent CLI.
+    /// Securely store a model-provider API key for InfiniShell TUI.
     #[arg(
         long,
         value_name = LLMProvider::API_KEY_PROVIDER_VALUE_NAME,
@@ -71,7 +71,7 @@ struct TuiArgs {
     )]
     set_provider_api_key: Option<LLMProvider>,
 
-    /// Remove a securely stored model-provider API key from Warp Agent CLI.
+    /// Remove a securely stored model-provider API key from InfiniShell TUI.
     #[arg(
         long,
         value_name = LLMProvider::API_KEY_PROVIDER_VALUE_NAME,

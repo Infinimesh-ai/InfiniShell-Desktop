@@ -1,4 +1,4 @@
-//! Local-channel `warp-tui` binary (internal dev builds).
+//! Local-channel `infinishell-tui-local` binary (internal dev builds).
 //!
 //! Mirrors `app/src/bin/local.rs`: loads the internal `local` channel config
 //! (via the `warp-channel-config` generator) and layers the dev feature flags,

@@ -4,7 +4,7 @@ Linear: CODE-1806
 
 ## Summary
 
-Users can drag with the mouse over the Warp TUI's transcript view to select the text they see — across agent responses, tool-call rows, and terminal command output alike — and the selection is copied to the system clipboard on mouse release. Today the TUI captures the mouse globally, so neither native terminal selection nor any in-app selection works over the transcript.
+Users can drag with the mouse over the InfiniShell TUI's transcript view to select the text they see — across agent responses, tool-call rows, and terminal command output alike — and the selection is copied to the system clipboard on mouse release. Today the TUI captures the mouse globally, so neither native terminal selection nor any in-app selection works over the transcript.
 
 ## Figma
 

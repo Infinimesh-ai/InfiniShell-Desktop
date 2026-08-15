@@ -23,16 +23,16 @@ use super::{
 #[cfg(windows)]
 use super::{PREVIOUS_POINTER_NAME, installer_dir_argument};
 
-const BINARY_NAME: &str = "warp-tui-dev";
-const HELPER_MODE_ENV: &str = "WARP_TUI_AUTOUPDATE_HELPER_MODE";
-const HELPER_ROOT_ENV: &str = "WARP_TUI_AUTOUPDATE_HELPER_ROOT";
-const HELPER_VERSION_ENV: &str = "WARP_TUI_AUTOUPDATE_HELPER_VERSION";
-const HELPER_READY_ENV: &str = "WARP_TUI_AUTOUPDATE_HELPER_READY";
-const HELPER_RELEASE_ENV: &str = "WARP_TUI_AUTOUPDATE_HELPER_RELEASE";
+const BINARY_NAME: &str = "infinishell-tui-dev";
+const HELPER_MODE_ENV: &str = "INFINISHELL_TUI_AUTOUPDATE_HELPER_MODE";
+const HELPER_ROOT_ENV: &str = "INFINISHELL_TUI_AUTOUPDATE_HELPER_ROOT";
+const HELPER_VERSION_ENV: &str = "INFINISHELL_TUI_AUTOUPDATE_HELPER_VERSION";
+const HELPER_READY_ENV: &str = "INFINISHELL_TUI_AUTOUPDATE_HELPER_READY";
+const HELPER_RELEASE_ENV: &str = "INFINISHELL_TUI_AUTOUPDATE_HELPER_RELEASE";
 
 fn temp_root(name: &str) -> tempfile::TempDir {
     tempfile::Builder::new()
-        .prefix(&format!("warp-tui-autoupdate-{name}-"))
+        .prefix(&format!("infinishell-tui-autoupdate-{name}-"))
         .tempdir()
         .unwrap()
 }
@@ -148,7 +148,8 @@ fn spawn_helper(
 
 #[test]
 fn detects_managed_install_layout() {
-    let exe = Path::new("/home/user/.warp/tui/versions/v0.2026.01.01.00.00.dev_00/warp-tui-dev");
+    let exe =
+        Path::new("/home/user/.warp/tui/versions/v0.2026.01.01.00.00.dev_00/infinishell-tui-dev");
     let layout = InstallLayout::from_canonical_exe_path(exe).unwrap();
 
     assert_eq!(layout.root, Path::new("/home/user/.warp/tui"));
@@ -193,11 +194,15 @@ fn installer_dir_argument_preserves_plain_paths() {
 #[test]
 fn rejects_unmanaged_exe_paths() {
     assert_eq!(
-        InstallLayout::from_canonical_exe_path(Path::new("/home/user/.warp/tui/warp-tui-dev")),
+        InstallLayout::from_canonical_exe_path(Path::new(
+            "/home/user/.warp/tui/infinishell-tui-dev",
+        )),
         None
     );
     assert_eq!(
-        InstallLayout::from_canonical_exe_path(Path::new("/repo/target/debug/warp-tui-dev")),
+        InstallLayout::from_canonical_exe_path(
+            Path::new("/repo/target/debug/infinishell-tui-dev",)
+        ),
         None
     );
     assert!(

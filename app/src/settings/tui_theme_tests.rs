@@ -63,7 +63,7 @@ fn theme_schema_entry_is_tui_only() {
     let entry = inventory::iter::<SettingSchemaEntry>
         .into_iter()
         .find(|entry| entry.hierarchy == Some("appearance") && entry.storage_key == "theme")
-        .expect("expected Warp Agent CLI theme schema entry");
+        .expect("expected InfiniShell TUI theme schema entry");
     let surfaces: SettingSurfaces = (entry.surfaces_fn)();
 
     assert!(surfaces.includes(SettingsMode::Tui));

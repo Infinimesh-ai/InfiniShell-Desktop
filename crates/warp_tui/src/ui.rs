@@ -1,4 +1,4 @@
-//! Small presentation helpers for the `warp-tui` front-end's TUI views.
+//! Small presentation helpers for the `infinishell-tui` front-end's TUI views.
 use std::time::Duration;
 
 use warpui_core::AppContext;
@@ -128,7 +128,7 @@ pub(crate) fn centered_in_viewport(content: Box<dyn TuiElement>) -> Box<dyn TuiE
 }
 
 pub(crate) fn render_welcome_title(builder: &TuiUiBuilder) -> Box<dyn TuiElement> {
-    TuiText::new("Welcome to Warp")
+    TuiText::new("Welcome to InfiniShell TUI")
         .with_style(builder.brand_primary_style().add_modifier(Modifier::BOLD))
         .truncate()
         .finish()
@@ -139,7 +139,7 @@ pub(crate) fn append_welcome_capability_section(
     builder: &TuiUiBuilder,
 ) -> TuiFlex {
     column = column.child(
-        TuiText::new("What’s different about Warp")
+        TuiText::new("What’s different about InfiniShell TUI")
             .with_style(builder.muted_text_style())
             .truncate()
             .finish(),

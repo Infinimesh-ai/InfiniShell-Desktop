@@ -35,8 +35,6 @@ use crate::code_review::git_repo_model::GitRepoModels;
 use crate::network::NetworkStatus;
 use crate::persistence::PersistenceWriter;
 use crate::server::experiments::ServerExperiments;
-#[cfg(feature = "voice_input")]
-use crate::server::voice_transcriber::ServerVoiceTranscriber;
 use crate::settings::manager::SettingsManager;
 use crate::settings::{
     AISettings, PrivacySettings, TuiVoiceSettings, init_and_register_user_preferences,
@@ -56,8 +54,6 @@ use crate::terminal::shell::{Shell, ShellType};
 use crate::terminal::{History, HistoryEntry, HistoryEvent};
 use crate::tui_onboarding_markers::TuiOnboardingMarkers;
 use crate::user_config::WarpConfig;
-#[cfg(feature = "voice_input")]
-use crate::voice::transcriber::VoiceTranscriber;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// Builds a history model with persisted AI queries for TUI tests.

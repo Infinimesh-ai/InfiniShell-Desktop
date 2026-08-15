@@ -3,7 +3,7 @@ Linear: [CODE-1822 — Orchestration](https://linear.app/warpdotdev/issue/CODE-1
 Depends on: [specs/code-1822-tui-local-children/TECH.md](../code-1822-tui-local-children/TECH.md)
 
 ## Summary
-The Warp TUI can launch cloud child agents from an accepted orchestration request and represent each child as a retained, navigable cloud session. Before cloud session viewing is available, the child surface is read-only and shows the cloud run's status plus an actionable link to view the run in Oz.
+The InfiniShell TUI can launch cloud child agents from an accepted orchestration request and represent each child as a retained, navigable cloud session. Before cloud session viewing is available, the child surface is read-only and shows the cloud run's status plus an actionable link to view the run in Oz.
 
 ## Figma
 Figma: none provided.

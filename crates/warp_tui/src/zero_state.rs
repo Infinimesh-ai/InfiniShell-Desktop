@@ -1,5 +1,5 @@
 //! The pre-first-interaction "zero state" filling the transcript area: the
-//! Warp title and version, either first-run guidance or a "What's new"
+//! InfiniShell TUI title and version, either first-run guidance or a "What's new"
 //! changelog section, and the session's project context.
 //!
 //! The session view owns visibility: the zero state fills the transcript
@@ -635,7 +635,7 @@ fn render_standard_top_section(
 
     let mut column = TuiFlex::column()
         .child(
-            TuiText::new("Warp Agent CLI")
+            TuiText::new("InfiniShell TUI")
                 .with_style(title_style)
                 .truncate()
                 .finish(),

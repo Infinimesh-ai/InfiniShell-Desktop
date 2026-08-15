@@ -100,8 +100,8 @@ fn first_zero_state_matches_welcome_design_copy() {
         });
         let rendered = lines.join("\n");
         for expected in [
-            "Welcome to Warp",
-            "What’s different about Warp",
+            "Welcome to InfiniShell TUI",
+            "What’s different about InfiniShell TUI",
             "✶ State of the art coding agents",
             "✶ Frontier and open-weight models",
             "✶ Fully customizable model routers",

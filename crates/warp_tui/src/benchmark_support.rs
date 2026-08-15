@@ -156,7 +156,7 @@ impl TuiView for BenchmarkZeroStateView {
         .without_background_stars()
         .finish();
         let overlay = TuiText::new(
-            "Warp Agent\nv0.0.0\n\nWhat's new\n• benchmark\n\nProject\nbenchmark fixture",
+            "InfiniShell TUI\nv0.0.0\n\nWhat's new\n• benchmark\n\nProject\nbenchmark fixture",
         )
         .finish();
         build_zero_state_layout(starfield, animation, overlay)

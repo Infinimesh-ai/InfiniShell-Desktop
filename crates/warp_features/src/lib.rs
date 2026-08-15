@@ -624,7 +624,7 @@ pub enum FeatureFlag {
     /// Enables the orchestration launch modal announcing multi-agent orchestration features.
     OrchestrationLaunchModal,
 
-    /// Enables the launch modal announcing the Warp Agent CLI.
+    /// Enables the launch modal announcing InfiniShell TUI.
     AgentCliLaunchModal,
 
     /// Updated tab styling (background colors, border, close button positioning, margins).

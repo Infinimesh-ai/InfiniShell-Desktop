@@ -3,7 +3,7 @@ Linear: [CODE-1822 — Orchestration](https://linear.app/warpdotdev/issue/CODE-1
 Component: [specs/code-1822-tui-tab-bar-component/PRODUCT.md](../code-1822-tui-tab-bar-component/PRODUCT.md)
 
 ## Summary
-The Warp TUI shows a tab bar for an orchestration tree so users can see and switch among the orchestrator and its navigable child-agent conversations. The bar supports keyboard and mouse navigation, preserves each session's state, and paginates predictably when all child tabs do not fit.
+The InfiniShell TUI shows a tab bar for an orchestration tree so users can see and switch among the orchestrator and its navigable child-agent conversations. The bar supports keyboard and mouse navigation, preserves each session's state, and paginates predictably when all child tabs do not fit.
 
 ## Figma
 - Orchestration bar visible but unfocused: https://www.figma.com/design/yg5nbPZuGoAszHS3Rhvehu/TUI?node-id=806-20498&m=dev

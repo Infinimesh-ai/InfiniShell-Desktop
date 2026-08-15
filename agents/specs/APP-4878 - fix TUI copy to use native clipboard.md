@@ -8,7 +8,7 @@ Commit-pinned references below are anchored at `warpdotdev/warp@e6aaaf9b8f84f786
 ## PRODUCT
 
 **Summary:** Copying a selection or running `/export-to-clipboard` in the headless
-Warp TUI (`crates/warp_tui`) fails consistently in the common case — a user
+InfiniShell TUI (`crates/warp_tui`) fails consistently in the common case — a user
 running the TUI on their own machine, most notably inside the Warp terminal
 itself — yet the TUI still reports "copied to clipboard". The copy path relies
 *entirely* on OSC 52, which only works if the host terminal accepts programmatic

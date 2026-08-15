@@ -154,7 +154,7 @@ Focused viewport tests in `crates/warpui_core/src/elements/tui/viewported_list_t
 
 Selection-state tests in `crates/warpui_core/src/elements/tui/selectable/state_tests.rs` cover cumulative resize rebasing.
 
-Warp TUI tests cover:
+InfiniShell TUI tests cover:
 
 - read-only transcript row extraction and explicit resize reporting (`tui_block_list_viewport_source_tests.rs`);
 - input selection clearing (`input/view_tests.rs`);

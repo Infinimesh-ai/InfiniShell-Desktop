@@ -1,4 +1,4 @@
-//! [`RootTuiView`]: the local `warp-tui` session root.
+//! [`RootTuiView`]: the local `infinishell-tui` session root.
 
 use warpui::SingletonEntity as _;
 use warpui_core::elements::tui::{TuiChildView, TuiElement};

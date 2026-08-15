@@ -846,7 +846,7 @@ pub fn run_integration_test(driver: TestDriver) -> Result<()> {
     run_internal(launch)
 }
 
-/// Runs the headless TUI front-end (the `warp-tui` binary in the `warp_tui`
+/// Runs the headless TUI front-end (the `infinishell-tui` binary in the `warp_tui`
 /// crate). Bootstraps the real (headless) app and then runs `mount`, which
 /// builds the root TUI view and starts the non-blocking TUI driver.
 ///

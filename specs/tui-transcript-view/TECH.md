@@ -1,9 +1,9 @@
 # TUI transcript view — TECH
 ## Context
-This PR builds the first production-shaped conversation transcript view for Warp's TUI. It proves the transcript container and canonical ordering path with two intentionally simple block renderers:
+This PR builds the first production-shaped conversation transcript view for InfiniShell TUI. It proves the transcript container and canonical ordering path with two intentionally simple block renderers:
 - an agent block that renders user input and streamed plain-text agent output
 - a terminal block that renders command/input and streamed terminal output
-Bare `warp-tui` launches a real login-gated TUI root. Once authenticated, the root delegates to an authenticated terminal session view containing an editor-backed input docked at the bottom and a transcript above it. Submitting the input sends a prompt to the surface's conversation, streaming the response into the transcript as an agent block.
+Bare `infinishell-tui` launches a real login-gated TUI root. Once authenticated, the root delegates to an authenticated terminal session view containing an editor-backed input docked at the bottom and a transcript above it. Submitting the input sends a prompt to the surface's conversation, streaming the response into the transcript as an agent block.
 
 Rich block content and interactive block affordances are outside this PR. Those features must extend the block-render boundary established here rather than alter the transcript container or introduce a TUI-specific blocklist.
 The generalized, content-agnostic TUI viewport this transcript renders into (the virtualized list, scroll/anchor model, height reconciliation, and wheel/event plumbing) is a dependency provided by the downstack branch and specified in [`specs/tui-viewport/TECH.md`](../tui-viewport/TECH.md). This spec covers only the terminal-backed transcript built on top of it.
@@ -17,7 +17,7 @@ WarpUI already has a TUI-specific element/view/presenter stack. [`TuiElement`](h
 The TUI transcript will use this existing order. It will not own a second transcript order or introduce a `TUIBlocklistElement`.
 ## Proposed changes
 ### TUI transcript composition root
-Change the no-prompt TUI frontend callback in `crates/warp_tui/src/lib.rs`: after app-side authentication, bare `warp-tui` starts a real TUI session instead of printing the authenticated user ID and exiting.
+Change the no-prompt TUI frontend callback in `crates/warp_tui/src/lib.rs`: after app-side authentication, bare `infinishell-tui` starts a real TUI session instead of printing the authenticated user ID and exiting.
 
 Add a root TUI view that owns login branching and the optional terminal-session child handle. The root window and TUI driver start immediately so the login placeholder can render, but `TuiTerminalSessionView` and the local terminal manager are created only after `TuiLoginPhase::LoggedIn`. `RootTuiView::ensure_terminal_session` creates the terminal child through the root view's own `ViewContext`, preserving normal TUI view hierarchy and parentage, while `crates/warp_tui/src/session.rs` owns the driver and retains the terminal manager handle after login.
 
@@ -128,7 +128,7 @@ The rich-content height adapter measures the same composed element tree at the a
 ## End-to-end flow
 ```mermaid
 flowchart TD
-  Init["bare warp-tui"] --> Root["RootTuiView<br/>login shell"]
+  Init["bare infinishell-tui"] --> Root["RootTuiView<br/>login shell"]
   Root --> Driver["Invalidation-driven<br/>TUI driver"]
   Root -->|after LoggedIn| Session["TuiTerminalSessionView<br/>TerminalSurface"]
   Session --> Input["TuiInputView<br/>bottom bordered"]

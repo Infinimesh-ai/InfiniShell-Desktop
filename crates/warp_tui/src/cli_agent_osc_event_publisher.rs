@@ -17,6 +17,7 @@ use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonE
 
 use crate::tool_call_labels::tool_call_label;
 
+// 这是宿主终端已经识别的协议标识，不随产品可执行文件改名。
 const WARP_TUI_AGENT_NAME: &str = "warp-tui";
 const MAX_NOTIFICATION_DESCRIPTION_CHARS: usize = 320;
 
@@ -79,14 +80,14 @@ impl CliAgentOscEventPublisher {
 
     pub(crate) fn publish_session_start(&self, ctx: &AppContext) {
         let mut notification = self.notification("session_start", ctx);
-        notification.summary = Some("Warp Agent session started.".to_owned());
+        notification.summary = Some("InfiniShell TUI session started.".to_owned());
         self.publish(notification);
     }
 
     pub(crate) fn publish_prompt_submit(&self, prompt: String, ctx: &AppContext) {
         let mut notification = self.notification("prompt_submit", ctx);
         notification.query = notification_excerpt(&prompt);
-        notification.summary = Some("Warp Agent is working on your request.".to_owned());
+        notification.summary = Some("InfiniShell TUI is working on your request.".to_owned());
         self.publish(notification);
     }
 
@@ -193,13 +194,13 @@ impl CliAgentOscEventPublisher {
         notification.error_type = status_event.error_type.map(str::to_owned);
         notification.summary = Some(
             match new_status {
-                ConversationStatus::Success => "Warp Agent completed your request.",
-                ConversationStatus::Error => "Warp Agent encountered an error.",
-                ConversationStatus::Cancelled => "Warp Agent was cancelled.",
-                ConversationStatus::InProgress => "Warp Agent is working on your request.",
-                ConversationStatus::Blocked { .. } => "Warp Agent is waiting for your input.",
-                ConversationStatus::TransientError => "Warp Agent is reconnecting.",
-                ConversationStatus::WaitingForEvents => "Warp Agent is waiting for events.",
+                ConversationStatus::Success => "InfiniShell TUI completed your request.",
+                ConversationStatus::Error => "InfiniShell TUI encountered an error.",
+                ConversationStatus::Cancelled => "InfiniShell TUI was cancelled.",
+                ConversationStatus::InProgress => "InfiniShell TUI is working on your request.",
+                ConversationStatus::Blocked { .. } => "InfiniShell TUI is waiting for your input.",
+                ConversationStatus::TransientError => "InfiniShell TUI is reconnecting.",
+                ConversationStatus::WaitingForEvents => "InfiniShell TUI is waiting for events.",
             }
             .to_owned(),
         );

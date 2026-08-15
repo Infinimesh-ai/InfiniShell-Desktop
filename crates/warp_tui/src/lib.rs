@@ -1,4 +1,4 @@
-//! `warp_tui` — the headless TUI front-end for Warp.
+//! `warp_tui` — the headless InfiniShell TUI front-end.
 //!
 //! This crate contains:
 //! - [`input`] — the editor-backed TUI input view (`TuiEditorModel` + `TuiInputView`).

@@ -270,6 +270,8 @@ fn test_detect_known_agents() {
                 ("goose", CLIAgent::Goose),
                 ("vibe", CLIAgent::Vibe),
                 ("omp", CLIAgent::OhMyPi),
+                ("infinishell-tui", CLIAgent::WarpTui),
+                ("infinishell-tui-dev", CLIAgent::WarpTui),
                 ("warp", CLIAgent::WarpTui),
                 ("warp-dev", CLIAgent::WarpTui),
                 ("./script/run-tui", CLIAgent::WarpTui),
@@ -589,29 +591,38 @@ fn test_warp_tui_matches_binaries_and_launchers() {
     assert!(CLIAgent::WarpTui.matches_command("warp", None));
     assert!(CLIAgent::WarpTui.matches_command("warp-preview", None));
     assert!(CLIAgent::WarpTui.matches_command("warp-dev", None));
+    assert!(CLIAgent::WarpTui.matches_command("infinishell-tui", None));
+    assert!(CLIAgent::WarpTui.matches_command("infinishell-tui-local", None));
+    assert!(CLIAgent::WarpTui.matches_command("infinishell-tui-dev", None));
+    assert!(CLIAgent::WarpTui.matches_command("infinishell-tui-preview", None));
+    assert!(CLIAgent::WarpTui.matches_command("infinishell-tui-stable", None));
     assert!(CLIAgent::WarpTui.matches_command("warp-tui", None));
     assert!(CLIAgent::WarpTui.matches_command("warp-tui-oss", None));
     // The dev launcher script.
     assert!(CLIAgent::WarpTui.matches_command("./script/run-tui", None));
     assert!(CLIAgent::WarpTui.matches_command("script/run-tui", None));
     // Absolute / relative paths to the binary.
-    assert!(CLIAgent::WarpTui.matches_command("/workspace/warp/target/debug/warp-tui", None,));
-    assert!(CLIAgent::WarpTui.matches_command("./target/debug/warp-tui", None));
+    assert!(
+        CLIAgent::WarpTui
+            .matches_command("/workspace/infinishell/target/debug/infinishell-tui", None,)
+    );
+    assert!(CLIAgent::WarpTui.matches_command("./target/debug/infinishell-tui", None));
     assert!(CLIAgent::WarpTui.matches_command(
         "/Applications/WarpPreview.app/Contents/MacOS/warp-preview --resume abc",
         None,
     ));
     // With arguments and leading whitespace.
-    assert!(CLIAgent::WarpTui.matches_command("  warp --resume abc", None));
+    assert!(CLIAgent::WarpTui.matches_command("  infinishell-tui --resume abc", None));
 }
 
 #[test]
 fn test_warp_tui_matches_with_env_var_prefix() {
     // Env-var assignments before the command are skipped when an escape char is
     // provided (mirrors `CLIAgent::detect`).
-    assert!(
-        CLIAgent::WarpTui.matches_command("WARP_API_KEY=secret warp", Some(EscapeChar::Backslash),)
-    );
+    assert!(CLIAgent::WarpTui.matches_command(
+        "WARP_API_KEY=secret infinishell-tui",
+        Some(EscapeChar::Backslash),
+    ));
 }
 
 #[test]
@@ -622,6 +633,8 @@ fn test_warp_tui_does_not_match_other_commands() {
     // Lookalikes / substrings should not match.
     assert!(!CLIAgent::WarpTui.matches_command("warp-preview-wrapper", None));
     assert!(!CLIAgent::WarpTui.matches_command("mywarp-dev", None));
+    assert!(!CLIAgent::WarpTui.matches_command("infinishell-tui-wrapper", None));
+    assert!(!CLIAgent::WarpTui.matches_command("myinfinishell-tui", None));
     assert!(!CLIAgent::WarpTui.matches_command("warp-tui-wrapper", None));
     assert!(!CLIAgent::WarpTui.matches_command("mywarp-tui", None));
     assert!(!CLIAgent::WarpTui.matches_command("", None));
@@ -632,10 +645,15 @@ fn test_warp_tui_does_not_match_other_commands() {
 #[test]
 fn test_warp_tui_variant_properties() {
     assert!(CLIAgent::Claude.supports_cli_agent_footer());
-    assert_eq!(CLIAgent::WarpTui.command_prefix(), "warp");
+    assert_eq!(CLIAgent::WarpTui.command_prefix(), "infinishell-tui");
     assert_eq!(
         CLIAgent::WarpTui.command_prefixes(),
         &[
+            "infinishell-tui",
+            "infinishell-tui-local",
+            "infinishell-tui-dev",
+            "infinishell-tui-preview",
+            "infinishell-tui-stable",
             "warp",
             "warp-preview",
             "warp-dev",
@@ -644,7 +662,7 @@ fn test_warp_tui_variant_properties() {
             "run-tui",
         ]
     );
-    assert_eq!(CLIAgent::WarpTui.display_name(), "Warp TUI");
+    assert_eq!(CLIAgent::WarpTui.display_name(), "InfiniShell TUI");
     assert_eq!(CLIAgent::WarpTui.brand_color(), Some(ColorU::black()));
     // InfiniShell TUI 使用 InfiniShell 品牌图标。
     assert_eq!(CLIAgent::WarpTui.icon(), Some(Icon::InfiniShell));

@@ -715,10 +715,10 @@ pub enum WorkspaceAction {
     /// Reset the orchestration launch modal dismissed state (for debugging)
     #[cfg(debug_assertions)]
     ResetOrchestrationLaunchModalState,
-    /// Open the Warp Agent CLI Launch Modal (for debugging)
+    /// Open the InfiniShell TUI launch modal (for debugging)
     #[cfg(debug_assertions)]
     OpenAgentCliLaunchModal,
-    /// Reset the Warp Agent CLI launch modal dismissed state (for debugging)
+    /// Reset the InfiniShell TUI launch modal dismissed state (for debugging)
     #[cfg(debug_assertions)]
     ResetAgentCliLaunchModalState,
     /// Open the Feature Intro Modal (for debugging)

@@ -1,7 +1,7 @@
 *Spec: Change where TUI logs are stored (CODE-1902)*
 
 == PRODUCT ==
-*Summary:* Headless Warp TUI processes must write their logs to a frontend-specific location while using the same channel filenames as the GUI. On macOS, examples include `~/Library/Logs/warp-cli/warp_local.log`, `~/Library/Logs/warp-cli/warp_dev.log`, `~/Library/Logs/warp-cli/warp_preview.log`, and `~/Library/Logs/warp-cli/warp.log`. The existing `/view-logs` command must bundle and reveal the TUI logs from this resolved location.
+*Summary:* Headless InfiniShell TUI processes must write their logs to a frontend-specific location while using the same channel filenames as the GUI. On macOS, examples include `~/Library/Logs/warp-cli/warp_local.log`, `~/Library/Logs/warp-cli/warp_dev.log`, `~/Library/Logs/warp-cli/warp_preview.log`, and `~/Library/Logs/warp-cli/warp.log`. The existing `/view-logs` command must bundle and reveal the TUI logs from this resolved location.
 
 *Key design choices:* Use an explicit `LogFrontend::Tui` configuration seam rather than inferring TUI from “file destination”/`is_cli`; resolve frontend-specific directories and rotation policy centrally in `warp_logging` while continuing to source filenames from `ChannelState::logfile_name()`; make all path consumers (rotation, crash paths, bundles, prompt-chip sidecars, and `/view-logs`) read the resolved logging state so GUI behavior remains unchanged.
 

@@ -24020,14 +24020,14 @@ impl TypedActionView for Workspace {
                         .set_value(false, ctx)
                     {
                         log::warn!(
-                            "Failed to reset Warp Agent CLI launch modal dismissed setting: {e}"
+                            "Failed to reset InfiniShell TUI launch modal dismissed setting: {e}"
                         );
                     }
                 });
                 let new_value =
                     *AISettings::as_ref(ctx).did_check_to_trigger_agent_cli_launch_modal;
                 log::info!(
-                    "Warp Agent CLI launch modal state: old={old_value}, new={new_value}, feature_flag_enabled={}",
+                    "InfiniShell TUI launch modal state: old={old_value}, new={new_value}, feature_flag_enabled={}",
                     FeatureFlag::AgentCliLaunchModal.is_enabled()
                 );
             }

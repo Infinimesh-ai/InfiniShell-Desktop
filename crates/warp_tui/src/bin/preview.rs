@@ -1,4 +1,4 @@
-//! Preview-channel `warp-tui` binary.
+//! Preview-channel `infinishell-tui-preview` binary.
 //!
 //! Mirrors `app/src/bin/preview.rs`: loads the `preview` channel config and
 //! enables the preview feature flags, then hands off to the

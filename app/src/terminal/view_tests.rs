@@ -9099,7 +9099,7 @@ fn warp_tui_listener_does_not_auto_open_rich_input() {
         terminal.read(&app, |view, ctx| {
             let session = CLIAgentSessionsModel::as_ref(ctx)
                 .session(view.view_id)
-                .expect("Warp TUI session should be registered");
+                .expect("InfiniShell TUI session should be registered");
             assert!(session.listener.is_some());
             assert!(!session.should_auto_toggle_input);
             assert!(!view.has_active_cli_agent_input_session(ctx));
@@ -9121,13 +9121,13 @@ fn active_cli_agent_recognizes_detected_warp_tui_session() {
             assert_eq!(
                 view.active_cli_agent(ctx),
                 Some(CLIAgent::WarpTui),
-                "Warp TUI should be recognized as a code-review destination while running"
+                "InfiniShell TUI should be recognized as a code-review destination while running"
             );
         });
     });
 }
 
-/// `active_cli_agent` must return `None` for the Warp TUI when `HoaCodeReview`
+/// `active_cli_agent` must return `None` for the InfiniShell TUI when `HoaCodeReview`
 /// is disabled, preserving the pre-feature behavior (no review destination).
 #[test]
 fn active_cli_agent_ignores_warp_tui_when_hoa_code_review_disabled() {
@@ -9144,7 +9144,7 @@ fn active_cli_agent_ignores_warp_tui_when_hoa_code_review_disabled() {
             assert_eq!(
                 view.active_cli_agent(ctx),
                 None,
-                "Warp TUI should not be a review destination when HoaCodeReview is disabled"
+                "InfiniShell TUI should not be a review destination when HoaCodeReview is disabled"
             );
         });
     });
@@ -9172,7 +9172,7 @@ fn active_cli_agent_ignores_non_tui_long_running_command() {
     });
 }
 
-/// Sending review comments while the Warp TUI is running writes the built prompt
+/// Sending review comments while the InfiniShell TUI is running writes the built prompt
 /// directly to the TUI's PTY rather than the outer rich input.
 #[test]
 fn send_review_comments_to_warp_tui_writes_prompt_to_pty() {
@@ -9202,7 +9202,7 @@ fn send_review_comments_to_warp_tui_writes_prompt_to_pty() {
         });
 
         // The review prompt is written to the PTY in a single write because
-        // Warp TUI sessions do not open the outer rich input.
+        // InfiniShell TUI sessions do not open the outer rich input.
         let writes = pty_writes.borrow();
         assert_eq!(
             writes.len(),

@@ -27,7 +27,7 @@ const CONTENT_WIDTH: f32 = COLUMN_WIDTH - COLUMN_HORIZONTAL_PADDING * 2.;
 const CARD_RADIUS: f32 = 8.;
 const FEATURE_FONT_SIZE: f32 = 12.;
 const HERO_IMAGE_PATH: &str = "async/png/onboarding/agent_cli_launch_banner.png";
-const GET_STARTED_URL: &str = "https://docs.warp.dev/cli/quickstart/";
+const GET_STARTED_URL: &str = "https://github.com/Infinimesh-ai/InfiniShell-Desktop";
 
 fn modal_background(appearance: &Appearance) -> Fill {
     appearance.theme().surface_3()
@@ -71,14 +71,14 @@ const FEATURE_ITEMS: &[FeatureItem] = &[
     FeatureItem {
         icon: Icon::LayoutAlt01,
         label: "What's new:",
-        title: "Use the Warp Agent anywhere",
-        description: "Warp's state of the art agent is now available in any terminal through the CLI.",
+        title: "Use InfiniShell TUI anywhere",
+        description: "InfiniShell's coding agent is available in any terminal through its standalone TUI.",
     },
     FeatureItem {
         icon: Icon::Inbox,
         label: "What's special:",
         title: "Built-in terminal multiplexer",
-        description: "Each Warp Agent creates its own PTY, enabling better behavior for REPLS, ssh, directory switching, and more.",
+        description: "Each InfiniShell TUI session creates its own PTY for REPLs, SSH, directory switching, and more.",
     },
 ];
 
@@ -230,7 +230,7 @@ impl AgentCliLaunchModal {
 
     fn render_title(appearance: &Appearance) -> Box<dyn Element> {
         Text::new(
-            "Introducing the Warp Agent CLI: A coding agent that does what others can't",
+            "Introducing InfiniShell TUI: your coding agent in any terminal",
             appearance.ui_font_family(),
             20.,
         )

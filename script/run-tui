@@ -25,10 +25,10 @@ cd "${REPO_ROOT}"
 ./script/install_channel_config || echo "Skipping internal channel config installation (no repo access)."
 
 if command -v warp-channel-config &>/dev/null; then
-    BIN="warp-tui"
+    BIN="infinishell-tui-local"
     CHANNEL="local"
 else
-    BIN="warp-tui-oss"
+    BIN="infinishell-tui"
     CHANNEL="oss"
 fi
 

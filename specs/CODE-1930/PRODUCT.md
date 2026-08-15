@@ -4,7 +4,7 @@ Linear: [CODE-1930 — TUI: replace BYOK slash commands with a /api-keys inline 
 
 ## Summary
 
-The Warp TUI provides one `/api-keys` slash command that opens an inline menu for viewing, filtering, setting, replacing, and clearing supported AI-provider credentials. The same menu also exposes the TUI-local Warp credit fallback setting and embeds the existing browser-based X premium/SuperGrok connection flow.
+The InfiniShell TUI provides one `/api-keys` slash command that opens an inline menu for viewing, filtering, setting, replacing, and clearing supported AI-provider credentials. The same menu also exposes the TUI-local Warp credit fallback setting and embeds the existing browser-based X premium/SuperGrok connection flow.
 
 ## Figma
 

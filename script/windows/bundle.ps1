@@ -140,31 +140,30 @@ if ("$CHANNEL" -eq 'local') {
 
 if ($IS_TUI) {
     $WARP_BIN = switch ($CHANNEL) {
-        'local' { 'warp-tui' }
-        'oss' { 'warp-tui-oss' }
-        Default { "warp-tui-$CHANNEL" }
+        'oss' { 'infinishell-tui' }
+        Default { "infinishell-tui-$CHANNEL" }
     }
     $BINARY_NAME = "$WARP_BIN.exe"
     $APP_NAME = switch ($CHANNEL) {
-        'local' { 'WarpAgentCLI' }
-        'dev' { 'WarpAgentCLIDev' }
-        'preview' { 'WarpAgentCLIPreview' }
-        'stable' { 'WarpAgentCLI' }
-        'oss' { 'WarpAgentCLIOss' }
+        'local' { 'InfiniShellTUILocal' }
+        'dev' { 'InfiniShellTUIDev' }
+        'preview' { 'InfiniShellTUIPreview' }
+        'stable' { 'InfiniShellTUIStable' }
+        'oss' { 'InfiniShellTUI' }
     }
     $CLI_NAME = switch ($CHANNEL) {
-        'local' { 'warp' }
-        'dev' { 'warp-dev' }
-        'preview' { 'warp-preview' }
-        'stable' { 'warp' }
-        'oss' { 'warp-oss' }
+        'local' { 'infinishell-tui-local' }
+        'dev' { 'infinishell-tui-dev' }
+        'preview' { 'infinishell-tui-preview' }
+        'stable' { 'infinishell-tui-stable' }
+        'oss' { 'infinishell-tui' }
     }
     $INSTALL_DIR_NAME = switch ($CHANNEL) {
         'local' { 'tui-local' }
         'dev' { 'tui-dev' }
         'preview' { 'tui-preview' }
-        'stable' { 'tui' }
-        'oss' { 'tui-oss' }
+        'stable' { 'tui-stable' }
+        'oss' { 'tui' }
     }
     $FEATURES = 'release_bundle,standalone,voice_input'
     if ("$CHANNEL" -ne 'oss') {
@@ -178,11 +177,12 @@ if ($IS_TUI) {
 $BINARY_PATH = "$CARGO_TARGET_OUTPUT_DIR\$BINARY_NAME"
 # AUMID(Windows AppUserModel ID)—— 必须与进程端 `ChannelState::app_id()` 生成的完全一致,
 # 否则 Windows ToastNotificationManager 会在 Start Menu 快捷方式 / 进程 AUMID 不匹配时
-# 静默吞掉 toast。OSS(InfiniShell)在 `app/src/bin/infinishell.rs` 里是
-# `dev.infinishell.InfiniShell`,其他官方 channel 是 `dev.warp.<Name>`。
-#
-# OSS 的 AUMID 刻意**不**由 $APP_NAME 拼接:organization 段是 `infinishell` 而非 `warp`。
-if ("$CHANNEL" -eq 'oss') {
+# 静默吞掉 toast。TUI 全部使用 `dev.infinishell.<Name>`；GUI 的 OSS 版在
+# `app/src/bin/infinishell.rs` 里是 `dev.infinishell.InfiniShell`，其他 GUI
+# channel 是 `dev.warp.<Name>`。
+if ($IS_TUI) {
+    $AUMID = "dev.infinishell.$APP_NAME"
+} elseif ("$CHANNEL" -eq 'oss') {
     $AUMID = "dev.infinishell.InfiniShell"
 } else {
     $AUMID = "dev.warp.$APP_NAME"
@@ -232,7 +232,13 @@ if (-Not $SKIP_BUILD_BINARY) {
     $env:CARGO_BIN_NAME = $CHANNEL
     # PE 资源里的 ProductName / FileDescription(任务管理器的进程分组名)走展示名。
     # OSS 的展示品牌是 InfiniShell,而 $APP_NAME 仍是安装包资产名,两者需要分开。
-    $env:WARP_APP_NAME = if ("$CHANNEL" -eq 'oss') { 'InfiniShell' } else { $APP_NAME }
+    $env:WARP_APP_NAME = if ($IS_TUI) {
+        $APP_NAME
+    } elseif ("$CHANNEL" -eq 'oss') {
+        'InfiniShell'
+    } else {
+        $APP_NAME
+    }
     cargo build -p $CARGO_PACKAGE --profile "$CARGO_PROFILE" --bin "$WARP_BIN" --features "$FEATURES" --target $PLATFORM_TARGET
     if (-Not $?) {
         Write-Error "Failed to build InfiniShell $WARP_BIN binary with profile $CARGO_PROFILE"
@@ -298,7 +304,7 @@ if ($IS_TUI) {
     )
     foreach ($requiredFile in $requiredPayloadFiles) {
         if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
-            throw "Required Warp Agent CLI payload file does not exist: $requiredFile"
+            throw "Required InfiniShell TUI payload file does not exist: $requiredFile"
         }
         if ($REQUIRE_SIGNATURES) {
             Assert-ValidSignature -Path $requiredFile
@@ -307,10 +313,12 @@ if ($IS_TUI) {
 }
 
 Write-Output 'Building InfiniShell installer'
-# Inno Setup `AppId` 决定注册表 Uninstall 条目与升级跟踪键。OSS 下固定为 `infinishell`,
-# 避免留在默认的 `warp-terminal-oss` 上。其他 channel 走 .iss 里的默认
-# `warp-terminal-{ReleaseChannel}`。
-if ("$CHANNEL" -eq 'oss') {
+# Inno Setup `AppId` 决定注册表 Uninstall 条目与升级跟踪键。TUI 统一使用
+# `infinishell-tui[-{channel}]`；GUI 的 OSS 版固定为 `infinishell`，其他 GUI
+# channel 继续使用 `warp-terminal-{ReleaseChannel}`。
+if ($IS_TUI) {
+    $INNO_APP_ID = if ("$CHANNEL" -eq 'oss') { 'infinishell-tui' } else { "infinishell-tui-$CHANNEL" }
+} elseif ("$CHANNEL" -eq 'oss') {
     $INNO_APP_ID = 'infinishell'
 } else {
     $INNO_APP_ID = "warp-terminal-$CHANNEL"

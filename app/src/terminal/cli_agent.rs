@@ -203,6 +203,11 @@ impl CLIAgent {
             CLIAgent::Antigravity => &["agy"],
             CLIAgent::Omp => &["omp"],
             CLIAgent::WarpTui => &[
+                "infinishell-tui",
+                "infinishell-tui-local",
+                "infinishell-tui-dev",
+                "infinishell-tui-preview",
+                "infinishell-tui-stable",
                 "warp",
                 "warp-preview",
                 "warp-dev",
@@ -267,7 +272,7 @@ impl CLIAgent {
             CLIAgent::Vibe => "Mistral Vibe",
             CLIAgent::Antigravity => "Antigravity",
             CLIAgent::Omp => "Omp",
-            CLIAgent::WarpTui => "Warp TUI",
+            CLIAgent::WarpTui => "InfiniShell TUI",
             CLIAgent::Unknown => "CLI Agent",
         }
     }
