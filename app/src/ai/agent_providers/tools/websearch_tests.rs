@@ -206,7 +206,7 @@ async fn handles_multiple_data_lines() {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// 真实端点 smoke 测试(默认开启;CI 网络受限时设 WARP_SKIP_WEB_INTEGRATION=1)
+// 真实端点 smoke 测试默认忽略,需要时通过 ignored 测试显式运行。
 // ---------------------------------------------------------------------------
 
 fn skip_real() -> bool {
@@ -214,6 +214,7 @@ fn skip_real() -> bool {
 }
 
 #[tokio::test]
+#[ignore = "需要访问真实 Exa 端点"]
 async fn real_exa_anonymous_search() {
     if skip_real() {
         return;

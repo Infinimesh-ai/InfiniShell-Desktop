@@ -13,6 +13,7 @@ mod clipboard_tests {
     }
 
     #[test]
+    #[ignore = "需要交互式 Windows 桌面剪贴板"]
     fn test_clipboard_round_trip() {
         let mut clipboard = match create_test_clipboard() {
             Some(clipboard) => clipboard,
@@ -37,6 +38,7 @@ mod clipboard_tests {
     }
 
     #[test]
+    #[ignore = "需要交互式 Windows 桌面剪贴板"]
     fn test_html_content_handling() {
         let mut clipboard = match create_test_clipboard() {
             Some(clipboard) => clipboard,
@@ -67,6 +69,7 @@ mod clipboard_tests {
     }
 
     #[test]
+    #[ignore = "需要交互式 Windows 桌面剪贴板"]
     fn test_empty_content_handling() {
         let mut clipboard = match create_test_clipboard() {
             Some(clipboard) => clipboard,

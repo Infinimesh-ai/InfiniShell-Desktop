@@ -2244,8 +2244,6 @@ mod tests;
 
 #[cfg(all(test, feature = "local_fs"))]
 mod is_unsafe_watch_root_tests {
-    use std::path::Path;
-
     use super::is_unsafe_watch_root;
 
     #[test]
@@ -2261,9 +2259,14 @@ mod is_unsafe_watch_root_tests {
             home.display()
         );
 
+        let filesystem_root = home
+            .ancestors()
+            .last()
+            .expect("home directory must have a filesystem root");
         assert!(
-            is_unsafe_watch_root(Path::new("/")),
-            "filesystem root must be rejected",
+            is_unsafe_watch_root(filesystem_root),
+            "filesystem root ({}) must be rejected",
+            filesystem_root.display(),
         );
 
         if let Some(parent) = home.parent() {

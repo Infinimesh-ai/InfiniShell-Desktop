@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use ai::skills::{ParsedSkill, SkillProvider, SkillScope};
+use ai::skills::{ParsedSkill, SkillProvider, SkillReference, SkillScope};
 use warp_util::host_id::HostId;
 use warp_util::local_or_remote_path::LocalOrRemotePath;
 use warp_util::remote_path::RemotePath;
@@ -142,27 +142,24 @@ fn test_unique_skills_keeps_same_provider_skills_from_different_dirs() {
     let skill_paths = vec![
         (
             LocalOrRemotePath::Local(home_dir),
-            LocalOrRemotePath::Local(home_path),
+            LocalOrRemotePath::Local(home_path.clone()),
         ),
         (
             LocalOrRemotePath::Local(project_dir),
-            LocalOrRemotePath::Local(project_path),
+            LocalOrRemotePath::Local(project_path.clone()),
         ),
     ];
 
     let result = unique_skills(&skill_paths, &skills_by_path);
     assert_eq!(result.len(), 2, "同名 + 同 provider 跨目录应各自保留");
     assert!(
-        result
-            .iter()
-            .any(|skill| skill.reference.to_string().contains("/home/user/.agents")),
+        result.iter().any(|skill| skill.reference
+            == SkillReference::Path(LocalOrRemotePath::Local(home_path.clone()))),
         "应保留 home 目录里的同名 skill,实际={result:?}"
     );
     assert!(
-        result.iter().any(|skill| skill
-            .reference
-            .to_string()
-            .contains("/home/user/projects/repo/.agents")),
+        result.iter().any(|skill| skill.reference
+            == SkillReference::Path(LocalOrRemotePath::Local(project_path.clone()))),
         "应保留 project 目录里的同名 skill,实际={result:?}"
     );
 }

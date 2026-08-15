@@ -1,3 +1,6 @@
+use std::io::ErrorKind;
+use std::rc::Rc;
+
 use async_channel::{Receiver, unbounded};
 use warpui_core::r#async::block_on;
 use warpui_core::{App, ModelHandle};
@@ -17,7 +20,7 @@ enum TestFileModelEvent {
         _version: ContentVersion,
     },
     FileSaved,
-    FailedToLoad(String),
+    FailedToLoad(Rc<FileLoadError>),
     FailedToSave,
 }
 
@@ -37,7 +40,7 @@ impl From<&FileModelEvent> for TestFileModelEvent {
             FileModelEvent::FailedToLoad {
                 id: _id,
                 error: err,
-            } => TestFileModelEvent::FailedToLoad(format!("{err:?}")),
+            } => TestFileModelEvent::FailedToLoad(Rc::clone(err)),
             FileModelEvent::FailedToSave { .. } => TestFileModelEvent::FailedToSave,
             FileModelEvent::FileUpdated { .. } => {
                 // For now, we don't handle file updated events in tests
@@ -181,17 +184,12 @@ fn test_load_missing_file() {
         let event = receiver.recv().await.expect("Could not receive the result");
         match event {
             TestFileModelEvent::FailedToLoad(err) => {
-                // File not found error strings differ across operating systems.
-                #[cfg(not(windows))]
-                let os_error_message = "No such file or directory";
-                #[cfg(windows)]
-                let os_error_message = "The system cannot find the file specified.";
-
-                assert_eq!(
-                    err,
-                    format!(
-                        "IOError(Os {{ code: 2, kind: NotFound, message: \"{os_error_message}\" }})"
-                    )
+                assert!(
+                    matches!(
+                        err.as_ref(),
+                        FileLoadError::IOError(error) if error.kind() == ErrorKind::NotFound
+                    ),
+                    "缺失文件应返回 NotFound,实际={err:?}"
                 );
             }
             _ => panic!("Failed to load file"),
