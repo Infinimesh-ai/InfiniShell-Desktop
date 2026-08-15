@@ -26,10 +26,10 @@ body = """
 {% endfor %}
 {% endfor %}
 {%- macro compare_url(prev, curr) -%}
-https://github.com/zerx-lab/warp/compare/{{ prev }}...{{ curr }}
+https://github.com/Infinimesh-ai/InfiniShell-Desktop/compare/{{ prev }}...{{ curr }}
 {%- endmacro -%}
 {%- macro commit_url(sha) -%}
-https://github.com/zerx-lab/warp/commit/{{ sha }}
+https://github.com/Infinimesh-ai/InfiniShell-Desktop/commit/{{ sha }}
 {%- endmacro -%}
 """
 
