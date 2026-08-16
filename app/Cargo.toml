@@ -391,6 +391,7 @@ interprocess = { version = "1.2.1", features = ["tokio_support"] }
 windows = { workspace = true, features = [
     "Wdk_Foundation",
     "Wdk_Storage_FileSystem",
+    "Win32_Networking_WinSock",
     "Win32_Security",
     "Win32_Storage",
     "Win32_Storage_FileSystem",

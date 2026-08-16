@@ -20,6 +20,7 @@ batchmode no
 compression yes
 ciphers aes256-ctr,aes128-ctr
 hostkeyalgorithms ssh-ed25519,rsa-sha2-256
+pubkeyacceptedalgorithms ssh-ed25519,rsa-sha2-256
 kexalgorithms curve25519-sha256,diffie-hellman-group14-sha256
 macs hmac-sha2-256,hmac-sha2-512
 proxycommand none
@@ -63,6 +64,10 @@ fn parses_resolved_openssh_config() {
     assert_eq!(config.preferred_authentications, ["publickey", "password"]);
     assert!(config.compression);
     assert_eq!(config.ciphers.as_deref(), Some("aes256-ctr,aes128-ctr"));
+    assert_eq!(
+        config.pubkey_accepted_algorithms.as_deref(),
+        Some("ssh-ed25519,rsa-sha2-256")
+    );
     assert_eq!(config.proxy_command, None);
     assert_eq!(config.proxy_jump, None);
     assert_eq!(config.address_family, "inet");
@@ -73,6 +78,123 @@ fn parses_resolved_openssh_config() {
     assert_eq!(config.server_alive_count_max, 4);
     assert_eq!(config.send_env, ["LANG", "LC_*"]);
     assert_eq!(config.set_env, [("WARP_TEST".into(), "value".into())]);
+}
+
+#[test]
+fn rejects_an_unrecognized_effective_config_field_before_connecting() {
+    let config = format!("{BASIC_CONFIG}\nfuturetransportoption enabled\n");
+
+    assert!(parse_openssh_config(&config).is_err());
+}
+
+#[test]
+fn rejects_update_host_keys_until_the_rust_transport_can_persist_them() {
+    let config = format!("{BASIC_CONFIG}\nupdatehostkeys yes\n");
+
+    assert!(parse_openssh_config(&config).is_err());
+}
+
+#[test]
+fn rejects_keystroke_timing_obfuscation_until_the_transport_can_preserve_it() {
+    let config = format!("{BASIC_CONFIG}\nobscurekeystroketiming yes\n");
+
+    assert!(parse_openssh_config(&config).is_err());
+}
+
+#[test]
+fn rejects_an_invalid_ip_qos_value_before_connecting() {
+    let config = format!("{BASIC_CONFIG}\nipqos invalid\n");
+
+    assert!(parse_openssh_config(&config).is_err());
+}
+
+#[test]
+fn parses_the_interactive_ip_qos_value() {
+    for (value, expected) in [
+        ("ef cs0", Some(46 << 2)),
+        ("af21 none", Some(18 << 2)),
+        ("42", Some(42 << 2)),
+        ("none", None),
+    ] {
+        let config = parse_openssh_config(&format!("{BASIC_CONFIG}\nipqos {value}\n")).unwrap();
+        assert_eq!(config.interactive_ip_qos, expected, "{value}");
+    }
+}
+
+#[test]
+fn parses_custom_and_disabled_escape_characters() {
+    for (value, expected) in [
+        ("~", Some(b'~')),
+        ("none", None),
+        ("^]", Some(0x1d)),
+        ("^?", Some(0x7f)),
+    ] {
+        assert_eq!(parse_escape_char(value).unwrap(), expected, "{value}");
+    }
+    assert!(parse_escape_char("long").is_err());
+}
+
+#[test]
+fn ssh_escape_filter_handles_chunk_boundaries_and_line_start() {
+    let mut filter = SshEscapeFilter::new(Some(b'~'));
+
+    assert_eq!(filter.push(b"echo ~.\r").bytes, b"echo ~.\r");
+    assert_eq!(filter.push(b"~"), SshEscapeOutput::default());
+    assert_eq!(
+        filter.push(b"~literal\r"),
+        SshEscapeOutput {
+            bytes: b"~literal\r".to_vec(),
+            ..SshEscapeOutput::default()
+        }
+    );
+    assert_eq!(
+        filter.push(b"~."),
+        SshEscapeOutput {
+            disconnect: true,
+            ..SshEscapeOutput::default()
+        }
+    );
+}
+
+#[test]
+fn ssh_escape_help_keeps_the_filter_at_line_start() {
+    let mut filter = SshEscapeFilter::new(Some(b'~'));
+
+    assert_eq!(
+        filter.push(b"~?"),
+        SshEscapeOutput {
+            show_help: true,
+            ..SshEscapeOutput::default()
+        }
+    );
+    assert!(filter.push(b"~.").disconnect);
+}
+
+#[test]
+fn ssh_escape_filter_flushes_a_pending_literal_at_eof() {
+    let mut filter = SshEscapeFilter::new(Some(b'~'));
+    assert_eq!(filter.push(b"~"), SshEscapeOutput::default());
+    assert_eq!(filter.finish(), b"~");
+
+    let mut disabled = SshEscapeFilter::new(None);
+    assert_eq!(disabled.push(b"~.").bytes, b"~.");
+}
+
+#[test]
+fn accepts_audited_neutral_values_for_modern_openssh_fields() {
+    let config = format!(
+        "{BASIC_CONFIG}\ncanonicalizehostname false\ncontrolpath none\ncontrolpersist no\nobscurekeystroketiming no\nupdatehostkeys no\nwarnweakcrypto no\nipqos none\n"
+    );
+
+    assert!(parse_openssh_config(&config).is_ok());
+}
+
+#[test]
+fn applies_audited_algorithm_preferences_before_connecting() {
+    let config = parse_openssh_config(BASIC_CONFIG).unwrap();
+    let session = Session::new().unwrap();
+
+    apply_session_preferences(&session, &config).unwrap();
 }
 
 #[test]
@@ -344,4 +466,39 @@ fn native_fallback_preserves_a_remote_status_that_was_previously_reserved() {
     };
 
     assert_eq!(run_native_ssh(&args).unwrap(), 125);
+}
+
+#[cfg(unix)]
+#[test]
+fn unknown_effective_config_falls_back_with_the_original_arguments_before_connecting() {
+    let directory = tempfile::tempdir().unwrap();
+    let executable = directory.path().join("fake ssh");
+    let recorded_arguments = directory.path().join("fallback arguments");
+    std::fs::write(
+        &executable,
+        format!(
+            "#!/bin/sh\nif [ \"$1\" = \"-G\" ]; then\n  printf '%s\\n' 'host test' 'hostname 192.0.2.10' 'user alice' 'port 22' 'futuretransportoption enabled'\n  exit 0\nfi\nprintf '%s\\n' \"$@\" > '{}'\nexit 73\n",
+            recorded_arguments.display()
+        ),
+    )
+    .unwrap();
+    std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let ssh_args = ["-F", "config with spaces", "alice@test"]
+        .into_iter()
+        .map(OsString::from)
+        .collect::<Vec<_>>();
+    let args = RustSshSessionArgs {
+        session_id: 1,
+        remote_session_id: 2,
+        ssh_executable: executable,
+        posix_command: String::new(),
+        windows_command: String::new(),
+        ssh_args,
+    };
+
+    assert_eq!(run_session_worker(&args).unwrap(), 73);
+    assert_eq!(
+        std::fs::read_to_string(recorded_arguments).unwrap(),
+        "-F\nconfig with spaces\nalice@test\n"
+    );
 }

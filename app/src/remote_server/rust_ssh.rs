@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context as _, Result, anyhow, bail};
 use rand::RngCore as _;
 use serde::{Deserialize, Serialize};
+use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use ssh2::{
     CheckResult, ErrorCode, HashType, HostKeyType, KeyboardInteractivePrompt, KnownHostFileKind,
     MethodType, Prompt, Session,
@@ -33,6 +34,11 @@ use zeroize::Zeroizing;
 
 #[cfg(windows)]
 use windows::Win32::Foundation::HANDLE;
+#[cfg(windows)]
+use windows::Win32::Networking::WinSock::{
+    IP_TOS, IPPROTO_IP, IPPROTO_IPV6, IPV6_TCLASS, SOCKET, SOCKET_ERROR, WSAGetLastError,
+    setsockopt,
+};
 #[cfg(windows)]
 use windows::Win32::System::Console::{
     CONSOLE_MODE, ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT,
@@ -146,25 +152,206 @@ struct OpenSshConfig {
     preferred_authentications: Vec<String>,
     kex_algorithms: Option<String>,
     host_key_algorithms: Option<String>,
+    pubkey_accepted_algorithms: Option<String>,
     ciphers: Option<String>,
     macs: Option<String>,
     compression: bool,
     proxy_command: Option<String>,
     proxy_jump: Option<String>,
     address_family: String,
+    interactive_ip_qos: Option<u8>,
     connect_timeout: Option<Duration>,
     connection_attempts: u32,
     tcp_keep_alive: bool,
     server_alive_interval: Option<Duration>,
     server_alive_count_max: u32,
+    escape_char: Option<u8>,
     send_env: Vec<String>,
     set_env: Vec<(String, String)>,
 }
+
+/// `ssh -G` 输出中经过审计的字段。这里是能力门禁而不是解析便利列表：
+/// OpenSSH 新增字段时必须先判断它是否影响当前会话，并为非中性值增加
+/// 实现或显式回退；未知字段不能被静默忽略。
+const RECOGNIZED_OPENSSH_CONFIG_KEYS: &[&str] = &[
+    "addkeystoagent",
+    "addressfamily",
+    "applemultipath",
+    "batchmode",
+    "bindaddress",
+    "bindinterface",
+    "canonicaldomains",
+    "canonicalizefallbacklocal",
+    "canonicalizehostname",
+    "canonicalizemaxdots",
+    "canonicalizepermittedcnames",
+    "casignaturealgorithms",
+    "certificatefile",
+    "channeltimeout",
+    "checkhostip",
+    "ciphers",
+    "clearallforwardings",
+    "compression",
+    "connectionattempts",
+    "connecttimeout",
+    "controlmaster",
+    "controlpath",
+    "controlpersist",
+    "dynamicforward",
+    "enableescapecommandline",
+    "enablesshkeysign",
+    "escapechar",
+    "exitonforwardfailure",
+    "fingerprinthash",
+    "forkafterauthentication",
+    "forwardagent",
+    "forwardx11",
+    "forwardx11timeout",
+    "forwardx11trusted",
+    "gatewayports",
+    "globalknownhostsfile",
+    "gssapiauthentication",
+    "gssapidelegatecredentials",
+    "hashknownhosts",
+    "host",
+    "hostbasedacceptedalgorithms",
+    "hostbasedauthentication",
+    "hostkeyalias",
+    "hostkeyalgorithms",
+    "hostname",
+    "identitiesonly",
+    "identityagent",
+    "identityfile",
+    "ipqos",
+    "kbdinteractiveauthentication",
+    "kexalgorithms",
+    "knownhostscommand",
+    "localcommand",
+    "localforward",
+    "loglevel",
+    "logverbose",
+    "macs",
+    "nohostauthenticationforlocalhost",
+    "nohostauthenticationforproxycommand",
+    "numberofpasswordprompts",
+    "obscurekeystroketiming",
+    "passwordauthentication",
+    "permitlocalcommand",
+    "permitremoteopen",
+    "pkcs11provider",
+    "port",
+    "preferredauthentications",
+    "proxycommand",
+    "proxyjump",
+    "proxyusefdpass",
+    "pubkeyacceptedalgorithms",
+    "pubkeyauthentication",
+    "rekeylimit",
+    "remotecommand",
+    "remoteforward",
+    "requesttty",
+    "requiredrsasize",
+    "revokedhostkeys",
+    "securitykeyprovider",
+    "sendenv",
+    "serveralivecountmax",
+    "serveraliveinterval",
+    "sessiontype",
+    "setenv",
+    "stdinnull",
+    "streamlocalbindmask",
+    "streamlocalbindunlink",
+    "stricthostkeychecking",
+    "syslogfacility",
+    "tcpkeepalive",
+    "tunnel",
+    "tunneldevice",
+    "updatehostkeys",
+    "user",
+    "userknownhostsfile",
+    "verifyhostkeydns",
+    "visualhostkey",
+    "warnweakcrypto",
+    "xauthlocation",
+];
 
 #[derive(Debug, PartialEq, Eq)]
 struct ProxyProcessSpec {
     program: PathBuf,
     args: Vec<OsString>,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct SshEscapeOutput {
+    bytes: Vec<u8>,
+    disconnect: bool,
+    show_help: bool,
+}
+
+struct SshEscapeFilter {
+    escape_char: Option<u8>,
+    at_line_start: bool,
+    pending_escape: bool,
+}
+
+impl SshEscapeFilter {
+    fn new(escape_char: Option<u8>) -> Self {
+        Self {
+            escape_char,
+            at_line_start: true,
+            pending_escape: false,
+        }
+    }
+
+    fn push(&mut self, input: &[u8]) -> SshEscapeOutput {
+        let mut output = SshEscapeOutput::default();
+        let Some(escape_char) = self.escape_char else {
+            output.bytes.extend_from_slice(input);
+            return output;
+        };
+        for &byte in input {
+            if self.pending_escape {
+                self.pending_escape = false;
+                match byte {
+                    b'.' => {
+                        output.disconnect = true;
+                        break;
+                    }
+                    b'?' => {
+                        output.show_help = true;
+                        self.at_line_start = true;
+                    }
+                    byte if byte == escape_char => {
+                        output.bytes.push(byte);
+                        self.at_line_start = false;
+                    }
+                    byte => {
+                        output.bytes.push(escape_char);
+                        output.bytes.push(byte);
+                        self.at_line_start = matches!(byte, b'\r' | b'\n');
+                    }
+                }
+                continue;
+            }
+            if self.at_line_start && byte == escape_char {
+                self.pending_escape = true;
+                continue;
+            }
+            output.bytes.push(byte);
+            self.at_line_start = matches!(byte, b'\r' | b'\n');
+        }
+        output
+    }
+
+    fn finish(&mut self) -> Vec<u8> {
+        if self.pending_escape {
+            self.pending_escape = false;
+            self.at_line_start = false;
+            self.escape_char.into_iter().collect()
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 /// libssh2 需要一个双向 socket。ProxyCommand 使用 stdin/stdout 传输 SSH 字节流，
@@ -332,6 +519,7 @@ pub fn run_session_worker(args: &RustSshSessionArgs) -> Result<i32> {
         &session_gate,
         config.server_alive_interval,
         config.server_alive_count_max,
+        config.escape_char,
     );
     running.store(false, Ordering::Release);
     if let Some(broker_thread) = broker_thread {
@@ -511,6 +699,12 @@ fn parse_openssh_config(stdout: &str) -> Result<OpenSshConfig> {
         single.entry(key).or_insert(value);
     }
 
+    for key in single.keys() {
+        if !RECOGNIZED_OPENSSH_CONFIG_KEYS.contains(&key.as_str()) {
+            bail!("unrecognized OpenSSH configuration requires the native SSH fallback");
+        }
+    }
+
     for unsupported in [
         "remotecommand",
         "localcommand",
@@ -549,7 +743,7 @@ fn parse_openssh_config(stdout: &str) -> Result<OpenSshConfig> {
             bail!("OpenSSH option requires the native SSH fallback");
         }
     }
-    for unsupported in ["localforward", "remoteforward"] {
+    for unsupported in ["dynamicforward", "localforward", "remoteforward"] {
         if multiple
             .get(unsupported)
             .is_some_and(|values| !values.is_empty())
@@ -613,10 +807,15 @@ fn parse_openssh_config(stdout: &str) -> Result<OpenSshConfig> {
         ("forkafterauthentication", &["no"][..]),
         ("tunnel", &["false", "no"][..]),
         ("channeltimeout", &["none"][..]),
-        ("escapechar", &["~"][..]),
         ("loglevel", &["INFO"][..]),
         ("logverbose", &["none"][..]),
         ("rekeylimit", &["0 0"][..]),
+        ("canonicalizehostname", &["false", "no"][..]),
+        ("controlpath", &["none"][..]),
+        ("controlpersist", &["false", "no", "0"][..]),
+        ("obscurekeystroketiming", &["false", "no"][..]),
+        ("updatehostkeys", &["false", "no"][..]),
+        ("warnweakcrypto", &["false", "no"][..]),
     ] {
         if single.get(key).is_some_and(|value| {
             !allowed
@@ -704,6 +903,16 @@ fn parse_openssh_config(stdout: &str) -> Result<OpenSshConfig> {
         .filter_map(|value| value.split_once('='))
         .map(|(name, value)| (name.to_string(), value.to_string()))
         .collect();
+    let interactive_ip_qos = single
+        .get("ipqos")
+        .map(|value| parse_ip_qos(value))
+        .transpose()?
+        .flatten();
+    let escape_char = single
+        .get("escapechar")
+        .map(|value| parse_escape_char(value))
+        .transpose()?
+        .unwrap_or(Some(b'~'));
 
     Ok(OpenSshConfig {
         hostname,
@@ -740,6 +949,7 @@ fn parse_openssh_config(stdout: &str) -> Result<OpenSshConfig> {
         preferred_authentications,
         kex_algorithms: single.get("kexalgorithms").cloned(),
         host_key_algorithms: single.get("hostkeyalgorithms").cloned(),
+        pubkey_accepted_algorithms: single.get("pubkeyacceptedalgorithms").cloned(),
         ciphers: single.get("ciphers").cloned(),
         macs: single.get("macs").cloned(),
         compression: single
@@ -751,6 +961,7 @@ fn parse_openssh_config(stdout: &str) -> Result<OpenSshConfig> {
             .get("addressfamily")
             .cloned()
             .unwrap_or_else(|| "any".to_string()),
+        interactive_ip_qos,
         connect_timeout,
         connection_attempts,
         tcp_keep_alive: single
@@ -758,6 +969,7 @@ fn parse_openssh_config(stdout: &str) -> Result<OpenSshConfig> {
             .is_none_or(|value| value.eq_ignore_ascii_case("yes")),
         server_alive_interval,
         server_alive_count_max,
+        escape_char,
         send_env: multiple
             .get("sendenv")
             .into_iter()
@@ -767,6 +979,79 @@ fn parse_openssh_config(stdout: &str) -> Result<OpenSshConfig> {
             .collect(),
         set_env,
     })
+}
+
+fn parse_escape_char(value: &str) -> Result<Option<u8>> {
+    if value.eq_ignore_ascii_case("none") {
+        return Ok(None);
+    }
+    let bytes = value.as_bytes();
+    match bytes {
+        [byte] if byte.is_ascii() => Ok(Some(*byte)),
+        [b'^', b'?'] => Ok(Some(0x7f)),
+        [b'^', control] if control.is_ascii() => {
+            let control = control.to_ascii_uppercase();
+            if (b'@'..=b'_').contains(&control) {
+                Ok(Some(control & 0x1f))
+            } else {
+                bail!("EscapeChar requires the native SSH fallback")
+            }
+        }
+        _ => bail!("EscapeChar requires the native SSH fallback"),
+    }
+}
+
+fn parse_ip_qos(value: &str) -> Result<Option<u8>> {
+    let values = value.split_whitespace().collect::<Vec<_>>();
+    if !(1..=2).contains(&values.len()) {
+        bail!("IPQoS requires the native SSH fallback");
+    }
+    let interactive = parse_ip_qos_value(values[0])?;
+    if let Some(non_interactive) = values.get(1) {
+        parse_ip_qos_value(non_interactive)?;
+    }
+    Ok(interactive)
+}
+
+fn parse_ip_qos_value(value: &str) -> Result<Option<u8>> {
+    let value = value.to_ascii_lowercase();
+    if value == "none" {
+        return Ok(None);
+    }
+    let dscp = match value.as_str() {
+        "af11" => 10,
+        "af12" => 12,
+        "af13" => 14,
+        "af21" => 18,
+        "af22" => 20,
+        "af23" => 22,
+        "af31" => 26,
+        "af32" => 28,
+        "af33" => 30,
+        "af41" => 34,
+        "af42" => 36,
+        "af43" => 38,
+        "cs0" => 0,
+        "cs1" => 8,
+        "cs2" => 16,
+        "cs3" => 24,
+        "cs4" => 32,
+        "cs5" => 40,
+        "cs6" => 48,
+        "cs7" => 56,
+        "ef" => 46,
+        "le" => 1,
+        // 旧版 OpenSSH 接受的 IPv4 ToS 名称；换算成等价 DSCP。
+        "lowdelay" => 4,
+        "throughput" => 2,
+        "reliability" => 1,
+        numeric => numeric
+            .parse::<u8>()
+            .ok()
+            .filter(|value| *value <= 63)
+            .context("IPQoS requires the native SSH fallback")?,
+    };
+    Ok(Some(dscp << 2))
 }
 
 fn optional_config(config: &HashMap<String, String>, key: &str) -> Option<String> {
@@ -1237,6 +1522,10 @@ fn apply_session_preferences(session: &Session, config: &OpenSshConfig) -> Resul
     for (method, preferences) in [
         (MethodType::Kex, config.kex_algorithms.as_deref()),
         (MethodType::HostKey, config.host_key_algorithms.as_deref()),
+        (
+            MethodType::SignAlgo,
+            config.pubkey_accepted_algorithms.as_deref(),
+        ),
         (MethodType::CryptCs, config.ciphers.as_deref()),
         (MethodType::CryptSc, config.ciphers.as_deref()),
         (MethodType::MacCs, config.macs.as_deref()),
@@ -1345,15 +1634,9 @@ fn connect_tcp(config: &OpenSshConfig) -> Result<TcpStream> {
     let mut last_error = None;
     for _ in 0..config.connection_attempts {
         for address in &addresses {
-            let result = match config.connect_timeout {
-                Some(timeout) => TcpStream::connect_timeout(address, timeout),
-                None => TcpStream::connect(address),
-            };
+            let result = connect_tcp_address(config, *address);
             match result {
-                Ok(stream) => {
-                    socket2::SockRef::from(&stream).set_keepalive(config.tcp_keep_alive)?;
-                    return Ok(stream);
-                }
+                Ok(stream) => return Ok(stream),
                 Err(error) => last_error = Some(error),
             }
         }
@@ -1361,6 +1644,72 @@ fn connect_tcp(config: &OpenSshConfig) -> Result<TcpStream> {
     Err(last_error
         .map(anyhow::Error::from)
         .unwrap_or_else(|| anyhow!("failed to connect to SSH host")))
+}
+
+fn connect_tcp_address(config: &OpenSshConfig, address: SocketAddr) -> io::Result<TcpStream> {
+    let socket = Socket::new(
+        Domain::for_address(address),
+        Type::STREAM,
+        Some(Protocol::TCP),
+    )?;
+    socket.set_keepalive(config.tcp_keep_alive)?;
+    if let Some(tos) = config.interactive_ip_qos {
+        // OpenSSH 将 IPQoS 作为 best-effort socket hint；平台拒绝 DSCP 时
+        // 连接仍应继续，不能把普通 SSH 变成不可用。
+        let _ = set_socket_ip_qos(&socket, address, tos);
+    }
+    match config.connect_timeout {
+        Some(timeout) => socket.connect_timeout(&SockAddr::from(address), timeout)?,
+        None => socket.connect(&SockAddr::from(address))?,
+    }
+    Ok(socket.into())
+}
+
+#[cfg(unix)]
+fn set_socket_ip_qos(socket: &Socket, address: SocketAddr, tos: u8) -> io::Result<()> {
+    let (level, option) = if address.is_ipv4() {
+        (libc::IPPROTO_IP, libc::IP_TOS)
+    } else {
+        (libc::IPPROTO_IPV6, libc::IPV6_TCLASS)
+    };
+    let value = i32::from(tos);
+    let result = unsafe {
+        libc::setsockopt(
+            socket.as_raw_fd(),
+            level,
+            option,
+            std::ptr::from_ref(&value).cast(),
+            std::mem::size_of_val(&value) as libc::socklen_t,
+        )
+    };
+    if result == -1 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+fn set_socket_ip_qos(socket: &Socket, address: SocketAddr, tos: u8) -> io::Result<()> {
+    let (level, option) = if address.is_ipv4() {
+        (IPPROTO_IP.0, IP_TOS)
+    } else {
+        (IPPROTO_IPV6.0, IPV6_TCLASS)
+    };
+    let value = i32::from(tos).to_ne_bytes();
+    let result = unsafe {
+        setsockopt(
+            SOCKET(socket.as_raw_socket() as usize),
+            level,
+            option,
+            Some(&value),
+        )
+    };
+    if result == SOCKET_ERROR {
+        Err(io::Error::from_raw_os_error(unsafe { WSAGetLastError() }.0))
+    } else {
+        Ok(())
+    }
 }
 
 fn verify_host_key(session: &Session, config: &OpenSshConfig, prompted: &mut bool) -> Result<()> {
@@ -1725,6 +2074,7 @@ fn bridge_interactive_channel(
     session_gate: &SessionGate,
     server_alive_interval: Option<Duration>,
     server_alive_count_max: u32,
+    escape_char: Option<u8>,
 ) -> Result<i32> {
     let (input_tx, input_rx) = mpsc::channel::<Option<Vec<u8>>>();
     thread::spawn(move || {
@@ -1755,12 +2105,32 @@ fn bridge_interactive_channel(
     let mut next_resize_poll = Instant::now() + RESIZE_POLL_INTERVAL;
     let mut next_keepalive = server_alive_interval.map(|interval| Instant::now() + interval);
     let mut keepalive_failures = 0_u32;
+    let mut escape_filter = SshEscapeFilter::new(escape_char);
+    let mut local_disconnect = false;
     loop {
         let mut progressed = false;
         while let Ok(input) = input_rx.try_recv() {
             match input {
-                Some(bytes) => pending.push_back(bytes),
-                None => stdin_eof = true,
+                Some(bytes) => {
+                    let output = escape_filter.push(&bytes);
+                    if !output.bytes.is_empty() {
+                        pending.push_back(output.bytes);
+                    }
+                    if output.show_help {
+                        print_ssh_escape_help()?;
+                    }
+                    if output.disconnect {
+                        local_disconnect = true;
+                        break;
+                    }
+                }
+                None => {
+                    let bytes = escape_filter.finish();
+                    if !bytes.is_empty() {
+                        pending.push_back(bytes);
+                    }
+                    stdin_eof = true;
+                }
             }
             progressed = true;
         }
@@ -1770,6 +2140,9 @@ fn bridge_interactive_channel(
             &mut pending_offset,
             session_gate,
         )?;
+        if local_disconnect && pending.is_empty() {
+            return Ok(0);
+        }
         if stdin_eof && pending.is_empty() && !sent_eof {
             let _guard = lock_session_gate(session_gate);
             match channel.send_eof() {
@@ -1844,6 +2217,14 @@ fn bridge_interactive_channel(
             thread::sleep(POLL_INTERVAL);
         }
     }
+}
+
+fn print_ssh_escape_help() -> io::Result<()> {
+    let mut stderr = io::stderr().lock();
+    stderr.write_all(
+        b"\r\nSupported InfiniShell SSH escape sequences:\r\n  ~.  disconnect\r\n  ~~  send the escape character\r\n  ~?  show this help\r\n",
+    )?;
+    stderr.flush()
 }
 
 fn terminal_dimensions() -> (u32, u32) {
