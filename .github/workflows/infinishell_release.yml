@@ -3,14 +3,14 @@
 # 与上游 create_release.yml 的差异:
 # - CI 客户端仅构建 macOS Intel + Windows x64 + Linux x86_64;macOS arm64
 #   在本地签名机使用 Developer ID 构建、公证后加入同一个 Draft Release。
-#   remote-server 仍构建 macOS/Linux 双架构,确保所有客户端内置完整远端能力。
+#   remote-server 构建 macOS/Linux/Windows 双架构,确保所有客户端内置完整远端能力。
 # - 单 channel: oss(由 release_configurations.json 提供配置)
 # - 不签名:不传 --read-passwords-from-env(macOS) / 不设 SIGN_TOOL_CMD(Windows)
 # - 不上传 GCS / 第三方 crash 平台 / Slack / changelog,不调 channel-versions repository_dispatch
 # - 复用 ./.github/actions/{prepare_environment,get_channel_config}
 #
 # 流水线结构(先打包后发布,避免出现空 Release):
-#   prepare_metadata → release_remote_server_{macos,linux}
+#   prepare_metadata → release_remote_server_{macos,linux,windows}
 #                    → bundle_remote_server_resources
 #                    → release_{macos,windows,linux} (内置 remote-server 后打包)
 #                    → publish_release (全部 CI build 成功后创建 Draft Release)
@@ -290,6 +290,68 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  release_remote_server_windows:
+    name: Build remote-server (Windows ${{ matrix.arch }})
+    runs-on: windows-latest
+    needs: prepare_metadata
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            bundle_arch: x64
+            rust_target: x86_64-pc-windows-msvc
+          - arch: aarch64
+            bundle_arch: arm64
+            rust_target: aarch64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ needs.prepare_metadata.outputs.release_branch }}
+
+      - uses: ./.github/actions/prepare_environment
+        with:
+          target_os: windows
+          cache_key: remote-server-windows-${{ matrix.arch }}
+          is_self_hosted: false
+          install_release_deps: true
+
+      - name: Test remote-server packaging script
+        run: ./script/windows/test_package_remote_server.ps1
+        shell: pwsh
+
+      - name: Ensure rust target is installed
+        run: rustup target add ${{ matrix.rust_target }}
+        shell: pwsh
+
+      - name: Build CLI
+        id: bundle_cli
+        run: >-
+          ./script/windows/bundle.ps1
+          -Channel $env:CHANNEL
+          -Artifact cli
+          -Arch ${{ matrix.bundle_arch }}
+        shell: pwsh
+        env:
+          GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
+
+      - name: Package remote-server zip
+        run: >-
+          ./script/windows/package_remote_server.ps1
+          -BinaryPath '${{ steps.bundle_cli.outputs.binary_path }}'
+          -ResourcesDirectory '${{ steps.bundle_cli.outputs.bundled_resources_dir }}'
+          -DestinationPath 'infinishell-windows-${{ matrix.arch }}.zip'
+        shell: pwsh
+
+      - name: Upload remote-server artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: infinishell-cli-windows-${{ matrix.arch }}
+          path: infinishell-windows-${{ matrix.arch }}.zip
+          if-no-files-found: error
+          retention-days: 7
+
   bundle_remote_server_resources:
     name: Prepare bundled remote-server resources
     runs-on: ubuntu-latest
@@ -297,10 +359,15 @@ jobs:
       - prepare_metadata
       - release_remote_server_macos
       - release_remote_server_linux
+      - release_remote_server_windows
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: ${{ needs.prepare_metadata.outputs.release_branch }}
+
+      - name: Test remote-server manifest script
+        run: python3 -m unittest script/test_prepare_bundled_remote_server_resources.py
+        shell: bash
 
       - name: Download remote-server artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0

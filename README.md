@@ -31,8 +31,12 @@ default. No account. No mandatory cloud.
   leave your machine.
 - 🤖 **Third-party CLI agents** — DeepSeek-TUI, Codex CLI, Claude Code and
   Google Antigravity (`agy`) wired into Blocks and the notification center.
-- 🖥️ **Built-in SSH host manager** — manage hosts, configs and sessions inside
-  the terminal, with tmux integration and per-machine agent memory.
+- 🖥️ **Cross-platform enhanced SSH** — manage hosts, configs and sessions
+  inside the terminal, with shell integration and remote-server support across
+  macOS, Linux and Windows clients and POSIX or Windows PowerShell remotes.
+  Existing OpenSSH configurations, including ProxyJump/ProxyCommand, remain
+  usable through compatibility handling and safe native fallback. See
+  [below](#cross-platform-ssh-extension).
 - 🗂️ **Project-scoped agent mode** — group SSH servers, a Git repo and ops
   rules into a project; agent conversations pick up the project context
   automatically, run commands on project hosts, and fan out across hosts
@@ -46,6 +50,29 @@ default. No account. No mandatory cloud.
 - 🔒 **Privacy by default** — no account, no login, no Drive sync, no cloud
   agent history. Cloud Agent / Computer Use / telemetry are off by default;
   most of the reporting code paths are removed outright.
+
+## Cross-platform SSH extension
+
+InfiniShell now selects the bootstrap for the detected remote shell instead of
+assuming every SSH server is POSIX. This preserves the existing OpenSSH-based
+flow while extending interactive SSH sessions to Windows OpenSSH servers and
+enabling Windows clients to use the same remote-server features.
+
+| Client | POSIX remote (`bash` / `zsh`) | Windows remote (PowerShell) |
+|---|---|---|
+| macOS / Linux | Existing OpenSSH ControlMaster flow | Versioned capability probe and PowerShell bootstrap |
+| Windows | Rust SSH worker and POSIX bootstrap | Rust SSH worker and PowerShell bootstrap |
+
+The enhanced path is limited to compatible interactive, single-destination
+sessions. Port forwarding, remote commands, unsupported authentication or host
+key policies, and other SSH modes continue through the user's native OpenSSH
+unchanged. The Windows worker reuses one authenticated target session for the
+remote-shell probe, interactive terminal and remote-server command channels;
+its newer `russh` backend is separately gated while compatibility matures.
+
+Architecture, compatibility boundaries, verification commands and the
+post-merge observation checklist are documented in the
+[cross-platform SSH transport guide](docs/cross-platform-ssh-transport.md).
 
 ## Project-scoped agent ops
 

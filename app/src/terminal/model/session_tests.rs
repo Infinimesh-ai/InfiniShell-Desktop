@@ -6,7 +6,11 @@ use warpui::platform::WindowStyle;
 use warpui::{App, AppContext, Element, Entity, ModelHandle, TypedActionView, View, ViewContext};
 
 use super::command_executor::testing::TestCommandExecutor;
-use super::{BootstrapSessionType, Session, SessionId, SessionInfo, Sessions, SessionsEvent};
+use super::{
+    BootstrapSessionType, ControlMasterOwnership, Session, SessionId, SessionInfo, Sessions,
+    SessionsEvent, SshSessionTransportDescriptor,
+};
+use crate::terminal::model::ansi::{SSHValue, SshTransportValue};
 
 struct TestView {
     events: Vec<SessionsEvent>,
@@ -37,6 +41,146 @@ impl TestView {
         });
         Self { events: Vec::new() }
     }
+}
+
+#[test]
+fn legacy_ssh_transport_maps_to_control_master() {
+    let value = SSHValue {
+        socket_path: Some("/tmp/warp-control".into()),
+        external_control_master: true,
+        ..Default::default()
+    };
+
+    assert_eq!(
+        SshSessionTransportDescriptor::from_ssh_value(&value),
+        SshSessionTransportDescriptor::ControlMaster {
+            socket_path: "/tmp/warp-control".into(),
+            ownership: ControlMasterOwnership::UserOwned,
+        }
+    );
+}
+
+#[test]
+fn versioned_ssh_transport_accepts_consistent_legacy_fields() {
+    let value = SSHValue {
+        socket_path: Some("/tmp/warp-control".into()),
+        transport: Some(SshTransportValue {
+            version: 1,
+            transport_type: "control_master".to_owned(),
+            socket_path: Some("/tmp/warp-control".into()),
+            ownership: Some("warp_managed".to_owned()),
+            endpoint: None,
+            capability: None,
+        }),
+        ..Default::default()
+    };
+
+    assert_eq!(
+        SshSessionTransportDescriptor::from_ssh_value(&value),
+        SshSessionTransportDescriptor::ControlMaster {
+            socket_path: "/tmp/warp-control".into(),
+            ownership: ControlMasterOwnership::WarpManaged,
+        }
+    );
+}
+
+#[test]
+fn conflicting_or_unknown_ssh_transport_is_unavailable() {
+    let conflicting = SSHValue {
+        socket_path: Some("/tmp/legacy-control".into()),
+        transport: Some(SshTransportValue {
+            version: 1,
+            transport_type: "control_master".to_owned(),
+            socket_path: Some("/tmp/new-control".into()),
+            ownership: Some("warp_managed".to_owned()),
+            endpoint: None,
+            capability: None,
+        }),
+        ..Default::default()
+    };
+    let unknown_version = SSHValue {
+        transport: Some(SshTransportValue {
+            version: 2,
+            transport_type: "control_master".to_owned(),
+            socket_path: Some("/tmp/warp-control".into()),
+            ownership: Some("warp_managed".to_owned()),
+            endpoint: None,
+            capability: None,
+        }),
+        ..Default::default()
+    };
+
+    assert_eq!(
+        SshSessionTransportDescriptor::from_ssh_value(&conflicting),
+        SshSessionTransportDescriptor::Unavailable
+    );
+    assert_eq!(
+        SshSessionTransportDescriptor::from_ssh_value(&unknown_version),
+        SshSessionTransportDescriptor::Unavailable
+    );
+}
+
+#[test]
+fn versioned_ssh_transport_accepts_loopback_rust_broker() {
+    let capability = "ab".repeat(32);
+    let value = SSHValue {
+        transport: Some(SshTransportValue {
+            version: 1,
+            transport_type: "rust_broker".to_owned(),
+            socket_path: None,
+            ownership: None,
+            endpoint: Some("127.0.0.1:49152".to_owned()),
+            capability: Some(capability.clone()),
+        }),
+        ..Default::default()
+    };
+
+    let descriptor = SshSessionTransportDescriptor::from_ssh_value(&value);
+    let debug = format!("{descriptor:?}");
+    assert!(!debug.contains(&capability));
+    assert!(debug.contains("<redacted>"));
+    assert_eq!(
+        descriptor,
+        SshSessionTransportDescriptor::RustBroker {
+            endpoint: "127.0.0.1:49152".to_owned(),
+            capability,
+        }
+    );
+}
+
+#[test]
+fn rust_broker_rejects_non_loopback_or_malformed_capability() {
+    for (endpoint, capability) in [
+        ("192.0.2.1:22", "ab".repeat(32)),
+        ("127.0.0.1:49152", "not-a-capability".to_owned()),
+    ] {
+        let value = SSHValue {
+            transport: Some(SshTransportValue {
+                version: 1,
+                transport_type: "rust_broker".to_owned(),
+                socket_path: None,
+                ownership: None,
+                endpoint: Some(endpoint.to_owned()),
+                capability: Some(capability),
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            SshSessionTransportDescriptor::from_ssh_value(&value),
+            SshSessionTransportDescriptor::Unavailable
+        );
+    }
+}
+
+#[test]
+fn unavailable_transport_keeps_wrapper_identity_without_remote_server_support() {
+    let wrapper = super::IsSSHWrapperSession::Yes {
+        transport: SshSessionTransportDescriptor::Unavailable,
+    };
+
+    assert!(wrapper.transport().is_some());
+    assert!(!wrapper.supports_ssh_remote_server());
+    assert!(wrapper.control_master().is_none());
 }
 
 #[test]

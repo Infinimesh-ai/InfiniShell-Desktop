@@ -317,7 +317,7 @@ impl DProtoHook {
                 }
             },
             DProtoHook::SSH { value } => match key.as_ref() {
-                "socket_path" => value.socket_path = v.into(),
+                "socket_path" => value.socket_path = Some(v.into()),
                 "remote_shell" => value.remote_shell = v,
                 "session_id" => value.session_id = v.parse::<u64>().ok(),
                 "remote_session_id" => value.remote_session_id = v.parse::<u64>().ok(),
@@ -713,9 +713,49 @@ pub struct PreInteractiveSSHSessionValue {
 
 /// Received from the pty after establishing an SSH connection, prior to
 /// bootstrapping the session.
+#[derive(PartialEq, Eq, Deserialize, Serialize, Clone)]
+pub struct SshTransportValue {
+    pub version: u64,
+    #[serde(rename = "type")]
+    pub transport_type: String,
+    #[serde(default)]
+    pub socket_path: Option<PathBuf>,
+    #[serde(default)]
+    pub ownership: Option<String>,
+    #[serde(default)]
+    pub endpoint: Option<String>,
+    /// 本机 broker 的 bearer capability。Debug 必须始终脱敏。
+    #[serde(default)]
+    pub capability: Option<String>,
+}
+
+impl std::fmt::Debug for SshTransportValue {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SshTransportValue")
+            .field("version", &self.version)
+            .field("transport_type", &self.transport_type)
+            .field("socket_path", &self.socket_path)
+            .field("ownership", &self.ownership)
+            .field("endpoint", &self.endpoint)
+            .field(
+                "capability",
+                &self.capability.as_ref().map(|_| "<redacted>"),
+            )
+            .finish()
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Eq, Deserialize, Serialize, Clone)]
 pub struct SSHValue {
-    pub socket_path: PathBuf,
+    /// 旧版 hook 只发送这个 ControlMaster 路径。新 hook 同时发送
+    /// `transport`,保留此字段是为了兼容旧客户端。
+    #[serde(default)]
+    pub socket_path: Option<PathBuf>,
+    /// 版本化的 SSH 会话传输描述。未知版本或无效内容必须安全降级为
+    /// 不可用,不能据此启动 remote-server。
+    #[serde(default)]
+    pub transport: Option<SshTransportValue>,
     pub remote_shell: String,
     #[serde(default)]
     pub session_id: HookSessionId,

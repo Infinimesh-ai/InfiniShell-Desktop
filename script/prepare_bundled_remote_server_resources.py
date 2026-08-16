@@ -13,6 +13,8 @@ ARTIFACTS = (
     ("linux", "aarch64", "infinishell-linux-aarch64.tar.gz"),
     ("macos", "x86_64", "infinishell-macos-x86_64.tar.gz"),
     ("macos", "aarch64", "infinishell-macos-aarch64.tar.gz"),
+    ("windows", "x86_64", "infinishell-windows-x86_64.zip"),
+    ("windows", "aarch64", "infinishell-windows-aarch64.zip"),
 )
 
 

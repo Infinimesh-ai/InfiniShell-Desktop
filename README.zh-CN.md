@@ -29,8 +29,11 @@
   Gemini / DeepSeek / Ollama 原生协议。API 密钥永不离开本机。
 - 🤖 **第三方 CLI agent** — DeepSeek-TUI、Codex CLI、Claude Code、Google
   Antigravity(`agy`)接入 Blocks 与通知中心。
-- 🖥️ **内置 SSH 主机管理器** — 在终端内管理主机、配置与会话,支持 tmux 集成
-  与按机器隔离的 agent 记忆。
+- 🖥️ **跨平台 SSH 增强** — 在终端内管理主机、配置与会话,并为
+  macOS、Linux、Windows 客户端连接 POSIX 或 Windows PowerShell 远端
+  提供 shell 集成与 remote-server。原有 OpenSSH 配置(包括
+  ProxyJump/ProxyCommand)继续通过兼容处理和安全原生回退保留。详见
+  [下文](#跨平台-ssh-扩展)。
 - 🗂️ **项目级 Agent 模式** — 用「项目」组织 SSH 服务器、Git 仓库与运维规则;
   Agent 对话自动携带项目上下文,可在项目主机上执行命令,并支持金丝雀先行的
   跨主机批量执行。详见[下文](#项目级-agent-运维)。
@@ -40,6 +43,27 @@
   渲染修复(软换行光标、粗体亚像素)。
 - 🔒 **隐私默认** — 无账号、无登录、无 Drive 同步、无云端 agent 历史。
   Cloud Agent / Computer Use / 遥测默认关闭,且大部分上报代码路径被物理移除。
+
+## 跨平台 SSH 扩展
+
+InfiniShell 现在会根据已识别的远端 shell 选择 bootstrap,不再假设所有
+SSH 服务端都是 POSIX。这既保留了原有基于 OpenSSH 的连接方式,也将
+交互式 SSH 扩展到 Windows OpenSSH 服务端,并让 Windows 客户端能使用
+同样的 remote-server 能力。
+
+| 客户端 | POSIX 远端(`bash` / `zsh`) | Windows 远端(PowerShell) |
+|---|---|---|
+| macOS / Linux | 原有 OpenSSH ControlMaster 链路 | 版本化能力探测 + PowerShell bootstrap |
+| Windows | Rust SSH worker + POSIX bootstrap | Rust SSH worker + PowerShell bootstrap |
+
+增强链路只处理兼容的、交互式的单目标会话。端口转发、远端命令、
+尚未支持的认证或主机密钥策略,以及其他 SSH 模式仍原样交给用户的
+原生 OpenSSH。Windows worker 在一个已认证的目标 session 内复用远端
+shell 探测、交互终端与 remote-server 命令 channel;新的 `russh` 后端仍单独
+受开关控制,便于在兼容性成熟前分阶段放量。
+
+架构、兼容边界、验证命令与合并后观察清单见
+[跨平台 SSH transport 技术文档](docs/cross-platform-ssh-transport.zh-CN.md)。
 
 ## 项目级 Agent 运维
 

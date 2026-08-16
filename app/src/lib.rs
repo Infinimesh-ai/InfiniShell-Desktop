@@ -335,14 +335,14 @@ pub(crate) enum LaunchMode {
         is_integration_test: bool,
     },
 
-    /// Remote server proxy — bridges SSH stdio to the daemon's Unix socket.
+    /// Remote server proxy — bridges SSH stdio to the daemon's local IPC endpoint.
     /// This is a short-lived process that runs for the lifetime of an SSH session.
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     RemoteServerProxy,
 
     /// Remote server daemon — long-lived headless process serving remote
-    /// connections via a Unix domain socket.
-    #[cfg_attr(not(unix), allow(dead_code))]
+    /// connections via a Unix domain socket or Windows named pipe.
+    #[cfg_attr(not(any(unix, windows)), allow(dead_code))]
     RemoteServerDaemon {
         /// Stable identity key used to partition the daemon's socket/PID
         /// directory on the remote host.
@@ -804,6 +804,30 @@ fn run_worker_command(worker: &warp_cli::WorkerCommand) -> Result<()> {
             // Daemon handles its own full initialization (including
             // initialize_app and crash reporting) inside run_daemon_app.
             crate::remote_server::run_daemon(args.identity_key.clone())
+        }
+        #[cfg(not(target_family = "wasm"))]
+        warp_cli::WorkerCommand::RustSshSession(args) => {
+            #[cfg(windows)]
+            warp_util::windows::attach_to_parent_console();
+            match crate::remote_server::rust_ssh::run_session_worker(args) {
+                Ok(exit_code) => std::process::exit(exit_code),
+                Err(_) => {
+                    eprintln!("InfiniShell could not start the SSH session.");
+                    std::process::exit(255);
+                }
+            }
+        }
+        #[cfg(not(target_family = "wasm"))]
+        warp_cli::WorkerCommand::RustSshBrokerCommand(args) => {
+            #[cfg(windows)]
+            warp_util::windows::attach_to_parent_console();
+            match crate::remote_server::rust_ssh::run_broker_command(args) {
+                Ok(exit_code) => std::process::exit(exit_code),
+                Err(_) => {
+                    eprintln!("InfiniShell SSH broker command failed.");
+                    std::process::exit(255);
+                }
+            }
         }
         #[cfg(not(target_family = "wasm"))]
         warp_cli::WorkerCommand::RipgrepSearch {
@@ -2769,14 +2793,18 @@ fn launch(ctx: &mut warpui::AppContext, app_state: Option<AppState>, launch_mode
             report_error!("Proxy mode should not use the launch() path");
             std::process::exit(1);
         }
-        // Daemon: bind the Unix socket and register the ServerModel.
+        // Daemon: bind the platform IPC endpoint and register the ServerModel.
         // initialize_app already set up everything else including crash
         // reporting.
         #[cfg(unix)]
         LaunchMode::RemoteServerDaemon { identity_key } => {
             remote_server::unix::launch_daemon(&identity_key, ctx);
         }
-        #[cfg(not(unix))]
+        #[cfg(windows)]
+        LaunchMode::RemoteServerDaemon { identity_key } => {
+            remote_server::windows::launch_daemon(&identity_key, ctx);
+        }
+        #[cfg(not(any(unix, windows)))]
         LaunchMode::RemoteServerDaemon { .. } => {
             report_error!("RemoteServerDaemon is not supported on this platform");
             std::process::exit(1);

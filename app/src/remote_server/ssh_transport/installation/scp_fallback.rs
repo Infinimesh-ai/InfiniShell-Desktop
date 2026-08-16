@@ -26,7 +26,7 @@ const REMOTE_SERVER_TARBALL_DOWNLOAD_RETRY_DELAY: Duration = Duration::from_mill
 
 /// Exit codes where SCP fallback would not help because the failure is on the
 /// remote host itself, not a network/download issue.
-pub(super) fn should_try_install(error: &Error) -> bool {
+pub(in crate::remote_server::ssh_transport) fn should_try_install(error: &Error) -> bool {
     !matches!(error, Error::ScriptFailed { exit_code, .. } if *exit_code == 2)
 }
 
@@ -134,7 +134,7 @@ async fn install_tarball(socket_path: &Path, client_tarball_path: &Path) -> Resu
     }
 }
 
-async fn bundled_remote_server_tarball(
+pub(in crate::remote_server::ssh_transport) async fn bundled_remote_server_tarball(
     platform: &RemotePlatform,
 ) -> anyhow::Result<Option<PathBuf>> {
     let Some(resources_dir) = warp_core::paths::bundled_resources_dir() else {
@@ -261,7 +261,9 @@ async fn is_valid_cached_tarball(path: &Path) -> bool {
 ///
 /// Reuses an existing cached tarball when available; otherwise downloads the
 /// tarball into the cache and returns the newly cached path.
-async fn cached_remote_server_tarball(platform: &RemotePlatform) -> anyhow::Result<PathBuf> {
+pub(in crate::remote_server::ssh_transport) async fn cached_remote_server_tarball(
+    platform: &RemotePlatform,
+) -> anyhow::Result<PathBuf> {
     let cache_path = remote_server_tarball_cache_path(platform);
     if is_valid_cached_tarball(&cache_path).await {
         log::info!(

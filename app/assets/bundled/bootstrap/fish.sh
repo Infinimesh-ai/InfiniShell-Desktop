@@ -628,6 +628,51 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"
         end
     end
 
+    function warp_powershell_encoded_command
+        if not command -sq iconv; or not command -sq base64
+            return 1
+        end
+
+        set -l encoded_command (printf '%s' "$argv[1]" | command iconv -f UTF-8 -t UTF-16LE | command base64 | command tr -d '\r\n')
+        or return 1
+        if test -z "$encoded_command"
+            return 1
+        end
+        printf 'powershell.exe -NoLogo %s-EncodedCommand %s' "$argv[2]" "$encoded_command"
+    end
+
+    function warp_windows_powershell_capability_probe_command
+        set -l probe_script "\$os=if(\$PSVersionTable.PSVersion.Major -le 5 -or \$IsWindows -or \$env:OS -eq 'Windows_NT'){'windows'}else{'unknown'};[Console]::Out.WriteLine('__WARP_REMOTE_CAPS__v=1;os={0};shell=powershell' -f \$os)"
+        warp_powershell_encoded_command "$probe_script" '-NoProfile -NonInteractive '
+    end
+
+    function warp_windows_powershell_bootstrap_command
+        set -l remote_session_id "$argv[1]"
+        set -l ssh_hook_hex "$argv[2]"
+        set -l client_version "$argv[3]"
+        set -l protocol_version "$argv[4]"
+        set -l init_shell_hex '@@WARP_WINDOWS_REMOTE_INIT_SHELL_HEX@@'
+
+        if not string match --quiet --regex '^[A-Za-z0-9._+-]*$' -- "$client_version"
+            set client_version ''
+        end
+        if not string match --quiet --regex '^[A-Za-z0-9._+-]*$' -- "$protocol_version"
+            set protocol_version ''
+        end
+
+        set -l bootstrap_script "\$env:TERM_PROGRAM = 'WarpTerminal'
+\$env:WARP_IS_SSH = '1'
+\$env:WARP_CLIENT_VERSION = '$client_version'
+\$env:WARP_CLI_AGENT_PROTOCOL_VERSION = '$protocol_version'
+[Console]::Out.Write(([char]27) + ']9278;d;$ssh_hook_hex' + ([char]7))
+\$h = '$init_shell_hex'
+\$bytes = New-Object byte[] (\$h.Length / 2)
+for (\$i = 0; \$i -lt \$bytes.Length; \$i++) { \$bytes[\$i] = [Convert]::ToByte(\$h.Substring(\$i * 2, 2), 16) }
+\$initShell = [Text.Encoding]::UTF8.GetString(\$bytes).Replace('@@WARP_SESSION_ID@@', '$remote_session_id')
+. ([ScriptBlock]::Create(\$initShell))"
+        warp_powershell_encoded_command "$bootstrap_script" '-NoExit '
+    end
+
     function warp_ssh_helper
         set -l init_shell_zsh (warp_init_shell "zsh")
         set -l init_shell_bash (warp_init_shell "bash")
@@ -664,6 +709,7 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"
         set -l control_path "$SSH_SOCKET_DIR/$WARP_SESSION_ID"
         set -l control_master_mode "yes"
         set -l external_control_master "false"
+        set -l control_master_ownership "warp_managed"
         if test "$WARP_SSH_REUSE_CONTROL_MASTER" = "1"
             set -l user_control_path (command ssh -G $argv 2>/dev/null | command sed -n 's/^controlpath //p')
             # Skip when no ControlPath is configured, and reject resolved
@@ -679,6 +725,7 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"
                     set control_path "$user_control_path"
                     set control_master_mode "no"
                     set external_control_master "true"
+                    set control_master_ownership "user_owned"
                 end
             end
         end
@@ -710,6 +757,34 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"
                 # slave 接入,以复用该已认证连接。
                 set control_master_mode "no"
             case '*'
+                set -l remote_powershell
+                if test -z "$remote_shell"; or test "$remote_shell" = '\$SHELL'
+                    set -l capability_probe_command (warp_windows_powershell_capability_probe_command)
+                    if test -n "$capability_probe_command"
+                        set -l capability_probe_output (command ssh -o ControlMaster=no \
+                            -o ControlPath="$control_path" $argv "$capability_probe_command")
+                        set -l capability_probe_status $status
+                        if test $capability_probe_status -eq 0; and test (count $capability_probe_output) -eq 1
+                            set -l capability (string trim -- "$capability_probe_output[1]")
+                            if test "$capability" = '__WARP_REMOTE_CAPS__v=1;os=windows;shell=powershell'
+                                set remote_powershell powershell
+                            end
+                        end
+                    end
+                end
+
+                if test "$remote_powershell" = powershell
+                    set -l windows_ssh_hook (printf '{"hook": "SSH", "value": {"socket_path": "%s", "transport": {"version": 1, "type": "control_master", "socket_path": "%s", "ownership": "%s"}, "remote_shell": "pwsh", "session_id": %s, "remote_session_id": %s, "external_control_master": %s}}' "$control_path" "$control_path" "$control_master_ownership" "$WARP_SESSION_ID" "$remote_session_id" "$external_control_master" | command od -An -v -tx1 | command tr -d ' \n')
+                    set -l windows_bootstrap_command (warp_windows_powershell_bootstrap_command \
+                        "$remote_session_id" "$windows_ssh_hook" "$WARP_CLIENT_VERSION" \
+                        "$WARP_CLI_AGENT_PROTOCOL_VERSION")
+                    if test -n "$windows_bootstrap_command"
+                        command ssh -o ControlMaster=no -o ControlPath="$control_path" \
+                            -t $argv "$windows_bootstrap_command"
+                        return $status
+                    end
+                end
+
                 printf '%s\n' "InfiniShell shell integration is unavailable for this remote shell; continuing with standard SSH."
                 command ssh -o ControlMaster=no -o ControlPath="$control_path" -t $argv
                 set -l ssh_status $status
@@ -732,7 +807,7 @@ export TERM_PROGRAM='WarpTerminal'
 test -n '$WARP_CLIENT_VERSION' && export WARP_CLIENT_VERSION='$WARP_CLIENT_VERSION'
 # Only forward the protocol version if it was set locally (i.e. the HOANotifications feature flag is on).
 test -n '$WARP_CLI_AGENT_PROTOCOL_VERSION' && export WARP_CLI_AGENT_PROTOCOL_VERSION='$WARP_CLI_AGENT_PROTOCOL_VERSION'
-hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"remote_shell\": \"%s\", \"session_id\": '"$WARP_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command od -An -v -tx1 | command tr -d " \n")'"
+hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"transport\": {\"version\": 1, \"type\": \"control_master\", \"socket_path\": \"'$control_path'\", \"ownership\": \"'$control_master_ownership'\"}, \"remote_shell\": \"%s\", \"session_id\": '"$WARP_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command od -An -v -tx1 | command tr -d " \n")'"
 printf '$DCS_START$DCS_JSON_MARKER%s$DCS_END' "'$hook'"
 
 if test "'"${SHELL##*/}" != "bash" -a "${SHELL##*/}" != "zsh"'"; then

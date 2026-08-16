@@ -26,11 +26,10 @@ fn enabled_features() -> HashSet<FeatureFlag> {
     // (`cargo run`)不是 release bundle,该 flag 会一直关闭 —— 于是 SSH 会话
     // 永远退回 legacy 路径,remote-server transport 不激活,dev 模式自动构建并
     // 上传二进制(见 ssh_transport.rs)也就没有机会触发。这里在 debug 构建里
-    // 显式开启,保证开发时能联调远端文件打开 / buffer-sync。Windows 暂不支持
-    // remote-server 二进制,与 RELEASE_FLAGS 的 cfg 保持一致排除掉。
-    #[cfg(all(debug_assertions, not(windows)))]
+    // 显式开启,保证所有本地平台都能联调远端文件打开 / buffer-sync。
+    #[cfg(debug_assertions)]
     flags.insert(FeatureFlag::SshRemoteServer);
-    #[cfg(all(debug_assertions, not(windows)))]
+    #[cfg(debug_assertions)]
     flags.insert(FeatureFlag::ServerFileBrowser);
 
     // Issue #72: HTTP 代理设置页面。不走 channel 判断,所有 channel 含 infinishell
@@ -74,6 +73,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::FileBackedExecutionProfiles,
         #[cfg(feature = "rect_selection")]
         FeatureFlag::RectSelection,
+        #[cfg(feature = "russh_transport")]
+        FeatureFlag::RusshTransport,
         #[cfg(feature = "alacritty_settings_import")]
         FeatureFlag::AlacrittySettingsImport,
         #[cfg(feature = "dynamic_workflow_enums")]

@@ -8,7 +8,7 @@ Param (
 
     [Alias('check-only')]
     [Switch]$CHECK_ONLY,
-    [ValidateSet('app', 'tui')]
+    [ValidateSet('app', 'cli', 'tui')]
     [String]$ARTIFACT = 'app',
 
     [ValidateSet('local', 'dev', 'preview', 'stable', 'oss')]
@@ -80,12 +80,13 @@ $WORKSPACE_ROOT_DIR = $(Get-Location).Path
 $CARGO_TARGET_DIR = $WORKSPACE_ROOT_DIR + '\target'
 $WINDOWS_INSTALLER_DIR = $WORKSPACE_ROOT_DIR + '\script\windows'
 $IS_TUI = $ARTIFACT -eq 'tui'
+$IS_CLI = $ARTIFACT -eq 'cli'
 
 if ($DEBUG_BUILD) {
     $CARGO_PROFILE = 'dev'
-} elseif ($IS_TUI -and (("$CHANNEL" -eq 'local') -or ("$CHANNEL" -eq 'dev'))) {
+} elseif (($IS_TUI -or $IS_CLI) -and (("$CHANNEL" -eq 'local') -or ("$CHANNEL" -eq 'dev'))) {
     $CARGO_PROFILE = 'rclida'
-} elseif ($IS_TUI) {
+} elseif ($IS_TUI -or $IS_CLI) {
     $CARGO_PROFILE = 'rcli'
 } elseif (("$CHANNEL" -eq 'local') -or ("$CHANNEL" -eq 'dev')) {
     # For dev bundles, we want to enable debug assertions to
@@ -169,6 +170,10 @@ if ($IS_TUI) {
     if ("$CHANNEL" -ne 'oss') {
         $FEATURES = "$FEATURES,crash_reporting"
     }
+} elseif ($IS_CLI) {
+    # Windows remote-server 必须保留控制台 stdout，并从相邻 resources 目录读取资源。
+    # 因此不能启用会设置 windows_subsystem="windows" 的 release_bundle。
+    $FEATURES = 'standalone'
 } else {
     # All app channels ship the v3 classifier and v2 heuristic.
     $FEATURES = "$FEATURES,nld_classifier_v3,nld_heuristic_v2"
@@ -224,6 +229,13 @@ if ($CHECK_ONLY) {
         Write-Error "Failed to verify InfiniShell $WARP_BIN compilation with profile $CARGO_PROFILE"
         exit 1
     }
+    if (-not $IS_TUI -and -not $IS_CLI) {
+        cargo check -p warp --profile "$CARGO_PROFILE" --bin infinishell-ssh --features "$FEATURES,rust_ssh_worker,russh_transport" --target $PLATFORM_TARGET
+        if (-Not $?) {
+            Write-Error "Failed to verify InfiniShell SSH worker compilation with profile $CARGO_PROFILE"
+            exit 1
+        }
+    }
     exit 0
 }
 
@@ -251,9 +263,17 @@ if (-Not $SKIP_BUILD_BINARY) {
         Write-Output "Renaming executable $WARP_BIN.exe to $BINARY_NAME"
         Move-Item -Path "$binarySource" -Destination "$BINARY_PATH" -Force
     }
+
+    if (-not $IS_TUI -and -not $IS_CLI) {
+        cargo build -p warp --profile "$CARGO_PROFILE" --bin infinishell-ssh --features "$FEATURES,rust_ssh_worker,russh_transport" --target $PLATFORM_TARGET
+        if (-Not $?) {
+            Write-Error "Failed to build InfiniShell SSH worker with profile $CARGO_PROFILE"
+            exit 1
+        }
+    }
 }
 
-if ($SKIP_BUILD_INSTALLER) {
+if ($SKIP_BUILD_INSTALLER -and -not $IS_CLI) {
     # If this is being run within a GitHub action, set an output variable with the
     # location of the binary so it can be referenced by subsequent actions.
     if ($env:GITHUB_ACTIONS -eq 'true') {
@@ -291,6 +311,19 @@ if ($PLATFORM_TARGET -eq $HOST_TARGET) {
 if (-Not $?) {
     Write-Error 'Failed to prepare bundled resources'
     exit 1
+}
+if ($IS_CLI) {
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+        Write-Output '::echo::on'
+        $githubBinaryPath = $BINARY_PATH -replace '\\', '/'
+        $githubResourcesDirectory = $BUNDLED_RESOURCES_DIR -replace '\\', '/'
+        "binary_path=$githubBinaryPath" >> "$env:GITHUB_OUTPUT"
+        "bundled_resources_dir=$githubResourcesDirectory" >> "$env:GITHUB_OUTPUT"
+        "pdb_file_path=$PDB_PATH" >> "$env:GITHUB_OUTPUT"
+        "rust_target=$PLATFORM_TARGET" >> "$env:GITHUB_OUTPUT"
+        Write-Output '::echo::off'
+    }
+    exit 0
 }
 if ($IS_TUI) {
     $WINDOWS_ASSETS_DIR = "$WORKSPACE_ROOT_DIR\app\assets\windows\$ARCH"

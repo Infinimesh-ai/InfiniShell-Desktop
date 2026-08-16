@@ -1,12 +1,12 @@
 use super::*;
 
 #[test]
-fn enabled_support_uses_remote_server_for_ssh_wrapper_when_feature_is_enabled() {
+fn enabled_support_uses_remote_server_when_feature_and_transport_are_available() {
     assert!(SshRemoteServerSupport::Enabled.should_use_remote_server(true, true,));
 }
 
 #[test]
-fn disabled_support_skips_remote_server_for_ssh_wrapper() {
+fn disabled_support_skips_remote_server_when_transport_is_available() {
     assert!(!SshRemoteServerSupport::Disabled.should_use_remote_server(true, true,));
 }
 
@@ -16,6 +16,6 @@ fn enabled_support_skips_remote_server_when_feature_is_disabled() {
 }
 
 #[test]
-fn enabled_support_skips_remote_server_for_non_ssh_session() {
+fn enabled_support_skips_remote_server_without_transport() {
     assert!(!SshRemoteServerSupport::Enabled.should_use_remote_server(true, false,));
 }

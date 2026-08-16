@@ -129,6 +129,7 @@ bytes = { version = "1.11.1", features = ["serde"] }
 command-corrections = { git = "https://github.com/warpdotdev/command-corrections.git", rev = "eae08c8c51d9bc9741fcb17eef2c21f696aebbeb" }
 core-foundation = "0.10.1"
 concat-idents = "1.1.4"
+console = "0.15.11"
 cfg_aliases = "0.2.1"
 cfg-if = "1.0.0"
 chrono = { version = "0.4.38", features = ["serde"] }
@@ -300,6 +301,7 @@ fluent = "0.16"
 unic-langid = { version = "0.9", features = ["macros"] }
 sys-locale = "0.3"
 rustc-hash = "2.1.1"
+russh = "0.62.6"
 rustls = "0.23.39"
 schemars = { version = "1", features = ["chrono04"] }
 serde = { version = "1.0", features = ["derive", "rc"] }
@@ -309,6 +311,7 @@ serde_json = { version = "1.0", features = ["raw_value"] }
 serde_urlencoded = "0.7"
 serde_with = "^3.21"
 serde_yaml = "0.8"
+ssh2 = { version = "0.9", features = ["openssl-on-win32"] }
 similar = { version = "2.7", features = ["inline"] }
 simplelog = "0.12.2"
 smallvec = "1.6.1"
@@ -441,6 +444,7 @@ aes-gcm = "0.10"
 sha2 = "0.10"
 shell-escape = "0.1.5"
 shellexpand = "3.1.1"
+socket2 = "0.6.0"
 warp-command-signatures = { git = "https://github.com/warpdotdev/command-signatures.git", rev = "fe3526693fe4ea3dc208ee5ef892b3aad2679af6", default-features = false }
 winit = { git = "https://github.com/chenx-dust/winit.git", rev = "7ef914a440ad203da05355e6c3f8c482766987ec" }
 x11rb = "0.13.0"

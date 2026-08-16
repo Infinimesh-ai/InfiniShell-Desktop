@@ -1,10 +1,10 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use instant::Instant;
 use remote_server::auth::RemoteServerAuthContext;
 use remote_server::setup::{
-    PreinstallCheckResult, PreinstallStatus, RemoteLibc, RemotePlatform, UnsupportedReason,
+    PreinstallCheckResult, PreinstallStatus, RemoteLibc, RemoteOs, RemotePlatform,
+    UnsupportedReason,
 };
 use remote_server::transport::Error;
 use settings::Setting;
@@ -19,8 +19,11 @@ use crate::auth::AuthStateProvider;
 use crate::remote_server::auth_context::server_api_auth_context;
 use crate::remote_server::manager::{RemoteServerManager, RemoteServerManagerEvent};
 use crate::remote_server::ssh_transport::SshTransport;
-use crate::terminal::model::session::{IsSSHWrapperSession, SessionInfo};
+use crate::terminal::model::session::{
+    ControlMasterOwnership, SessionInfo, SshSessionTransportDescriptor,
+};
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
+use crate::terminal::shell::ShellType;
 use crate::terminal::warpify::settings::{SshExtensionInstallMode, WarpifySettings};
 use crate::{TelemetryEvent, send_telemetry_from_ctx};
 
@@ -198,16 +201,38 @@ impl<T: EventLoopSender> RemoteServerController<T> {
 
     /// Idle -> AwaitingCheck
     fn on_ssh_init_shell_requested(&mut self, info: SessionInfo, ctx: &mut ModelContext<Self>) {
-        let IsSSHWrapperSession::Yes {
-            socket_path,
-            external_control_master,
-        } = &info.is_ssh_wrapper_session
-        else {
+        let Some(descriptor) = info.is_ssh_wrapper_session.transport() else {
             return;
         };
         let session_id = info.session_id;
-        let socket_path = socket_path.clone();
-        let warp_owns_control_master = !external_control_master;
+        let remote_os = if info.shell.shell_type() == ShellType::PowerShell {
+            RemoteOs::Windows
+        } else {
+            // Linux 与 macOS 的 setup 命令均为 POSIX；精确平台随后在同一
+            // transport 上探测。这里的 Linux 仅作为 shell dialect hint。
+            RemoteOs::Linux
+        };
+        let transport = match descriptor {
+            SshSessionTransportDescriptor::ControlMaster {
+                socket_path,
+                ownership,
+            } => SshTransport::new_control_master(
+                socket_path.clone(),
+                self.auth_context.clone(),
+                *ownership == ControlMasterOwnership::WarpManaged,
+                remote_os,
+            ),
+            SshSessionTransportDescriptor::RustBroker {
+                endpoint,
+                capability,
+            } => SshTransport::new_rust_broker(
+                endpoint.clone(),
+                capability.clone(),
+                self.auth_context.clone(),
+                remote_os,
+            ),
+            SshSessionTransportDescriptor::Unavailable => return,
+        };
         debug_assert!(matches!(self.state, SshInitState::Idle));
         match std::mem::replace(&mut self.state, SshInitState::Idle) {
             SshInitState::Idle => {}
@@ -230,11 +255,6 @@ impl<T: EventLoopSender> RemoteServerController<T> {
                 self.flush_stashed_bootstrap(old_info, ctx);
             }
         }
-        let transport = SshTransport::new(
-            socket_path,
-            self.auth_context.clone(),
-            warp_owns_control_master,
-        );
         self.did_install = false;
         self.remote_platform = None;
         self.preinstall_check = None;
@@ -301,8 +321,6 @@ impl<T: EventLoopSender> RemoteServerController<T> {
 
         match result {
             Ok(true) => {
-                let socket_path = transport.socket_path().clone();
-                let warp_owns_control_master = transport.warp_owns_control_master();
                 let connection_label = connection_label_for_session_info(&session_info);
                 self.state = SshInitState::AwaitingConnect {
                     session_id,
@@ -311,8 +329,7 @@ impl<T: EventLoopSender> RemoteServerController<T> {
                 };
                 self.connect_session_for_current_identity(
                     session_id,
-                    socket_path,
-                    warp_owns_control_master,
+                    transport,
                     connection_label,
                     ctx,
                 );
@@ -536,8 +553,6 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             };
         match result {
             Ok(()) => {
-                let socket_path = transport.socket_path().clone();
-                let warp_owns_control_master = transport.warp_owns_control_master();
                 let connection_label = connection_label_for_session_info(&session_info);
                 self.state = SshInitState::AwaitingConnect {
                     session_id,
@@ -546,8 +561,7 @@ impl<T: EventLoopSender> RemoteServerController<T> {
                 };
                 self.connect_session_for_current_identity(
                     session_id,
-                    socket_path,
-                    warp_owns_control_master,
+                    transport,
                     connection_label,
                     ctx,
                 );
@@ -564,16 +578,13 @@ impl<T: EventLoopSender> RemoteServerController<T> {
     fn connect_session_for_current_identity(
         &mut self,
         session_id: SessionId,
-        socket_path: PathBuf,
-        warp_owns_control_master: bool,
+        transport: SshTransport,
         connection_label: String,
         ctx: &mut ModelContext<Self>,
     ) {
         // Zap:auth context 为构造时缓存的本地 BYOP context(无 auth_client、
         // 无 crash-reporting 上报),不随连接重建。
         let auth_context = self.auth_context.clone();
-        let transport =
-            SshTransport::new(socket_path, auth_context.clone(), warp_owns_control_master);
         RemoteServerManager::handle(ctx).update(ctx, |mgr, ctx| {
             mgr.connect_session(
                 session_id,

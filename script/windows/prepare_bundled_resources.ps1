@@ -89,7 +89,7 @@ if ($env:GIT_RELEASE_TAG) {
         Set-Content -Path $VersionMetadataPath -Encoding utf8
 }
 
-# 发布流水线通过该目录注入四个平台的 remote-server tarball。复制前再次
+# 发布流水线通过该目录注入六个 remote-server 压缩包。复制前再次
 # 校验版本、文件集合与 SHA-256，避免安装包带入缺失或串版本的产物。
 if ($env:WARP_BUNDLED_REMOTE_SERVER_DIR) {
     if (-Not $env:GIT_RELEASE_TAG) {
