@@ -92,7 +92,7 @@ if [ -n "$GIT_RELEASE_TAG" ]; then
   printf '{\n  "warp_version": "%s"\n}\n' "$GIT_RELEASE_TAG" > "$VERSION_METADATA_PATH"
 fi
 
-# 发布流水线通过该目录注入四个平台的 remote-server tarball。复制前再次
+# 发布流水线通过该目录注入六个 remote-server 压缩包。复制前再次
 # 校验版本、文件集合与 SHA-256，避免安装包带入缺失或串版本的产物。
 if [ -n "${WARP_BUNDLED_REMOTE_SERVER_DIR:-}" ]; then
   if [ -z "${GIT_RELEASE_TAG:-}" ]; then

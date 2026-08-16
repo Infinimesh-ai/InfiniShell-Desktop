@@ -37,6 +37,20 @@ fn parse_uname_darwin_x86_64() {
 }
 
 #[test]
+fn parse_windows_amd64() {
+    let platform = parse_platform_output("Windows AMD64").unwrap();
+    assert_eq!(platform.os, RemoteOs::Windows);
+    assert_eq!(platform.arch, RemoteArch::X86_64);
+}
+
+#[test]
+fn parse_windows_nt_arm64() {
+    let platform = parse_platform_output("Windows_NT ARM64").unwrap();
+    assert_eq!(platform.os, RemoteOs::Windows);
+    assert_eq!(platform.arch, RemoteArch::Aarch64);
+}
+
+#[test]
 fn parse_uname_unsupported_armv8l() {
     let result = parse_uname_output("Linux armv8l");
     match result {
@@ -64,10 +78,10 @@ fn parse_uname_trims_whitespace() {
 
 #[test]
 fn parse_uname_unsupported_os() {
-    let result = parse_uname_output("Windows x86_64");
+    let result = parse_uname_output("FreeBSD x86_64");
     match result {
         Err(crate::transport::Error::UnsupportedOs { os }) => {
-            assert_eq!(os, "Windows");
+            assert_eq!(os, "FreeBSD");
         }
         other => panic!("expected UnsupportedOs, got {other:?}"),
     }
@@ -296,6 +310,61 @@ fn removal_command_removes_binary_but_leaves_global_resources() {
 }
 
 #[test]
+fn windows_platform_probe_uses_powershell_architecture_environment() {
+    let command = platform_probe_command(&RemoteOs::Windows);
+    assert_eq!(command.dialect, RemoteShellDialect::PowerShell);
+    assert!(command.script.contains("PROCESSOR_ARCHITEW6432"));
+    assert!(command.script.contains("PROCESSOR_ARCHITECTURE"));
+    assert!(command.script.contains("Windows {0}"));
+}
+
+#[test]
+fn windows_skips_posix_preinstall_check() {
+    assert_eq!(preinstall_check_command(&RemoteOs::Windows), None);
+    let linux = preinstall_check_command(&RemoteOs::Linux).unwrap();
+    assert_eq!(linux.dialect, RemoteShellDialect::Posix);
+    assert_eq!(linux.script, PREINSTALL_CHECK_SCRIPT);
+}
+
+#[test]
+fn windows_binary_commands_use_exe_and_powershell_literal_paths() {
+    let binary_name = remote_server_binary_name(&RemoteOs::Windows);
+    assert!(binary_name.ends_with(".exe"));
+    assert!(remote_server_binary_for(&RemoteOs::Windows).starts_with("$HOME/"));
+
+    let check = binary_check_command_for(&RemoteOs::Windows);
+    assert_eq!(check.dialect, RemoteShellDialect::PowerShell);
+    assert!(check.script.contains("Join-Path $HOME"));
+    assert!(check.script.contains(&binary_name));
+    assert!(check.script.contains("--version"));
+
+    let removal = remote_server_removal_command_for(&RemoteOs::Windows);
+    assert_eq!(removal.dialect, RemoteShellDialect::PowerShell);
+    assert!(removal.script.contains("Remove-Item -LiteralPath"));
+    assert!(removal.script.contains(&binary_name));
+    assert!(!removal.script.contains(BUNDLED_RESOURCES_DIR_NAME));
+}
+
+#[test]
+fn windows_proxy_command_escapes_identity_key() {
+    let command = remote_server_proxy_command(&RemoteOs::Windows, "user's identity");
+    assert_eq!(command.dialect, RemoteShellDialect::PowerShell);
+    assert!(command.script.contains("remote-server-proxy"));
+    assert!(command.script.contains("'user''s identity'"));
+}
+
+#[test]
+fn posix_command_helpers_preserve_existing_behavior() {
+    let check = binary_check_command_for(&RemoteOs::Linux);
+    assert_eq!(check.dialect, RemoteShellDialect::Posix);
+    assert_eq!(check.script, binary_check_command());
+
+    let removal = remote_server_removal_command_for(&RemoteOs::MacOs);
+    assert_eq!(removal.dialect, RemoteShellDialect::Posix);
+    assert_eq!(removal.script, remote_server_removal_command());
+}
+
+#[test]
 fn install_script_substitutes_bundled_resources_dir_name() {
     let script = install_script(None);
     assert!(!script.contains("{bundled_resources_dir_name}"));
@@ -494,8 +563,7 @@ fn install_script_tolerates_tarball_without_resources() {
 /// marker `printf` to capture the resolved `install_dir`.
 ///
 /// Gated to Unix because the test invokes `/bin/bash` (or `bash` from
-/// PATH) directly. The bug only matters on Unix remotes anyway —
-/// Warp's remote-server SSH wrapper doesn't target Windows hosts.
+/// PATH) directly. Windows remotes use the separate PowerShell installer.
 #[cfg(unix)]
 #[test]
 fn install_script_tilde_expansion_resolves_correctly() {
@@ -789,6 +857,91 @@ fn oss_macos_x86_64_tarball_url_uses_infinishell_release_asset() {
         url,
         "https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/latest/download/infinishell-macos-x86_64.tar.gz"
     );
+}
+
+#[test]
+fn oss_windows_archives_use_zip() {
+    for (arch, expected_arch) in [
+        (RemoteArch::X86_64, "x86_64"),
+        (RemoteArch::Aarch64, "aarch64"),
+    ] {
+        let platform = RemotePlatform {
+            os: RemoteOs::Windows,
+            arch,
+        };
+        let expected_name = format!("infinishell-windows-{expected_arch}.zip");
+        assert_eq!(remote_server_archive_name(&platform), expected_name);
+        assert_eq!(remote_server_tarball_name(&platform), expected_name);
+        assert!(download_archive_url(&platform).ends_with(&expected_name));
+        assert!(download_tarball_url(&platform).ends_with(&expected_name));
+    }
+}
+
+#[test]
+fn windows_install_command_uses_zip_and_powershell() {
+    let platform = RemotePlatform {
+        os: RemoteOs::Windows,
+        arch: RemoteArch::X86_64,
+    };
+    let command = install_command(
+        &platform,
+        Some("~/.infinishell/remote-server/user's-upload.zip"),
+    );
+
+    assert_eq!(command.dialect, RemoteShellDialect::PowerShell);
+    assert!(command.script.contains("infinishell-windows-x86_64.zip"));
+    assert!(command.script.contains("Expand-Archive -LiteralPath"));
+    assert!(command.script.contains("infinishell.exe"));
+    assert!(command.script.contains(BUNDLED_RESOURCES_DIR_NAME));
+    assert!(command.script.contains("user''s-upload.zip"));
+    assert!(!command.script.contains("{install_relative_dir}"));
+    assert!(!command.script.contains("{archive_url}"));
+}
+
+#[cfg(unix)]
+#[test]
+fn windows_powershell_commands_have_valid_syntax() {
+    let platform = RemotePlatform {
+        os: RemoteOs::Windows,
+        arch: RemoteArch::X86_64,
+    };
+    let commands = [
+        platform_probe_command(&RemoteOs::Windows),
+        binary_check_command_for(&RemoteOs::Windows),
+        remote_server_removal_command_for(&RemoteOs::Windows),
+        remote_server_proxy_command(&RemoteOs::Windows, "identity's key"),
+        install_command(&platform, Some("~/remote server/upload.zip")),
+    ];
+    let parser_script = r#"$tokens = $null
+$errors = $null
+[System.Management.Automation.Language.Parser]::ParseInput(
+    $env:WARP_SETUP_SCRIPT,
+    [ref]$tokens,
+    [ref]$errors
+) | Out-Null
+if ($errors.Count -gt 0) {
+    $errors | ForEach-Object { [Console]::Error.WriteLine($_.Message) }
+    exit 1
+}"#;
+
+    for command in commands {
+        let output = match Command::new("pwsh")
+            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
+            .arg(parser_script)
+            .env("WARP_SETUP_SCRIPT", &command.script)
+            .output()
+        {
+            Ok(output) => output,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+            Err(error) => panic!("无法运行 PowerShell 语法检查: {error}"),
+        };
+        assert!(
+            output.status.success(),
+            "PowerShell 脚本语法错误: {}\n{}",
+            String::from_utf8_lossy(&output.stderr),
+            command.script,
+        );
+    }
 }
 
 #[test]

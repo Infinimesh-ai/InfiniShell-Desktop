@@ -1,4 +1,5 @@
 mod glibc;
+mod windows;
 
 use std::time::Duration;
 
@@ -234,7 +235,7 @@ fn parse_status(
 /// rather than templated from Rust.
 pub const PREINSTALL_CHECK_SCRIPT: &str = include_str!("preinstall_check.sh");
 
-/// Detected remote platform from `uname -sm` output.
+/// 探测到的远端平台。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RemotePlatform {
     pub os: RemoteOs,
@@ -245,6 +246,7 @@ pub struct RemotePlatform {
 pub enum RemoteOs {
     Linux,
     MacOs,
+    Windows,
 }
 
 impl RemoteOs {
@@ -252,6 +254,7 @@ impl RemoteOs {
         match self {
             Self::Linux => "linux",
             Self::MacOs => "macos",
+            Self::Windows => "windows",
         }
     }
 }
@@ -271,11 +274,45 @@ impl RemoteArch {
     }
 }
 
-/// Parse `uname -sm` output into a `RemotePlatform`.
+/// 远端命令应由哪种 shell 解释。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RemoteShellDialect {
+    Posix,
+    PowerShell,
+}
+
+/// transport 可执行的远端命令或脚本。
 ///
-/// The expected format is `<os> <arch>`, e.g. `Linux x86_64` or `Darwin arm64`.
-/// Takes the last line to skip any shell initialization output.
-pub fn parse_uname_output(
+/// `PowerShell` 脚本应由 transport 编码成 UTF-16LE Base64，并通过
+/// `powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand` 执行，
+/// 避免把脚本直接拼进远端默认 shell。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RemoteSetupCommand {
+    pub dialect: RemoteShellDialect,
+    pub script: String,
+}
+
+impl RemoteSetupCommand {
+    fn posix(script: String) -> Self {
+        Self {
+            dialect: RemoteShellDialect::Posix,
+            script,
+        }
+    }
+
+    fn powershell(script: String) -> Self {
+        Self {
+            dialect: RemoteShellDialect::PowerShell,
+            script,
+        }
+    }
+}
+
+/// Parse platform probe output into a [`RemotePlatform`].
+///
+/// 格式为 `<os> <arch>`，例如 `Linux x86_64`、`Darwin arm64` 或
+/// `Windows AMD64`。读取最后一行以跳过 shell 初始化输出。
+pub fn parse_platform_output(
     output: &str,
 ) -> std::result::Result<RemotePlatform, crate::transport::Error> {
     use crate::transport::Error;
@@ -283,38 +320,66 @@ pub fn parse_uname_output(
     let line = output
         .lines()
         .last()
-        .ok_or_else(|| Error::Other(anyhow!("empty uname output")))
+        .ok_or_else(|| Error::Other(anyhow!("empty platform probe output")))
         .map(str::trim)?;
 
     let mut parts = line.split_whitespace();
     let os_str = parts
         .next()
-        .ok_or_else(|| Error::Other(anyhow!("missing OS in uname output: {line}")))?;
+        .ok_or_else(|| Error::Other(anyhow!("missing OS in platform probe output: {line}")))?;
     let arch_str = parts
         .next()
-        .ok_or_else(|| Error::Other(anyhow!("missing arch in uname output: {line}")))?;
+        .ok_or_else(|| Error::Other(anyhow!("missing arch in platform probe output: {line}")))?;
 
-    let os = match os_str {
-        "Linux" => RemoteOs::Linux,
-        "Darwin" => RemoteOs::MacOs,
-        other => {
-            return Err(Error::UnsupportedOs {
-                os: other.to_string(),
-            });
-        }
+    let os = if os_str.eq_ignore_ascii_case("linux") {
+        RemoteOs::Linux
+    } else if os_str.eq_ignore_ascii_case("darwin") {
+        RemoteOs::MacOs
+    } else if os_str.eq_ignore_ascii_case("windows") || os_str.eq_ignore_ascii_case("windows_nt") {
+        RemoteOs::Windows
+    } else {
+        return Err(Error::UnsupportedOs {
+            os: os_str.to_string(),
+        });
     };
 
-    let arch = match arch_str {
-        "x86_64" | "amd64" => RemoteArch::X86_64,
-        "aarch64" | "arm64" => RemoteArch::Aarch64,
-        other => {
-            return Err(Error::UnsupportedArch {
-                arch: other.to_string(),
-            });
-        }
+    let arch = if arch_str.eq_ignore_ascii_case("x86_64") || arch_str.eq_ignore_ascii_case("amd64")
+    {
+        RemoteArch::X86_64
+    } else if arch_str.eq_ignore_ascii_case("aarch64") || arch_str.eq_ignore_ascii_case("arm64") {
+        RemoteArch::Aarch64
+    } else {
+        return Err(Error::UnsupportedArch {
+            arch: arch_str.to_string(),
+        });
     };
 
     Ok(RemotePlatform { os, arch })
+}
+
+/// 保留原 API；Unix transport 的 `uname -sm` 输出同样走通用平台解析器。
+pub fn parse_uname_output(
+    output: &str,
+) -> std::result::Result<RemotePlatform, crate::transport::Error> {
+    parse_platform_output(output)
+}
+
+/// 返回已知平台对应的平台探测命令。
+pub fn platform_probe_command(os: &RemoteOs) -> RemoteSetupCommand {
+    match os {
+        RemoteOs::Linux | RemoteOs::MacOs => RemoteSetupCommand::posix("uname -sm".to_string()),
+        RemoteOs::Windows => RemoteSetupCommand::powershell(windows::platform_probe_script()),
+    }
+}
+
+/// 返回预安装检查；Windows 不需要 Linux libc 检查。
+pub fn preinstall_check_command(os: &RemoteOs) -> Option<RemoteSetupCommand> {
+    match os {
+        RemoteOs::Linux | RemoteOs::MacOs => Some(RemoteSetupCommand::posix(
+            PREINSTALL_CHECK_SCRIPT.to_string(),
+        )),
+        RemoteOs::Windows => None,
+    }
 }
 
 /// 返回远端二进制安装目录,按 channel 隔离。
@@ -326,14 +391,21 @@ pub fn parse_uname_output(
 /// - integration: `~/.warp-dev/remote-server`
 /// - oss:         `~/.infinishell/remote-server`
 pub fn remote_server_dir() -> String {
-    let config_dir = match ChannelState::channel() {
+    format!("~/{}/remote-server", remote_server_config_dir_name())
+}
+
+fn remote_server_config_dir_name() -> &'static str {
+    match ChannelState::channel() {
         Channel::Stable => ".warp",
         Channel::Preview => ".warp-preview",
         Channel::Dev | Channel::Integration => ".warp-dev",
         Channel::Local => ".warp-local",
         Channel::Oss => OSS_CONFIG_DIR,
-    };
-    format!("~/{config_dir}/remote-server")
+    }
+}
+
+fn remote_server_relative_dir() -> String {
+    format!("{}/remote-server", remote_server_config_dir_name())
 }
 
 /// Returns a short, deterministic directory name for a remote-server
@@ -446,6 +518,15 @@ pub fn binary_name() -> &'static str {
     ChannelState::channel().cli_command_name()
 }
 
+/// 返回平台对应的版本化 remote-server 文件名。
+pub fn remote_server_binary_name(os: &RemoteOs) -> String {
+    let extension = match os {
+        RemoteOs::Linux | RemoteOs::MacOs => "",
+        RemoteOs::Windows => ".exe",
+    };
+    format!("{}{}{extension}", binary_name(), version_suffix())
+}
+
 /// 返回当前 channel 和客户端版本对应的远端二进制完整路径。
 ///
 /// Local 构建保留无版本后缀路径,以便 `script/deploy_remote_server`
@@ -453,15 +534,15 @@ pub fn binary_name() -> &'static str {
 /// 时使用版本后缀,这样新版本会自然触发重新安装;源码本地构建没有
 /// release tag,仍使用无后缀路径。
 pub fn remote_server_binary() -> String {
-    let dir = remote_server_dir();
-    let name = binary_name();
-    match ChannelState::channel() {
-        Channel::Local => format!("{dir}/{name}"),
-        Channel::Oss if ChannelState::app_version().is_none() => format!("{dir}/{name}"),
-        Channel::Oss => format!("{dir}/{name}-{}", pinned_version()),
-        Channel::Stable | Channel::Preview | Channel::Dev | Channel::Integration => {
-            format!("{dir}/{name}-{}", pinned_version())
-        }
+    remote_server_binary_for(&RemoteOs::Linux)
+}
+
+/// 返回适用于目标平台 shell 的 remote-server 路径表达式。
+pub fn remote_server_binary_for(os: &RemoteOs) -> String {
+    let binary_name = remote_server_binary_name(os);
+    match os {
+        RemoteOs::Linux | RemoteOs::MacOs => format!("{}/{binary_name}", remote_server_dir()),
+        RemoteOs::Windows => format!("$HOME/{}/{binary_name}", remote_server_relative_dir()),
     }
 }
 
@@ -473,6 +554,16 @@ pub fn binary_check_command() -> String {
     format!("{} --version", remote_server_binary())
 }
 
+/// 返回目标平台对应的二进制检查命令。
+pub fn binary_check_command_for(os: &RemoteOs) -> RemoteSetupCommand {
+    match os {
+        RemoteOs::Linux | RemoteOs::MacOs => RemoteSetupCommand::posix(binary_check_command()),
+        RemoteOs::Windows => RemoteSetupCommand::powershell(windows::binary_check_script(
+            &remote_server_relative_binary_path(os),
+        )),
+    }
+}
+
 /// Returns the shell command to remove the current remote-server binary.
 ///
 /// The global bundled resources directory is deliberately left in place:
@@ -480,6 +571,45 @@ pub fn binary_check_command() -> String {
 /// running parsed its skills at startup.
 pub fn remote_server_removal_command() -> String {
     format!("rm -f {}", remote_server_binary())
+}
+
+/// 返回目标平台对应的清理命令。全局 bundled resources 保持不变。
+pub fn remote_server_removal_command_for(os: &RemoteOs) -> RemoteSetupCommand {
+    match os {
+        RemoteOs::Linux | RemoteOs::MacOs => {
+            RemoteSetupCommand::posix(remote_server_removal_command())
+        }
+        RemoteOs::Windows => RemoteSetupCommand::powershell(windows::removal_script(
+            &remote_server_relative_binary_path(os),
+        )),
+    }
+}
+
+/// 返回通过 SSH 启动 remote-server proxy 的平台命令。
+pub fn remote_server_proxy_command(os: &RemoteOs, identity_key: &str) -> RemoteSetupCommand {
+    match os {
+        RemoteOs::Linux | RemoteOs::MacOs => RemoteSetupCommand::posix(format!(
+            "{} remote-server-proxy --identity-key {}",
+            remote_server_binary_for(os),
+            posix_single_quoted(identity_key),
+        )),
+        RemoteOs::Windows => RemoteSetupCommand::powershell(windows::proxy_script(
+            &remote_server_relative_binary_path(os),
+            identity_key,
+        )),
+    }
+}
+
+fn remote_server_relative_binary_path(os: &RemoteOs) -> String {
+    format!(
+        "{}/{}",
+        remote_server_relative_dir(),
+        remote_server_binary_name(os)
+    )
+}
+
+fn posix_single_quoted(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
 /// 返回用于版本化安装路径的版本号。优先使用编译时注入的
@@ -544,6 +674,27 @@ pub fn install_script(staging_tarball_path: Option<&str>) -> String {
         .replace("{staging_tarball_path}", staging_tarball_path.unwrap_or(""))
 }
 
+/// 返回目标平台对应的安装脚本。
+///
+/// POSIX 平台保持现有 Bash/tar.gz 行为；Windows 返回 PowerShell/zip 脚本。
+pub fn install_command(
+    platform: &RemotePlatform,
+    staging_archive_path: Option<&str>,
+) -> RemoteSetupCommand {
+    match platform.os {
+        RemoteOs::Linux | RemoteOs::MacOs => {
+            RemoteSetupCommand::posix(install_script(staging_archive_path))
+        }
+        RemoteOs::Windows => RemoteSetupCommand::powershell(windows::install_script(
+            &remote_server_relative_dir(),
+            &remote_server_binary_name(&platform.os),
+            &download_archive_url(platform),
+            staging_archive_path,
+            BUNDLED_RESOURCES_DIR_NAME,
+        )),
+    }
+}
+
 /// 构造 InfiniShell CLI release 资产下载基址。
 fn download_url() -> String {
     let release_path = match ChannelState::app_version() {
@@ -565,20 +716,35 @@ fn version_suffix() -> String {
 
 /// 返回指定远端平台对应的 InfiniShell CLI tarball URL。
 pub fn download_tarball_url(platform: &RemotePlatform) -> String {
+    download_archive_url(platform)
+}
+
+/// 返回指定平台的 release archive URL。
+pub fn download_archive_url(platform: &RemotePlatform) -> String {
     format!(
         "{}/{}",
         download_url(),
-        remote_server_tarball_name(platform)
+        remote_server_archive_name(platform)
     )
 }
 
-/// 返回指定远端平台对应的 InfiniShell CLI tarball 文件名。
-pub fn remote_server_tarball_name(platform: &RemotePlatform) -> String {
+/// 返回指定远端平台对应的 InfiniShell CLI archive 文件名。
+pub fn remote_server_archive_name(platform: &RemotePlatform) -> String {
+    let extension = match platform.os {
+        RemoteOs::Linux | RemoteOs::MacOs => "tar.gz",
+        RemoteOs::Windows => "zip",
+    };
     format!(
-        "infinishell-{}-{}.tar.gz",
+        "infinishell-{}-{}.{}",
         platform.os.as_str(),
         platform.arch.as_str(),
+        extension,
     )
+}
+
+/// 保留原 API 名称；Windows 平台返回 `.zip` 文件名。
+pub fn remote_server_tarball_name(platform: &RemotePlatform) -> String {
+    remote_server_archive_name(platform)
 }
 
 /// Exit code the install script uses when neither curl nor wget is

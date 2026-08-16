@@ -173,7 +173,7 @@ pub fn script_for_shell(shell_type: ShellType, assets: &dyn AssetProvider) -> Co
                                 });
                                 let data_string =
                                     unsafe { String::from_utf8_unchecked(data.to_vec()) };
-                                data_string.replace(
+                                data_string.trim_start_matches(BYTE_ORDER_MARK).replace(
                                     "@@USING_CON_PTY_BOOLEAN@@",
                                     &(cfg!(windows).to_string()),
                                 )
@@ -197,12 +197,34 @@ pub fn script_for_shell(shell_type: ShellType, assets: &dyn AssetProvider) -> Co
                 })
                 .join("\n");
 
+            script = embed_windows_remote_init_shell(script, assets);
+
             // Make sure there's a newline at the end of the bootstrap script,
             // otherwise we'll never submit the final line to the shell.
             script.push('\n');
             script.into_bytes()
         })
         .into()
+}
+
+const WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER: &str = "@@WARP_WINDOWS_REMOTE_INIT_SHELL_HEX@@";
+
+fn embed_windows_remote_init_shell(script: String, assets: &dyn AssetProvider) -> String {
+    if !script.contains(WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER) {
+        return script;
+    }
+
+    let init_shell = assets
+        .get("bundled/bootstrap/pwsh_init_shell.ps1")
+        .expect("failed to retrieve bundled/bootstrap/pwsh_init_shell.ps1");
+    let init_shell = std::str::from_utf8(&init_shell)
+        .expect("PowerShell init shell should be UTF-8")
+        .trim_start_matches(BYTE_ORDER_MARK)
+        .replace("@@USING_CON_PTY_BOOLEAN@@", &(cfg!(windows).to_string()));
+    script.replace(
+        WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER,
+        &hex::encode(init_shell),
+    )
 }
 
 /// Generates a cryptographically random session ID for use as both a session

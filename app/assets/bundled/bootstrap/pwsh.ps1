@@ -6,6 +6,7 @@ param()
 # NOTE: If you do need a function to be global and also have access to variables in this scope, add
 # the function name to the 'Export-ModuleMember' call at the end.
 $null = New-Module -Name Warp-Module -ScriptBlock {
+#include bundled/bootstrap/pwsh_ssh_wrapper.ps1
     # Byte sequence used to signal the start of an OSC for Warp JSON messages.
     $oscStart = "$([char]0x1b)]9278;"
 
@@ -129,6 +130,16 @@ $null = New-Module -Name Warp-Module -ScriptBlock {
 
     # Load the Warp Common functions in the current session
     . $warpCommon
+
+$script:WarpBashInitShell = @'
+#include bundled/bootstrap/bash_init_shell.sh
+'@
+$script:WarpZshInitShell = @'
+#include bundled/bootstrap/zsh_init_shell.sh
+'@
+$script:WarpPwshInitShell = @'
+#include bundled/bootstrap/pwsh_init_shell.ps1
+'@
 
     function Get-EpochTime {
         [decimal]([DateTime]::UtcNow - [DateTime]::new(1970, 1, 1, 0, 0, 0, 0)).Ticks / 1e7
@@ -990,6 +1001,7 @@ $null = New-Module -Name Warp-Module -ScriptBlock {
         # This sets up our wrapper around $function:prompt, which runs the precmd hook
         # and computes the user's custom prompt.
         $function:global:prompt = (Get-Command Warp-Prompt).ScriptBlock
+        Warp-Install-SshWrapper
         Warp-Bootstrapped -rcStartTime $rcStartTime -rcEndTime $rcEndTime
     }
 
@@ -1001,7 +1013,7 @@ $null = New-Module -Name Warp-Module -ScriptBlock {
     # bootstrap logic pasted into the PTY and the output of shell startup files.
     Warp-Precmd -status $global:? -code $global:LASTEXITCODE
 
-    Export-ModuleMember -Function clear, Clear-Host, Get-EpochTime, Warp-Finish-Update, Warp-Handle-DistUpgrade, Warp-Run-GeneratorCommand, Warp-Finish-Bootstrap
+    Export-ModuleMember -Function clear, Clear-Host, Get-EpochTime, Warp-Finish-Update, Warp-Handle-DistUpgrade, Warp-Run-GeneratorCommand, Warp-Finish-Bootstrap, Warp-Ssh
 }
 
 # Finally, get ready to source the user's RC files. This must be done in the global scope (not

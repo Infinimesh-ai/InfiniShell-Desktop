@@ -3155,11 +3155,13 @@ impl ansi::Handler for TerminalModel {
                 return;
             }
             self.register_session_id(remote_session_id);
-            if value.external_control_master {
+            if value.external_control_master
+                && let Some(socket_path) = &value.socket_path
+            {
                 log::info!(
                     "SSH wrapper attached to an external ControlMaster at {}; \
                      Warp will not tear it down on session exit",
-                    value.socket_path.display()
+                    socket_path.display()
                 );
             }
             self.pending_ssh_wrapper_session = Some(value);

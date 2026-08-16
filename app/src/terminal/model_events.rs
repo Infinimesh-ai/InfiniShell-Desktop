@@ -9,7 +9,7 @@ use super::model::ansi::FinishUpdateValue;
 use super::model::block::BlockId;
 use super::model::completions::ShellCompletion;
 use super::model::lifecycle::LifecycleTelemetryEvent;
-use super::model::session::{IsSSHWrapperSession, SessionId, SessionInfo};
+use super::model::session::{SessionId, SessionInfo};
 use super::model::terminal_model::{CommandType, ExitReason, HandlerEvent};
 use crate::features::FeatureFlag;
 use crate::remote_server::manager::RemoteServerManager;
@@ -30,8 +30,8 @@ pub(crate) enum SshRemoteServerSupport {
 }
 
 impl SshRemoteServerSupport {
-    fn should_use_remote_server(self, feature_enabled: bool, is_ssh_wrapper_session: bool) -> bool {
-        matches!(self, Self::Enabled) && feature_enabled && is_ssh_wrapper_session
+    fn should_use_remote_server(self, feature_enabled: bool, transport_available: bool) -> bool {
+        matches!(self, Self::Enabled) && feature_enabled && transport_available
     }
 }
 
@@ -77,10 +77,10 @@ impl ModelEventDispatcher {
             ssh_remote_server_support,
         }
     }
-    fn should_use_ssh_remote_server(&self, is_ssh_wrapper_session: bool) -> bool {
+    fn should_use_ssh_remote_server(&self, transport_available: bool) -> bool {
         self.ssh_remote_server_support.should_use_remote_server(
             FeatureFlag::SshRemoteServer.is_enabled(),
-            is_ssh_wrapper_session,
+            transport_available,
         )
     }
 
@@ -108,11 +108,10 @@ impl ModelEventDispatcher {
                 self.sessions.update(ctx, |sessions, ctx| {
                     sessions.register_pending_session(pending_session_info.as_ref(), ctx);
                 });
-                let is_ssh_wrapper_session = matches!(
-                    pending_session_info.is_ssh_wrapper_session,
-                    IsSSHWrapperSession::Yes { .. }
-                );
-                if self.should_use_ssh_remote_server(is_ssh_wrapper_session) {
+                let transport_available = pending_session_info
+                    .is_ssh_wrapper_session
+                    .supports_ssh_remote_server();
+                if self.should_use_ssh_remote_server(transport_available) {
                     ModelEvent::SshInitShell {
                         pending_session_info,
                     }
@@ -319,11 +318,10 @@ impl ModelEventDispatcher {
             rcfiles_duration_seconds,
         } = event;
 
-        let (is_ssh_wrapper_session, session_id, shell_type_name, shell_path) = (
-            matches!(
-                session_info.is_ssh_wrapper_session,
-                IsSSHWrapperSession::Yes { .. }
-            ),
+        let (transport_available, session_id, shell_type_name, shell_path) = (
+            session_info
+                .is_ssh_wrapper_session
+                .supports_ssh_remote_server(),
             session_info.session_id,
             session_info.shell.shell_type().name().to_owned(),
             session_info.shell.shell_path().clone(),
@@ -334,7 +332,7 @@ impl ModelEventDispatcher {
         // `SessionsEvent::SessionBootstrapped`, which causes subscribers to
         // immediately queue `RunCommand` requests (e.g. `load_external_commands`).
         // The daemon must have the executor ready before those requests arrive.
-        if self.should_use_ssh_remote_server(is_ssh_wrapper_session) {
+        if self.should_use_ssh_remote_server(transport_available) {
             RemoteServerManager::handle(ctx).update(ctx, |mgr, _ctx| {
                 mgr.notify_session_bootstrapped(
                     session_id,

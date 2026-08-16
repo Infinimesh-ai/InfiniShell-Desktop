@@ -80,6 +80,38 @@ pub struct RemoteServerIdentityArgs {
     pub identity_key: String,
 }
 
+/// 单连接 Rust SSH worker 的启动参数。
+#[derive(Debug, Clone, clap::Args)]
+pub struct RustSshSessionArgs {
+    /// 当前本地终端会话 ID。
+    #[arg(long, hide = true)]
+    pub session_id: u64,
+    /// 为远端 shell 生成的会话 ID。
+    #[arg(long, hide = true)]
+    pub remote_session_id: u64,
+    /// wrapper 已解析出的真实 OpenSSH 可执行文件，仅用于读取 `ssh -G` 配置。
+    #[arg(long, hide = true)]
+    pub ssh_executable: std::path::PathBuf,
+    /// POSIX 远端使用的 bootstrap 命令。
+    #[arg(long, hide = true)]
+    pub posix_command: String,
+    /// Windows 远端使用的 PowerShell bootstrap 命令。
+    #[arg(long, hide = true)]
+    pub windows_command: String,
+    /// 用户原始 SSH 参数；worker 通过 `ssh -G` 展开 OpenSSH 配置。
+    #[arg(last = true, allow_hyphen_values = true, hide = true)]
+    pub ssh_args: Vec<std::ffi::OsString>,
+}
+
+/// 本地 broker proxy 的参数。认证 capability 只通过环境变量传递，避免进入进程列表。
+#[derive(Debug, Clone, clap::Args)]
+pub struct RustSshBrokerCommandArgs {
+    #[arg(long, hide = true)]
+    pub endpoint: String,
+    #[arg(long, hide = true)]
+    pub command: String,
+}
+
 /// Global options that apply to all CLI commands.
 #[derive(Debug, Default, Clone, clap::Args)]
 pub struct GlobalOptions {
@@ -357,6 +389,16 @@ pub enum WorkerCommand {
     #[cfg(not(target_family = "wasm"))]
     #[clap(hide = true)]
     RemoteServerDaemon(RemoteServerIdentityArgs),
+
+    /// 建立交互 shell，并在同一条 SSH 连接上为后续命令提供 broker。
+    #[cfg(not(target_family = "wasm"))]
+    #[clap(hide = true)]
+    RustSshSession(RustSshSessionArgs),
+
+    /// 连接本机 Rust SSH broker，并把一个远端 exec channel 映射到 stdio。
+    #[cfg(not(target_family = "wasm"))]
+    #[clap(hide = true)]
+    RustSshBrokerCommand(RustSshBrokerCommandArgs),
 
     /// Run a headless ripgrep search worker.
     #[cfg(not(target_family = "wasm"))]

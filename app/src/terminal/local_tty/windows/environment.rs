@@ -28,6 +28,7 @@ const TERM_PROGRAM_NAME: &str = "TERM_PROGRAM";
 const IS_LOCAL_SESSION_NAME: &str = "WARP_IS_LOCAL_SHELL_SESSION";
 const SSH_SOCKET_DIR: &str = "SSH_SOCKET_DIR";
 const PATH_APPEND_NAME: &str = "WARP_PATH_APPEND";
+const RUST_SSH_EXECUTABLE_NAME: &str = "WARP_RUST_SSH_EXECUTABLE";
 const WSLENV: &str = "WSLENV";
 const HISTIGNORE: &str = "HISTIGNORE";
 
@@ -92,6 +93,15 @@ pub(super) fn get_shell_environment_variables(options: &PtyOptions) -> Vec<u16> 
             value: (options.enable_ssh_wrapper as usize).to_string().into(),
         },
     );
+    if let Ok(executable) = crate::remote_server::rust_ssh::worker_executable() {
+        env.insert(
+            map_key(RUST_SSH_EXECUTABLE_NAME.into()),
+            EnvEntry {
+                preferred_key: RUST_SSH_EXECUTABLE_NAME.into(),
+                value: executable.into_os_string(),
+            },
+        );
+    }
     env.insert(
         map_key(SSH_REUSE_CONTROL_MASTER_NAME.into()),
         EnvEntry {

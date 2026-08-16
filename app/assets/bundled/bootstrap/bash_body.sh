@@ -1036,6 +1036,7 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
             local control_path="$SSH_SOCKET_DIR/$WARP_SESSION_ID"
             local control_master_mode="yes"
             local external_control_master="false"
+            local control_master_ownership="warp_managed"
             if [[ "$WARP_SSH_REUSE_CONTROL_MASTER" == "1" ]]; then
                 local user_control_path=$(command ssh -G "${@:1}" 2>/dev/null | command -p sed -n 's/^controlpath //p')
                 case "$user_control_path" in
@@ -1055,6 +1056,7 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
                             control_path="$user_control_path"
                             control_master_mode="no"
                             external_control_master="true"
+                            control_master_ownership="user_owned"
                         fi
                         ;;
                 esac
@@ -1077,6 +1079,31 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
 
             local remote_shell=$(warp_remote_shell_from_probe_output "$remote_shell_probe_output")
             if ! warp_remote_shell_supports_bootstrap "$remote_shell"; then
+                local remote_powershell=""
+                if [[ -z "$remote_shell" || "$remote_shell" == '\$SHELL' ]]; then
+                    local capability_probe_command=$(warp_windows_powershell_capability_probe_command)
+                    if [[ -n "$capability_probe_command" ]]; then
+                        local capability_probe_output
+                        capability_probe_output=$(command ssh -o ControlMaster=no \
+                            -o ControlPath="$control_path" "${@:1}" "$capability_probe_command")
+                        if [[ $? -eq 0 ]]; then
+                            remote_powershell=$(warp_windows_powershell_from_probe_output "$capability_probe_output")
+                        fi
+                    fi
+                fi
+
+                if [[ "$remote_powershell" == "powershell" ]]; then
+                    local windows_ssh_hook=$(printf '{"hook": "SSH", "value": {"socket_path": "%s", "transport": {"version": 1, "type": "control_master", "socket_path": "%s", "ownership": "%s"}, "remote_shell": "pwsh", "session_id": %s, "remote_session_id": %s, "external_control_master": %s}}' "$control_path" "$control_path" "$control_master_ownership" "$WARP_SESSION_ID" "$remote_session_id" "$external_control_master" | command -p od -An -v -tx1 | command -p tr -d ' \n')
+                    local windows_bootstrap_command=$(warp_windows_powershell_bootstrap_command \
+                        "$remote_session_id" "$windows_ssh_hook" "$WARP_CLIENT_VERSION" \
+                        "$WARP_CLI_AGENT_PROTOCOL_VERSION")
+                    if [[ -n "$windows_bootstrap_command" ]]; then
+                        command ssh -o ControlMaster=no -o ControlPath="$control_path" \
+                            -t "${@:1}" "$windows_bootstrap_command"
+                        return $?
+                    fi
+                fi
+
                 printf '%s\n' "InfiniShell shell integration is unavailable for this remote shell; continuing with standard SSH."
                 command ssh -o ControlMaster=no -o ControlPath="$control_path" -t "${@:1}"
                 local ssh_status=$?
@@ -1109,7 +1136,7 @@ test -n '$WARP_CLIENT_VERSION' && export WARP_CLIENT_VERSION='$WARP_CLIENT_VERSI
 # Only forward the protocol version if it was set locally (i.e. the HOANotifications feature flag is on).
 test -n '$WARP_CLI_AGENT_PROTOCOL_VERSION' && export WARP_CLI_AGENT_PROTOCOL_VERSION='$WARP_CLI_AGENT_PROTOCOL_VERSION'
 
-hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"remote_shell\": \"%s\", \"session_id\": '"$WARP_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command -p od -An -v -tx1 | command -p tr -d " \n")'"
+hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"transport\": {\"version\": 1, \"type\": \"control_master\", \"socket_path\": \"'$control_path'\", \"ownership\": \"'$control_master_ownership'\"}, \"remote_shell\": \"%s\", \"session_id\": '"$WARP_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command -p od -An -v -tx1 | command -p tr -d " \n")'"
 printf '$OSC_START$DCS_JSON_MARKER$OSC_PARAM_SEPARATOR%s$OSC_END' "'$hook'"
 
 if test "'"${SHELL##*/}" != "bash" -a "${SHELL##*/}" != "zsh"'"; then

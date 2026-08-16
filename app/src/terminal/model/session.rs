@@ -569,28 +569,190 @@ impl From<&SessionType> for command_corrections::SessionType {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControlMasterOwnership {
+    WarpManaged,
+    UserOwned,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub enum SshSessionTransportDescriptor {
+    ControlMaster {
+        socket_path: PathBuf,
+        ownership: ControlMasterOwnership,
+    },
+    RustBroker {
+        endpoint: String,
+        capability: String,
+    },
+    Unavailable,
+}
+
+impl std::fmt::Debug for SshSessionTransportDescriptor {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ControlMaster {
+                socket_path,
+                ownership,
+            } => formatter
+                .debug_struct("ControlMaster")
+                .field("socket_path", socket_path)
+                .field("ownership", ownership)
+                .finish(),
+            Self::RustBroker { endpoint, .. } => formatter
+                .debug_struct("RustBroker")
+                .field("endpoint", endpoint)
+                .field("capability", &"<redacted>")
+                .finish(),
+            Self::Unavailable => formatter.write_str("Unavailable"),
+        }
+    }
+}
+
+impl SshSessionTransportDescriptor {
+    fn from_ssh_value(value: &SSHValue) -> Self {
+        let legacy_transport = value.socket_path.as_ref().and_then(|socket_path| {
+            if socket_path.as_os_str().is_empty() {
+                None
+            } else {
+                Some(Self::ControlMaster {
+                    socket_path: socket_path.clone(),
+                    ownership: if value.external_control_master {
+                        ControlMasterOwnership::UserOwned
+                    } else {
+                        ControlMasterOwnership::WarpManaged
+                    },
+                })
+            }
+        });
+
+        let Some(transport) = &value.transport else {
+            return legacy_transport.unwrap_or(Self::Unavailable);
+        };
+        if transport.version != 1 {
+            return Self::Unavailable;
+        }
+
+        let parsed_transport = match transport.transport_type.as_str() {
+            "control_master" => {
+                let Some(socket_path) = transport
+                    .socket_path
+                    .as_ref()
+                    .filter(|path| !path.as_os_str().is_empty())
+                else {
+                    return Self::Unavailable;
+                };
+                let ownership = match transport.ownership.as_deref() {
+                    Some("warp_managed") => ControlMasterOwnership::WarpManaged,
+                    Some("user_owned") => ControlMasterOwnership::UserOwned,
+                    None | Some(_) => return Self::Unavailable,
+                };
+                Self::ControlMaster {
+                    socket_path: socket_path.clone(),
+                    ownership,
+                }
+            }
+            "rust_broker" => {
+                let Some(endpoint) = transport
+                    .endpoint
+                    .as_ref()
+                    .filter(|endpoint| !endpoint.is_empty())
+                else {
+                    return Self::Unavailable;
+                };
+                let Ok(address) = endpoint.parse::<std::net::SocketAddr>() else {
+                    return Self::Unavailable;
+                };
+                if !address.ip().is_loopback() {
+                    return Self::Unavailable;
+                }
+                let Some(capability) = transport
+                    .capability
+                    .as_ref()
+                    .filter(|capability| capability.len() == 64)
+                else {
+                    return Self::Unavailable;
+                };
+                if !capability.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                    return Self::Unavailable;
+                }
+                Self::RustBroker {
+                    endpoint: endpoint.clone(),
+                    capability: capability.clone(),
+                }
+            }
+            "unavailable" => Self::Unavailable,
+            _ => return Self::Unavailable,
+        };
+
+        if let Some(legacy_transport) = legacy_transport
+            && legacy_transport != parsed_transport
+        {
+            return Self::Unavailable;
+        }
+        parsed_transport
+    }
+
+    pub fn control_master(&self) -> Option<(&PathBuf, ControlMasterOwnership)> {
+        match self {
+            Self::ControlMaster {
+                socket_path,
+                ownership,
+            } => Some((socket_path, *ownership)),
+            Self::RustBroker { .. } | Self::Unavailable => None,
+        }
+    }
+
+    pub fn rust_broker(&self) -> Option<(&str, &str)> {
+        match self {
+            Self::RustBroker {
+                endpoint,
+                capability,
+            } => Some((endpoint, capability)),
+            Self::ControlMaster { .. } | Self::Unavailable => None,
+        }
+    }
+}
+
 /// Whether a session was established by Warp's in-band SSH wrapper — the shell function our
-/// bootstrap injects that intercepts `ssh`, sets up a ControlMaster connection, and bootstraps
-/// the remote shell. This applies to all SSH warpification today: the remote-server SSH
-/// extension also runs on top of a wrapper session (reusing the ControlMaster socket for its
-/// proxy and for the `RemoteCommandExecutor` fallback).
+/// bootstrap injects that intercepts `ssh` and bootstraps the remote shell. A wrapper session
+/// does not necessarily have an out-of-band transport: unsupported OpenSSH configurations may
+/// safely fall back to a native session without ControlMaster or the Rust broker.
 ///
 /// `No` covers local sessions, subshells, and remote sessions warpified *without* the wrapper
 /// (e.g. via the auto-warpify RC snippet inside an unwrapped `ssh` session), which carry no
 /// ControlMaster socket.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IsSSHWrapperSession {
-    /// The session was established by the SSH wrapper; `socket_path` is the ControlMaster
-    /// socket for the underlying connection.
+    /// The session was established by the SSH wrapper. `transport` describes whether the
+    /// connection can also carry remote-server and out-of-band generator traffic.
     Yes {
-        socket_path: PathBuf,
-        /// `true` when `socket_path` points at a ControlMaster the user
-        /// already had running (the SSH wrapper attached to it instead of
-        /// creating a Warp-owned one). Warp must not tear down such a
-        /// master on session exit.
-        external_control_master: bool,
+        transport: SshSessionTransportDescriptor,
     },
     No,
+}
+
+impl IsSSHWrapperSession {
+    pub fn transport(&self) -> Option<&SshSessionTransportDescriptor> {
+        match self {
+            Self::Yes { transport } => Some(transport),
+            Self::No => None,
+        }
+    }
+
+    pub fn control_master(&self) -> Option<(&PathBuf, ControlMasterOwnership)> {
+        self.transport()?.control_master()
+    }
+
+    pub fn supports_ssh_remote_server(&self) -> bool {
+        matches!(
+            self.transport(),
+            Some(
+                SshSessionTransportDescriptor::ControlMaster { .. }
+                    | SshSessionTransportDescriptor::RustBroker { .. }
+            )
+        )
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -670,8 +832,7 @@ impl SessionInfo {
     ) -> Self {
         let is_ssh_wrapper_session = match ssh_wrapper_session {
             Some(ssh_value) => IsSSHWrapperSession::Yes {
-                socket_path: ssh_value.socket_path,
-                external_control_master: ssh_value.external_control_master,
+                transport: SshSessionTransportDescriptor::from_ssh_value(&ssh_value),
             },
             None => IsSSHWrapperSession::No,
         };
@@ -1837,8 +1998,10 @@ pub mod testing {
                 self.session_type = BootstrapSessionType::WarpifiedRemote;
             }
             self.is_ssh_wrapper_session = IsSSHWrapperSession::Yes {
-                socket_path,
-                external_control_master: false,
+                transport: SshSessionTransportDescriptor::ControlMaster {
+                    socket_path,
+                    ownership: ControlMasterOwnership::WarpManaged,
+                },
             };
             self
         }

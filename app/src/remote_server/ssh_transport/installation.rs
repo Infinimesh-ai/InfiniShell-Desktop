@@ -1,5 +1,5 @@
 #[path = "installation/scp_fallback.rs"]
-mod scp_fallback;
+pub(super) mod scp_fallback;
 
 use std::path::Path;
 
