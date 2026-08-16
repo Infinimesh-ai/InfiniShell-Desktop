@@ -150,6 +150,21 @@ pwsh -File script/windows/test_package_remote_server.ps1
 精确的 merge commit 在远端可用后,应使用 Linux 与 Windows runner 运行跨平台
 云验证。如果 commit 尚只在本地,未获明确授权时不应仅为触发验证而 push。
 
+### 基线验证记录(2026-08-16)
+
+整合当前本地 `main` 后的功能树已通过:
+
+- `cargo check -p warp --lib --locked`;
+- 同时启用两个 Rust transport feature 的 `infinishell-ssh` worker check;
+- 全部 38 个 `remote_server::rust_ssh` 聚焦测试;
+- `cargo fmt --all -- --check`;
+- PowerShell 下的 `script/windows/test_package_remote_server.ps1`。
+
+在 macOS 上面向 `x86_64-pc-windows-msvc` 交叉编译 worker 时,在进入项目 Rust
+代码前就停在 `aws-lc-sys 0.39.1`,原因是 macOS 主机没有 Windows SDK 头文件
+(`stdlib.h` 与 `windows.h`)。原生 Windows 和 Linux 云任务需等精确 merge commit
+push 后才能运行;这是环境/授权缺口,不代表 Windows 运行时已验证通过。
+
 ## 合并后观察记录
 
 在发布 issue 或后续文档中使用下表。请按“客户端/远端”组合分开记录,避免

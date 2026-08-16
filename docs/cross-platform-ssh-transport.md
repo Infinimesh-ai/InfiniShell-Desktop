@@ -178,6 +178,22 @@ Cross-platform cloud verification should use Linux and Windows runners after
 the exact merge commit is available remotely. A local-only commit must not be
 pushed solely to trigger verification without explicit authorization.
 
+### Baseline verification record (2026-08-16)
+
+The feature tree after integrating the current local `main` passed:
+
+- `cargo check -p warp --lib --locked`;
+- the `infinishell-ssh` worker check with both Rust transport features;
+- all 38 focused `remote_server::rust_ssh` tests;
+- `cargo fmt --all -- --check`; and
+- `script/windows/test_package_remote_server.ps1` under PowerShell.
+
+Cross-compiling the worker from macOS for `x86_64-pc-windows-msvc` stops in
+`aws-lc-sys 0.39.1` before project Rust code because the macOS host has no
+Windows SDK headers (`stdlib.h` and `windows.h`). Native Windows and Linux
+cloud jobs remain pending until the exact merge commit is pushed; this is an
+environment/authorization gap, not a passing Windows runtime result.
+
 ## Post-merge observation log
 
 Use the table below in a release issue or follow-up document. Keep counts by
