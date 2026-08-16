@@ -9,17 +9,19 @@ use diesel::prelude::*;
 use diesel::result::Error as DieselError;
 use diesel::sqlite::SqliteConnection;
 use persistence::model::{
-    NewSshNode, NewSshOneKeyCredential, NewSshServer, NewSyncMeta, SshNodeRow,
-    SshOneKeyCredentialRow, SshServerRow, SyncMetaRow,
+    NewSshNode, NewSshOneKeyCredential, NewSshRoute, NewSshRouteHop, NewSshServer, NewSyncMeta,
+    SshNodeRow, SshOneKeyCredentialRow, SshRouteHopRow, SshRouteRow, SshServerRow, SyncMetaRow,
 };
-use persistence::schema::{ssh_nodes, ssh_onekey_credentials, ssh_servers, sync_meta};
+use persistence::schema::{
+    ssh_nodes, ssh_onekey_credentials, ssh_route_hops, ssh_routes, ssh_servers, sync_meta,
+};
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::secrets::SecretKind;
 use crate::types::{
     AuthType, NodeKind, OneKeyCredentialKind, ResolvedSshAuth, SshNode, SshOneKeyCredential,
-    SshServerInfo,
+    SshRoute, SshRouteHop, SshServerInfo,
 };
 
 #[derive(Debug, Error)]
@@ -32,6 +34,8 @@ pub enum SshRepositoryError {
     InvalidEnum { column: &'static str, value: String },
     #[error("sync version overflow at {0}")]
     SyncVersionOverflow(i64),
+    #[error("invalid SSH route: {0}")]
+    InvalidRoute(String),
 }
 
 /// 数据访问层。每个方法都接受 `&mut SqliteConnection`,调用方持有连接,
@@ -53,6 +57,113 @@ impl SshRepository {
     ) -> Result<Option<SshServerInfo>, SshRepositoryError> {
         let row: Option<SshServerRow> = ssh_servers::table.find(node_id).first(conn).optional()?;
         row.map(server_from_row).transpose()
+    }
+
+    pub fn list_routes(conn: &mut SqliteConnection) -> Result<Vec<SshRoute>, SshRepositoryError> {
+        let rows: Vec<SshRouteRow> = ssh_routes::table
+            .order((ssh_routes::updated_at.desc(), ssh_routes::id.asc()))
+            .load(conn)?;
+        rows.into_iter()
+            .map(|row| route_from_row(conn, row))
+            .collect()
+    }
+
+    pub fn get_route(
+        conn: &mut SqliteConnection,
+        route_id: &str,
+    ) -> Result<Option<SshRoute>, SshRepositoryError> {
+        let row = ssh_routes::table
+            .find(route_id)
+            .first::<SshRouteRow>(conn)
+            .optional()?;
+        row.map(|row| route_from_row(conn, row)).transpose()
+    }
+
+    pub fn create_route(
+        conn: &mut SqliteConnection,
+        name: &str,
+        target_node_id: Option<&str>,
+        hops: &[SshRouteHop],
+    ) -> Result<SshRoute, SshRepositoryError> {
+        validate_route(name, hops)?;
+        let id = new_uuid();
+        conn.transaction::<_, DieselError, _>(|conn| {
+            diesel::insert_into(ssh_routes::table)
+                .values(NewSshRoute {
+                    id: &id,
+                    name,
+                    target_node_id,
+                })
+                .execute(conn)?;
+            let rows = route_hop_inserts(&id, hops);
+            diesel::insert_into(ssh_route_hops::table)
+                .values(&rows)
+                .execute(conn)?;
+            Ok(())
+        })?;
+        let _ = Self::increment_sync_version(conn);
+        Self::get_route(conn, &id)?.ok_or(SshRepositoryError::NotFound(id))
+    }
+
+    pub fn update_route(
+        conn: &mut SqliteConnection,
+        route_id: &str,
+        name: &str,
+        target_node_id: Option<&str>,
+        hops: &[SshRouteHop],
+    ) -> Result<(), SshRepositoryError> {
+        validate_route(name, hops)?;
+        conn.transaction::<_, SshRepositoryError, _>(|conn| {
+            let updated = diesel::update(ssh_routes::table.find(route_id))
+                .set((
+                    ssh_routes::name.eq(name),
+                    ssh_routes::target_node_id.eq(target_node_id),
+                    ssh_routes::updated_at.eq(Utc::now().naive_utc()),
+                ))
+                .execute(conn)?;
+            if updated == 0 {
+                return Err(SshRepositoryError::NotFound(route_id.to_string()));
+            }
+            diesel::delete(ssh_route_hops::table.filter(ssh_route_hops::route_id.eq(route_id)))
+                .execute(conn)?;
+            let rows = route_hop_inserts(route_id, hops);
+            diesel::insert_into(ssh_route_hops::table)
+                .values(&rows)
+                .execute(conn)?;
+            Ok(())
+        })?;
+        let _ = Self::increment_sync_version(conn);
+        Ok(())
+    }
+
+    pub fn delete_route(
+        conn: &mut SqliteConnection,
+        route_id: &str,
+    ) -> Result<(), SshRepositoryError> {
+        let deleted = diesel::delete(ssh_routes::table.find(route_id)).execute(conn)?;
+        if deleted == 0 {
+            return Err(SshRepositoryError::NotFound(route_id.to_string()));
+        }
+        let _ = Self::increment_sync_version(conn);
+        Ok(())
+    }
+
+    pub fn mark_route_connected(
+        conn: &mut SqliteConnection,
+        route_id: &str,
+    ) -> Result<(), SshRepositoryError> {
+        let now = Utc::now().naive_utc();
+        let updated = diesel::update(ssh_routes::table.find(route_id))
+            .set((
+                ssh_routes::last_connected_at.eq(Some(now)),
+                ssh_routes::updated_at.eq(now),
+            ))
+            .execute(conn)?;
+        if updated == 0 {
+            return Err(SshRepositoryError::NotFound(route_id.to_string()));
+        }
+        let _ = Self::increment_sync_version(conn);
+        Ok(())
     }
 
     /// 按 host(大小写不敏感)+ port 查找第一台匹配的服务器,返回其 node_id。
@@ -439,6 +550,84 @@ fn new_uuid() -> String {
     Uuid::new_v4().to_string()
 }
 
+fn validate_route(name: &str, hops: &[SshRouteHop]) -> Result<(), SshRepositoryError> {
+    if name.trim().is_empty() {
+        return Err(SshRepositoryError::InvalidRoute(
+            "路径名称不能为空".to_string(),
+        ));
+    }
+    if hops.is_empty() || hops.len() > 8 {
+        return Err(SshRepositoryError::InvalidRoute(
+            "路径必须包含 1 到 8 个跳点".to_string(),
+        ));
+    }
+    for hop in hops {
+        if hop.port == Some(0)
+            || hop.target_alias.trim().is_empty()
+            || hop.target_alias.trim() != hop.target_alias
+            || hop.target_alias.starts_with('-')
+            || hop.target_alias.len() > 255
+            || hop
+                .target_alias
+                .chars()
+                .any(|ch| ch.is_control() || ch.is_whitespace())
+        {
+            return Err(SshRepositoryError::InvalidRoute(
+                "跳点别名或端口无效".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn route_hop_inserts<'a>(route_id: &'a str, hops: &'a [SshRouteHop]) -> Vec<NewSshRouteHop<'a>> {
+    hops.iter()
+        .enumerate()
+        .map(|(position, hop)| NewSshRouteHop {
+            route_id,
+            position: position as i32,
+            node_id: hop.node_id.as_deref(),
+            target_alias: &hop.target_alias,
+            port: hop.port.map(i32::from),
+            execution_scope: "previous_hop",
+        })
+        .collect()
+}
+
+fn route_from_row(
+    conn: &mut SqliteConnection,
+    row: SshRouteRow,
+) -> Result<SshRoute, SshRepositoryError> {
+    let hop_rows: Vec<SshRouteHopRow> = ssh_route_hops::table
+        .filter(ssh_route_hops::route_id.eq(&row.id))
+        .order(ssh_route_hops::position.asc())
+        .load(conn)?;
+    let mut hops = Vec::with_capacity(hop_rows.len());
+    for (expected_position, hop) in hop_rows.into_iter().enumerate() {
+        if hop.position != expected_position as i32 || hop.execution_scope != "previous_hop" {
+            return Err(SshRepositoryError::InvalidRoute(format!(
+                "路径 {} 的跳点顺序或执行作用域无效",
+                row.id
+            )));
+        }
+        hops.push(SshRouteHop {
+            node_id: hop.node_id,
+            target_alias: hop.target_alias,
+            port: hop.port.map(|port| port as u16),
+        });
+    }
+    validate_route(&row.name, &hops)?;
+    Ok(SshRoute {
+        id: row.id,
+        name: row.name,
+        target_node_id: row.target_node_id,
+        hops,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        last_connected_at: row.last_connected_at,
+    })
+}
+
 fn node_from_row(r: SshNodeRow) -> Result<SshNode, SshRepositoryError> {
     let kind = NodeKind::parse(&r.kind).ok_or_else(|| SshRepositoryError::InvalidEnum {
         column: "ssh_nodes.kind",
@@ -638,6 +827,7 @@ pub(crate) fn run_test_migrations(conn: &mut SqliteConnection) {
         include_str!(
             "../../persistence/migrations/2026-07-26-010000_add_ssh_machine_memory_deleted_at/up.sql"
         ),
+        include_str!("../../persistence/migrations/2026-08-14-000000_add_ssh_routes/up.sql"),
     ] {
         conn.batch_execute(up).unwrap();
     }
@@ -1266,3 +1456,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "route_repository_tests.rs"]
+mod route_tests;

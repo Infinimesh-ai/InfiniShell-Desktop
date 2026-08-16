@@ -23,12 +23,13 @@ use crate::auth::RemoteServerAuthContext;
 use crate::client::ClientEvent;
 #[cfg(not(target_family = "wasm"))]
 use crate::client::InitializeParams;
-use crate::client::RemoteServerClient;
+use crate::client::{ParentConnectionHandle, RemoteServerClient};
 use crate::codebase_index_proto::RemoteCodebaseIndexStatus;
 use crate::proto::{
     CodebaseIndexLimits, DiffMode, DiffState, DiffStateErrorValue, DiffStateFileDelta,
     DiffStateMetadataUpdate, DiffStateSnapshot, FileStatusInfo, GetDiffStateResponse, GitOpDelta,
-    GitStatusMetadata, PrInfo, RepositoryInfo, TextEdit, diff_state, get_diff_state_response,
+    GitStatusMetadata, PrInfo, RemoteServerCapability, RepositoryInfo, TextEdit, diff_state,
+    get_diff_state_response,
 };
 use crate::repo_metadata_proto::proto_load_repo_metadata_directory_response_to_update;
 #[cfg(not(target_family = "wasm"))]
@@ -39,7 +40,7 @@ use crate::setup::RemoteOs;
 use crate::setup::UnsupportedReason;
 use crate::setup::{PreinstallCheckResult, RemotePlatform, RemoteServerSetupState};
 #[cfg(not(target_family = "wasm"))]
-use crate::transport::{Connection, ControlPath};
+use crate::transport::{Connection, ControlPath, TransportConnection};
 use crate::transport::{Error, InstallSource, RemoteTransport};
 
 /// Maximum number of reconnection attempts after a spontaneous disconnect.
@@ -75,6 +76,7 @@ struct ReconnectParams {
 #[cfg(not(target_family = "wasm"))]
 struct InitializeHandshake {
     host_id: HostId,
+    capabilities: HashSet<i32>,
     event_rx: async_channel::Receiver<ClientEvent>,
     failure_rx: async_channel::Receiver<crate::client::RequestFailedEvent>,
     host_response_rx: async_channel::Receiver<crate::proto::ServerMessage>,
@@ -338,17 +340,12 @@ pub enum RemoteSessionState {
     /// Server process spawned, client exists, initialize handshake in progress.
     Initializing {
         client: Arc<RemoteServerClient>,
-        /// The transport's owning `Child`. Dropped when the state is
-        /// replaced or removed, killing the subprocess via
-        /// `kill_on_drop`.
+        /// transport 持有的生命周期资源；移除状态时会权威终止连接。
         #[cfg(not(target_family = "wasm"))]
-        _child: async_process::Child,
+        resource: Box<dyn TransportConnection>,
         /// See type-level doc.
         #[cfg(not(target_family = "wasm"))]
         control_path: ControlPath,
-        /// Tail buffer of the last N stderr lines from the proxy subprocess.
-        #[cfg(not(target_family = "wasm"))]
-        stderr_tail: crate::client::RemoteServerLog,
     },
     /// Initialize handshake succeeded. Client is ready for requests.
     Connected {
@@ -360,9 +357,9 @@ pub enum RemoteSessionState {
         /// identity, preventing a stale session for a previous identity from
         /// receiving a different user's bearer token.
         identity_key: String,
-        /// The transport's owning `Child`. See `Initializing::_child`.
+        /// transport 持有的生命周期资源。
         #[cfg(not(target_family = "wasm"))]
-        _child: async_process::Child,
+        resource: Box<dyn TransportConnection>,
         /// See type-level doc.
         #[cfg(not(target_family = "wasm"))]
         control_path: ControlPath,
@@ -385,6 +382,27 @@ pub enum RemoteSessionState {
     AwaitingExitStatus { control_path: ControlPath },
     /// Connection dropped (EOF/error from the reader task).
     Disconnected,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SshRouteNodeState {
+    Preparing,
+    Connected,
+    BlockedByParent,
+    Reconnecting,
+    Disconnected,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SshRouteNode {
+    pub session_id: SessionId,
+    pub parent_session_id: Option<SessionId>,
+    pub host_id: Option<HostId>,
+    /// 用户在父级 shell 中输入的 SSH 目标；不包含其他命令或配置正文。
+    pub target_alias: String,
+    pub port: Option<u16>,
+    pub depth: u32,
+    pub state: SshRouteNodeState,
 }
 
 /// Events emitted by [`RemoteServerManager`].
@@ -1316,6 +1334,13 @@ pub struct RemoteServerManager {
     /// Per-session connection state. Each SSH session gets its own dedicated
     /// connection to the remote server.
     sessions: HashMap<SessionId, RemoteSessionState>,
+    /// 运行时 SSH 控制面路由图，以 shell session 为稳定节点。
+    ssh_routes: HashMap<SessionId, SshRouteNode>,
+    ssh_route_children: HashMap<SessionId, HashSet<SessionId>>,
+    /// 可跨父级重连复用的动态 client 句柄。
+    parent_connection_handles: HashMap<SessionId, ParentConnectionHandle>,
+    /// 每个已完成握手的 session 显式宣告的协议能力。
+    session_capabilities: HashMap<SessionId, HashSet<i32>>,
     /// Reverse index: host → sessions for O(1) lookup by `HostId`.
     host_to_sessions: HashMap<HostId, HashSet<SessionId>>,
     /// User-facing connection labels by session, applied after the initialize
@@ -1365,6 +1390,10 @@ impl RemoteServerManager {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
         Self {
             sessions: HashMap::new(),
+            ssh_routes: HashMap::new(),
+            ssh_route_children: HashMap::new(),
+            parent_connection_handles: HashMap::new(),
+            session_capabilities: HashMap::new(),
             host_to_sessions: HashMap::new(),
             session_labels: HashMap::new(),
             spawner: ctx.spawner(),
@@ -1384,6 +1413,165 @@ impl RemoteServerManager {
         codebase_index_limits: Option<CodebaseIndexLimits>,
     ) {
         self.codebase_index_limits = codebase_index_limits;
+    }
+
+    pub fn register_ssh_route(
+        &mut self,
+        session_id: SessionId,
+        parent_session_id: Option<SessionId>,
+        reported_depth: u32,
+        target_alias: String,
+        port: Option<u16>,
+    ) -> Result<(), String> {
+        if target_alias.is_empty()
+            || target_alias.starts_with('-')
+            || target_alias.len() > 255
+            || target_alias
+                .chars()
+                .any(|ch| ch.is_control() || ch.is_whitespace())
+        {
+            return Err("SSH route 目标别名无效".to_string());
+        }
+        let expected_depth = match parent_session_id {
+            Some(parent_session_id) => {
+                let parent = self
+                    .ssh_routes
+                    .get(&parent_session_id)
+                    .ok_or_else(|| "父级 SSH route 尚未注册".to_string())?;
+                parent.depth.saturating_add(1)
+            }
+            None => 1,
+        };
+        if expected_depth > 8 || reported_depth != expected_depth {
+            return Err(format!(
+                "SSH route 深度无效：reported={reported_depth} expected={expected_depth}"
+            ));
+        }
+        let mut ancestor = parent_session_id;
+        while let Some(ancestor_id) = ancestor {
+            if ancestor_id == session_id {
+                return Err("SSH route 包含循环".to_string());
+            }
+            ancestor = self
+                .ssh_routes
+                .get(&ancestor_id)
+                .and_then(|node| node.parent_session_id);
+        }
+        if let Some(previous) = self.ssh_routes.insert(
+            session_id,
+            SshRouteNode {
+                session_id,
+                parent_session_id,
+                host_id: None,
+                target_alias,
+                port,
+                depth: expected_depth,
+                state: SshRouteNodeState::Preparing,
+            },
+        ) && let Some(previous_parent) = previous.parent_session_id
+            && let Some(children) = self.ssh_route_children.get_mut(&previous_parent)
+        {
+            children.remove(&session_id);
+        }
+        if let Some(parent_session_id) = parent_session_id {
+            self.ssh_route_children
+                .entry(parent_session_id)
+                .or_default()
+                .insert(session_id);
+        }
+        self.parent_connection_handles
+            .entry(session_id)
+            .or_insert_with(|| ParentConnectionHandle::new(session_id));
+        Ok(())
+    }
+
+    pub fn parent_connection_handle(&mut self, session_id: SessionId) -> ParentConnectionHandle {
+        let connected_client = self.client_for_session(session_id).cloned();
+        let handle = self
+            .parent_connection_handles
+            .entry(session_id)
+            .or_insert_with(|| ParentConnectionHandle::new(session_id));
+        if let Some(client) = connected_client {
+            handle.set_client(Some(client));
+        }
+        handle.clone()
+    }
+
+    pub fn ssh_route(&self, session_id: SessionId) -> Option<&SshRouteNode> {
+        self.ssh_routes.get(&session_id)
+    }
+
+    pub fn session_supports(
+        &self,
+        session_id: SessionId,
+        capability: RemoteServerCapability,
+    ) -> bool {
+        self.session_capabilities
+            .get(&session_id)
+            .is_some_and(|capabilities| capabilities.contains(&(capability as i32)))
+    }
+
+    pub fn ssh_route_path(&self, session_id: SessionId) -> Vec<SshRouteNode> {
+        let mut path = Vec::new();
+        let mut current = Some(session_id);
+        while let Some(session_id) = current {
+            let Some(node) = self.ssh_routes.get(&session_id) else {
+                break;
+            };
+            path.push(node.clone());
+            current = node.parent_session_id;
+        }
+        path.reverse();
+        path
+    }
+
+    /// 返回终端标题使用的 SSH 访问路径。
+    ///
+    /// 路径只使用已记录的连接标签，不暴露 ControlMaster socket、配置或凭据；
+    /// 尚未完成连接、因而没有标签的节点使用稳定的通用名称。
+    pub fn ssh_route_display_path(&self, session_id: SessionId) -> Option<String> {
+        let path = self.ssh_route_path(session_id);
+        if path.is_empty() {
+            return None;
+        }
+
+        let labels = path
+            .iter()
+            .map(|node| {
+                self.session_labels
+                    .get(&node.session_id)
+                    .map(String::as_str)
+                    .unwrap_or("Remote host")
+            })
+            .collect::<Vec<_>>();
+        Some(format!("Local > {}", labels.join(" > ")))
+    }
+
+    /// 返回保存访问路径所需的最小连接信息，按本地到叶节点排序。
+    pub fn ssh_route_targets(&self, session_id: SessionId) -> Option<Vec<(String, Option<u16>)>> {
+        let path = self.ssh_route_path(session_id);
+        (!path.is_empty()).then(|| {
+            path.into_iter()
+                .map(|node| (node.target_alias, node.port))
+                .collect()
+        })
+    }
+
+    fn mark_route_descendants_blocked(&mut self, session_id: SessionId) {
+        let mut pending = self
+            .ssh_route_children
+            .get(&session_id)
+            .into_iter()
+            .flat_map(|children| children.iter().copied())
+            .collect::<Vec<_>>();
+        while let Some(child_id) = pending.pop() {
+            if let Some(node) = self.ssh_routes.get_mut(&child_id) {
+                node.state = SshRouteNodeState::BlockedByParent;
+            }
+            if let Some(children) = self.ssh_route_children.get(&child_id) {
+                pending.extend(children.iter().copied());
+            }
+        }
     }
 
     /// Returns a connected client for the given host by picking an arbitrary
@@ -2147,13 +2335,12 @@ impl RemoteServerManager {
                             // to Disconnected while we wait so the session slot
                             // is not empty (an empty slot would be misread as
                             // "user deregistered" by the is_cancelled check).
-                            let maybe_child_and_stderr = spawner
+                            let maybe_resource = spawner
                                 .spawn(move |me, _ctx| {
                                     match me.sessions.remove(&session_id) {
                                         Some(RemoteSessionState::Initializing {
-                                            _child,
+                                            resource,
                                             control_path,
-                                            stderr_tail,
                                             ..
                                         }) => {
                                             me.sessions.insert(
@@ -2162,7 +2349,7 @@ impl RemoteServerManager {
                                                     control_path,
                                                 },
                                             );
-                                            Some((_child, stderr_tail))
+                                            Some(resource)
                                         }
                                         other => {
                                             // Put back whatever was there
@@ -2184,10 +2371,11 @@ impl RemoteServerManager {
                             // which is critical for ResponseChannelClosed
                             // errors where the non-blocking try_status()
                             // previously returned None due to a timing race.
-                            let (exit_status, proxy_stderr) = match maybe_child_and_stderr {
-                                Some((child, stderr_tail)) => {
-                                    let status = Self::await_exit_status(child, session_id).await;
-                                    let stderr = stderr_tail.drain();
+                            let (exit_status, proxy_stderr) = match maybe_resource {
+                                Some(resource) => {
+                                    let stderr = resource.stderr_tail();
+                                    let status =
+                                        Self::await_exit_status(resource, session_id).await;
                                     (status, stderr)
                                 }
                                 None => (None, None),
@@ -2258,9 +2446,8 @@ impl RemoteServerManager {
             event_rx,
             failure_rx,
             host_response_rx,
-            child,
+            resource,
             control_path,
-            stderr_tail,
         } = transport
             .connect(executor.clone())
             .await
@@ -2281,9 +2468,8 @@ impl RemoteServerManager {
                     session_id,
                     RemoteSessionState::Initializing {
                         client: client_for_init,
-                        _child: child,
+                        resource,
                         control_path,
-                        stderr_tail,
                     },
                 );
                 true
@@ -2365,6 +2551,7 @@ impl RemoteServerManager {
 
         Ok(InitializeHandshake {
             host_id: HostId::new(resp.host_id),
+            capabilities: resp.capabilities.into_iter().collect(),
             event_rx,
             failure_rx,
             host_response_rx,
@@ -2412,10 +2599,29 @@ impl RemoteServerManager {
     ///   outright. Unlike `SessionDisconnected`, this one never fires for
     ///   spontaneous drops -- only for explicit teardown.
     pub fn deregister_session(&mut self, session_id: SessionId, ctx: &mut ModelContext<Self>) {
+        let children = self
+            .ssh_route_children
+            .get(&session_id)
+            .map(|children| children.iter().copied().collect::<Vec<_>>())
+            .unwrap_or_default();
+        for child_id in children {
+            self.deregister_session(child_id, ctx);
+        }
+        if let Some(handle) = self.parent_connection_handles.remove(&session_id) {
+            handle.set_client(None);
+        }
         self.last_navigation.remove(&session_id);
         self.session_bootstrap_info.remove(&session_id);
         self.session_platforms.remove(&session_id);
+        self.session_capabilities.remove(&session_id);
         self.session_labels.remove(&session_id);
+        self.ssh_route_children.remove(&session_id);
+        if let Some(route) = self.ssh_routes.remove(&session_id)
+            && let Some(parent_session_id) = route.parent_session_id
+            && let Some(children) = self.ssh_route_children.get_mut(&parent_session_id)
+        {
+            children.remove(&session_id);
+        }
 
         // Remove the session entry. Dropping the `RemoteSessionState`
         // here drops the transport's owned `Child` (if any), which
@@ -3637,6 +3843,7 @@ impl RemoteServerManager {
     ) {
         let InitializeHandshake {
             host_id,
+            capabilities,
             event_rx,
             failure_rx,
             host_response_rx,
@@ -3646,7 +3853,7 @@ impl RemoteServerManager {
         // Only transition if the session is still in Initializing state.
         let Some(RemoteSessionState::Initializing {
             client,
-            _child,
+            resource,
             control_path,
             ..
         }) = self.sessions.remove(&session_id)
@@ -3661,11 +3868,18 @@ impl RemoteServerManager {
                 client: client.clone(),
                 host_id: host_id.clone(),
                 identity_key,
-                _child,
+                resource,
                 control_path,
                 transport,
             },
         );
+        self.parent_connection_handle(session_id)
+            .set_client(Some(client.clone()));
+        self.session_capabilities.insert(session_id, capabilities);
+        if let Some(route) = self.ssh_routes.get_mut(&session_id) {
+            route.host_id = Some(host_id.clone());
+            route.state = SshRouteNodeState::Connected;
+        }
         self.host_to_sessions
             .entry(host_id.clone())
             .or_default()
@@ -3752,39 +3966,22 @@ impl RemoteServerManager {
         }
     }
 
-    /// Captures the exit status from a `Child` process, if available.
+    /// 非阻塞读取 transport 连接资源的退出状态。
     #[cfg(not(target_family = "wasm"))]
     fn capture_exit_status(
-        child: &mut async_process::Child,
+        resource: &mut dyn TransportConnection,
         session_id: SessionId,
     ) -> Option<RemoteServerExitStatus> {
-        match child.try_status() {
-            Ok(Some(status)) => {
-                let code = status.code();
-                #[cfg(unix)]
-                let signal_killed = {
-                    use std::os::unix::process::ExitStatusExt;
-                    status.signal().is_some()
-                };
-                #[cfg(not(unix))]
-                let signal_killed = false;
+        match resource.try_exit_status() {
+            Some(status) => {
                 log::warn!(
-                    "Remote server process exited: session={session_id:?} code={code:?} signal_killed={signal_killed}"
+                    "Remote server transport exited: session={session_id:?} status={status:?}"
                 );
-                Some(RemoteServerExitStatus {
-                    code,
-                    signal_killed,
-                })
+                Some(status)
             }
-            Ok(None) => {
+            None => {
                 log::warn!(
-                    "Remote server process still running despite EOF on reader task: session={session_id:?}"
-                );
-                None
-            }
-            Err(e) => {
-                log::warn!(
-                    "Remote server exit status read failed: session={session_id:?} error={e}"
+                    "Remote server transport has no exit status after EOF: session={session_id:?}"
                 );
                 None
             }
@@ -3803,34 +4000,21 @@ impl RemoteServerManager {
     /// `None` due to the timing race.
     #[cfg(not(target_family = "wasm"))]
     async fn await_exit_status(
-        mut child: async_process::Child,
+        resource: Box<dyn TransportConnection>,
         session_id: SessionId,
     ) -> Option<RemoteServerExitStatus> {
-        match child.status().with_timeout(EXIT_STATUS_WAIT_TIMEOUT).await {
-            Ok(Ok(status)) => {
-                let code = status.code();
-                #[cfg(unix)]
-                let signal_killed = {
-                    use std::os::unix::process::ExitStatusExt;
-                    status.signal().is_some()
-                };
-                #[cfg(not(unix))]
-                let signal_killed = false;
+        match resource
+            .wait_for_exit()
+            .with_timeout(EXIT_STATUS_WAIT_TIMEOUT)
+            .await
+        {
+            Ok(Some(status)) => {
                 log::info!(
-                    "Remote server process exited (async): session={session_id:?} \
-                     code={code:?} signal_killed={signal_killed}"
+                    "Remote server transport exited (async): session={session_id:?} status={status:?}"
                 );
-                Some(RemoteServerExitStatus {
-                    code,
-                    signal_killed,
-                })
+                Some(status)
             }
-            Ok(Err(e)) => {
-                log::warn!(
-                    "Remote server exit status read failed: session={session_id:?} error={e}"
-                );
-                None
-            }
+            Ok(None) => None,
             Err(_) => {
                 log::warn!(
                     "Remote server process did not exit within \
@@ -3847,6 +4031,9 @@ impl RemoteServerManager {
         session_id: SessionId,
         ctx: &mut ModelContext<Self>,
     ) {
+        if let Some(handle) = self.parent_connection_handles.get(&session_id) {
+            handle.set_client(None);
+        }
         let Some(prev) = self.sessions.remove(&session_id) else {
             return;
         };
@@ -3856,15 +4043,19 @@ impl RemoteServerManager {
         if let RemoteSessionState::Connected {
             host_id,
             identity_key,
-            mut _child,
+            mut resource,
             control_path,
             transport,
             ..
         } = prev
         {
-            let exit_status = Self::capture_exit_status(&mut _child, session_id);
-            // Drop the old child process explicitly before reconnecting.
-            drop(_child);
+            if let Some(route) = self.ssh_routes.get_mut(&session_id) {
+                route.state = SshRouteNodeState::Disconnected;
+            }
+            self.mark_route_descendants_blocked(session_id);
+            let exit_status = Self::capture_exit_status(&mut *resource, session_id);
+            resource.terminate();
+            drop(resource);
 
             // Ask the transport whether a reconnect is viable given the
             // exit status. For example, SSH returns false when exit code
@@ -3962,6 +4153,9 @@ impl RemoteServerManager {
                 control_path: control_path.clone(),
             },
         );
+        if let Some(route) = self.ssh_routes.get_mut(&session_id) {
+            route.state = SshRouteNodeState::Reconnecting;
+        }
 
         let spawner = self.spawner.clone();
         let executor = ctx.background_executor().clone();

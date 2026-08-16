@@ -141,6 +141,10 @@ pub enum LeftPanelEvent {
         node_id: String,
         server: warp_ssh_manager::SshServerInfo,
     },
+    /// 用户点击已保存的多级 SSH 路径，由工作区创建第一跳终端并自动推进后续跳点。
+    OpenSshRoute {
+        route: warp_ssh_manager::SshRoute,
+    },
     /// 用户从 SSH 管理器右键 "SFTP 浏览" → 主窗口开 SFTP 文件浏览器 pane。
     OpenSftpPane {
         node_id: String,
@@ -334,6 +338,11 @@ impl LeftPanelView {
                     ctx.emit(LeftPanelEvent::OpenSftpPane {
                         node_id: node_id.clone(),
                         server: server.clone(),
+                    });
+                }
+                SshManagerPanelEvent::OpenSshRoute { route } => {
+                    ctx.emit(LeftPanelEvent::OpenSshRoute {
+                        route: route.clone(),
                     });
                 }
                 SshManagerPanelEvent::PersistenceError(msg) => {

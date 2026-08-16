@@ -267,6 +267,25 @@ fn password_auth_args_ends_with_echo_ok_command() {
     );
 }
 
+#[test]
+fn saved_route_hop_command_preserves_target_and_port_as_arguments() {
+    assert_eq!(
+        build_ssh_route_hop_command("deploy@staging", Some(2222)).as_deref(),
+        Some("ssh -p 2222 'deploy@staging'")
+    );
+}
+
+#[test]
+fn saved_route_hop_command_rejects_option_and_whitespace_injection() {
+    assert_eq!(
+        build_ssh_route_hop_command("-oProxyCommand=bad", None),
+        None
+    );
+    assert_eq!(build_ssh_route_hop_command("host; shutdown", None), None);
+    assert_eq!(build_ssh_route_hop_command("host", Some(0)), None);
+    assert_eq!(build_ssh_route_hop_command(&"h".repeat(256), None), None);
+}
+
 /// 回归保护:password 路径的 destination (`user@host`) 必须出现在所有 `-o`
 /// 选项**之后**、`echo ok` **之前**。SSH 命令行解析规则为
 /// `ssh [options] destination [command]`,第一个非选项参数 = destination,

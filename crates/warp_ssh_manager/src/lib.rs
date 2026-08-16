@@ -19,7 +19,8 @@ pub use memory::{
 pub use repository::{SshRepository, SshRepositoryError, SyncMetaRepository};
 pub use secrets::{KeychainSecretStore, SecretKind, SshSecretStore, SshSecretStoreError};
 pub use ssh_command::{
-    ConnectionTestResult, build_ssh_args, build_ssh_command_line, test_connection,
+    ConnectionTestResult, build_ssh_args, build_ssh_command_line, build_ssh_route_hop_command,
+    test_connection,
 };
 pub use ssh_config_parser::{
     LoadOutcome, LoadResult, SshConfigCandidate, default_ssh_config_path, load_candidates,
@@ -31,5 +32,5 @@ pub use sync_provider::{
 };
 pub use types::{
     AuthType, ConnectionStatus, NodeKind, OneKeyCredentialKind, ResolvedSshAuth, SshNode,
-    SshOneKeyCredential, SshServerInfo,
+    SshOneKeyCredential, SshRoute, SshRouteHop, SshServerInfo,
 };

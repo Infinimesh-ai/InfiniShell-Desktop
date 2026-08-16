@@ -5,6 +5,13 @@ use prost::Message;
 
 use crate::proto::{ClientMessage, ServerMessage};
 
+/// 单个 SSH 隧道数据帧允许携带的最大字节数。
+pub const MAX_TUNNEL_CHUNK_SIZE: usize = 32 * 1024;
+/// 每个隧道 channel 建立时授予对端的初始窗口。
+pub const INITIAL_TUNNEL_WINDOW: usize = 256 * 1024;
+/// 单个父连接允许同时打开的 SSH 隧道上限。
+pub const MAX_TUNNELS_PER_CONNECTION: usize = 16;
+
 /// Maximum allowed message payload size (64 MB).
 ///
 /// `read_message` rejects payloads exceeding this limit after decoding the

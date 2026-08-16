@@ -45,6 +45,32 @@ fn server(id: &str, parent_id: Option<&str>, name: &str, sort_order: i32) -> Ssh
     }
 }
 
+#[test]
+fn saved_route_context_target_round_trips() {
+    let target = route_context_target("route-1");
+    assert_eq!(target, "saved-route:route-1");
+    assert_eq!(route_id_from_context_target(&target), Some("route-1"));
+    assert_eq!(route_id_from_context_target("server-1"), None);
+}
+
+#[test]
+fn saved_route_hops_display_preserves_aliases_and_ports() {
+    let hops = vec![
+        SshRouteHop {
+            node_id: None,
+            target_alias: "bastion".to_string(),
+            port: None,
+        },
+        SshRouteHop {
+            node_id: None,
+            target_alias: "deploy@internal".to_string(),
+            port: Some(2222),
+        },
+    ];
+
+    assert_eq!(route_hops_display(&hops), "bastion > deploy@internal:2222");
+}
+
 fn panel_with_nodes(
     ctx: &mut ViewContext<SshManagerPanel>,
     nodes: Vec<SshNode>,
@@ -60,6 +86,7 @@ fn panel_with_nodes(
 
     SshManagerPanel {
         nodes,
+        routes: Vec::new(),
         depths,
         selected_id: None,
         add_folder_btn: MouseStateHandle::default(),
@@ -67,6 +94,7 @@ fn panel_with_nodes(
         toggle_all_btn: MouseStateHandle::default(),
         row_states,
         row_drag_states,
+        route_row_states: HashMap::new(),
         context_menu_position: None,
         context_menu_target: None,
         context_menu_item_states: (0..MAX_CONTEXT_MENU_ITEMS)

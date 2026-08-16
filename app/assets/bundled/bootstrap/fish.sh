@@ -55,6 +55,16 @@ function warp_send_json_message
     end
 end
 
+if test "$WARP_IS_SSH" = "1"
+    set -g _WARP_EXIT_SHELL_SENT 0
+    function __warp_emit_exit_shell --on-event fish_exit
+        if test "$_WARP_EXIT_SHELL_SENT" = "0"; and test -n "$WARP_SESSION_ID"
+            set -g _WARP_EXIT_SHELL_SENT 1
+            warp_send_json_message "{\"hook\": \"ExitShell\", \"value\": {\"session_id\": $WARP_SESSION_ID}}"
+        end
+    end
+end
+
 function warp_maybe_send_reset_grid_osc
     # Note that $WARP_USING_WINDOWS_CON_PTY is set in the init shell script.
     if [ "$WARP_USING_WINDOWS_CON_PTY" = true ]
@@ -601,9 +611,8 @@ if not test -e $APT_SOURCESDIR$source_file_name.list; and not test -e $APT_SOURC
   end
 end
 
-# The SSH logic only applies to local sessions, because we don't yet have support for bootstrapping
-# recursive SSH sessions.
-if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"
+# 本地 shell 和已协商递归能力的远端 shell 都安装 SSH wrapper。
+if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1" -a "$WARP_RECURSIVE_SSH_EXTENSION" = "1"
     function is_interactive_ssh_session
         # Parse through all ssh options, as defined in the ssh man pages.  Send
         # stderr to /dev/null to silence argparse output when an option is invalid.
@@ -676,6 +685,19 @@ for (\$i = 0; \$i -lt \$bytes.Length; \$i++) { \$bytes[\$i] = [Convert]::ToByte(
     function warp_ssh_helper
         set -l init_shell_zsh (warp_init_shell "zsh")
         set -l init_shell_bash (warp_init_shell "bash")
+        set -l current_hop_depth 0
+        if string match --quiet --regex '^[0-9]+$' -- "$WARP_SSH_HOP_DEPTH"
+            set current_hop_depth "$WARP_SSH_HOP_DEPTH"
+        end
+        set -l next_hop_depth (math "$current_hop_depth + 1")
+        if test "$next_hop_depth" -gt 8
+            command ssh $argv
+            return
+        end
+        set -l control_scope "local"
+        if test "$WARP_IS_SSH" = "1"
+            set control_scope "remote"
+        end
         set -l remote_session_id (command od -An -N8 -tu8 /dev/urandom 2>/dev/null | command tr -d ' \n')
         if test -z "$remote_session_id"; or test "$remote_session_id" = "0"
             # If we cannot generate a non-zero random token, run plain SSH instead.
@@ -804,10 +826,18 @@ for (\$i = 0; \$i -lt \$bytes.Length; \$i++) { \$bytes[\$i] = [Convert]::ToByte(
         -t $argv \
 "
 export TERM_PROGRAM='WarpTerminal'
+export WARP_IS_SSH='1'
+export WARP_USE_SSH_WRAPPER='$WARP_USE_SSH_WRAPPER'
+export WARP_SSH_REUSE_CONTROL_MASTER='$WARP_SSH_REUSE_CONTROL_MASTER'
+export WARP_RECURSIVE_SSH_EXTENSION='$WARP_RECURSIVE_SSH_EXTENSION'
+export WARP_SSH_HOP_DEPTH='$next_hop_depth'
+SSH_SOCKET_DIR="\${XDG_RUNTIME_DIR:-\$HOME/.cache}/infinishell-ssh"
+export SSH_SOCKET_DIR
+command -p mkdir -p "\$SSH_SOCKET_DIR" && command -p chmod 700 "\$SSH_SOCKET_DIR"
 test -n '$WARP_CLIENT_VERSION' && export WARP_CLIENT_VERSION='$WARP_CLIENT_VERSION'
 # Only forward the protocol version if it was set locally (i.e. the HOANotifications feature flag is on).
 test -n '$WARP_CLI_AGENT_PROTOCOL_VERSION' && export WARP_CLI_AGENT_PROTOCOL_VERSION='$WARP_CLI_AGENT_PROTOCOL_VERSION'
-hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"transport\": {\"version\": 1, \"type\": \"control_master\", \"socket_path\": \"'$control_path'\", \"ownership\": \"'$control_master_ownership'\"}, \"remote_shell\": \"%s\", \"session_id\": '"$WARP_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command od -An -v -tx1 | command tr -d " \n")'"
+hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"transport\": {\"version\": 1, \"type\": \"control_master\", \"socket_path\": \"'$control_path'\", \"ownership\": \"'$control_master_ownership'\"}, \"remote_shell\": \"%s\", \"session_id\": '"$WARP_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"control_scope\": \"'$control_scope'\", \"hop_depth\": '$next_hop_depth', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command od -An -v -tx1 | command tr -d " \n")'"
 printf '$DCS_START$DCS_JSON_MARKER%s$DCS_END' "'$hook'"
 
 if test "'"${SHELL##*/}" != "bash" -a "${SHELL##*/}" != "zsh"'"; then

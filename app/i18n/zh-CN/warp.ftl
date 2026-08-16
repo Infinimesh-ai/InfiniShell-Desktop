@@ -2810,6 +2810,7 @@ workspace-left-panel-ssh-manager-candidates-error = 读取 SSH 配置失败 { $p
 workspace-left-panel-ssh-manager-candidates-add = 添加到 SSH 管理器
 workspace-left-panel-ssh-manager-candidates-added = 已添加
 workspace-left-panel-ssh-manager-candidates-refresh = 从 ~/.ssh/config 重新加载
+workspace-left-panel-ssh-manager-routes-header = 已保存路径
 terminal-su-root-password-confirm = 自动输入 Root 密码
 terminal-su-root-password-confirm-subtitle = 点击确认后自动填入保存的 Root 密码
 terminal-su-root-password-cancel = 取消

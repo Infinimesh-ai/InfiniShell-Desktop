@@ -19,6 +19,7 @@ pub use load_ai_conversation::ConversationRestorationInNewPaneType;
 use onboarding::callout::{FinalState, OnboardingCalloutViewEvent, OnboardingQuery};
 use onboarding::{OnboardingCalloutView, OnboardingKeybindings};
 use repo_metadata::CanonicalizedPath;
+use warp_ssh_manager::{SshRepository, SshRouteHop, build_ssh_route_hop_command};
 use warp_util::remote_path::RemotePath;
 use warp_util::standardized_path::StandardizedPath;
 
@@ -28,6 +29,7 @@ use crate::ai::skills::SkillOpenOrigin;
 use crate::global_resource_handles::GlobalResourceHandlesProvider;
 use crate::ssh_manager::onekey::{OneKeyCredentialKind, load_saved_ssh_credentials};
 use crate::ssh_manager::password_prompt::bytes_look_like_password_prompt;
+use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
 pub(crate) mod docker_sandbox;
 mod link_detection;
 mod open_in_warp;
@@ -2402,6 +2404,17 @@ struct OneKeyPromptCandidate {
     kind: OneKeyCredentialKind,
 }
 
+struct PendingSshRouteLaunch {
+    route_id: String,
+    root_session_id: Option<SessionId>,
+    expected_depth: u32,
+    remaining_hops: VecDeque<SshRouteHop>,
+}
+
+fn is_ssh_route_command(command: &str) -> bool {
+    command.split_ascii_whitespace().next() == Some("ssh")
+}
+
 /// Cached result of [`TerminalView::canonical_session_pwd_if_local`].
 struct LocalSessionCanonicalPwdCache {
     /// Non-canonical path
@@ -2547,6 +2560,9 @@ pub struct TerminalView {
     /// SSH 管理器创建的 tab 会先启动本地 shell，再执行 ssh 并等待远端 shell
     /// bootstrap；默认 Agent 模式必须延后到远端会话可用后再进入。
     enter_agent_view_after_ssh_bootstrap: bool,
+    /// SSH Manager 保存路径的逐跳启动状态；每个目标都等上一跳完成 bootstrap
+    /// 后才写入 PTY，确保命令由正确的父主机 OpenSSH 执行。
+    pending_ssh_route_launch: Option<PendingSshRouteLaunch>,
     /// Zap:「从项目发起 Agent 对话」入口暂存的 (project_id, node_id) 绑定,
     /// 在本终端下一次新建 Agent 会话时消费并写入会话数据(仅入口 UX,不参与
     /// 上下文注入)。
@@ -4240,6 +4256,7 @@ impl TerminalView {
             pending_command_queue: Default::default(),
             enter_agent_view_after_pending_commands: false,
             enter_agent_view_after_ssh_bootstrap: false,
+            pending_ssh_route_launch: None,
             pending_project_binding: None,
             slow_bootstrap_banner,
             is_slow_bootstrap_banner_open: false,
@@ -4425,6 +4442,9 @@ impl TerminalView {
                         proxy_stderr,
                         is_cancelled,
                     } => {
+                        // 保存路径只在每一跳 remote-server 就绪后继续；某跳扩展失败时
+                        // 停止自动推进，但保留用户已经登录的普通 SSH shell。
+                        me.pending_ssh_route_launch = None;
                         me.model.lock().event_proxy.send_terminal_event(
                             crate::terminal::event::Event::RemoteServerFailed {
                                 session_id: *session_id,
@@ -11446,6 +11466,7 @@ impl TerminalView {
                 ctx.request_user_attention();
             }
             ModelEvent::Exit { reason } => {
+                self.pending_ssh_route_launch = None;
                 if !self.manual_pty_shutdown_requested
                     && let Some((conversation_id, command)) =
                         self.maybe_send_agent_exited_shell_telemetry(ctx)
@@ -11824,6 +11845,14 @@ impl TerminalView {
                 cloud_workflow_id,
                 cloud_env_var_collection_id,
             }) => {
+                // 成功进入下一跳时，当前 ssh block 会一直运行到用户退出；若它在
+                // bootstrap 前就结束，则说明该跳没有建立，必须取消残留的自动推进。
+                if self.pending_ssh_route_launch.is_some()
+                    && let BlockType::User(completed) = block_type
+                    && is_ssh_route_command(&completed.command)
+                {
+                    self.pending_ssh_route_launch = None;
+                }
                 // To automatically warpify a subshell, we run the relevant command to open the
                 // subshell and create a future to delay bootstrapping the subshell long enough for
                 // the command to complete. We receive AfterBlockCompleted if the subshell command
@@ -12367,6 +12396,9 @@ impl TerminalView {
                     self.update_agent_view_back_button_state(ctx);
                 }
             }
+            ModelEvent::Handler(AnsiHandlerEvent::Bootstrapped { session_id, .. }) => {
+                self.advance_pending_ssh_route(*session_id, ctx);
+            }
             ModelEvent::DetectedEndOfSshLogin(check_type) => {
                 self.handle_detected_end_of_ssh_login(check_type, ctx);
             }
@@ -12533,6 +12565,19 @@ impl TerminalView {
             }
             ModelEvent::ExitShell { session_id } => {
                 self.maybe_spawn_machine_memory_review(*session_id, ctx);
+                if self
+                    .pending_ssh_route_launch
+                    .as_ref()
+                    .is_some_and(|pending| {
+                        RemoteServerManager::handle(ctx)
+                            .as_ref(ctx)
+                            .ssh_route_path(*session_id)
+                            .first()
+                            .is_some_and(|root| Some(root.session_id) == pending.root_session_id)
+                    })
+                {
+                    self.pending_ssh_route_launch = None;
+                }
 
                 // Drop the remote server client for this session before the
                 // user's outer ssh tunnel starts closing. The last
@@ -15147,6 +15192,125 @@ impl TerminalView {
     pub fn execute_command_or_set_pending(&mut self, command: &str, ctx: &mut ViewContext<Self>) {
         self.set_pending_command(command, ctx);
         self.execute_pending_command((), ctx);
+    }
+
+    /// 让当前终端在第一跳登录后继续执行保存路径的后续跳点。
+    pub fn start_saved_ssh_route(
+        &mut self,
+        route_id: String,
+        remaining_hops: Vec<SshRouteHop>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.pending_ssh_route_launch = Some(PendingSshRouteLaunch {
+            route_id,
+            root_session_id: None,
+            expected_depth: 1,
+            remaining_hops: remaining_hops.into(),
+        });
+        ctx.notify();
+    }
+
+    fn advance_pending_ssh_route(&mut self, session_id: SessionId, ctx: &mut ViewContext<Self>) {
+        let (route, root_session_id) = {
+            let manager = RemoteServerManager::handle(ctx);
+            let manager = manager.as_ref(ctx);
+            let Some(route) = manager.ssh_route(session_id).cloned() else {
+                return;
+            };
+            if route.state != crate::remote_server::manager::SshRouteNodeState::Connected {
+                return;
+            }
+            let root_session_id = manager
+                .ssh_route_path(session_id)
+                .first()
+                .map(|node| node.session_id);
+            (route, root_session_id)
+        };
+
+        let Some(pending) = self.pending_ssh_route_launch.as_mut() else {
+            return;
+        };
+        if route.depth != pending.expected_depth {
+            return;
+        }
+        match pending.root_session_id {
+            Some(expected_root) if Some(expected_root) != root_session_id => return,
+            Some(_) => {}
+            None => pending.root_session_id = root_session_id,
+        }
+
+        if let Some(hop) = pending.remaining_hops.pop_front() {
+            let Some(command) = build_ssh_route_hop_command(&hop.target_alias, hop.port) else {
+                log::warn!("保存的 SSH 路径包含无效跳点，停止自动推进");
+                self.pending_ssh_route_launch = None;
+                return;
+            };
+            pending.expected_depth += 1;
+            self.execute_command_or_set_pending(&command, ctx);
+            return;
+        }
+
+        let route_id = pending.route_id.clone();
+        self.pending_ssh_route_launch = None;
+        if let Err(error) = warp_ssh_manager::with_conn(|conn| {
+            Ok(SshRepository::mark_route_connected(conn, &route_id)?)
+        }) {
+            log::warn!("更新 SSH 保存路径最近连接时间失败：{error}");
+            return;
+        }
+        SshTreeChangedNotifier::handle(ctx).update(ctx, |_, ctx| {
+            ctx.emit(SshTreeChangedEvent::TreeChanged);
+        });
+    }
+
+    fn save_current_ssh_route(&mut self, ctx: &mut ViewContext<Self>) {
+        let Some(session_id) = self.active_block_session_id() else {
+            return;
+        };
+        let Some(targets) = RemoteServerManager::handle(ctx)
+            .as_ref(ctx)
+            .ssh_route_targets(session_id)
+        else {
+            return;
+        };
+
+        let result = warp_ssh_manager::with_conn(|conn| {
+            let mut hops = Vec::with_capacity(targets.len());
+            for (target_alias, port) in &targets {
+                let host = target_alias
+                    .rsplit_once('@')
+                    .map_or(target_alias.as_str(), |(_, host)| host);
+                let node_id =
+                    SshRepository::find_server_node_by_host_port(conn, host, port.unwrap_or(22))?;
+                hops.push(SshRouteHop {
+                    node_id,
+                    target_alias: target_alias.clone(),
+                    port: *port,
+                });
+            }
+            let name = targets
+                .iter()
+                .map(|(target_alias, port)| match port {
+                    Some(port) => format!("{target_alias}:{port}"),
+                    None => target_alias.clone(),
+                })
+                .join(" > ");
+            let target_node_id = hops.last().and_then(|hop| hop.node_id.as_deref());
+            Ok(SshRepository::create_route(
+                conn,
+                &name,
+                target_node_id,
+                &hops,
+            )?)
+        });
+        match result {
+            Ok(_) => {
+                SshTreeChangedNotifier::handle(ctx).update(ctx, |_, ctx| {
+                    ctx.emit(SshTreeChangedEvent::TreeChanged);
+                });
+            }
+            Err(error) => log::warn!("保存 SSH 访问路径失败：{error}"),
+        }
     }
 
     fn hide_slow_bootstrap_banner(&mut self, ctx: &mut ViewContext<Self>) {
@@ -26080,6 +26244,7 @@ impl TypedActionView for TerminalView {
             | AltSelect(_)
             | AltMouseAction(_)
             | ToggleMaximizePane
+            | SaveCurrentSshRoute
             | PromptContextMenu { .. }
             | OpenInputContextMenu { .. }
             | InputContextMenuItem(_)
@@ -26377,6 +26542,7 @@ impl TypedActionView for TerminalView {
                 ctx.emit(Event::Pane(PaneEvent::SplitUp(chosen_shell.to_owned())))
             }
             ToggleMaximizePane => ctx.emit(Event::Pane(PaneEvent::ToggleMaximized)),
+            SaveCurrentSshRoute => self.save_current_ssh_route(ctx),
             PromptContextMenu {
                 position_offset_from_prompt,
             } => self.show_prompt_context_menu(*position_offset_from_prompt, ctx),

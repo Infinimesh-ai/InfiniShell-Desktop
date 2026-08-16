@@ -120,6 +120,14 @@ fn new_command_executor_for_network_backed_pty(
     ctx: &mut ModelContext<Sessions>,
 ) -> Arc<dyn CommandExecutor> {
     log::info!("creating an in-band command executor!");
+    new_in_band_command_executor(executor_command_tx, in_band_command_output_rx, ctx)
+}
+
+fn new_in_band_command_executor(
+    executor_command_tx: &Sender<ExecutorCommandEvent>,
+    in_band_command_output_rx: Receiver<ExecutedExecutorCommandEvent>,
+    ctx: &mut ModelContext<Sessions>,
+) -> Arc<dyn CommandExecutor> {
     let (in_band_command_cancelled_tx, in_band_command_cancelled_rx) = async_channel::unbounded();
     let executor = Arc::new(InBandCommandExecutor::new(
         executor_command_tx.clone(),
@@ -320,25 +328,7 @@ fn new_command_executor_for_local_tty_session(
                 Arc::new(NoOpCommandExecutor::new())
             } else {
                 log::info!("creating an in-band command executor!");
-                let (in_band_command_cancelled_tx, in_band_command_cancelled_rx) =
-                    async_channel::unbounded();
-                let executor = Arc::new(InBandCommandExecutor::new(
-                    executor_command_tx.clone(),
-                    in_band_command_cancelled_tx.clone(),
-                ));
-                let executor_clone = executor.clone();
-                ctx.spawn_stream_local(
-                    in_band_command_output_rx,
-                    move |_, event, _| executor_clone.handle_executed_command_event(event),
-                    |_, _| {}, /* on_done */
-                );
-                let executor_clone = executor.clone();
-                ctx.spawn_stream_local(
-                    in_band_command_cancelled_rx,
-                    move |_, event, _| executor_clone.handle_cancelled_in_band_command_event(event),
-                    |_, _| {}, /* on_done */
-                );
-                executor
+                new_in_band_command_executor(executor_command_tx, in_band_command_output_rx, ctx)
             }
         }
     }

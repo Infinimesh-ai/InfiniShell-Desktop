@@ -321,6 +321,10 @@ impl DProtoHook {
                 "remote_shell" => value.remote_shell = v,
                 "session_id" => value.session_id = v.parse::<u64>().ok(),
                 "remote_session_id" => value.remote_session_id = v.parse::<u64>().ok(),
+                "control_scope" => {
+                    value.control_scope = SshControlScope::parse(&v).unwrap_or_default()
+                }
+                "hop_depth" => value.hop_depth = v.parse::<u32>().unwrap_or_default(),
                 "external_control_master" => {
                     value.external_control_master = v.parse::<bool>().unwrap_or(false)
                 }
@@ -711,6 +715,26 @@ pub struct PreInteractiveSSHSessionValue {
     pub session_id: HookSessionId,
 }
 
+/// 标识 SSH wrapper 的 ControlMaster socket 位于哪台机器。
+/// 旧版 hook 不包含该字段，因此默认解析为本地。
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SshControlScope {
+    #[default]
+    Local,
+    Remote,
+}
+
+impl SshControlScope {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "local" => Some(Self::Local),
+            "remote" => Some(Self::Remote),
+            _ => None,
+        }
+    }
+}
+
 /// Received from the pty after establishing an SSH connection, prior to
 /// bootstrapping the session.
 #[derive(PartialEq, Eq, Deserialize, Serialize, Clone)]
@@ -761,6 +785,12 @@ pub struct SSHValue {
     pub session_id: HookSessionId,
     #[serde(default)]
     pub remote_session_id: HookSessionId,
+    /// `socket_path` 位于桌面客户端还是父级远端服务所在机器。
+    #[serde(default)]
+    pub control_scope: SshControlScope,
+    /// 从本地 shell 到当前目标经过的交互式 SSH 边数。
+    #[serde(default)]
+    pub hop_depth: u32,
     /// `true` when `socket_path` points at a ControlMaster the user already
     /// had running (the wrapper attached to it instead of creating its own).
     /// Warp must not tear down such a master on session exit. Defaults to

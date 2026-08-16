@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::io;
 use std::sync::Arc;
+use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::channel::oneshot;
+use futures::channel::{mpsc, oneshot};
 use futures::io::{AsyncRead, AsyncWrite};
+use futures::{FutureExt as _, StreamExt as _};
 use warpui_core::r#async::{FutureExt as _, executor};
 
 use crate::codebase_index_proto::{
@@ -18,12 +21,13 @@ use crate::proto::{
     CreateDirectory, CreateDirectoryResponse, DeleteFile, DiffMode, DiffStateFileDelta,
     DiffStateMetadataUpdate, DiffStateSnapshot, ErrorCode, GitStatusMetadata, Initialize,
     InitializeResponse, ListDirectory, ListDirectoryResponse, LoadRepoMetadataDirectoryResponse,
-    NavigatedToDirectoryResponse, PrInfo, ReadFileChunk, ReadFileChunkResponse,
-    RemoteAgentContextSnapshot, RepositoryInfo, ResolvePath, ResolvePathResponse,
-    RunCommandRequest, RunCommandResponse, ServerMessage, SessionBootstrapped, TextEdit,
-    UnsubscribeDiffState, UpdateGitHubPrInfo, UpdateGitHubRepoInfo, UpdateGitStatus,
-    WriteFileChunk, WriteFileChunkResponse, host_scoped_request, notification,
-    read_file_chunk_response, server_message, session_scoped_request,
+    NavigatedToDirectoryResponse, OpenSshStream, PrInfo, ReadFileChunk, ReadFileChunkResponse,
+    RegisterSshControl, ReleaseSshControl, RemoteAgentContextSnapshot, RepositoryInfo, ResolvePath,
+    ResolvePathResponse, RunCommandRequest, RunCommandResponse, ServerMessage, SessionBootstrapped,
+    SshStreamPurpose, TextEdit, TunnelReset, UnsubscribeDiffState, UpdateGitHubPrInfo,
+    UpdateGitHubRepoInfo, UpdateGitStatus, WriteFileChunk, WriteFileChunkResponse,
+    host_scoped_request, notification, read_file_chunk_response, server_message,
+    session_scoped_request, tunnel_client_message, tunnel_server_message,
 };
 use crate::repo_metadata_proto::{proto_snapshot_to_update, proto_to_repo_metadata_update};
 
@@ -37,6 +41,9 @@ use warp_util::standardized_path::StandardizedPath;
 use warpui_core::r#async::TransportStream;
 
 use crate::protocol::{self, ProtocolError, RequestId};
+
+mod tunnel;
+pub use tunnel::TunnelStream;
 
 /// Default request timeout (2 minutes).
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
@@ -176,6 +183,55 @@ pub struct RequestFailedEvent {
     pub error_kind: crate::manager::RemoteServerErrorKind,
 }
 
+/// 为嵌套 transport 提供父级会话当前可用的 client。
+///
+/// manager 在父级连接切换时原地更新该句柄，因此后代不会永久持有已经断开的
+/// `RemoteServerClient`。
+#[derive(Clone)]
+pub struct ParentConnectionHandle {
+    session_id: SessionId,
+    client: Arc<RwLock<Option<Arc<RemoteServerClient>>>>,
+}
+
+impl ParentConnectionHandle {
+    pub(crate) fn new(session_id: SessionId) -> Self {
+        Self {
+            session_id,
+            client: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    pub fn session_id(&self) -> SessionId {
+        self.session_id
+    }
+
+    pub fn client(&self) -> Option<Arc<RemoteServerClient>> {
+        self.client
+            .read()
+            .expect("parent connection handle poisoned")
+            .as_ref()
+            .filter(|client| !client.is_disconnected())
+            .cloned()
+    }
+
+    pub(crate) fn set_client(&self, client: Option<Arc<RemoteServerClient>>) {
+        *self
+            .client
+            .write()
+            .expect("parent connection handle poisoned") = client;
+    }
+}
+
+impl std::fmt::Debug for ParentConnectionHandle {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ParentConnectionHandle")
+            .field("session_id", &self.session_id)
+            .field("connected", &self.client().is_some())
+            .finish()
+    }
+}
+
 /// Client for communicating with a `remote_server` process over the remote server protocol.
 ///
 /// Exposes async request/response APIs over generic I/O streams (child-process pipes,
@@ -228,6 +284,9 @@ pub struct RemoteServerClient {
     /// get nudged to drop the attribute if the field ever starts being read.
     #[expect(dead_code)]
     host_response_tx: async_channel::Sender<ServerMessage>,
+
+    tunnel_outbound_tx: mpsc::Sender<ClientMessage>,
+    tunnel_multiplexer: tunnel::TunnelMultiplexer,
 }
 
 impl fmt::Debug for RemoteServerClient {
@@ -291,7 +350,9 @@ impl RemoteServerClient {
         let pending_requests: Arc<
             DashMap<RequestId, oneshot::Sender<Result<ServerMessage, ClientError>>>,
         > = Arc::new(DashMap::new());
-        let (outbound_tx, outbound_rx) = async_channel::unbounded::<ClientMessage>();
+        let (outbound_tx, outbound_rx) = async_channel::bounded::<ClientMessage>(256);
+        let (tunnel_outbound_tx, tunnel_outbound_rx) = mpsc::channel::<ClientMessage>(128);
+        let tunnel_multiplexer = tunnel::TunnelMultiplexer::new(tunnel_outbound_tx.clone());
         let (event_tx, event_rx) = async_channel::unbounded::<ClientEvent>();
         let (failure_tx, failure_rx) = async_channel::unbounded::<RequestFailedEvent>();
         let (host_response_tx, host_response_rx) = async_channel::unbounded::<ServerMessage>();
@@ -301,6 +362,7 @@ impl RemoteServerClient {
             .spawn(Self::writer_task(
                 writer,
                 outbound_rx,
+                tunnel_outbound_rx,
                 Arc::clone(&pending_requests),
                 event_tx.clone(),
             ))
@@ -312,6 +374,7 @@ impl RemoteServerClient {
                 event_tx,
                 Arc::clone(&disconnected),
                 host_response_tx.clone(),
+                tunnel_multiplexer.clone(),
             ))
             .detach();
 
@@ -322,6 +385,8 @@ impl RemoteServerClient {
                 disconnected,
                 failure_tx,
                 host_response_tx,
+                tunnel_outbound_tx,
+                tunnel_multiplexer,
             },
             event_rx,
             failure_rx,
@@ -373,6 +438,109 @@ impl RemoteServerClient {
                 Err(ClientError::UnexpectedResponse)
             }
         }
+    }
+
+    /// 在当前父连接上注册一个 SSH ControlMaster，并返回仅对该连接有效的引用。
+    pub async fn register_ssh_control(
+        &self,
+        registration: RegisterSshControl,
+    ) -> Result<String, ClientError> {
+        let request_id = RequestId::new();
+        let message = ClientMessage::tunnel(
+            request_id.to_string(),
+            String::new(),
+            tunnel_client_message::Message::RegisterControl(registration),
+        );
+        let response = self.send_request_internal(request_id, message).await?;
+        match response.message {
+            Some(server_message::Message::Tunnel(tunnel)) => match tunnel.message {
+                Some(tunnel_server_message::Message::ControlRegistered(response)) => {
+                    Ok(response.control_id)
+                }
+                _ => Err(ClientError::UnexpectedResponse),
+            },
+            _ => Err(ClientError::UnexpectedResponse),
+        }
+    }
+
+    /// 释放当前父连接上的 SSH ControlMaster 引用。
+    pub async fn release_ssh_control(
+        &self,
+        control_id: String,
+        stop_control_master: bool,
+    ) -> Result<(), ClientError> {
+        let message = ClientMessage::tunnel(
+            String::new(),
+            String::new(),
+            tunnel_client_message::Message::ReleaseControl(ReleaseSshControl {
+                control_id,
+                stop_control_master,
+            }),
+        );
+        self.outbound_tx
+            .send(message)
+            .await
+            .map_err(|_| ClientError::Disconnected)
+    }
+
+    /// 通过已注册的 ControlMaster 打开一条受流控的双向字节流。
+    pub async fn open_ssh_stream(
+        &self,
+        control_id: String,
+        purpose: SshStreamPurpose,
+        identity_key: String,
+    ) -> Result<TunnelStream, ClientError> {
+        let stream_id = uuid::Uuid::new_v4().to_string();
+        let stream = self.tunnel_multiplexer.register(stream_id.clone());
+        let request_id = RequestId::new();
+        let message = ClientMessage::tunnel(
+            request_id.to_string(),
+            stream_id.clone(),
+            tunnel_client_message::Message::Open(OpenSshStream {
+                control_id,
+                purpose: purpose.into(),
+                stdout_window_bytes: protocol::INITIAL_TUNNEL_WINDOW as u32,
+                stderr_window_bytes: protocol::INITIAL_TUNNEL_WINDOW as u32,
+                identity_key,
+            }),
+        );
+        let response = match self.send_request_internal(request_id, message).await {
+            Ok(response) => response,
+            Err(error) => {
+                self.tunnel_multiplexer.remove(&stream_id);
+                return Err(error);
+            }
+        };
+        let Some(server_message::Message::Tunnel(tunnel)) = response.message else {
+            self.tunnel_multiplexer.remove(&stream_id);
+            return Err(ClientError::UnexpectedResponse);
+        };
+        let Some(tunnel_server_message::Message::Opened(opened)) = tunnel.message else {
+            self.tunnel_multiplexer.remove(&stream_id);
+            return Err(ClientError::UnexpectedResponse);
+        };
+        if self
+            .tunnel_multiplexer
+            .activate(&stream_id, opened.stdin_window_bytes as usize)
+            .is_err()
+        {
+            self.tunnel_multiplexer.remove(&stream_id);
+            let _ = self
+                .tunnel_outbound_tx
+                .clone()
+                .try_send(ClientMessage::tunnel(
+                    String::new(),
+                    stream_id,
+                    tunnel_client_message::Message::Reset(TunnelReset {
+                        message: "server granted an invalid SSH tunnel window".to_string(),
+                    }),
+                ));
+            return Err(ClientError::Protocol(ProtocolError::Io(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "server granted an invalid SSH tunnel window",
+            ))));
+        }
+        Ok(stream)
     }
 
     /// Sends an `Authenticate` notification to rotate the daemon-wide
@@ -1155,13 +1323,25 @@ impl RemoteServerClient {
     async fn writer_task(
         writer: impl AsyncWrite + TransportStream,
         outbound_rx: async_channel::Receiver<ClientMessage>,
+        tunnel_outbound_rx: mpsc::Receiver<ClientMessage>,
         pending_requests: Arc<
             DashMap<RequestId, oneshot::Sender<Result<ServerMessage, ClientError>>>,
         >,
         event_tx: async_channel::Sender<ClientEvent>,
     ) {
         let mut writer = futures::io::BufWriter::new(writer);
-        while let Ok(msg) = outbound_rx.recv().await {
+        let mut tunnel_outbound_rx = tunnel_outbound_rx;
+        loop {
+            let control_message = outbound_rx.recv();
+            let tunnel_message = tunnel_outbound_rx.next();
+            futures::pin_mut!(control_message, tunnel_message);
+            let msg = futures::select_biased! {
+                msg = control_message.fuse() => msg.ok(),
+                msg = tunnel_message.fuse() => msg,
+            };
+            let Some(msg) = msg else {
+                break;
+            };
             let request_id = RequestId::from(msg.request_id.clone());
             let is_host_scoped = matches!(
                 &msg.message,
@@ -1204,6 +1384,7 @@ impl RemoteServerClient {
         event_tx: async_channel::Sender<ClientEvent>,
         disconnected: Arc<AtomicBool>,
         host_response_tx: async_channel::Sender<ServerMessage>,
+        tunnel_multiplexer: tunnel::TunnelMultiplexer,
     ) {
         let mut reader = futures::io::BufReader::new(reader);
         loop {
@@ -1211,6 +1392,13 @@ impl RemoteServerClient {
                 Ok(msg) => {
                     let request_id = RequestId::from(msg.request_id.clone());
                     if request_id.is_empty() {
+                        if matches!(
+                            &msg.message,
+                            Some(crate::proto::server_message::Message::Tunnel(_))
+                        ) {
+                            tunnel_multiplexer.handle_server_message(msg).await;
+                            continue;
+                        }
                         // Push message — convert to a domain event and forward.
                         if let Some(event) = Self::push_message_to_event(msg)
                             && event_tx.send(event).await.is_err()
@@ -1286,6 +1474,7 @@ impl RemoteServerClient {
         // where `pending_requests.clear()` runs before `send_request` has
         // inserted its oneshot entry.
         disconnected.store(true, Ordering::Release);
+        tunnel_multiplexer.disconnect_all();
 
         // Notify all pending requests that the connection is gone.
         pending_requests.clear();

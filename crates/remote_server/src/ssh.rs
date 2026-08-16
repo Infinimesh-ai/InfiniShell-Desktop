@@ -75,11 +75,21 @@ pub fn ssh_args(socket_path: &Path) -> Vec<String> {
 pub async fn stop_control_master(control_path: &ControlPath) {
     let socket_path = match control_path {
         ControlPath::WarpManaged(socket_path) => socket_path,
-        ControlPath::UserOwned(socket_path) => {
-            log::info!(
-                "stop_control_master: leaving user-owned ControlMaster at {} running",
-                socket_path.display()
-            );
+        ControlPath::UserOwned(_) => {
+            log::info!("stop_control_master: leaving user-owned ControlMaster running");
+            return;
+        }
+        ControlPath::Remote {
+            client,
+            control_id,
+            warp_managed,
+        } => {
+            if let Err(error) = client
+                .release_ssh_control(control_id.clone(), *warp_managed)
+                .await
+            {
+                log::warn!("远端 SSH ControlMaster 释放失败：{error}");
+            }
             return;
         }
         ControlPath::None => return,
@@ -99,30 +109,20 @@ pub async fn stop_control_master(control_path: &ControlPath) {
 
     match result {
         Ok(Ok(output)) if output.status.success() => {
-            log::info!(
-                "stop_control_master: `ssh -O exit` succeeded for {}",
-                socket_path.display()
-            );
+            log::info!("stop_control_master: `ssh -O exit` succeeded");
         }
         Ok(Ok(output)) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
             log::info!(
-                "stop_control_master: `ssh -O exit` for {} exited with {:?}: {stderr}",
-                socket_path.display(),
+                "stop_control_master: `ssh -O exit` exited with {:?}",
                 output.status.code(),
             );
         }
         Ok(Err(e)) => {
-            log::info!(
-                "stop_control_master: failed to spawn `ssh -O exit` for {}: {e}",
-                socket_path.display()
-            );
+            log::info!("stop_control_master: failed to spawn `ssh -O exit`: {e}");
         }
         Err(_) => {
             log::warn!(
-                "stop_control_master: `ssh -O exit` for {} timed out after {:?}",
-                socket_path.display(),
-                STOP_CONTROL_MASTER_TIMEOUT,
+                "stop_control_master: `ssh -O exit` timed out after {STOP_CONTROL_MASTER_TIMEOUT:?}"
             );
         }
     }

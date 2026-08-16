@@ -2893,6 +2893,7 @@ workspace-left-panel-ssh-manager-candidates-error = Could not read SSH config at
 workspace-left-panel-ssh-manager-candidates-add = Add to SSH Manager
 workspace-left-panel-ssh-manager-candidates-added = Added
 workspace-left-panel-ssh-manager-candidates-refresh = Refresh from ~/.ssh/config
+workspace-left-panel-ssh-manager-routes-header = Saved paths
 terminal-su-root-password-confirm = Auto-fill Root Password
 terminal-su-root-password-confirm-subtitle = Click to confirm and inject the saved Root password
 terminal-su-root-password-cancel = Cancel

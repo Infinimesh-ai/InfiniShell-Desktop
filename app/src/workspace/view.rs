@@ -6041,6 +6041,9 @@ impl Workspace {
             LeftPanelEvent::OpenSshTerminal { node_id, server } => {
                 self.open_ssh_terminal(node_id.clone(), server.clone(), ctx);
             }
+            LeftPanelEvent::OpenSshRoute { route } => {
+                self.open_ssh_route(route.clone(), ctx);
+            }
             LeftPanelEvent::OpenSftpPane { node_id, server: _ } => {
                 self.open_sftp_pane(node_id.clone(), ctx);
             }
@@ -6299,6 +6302,55 @@ impl Workspace {
         );
 
         Some(terminal_view)
+    }
+
+    /// 打开一条已保存的多级 SSH 路径。
+    ///
+    /// 第一跳若仍关联 SSH Manager 节点，则复用该节点的本地凭据解析；后续跳点
+    /// 只把别名和端口交给已登录的父级 shell，绝不转发本地 secret 或私钥路径。
+    pub fn open_ssh_route(
+        &mut self,
+        route: warp_ssh_manager::SshRoute,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let Some(first_hop) = route.hops.first() else {
+            log::warn!("无法打开空的 SSH 保存路径：{}", route.id);
+            return;
+        };
+
+        let linked_server = first_hop.node_id.as_deref().and_then(|node_id| {
+            warp_ssh_manager::with_conn(|conn| {
+                Ok(warp_ssh_manager::SshRepository::get_server(conn, node_id)?)
+            })
+            .unwrap_or_else(|error| {
+                log::warn!("读取 SSH 保存路径第一跳失败：{error}");
+                None
+            })
+        });
+        let mut server = linked_server.unwrap_or_else(|| warp_ssh_manager::SshServerInfo {
+            node_id: format!("saved-route:{}", route.id),
+            host: first_hop.target_alias.clone(),
+            port: first_hop.port.unwrap_or(22),
+            username: String::new(),
+            auth_type: warp_ssh_manager::AuthType::Key,
+            key_path: None,
+            credential_id: None,
+            startup_command: None,
+            notes: None,
+            last_connected_at: None,
+        });
+        // 保存路径的后续跳点必须紧跟第一跳 bootstrap，不能与节点自带启动命令竞争。
+        server.startup_command = None;
+        let node_id = server.node_id.clone();
+        let remaining_hops = route.hops.iter().skip(1).cloned().collect();
+        let route_id = route.id;
+
+        let Some(terminal_view) = self.open_ssh_terminal(node_id, server, ctx) else {
+            return;
+        };
+        terminal_view.update(ctx, |view, ctx| {
+            view.start_saved_ssh_route(route_id, remaining_hops, ctx);
+        });
     }
 
     /// Zap M4:处理项目主机路由器的开会话请求。多窗口下所有 WorkspaceView

@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 
 use chrono::{DateTime, Utc};
 use diesel::connection::{Connection, SimpleConnection};
-use diesel::{QueryDsl, RunQueryDsl};
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use zap_sync::{ApplyDataOutcome, SyncDataProvider, SyncEngineError, SyncVersionStore, crypto};
 use zeroize::Zeroizing;
@@ -17,7 +17,7 @@ use crate::db::with_conn;
 use crate::memory::{MAX_MEMORY_CHARS, MachineMemory, MachineMemoryRepository};
 use crate::repository::{SshRepository, SyncMetaRepository};
 use crate::secrets::{KeychainSecretStore, SecretKind, SshSecretStore};
-use crate::types::{NodeKind, OneKeyCredentialKind};
+use crate::types::{NodeKind, OneKeyCredentialKind, SshRoute};
 
 /// keychain 三种凭据 kind,用于 collect/apply/orphan-cleanup 时统一遍历
 const ALL_SECRET_KINDS: [SecretKind; 4] = [
@@ -93,6 +93,11 @@ pub struct SshSyncData {
     pub onekey_credentials: Vec<SyncOneKeyCredential>,
     #[serde(default)]
     pub machine_memories: Vec<SyncMachineMemory>,
+    /// 仅同步路径结构；该类型没有密码、socket、私钥内容或 agent 信息。
+    /// `None` 表示载荷来自尚不认识保存路径的旧客户端，应用时必须保留本地路径；
+    /// `Some([])` 才表示新客户端明确清空路径。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub routes: Option<Vec<SshRoute>>,
 }
 
 /// SSH 数据同步提供者
@@ -132,6 +137,8 @@ impl SyncDataProvider for SshSyncProvider {
             with_conn(|conn| Ok(MachineMemoryRepository::list_all_for_sync(conn)?))
                 .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
         let sync_machine_memories = encrypt_machine_memories(token, &machine_memories)?;
+        let routes = with_conn(|conn| Ok(SshRepository::list_routes(conn)?))
+            .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
 
         let onekey_credentials =
             with_conn(|conn| Ok(SshRepository::list_onekey_credentials(conn)?))
@@ -202,6 +209,7 @@ impl SyncDataProvider for SshSyncProvider {
             servers: sync_servers,
             onekey_credentials: sync_onekey_credentials,
             machine_memories: sync_machine_memories,
+            routes: Some(routes),
         };
 
         serde_json::to_value(&data)
@@ -279,6 +287,10 @@ impl SyncDataProvider for SshSyncProvider {
         // ---- 阶段 0.5 ---- 拓扑排序节点,父节点先于子节点;orphan(parent 不在数据集中)
         // 视作根节点插入,避免 SQLite FK 违规整事务回滚
         let sorted_nodes = topologically_sort_nodes(&ssh_data.nodes);
+        let synced_node_ids = sorted_nodes
+            .iter()
+            .map(|node| node.id.as_str())
+            .collect::<HashSet<_>>();
 
         // ---- 阶段 0.6 ---- 收集本地原有 keychain owner id,供后续 orphan keychain 清理
         let mut existing_secret_owner_ids: Vec<String> = with_conn(|conn| {
@@ -336,6 +348,29 @@ impl SyncDataProvider for SshSyncProvider {
         // ---- 阶段 2 ---- DB 事务:DELETE + 按拓扑顺序 INSERT
         let db_result = with_conn(|conn| {
             conn.transaction::<ApplyDataOutcome, anyhow::Error, _>(|conn| {
+                let (preserved_route_targets, preserved_hop_nodes) =
+                    if ssh_data.routes.is_none() {
+                        (
+                            persistence::schema::ssh_routes::table
+                                .select((
+                                    persistence::schema::ssh_routes::id,
+                                    persistence::schema::ssh_routes::target_node_id,
+                                ))
+                                .load::<(String, Option<String>)>(conn)?,
+                            persistence::schema::ssh_route_hops::table
+                                .select((
+                                    persistence::schema::ssh_route_hops::route_id,
+                                    persistence::schema::ssh_route_hops::position,
+                                    persistence::schema::ssh_route_hops::node_id,
+                                ))
+                                .load::<(String, i32, Option<String>)>(conn)?,
+                        )
+                    } else {
+                        (Vec::new(), Vec::new())
+                    };
+                if ssh_data.routes.is_some() {
+                    conn.batch_execute("DELETE FROM ssh_route_hops; DELETE FROM ssh_routes;")?;
+                }
                 conn.batch_execute(
                     "DELETE FROM ssh_servers; DELETE FROM ssh_nodes; DELETE FROM ssh_onekey_credentials;",
                 )?;
@@ -385,6 +420,82 @@ impl SyncDataProvider for SshSyncProvider {
                             credential_id: server.credential_id.as_deref(),
                         })
                         .execute(conn)?;
+                }
+                // 旧客户端载荷不包含 routes。重建 ssh_nodes 时 SQLite 会按外键规则
+                // 暂时把保存路径的 node 引用置空；对本次载荷中仍存在的 node 恢复
+                // 引用，避免一次旧客户端同步让第一跳丢失 SSH Manager 凭据关联。
+                for (route_id, node_id) in preserved_route_targets {
+                    if let Some(node_id) = node_id.filter(|id| synced_node_ids.contains(id.as_str()))
+                    {
+                        diesel::update(persistence::schema::ssh_routes::table.find(route_id))
+                            .set(persistence::schema::ssh_routes::target_node_id.eq(node_id))
+                            .execute(conn)?;
+                    }
+                }
+                for (route_id, position, node_id) in preserved_hop_nodes {
+                    if let Some(node_id) = node_id.filter(|id| synced_node_ids.contains(id.as_str()))
+                    {
+                        diesel::update(
+                            persistence::schema::ssh_route_hops::table
+                                .filter(
+                                    persistence::schema::ssh_route_hops::route_id.eq(route_id),
+                                )
+                                .filter(
+                                    persistence::schema::ssh_route_hops::position.eq(position),
+                                ),
+                        )
+                        .set(persistence::schema::ssh_route_hops::node_id.eq(node_id))
+                        .execute(conn)?;
+                    }
+                }
+                for route in ssh_data.routes.iter().flatten() {
+                    if route.name.trim().is_empty() || route.hops.is_empty() || route.hops.len() > 8
+                    {
+                        return Err(anyhow::anyhow!("同步数据包含无效的 SSH 路径"));
+                    }
+                    let target_node_id = route
+                        .target_node_id
+                        .as_deref()
+                        .filter(|node_id| synced_node_ids.contains(node_id));
+                    diesel::insert_into(persistence::schema::ssh_routes::table)
+                        .values((
+                            persistence::schema::ssh_routes::id.eq(&route.id),
+                            persistence::schema::ssh_routes::name.eq(&route.name),
+                            persistence::schema::ssh_routes::target_node_id.eq(target_node_id),
+                            persistence::schema::ssh_routes::created_at.eq(route.created_at),
+                            persistence::schema::ssh_routes::updated_at.eq(route.updated_at),
+                            persistence::schema::ssh_routes::last_connected_at
+                                .eq(route.last_connected_at),
+                        ))
+                        .execute(conn)?;
+                    for (position, hop) in route.hops.iter().enumerate() {
+                        if hop.port == Some(0)
+                            || hop.target_alias.trim().is_empty()
+                            || hop.target_alias.trim() != hop.target_alias
+                            || hop.target_alias.starts_with('-')
+                            || hop.target_alias.len() > 255
+                            || hop
+                                .target_alias
+                                .chars()
+                                .any(|ch| ch.is_control() || ch.is_whitespace())
+                        {
+                            return Err(anyhow::anyhow!("同步数据包含无效的 SSH 跳点"));
+                        }
+                        let node_id = hop
+                            .node_id
+                            .as_deref()
+                            .filter(|node_id| synced_node_ids.contains(node_id));
+                        diesel::insert_into(persistence::schema::ssh_route_hops::table)
+                            .values(persistence::model::NewSshRouteHop {
+                                route_id: &route.id,
+                                position: position as i32,
+                                node_id,
+                                target_alias: &hop.target_alias,
+                                port: hop.port.map(i32::from),
+                                execution_scope: "previous_hop",
+                            })
+                            .execute(conn)?;
+                    }
                 }
                 // 快照读取 + LWW 归并 + 写回在同一事务内完成,
                 // 阶段 1(keychain)期间落地的本地 memory 写入也会被归并进来。
@@ -932,6 +1043,7 @@ mod tests {
             }],
             onekey_credentials: Vec::new(),
             machine_memories: Vec::new(),
+            routes: Some(Vec::new()),
         };
         let json = serde_json::to_string(&data).unwrap();
         let parsed: SshSyncData = serde_json::from_str(&json).unwrap();
@@ -942,6 +1054,7 @@ mod tests {
             parsed.servers[0].password_encrypted,
             Some("enc".to_string())
         );
+        assert_eq!(parsed.routes, Some(Vec::new()));
     }
 
     #[test]
@@ -978,6 +1091,7 @@ mod tests {
 
         assert!(parsed.onekey_credentials.is_empty());
         assert!(parsed.machine_memories.is_empty());
+        assert!(parsed.routes.is_none());
         assert_eq!(parsed.servers[0].credential_id, None);
     }
 
@@ -995,6 +1109,7 @@ mod tests {
                 password_encrypted: Some("enc".to_string()),
             }],
             machine_memories: Vec::new(),
+            routes: Some(Vec::new()),
         };
 
         let json = serde_json::to_string(&data).unwrap();
@@ -1362,6 +1477,7 @@ mod tests {
                 updated_at: "2020-01-01T00:00:00Z".to_string(),
                 deleted_at: None,
             }],
+            routes: Some(Vec::new()),
         };
 
         let provider =

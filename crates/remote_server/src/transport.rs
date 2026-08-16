@@ -10,6 +10,7 @@
 //! `Arc<dyn RemoteTransport>` for reconnection.
 //!
 //! [`RemoteServerManager`]: crate::manager::RemoteServerManager
+use std::fmt::Debug;
 use std::future::Future;
 #[cfg(not(target_family = "wasm"))]
 use std::path::PathBuf;
@@ -153,6 +154,12 @@ pub enum ControlPath {
     /// The SSH wrapper attached to a ControlMaster the user already had
     /// running at this socket path. Warp must never tear it down.
     UserOwned(PathBuf),
+    /// ControlMaster 位于父级远端 daemon，只能通过该父连接引用。
+    Remote {
+        client: std::sync::Arc<RemoteServerClient>,
+        control_id: String,
+        warp_managed: bool,
+    },
     /// No ControlMaster socket (e.g. in-process test transports).
     None,
 }
@@ -180,15 +187,9 @@ pub struct Connection {
     /// this client's `pending_requests`. The manager drains this to match
     /// against its `pending_host_requests`.
     pub host_response_rx: async_channel::Receiver<crate::proto::ServerMessage>,
-    /// The subprocess whose stdio backs the client (e.g.
-    /// `ssh … remote-server-proxy`). Spawned with `kill_on_drop(true)`
-    /// by the transport, so dropping this `Child` sends SIGKILL to the
-    /// subprocess. The [`RemoteServerManager`] holds it for the
-    /// lifetime of the session and drops it on teardown.
-    ///
-    /// [`RemoteServerManager`]: crate::manager::RemoteServerManager
+    /// 与协议流绑定的 transport 生命周期资源。
     #[cfg(not(target_family = "wasm"))]
-    pub child: async_process::Child,
+    pub resource: Box<dyn TransportConnection>,
     /// For transports that multiplex through a local SSH
     /// `ControlMaster` socket: the socket path tagged with master
     /// ownership, which decides whether explicit teardown (after the
@@ -196,10 +197,72 @@ pub struct Connection {
     /// [`ControlPath`].
     #[cfg(not(target_family = "wasm"))]
     pub control_path: ControlPath,
-    /// Tail buffer of the last N stderr lines from the SSH subprocess.
-    /// Drained on connection failure and attached to telemetry.
-    #[cfg(not(target_family = "wasm"))]
-    pub stderr_tail: RemoteServerLog,
+}
+
+/// 抹平本地子进程与远端隧道的退出、清理和诊断接口。
+#[cfg(not(target_family = "wasm"))]
+pub trait TransportConnection: Send + Debug {
+    fn terminate(&mut self);
+    fn try_exit_status(&mut self) -> Option<RemoteServerExitStatus>;
+    fn wait_for_exit(
+        self: Box<Self>,
+    ) -> Pin<Box<dyn Future<Output = Option<RemoteServerExitStatus>> + Send>>;
+    fn stderr_tail(&self) -> Option<String>;
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[derive(Debug)]
+pub struct LocalProcessConnection {
+    child: async_process::Child,
+    stderr_tail: RemoteServerLog,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl LocalProcessConnection {
+    pub fn new(child: async_process::Child, stderr_tail: RemoteServerLog) -> Self {
+        Self { child, stderr_tail }
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl TransportConnection for LocalProcessConnection {
+    fn terminate(&mut self) {
+        let _ = self.child.kill();
+    }
+
+    fn try_exit_status(&mut self) -> Option<RemoteServerExitStatus> {
+        self.child
+            .try_status()
+            .ok()
+            .flatten()
+            .map(exit_status_to_remote)
+    }
+
+    fn wait_for_exit(
+        mut self: Box<Self>,
+    ) -> Pin<Box<dyn Future<Output = Option<RemoteServerExitStatus>> + Send>> {
+        Box::pin(async move { self.child.status().await.ok().map(exit_status_to_remote) })
+    }
+
+    fn stderr_tail(&self) -> Option<String> {
+        self.stderr_tail.drain()
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn exit_status_to_remote(status: std::process::ExitStatus) -> RemoteServerExitStatus {
+    let code = status.code();
+    #[cfg(unix)]
+    let signal_killed = {
+        use std::os::unix::process::ExitStatusExt as _;
+        status.signal().is_some()
+    };
+    #[cfg(not(unix))]
+    let signal_killed = false;
+    RemoteServerExitStatus {
+        code,
+        signal_killed,
+    }
 }
 
 /// Transport abstraction for remote server connections.
@@ -303,4 +366,50 @@ pub trait RemoteTransport: Send + Sync + std::fmt::Debug {
     /// code 255) should return `false`, which tells the manager to skip
     /// the reconnect loop entirely.
     fn is_reconnectable(&self, exit_status: Option<&RemoteServerExitStatus>) -> bool;
+}
+
+impl<T> RemoteTransport for std::sync::Arc<T>
+where
+    T: RemoteTransport + ?Sized + 'static,
+{
+    fn detect_platform(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<RemotePlatform, Error>> + Send>> {
+        (**self).detect_platform()
+    }
+
+    fn run_preinstall_check(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<PreinstallCheckResult, Error>> + Send>> {
+        (**self).run_preinstall_check()
+    }
+
+    fn check_binary(&self) -> Pin<Box<dyn Future<Output = Result<bool, Error>> + Send>> {
+        (**self).check_binary()
+    }
+
+    fn check_has_old_binary(&self) -> Pin<Box<dyn Future<Output = anyhow::Result<bool>> + Send>> {
+        (**self).check_has_old_binary()
+    }
+
+    fn install_binary(&self) -> Pin<Box<dyn Future<Output = InstallOutcome> + Send>> {
+        (**self).install_binary()
+    }
+
+    fn connect(
+        &self,
+        executor: std::sync::Arc<executor::Background>,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<Connection>> + Send>> {
+        (**self).connect(executor)
+    }
+
+    fn remove_remote_server_binary(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>> {
+        (**self).remove_remote_server_binary()
+    }
+
+    fn is_reconnectable(&self, exit_status: Option<&RemoteServerExitStatus>) -> bool {
+        (**self).is_reconnectable(exit_status)
+    }
 }

@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use instant::Instant;
 use remote_server::auth::RemoteServerAuthContext;
+use remote_server::proto::{RegisterSshControl, RemoteServerCapability, SshControlOwnership};
 use remote_server::setup::{
     PreinstallCheckResult, PreinstallStatus, RemoteLibc, RemoteOs, RemotePlatform,
     UnsupportedReason,
 };
-use remote_server::transport::Error;
+use remote_server::transport::{Error, RemoteTransport};
 use settings::Setting;
 use warp_core::SessionId;
 use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity, WeakModelHandle};
@@ -16,11 +17,13 @@ use super::pty_controller::{EventLoopSender, PtyController};
 // 调用点随 AuthClient 一同物理删。auth context 在构造时基于
 // `AuthState` 构建一次并缓存(BYOP 路径下无云端 token 刷新)。
 use crate::auth::AuthStateProvider;
+use crate::features::FeatureFlag;
 use crate::remote_server::auth_context::server_api_auth_context;
 use crate::remote_server::manager::{RemoteServerManager, RemoteServerManagerEvent};
+use crate::remote_server::remote_ssh_transport::RemoteSshTransport;
 use crate::remote_server::ssh_transport::SshTransport;
 use crate::terminal::model::session::{
-    ControlMasterOwnership, SessionInfo, SshSessionTransportDescriptor,
+    ControlMasterOwnership, ScopedControlPath, SessionInfo, SshSessionTransportDescriptor,
 };
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
 use crate::terminal::shell::ShellType;
@@ -35,16 +38,21 @@ use crate::{TelemetryEvent, send_telemetry_from_ctx};
 /// can be measured when the flow reaches `SessionConnected`.
 enum SshInitState {
     Idle,
+    /// 正在把远端 ControlMaster 注册到父级 daemon。
+    AwaitingRegistration {
+        session_info: SessionInfo,
+        setup_start: Instant,
+    },
     /// Stash held, `check_binary` in flight.
     AwaitingCheck {
         session_info: SessionInfo,
-        transport: SshTransport,
+        transport: Arc<dyn RemoteTransport>,
         setup_start: Instant,
     },
     /// Stash held, choice block showing.
     AwaitingUserChoice {
         session_info: SessionInfo,
-        transport: SshTransport,
+        transport: Arc<dyn RemoteTransport>,
         setup_start: Instant,
     },
     /// Stash held, `install_binary` in flight.
@@ -53,7 +61,7 @@ enum SshInitState {
     AwaitingInstall {
         session_id: SessionId,
         session_info: SessionInfo,
-        transport: SshTransport,
+        transport: Arc<dyn RemoteTransport>,
         setup_start: Instant,
         #[allow(dead_code)]
         for_update: bool,
@@ -199,9 +207,9 @@ impl<T: EventLoopSender> RemoteServerController<T> {
         }
     }
 
-    /// Idle -> AwaitingCheck
+    /// Idle -> AwaitingRegistration/AwaitingCheck
     fn on_ssh_init_shell_requested(&mut self, info: SessionInfo, ctx: &mut ModelContext<Self>) {
-        let Some(descriptor) = info.is_ssh_wrapper_session.transport() else {
+        let Some(descriptor) = info.is_ssh_wrapper_session.transport().cloned() else {
             return;
         };
         let session_id = info.session_id;
@@ -212,31 +220,15 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             // transport 上探测。这里的 Linux 仅作为 shell dialect hint。
             RemoteOs::Linux
         };
-        let transport = match descriptor {
-            SshSessionTransportDescriptor::ControlMaster {
-                socket_path,
-                ownership,
-            } => SshTransport::new_control_master(
-                socket_path.clone(),
-                self.auth_context.clone(),
-                *ownership == ControlMasterOwnership::WarpManaged,
-                remote_os,
-            ),
-            SshSessionTransportDescriptor::RustBroker {
-                endpoint,
-                capability,
-            } => SshTransport::new_rust_broker(
-                endpoint.clone(),
-                capability.clone(),
-                self.auth_context.clone(),
-                remote_os,
-            ),
-            SshSessionTransportDescriptor::Unavailable => return,
-        };
+        let setup_start = Instant::now();
         debug_assert!(matches!(self.state, SshInitState::Idle));
         match std::mem::replace(&mut self.state, SshInitState::Idle) {
             SshInitState::Idle => {}
-            SshInitState::AwaitingCheck {
+            SshInitState::AwaitingRegistration {
+                session_info: old_info,
+                ..
+            }
+            | SshInitState::AwaitingCheck {
                 session_info: old_info,
                 ..
             }
@@ -258,10 +250,179 @@ impl<T: EventLoopSender> RemoteServerController<T> {
         self.did_install = false;
         self.remote_platform = None;
         self.preinstall_check = None;
+
+        let ssh_connection = info
+            .subshell_info
+            .as_ref()
+            .and_then(|subshell| subshell.ssh_connection_info.as_ref());
+        let target_alias = ssh_connection
+            .and_then(|connection| connection.host.clone())
+            .unwrap_or_else(|| connection_label_for_session_info(&info));
+        let port = ssh_connection
+            .and_then(|connection| connection.port.as_deref())
+            .and_then(|port| port.parse::<u16>().ok());
+
+        let control_path = match descriptor {
+            SshSessionTransportDescriptor::ControlMaster {
+                socket_path,
+                ownership,
+            } => info
+                .is_ssh_wrapper_session
+                .scoped_control_path()
+                .cloned()
+                .unwrap_or_else(|| {
+                    ScopedControlPath::local(
+                        socket_path,
+                        info.spawning_session_id.unwrap_or(session_id),
+                        ownership,
+                    )
+                }),
+            SshSessionTransportDescriptor::RustBroker {
+                endpoint,
+                capability,
+            } => {
+                let route_result = RemoteServerManager::handle(ctx).update(ctx, |manager, _| {
+                    manager.register_ssh_route(session_id, None, 1, target_alias, port)
+                });
+                if let Err(error) = route_result {
+                    log::warn!("SSH 路由注册失败：session={session_id:?} error={error}");
+                    self.flush_stashed_bootstrap(info, ctx);
+                    return;
+                }
+                let transport: Arc<dyn RemoteTransport> = Arc::new(SshTransport::new_rust_broker(
+                    endpoint,
+                    capability,
+                    self.auth_context.clone(),
+                    remote_os,
+                ));
+                self.start_check(info, transport, setup_start, ctx);
+                return;
+            }
+            SshSessionTransportDescriptor::Unavailable => {
+                self.flush_stashed_bootstrap(info, ctx);
+                return;
+            }
+        };
+
+        let warp_owns_control_master =
+            control_path.ownership() == ControlMasterOwnership::WarpManaged;
+        if !control_path.is_local() && !FeatureFlag::RecursiveSshExtension.is_enabled() {
+            log::warn!("递归 SSH 功能未启用，嵌套 SSH 回退到带内执行");
+            self.flush_stashed_bootstrap(info, ctx);
+            return;
+        }
+        let parent_session_id = (!control_path.is_local()).then(|| control_path.owner_session_id());
+        let route_result = RemoteServerManager::handle(ctx).update(ctx, |manager, _| {
+            manager.register_ssh_route(
+                session_id,
+                parent_session_id,
+                control_path.hop_depth(),
+                target_alias,
+                port,
+            )
+        });
+        if let Err(error) = route_result {
+            log::warn!("SSH 路由注册失败：session={session_id:?} error={error}");
+            self.flush_stashed_bootstrap(info, ctx);
+            return;
+        }
+        if control_path.is_local() {
+            let transport: Arc<dyn RemoteTransport> = Arc::new(SshTransport::new_control_master(
+                control_path.path().to_path_buf(),
+                self.auth_context.clone(),
+                warp_owns_control_master,
+                remote_os,
+            ));
+            self.start_check(info, transport, setup_start, ctx);
+            return;
+        }
+
+        let parent_session_id = control_path.owner_session_id();
+        let (parent_connection, supports_recursive_ssh) =
+            RemoteServerManager::handle(ctx).update(ctx, |manager, _| {
+                (
+                    manager.parent_connection_handle(parent_session_id),
+                    manager.session_supports(
+                        parent_session_id,
+                        RemoteServerCapability::SshByteStreamV1,
+                    ),
+                )
+            });
+        if !supports_recursive_ssh {
+            log::warn!("父级 remote-server 不支持递归 SSH，嵌套 SSH 回退到带内执行");
+            self.flush_stashed_bootstrap(info, ctx);
+            return;
+        }
+        let Some(parent_client) = parent_connection.client() else {
+            log::warn!("父级 remote-server 尚未连接，嵌套 SSH 回退到带内执行");
+            self.flush_stashed_bootstrap(info, ctx);
+            return;
+        };
+        let ownership = if warp_owns_control_master {
+            SshControlOwnership::WarpManaged
+        } else {
+            SshControlOwnership::UserOwned
+        };
+        let registration = RegisterSshControl {
+            owner_session_id: u64::from(parent_session_id),
+            socket_path: control_path.path().to_string_lossy().into_owned(),
+            ownership: ownership.into(),
+            hop_depth: control_path.hop_depth(),
+        };
+        self.state = SshInitState::AwaitingRegistration {
+            session_info: info,
+            setup_start,
+        };
+        let auth_context = Arc::clone(&self.auth_context);
+        let registration_for_transport = registration.clone();
+        ctx.spawn(
+            async move {
+                let result = parent_client.register_ssh_control(registration).await;
+                (parent_client, result)
+            },
+            move |me, (parent_client, result), ctx| {
+                let SshInitState::AwaitingRegistration {
+                    session_info,
+                    setup_start,
+                } = std::mem::replace(&mut me.state, SshInitState::Idle)
+                else {
+                    return;
+                };
+                match result {
+                    Ok(control_id) => {
+                        let transport: Arc<dyn RemoteTransport> =
+                            Arc::new(RemoteSshTransport::new(
+                                parent_session_id,
+                                parent_connection,
+                                parent_client,
+                                control_id,
+                                registration_for_transport,
+                                auth_context,
+                                warp_owns_control_master,
+                            ));
+                        me.start_check(session_info, transport, setup_start, ctx);
+                    }
+                    Err(error) => {
+                        log::warn!("嵌套 SSH ControlMaster 注册失败：{error}");
+                        me.flush_stashed_bootstrap(session_info, ctx);
+                    }
+                }
+            },
+        );
+    }
+
+    fn start_check(
+        &mut self,
+        info: SessionInfo,
+        transport: Arc<dyn RemoteTransport>,
+        setup_start: Instant,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let session_id = info.session_id;
         self.state = SshInitState::AwaitingCheck {
             session_info: info,
             transport: transport.clone(),
-            setup_start: Instant::now(),
+            setup_start,
         };
         RemoteServerManager::handle(ctx).update(ctx, |mgr, ctx| {
             mgr.check_binary(session_id, transport, ctx);
@@ -578,7 +739,7 @@ impl<T: EventLoopSender> RemoteServerController<T> {
     fn connect_session_for_current_identity(
         &mut self,
         session_id: SessionId,
-        transport: SshTransport,
+        transport: Arc<dyn RemoteTransport>,
         connection_label: String,
         ctx: &mut ModelContext<Self>,
     ) {

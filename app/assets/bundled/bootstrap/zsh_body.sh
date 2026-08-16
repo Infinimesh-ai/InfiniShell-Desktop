@@ -939,9 +939,8 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   # so we can reference this when we register it with a bindkey.
   zle -N warp_change_prompt_modes_to_warp_prompt
 
-  # The SSH logic only applies to local sessions, because we don't yet have support for bootstrapping
-  # recursive SSH sessions.
-  if [[ $WARP_IS_LOCAL_SHELL_SESSION == "1" ]]; then
+  # 本地 shell 和已协商递归能力的远端 shell 都安装 SSH wrapper。
+  if [[ $WARP_IS_LOCAL_SHELL_SESSION == "1" || ( $WARP_IS_SSH == "1" && $WARP_RECURSIVE_SSH_EXTENSION == "1" ) ]]; then
       # This helper function determines whether the user's ssh arguments imply
       # creation of a non-interactive session or otherwise would conflict with
       # our SSH wrapper.  Returns 0 for an interactive session; >0 otherwise.
@@ -980,6 +979,16 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
       }
 
       function warp_ssh_helper() {
+          local current_hop_depth="${WARP_SSH_HOP_DEPTH:-0}"
+          local next_hop_depth=$((current_hop_depth + 1))
+          if (( next_hop_depth > 8 )); then
+              command ssh "${@:1}"
+              return
+          fi
+          local control_scope="local"
+          if [[ "$WARP_IS_SSH" == "1" ]]; then
+              control_scope="remote"
+          fi
           local remote_session_id=$(command -p od -An -N8 -tu8 /dev/urandom 2>/dev/null | command -p tr -d ' \n')
           if [[ -z "$remote_session_id" || "$remote_session_id" == "0" ]]; then
               # If we cannot generate a non-zero random token, run plain SSH instead.
@@ -1109,10 +1118,17 @@ export TERM_PROGRAM='WarpTerminal'
 # body can distinguish it from local shells. Used to gate the ExitShell
 # hook which tears down the remote-server-proxy subprocess.
 export WARP_IS_SSH='1'
+export WARP_USE_SSH_WRAPPER='$WARP_USE_SSH_WRAPPER'
+export WARP_SSH_REUSE_CONTROL_MASTER='$WARP_SSH_REUSE_CONTROL_MASTER'
+export WARP_RECURSIVE_SSH_EXTENSION='$WARP_RECURSIVE_SSH_EXTENSION'
+export WARP_SSH_HOP_DEPTH='$next_hop_depth'
+SSH_SOCKET_DIR="\${XDG_RUNTIME_DIR:-\$HOME/.cache}/infinishell-ssh"
+export SSH_SOCKET_DIR
+command -p mkdir -p "\$SSH_SOCKET_DIR" && command -p chmod 700 "\$SSH_SOCKET_DIR"
 test -n '$WARP_CLIENT_VERSION' && export WARP_CLIENT_VERSION='$WARP_CLIENT_VERSION'
 # Only forward the protocol version if it was set locally (i.e. the HOANotifications feature flag is on).
 test -n '$WARP_CLI_AGENT_PROTOCOL_VERSION' && export WARP_CLI_AGENT_PROTOCOL_VERSION='$WARP_CLI_AGENT_PROTOCOL_VERSION'
-hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"transport\": {\"version\": 1, \"type\": \"control_master\", \"socket_path\": \"'$control_path'\", \"ownership\": \"'$control_master_ownership'\"}, \"remote_shell\": \"%s\", \"session_id\": '"$WARP_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command -p od -An -v -tx1 | command -p tr -d " \n")'"
+hook="'$(printf "{\"hook\": \"SSH\", \"value\": {\"socket_path\": \"'$control_path'\", \"transport\": {\"version\": 1, \"type\": \"control_master\", \"socket_path\": \"'$control_path'\", \"ownership\": \"'$control_master_ownership'\"}, \"remote_shell\": \"%s\", \"session_id\": '"$WARP_SESSION_ID"', \"remote_session_id\": '"$remote_session_id"', \"control_scope\": \"'$control_scope'\", \"hop_depth\": '$next_hop_depth', \"external_control_master\": '"$external_control_master"'}}" "${SHELL##*/}" | command -p od -An -v -tx1 | command -p tr -d " \n")'"
 printf '$OSC_START$DCS_JSON_MARKER$OSC_PARAM_SEPARATOR%s$OSC_END' "'$hook'"
 
 if test "'"${SHELL##*/}" != "bash" -a "${SHELL##*/}" != "zsh"'"; then

@@ -21,7 +21,8 @@ use remote_server::setup::{
 };
 use remote_server::ssh::ssh_args;
 use remote_server::transport::{
-    Connection, ControlPath, Error, InstallOutcome, InstallSource, RemoteTransport,
+    Connection, ControlPath, Error, InstallOutcome, InstallSource, LocalProcessConnection,
+    RemoteTransport,
 };
 use warpui::r#async::{FutureExt as _, executor};
 
@@ -1073,9 +1074,8 @@ impl RemoteTransport for SshTransport {
                 event_rx,
                 failure_rx,
                 host_response_rx,
-                child,
+                resource: Box::new(LocalProcessConnection::new(child, stderr_tail)),
                 control_path,
-                stderr_tail,
             })
         })
     }

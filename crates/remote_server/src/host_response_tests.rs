@@ -172,6 +172,11 @@ fn every_host_scoped_request_has_a_response_disposition() {
             M::GitGenerateCommitMessage(_) => "manager::generate_commit_message",
             M::GitGetCommittedBranchFiles(_) => "manager::get_committed_branch_files",
             M::RipgrepSearch(_) => "manager::start_ripgrep_search",
+            M::ListDirectory(_) => "manager::list_directory",
+            M::ResolvePath(_) => "manager::resolve_path",
+            M::CreateDirectory(_) => "manager::create_directory",
+            M::ReadFileChunk(_) => "manager::read_file_chunk",
+            M::WriteFileChunk(_) => "manager::write_file_chunk",
         }
     }
 

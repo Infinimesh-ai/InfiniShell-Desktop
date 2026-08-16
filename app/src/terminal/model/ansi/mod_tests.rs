@@ -545,6 +545,8 @@ fn parse_dcs_ssh() {
                 remote_shell: "zsh".to_string(),
                 session_id: Some(167303092612201),
                 remote_session_id: Some(167303092612202),
+                control_scope: SshControlScope::Local,
+                hop_depth: 0,
                 external_control_master: false,
             }
         ),
@@ -578,6 +580,8 @@ fn parse_dcs_ssh_with_external_control_master() {
                 remote_shell: "zsh".to_string(),
                 session_id: Some(167303092612201),
                 remote_session_id: Some(167303092612202),
+                control_scope: SshControlScope::Local,
+                hop_depth: 0,
                 external_control_master: true,
             }
         ),
@@ -618,6 +622,42 @@ fn parse_dcs_ssh_with_versioned_transport() {
                 endpoint: None,
                 capability: None,
             })
+        ),
+        _ => panic!("incorrect dcs value"),
+    };
+}
+
+#[test]
+fn parse_dcs_ssh_with_remote_control_scope() {
+    let bytes = hex_encoded_dcs_string(
+        r#"{
+                "hook": "SSH",
+                "value": {
+                    "socket_path": "/tmp/infinishell-ssh/parent-session",
+                    "remote_shell": "bash",
+                    "session_id": 167303092612201,
+                    "remote_session_id": 167303092612202,
+                    "control_scope": "remote",
+                    "hop_depth": 2
+                }
+            }"#,
+    );
+    let (_, handler) = parse_bytes(&bytes);
+
+    assert_eq!(handler.d_proto_hooks.len(), 1);
+    match handler.d_proto_hooks.first().unwrap() {
+        DProtoHook::SSH { value } => assert_eq!(
+            *value,
+            SSHValue {
+                socket_path: Some(PathBuf::from("/tmp/infinishell-ssh/parent-session")),
+                transport: None,
+                remote_shell: "bash".to_string(),
+                session_id: Some(167303092612201),
+                remote_session_id: Some(167303092612202),
+                control_scope: SshControlScope::Remote,
+                hop_depth: 2,
+                external_control_master: false,
+            }
         ),
         _ => panic!("incorrect dcs value"),
     };

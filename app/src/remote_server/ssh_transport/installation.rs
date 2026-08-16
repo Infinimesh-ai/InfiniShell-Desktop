@@ -8,6 +8,13 @@ use remote_server::ssh::SshCommandError;
 use remote_server::transport::{Error, InstallOutcome, InstallSource};
 use warp_core::safe_warn;
 
+/// 返回适合目标平台的本地安装包，优先使用随应用分发的资源，再回退到缓存/下载。
+pub(crate) async fn client_tarball_for_platform(
+    platform: &remote_server::setup::RemotePlatform,
+) -> Result<std::path::PathBuf, Error> {
+    scp_fallback::client_tarball_for_platform(platform).await
+}
+
 /// 运行 SSH remote-server 安装流程。优先上传安装包内置的 tarball；内置资源
 /// 不可用时才让远端直接下载，最后回退到客户端缓存/下载后通过 SCP 上传。
 pub(super) async fn install_binary(socket_path: &Path) -> InstallOutcome {

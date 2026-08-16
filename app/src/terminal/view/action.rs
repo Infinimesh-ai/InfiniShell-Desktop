@@ -204,6 +204,8 @@ pub enum TerminalAction {
     ClearSelectionsWhenShellMode,
     Close,
     ToggleMaximizePane,
+    /// 把当前运行时 SSH 路径保存到 SSH Manager。
+    SaveCurrentSshRoute,
     SplitRight(Option<AvailableShell>),
     SplitLeft(Option<AvailableShell>),
     SplitDown(Option<AvailableShell>),
@@ -538,6 +540,7 @@ impl fmt::Debug for TerminalAction {
             SplitDown(_) => f.write_str("SplitDown"),
             SplitUp(_) => f.write_str("SplitUp"),
             ToggleMaximizePane => f.write_str("ToggleMaximizeActivePane"),
+            SaveCurrentSshRoute => f.write_str("SaveCurrentSshRoute"),
             PromptContextMenu {
                 position_offset_from_prompt,
             } => write!(

@@ -60,6 +60,35 @@ pub fn build_ssh_command_line(server: &SshServerInfo) -> String {
         .join(" ")
 }
 
+/// 构造由上一跳 shell 执行的保存路径命令。
+///
+/// 目标和端口只作为单独参数参与 shell escaping，不允许保存任意 SSH 选项。
+pub fn build_ssh_route_hop_command(target_alias: &str, port: Option<u16>) -> Option<String> {
+    if port == Some(0)
+        || target_alias.is_empty()
+        || target_alias.starts_with('-')
+        || target_alias.len() > 255
+        || target_alias
+            .chars()
+            .any(|ch| ch.is_control() || ch.is_whitespace())
+    {
+        return None;
+    }
+
+    let mut args = vec!["ssh".to_string()];
+    if let Some(port) = port {
+        args.push("-p".to_string());
+        args.push(port.to_string());
+    }
+    args.push(target_alias.to_string());
+    Some(
+        args.iter()
+            .map(|arg| shell_escape::unix::escape(Cow::Borrowed(arg)).to_string())
+            .collect::<Vec<_>>()
+            .join(" "),
+    )
+}
+
 const TEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct ConnectionTestResult {

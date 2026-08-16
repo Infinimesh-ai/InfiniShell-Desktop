@@ -110,6 +110,26 @@ pub struct SshServerInfo {
     pub last_connected_at: Option<NaiveDateTime>,
 }
 
+/// 已保存的多级 SSH 访问路径。只包含结构信息，不包含任何秘密或运行时 socket。
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct SshRoute {
+    pub id: String,
+    pub name: String,
+    pub target_node_id: Option<String>,
+    pub hops: Vec<SshRouteHop>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+    pub last_connected_at: Option<NaiveDateTime>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct SshRouteHop {
+    pub node_id: Option<String>,
+    pub target_alias: String,
+    #[serde(default)]
+    pub port: Option<u16>,
+}
+
 impl SshServerInfo {
     pub fn new_default(node_id: String) -> Self {
         Self {

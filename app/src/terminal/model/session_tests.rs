@@ -176,6 +176,7 @@ fn rust_broker_rejects_non_loopback_or_malformed_capability() {
 fn unavailable_transport_keeps_wrapper_identity_without_remote_server_support() {
     let wrapper = super::IsSSHWrapperSession::Yes {
         transport: SshSessionTransportDescriptor::Unavailable,
+        control_path: None,
     };
 
     assert!(wrapper.transport().is_some());

@@ -44,12 +44,12 @@ use super::proto::{
     GitOpError, GitPushRequest, GitPushResponse, GitStatusPush, HomeSkillMetadata, IndexCodebase,
     Initialize, InitializeResponse, NavigatedToDirectory, NavigatedToDirectoryResponse, OpenBuffer,
     OpenBufferResponse, ReadFileContextResponse, RemoteAgentContextSnapshot,
-    RemoteContextFileProto, RemoteSkillProto, ResolveConflict, ResolveConflictResponse,
-    ResolveConflictSuccess, ResyncCodebase, RipgrepSearchRequest, RunCommandError,
-    RunCommandErrorCode, RunCommandRequest, RunCommandResponse, RunCommandSuccess, SaveBuffer,
-    SaveBufferResponse, SaveBufferSuccess, ServerMessage, SessionBootstrapped, TextEdit,
-    UpdateGitHubPrInfo, UpdateGitHubRepoInfo, UpdateGitStatus, UploadHandoffSnapshot, WriteFile,
-    WriteFileResponse, WriteFileSuccess, client_message, delete_file_response,
+    RemoteContextFileProto, RemoteServerCapability, RemoteSkillProto, ResolveConflict,
+    ResolveConflictResponse, ResolveConflictSuccess, ResyncCodebase, RipgrepSearchRequest,
+    RunCommandError, RunCommandErrorCode, RunCommandRequest, RunCommandResponse, RunCommandSuccess,
+    SaveBuffer, SaveBufferResponse, SaveBufferSuccess, ServerMessage, SessionBootstrapped,
+    TextEdit, UpdateGitHubPrInfo, UpdateGitHubRepoInfo, UpdateGitStatus, UploadHandoffSnapshot,
+    WriteFile, WriteFileResponse, WriteFileSuccess, client_message, delete_file_response,
     discard_files_response, get_diff_state_response, get_fragment_metadata_from_hash_response,
     git_commit_chain_response, git_create_pr_response, git_generate_commit_message_response,
     git_get_committed_branch_files_response, git_push_response, host_scoped_request, notification,
@@ -1119,6 +1119,12 @@ impl ServerModel {
                 }
                 return; // Notifications never produce a response.
             }
+            Some(client_message::Message::Tunnel(_)) => {
+                log::warn!(
+                    "SSH tunnel message reached ServerModel instead of the connection broker"
+                );
+                return;
+            }
             None => {
                 log::warn!(
                     "Received ClientMessage with no message variant (request_id={request_id})"
@@ -1440,6 +1446,7 @@ impl ServerModel {
             InitializeResponse {
                 server_version,
                 host_id: self.host_id.clone(),
+                capabilities: vec![RemoteServerCapability::SshByteStreamV1.into()],
             },
         ))
     }

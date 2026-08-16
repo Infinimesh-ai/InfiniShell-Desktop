@@ -16,9 +16,9 @@ use super::schema::{
     mcp_server_installations, mcp_server_panes, notebook_panes, notebooks, object_actions,
     object_metadata, object_permissions, pane_branches, pane_leaves, pane_nodes, panels,
     project_rules, projects, server_experiments, settings_panes, ssh_machine_memories, ssh_nodes,
-    ssh_onekey_credentials, ssh_servers, sync_meta, tab_groups, tabs, team_members, team_settings,
-    teams, terminal_panes, user_profiles, windows, workflow_panes, workflows, workspace_teams,
-    workspaces, zap_project_servers, zap_projects,
+    ssh_onekey_credentials, ssh_route_hops, ssh_routes, ssh_servers, sync_meta, tab_groups, tabs,
+    team_members, team_settings, teams, terminal_panes, user_profiles, windows, workflow_panes,
+    workflows, workspace_teams, workspaces, zap_project_servers, zap_projects,
 };
 
 #[derive(Insertable)]
@@ -1844,10 +1844,10 @@ pub struct SshOneKeyCredentialRow {
     pub id: String,
     pub label: String,
     pub username: String,
-    pub kind: String,
-    pub key_path: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub kind: String,
+    pub key_path: Option<String>,
 }
 
 #[derive(Insertable, AsChangeset, Clone, Debug)]
@@ -1890,6 +1890,50 @@ pub struct NewSshServer<'a> {
     pub startup_command: Option<&'a str>,
     pub notes: Option<&'a str>,
     pub credential_id: Option<&'a str>,
+}
+
+#[derive(Identifiable, Queryable, Selectable, Clone, Debug)]
+#[diesel(table_name = ssh_routes)]
+#[diesel(primary_key(id))]
+pub struct SshRouteRow {
+    pub id: String,
+    pub name: String,
+    pub target_node_id: Option<String>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+    pub last_connected_at: Option<NaiveDateTime>,
+}
+
+#[derive(Insertable, AsChangeset, Clone, Debug)]
+#[diesel(table_name = ssh_routes)]
+pub struct NewSshRoute<'a> {
+    pub id: &'a str,
+    pub name: &'a str,
+    pub target_node_id: Option<&'a str>,
+}
+
+#[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug)]
+#[diesel(table_name = ssh_route_hops)]
+#[diesel(primary_key(route_id, position))]
+#[diesel(belongs_to(SshRouteRow, foreign_key = route_id))]
+pub struct SshRouteHopRow {
+    pub route_id: String,
+    pub position: i32,
+    pub node_id: Option<String>,
+    pub target_alias: String,
+    pub port: Option<i32>,
+    pub execution_scope: String,
+}
+
+#[derive(Insertable, Clone, Debug)]
+#[diesel(table_name = ssh_route_hops)]
+pub struct NewSshRouteHop<'a> {
+    pub route_id: &'a str,
+    pub position: i32,
+    pub node_id: Option<&'a str>,
+    pub target_alias: &'a str,
+    pub port: Option<i32>,
+    pub execution_scope: &'a str,
 }
 
 #[derive(Identifiable, Queryable, Selectable, Clone, Debug)]

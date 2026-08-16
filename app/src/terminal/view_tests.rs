@@ -9431,3 +9431,10 @@ fn onekey_empty_candidates_with_empty_query_returns_empty_ordered() {
     let result = filter_and_sort_onekey_candidates(candidates.iter().copied(), "");
     assert_eq!(rows_indices(result), Vec::<usize>::new());
 }
+#[test]
+fn saved_ssh_route_command_detection_only_matches_ssh_executable() {
+    assert!(super::is_ssh_route_command("ssh bastion"));
+    assert!(super::is_ssh_route_command("  ssh -p 2222 host"));
+    assert!(!super::is_ssh_route_command("sshpass ssh host"));
+    assert!(!super::is_ssh_route_command("echo ssh host"));
+}

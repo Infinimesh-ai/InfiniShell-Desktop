@@ -386,10 +386,32 @@ diesel::table! {
         id -> Text,
         label -> Text,
         username -> Text,
-        kind -> Text,
-        key_path -> Nullable<Text>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
+        kind -> Text,
+        key_path -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    ssh_route_hops (route_id, position) {
+        route_id -> Text,
+        position -> Integer,
+        node_id -> Nullable<Text>,
+        target_alias -> Text,
+        port -> Nullable<Integer>,
+        execution_scope -> Text,
+    }
+}
+
+diesel::table! {
+    ssh_routes (id) {
+        id -> Text,
+        name -> Text,
+        target_node_id -> Nullable<Text>,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+        last_connected_at -> Nullable<Timestamp>,
     }
 }
 
@@ -405,6 +427,13 @@ diesel::table! {
         notes -> Nullable<Text>,
         last_connected_at -> Nullable<Timestamp>,
         credential_id -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    sync_meta (key) {
+        key -> Text,
+        value -> Text,
     }
 }
 
@@ -544,13 +573,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    sync_meta (key) {
-        key -> Text,
-        value -> Text,
-    }
-}
-
-diesel::table! {
     zap_project_servers (project_id, node_id) {
         project_id -> Text,
         node_id -> Text,
@@ -582,13 +604,17 @@ diesel::joinable!(pane_branches -> pane_nodes (pane_node_id));
 diesel::joinable!(pane_leaves -> pane_nodes (pane_node_id));
 diesel::joinable!(pane_nodes -> tabs (tab_id));
 diesel::joinable!(panels -> tabs (tab_id));
-diesel::joinable!(ssh_servers -> ssh_onekey_credentials (credential_id));
+diesel::joinable!(ssh_route_hops -> ssh_nodes (node_id));
+diesel::joinable!(ssh_route_hops -> ssh_routes (route_id));
+diesel::joinable!(ssh_routes -> ssh_nodes (target_node_id));
 diesel::joinable!(ssh_servers -> ssh_nodes (node_id));
+diesel::joinable!(ssh_servers -> ssh_onekey_credentials (credential_id));
 diesel::joinable!(tab_groups -> windows (window_id));
 diesel::joinable!(tabs -> tab_groups (tab_group_id));
 diesel::joinable!(tabs -> windows (window_id));
 diesel::joinable!(team_members -> teams (team_id));
 diesel::joinable!(team_settings -> teams (team_id));
+diesel::joinable!(zap_project_servers -> zap_projects (project_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     ambient_agent_panes,
@@ -603,9 +629,12 @@ diesel::allow_tables_to_appear_in_same_query!(
 );
 diesel::allow_tables_to_appear_in_same_query!(code_pane_tabs, code_panes,);
 diesel::allow_tables_to_appear_in_same_query!(object_metadata, object_permissions,);
+diesel::allow_tables_to_appear_in_same_query!(
+    ssh_nodes,
+    ssh_onekey_credentials,
+    ssh_route_hops,
+    ssh_routes,
+    ssh_servers,
+);
 diesel::allow_tables_to_appear_in_same_query!(team_members, team_settings, teams,);
-diesel::allow_tables_to_appear_in_same_query!(ssh_machine_memories,);
-diesel::allow_tables_to_appear_in_same_query!(sync_meta,);
-diesel::allow_tables_to_appear_in_same_query!(ssh_nodes, ssh_onekey_credentials, ssh_servers,);
-diesel::joinable!(zap_project_servers -> zap_projects (project_id));
 diesel::allow_tables_to_appear_in_same_query!(zap_project_servers, zap_projects,);

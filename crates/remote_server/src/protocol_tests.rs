@@ -3,8 +3,9 @@ use prost::Message;
 use super::*;
 use crate::proto::{
     BundledSkillMetadata, ClientMessage, HomeSkillMetadata, Initialize, InitializeResponse,
-    RemoteAgentContextSnapshot, RemoteContextFileProto, RemoteSkillProto, ServerMessage,
-    client_message, remote_skill_proto, server_message, session_scoped_request,
+    OpenSshStream, RemoteAgentContextSnapshot, RemoteContextFileProto, RemoteSkillProto,
+    ServerMessage, SshStreamPurpose, TunnelClientMessage, client_message, remote_skill_proto,
+    server_message, session_scoped_request, tunnel_client_message,
 };
 
 #[tokio::test]
@@ -31,6 +32,35 @@ async fn round_trip_client_message() {
         Some(client_message::Message::SessionScoped(_)) => {}
         other => panic!("unexpected message variant: {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn round_trip_ssh_tunnel_open_uses_a_fixed_purpose() {
+    let msg = ClientMessage {
+        request_id: "open-1".to_string(),
+        message: Some(client_message::Message::Tunnel(TunnelClientMessage {
+            stream_id: "stream-1".to_string(),
+            message: Some(tunnel_client_message::Message::Open(OpenSshStream {
+                control_id: "opaque-control".to_string(),
+                purpose: SshStreamPurpose::RemoteServerProxy.into(),
+                stdout_window_bytes: INITIAL_TUNNEL_WINDOW as u32,
+                stderr_window_bytes: INITIAL_TUNNEL_WINDOW as u32,
+                identity_key: "identity".to_string(),
+            })),
+        })),
+    };
+
+    let mut buffer = Vec::new();
+    write_client_message(&mut buffer, &msg).await.unwrap();
+    let decoded = read_client_message(&mut &buffer[..]).await.unwrap();
+    let Some(client_message::Message::Tunnel(tunnel)) = decoded.message else {
+        panic!("期望隧道消息");
+    };
+    let Some(tunnel_client_message::Message::Open(open)) = tunnel.message else {
+        panic!("期望打开隧道消息");
+    };
+    assert_eq!(open.purpose(), SshStreamPurpose::RemoteServerProxy);
+    assert_eq!(open.identity_key, "identity");
 }
 
 #[tokio::test]
@@ -108,6 +138,7 @@ async fn round_trip_server_message() {
             InitializeResponse {
                 server_version: "0.1.0".to_string(),
                 host_id: "test-host".to_string(),
+                capabilities: Vec::new(),
             },
         )),
     };

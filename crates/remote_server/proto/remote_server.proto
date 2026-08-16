@@ -18,6 +18,7 @@ message ClientMessage {
     HostScopedRequest host_scoped = 2;
     SessionScopedRequest session_scoped = 3;
     Notification notification = 4;
+    TunnelClientMessage tunnel = 5;
   }
 }
 
@@ -137,6 +138,7 @@ message ServerMessage {
     CreateDirectoryResponse create_directory_response = 40;
     ReadFileChunkResponse read_file_chunk_response = 41;
     WriteFileChunkResponse write_file_chunk_response = 42;
+    TunnelServerMessage tunnel = 43;
   }
 }
 
@@ -189,6 +191,117 @@ message Abort {
 message InitializeResponse {
   string server_version = 1;
   string host_id = 2;
+  repeated RemoteServerCapability capabilities = 3;
+}
+
+enum RemoteServerCapability {
+  REMOTE_SERVER_CAPABILITY_UNSPECIFIED = 0;
+  SSH_BYTE_STREAM_V1 = 1;
+}
+
+// ── SSH 字节流隧道 ───────────────────────────────────────────────
+
+message TunnelClientMessage {
+  string stream_id = 1;
+  oneof message {
+    RegisterSshControl register_control = 2;
+    ReleaseSshControl release_control = 3;
+    OpenSshStream open = 4;
+    TunnelData data = 5;
+    TunnelWindowUpdate window_update = 6;
+    TunnelHalfClose half_close = 7;
+    TunnelReset reset = 8;
+  }
+}
+
+message TunnelServerMessage {
+  string stream_id = 1;
+  oneof message {
+    RegisterSshControlResponse control_registered = 2;
+    OpenSshStreamResponse opened = 3;
+    TunnelData data = 4;
+    TunnelWindowUpdate window_update = 5;
+    TunnelExit exit = 6;
+    TunnelReset reset = 7;
+  }
+}
+
+enum SshControlOwnership {
+  SSH_CONTROL_OWNERSHIP_UNSPECIFIED = 0;
+  WARP_MANAGED = 1;
+  USER_OWNED = 2;
+}
+
+enum TunnelChannel {
+  TUNNEL_CHANNEL_UNSPECIFIED = 0;
+  STDIN = 1;
+  STDOUT = 2;
+  STDERR = 3;
+}
+
+enum SshStreamPurpose {
+  SSH_STREAM_PURPOSE_UNSPECIFIED = 0;
+  DETECT_PLATFORM = 1;
+  PREINSTALL_CHECK = 2;
+  CHECK_BINARY = 3;
+  CHECK_OLD_BINARY = 4;
+  INSTALL_BINARY = 5;
+  REMOTE_SERVER_PROXY = 6;
+  REMOVE_BINARY = 7;
+  STAGE_BINARY = 8;
+  INSTALL_STAGED_BINARY = 9;
+}
+
+message RegisterSshControl {
+  uint64 owner_session_id = 1;
+  string socket_path = 2;
+  SshControlOwnership ownership = 3;
+  uint32 hop_depth = 4;
+}
+
+message RegisterSshControlResponse {
+  string control_id = 1;
+}
+
+message ReleaseSshControl {
+  string control_id = 1;
+  bool stop_control_master = 2;
+}
+
+message OpenSshStream {
+  string control_id = 1;
+  SshStreamPurpose purpose = 2;
+  uint32 stdout_window_bytes = 3;
+  uint32 stderr_window_bytes = 4;
+  string identity_key = 5;
+}
+
+message OpenSshStreamResponse {
+  uint32 stdin_window_bytes = 1;
+}
+
+message TunnelData {
+  TunnelChannel channel = 1;
+  uint64 offset = 2;
+  bytes data = 3;
+}
+
+message TunnelWindowUpdate {
+  TunnelChannel channel = 1;
+  uint32 consumed_bytes = 2;
+}
+
+message TunnelHalfClose {
+  TunnelChannel channel = 1;
+}
+
+message TunnelReset {
+  string message = 1;
+}
+
+message TunnelExit {
+  optional int32 exit_code = 1;
+  string stderr_tail = 2;
 }
 
 // Sent by the client after the SSH session has been bootstrapped.

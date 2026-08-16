@@ -371,6 +371,15 @@ fn build_host_shell_command(
         "WARP_SSH_REUSE_CONTROL_MASTER",
         if reuse_ssh_control_master { "1" } else { "0" },
     );
+    builder.env(
+        "WARP_RECURSIVE_SSH_EXTENSION",
+        if FeatureFlag::RecursiveSshExtension.is_enabled() {
+            "1"
+        } else {
+            "0"
+        },
+    );
+    builder.env("WARP_SSH_HOP_DEPTH", "0");
 
     // For integration tests, put SSH control master sockets under the actual
     // home directory, as the length of the path to sockets placed in the
@@ -889,6 +898,15 @@ fn build_docker_sandbox_command(
         "WARP_SSH_REUSE_CONTROL_MASTER",
         if reuse_ssh_control_master { "1" } else { "0" },
     );
+    builder.env(
+        "WARP_RECURSIVE_SSH_EXTENSION",
+        if FeatureFlag::RecursiveSshExtension.is_enabled() {
+            "1"
+        } else {
+            "0"
+        },
+    );
+    builder.env("WARP_SSH_HOP_DEPTH", "0");
     builder.env("SSH_SOCKET_DIR", ssh_socket_dir());
     builder.env("WARP_IS_LOCAL_SHELL_SESSION", "1");
     if FeatureFlag::HOANotifications.is_enabled() {

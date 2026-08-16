@@ -11,7 +11,8 @@ use warpui_core::App;
 
 use super::{
     HostRequestError, PendingHostRequest, RemoteServerManager, RemoteServerManagerEvent,
-    RipgrepSearchParams, should_enforce_remote_version_check, version_is_compatible,
+    RipgrepSearchParams, SshRouteNodeState, should_enforce_remote_version_check,
+    version_is_compatible,
 };
 use crate::HostId;
 use crate::proto::{ClientMessage, RemoteAgentContextSnapshot, WriteFile, host_scoped_request};
@@ -164,6 +165,114 @@ fn remote_agent_context_snapshot_revisions_are_deduplicated_per_host() {
 
             manager.handle_host_disconnected(&host_id, ctx);
             assert!(manager.accept_remote_agent_context_snapshot_revision(&host_id, 3));
+        });
+    });
+}
+
+#[test]
+fn ssh_route_graph_validates_depth_and_cycles_and_returns_root_to_leaf_path() {
+    App::test((), |mut app| async move {
+        let manager = app.add_model(RemoteServerManager::new);
+        manager.update(&mut app, |manager, _ctx| {
+            let root = SessionId::from(1);
+            let child = SessionId::from(2);
+            let leaf = SessionId::from(3);
+            manager
+                .register_ssh_route(root, None, 1, "bastion".to_string(), None)
+                .unwrap();
+            manager
+                .register_ssh_route(child, Some(root), 2, "staging".to_string(), Some(2222))
+                .unwrap();
+            manager
+                .register_ssh_route(leaf, Some(child), 3, "database".to_string(), None)
+                .unwrap();
+
+            let path = manager.ssh_route_path(leaf);
+            assert_eq!(
+                path.iter().map(|node| node.session_id).collect::<Vec<_>>(),
+                vec![root, child, leaf]
+            );
+            assert!(
+                manager
+                    .register_ssh_route(
+                        SessionId::from(4),
+                        Some(root),
+                        3,
+                        "invalid-depth".to_string(),
+                        None,
+                    )
+                    .is_err()
+            );
+            assert!(
+                manager
+                    .register_ssh_route(root, Some(leaf), 4, "cycle".to_string(), None)
+                    .is_err()
+            );
+
+            assert_eq!(
+                manager.ssh_route_targets(leaf),
+                Some(vec![
+                    ("bastion".to_string(), None),
+                    ("staging".to_string(), Some(2222)),
+                    ("database".to_string(), None),
+                ])
+            );
+        });
+    });
+}
+
+#[test]
+fn ssh_route_display_path_uses_connection_labels_without_exposing_route_internals() {
+    App::test((), |mut app| async move {
+        let manager = app.add_model(RemoteServerManager::new);
+        manager.update(&mut app, |manager, _ctx| {
+            let root = SessionId::from(1);
+            let child = SessionId::from(2);
+            manager
+                .register_ssh_route(root, None, 1, "bastion".to_string(), None)
+                .unwrap();
+            manager
+                .register_ssh_route(child, Some(root), 2, "staging".to_string(), None)
+                .unwrap();
+            manager.session_labels.insert(root, "bastion".to_string());
+            manager.session_labels.insert(child, "staging".to_string());
+
+            assert_eq!(
+                manager.ssh_route_display_path(child).as_deref(),
+                Some("Local > bastion > staging")
+            );
+            assert_eq!(manager.ssh_route_display_path(SessionId::from(3)), None);
+        });
+    });
+}
+
+#[test]
+fn parent_disconnect_blocks_all_route_descendants() {
+    App::test((), |mut app| async move {
+        let manager = app.add_model(RemoteServerManager::new);
+        manager.update(&mut app, |manager, _ctx| {
+            let root = SessionId::from(1);
+            let child = SessionId::from(2);
+            let leaf = SessionId::from(3);
+            manager
+                .register_ssh_route(root, None, 1, "bastion".to_string(), None)
+                .unwrap();
+            manager
+                .register_ssh_route(child, Some(root), 2, "staging".to_string(), None)
+                .unwrap();
+            manager
+                .register_ssh_route(leaf, Some(child), 3, "database".to_string(), None)
+                .unwrap();
+            manager.mark_route_descendants_blocked(root);
+
+            assert_eq!(
+                manager.ssh_route(child).unwrap().state,
+                SshRouteNodeState::BlockedByParent
+            );
+            assert_eq!(
+                manager.ssh_route(leaf).unwrap().state,
+                SshRouteNodeState::BlockedByParent
+            );
         });
     });
 }

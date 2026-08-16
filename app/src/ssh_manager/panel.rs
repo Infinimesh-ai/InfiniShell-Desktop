@@ -16,10 +16,11 @@ use std::collections::HashMap;
 
 use pathfinder_geometry::vector::Vector2F;
 use settings::Setting;
+use warp_core::features::FeatureFlag;
 use warp_core::ui::theme::color::internal_colors;
 use warp_ssh_manager::{
-    AuthType, KeychainSecretStore, NodeKind, SecretKind, SshNode, SshRepository, SshSecretStore,
-    SshServerInfo,
+    AuthType, KeychainSecretStore, NodeKind, SecretKind, SshNode, SshRepository, SshRoute,
+    SshRouteHop, SshSecretStore, SshServerInfo,
 };
 use warpui::elements::{
     AcceptedByDropTarget, Border, ChildAnchor, ClippedScrollStateHandle, ClippedScrollable,
@@ -58,6 +59,7 @@ const CONTEXT_MENU_ITEM_PADDING_V: f32 = 7.0;
 const CONTEXT_MENU_ITEM_PADDING_H: f32 = 12.0;
 const MAX_CONTEXT_MENU_ITEMS: usize = 5;
 const SSH_PANEL_POSITION_ID: &str = "ssh_manager_panel_root";
+const ROUTE_CONTEXT_PREFIX: &str = "saved-route:";
 
 #[derive(Clone, Debug)]
 pub enum SshManagerPanelAction {
@@ -103,6 +105,9 @@ pub enum SshManagerPanelAction {
     RefreshCandidates,
     /// 折叠/展开 "Candidates" 区段(列表长时手动收起)。
     ToggleCandidatesSection,
+    /// 打开或删除已保存的多级访问路径。
+    ConnectRoute(String),
+    DeleteRoute(String),
 }
 
 #[derive(Clone, Debug)]
@@ -122,6 +127,9 @@ pub enum SshManagerPanelEvent {
     OpenSftpPane {
         node_id: String,
         server: SshServerInfo,
+    },
+    OpenSshRoute {
+        route: SshRoute,
     },
     PersistenceError(String),
 }
@@ -167,6 +175,7 @@ impl DropTargetData for SshDropData {
 
 pub struct SshManagerPanel {
     nodes: Vec<SshNode>,
+    routes: Vec<SshRoute>,
     depths: HashMap<String, usize>,
     selected_id: Option<String>,
 
@@ -176,6 +185,7 @@ pub struct SshManagerPanel {
     row_states: HashMap<String, MouseStateHandle>,
     /// 每行的 DraggableState — 跨渲染保持拖拽进度,所以必须 cache 在 view state。
     row_drag_states: HashMap<String, DraggableState>,
+    route_row_states: HashMap<String, MouseStateHandle>,
 
     context_menu_position: Option<Vector2F>,
     context_menu_target: Option<String>,
@@ -203,6 +213,7 @@ impl SshManagerPanel {
 
         let mut me = Self {
             nodes: Vec::new(),
+            routes: Vec::new(),
             depths: HashMap::new(),
             selected_id: None,
             add_folder_btn: MouseStateHandle::default(),
@@ -210,6 +221,7 @@ impl SshManagerPanel {
             toggle_all_btn: MouseStateHandle::default(),
             row_states: HashMap::new(),
             row_drag_states: HashMap::new(),
+            route_row_states: HashMap::new(),
             context_menu_position: None,
             context_menu_target: None,
             context_menu_item_states: (0..MAX_CONTEXT_MENU_ITEMS)
@@ -267,6 +279,14 @@ impl SshManagerPanel {
             }
         }
 
+        match warp_ssh_manager::with_conn(|c| Ok(SshRepository::list_routes(c)?)) {
+            Ok(routes) => self.routes = routes,
+            Err(e) => {
+                log::error!("ssh_manager: failed to load saved routes: {e:?}");
+                ctx.emit(SshManagerPanelEvent::PersistenceError(e.to_string()));
+            }
+        }
+
         let active_ids: std::collections::HashSet<&str> =
             self.nodes.iter().map(|n| n.id.as_str()).collect();
         self.row_states
@@ -276,6 +296,16 @@ impl SshManagerPanel {
         for n in &self.nodes {
             self.row_states.entry(n.id.clone()).or_default();
             self.row_drag_states.entry(n.id.clone()).or_default();
+        }
+        let active_route_ids = self
+            .routes
+            .iter()
+            .map(|route| route.id.as_str())
+            .collect::<std::collections::HashSet<_>>();
+        self.route_row_states
+            .retain(|id, _| active_route_ids.contains(id.as_str()));
+        for route in &self.routes {
+            self.route_row_states.entry(route.id.clone()).or_default();
         }
 
         // 树变化 → 重算 "Added" 集合(PRODUCT.md decision E)。"已导入"按
@@ -559,6 +589,33 @@ impl SshManagerPanel {
         }
     }
 
+    fn on_connect_route(&self, route_id: &str, ctx: &mut ViewContext<Self>) {
+        match warp_ssh_manager::with_conn(|conn| Ok(SshRepository::get_route(conn, route_id)?)) {
+            Ok(Some(route)) => ctx.emit(SshManagerPanelEvent::OpenSshRoute { route }),
+            Ok(None) => log::warn!("ssh_manager: saved route no longer exists"),
+            Err(error) => {
+                log::error!("ssh_manager: failed to load saved route: {error:?}");
+                ctx.emit(SshManagerPanelEvent::PersistenceError(error.to_string()));
+            }
+        }
+    }
+
+    fn on_delete_route(&mut self, route_id: &str, ctx: &mut ViewContext<Self>) {
+        if let Err(error) =
+            warp_ssh_manager::with_conn(|conn| Ok(SshRepository::delete_route(conn, route_id)?))
+        {
+            log::error!("ssh_manager: delete saved route failed: {error:?}");
+            ctx.emit(SshManagerPanelEvent::PersistenceError(error.to_string()));
+            return;
+        }
+        self.context_menu_position = None;
+        self.context_menu_target = None;
+        self.refresh_tree(ctx);
+        SshTreeChangedNotifier::handle(ctx).update(ctx, |_, ctx| {
+            ctx.emit(SshTreeChangedEvent::TreeChanged);
+        });
+    }
+
     fn on_edit(&mut self, ctx: &mut ViewContext<Self>) {
         let Some(id) = self.selected_id.clone() else {
             return;
@@ -686,7 +743,9 @@ impl SshManagerPanel {
             self.commit_rename(ctx);
         }
         if let Some(t) = target.as_ref() {
-            self.selected_id = Some(t.clone());
+            if route_id_from_context_target(t).is_none() {
+                self.selected_id = Some(t.clone());
+            }
         } else {
             // 右键空白区域表示在根级操作，清除旧的选中状态。
             self.selected_id = None;
@@ -1425,6 +1484,125 @@ impl SshManagerPanel {
         DropTarget::new(hoverable, SshDropData { parent_id: None }).finish()
     }
 
+    fn render_routes(
+        &self,
+        appearance: &warp_core::ui::appearance::Appearance,
+    ) -> Box<dyn Element> {
+        if self.routes.is_empty() {
+            return Empty::new().finish();
+        }
+
+        let theme = appearance.theme();
+        let muted = theme.sub_text_color(theme.background());
+        let header = Container::new(
+            Text::new_inline(
+                crate::t!("workspace-left-panel-ssh-manager-routes-header"),
+                appearance.ui_font_family(),
+                appearance.ui_font_subheading(),
+            )
+            .with_color(muted.into())
+            .finish(),
+        )
+        .with_padding_top(ITEM_PADDING_VERTICAL)
+        .with_padding_bottom(ITEM_PADDING_VERTICAL)
+        .with_padding_left(ITEM_PADDING_HORIZONTAL)
+        .with_padding_right(ITEM_PADDING_HORIZONTAL)
+        .finish();
+
+        let mut routes = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(header);
+        for route in &self.routes {
+            routes.add_child(self.render_route_row(route, appearance));
+        }
+        routes.with_main_axis_size(MainAxisSize::Min).finish()
+    }
+
+    fn render_route_row(
+        &self,
+        route: &SshRoute,
+        appearance: &warp_core::ui::appearance::Appearance,
+    ) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let main = theme.main_text_color(theme.background());
+        let muted = theme.sub_text_color(theme.background());
+        let icon = ConstrainedBox::new(
+            crate::ui_components::icons::Icon::Key
+                .to_warpui_icon(muted)
+                .finish(),
+        )
+        .with_width(ITEM_ICON_SIZE)
+        .with_height(ITEM_ICON_SIZE)
+        .finish();
+        let name = Text::new_inline(
+            route.name.clone(),
+            appearance.ui_font_family(),
+            appearance.ui_font_subheading(),
+        )
+        .with_color(main.into())
+        .finish();
+        let path = Text::new_inline(
+            route_hops_display(&route.hops),
+            appearance.ui_font_family(),
+            appearance.ui_font_body(),
+        )
+        .with_color(muted.into())
+        .finish();
+        let labels = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_main_axis_size(MainAxisSize::Min)
+            .with_child(name)
+            .with_child(path)
+            .finish();
+        let row = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_spacing(ITEM_ICON_TEXT_SPACING)
+            .with_child(
+                ConstrainedBox::new(Empty::new().finish())
+                    .with_width(FOLDER_DEPTH_INDENT)
+                    .finish(),
+            )
+            .with_child(icon)
+            .with_child(warpui::elements::Shrinkable::new(1.0, labels).finish())
+            .with_main_axis_size(MainAxisSize::Max)
+            .finish();
+
+        let state = self
+            .route_row_states
+            .get(&route.id)
+            .cloned()
+            .unwrap_or_default();
+        let route_id = route.id.clone();
+        let context_target = route_context_target(&route.id);
+        Hoverable::new(state, move |mouse| {
+            let mut container = Container::new(row)
+                .with_padding_top(ITEM_PADDING_VERTICAL)
+                .with_padding_bottom(ITEM_PADDING_VERTICAL)
+                .with_padding_left(ITEM_PADDING_HORIZONTAL)
+                .with_padding_right(ITEM_PADDING_HORIZONTAL)
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.0)));
+            if mouse.is_hovered() {
+                container = container.with_background(internal_colors::fg_overlay_3(theme));
+            }
+            container.finish()
+        })
+        .with_cursor(Cursor::PointingHand)
+        .on_click(move |ctx, _, _| {
+            ctx.dispatch_typed_action(SshManagerPanelAction::ConnectRoute(route_id.clone()));
+        })
+        .on_right_click(move |ctx, _, position| {
+            let offset = match ctx.element_position_by_id(SSH_PANEL_POSITION_ID) {
+                Some(bounds) => position - bounds.origin(),
+                None => position,
+            };
+            ctx.dispatch_typed_action(SshManagerPanelAction::OpenContextMenu {
+                target: Some(context_target.clone()),
+                position: offset,
+            });
+        })
+        .finish()
+    }
+
     fn render_row(
         &self,
         node: &SshNode,
@@ -1635,6 +1813,18 @@ impl SshManagerPanel {
                 ),
             ],
             Some(id) => {
+                if let Some(route_id) = route_id_from_context_target(id) {
+                    return vec![
+                        (
+                            crate::t!("workspace-left-panel-ssh-manager-menu-connect"),
+                            SshManagerPanelAction::ConnectRoute(route_id.to_string()),
+                        ),
+                        (
+                            crate::t!("workspace-left-panel-ssh-manager-menu-delete"),
+                            SshManagerPanelAction::DeleteRoute(route_id.to_string()),
+                        ),
+                    ];
+                }
                 let kind = self.nodes.iter().find(|n| &n.id == id).map(|n| n.kind);
                 match kind {
                     Some(NodeKind::Folder) => vec![
@@ -1793,6 +1983,8 @@ impl TypedActionView for SshManagerPanel {
                     .update(ctx, |vm, ctx| vm.toggle_expanded(ctx));
                 ctx.notify();
             }
+            SshManagerPanelAction::ConnectRoute(route_id) => self.on_connect_route(route_id, ctx),
+            SshManagerPanelAction::DeleteRoute(route_id) => self.on_delete_route(route_id, ctx),
         }
     }
 }
@@ -1824,6 +2016,15 @@ impl View for SshManagerPanel {
             Empty::new().finish()
         };
 
+        let routes_section = if FeatureFlag::RecursiveSshExtension.is_enabled() {
+            Container::new(self.render_routes(appearance))
+                .with_padding_left(PANEL_HORIZONTAL_PADDING - ITEM_PADDING_HORIZONTAL)
+                .with_padding_right(PANEL_HORIZONTAL_PADDING - ITEM_PADDING_HORIZONTAL)
+                .finish()
+        } else {
+            Empty::new().finish()
+        };
+
         let tree = Container::new(self.render_tree(appearance))
             .with_padding_left(PANEL_HORIZONTAL_PADDING - ITEM_PADDING_HORIZONTAL)
             .with_padding_right(PANEL_HORIZONTAL_PADDING - ITEM_PADDING_HORIZONTAL)
@@ -1832,6 +2033,7 @@ impl View for SshManagerPanel {
         let root_content = Flex::column()
             .with_main_axis_size(MainAxisSize::Min)
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(routes_section)
             .with_child(candidates_section)
             .with_child(tree)
             .finish();
@@ -1960,6 +2162,24 @@ fn compute_depths(nodes: &[SshNode]) -> HashMap<String, usize> {
         depths.insert(n.id.clone(), d);
     }
     depths
+}
+
+fn route_context_target(route_id: &str) -> String {
+    format!("{ROUTE_CONTEXT_PREFIX}{route_id}")
+}
+
+fn route_id_from_context_target(target: &str) -> Option<&str> {
+    target.strip_prefix(ROUTE_CONTEXT_PREFIX)
+}
+
+fn route_hops_display(hops: &[SshRouteHop]) -> String {
+    hops.iter()
+        .map(|hop| match hop.port {
+            Some(port) => format!("{}:{port}", hop.target_alias),
+            None => hop.target_alias.clone(),
+        })
+        .collect::<Vec<_>>()
+        .join(" > ")
 }
 
 /// 一次性拉所有 ssh_servers 行的 `host` 字段。失败时返回空 Vec —— 候选区段的

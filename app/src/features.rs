@@ -29,6 +29,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
     // 显式开启,保证所有本地平台都能联调远端文件打开 / buffer-sync。
     #[cfg(debug_assertions)]
     flags.insert(FeatureFlag::SshRemoteServer);
+    #[cfg(all(debug_assertions, not(windows)))]
+    flags.insert(FeatureFlag::RecursiveSshExtension);
     #[cfg(debug_assertions)]
     flags.insert(FeatureFlag::ServerFileBrowser);
 
@@ -469,6 +471,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::TerminalLifecycleRecovery,
         #[cfg(feature = "onekey_prompt")]
         FeatureFlag::OneKeyPrompt,
+        #[cfg(feature = "recursive_ssh_extension")]
+        FeatureFlag::RecursiveSshExtension,
         #[cfg(feature = "block_toolbelt_save_as_workflow")]
         FeatureFlag::BlockToolbeltSaveAsWorkflow,
         #[cfg(feature = "remove_alt_screen_padding")]
@@ -509,6 +513,10 @@ fn enabled_features() -> HashSet<FeatureFlag> {
 /// 这里登记的功能在 release 构建下默认隐藏,设置对应 token 后才会出现;
 /// dev 构建走 debug_assertions 分支默认启用,无需该变量。
 const UNSTABLE_FEATURES: &[(&str, FeatureFlag)] = &[
+    (
+        "recursive_ssh_extension",
+        FeatureFlag::RecursiveSshExtension,
+    ),
     ("server_file_browser", FeatureFlag::ServerFileBrowser),
     (
         "windows_high_performance_gpu_default",

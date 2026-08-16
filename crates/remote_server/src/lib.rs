@@ -55,5 +55,27 @@ pub mod proto {
                 })),
             }
         }
+
+        /// 构造连接级 SSH 隧道消息。
+        pub fn tunnel(
+            request_id: String,
+            stream_id: String,
+            inner: tunnel_client_message::Message,
+        ) -> Self {
+            Self {
+                request_id,
+                message: Some(client_message::Message::Tunnel(TunnelClientMessage {
+                    stream_id,
+                    message: Some(inner),
+                })),
+            }
+        }
+    }
+
+    impl InitializeResponse {
+        /// 判断远端 daemon 是否显式宣告支持某项协议能力。
+        pub fn supports(&self, capability: RemoteServerCapability) -> bool {
+            self.capabilities.contains(&(capability as i32))
+        }
     }
 }

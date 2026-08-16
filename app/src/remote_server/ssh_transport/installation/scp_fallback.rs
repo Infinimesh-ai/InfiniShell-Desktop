@@ -81,6 +81,26 @@ pub(super) async fn install(socket_path: &Path) -> Result<(), Error> {
     install_tarball(socket_path, &client_tarball_path).await
 }
 
+pub(super) async fn client_tarball_for_platform(
+    platform: &RemotePlatform,
+) -> Result<PathBuf, Error> {
+    match bundled_remote_server_tarball(platform).await {
+        Ok(Some(path)) => Ok(path),
+        Ok(None) => cached_remote_server_tarball(platform)
+            .await
+            .map_err(Error::Other),
+        Err(error) => {
+            safe_warn!(
+                safe: ("Bundled remote-server tarball is unavailable; falling back to download"),
+                full: ("Bundled remote-server tarball is unavailable; falling back to download: {error:#}")
+            );
+            cached_remote_server_tarball(platform)
+                .await
+                .map_err(Error::Other)
+        }
+    }
+}
+
 async fn install_tarball(socket_path: &Path, client_tarball_path: &Path) -> Result<(), Error> {
     let timeout = remote_server::setup::SCP_INSTALL_TIMEOUT;
     let install_dir = remote_server::setup::remote_server_dir();

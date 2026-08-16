@@ -33,6 +33,7 @@ use crate::pane_group::pane::view::header::components::{
 use crate::pane_group::pane::view::header::{PANE_HEADER_HEIGHT, render_pane_header_draggable};
 use crate::pane_group::pane::{PaneStack, view};
 use crate::pane_group::{BackingView, SplitPaneState, TOGGLE_MAXIMIZE_PANE_BINDING_NAME};
+use crate::remote_server::manager::RemoteServerManager;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::shared_session::SharedSessionActionSource;
 use crate::terminal::shared_session::participant_avatar_view::render_participants_and_role_elements;
@@ -221,7 +222,17 @@ impl TerminalView {
 
         let appearance = Appearance::as_ref(app);
         let pane_config = self.pane_configuration.as_ref(app);
-        let title = pane_config.title().to_owned();
+        let title = if FeatureFlag::RecursiveSshExtension.is_enabled() {
+            self.active_block_session_id()
+                .and_then(|session_id| {
+                    RemoteServerManager::handle(app)
+                        .as_ref(app)
+                        .ssh_route_display_path(session_id)
+                })
+                .unwrap_or_else(|| pane_config.title().to_owned())
+        } else {
+            pane_config.title().to_owned()
+        };
         let clip_config = if self.is_using_conversation_for_pane_header_title {
             ClipConfig::ellipsis()
         } else {
@@ -573,6 +584,24 @@ impl BackingView for TerminalView {
         // Zap:删除 Pane 头部 "Share session" / "Copy link" / "Open on Desktop" 入口
         //(云端 shared session 链路已剥离,shared_session::manager 不存在)
 
+        let has_ssh_route = FeatureFlag::RecursiveSshExtension.is_enabled()
+            && self.active_block_session_id().is_some_and(|session_id| {
+                RemoteServerManager::handle(ctx)
+                    .as_ref(ctx)
+                    .ssh_route_targets(session_id)
+                    .is_some()
+            });
+        if has_ssh_route {
+            if !items.is_empty() {
+                items.push(MenuItem::Separator);
+            }
+            items.push(
+                MenuItemFields::new("Save SSH access path".to_string())
+                    .with_on_select_action(TerminalAction::SaveCurrentSshRoute)
+                    .into_item(),
+            );
+        }
+
         // Split-pane related items.
         if self.split_pane_state(ctx).is_in_split_pane() {
             if !items.is_empty() {
@@ -602,8 +631,16 @@ impl BackingView for TerminalView {
             .is_sharer_or_viewer();
         let is_fullscreen_agent_view = FeatureFlag::AgentView.is_enabled()
             && self.agent_view_controller.as_ref(app).is_fullscreen();
+        let has_ssh_route = FeatureFlag::RecursiveSshExtension.is_enabled()
+            && self.active_block_session_id().is_some_and(|session_id| {
+                RemoteServerManager::handle(app)
+                    .as_ref(app)
+                    .ssh_route_targets(session_id)
+                    .is_some()
+            });
         is_shared
             || is_fullscreen_agent_view
+            || has_ssh_route
             || FeatureFlag::ContextWindowUsageV2.is_enabled()
                 && self.split_pane_state(app).is_in_split_pane()
     }

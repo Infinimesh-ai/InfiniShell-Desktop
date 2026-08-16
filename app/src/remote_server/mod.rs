@@ -17,6 +17,8 @@ pub mod git_status_proto;
 #[cfg(not(target_family = "wasm"))]
 pub(crate) mod handoff_snapshot;
 #[cfg(not(target_family = "wasm"))]
+pub mod remote_ssh_transport;
+#[cfg(not(target_family = "wasm"))]
 mod ripgrep_search;
 #[cfg(not(target_family = "wasm"))]
 pub mod rust_ssh;
