@@ -149,7 +149,7 @@ AI layer speaks to *your* providers instead of a hosted gateway.
 Internal crate names keep their upstream `warp_*` prefixes on purpose: they
 mark which code is upstream heritage, which keeps future syncs tractable.
 
-## Roadmap
+## InfiniShell Desktop roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).
 

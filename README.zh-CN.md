@@ -128,7 +128,7 @@ InfiniShell 在终端内核(渲染、Blocks、agent 运行时)上跟随
 内部 crate 保留上游的 `warp_*` 前缀是有意为之:它标示哪些代码源自上游血统,
 让后续的上游同步保持可控。
 
-## 路线图
+## InfiniShell Desktop 路线图
 
 见 [docs/roadmap.zh-CN.md](docs/roadmap.zh-CN.md)。
 
