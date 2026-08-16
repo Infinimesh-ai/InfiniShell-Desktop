@@ -2804,6 +2804,48 @@ fn test_create_new_tab_group_groups_active_tab() {
 }
 
 #[test]
+fn test_snapshot_omits_tab_groups_without_persisted_members() {
+    let _grouped_tabs_guard = FeatureFlag::GroupedTabs.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+
+        let workspace = mock_workspace(&mut app);
+        let snapshot = workspace.update(&mut app, |workspace, ctx| {
+            let group = TabGroup::new();
+            workspace.tab_groups.insert(group.id, group);
+
+            workspace.snapshot(ctx.window_id(), false, ctx)
+        });
+
+        assert!(snapshot.tab_groups.is_empty());
+    });
+}
+
+#[test]
+fn test_snapshot_omits_group_pinned_state_when_pinned_tabs_disabled() {
+    let _grouped_tabs_guard = FeatureFlag::GroupedTabs.override_enabled(true);
+    let _pinned_tabs_guard = FeatureFlag::PinnedTabs.override_enabled(false);
+
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+
+        let workspace = mock_workspace(&mut app);
+        let snapshot = workspace.update(&mut app, |workspace, ctx| {
+            let mut group = TabGroup::new();
+            group.pinned = true;
+            workspace.tabs[0].group_id = Some(group.id);
+            workspace.tab_groups.insert(group.id, group);
+
+            workspace.snapshot(ctx.window_id(), false, ctx)
+        });
+
+        assert_eq!(snapshot.tab_groups.len(), 1);
+        assert!(!snapshot.tab_groups[0].pinned);
+    });
+}
+
+#[test]
 fn test_new_tab_group_from_tab_keeps_tab_in_place() {
     let _grouped_tabs_guard = FeatureFlag::GroupedTabs.override_enabled(true);
 

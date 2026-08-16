@@ -58,9 +58,7 @@ pub mod templatable;
 pub use cloud_object_models::{
     CLIServer, JSONMCPServer, JSONTransportType, ServerSentEvents, StaticEnvVar, StaticHeader,
 };
-pub use cloud_object_models::{
-    CloudMCPServer, CloudMCPServerModel, MCPServer, MCPServerState, TransportType,
-};
+pub use cloud_object_models::{MCPServer, MCPServerState, TransportType};
 pub use templatable::{JsonTemplate, TemplatableMCPServer, TemplateVariable};
 pub mod logs;
 pub mod templatable_installation;

@@ -6,7 +6,6 @@ use std::sync::LazyLock;
 use warpui::elements::ChildView;
 use warpui::{Element, Entity, ModelHandle, View, ViewContext, ViewHandle};
 
-use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent_conversations_model::AgentConversationEntryId;
 use crate::ai::blocklist::agent_view::AgentViewController;
 use crate::ai::blocklist::conversation_selection::ConversationSelectionHandle;

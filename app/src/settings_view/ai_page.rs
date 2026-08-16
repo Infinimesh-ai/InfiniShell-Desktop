@@ -8,8 +8,6 @@ use settings::{Setting, ToggleableSetting};
 use strum::IntoEnumIterator;
 use warp_core::context_flag::ContextFlag;
 use warp_core::features::FeatureFlag;
-use warp_core::ui::color::ContrastingColor;
-use warp_core::ui::color::contrast::MinimumAllowedContrast;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{
     Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Empty,
@@ -94,9 +92,7 @@ use crate::settings::{
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent::{CLIAgentInstallEvent, CLIAgentInstallModel};
 use crate::terminal::session_settings::{SessionSettings, SessionSettingsChangedEvent};
-use crate::view_components::action_button::{
-    ActionButton, ButtonSize, DangerSecondaryTheme, SecondaryTheme,
-};
+use crate::view_components::action_button::{ActionButton, ButtonSize, SecondaryTheme};
 use crate::view_components::{
     FilterableDropdown, SubmittableTextInput, SubmittableTextInputEvent, WarningBoxConfig,
     render_warning_box,

@@ -6,7 +6,6 @@ use async_channel::Sender;
 use itertools::Itertools;
 #[cfg(not(target_family = "wasm"))]
 use repo_metadata::repositories::DetectedRepositories;
-use settings::Setting as _;
 use warp_core::features::FeatureFlag;
 use warpui::elements::{
     AnchorPair, Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,

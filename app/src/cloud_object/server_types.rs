@@ -1,20 +1,14 @@
-use std::borrow::Cow;
-use std::fmt;
-use std::str::FromStr;
-
-use anyhow::{Result, anyhow};
-use chrono::{DateTime, Utc};
 // Zap:以下类型上游已抽到 `crates/cloud_objects`,合并时我方保留了一份结构相同的
 // 本地副本,导致同名类型在两处定义、跨 crate 传递时触发 E0308/E0277
 // (`ObjectIdType` / `ObjectType` 等)。改为直接复用 crate 版本消除分裂;
 // 下面 `StoredObject*` 系列是 Zap 自有的命名体系(上游叫 `CloudObject*`),继续本地定义。
+#[cfg(test)]
+use chrono::Utc;
 pub use cloud_objects::cloud_object::{
     GENERIC_STRING_OBJECT_PREFIX, GenericStringObjectFormat, JSON_OBJECT_PREFIX, JsonObjectType,
     NumInFlightRequests, ObjectIdType, ObjectType, Owner, Revision, ServerObjectContainer,
 };
-use derivative::Derivative;
 use pathfinder_geometry::vector::vec2f;
-use serde::{Deserialize, Serialize};
 use warp_core::ui::Icon;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::Fill;
@@ -27,7 +21,7 @@ use warpui::ui_components::components::UiComponent;
 
 use crate::auth::UserUid;
 use crate::drive::sharing::{SharingAccessLevel, Subject};
-use crate::server::ids::{ServerId, SyncId};
+use crate::server::ids::SyncId;
 use crate::server_time::ServerTimestamp;
 
 #[derive(Clone, Debug)]

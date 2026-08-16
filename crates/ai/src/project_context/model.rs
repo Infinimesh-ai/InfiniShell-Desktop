@@ -231,20 +231,6 @@ impl ProjectRules {
         }
     }
 
-    /// Remove a rule from the set of project rules. This returns the removed rule.
-    #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
-    fn remove_rule(&mut self, path: &LocalOrRemotePath) -> Option<ProjectRule> {
-        let parent = path.parent()?;
-        let file_name = path.file_name()?;
-
-        let rule = self
-            .rules
-            .iter_mut()
-            .find(|rule| rule.parent_path == parent)?;
-
-        rule.slot_for_file_name(file_name)?.take()
-    }
-
     /// Upsert a rule to the set of project rules. This will create a new RuleAtPath entry if none exists and update the existing one
     /// otherwise.
     #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
