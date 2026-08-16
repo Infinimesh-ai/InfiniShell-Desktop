@@ -1352,6 +1352,7 @@ fn enter_and_escape_stop_listening_while_escape_cancels_transcribing() {
                 | TuiInputViewEvent::AcceptedModel(_)
                 | TuiInputViewEvent::AcceptedMcp(_)
                 | TuiInputViewEvent::AcceptedMcpInstall(_)
+                | TuiInputViewEvent::FocusRequested
                 | TuiInputViewEvent::MoveFocusUp
                 | TuiInputViewEvent::AcceptedPromptAndCommandHistory { .. }
                 | TuiInputViewEvent::RequestShellCompletion
@@ -2236,6 +2237,7 @@ fn multiline_paste_emits_once_and_fallback_inserts_without_submitting() {
                 | TuiInputViewEvent::AcceptedPromptAndCommandHistory { .. }
                 | TuiInputViewEvent::RequestShellCompletion
                 | TuiInputViewEvent::BackspaceAtEmptyInput
+                | TuiInputViewEvent::FocusRequested
                 | TuiInputViewEvent::MoveFocusUp
                 | TuiInputViewEvent::ClipboardCopySucceeded
                 | TuiInputViewEvent::ClipboardCopyFailed
@@ -3210,6 +3212,29 @@ fn printable_input_is_accepted_only_while_focused() {
 
         view.update(&mut app, |_, ctx| ctx.focus_self());
         assert!(app.read(|ctx| dispatch_element_event(&view, ctx, &printable_key('c'))));
+    });
+}
+
+#[test]
+fn mouse_selection_requests_focus() {
+    App::test((), |mut app| async move {
+        let focus_requests = Rc::new(Cell::new(0));
+        let focus_requests_for_subscription = focus_requests.clone();
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            ctx.subscribe_to_view(&view, move |_, event, _| {
+                if matches!(event, TuiInputViewEvent::FocusRequested) {
+                    focus_requests_for_subscription.set(focus_requests_for_subscription.get() + 1);
+                }
+            });
+            view
+        });
+
+        app.update(|ctx| {
+            assert!(mouse(&view, ctx, &left_down(0, 0, 1, false)));
+        });
+
+        assert_eq!(focus_requests.get(), 1);
     });
 }
 

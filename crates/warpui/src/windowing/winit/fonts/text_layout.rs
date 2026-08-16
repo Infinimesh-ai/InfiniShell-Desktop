@@ -85,9 +85,14 @@ impl<'a> RunBuilder<'a> {
             .char_index(self.byte_offset + glyph.start)
             .unwrap_or_else(|| self.str_index_map.num_chars());
 
+        // `glyph.x` / `glyph.y` 是累积 advance 后的画笔位置；GPOS 字形定位偏移
+        // 单独存放在以 em 为单位的 offset 中，需要按字号缩放后合并。
+        let gpos_x_offset = glyph.font_size * glyph.x_offset;
+        let gpos_y_offset = glyph.font_size * glyph.y_offset;
+
         self.glyphs_in_current_run.push(Glyph {
             id: glyph.glyph_id as u32,
-            position_along_baseline: vec2f(glyph.x, glyph.y),
+            position_along_baseline: vec2f(glyph.x + gpos_x_offset, glyph.y - gpos_y_offset),
             index: glyph_char_index,
             width: glyph.w,
         });

@@ -59,10 +59,6 @@ pub(crate) enum TuiOrchestrationEvent {
         root_session_id: TuiSessionId,
         conversation: Box<AIConversation>,
     },
-    /// 仅保留给既有视图的刷新事件；本地版本不会主动产生远端状态更新。
-    RestoredRemoteChildStatusUpdated {
-        conversation_id: AIConversationId,
-    },
 }
 
 pub(crate) struct MaterializedLocalOzChildSession {
@@ -560,3 +556,7 @@ impl TuiOrchestrationModel {
         ctx.notify();
     }
 }
+
+#[cfg(test)]
+#[path = "orchestration_model_tests.rs"]
+mod tests;

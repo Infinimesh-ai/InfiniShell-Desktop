@@ -303,12 +303,22 @@ pub struct ProjectContextModel {
     /// 满足 `pending_context(&self, app: &AppContext)` 这种 `&self` 调用形态。
     #[cfg(feature = "local_fs")]
     fast_path_cache: RefCell<HashMap<PathBuf, FastPathEntry>>,
-    /// Latest metadata-backed async refresh per exact repository identity.
-    /// This uses the same identifier carried by metadata events rather than an arbitrary file path.
+    /// 每个仓库当前刷新的世代号；刷新完成后清除。
+    /// 用于阻止仓库被移除或失效后仍应用旧的在途结果。
     #[cfg(feature = "local_fs")]
     rule_refresh_generations: HashMap<RepositoryIdentifier, u64>,
     #[cfg(feature = "local_fs")]
     next_rule_refresh_generation: u64,
+    /// 当前有规则读取任务在后台运行的仓库。
+    ///
+    /// 底层文件读取在线程池启动后无法取消，因此同一仓库只允许一个读取任务在途；
+    /// 后续请求记录到 `rule_refresh_pending`，避免产生重叠读取。
+    #[cfg(feature = "local_fs")]
+    rule_refresh_in_flight: HashSet<RepositoryIdentifier>,
+    /// 在已有读取任务运行期间又收到刷新请求的仓库。
+    /// 在途任务完成后只补跑一次，并读取最新的 standing results。
+    #[cfg(feature = "local_fs")]
+    rule_refresh_pending: HashSet<RepositoryIdentifier>,
     /// File-based global rules and their local watcher state. Kept separate
     /// from `path_to_rules`, which is project-scoped.
     pub(super) global_rules: GlobalRules,
@@ -460,6 +470,7 @@ impl ProjectContextModel {
         Ok(())
     }
 
+    /// 请求刷新仓库规则。如果已有读取在途，则合并为一次后续刷新。
     #[cfg(feature = "local_fs")]
     fn refresh_project_rules_for_repo(
         &mut self,
@@ -470,6 +481,24 @@ impl ProjectContextModel {
         if repo_id.to_local_or_remote_path().is_none() {
             return;
         };
+        if self.rule_refresh_in_flight.contains(&repo_id) {
+            self.rule_refresh_pending.insert(repo_id);
+            return;
+        }
+        self.start_rule_refresh(repo_id, project_rule_content_reader, ctx);
+    }
+
+    /// 启动后台规则读取。调用方必须先确认同一仓库没有在途刷新。
+    #[cfg(feature = "local_fs")]
+    fn start_rule_refresh(
+        &mut self,
+        repo_id: RepositoryIdentifier,
+        project_rule_content_reader: ProjectRuleContentReader,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        self.rule_refresh_in_flight.insert(repo_id.clone());
+        self.rule_refresh_pending.remove(&repo_id);
+
         let rule_paths = standing_project_rule_paths(
             &repo_id,
             RepoMetadataModel::as_ref(ctx)
@@ -485,23 +514,29 @@ impl ProjectContextModel {
             .insert(repo_id.clone(), refresh_generation);
         let repo_id_for_result = repo_id.clone();
         ctx.spawn(read_rule_contents, move |me, result, ctx| {
-            if me.rule_refresh_generations.get(&repo_id_for_result) != Some(&refresh_generation) {
-                return;
-            }
-            match result {
-                Ok(contents) => {
-                    let Some(project_root) = repo_id_for_result.to_local_or_remote_path() else {
-                        return;
-                    };
-                    let existing_rules = me
-                        .path_to_rules
-                        .get(&project_root)
-                        .cloned()
-                        .unwrap_or_default();
-                    let rules = Self::reconcile_project_rules(rule_paths, contents, existing_rules);
-                    me.apply_project_rules(repo_id_for_result, rules, ctx);
+            me.rule_refresh_in_flight.remove(&repo_id_for_result);
+            // 仓库在读取期间被移除或失效时，不应用旧结果。
+            if me.rule_refresh_generations.get(&repo_id_for_result) == Some(&refresh_generation) {
+                me.rule_refresh_generations.remove(&repo_id_for_result);
+                match result {
+                    Ok(contents) => {
+                        if let Some(project_root) = repo_id_for_result.to_local_or_remote_path() {
+                            let existing_rules = me
+                                .path_to_rules
+                                .get(&project_root)
+                                .cloned()
+                                .unwrap_or_default();
+                            let rules =
+                                Self::reconcile_project_rules(rule_paths, contents, existing_rules);
+                            me.apply_project_rules(repo_id_for_result.clone(), rules, ctx);
+                        }
+                    }
+                    Err(error) => log::warn!("Failed to read project rules: {error}"),
                 }
-                Err(error) => log::warn!("Failed to read project rules: {error}"),
+            }
+            // 在途期间的所有刷新请求合并为一次，并基于最新索引结果重新读取。
+            if me.rule_refresh_pending.remove(&repo_id_for_result) {
+                me.start_rule_refresh(repo_id_for_result, project_rule_content_reader, ctx);
             }
         });
     }
@@ -527,6 +562,7 @@ impl ProjectContextModel {
         ctx: &mut ModelContext<Self>,
     ) {
         self.rule_refresh_generations.remove(repo_id);
+        self.rule_refresh_pending.remove(repo_id);
         let Some(project_root) = repo_id.to_local_or_remote_path() else {
             return;
         };

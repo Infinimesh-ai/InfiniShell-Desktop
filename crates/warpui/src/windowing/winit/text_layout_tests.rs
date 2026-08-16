@@ -1,3 +1,6 @@
+use std::fs;
+use std::path::PathBuf;
+
 use anyhow::Result;
 
 use super::*;
@@ -585,6 +588,89 @@ fn test_layout_text_first_line_indent_large_bidirectional() -> Result<()> {
         FRAME_WIDTH,
     ));
     // assert!(all_lines_bounded(&big_indent_frame, FRAME_WIDTH));
+
+    Ok(())
+}
+
+/// 组合附加符必须使用 shaping 结果中的 GPOS 偏移，而不是停留在画笔位置。
+#[test]
+fn test_combining_marks_are_placed_with_gpos_offsets() -> Result<()> {
+    let mut font_db = init_fonts().0;
+
+    // RobotoFlex 同时包含两个测试附加符及 mark-to-base / mark-to-mark 锚点。
+    let font_path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "..",
+        "..",
+        "app",
+        "assets",
+        "bundled",
+        "fonts",
+        "roboto",
+        "RobotoFlex-Semibold.ttf",
+    ]
+    .iter()
+    .collect();
+    let roboto_flex = font_db
+        .load_from_bytes(
+            "RobotoFlex",
+            vec![fs::read(font_path).expect("应能读取内置 RobotoFlex 字体")],
+        )
+        .expect("应能为测试加载 RobotoFlex 字体");
+
+    // b 没有对应的预组合字符，因此会形成基础字形和两个零 advance 的附加符。
+    let text = "b\u{0301}\u{0308}";
+    let line = font_db.text_layout_system().layout_line(
+        text,
+        LineStyle {
+            font_size: FONT_SIZE,
+            line_height_ratio: DEFAULT_UI_LINE_HEIGHT_RATIO,
+            baseline_ratio: DEFAULT_TOP_BOTTOM_RATIO,
+            fixed_width_tab_size: None,
+        },
+        &[(
+            0..text.chars().count(),
+            StyleAndFont::new(roboto_flex, Properties::default(), TextStyle::new()),
+        )],
+        f32::MAX,
+        crate::text_layout::ClipConfig::default(),
+    );
+
+    let glyphs = line
+        .runs
+        .iter()
+        .flat_map(|run| run.glyphs.iter())
+        .collect::<Vec<_>>();
+    assert_eq!(glyphs.len(), 3, "应得到一个基础字形和两个组合附加符");
+
+    let base = glyphs[0];
+    let (acute, diaeresis) = (glyphs[1], glyphs[2]);
+    assert!(base.width > 0., "基础字形应推进画笔");
+    assert_eq!(
+        (
+            base.position_along_baseline.x(),
+            base.position_along_baseline.y()
+        ),
+        (0., 0.),
+        "基础字形应从原点开始"
+    );
+
+    for mark in [acute, diaeresis] {
+        assert_eq!(mark.width, 0., "组合附加符不应推进画笔");
+        assert!(
+            mark.position_along_baseline.x() < base.width,
+            "GPOS x 偏移应把附加符拉回基础字形上方"
+        );
+        assert!(
+            mark.position_along_baseline.y() < 0.,
+            "GPOS y 偏移应把附加符抬到基线上方"
+        );
+    }
+
+    assert!(
+        diaeresis.position_along_baseline.y() < acute.position_along_baseline.y(),
+        "第二个附加符应通过 mark-to-mark 锚点叠在第一个之上"
+    );
 
     Ok(())
 }

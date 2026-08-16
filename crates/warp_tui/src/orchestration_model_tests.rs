@@ -1,18 +1,14 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use warp::tui_export::{
-    AIConversationId, BlocklistAIHistoryModel, CloudAgentStartupBlocker, CloudAgentStartupFailure,
-    CloudAgentStartupIssue, ConversationStatus, Harness, OrchestrationEventStreamerEvent,
-    RenderableAIError, StartAgentExecutionMode, StartAgentExecutor, StartAgentExecutorEvent,
-    StartAgentOutcome, StartAgentRequest, register_tui_session_view_test_singletons,
+    AIConversationId, BlocklistAIHistoryModel, Harness, register_tui_session_view_test_singletons,
 };
 use warpui::platform::WindowStyle;
-use warpui::{AddWindowOptions, ModelHandle, ReadModel, SingletonEntity as _, UpdateModel};
-use warpui_core::elements::tui::{TuiBufferExt, TuiRect, text_width};
-use warpui_core::presenter::tui::TuiPresenter;
-use warpui_core::{App, TuiView as _, TypedActionView as _, WindowId};
+use warpui::{AddWindowOptions, ModelHandle, ReadModel, SingletonEntity as _};
+use warpui_core::{App, EntityId, WindowId};
 
-use super::TuiOrchestrationModel;
-use crate::cloud_run::TuiCloudRunStartup;
-use crate::cloud_run_view::{TuiCloudRunAction, TuiCloudRunView};
+use super::{TuiOrchestrationEvent, TuiOrchestrationModel};
 use crate::root_view::RootTuiView;
 use crate::session_registry::{TuiSessionId, TuiSessionView, TuiSessions};
 use crate::test_fixtures::{add_test_semantic_selection, add_test_terminal_session};
@@ -22,30 +18,6 @@ struct OrchestrationFixture {
     window_id: WindowId,
 }
 
-fn remote_request(parent_conversation_id: AIConversationId) -> StartAgentRequest {
-    StartAgentRequest {
-        id: Default::default(),
-        name: "cloud-researcher".to_string(),
-        prompt: "research the codebase".to_string(),
-        execution_mode: StartAgentExecutionMode::Remote {
-            environment_id: "env-1".to_string(),
-            skill_references: Vec::new(),
-            model_id: "auto".to_string(),
-            computer_use_enabled: false,
-            worker_host: "warp".to_string(),
-            harness_type: "oz".to_string(),
-            title: "Researcher".to_string(),
-            auth_secret_name: None,
-            runner_id: String::new(),
-            agent_identity_uid: None,
-        },
-        lifecycle_subscription: None,
-        parent_conversation_id,
-        parent_run_id: Some("parent-run-1".to_string()),
-    }
-}
-
-/// Boots the container + root + orchestration model wiring (no live PTYs).
 fn orchestration_fixture(app: &mut App) -> OrchestrationFixture {
     register_tui_session_view_test_singletons(app);
     add_test_semantic_selection(app);
@@ -63,97 +35,17 @@ fn orchestration_fixture(app: &mut App) -> OrchestrationFixture {
     root.update(app, |_, ctx| {
         ctx.subscribe_to_model(&sessions, |_, _, _, ctx| ctx.notify());
     });
-    let orchestration = app.update(TuiOrchestrationModel::register);
-    app.update(|ctx| TuiSessions::wire_orchestration(&sessions, &orchestration, ctx));
+    app.update(TuiOrchestrationModel::register);
     OrchestrationFixture {
         sessions,
         window_id,
     }
 }
 
-fn add_child_session(
-    app: &mut App,
-    fixture: &OrchestrationFixture,
-    parent_conversation_id: AIConversationId,
-    name: &str,
-) -> (TuiSessionId, AIConversationId) {
+fn add_parent_session(app: &mut App, fixture: &OrchestrationFixture) -> TuiSessionId {
     let (session, manager) = add_test_terminal_session(app, fixture.window_id);
     let session_id = app.update(|ctx| {
-        TuiSessions::register_session(&fixture.sessions, session, manager, false, ctx)
-    });
-    let conversation_id = app.update(|ctx| {
-        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-            let conversation_id = history.start_new_child_conversation(
-                session_id.surface_id(),
-                name.to_owned(),
-                parent_conversation_id,
-                Some(Harness::Oz),
-                ctx,
-            );
-            history.set_active_conversation_id(conversation_id, session_id.surface_id(), ctx);
-            conversation_id
-        })
-    });
-    (session_id, conversation_id)
-}
-
-fn add_remote_child_session(
-    app: &mut App,
-    fixture: &OrchestrationFixture,
-    parent_session_id: TuiSessionId,
-    request: &StartAgentRequest,
-    display_name: String,
-    orchestration_harness: Harness,
-) -> (
-    AIConversationId,
-    warpui::EntityId,
-    ModelHandle<crate::cloud_run::TuiCloudRunState>,
-) {
-    let child = app.update(|ctx| {
-        TuiSessions::create_remote_child_session(&fixture.sessions, parent_session_id, ctx)
-    });
-    let surface_id = child.session_id.surface_id();
-    let cloud_run_state = child.cloud_run_state.clone();
-    let conversation_id = app.update(|ctx| {
-        TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-            model.initialize_remote_child_session(
-                &child,
-                request,
-                display_name,
-                orchestration_harness,
-                ctx,
-            )
-        })
-    });
-    (conversation_id, surface_id, cloud_run_state)
-}
-
-fn cloud_view(
-    surface_id: warpui::EntityId,
-    ctx: &warpui::AppContext,
-) -> warpui::ViewHandle<TuiCloudRunView> {
-    let session_id = TuiSessions::as_ref(ctx)
-        .session_id_for_surface(surface_id)
-        .expect("cloud session is retained");
-    match TuiSessions::as_ref(ctx)
-        .session(session_id)
-        .expect("cloud session is registered")
-        .view()
-    {
-        TuiSessionView::Cloud(view) => view.clone(),
-        TuiSessionView::Terminal(_) => panic!("expected a lightweight cloud session"),
-    }
-}
-
-/// Registers a session with a live active conversation.
-fn add_dispatching_session(
-    app: &mut App,
-    fixture: &OrchestrationFixture,
-    focus: bool,
-) -> TuiSessionId {
-    let (session, manager) = add_test_terminal_session(app, fixture.window_id);
-    let session_id = app.update(|ctx| {
-        TuiSessions::register_session(&fixture.sessions, session, manager, focus, ctx)
+        TuiSessions::register_session(&fixture.sessions, session, manager, true, ctx)
     });
     app.update(|ctx| {
         BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
@@ -164,676 +56,54 @@ fn add_dispatching_session(
     });
     session_id
 }
-/// Creates a standalone executor and relays its frontend materialization
-/// events into the coordinator.
-fn add_relayed_executor(
-    app: &mut App,
-    parent_session_id: TuiSessionId,
-) -> ModelHandle<StartAgentExecutor> {
-    let executor = app.add_model(StartAgentExecutor::new);
-    app.update(|ctx| {
-        let orchestration = TuiOrchestrationModel::handle(ctx);
-        ctx.subscribe_to_model(&executor, move |_, event, ctx| {
-            orchestration.update(ctx, |orchestration, ctx| match event {
-                StartAgentExecutorEvent::CreateAgent(request) => {
-                    orchestration.dispatch_create_agent(
-                        parent_session_id,
-                        (**request).clone(),
-                        None,
-                        ctx,
-                    );
-                }
-                StartAgentExecutorEvent::CleanupFailedChildLaunch { conversation_id } => {
-                    orchestration.cleanup_child(conversation_id, ctx);
-                }
-            });
-        });
-    });
-    executor
-}
 
-/// Dispatches a StartAgent request through the session's executor and
-/// returns the resolved outcome (the orchestration model resolves
-/// unsupported modes synchronously within the same effect flush).
-fn dispatch_and_recv(
-    app: &mut App,
-    session_id: TuiSessionId,
-    executor: &ModelHandle<StartAgentExecutor>,
-    execution_mode: StartAgentExecutionMode,
-) -> (AIConversationId, StartAgentOutcome) {
-    let parent_conversation_id = app.read(|ctx| {
-        warp::tui_export::BlocklistAIHistoryModel::as_ref(ctx)
-            .active_conversation(session_id.surface_id())
-            .expect("fixture registered an active conversation")
-            .id()
-    });
-    let receiver = app.update_model(executor, |executor, ctx| {
-        executor.dispatch(
-            "researcher".to_string(),
-            "research the codebase".to_string(),
-            execution_mode,
-            None,
-            parent_conversation_id,
-            Some("parent-run-1".to_string()),
-            ctx,
-        )
-    });
-    (
-        parent_conversation_id,
-        receiver
-            .try_recv()
-            .expect("unsupported-mode dispatches resolve before the update returns"),
-    )
-}
-
-fn assert_error_containing(outcome: StartAgentOutcome, needle: &str) {
-    match outcome {
-        StartAgentOutcome::Error(message) => {
-            assert!(message.contains(needle), "unexpected error: {message}");
-        }
-        StartAgentOutcome::Started { agent_id } => {
-            panic!("expected an error outcome, got Started({agent_id})");
-        }
-    }
-}
-
-fn assert_failed_launch_cleaned_up(
-    app: &App,
-    fixture: &OrchestrationFixture,
-    parent_conversation_id: AIConversationId,
-    expected_session_count: usize,
-) {
-    app.read(|ctx| {
-        let history = BlocklistAIHistoryModel::as_ref(ctx);
-        assert!(
-            history
-                .child_conversation_ids_of(&parent_conversation_id)
-                .is_empty()
-        );
-        assert!(
-            TuiOrchestrationModel::as_ref(ctx)
-                .event_consumers_by_session
-                .is_empty()
-        );
-    });
-    assert_eq!(
-        app.read_model(&fixture.sessions, |sessions, _| sessions.len()),
-        expected_session_count,
-    );
-}
-
-#[test]
-fn local_harness_children_fail_cleanly() {
-    App::test((), |mut app| async move {
-        let fixture = orchestration_fixture(&mut app);
-        let session_id = add_dispatching_session(&mut app, &fixture, true);
-        let executor = add_relayed_executor(&mut app, session_id);
-
-        let (parent_conversation_id, outcome) = dispatch_and_recv(
-            &mut app,
-            session_id,
-            &executor,
-            StartAgentExecutionMode::Local {
-                harness_type: Some("claude".to_string()),
-                model_id: None,
-            },
-        );
-        assert_error_containing(outcome, "aren't supported in InfiniShell TUI yet");
-        assert_failed_launch_cleaned_up(&app, &fixture, parent_conversation_id, 1);
-    });
-}
-
-#[test]
-fn github_auth_blocker_keeps_the_remote_session_and_actionable_url() {
-    App::test((), |mut app| async move {
-        let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = app.read(|ctx| {
-            BlocklistAIHistoryModel::as_ref(ctx)
-                .active_conversation(parent_session_id.surface_id())
-                .unwrap()
-                .id()
-        });
-        let request = remote_request(parent_conversation_id);
-        let (conversation_id, surface_id, cloud_run_state) = add_remote_child_session(
-            &mut app,
-            &fixture,
-            parent_session_id,
-            &request,
-            "cloud-researcher".to_string(),
-            Harness::Oz,
-        );
-        app.update(|ctx| {
-            TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.finish_remote_child_launch(
-                    conversation_id,
-                    surface_id,
-                    cloud_run_state.clone(),
-                    Err(CloudAgentStartupIssue::Blocked(
-                        CloudAgentStartupBlocker::GitHubAuthRequired {
-                            message: "GitHub authentication required".to_string(),
-                            auth_url: "https://example.com/auth".to_string(),
-                        },
-                    )),
-                    ctx,
-                );
-            });
-        });
-        app.read(|ctx| {
-            assert!(
-                TuiSessions::as_ref(ctx)
-                    .session_id_for_surface(surface_id)
-                    .is_some()
-            );
-            assert_eq!(
-                BlocklistAIHistoryModel::as_ref(ctx)
-                    .conversation(&conversation_id)
-                    .unwrap()
-                    .status(),
-                &ConversationStatus::Blocked {
-                    blocked_action: "GitHub authentication required".to_string(),
-                }
-            );
-            let TuiCloudRunStartup::Blocked(blocker) = cloud_run_state.as_ref(ctx).startup() else {
-                panic!("expected blocked cloud startup state");
-            };
-            assert_eq!(blocker.primary_url(), "https://example.com/auth");
-        });
-    });
-}
-
-#[test]
-fn failed_remote_launch_records_cloud_startup_error_for_tui_rendering() {
-    App::test((), |mut app| async move {
-        let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = app.read(|ctx| {
-            BlocklistAIHistoryModel::as_ref(ctx)
-                .active_conversation(parent_session_id.surface_id())
-                .unwrap()
-                .id()
-        });
-        let request = remote_request(parent_conversation_id);
-        let (conversation_id, surface_id, cloud_run_state) = add_remote_child_session(
-            &mut app,
-            &fixture,
-            parent_session_id,
-            &request,
-            "cloud-researcher".to_string(),
-            Harness::Oz,
-        );
-        app.update(|ctx| {
-            TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.finish_remote_child_launch(
-                    conversation_id,
-                    surface_id,
-                    cloud_run_state,
-                    Err(CloudAgentStartupIssue::Failed(
-                        CloudAgentStartupFailure::Other {
-                            message: "Environment failed to start".to_string(),
-                        },
-                    )),
-                    ctx,
-                );
-            });
-        });
-        app.read(|ctx| {
-            let conversation = BlocklistAIHistoryModel::as_ref(ctx)
-                .conversation(&conversation_id)
-                .expect("remote child conversation");
-            assert_eq!(conversation.status(), &ConversationStatus::Error);
-            assert!(matches!(
-                conversation.status_error(),
-                Some(RenderableAIError::CloudStartupFailed(message))
-                    if message == "Environment failed to start"
-            ));
-        });
-    });
-}
-
-#[test]
-fn snapshot_is_shared_across_tree_and_filters_conversations_without_sessions() {
-    App::test((), |mut app| async move {
-        let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = app.read(|ctx| {
-            BlocklistAIHistoryModel::as_ref(ctx)
-                .active_conversation(parent_session_id.surface_id())
-                .expect("parent conversation")
-                .id()
-        });
-        let (first_session_id, first_child_id) =
-            add_child_session(&mut app, &fixture, parent_conversation_id, "first-child");
-        let (second_session_id, second_child_id) =
-            add_child_session(&mut app, &fixture, parent_conversation_id, "second-child");
-        app.update(|ctx| {
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                history.start_new_child_conversation(
-                    warpui::EntityId::new(),
-                    "missing-session".to_owned(),
-                    parent_conversation_id,
-                    Some(Harness::Oz),
-                    ctx,
-                );
-            });
-        });
-
-        app.read(|ctx| {
-            let model = TuiOrchestrationModel::as_ref(ctx);
-            let parent = model
-                .snapshot(parent_conversation_id, ctx)
-                .expect("parent has navigable children");
-            let child = model
-                .snapshot(first_child_id, ctx)
-                .expect("child resolves the same tree");
-            assert_eq!(parent.root_conversation_id, parent_conversation_id);
-            assert_eq!(child.root_conversation_id, parent_conversation_id);
-            assert_eq!(
-                parent
-                    .children
-                    .iter()
-                    .map(|child| child.conversation_id)
-                    .collect::<Vec<_>>(),
-                vec![first_child_id, second_child_id]
-            );
-            assert_eq!(
-                parent
-                    .children
-                    .iter()
-                    .map(|child| child.spawn_index)
-                    .collect::<Vec<_>>(),
-                vec![0, 1]
-            );
-        });
-        app.update(|ctx| {
-            let selected = TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.focus_conversation_session(second_child_id, ctx)
-            });
-            assert_eq!(selected, Some(second_session_id));
-        });
-        app.read(|ctx| {
-            let snapshot = TuiOrchestrationModel::as_ref(ctx)
-                .snapshot(second_child_id, ctx)
-                .expect("tab snapshot");
-            assert_eq!(snapshot.page_anchor, Some(first_child_id));
-            assert!(snapshot.reveal_selected);
-        });
-        app.update(|ctx| {
-            TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.set_explicit_page(second_child_id, ctx);
-            });
-        });
-        app.read(|ctx| {
-            let snapshot = TuiOrchestrationModel::as_ref(ctx)
-                .snapshot(parent_conversation_id, ctx)
-                .expect("tab snapshot");
-            assert_eq!(snapshot.page_anchor, Some(second_child_id));
-            assert!(!snapshot.reveal_selected);
-        });
-
-        app.update(|ctx| {
-            let selected = TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.focus_conversation_session(first_child_id, ctx)
-            });
-            assert_eq!(selected, Some(first_session_id));
-        });
-        app.read(|ctx| {
-            let snapshot = TuiOrchestrationModel::as_ref(ctx)
-                .snapshot(first_child_id, ctx)
-                .expect("tab snapshot");
-            assert_eq!(
-                TuiSessions::as_ref(ctx).focused_session_id(),
-                Some(first_session_id)
-            );
-            assert_eq!(snapshot.page_anchor, Some(first_child_id));
-            assert!(snapshot.reveal_selected);
-        });
-    });
-}
-
-#[test]
-fn remote_child_session_is_navigable_and_projects_lifecycle() {
-    App::test((), |mut app| async move {
-        let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = app.read(|ctx| {
-            BlocklistAIHistoryModel::as_ref(ctx)
-                .active_conversation(parent_session_id.surface_id())
-                .unwrap()
-                .id()
-        });
-        let request = remote_request(parent_conversation_id);
-        let (conversation_id, surface_id, cloud_run_state) = add_remote_child_session(
-            &mut app,
-            &fixture,
-            parent_session_id,
-            &request,
-            "cloud-researcher".to_string(),
-            Harness::Oz,
-        );
-        app.read(|ctx| {
-            let history = BlocklistAIHistoryModel::as_ref(ctx);
-            let conversation = history.conversation(&conversation_id).unwrap();
-            assert!(conversation.is_remote_child());
-            assert_eq!(
-                history.resolved_parent_conversation_id_for_conversation(conversation),
-                Some(parent_conversation_id)
-            );
-            assert!(
-                TuiSessions::as_ref(ctx)
-                    .session_id_for_surface(surface_id)
-                    .is_some()
-            );
-            assert!(matches!(
-                cloud_run_state.as_ref(ctx).startup(),
-                TuiCloudRunStartup::Dispatching
-            ));
-            assert_eq!(
-                cloud_run_state.as_ref(ctx).conversation_id(),
-                Some(conversation_id)
-            );
-            let view = cloud_view(surface_id, ctx);
-            let mut presenter = TuiPresenter::new();
-            let frame = presenter.present_element(
-                view.as_ref(ctx).render(ctx),
-                TuiRect::new(0, 0, 80, 12),
-                ctx,
-            );
-            let lines = frame.buffer.to_lines();
-            let status_line = lines
-                .iter()
-                .find(|line| line.contains("Starting cloud run…"))
-                .expect("cloud status is visible");
-            let status_content = status_line.trim();
-            assert_eq!(
-                status_line.find(status_content),
-                Some(usize::from((80 - text_width(status_content)).div_ceil(2)))
-            );
-            assert!(
-                lines
-                    .iter()
-                    .any(|line| line.contains("Shift + ↑ sub-agents"))
-            );
-        });
-        app.update(|ctx| {
-            let view = cloud_view(surface_id, ctx);
-            view.update(ctx, |view, ctx| {
-                view.refresh_orchestration_tab_state(ctx);
-                view.handle_action(&TuiCloudRunAction::FocusOrchestrationTabs, ctx);
-            });
-        });
-        app.read(|ctx| {
-            let view = cloud_view(surface_id, ctx);
-            let mut presenter = TuiPresenter::new();
-            let frame = presenter.present_element(
-                view.as_ref(ctx).render(ctx),
-                TuiRect::new(0, 0, 112, 24),
-                ctx,
-            );
-            let lines = frame.buffer.to_lines();
-            assert_eq!(
-                lines.last().map(|line| line.trim()),
-                Some(
-                    "Tab or ← → to navigate | Shift + ← → to go to start/end | ↓ to send a \
-                     message  Ctrl+C to kill sub-agent"
-                )
-            );
-        });
-
-        app.update(|ctx| {
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                history.assign_run_id_for_conversation(
-                    conversation_id,
-                    "00000000-0000-0000-0000-000000000004".to_string(),
-                    None,
-                    surface_id,
-                    ctx,
-                );
-            });
-        });
-        app.read(|ctx| {
-            assert_eq!(
-                BlocklistAIHistoryModel::as_ref(ctx)
-                    .conversation_id_for_agent_id("00000000-0000-0000-0000-000000000004"),
-                Some(conversation_id)
-            );
-        });
-        app.update(|ctx| {
-            TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.handle_streamer_event(
-                    &OrchestrationEventStreamerEvent::WatchedRunStatusChanged {
-                        owner_conversation_id: parent_conversation_id,
-                        run_id: "00000000-0000-0000-0000-000000000004".to_string(),
-                        status: ConversationStatus::Success,
-                    },
-                    ctx,
-                );
-            });
-        });
-        app.read(|ctx| {
-            assert_eq!(
-                BlocklistAIHistoryModel::as_ref(ctx)
-                    .conversation(&conversation_id)
-                    .unwrap()
-                    .status(),
-                &ConversationStatus::Success
-            );
-            let snapshot = TuiOrchestrationModel::as_ref(ctx)
-                .snapshot(conversation_id, ctx)
-                .expect("remote child remains navigable");
-            let child = snapshot
-                .children
-                .iter()
-                .find(|child| child.conversation_id == conversation_id)
-                .expect("remote child has an orchestration tab");
-            assert_eq!(child.status, ConversationStatus::Success);
-        });
-    });
-}
-
-#[test]
-fn kill_child_agent_removes_session_and_conversation_from_map() {
-    // AC 6 / TuiSessions removal: `kill_child_agent` must delete the child
-    // conversation from history and remove the retained TUI session from the
-    // session registry.
-    App::test((), |mut app| async move {
-        let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = app.read(|ctx| {
-            BlocklistAIHistoryModel::as_ref(ctx)
-                .active_conversation(parent_session_id.surface_id())
-                .unwrap()
-                .id()
-        });
-        let request = remote_request(parent_conversation_id);
-        // Register a remote child with full orchestration-model wiring so the
-        // child is in `child_session_by_conversation` and its session is in
-        // `TuiSessions`.
-        let (child_conversation_id, child_surface_id, _cloud_run_state) = add_remote_child_session(
-            &mut app,
-            &fixture,
-            parent_session_id,
-            &request,
-            "researcher".to_string(),
-            Harness::Oz,
-        );
-
-        // Confirm the child is registered before the kill.
-        let initial_session_count = app.read_model(&fixture.sessions, |sessions, _| sessions.len());
-        assert_eq!(
-            initial_session_count, 2,
-            "parent + child sessions before kill"
-        );
-        app.read(|ctx| {
-            assert!(
-                TuiSessions::as_ref(ctx)
-                    .session_id_for_surface(child_surface_id)
-                    .is_some(),
-                "child session must be registered before kill"
-            );
-            assert!(
-                BlocklistAIHistoryModel::as_ref(ctx)
-                    .conversation(&child_conversation_id)
-                    .is_some(),
-                "child conversation must exist before kill"
-            );
-        });
-
-        // Kill the child through the orchestration model.
-        app.update(|ctx| {
-            TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.kill_child_agent(child_conversation_id, ctx);
-            });
-        });
-
-        // After kill: conversation is gone from history, session is removed.
-        app.read(|ctx| {
-            assert!(
-                BlocklistAIHistoryModel::as_ref(ctx)
-                    .conversation(&child_conversation_id)
-                    .is_none(),
-                "child conversation must be deleted from history after kill"
-            );
-            assert!(
-                TuiSessions::as_ref(ctx)
-                    .session_id_for_surface(child_surface_id)
-                    .is_none(),
-                "child session must be removed from TuiSessions after kill"
-            );
-            assert!(
-                BlocklistAIHistoryModel::as_ref(ctx)
-                    .conversation(&parent_conversation_id)
-                    .is_some(),
-                "parent conversation must survive child kill"
-            );
-        });
-        assert_eq!(
-            app.read_model(&fixture.sessions, |sessions, _| sessions.len()),
-            1,
-            "only the parent session should remain after kill"
-        );
-    });
-}
-
-#[test]
-fn kill_descendant_agents_removes_nested_sessions_and_conversations() {
-    App::test((), |mut app| async move {
-        let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = app.read(|ctx| {
-            BlocklistAIHistoryModel::as_ref(ctx)
-                .active_conversation(parent_session_id.surface_id())
-                .unwrap()
-                .id()
-        });
-        let child_request = remote_request(parent_conversation_id);
-        let (child_conversation_id, child_surface_id, _) = add_remote_child_session(
-            &mut app,
-            &fixture,
-            parent_session_id,
-            &child_request,
-            "researcher".to_string(),
-            Harness::Oz,
-        );
-        let child_session_id = app.read(|ctx| {
-            TuiSessions::as_ref(ctx)
-                .session_id_for_surface(child_surface_id)
-                .expect("child session should be retained")
-        });
-        let grandchild_request = remote_request(child_conversation_id);
-        let (grandchild_conversation_id, grandchild_surface_id, _) = add_remote_child_session(
-            &mut app,
-            &fixture,
-            child_session_id,
-            &grandchild_request,
-            "nested-researcher".to_string(),
-            Harness::Oz,
-        );
-
-        app.update(|ctx| {
-            TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.kill_descendant_agents(parent_conversation_id, ctx);
-            });
-        });
-
-        app.read(|ctx| {
-            let history = BlocklistAIHistoryModel::as_ref(ctx);
-            assert!(history.conversation(&child_conversation_id).is_none());
-            assert!(history.conversation(&grandchild_conversation_id).is_none());
-            let sessions = TuiSessions::as_ref(ctx);
-            assert!(sessions.session_id_for_surface(child_surface_id).is_none());
-            assert!(
-                sessions
-                    .session_id_for_surface(grandchild_surface_id)
-                    .is_none()
-            );
-            assert_eq!(sessions.focused_session_id(), Some(parent_session_id));
-        });
-        assert_eq!(
-            app.read_model(&fixture.sessions, |sessions, _| sessions.len()),
-            1
-        );
-    });
-}
-#[test]
-fn failed_launch_cleanup_preserves_other_sessions() {
-    App::test((), |mut app| async move {
-        let fixture = orchestration_fixture(&mut app);
-        let _ = add_dispatching_session(&mut app, &fixture, true);
-        let background_session_id = add_dispatching_session(&mut app, &fixture, false);
-        let executor = add_relayed_executor(&mut app, background_session_id);
-
-        let (parent_conversation_id, outcome) = dispatch_and_recv(
-            &mut app,
-            background_session_id,
-            &executor,
-            StartAgentExecutionMode::Local {
-                harness_type: Some("codex".to_string()),
-                model_id: None,
-            },
-        );
-        assert_error_containing(outcome, "aren't supported in InfiniShell TUI yet");
-        assert_failed_launch_cleaned_up(&app, &fixture, parent_conversation_id, 2);
-    });
-}
-
-// ---- Child-agent restoration (APP-5038) ------------------------------------
-
-fn read_active_conversation_id(app: &App, session_id: TuiSessionId) -> AIConversationId {
+fn active_conversation_id(app: &App, session_id: TuiSessionId) -> AIConversationId {
     app.read(|ctx| {
         BlocklistAIHistoryModel::as_ref(ctx)
             .active_conversation(session_id.surface_id())
-            .expect("session has an active conversation")
+            .expect("父会话应处于活动状态")
             .id()
     })
 }
 
-/// Seeds a hydrated remote-child conversation under `parent_conversation_id`
-/// with a stable run identity but no retained session, mimicking a
-/// startup-hydrated orchestration child that has not yet been materialized.
-fn seed_remote_child(
+fn seed_child(
     app: &mut App,
     parent_conversation_id: AIConversationId,
     name: &str,
-    run_id: &str,
+    harness: Harness,
 ) -> AIConversationId {
     app.update(|ctx| {
         BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-            let child_id = history.start_new_child_conversation(
-                warpui::EntityId::new(),
+            history.start_new_child_conversation(
+                EntityId::new(),
                 name.to_owned(),
                 parent_conversation_id,
-                Some(Harness::Oz),
+                Some(harness),
                 ctx,
-            );
-            if let Some(conversation) = history.conversation_mut(&child_id) {
-                conversation.mark_as_remote_child();
-                conversation.set_run_id(run_id.to_owned());
-            }
-            child_id
+            )
         })
     })
 }
+
+fn restore_requests(app: &mut App) -> Rc<RefCell<Vec<AIConversationId>>> {
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let requests_for_events = requests.clone();
+    app.update(|ctx| {
+        ctx.subscribe_to_model(
+            &TuiOrchestrationModel::handle(ctx),
+            move |_, event, _| match event {
+                TuiOrchestrationEvent::RestoreLocalChildSession { conversation, .. } => {
+                    requests_for_events.borrow_mut().push(conversation.id());
+                }
+                TuiOrchestrationEvent::CreateLocalChildSession { .. }
+                | TuiOrchestrationEvent::KillLocalChildSession { .. }
+                | TuiOrchestrationEvent::RemoveChildSession(_) => {}
+            },
+        );
+    });
+    requests
+}
+
 fn restore_descendants(
     app: &mut App,
     parent_conversation_id: AIConversationId,
@@ -846,329 +116,141 @@ fn restore_descendants(
     });
 }
 
-fn snapshot_child_ids(app: &App, selected: AIConversationId) -> Option<Vec<AIConversationId>> {
-    app.read(|ctx| {
-        TuiOrchestrationModel::as_ref(ctx)
-            .snapshot(selected, ctx)
-            .map(|snapshot| {
-                snapshot
-                    .children
-                    .iter()
-                    .map(|child| child.conversation_id)
-                    .collect()
-            })
-    })
+fn materialize_local_child(
+    app: &mut App,
+    fixture: &OrchestrationFixture,
+    conversation_id: AIConversationId,
+) -> TuiSessionId {
+    let conversation = app.read(|ctx| {
+        BlocklistAIHistoryModel::as_ref(ctx)
+            .conversation(&conversation_id)
+            .cloned()
+            .expect("本地子会话应已载入")
+    });
+    let (view, manager) = add_test_terminal_session(app, fixture.window_id);
+    let session_id = app.update(|ctx| {
+        TuiSessions::register_session(&fixture.sessions, view.clone(), manager, false, ctx)
+    });
+    view.update(app, |view, ctx| {
+        view.restore_orchestrated_child_conversation(conversation, ctx);
+    });
+    app.update(|ctx| {
+        TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
+            model.register_restored_local_oz_child_session(session_id, conversation_id, ctx);
+        });
+    });
+    session_id
 }
 
 #[test]
-fn restoring_parent_materializes_supported_descendant_sessions() {
+fn restoring_parent_requests_local_oz_descendants_in_spawn_order() {
     App::test((), |mut app| async move {
         let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = read_active_conversation_id(&app, parent_session_id);
+        let parent_session_id = add_parent_session(&mut app, &fixture);
+        let parent_id = active_conversation_id(&app, parent_session_id);
+        let child_id = seed_child(&mut app, parent_id, "child", Harness::Oz);
+        let grandchild_id = seed_child(&mut app, child_id, "grandchild", Harness::Oz);
+        let requests = restore_requests(&mut app);
 
-        let child_id = seed_remote_child(
-            &mut app,
-            parent_conversation_id,
-            "cloud-child",
-            "00000000-0000-0000-0000-000000000001",
-        );
-        let grandchild_id = seed_remote_child(
-            &mut app,
-            child_id,
-            "cloud-grandchild",
-            "00000000-0000-0000-0000-000000000002",
-        );
+        restore_descendants(&mut app, parent_id, parent_session_id);
 
-        // Before restore: the descendants have no sessions, so the shared
-        // snapshot filters them out and there is nothing navigable.
-        assert_eq!(snapshot_child_ids(&app, parent_conversation_id), None);
+        assert_eq!(requests.borrow().as_slice(), &[child_id, grandchild_id]);
         assert_eq!(
             app.read_model(&fixture.sessions, |sessions, _| sessions.len()),
-            1
+            1,
+            "请求恢复本身不应重新启动或提前创建本地进程"
         );
-
-        restore_descendants(&mut app, parent_conversation_id, parent_session_id);
-
-        // After restore: parent + both descendants have sessions, and the
-        // descendants appear in recursive spawn order.
-        assert_eq!(
-            snapshot_child_ids(&app, parent_conversation_id),
-            Some(vec![child_id, grandchild_id])
-        );
-        assert_eq!(
-            app.read_model(&fixture.sessions, |sessions, _| sessions.len()),
-            3
-        );
-
-        // A nested grandchild keeps its own parent linkage in history.
-        app.read(|ctx| {
-            let history = BlocklistAIHistoryModel::as_ref(ctx);
-            let grandchild = history.conversation(&grandchild_id).expect("grandchild");
-            assert_eq!(
-                history.resolved_parent_conversation_id_for_conversation(grandchild),
-                Some(child_id)
-            );
-        });
-
-        // Tab navigation resolves each restored session.
-        app.update(|ctx| {
-            let selected = TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.focus_conversation_session(grandchild_id, ctx)
-            });
-            assert!(selected.is_some());
-        });
     });
 }
 
 #[test]
-fn restored_remote_child_uses_authoritative_task_status() {
+fn restoring_parent_twice_does_not_duplicate_local_child_sessions() {
     App::test((), |mut app| async move {
         let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = read_active_conversation_id(&app, parent_session_id);
-        let run_id = "00000000-0000-0000-0000-000000000001";
-        let child_id = seed_remote_child(&mut app, parent_conversation_id, "cloud-child", run_id);
-        let task_id = run_id.parse().expect("hardcoded task ID parses");
+        let parent_session_id = add_parent_session(&mut app, &fixture);
+        let parent_id = active_conversation_id(&app, parent_session_id);
+        let child_id = seed_child(&mut app, parent_id, "child", Harness::Oz);
+        let requests = restore_requests(&mut app);
 
-        restore_descendants(&mut app, parent_conversation_id, parent_session_id);
-        app.update(|ctx| {
-            let session_id = {
-                let history = BlocklistAIHistoryModel::as_ref(ctx);
-                TuiSessions::as_ref(ctx)
-                    .session_ids_by_conversation(history)
-                    .get(&child_id)
-                    .copied()
-                    .expect("restored remote child has a session")
-            };
-            TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.apply_restored_remote_child_status(
-                    session_id,
-                    child_id,
-                    task_id,
-                    ConversationStatus::Success,
-                    ctx,
-                );
-            });
-        });
+        restore_descendants(&mut app, parent_id, parent_session_id);
+        let child_session_id = materialize_local_child(&mut app, &fixture, child_id);
+        restore_descendants(&mut app, parent_id, parent_session_id);
 
-        app.read(|ctx| {
-            let history = BlocklistAIHistoryModel::as_ref(ctx);
-            assert_eq!(
-                history
-                    .conversation(&child_id)
-                    .expect("restored remote child")
-                    .status(),
-                &ConversationStatus::Success
-            );
-            let session_id = TuiSessions::as_ref(ctx)
-                .session_ids_by_conversation(history)
-                .get(&child_id)
-                .copied()
-                .expect("restored remote child has a session");
-            let TuiSessionView::Cloud(view) = TuiSessions::as_ref(ctx)
-                .session(session_id)
-                .expect("restored remote child session")
-                .view()
-            else {
-                panic!("restored remote child uses a cloud view");
-            };
-            let mut presenter = TuiPresenter::new();
-            let frame = presenter.present_element(
-                view.as_ref(ctx).render(ctx),
-                TuiRect::new(0, 0, 112, 24),
-                ctx,
-            );
-            let lines = frame.buffer.to_lines();
-            assert!(
-                lines
-                    .iter()
-                    .any(|line| line.contains("Cloud run succeeded"))
-            );
-            assert!(
-                lines
-                    .iter()
-                    .all(|line| !line.contains("Cloud run in progress"))
-            );
-        });
-    });
-}
-#[test]
-fn restoring_parent_without_children_is_noop() {
-    App::test((), |mut app| async move {
-        let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = read_active_conversation_id(&app, parent_session_id);
-
-        restore_descendants(&mut app, parent_conversation_id, parent_session_id);
-
-        assert_eq!(
-            app.read_model(&fixture.sessions, |sessions, _| sessions.len()),
-            1
-        );
-        assert_eq!(snapshot_child_ids(&app, parent_conversation_id), None);
-    });
-}
-
-#[test]
-fn restoring_parent_twice_does_not_duplicate_child_sessions() {
-    App::test((), |mut app| async move {
-        let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = read_active_conversation_id(&app, parent_session_id);
-        let child_id = seed_remote_child(
-            &mut app,
-            parent_conversation_id,
-            "cloud-child",
-            "00000000-0000-0000-0000-000000000001",
-        );
-
-        restore_descendants(&mut app, parent_conversation_id, parent_session_id);
+        assert_eq!(requests.borrow().as_slice(), &[child_id]);
         assert_eq!(
             app.read_model(&fixture.sessions, |sessions, _| sessions.len()),
             2
         );
-
-        // A second restore of the same tree is idempotent: the child already
-        // has a session, so no duplicate session or tab is created.
-        restore_descendants(&mut app, parent_conversation_id, parent_session_id);
-        assert_eq!(
-            app.read_model(&fixture.sessions, |sessions, _| sessions.len()),
-            2
-        );
-        assert_eq!(
-            snapshot_child_ids(&app, parent_conversation_id),
-            Some(vec![child_id])
-        );
+        app.read(|ctx| {
+            let session = TuiSessions::as_ref(ctx)
+                .session(child_session_id)
+                .expect("恢复后的本地子会话应保持注册");
+            assert!(matches!(session.view(), TuiSessionView::Terminal(_)));
+        });
     });
 }
 
 #[test]
-fn restore_skips_unsupported_or_malformed_children() {
+fn restore_skips_remote_and_non_oz_children() {
     App::test((), |mut app| async move {
         let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = read_active_conversation_id(&app, parent_session_id);
-
-        // A supported remote sibling that should restore normally.
-        let supported_id = seed_remote_child(
-            &mut app,
-            parent_conversation_id,
-            "supported",
-            "00000000-0000-0000-0000-000000000001",
-        );
-        // A remote child without a stable task/run identity.
-        let no_identity_id = app.update(|ctx| {
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                let id = history.start_new_child_conversation(
-                    warpui::EntityId::new(),
-                    "no-identity".to_owned(),
-                    parent_conversation_id,
-                    Some(Harness::Oz),
-                    ctx,
-                );
+        let parent_session_id = add_parent_session(&mut app, &fixture);
+        let parent_id = active_conversation_id(&app, parent_session_id);
+        let local_id = seed_child(&mut app, parent_id, "local", Harness::Oz);
+        let _non_oz_id = seed_child(&mut app, parent_id, "codex", Harness::Codex);
+        let remote_id = seed_child(&mut app, parent_id, "remote", Harness::Oz);
+        app.update(|ctx| {
+            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, _| {
                 history
-                    .conversation_mut(&id)
-                    .expect("child exists")
+                    .conversation_mut(&remote_id)
+                    .expect("远端测试会话应存在")
                     .mark_as_remote_child();
-                id
-            })
+            });
         });
-        // An explicit local non-Oz harness child the TUI cannot display.
-        let non_oz_id = app.update(|ctx| {
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                history.start_new_child_conversation(
-                    warpui::EntityId::new(),
-                    "claude-child".to_owned(),
-                    parent_conversation_id,
-                    Some(Harness::Claude),
-                    ctx,
-                )
-            })
-        });
-        // A shared-session viewer child with no matching TUI view.
-        let shared_viewer_id = app.update(|ctx| {
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                let id = history.start_new_child_conversation(
-                    warpui::EntityId::new(),
-                    "shared-viewer".to_owned(),
-                    parent_conversation_id,
-                    Some(Harness::Oz),
-                    ctx,
-                );
-                history
-                    .conversation_mut(&id)
-                    .expect("child exists")
-                    .set_is_viewing_shared_session(true);
-                id
-            })
-        });
+        let requests = restore_requests(&mut app);
 
-        restore_descendants(&mut app, parent_conversation_id, parent_session_id);
+        restore_descendants(&mut app, parent_id, parent_session_id);
 
-        // Only the supported sibling materializes; the parent restore still
-        // succeeds and the unsupported children are skipped.
-        assert_eq!(
-            app.read_model(&fixture.sessions, |sessions, _| sessions.len()),
-            2
-        );
-        assert_eq!(
-            snapshot_child_ids(&app, parent_conversation_id),
-            Some(vec![supported_id])
-        );
-
-        // The skipped children keep their history records (nothing deleted).
-        app.read(|ctx| {
-            let history = BlocklistAIHistoryModel::as_ref(ctx);
-            assert!(history.conversation(&no_identity_id).is_some());
-            assert!(history.conversation(&non_oz_id).is_some());
-            assert!(history.conversation(&shared_viewer_id).is_some());
-        });
+        assert_eq!(requests.borrow().as_slice(), &[local_id]);
     });
 }
 
 #[test]
-fn discard_restored_descendant_sessions_removes_projections_without_deleting_records() {
+fn discard_restored_descendants_removes_projections_without_deleting_history() {
     App::test((), |mut app| async move {
         let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = read_active_conversation_id(&app, parent_session_id);
-        let child_id = seed_remote_child(
-            &mut app,
-            parent_conversation_id,
-            "cloud-child",
-            "00000000-0000-0000-0000-000000000001",
-        );
-
-        restore_descendants(&mut app, parent_conversation_id, parent_session_id);
-        assert_eq!(
-            app.read_model(&fixture.sessions, |sessions, _| sessions.len()),
-            2
-        );
-
-        // When a different parent replaces the tree, the prior tree's restored
-        // child-session projections are dropped without cancelling or deleting
-        // the underlying conversation.
+        let parent_session_id = add_parent_session(&mut app, &fixture);
+        let parent_id = active_conversation_id(&app, parent_session_id);
+        let child_id = seed_child(&mut app, parent_id, "child", Harness::Oz);
+        let child_session_id = materialize_local_child(&mut app, &fixture, child_id);
+        let sessions_for_events = fixture.sessions.clone();
         app.update(|ctx| {
-            TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.discard_restored_descendant_sessions(
-                    parent_conversation_id,
-                    parent_session_id,
-                    ctx,
-                );
+            ctx.subscribe_to_model(&TuiOrchestrationModel::handle(ctx), move |_, event, ctx| {
+                if let TuiOrchestrationEvent::RemoveChildSession(session_id) = event {
+                    sessions_for_events.update(ctx, |sessions, ctx| {
+                        sessions.remove_session(*session_id, ctx);
+                    });
+                }
             });
         });
 
-        assert_eq!(
-            app.read_model(&fixture.sessions, |sessions, _| sessions.len()),
-            1
-        );
+        app.update(|ctx| {
+            TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
+                model.discard_restored_descendant_sessions(parent_id, parent_session_id, ctx);
+            });
+        });
+
         app.read(|ctx| {
+            assert!(TuiSessions::as_ref(ctx).session(child_session_id).is_none());
             assert!(
                 BlocklistAIHistoryModel::as_ref(ctx)
                     .conversation(&child_id)
                     .is_some(),
-                "the child conversation record must be preserved after discard"
+                "移除 TUI 投影时必须保留历史记录"
+            );
+            assert_eq!(
+                TuiSessions::as_ref(ctx).focused_session_id(),
+                Some(parent_session_id)
             );
         });
     });
@@ -1178,78 +260,31 @@ fn discard_restored_descendant_sessions_removes_projections_without_deleting_rec
 fn restored_local_oz_child_materializes_terminal_session_without_relaunch() {
     App::test((), |mut app| async move {
         let fixture = orchestration_fixture(&mut app);
-        let parent_session_id = add_dispatching_session(&mut app, &fixture, true);
-        let parent_conversation_id = read_active_conversation_id(&app, parent_session_id);
+        let parent_session_id = add_parent_session(&mut app, &fixture);
+        let parent_id = active_conversation_id(&app, parent_session_id);
+        let child_id = seed_child(&mut app, parent_id, "local-child", Harness::Oz);
 
-        // Seed a hydrated local Oz child (no retained session yet).
-        let child_id = app.update(|ctx| {
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                history.start_new_child_conversation(
-                    warpui::EntityId::new(),
-                    "local-child".to_owned(),
-                    parent_conversation_id,
-                    Some(Harness::Oz),
-                    ctx,
-                )
-            })
-        });
-
-        // Materialize the child via the restore-only pieces on a fresh terminal
-        // session: restore its transcript, then register it. This deliberately
-        // does not call any launch/start-agent path, so the child is not
-        // relaunched and no prompt is resent.
-        let (child_view, child_manager) = add_test_terminal_session(&mut app, fixture.window_id);
-        let child_session_id = app.update(|ctx| {
-            TuiSessions::register_session(
-                &fixture.sessions,
-                child_view.clone(),
-                child_manager,
-                false,
-                ctx,
-            )
-        });
-        let child_conversation = app.read(|ctx| {
-            BlocklistAIHistoryModel::as_ref(ctx)
-                .conversation(&child_id)
-                .cloned()
-                .expect("child conversation is hydrated")
-        });
-        app.update(|ctx| {
-            child_view.update(ctx, |view, ctx| {
-                view.restore_orchestrated_child_conversation(child_conversation, ctx);
-            });
-        });
-        app.update(|ctx| {
-            TuiOrchestrationModel::handle(ctx).update(ctx, |model, ctx| {
-                model.register_restored_local_oz_child_session(child_session_id, child_id, ctx);
-            });
-        });
+        let child_session_id = materialize_local_child(&mut app, &fixture, child_id);
 
         app.read(|ctx| {
-            // The child is a full terminal session (not a lightweight cloud one).
             let session = TuiSessions::as_ref(ctx)
                 .session(child_session_id)
-                .expect("child session registered");
+                .expect("恢复后的子会话应已注册");
             assert!(matches!(session.view(), TuiSessionView::Terminal(_)));
-
-            // It appears in the parent's orchestration snapshot with its
-            // preserved agent name and parent linkage.
+            assert_eq!(
+                TuiSessions::as_ref(ctx).focused_session_id(),
+                Some(parent_session_id),
+                "恢复子会话不应抢占父会话焦点"
+            );
             let snapshot = TuiOrchestrationModel::as_ref(ctx)
-                .snapshot(parent_conversation_id, ctx)
-                .expect("child is navigable");
+                .snapshot(parent_id, ctx)
+                .expect("恢复后的子会话应出现在编排快照中");
             let child = snapshot
                 .children
                 .iter()
                 .find(|child| child.conversation_id == child_id)
-                .expect("child has an orchestration tab");
+                .expect("恢复后的子会话应可导航");
             assert_eq!(child.label, "local-child");
-
-            let history = BlocklistAIHistoryModel::as_ref(ctx);
-            let conversation = history.conversation(&child_id).expect("child conversation");
-            assert_eq!(
-                history.resolved_parent_conversation_id_for_conversation(conversation),
-                Some(parent_conversation_id)
-            );
         });
     });
 }

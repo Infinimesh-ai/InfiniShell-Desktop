@@ -296,6 +296,15 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
     GIT_OPTIONAL_LOCKS=0 command git "$@"
   }
 
+  # 清空行编辑器缓冲区；若当前处于 vi 命令模式，同时切回 vi 插入模式。
+  function warp_kill_buffer_and_reset_insert_mode () {
+    zle kill-buffer
+    if [[ $KEYMAP == vicmd ]]; then
+      zle -K viins
+    fi
+  }
+  zle -N warp_kill_buffer_and_reset_insert_mode
+
   # Note that this is very performance sensitive code, so try not to
   # invoke any external commands in here.
   warp_precmd () {
@@ -347,8 +356,12 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
       # Reset the custom kill-buffer binding as the user's zshrc (which is sourced after zshrc_warp)
       # could have added a bindkey. This won't have any user-impact because these shortcuts are only run
       # in the context of the zsh line editor, which isn't displayed in Warp.
-      bindkey -r '^P'
-      bindkey '^P' kill-buffer
+      # main 只是 emacs/viins 的链接，用户 rc 文件可能在初始化后切换编辑模式。
+      # 对全部标准 keymap 重新绑定，避免残留的 bootstrap 字节污染下一条命令。
+      local warp_keymap
+      for warp_keymap in main emacs viins vicmd; do
+        bindkey -M "$warp_keymap" '^P' warp_kill_buffer_and_reset_insert_mode 2>/dev/null || :
+      done
 
       # Reset the custom input-reporting binding as well, in case it was overridden
       # by the user's zshrc.

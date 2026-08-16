@@ -1291,7 +1291,8 @@ impl LocalRepoMetadataModel {
             }
             _ => None,
         };
-        let mut gitignores = state.gitignores.clone();
+        // 构建目录树时会随着遍历修改 gitignore 栈，因此这里仍需要独立的 Vec。
+        let mut gitignores = state.gitignores.as_ref().clone();
         let dir_path_for_build = dir_path.to_local_path_lossy();
         let repo_root_for_build = repo_root.clone();
         let dir_path_for_completion = dir_path.clone();

@@ -654,6 +654,131 @@ fn test_remote_global_rules_only_layer_for_matching_remote_host() {
     );
 }
 
+#[cfg(feature = "local_fs")]
+#[test]
+fn superseding_refresh_coalesces_without_overlapping_reads() {
+    use std::sync::OnceLock;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::time::Duration;
+
+    use repo_metadata::repositories::DetectedRepositories;
+    use warpui_core::App;
+    use warpui_core::r#async::Timer;
+
+    /// 协调一个受控的后台读取，让测试能稳定观察真正的在途任务。
+    struct ReadCoordinator {
+        active_readers: AtomicUsize,
+        max_active_readers: AtomicUsize,
+        completed_rounds: AtomicUsize,
+        release: AtomicBool,
+    }
+
+    fn coordinator() -> &'static ReadCoordinator {
+        static INSTANCE: OnceLock<ReadCoordinator> = OnceLock::new();
+        INSTANCE.get_or_init(|| ReadCoordinator {
+            active_readers: AtomicUsize::new(0),
+            max_active_readers: AtomicUsize::new(0),
+            completed_rounds: AtomicUsize::new(0),
+            release: AtomicBool::new(false),
+        })
+    }
+
+    fn repo_root() -> StandardizedPath {
+        let root = if cfg!(windows) { "C:/repo" } else { "/repo" };
+        StandardizedPath::try_new(root).unwrap()
+    }
+
+    fn path_in_repo(name: &str) -> LocalOrRemotePath {
+        local_path(repo_root().join(name).as_str())
+    }
+
+    // 第一轮返回规则，合并后的第二轮返回空集合，用于验证最新结果最终生效。
+    fn controlled_content_reader(
+        _paths: Vec<LocalOrRemotePath>,
+        _ctx: &AppContext,
+    ) -> BoxFuture<'static, anyhow::Result<ProjectRuleContents>> {
+        Box::pin(async move {
+            let coordinator = coordinator();
+            let active = coordinator.active_readers.fetch_add(1, Ordering::SeqCst) + 1;
+            coordinator
+                .max_active_readers
+                .fetch_max(active, Ordering::SeqCst);
+
+            while !coordinator.release.load(Ordering::SeqCst) {
+                Timer::after(Duration::from_millis(1)).await;
+            }
+
+            coordinator.active_readers.fetch_sub(1, Ordering::SeqCst);
+            let round = coordinator.completed_rounds.fetch_add(1, Ordering::SeqCst);
+            let contents = if round == 0 {
+                vec![(path_in_repo("WARP.md"), "stale-round".to_string())]
+            } else {
+                Vec::new()
+            };
+            Ok(contents)
+        })
+    }
+
+    App::test((), |mut app| async move {
+        app.add_singleton_model(|_| DetectedRepositories::default());
+        app.add_singleton_model(RepoMetadataModel::new);
+        let model = app.add_model(|_| ProjectContextModel::default());
+        let repo_id = RepositoryIdentifier::Local(repo_root());
+        let coordinator = coordinator();
+
+        model.update(&mut app, |model, ctx| {
+            model.refresh_project_rules_for_repo(repo_id.clone(), controlled_content_reader, ctx);
+        });
+
+        for _ in 0..2000 {
+            if coordinator.active_readers.load(Ordering::SeqCst) >= 1 {
+                break;
+            }
+            Timer::after(Duration::from_millis(1)).await;
+        }
+        assert_eq!(
+            coordinator.active_readers.load(Ordering::SeqCst),
+            1,
+            "第一轮刷新应处于阻塞读取中"
+        );
+
+        model.update(&mut app, |model, ctx| {
+            model.refresh_project_rules_for_repo(repo_id.clone(), controlled_content_reader, ctx);
+        });
+        Timer::after(Duration::from_millis(5)).await;
+        assert_eq!(
+            coordinator.active_readers.load(Ordering::SeqCst),
+            1,
+            "后续刷新不应启动第二个并发读取"
+        );
+
+        coordinator.release.store(true, Ordering::SeqCst);
+        let mut observed_two_rounds = false;
+        let mut has_stale_rule = true;
+        for _ in 0..5000 {
+            if coordinator.completed_rounds.load(Ordering::SeqCst) >= 2 {
+                observed_two_rounds = true;
+            }
+            has_stale_rule = model.read(&app, |model, _ctx| {
+                model
+                    .find_applicable_project_rules(&path_in_repo("main.rs"))
+                    .is_some()
+            });
+            if observed_two_rounds && !has_stale_rule {
+                break;
+            }
+            Timer::after(Duration::from_millis(1)).await;
+        }
+        assert!(observed_two_rounds, "在途任务完成后应运行一次合并刷新");
+        assert_eq!(
+            coordinator.max_active_readers.load(Ordering::SeqCst),
+            1,
+            "任意时刻都不应存在两个并发读取"
+        );
+        assert!(!has_stale_rule, "最新的空结果应覆盖第一轮旧规则");
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Fast-path tests(针对 ProjectContextModel::scan_fast_path + fast_path_entry_still_valid)
 // ---------------------------------------------------------------------------
