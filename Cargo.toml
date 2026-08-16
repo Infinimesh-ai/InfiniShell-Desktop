@@ -301,16 +301,17 @@ fluent = "0.16"
 unic-langid = { version = "0.9", features = ["macros"] }
 sys-locale = "0.3"
 rustc-hash = "2.1.1"
+russh = "0.62.6"
 rustls = "0.23.39"
 schemars = { version = "1", features = ["chrono04"] }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 serde-bytes-repr = "0.3"
 serde_json = { version = "1.0", features = ["raw_value"] }
-ssh2 = { version = "0.9", features = ["openssl-on-win32"] }
 serde_urlencoded = "0.7"
 serde_with = "^3.21"
 serde_yaml = "0.8"
+ssh2 = { version = "0.9", features = ["openssl-on-win32"] }
 similar = { version = "2.7", features = ["inline"] }
 simplelog = "0.12.2"
 smallvec = "1.6.1"

@@ -73,6 +73,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::FileBackedExecutionProfiles,
         #[cfg(feature = "rect_selection")]
         FeatureFlag::RectSelection,
+        #[cfg(feature = "russh_transport")]
+        FeatureFlag::RusshTransport,
         #[cfg(feature = "alacritty_settings_import")]
         FeatureFlag::AlacrittySettingsImport,
         #[cfg(feature = "dynamic_workflow_enums")]

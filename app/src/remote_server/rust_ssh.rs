@@ -30,6 +30,8 @@ use ssh2::{
     MethodType, Prompt, Session,
 };
 use warp_cli::{RustSshBrokerCommandArgs, RustSshSessionArgs};
+#[cfg(feature = "russh_transport")]
+use warp_core::features::FeatureFlag;
 use zeroize::Zeroizing;
 
 #[cfg(windows)]
@@ -56,6 +58,9 @@ const RESIZE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 
 type SessionGate = Arc<Mutex<()>>;
+
+#[cfg(feature = "russh_transport")]
+mod russh_backend;
 
 /// Windows 的 console stdin 默认是按行、回显并把 Ctrl+C 当本地信号处理。
 /// SSH 交互 channel 必须临时切到 VT raw input，退出时再恢复 PowerShell 的
@@ -432,6 +437,14 @@ struct BrokerRequest {
 
 /// 建立单个 SSH session，启动本地 broker，并把交互 channel 映射到 stdio。
 pub fn run_session_worker(args: &RustSshSessionArgs) -> Result<i32> {
+    #[cfg(feature = "russh_transport")]
+    if FeatureFlag::RusshTransport.is_enabled() {
+        return russh_backend::run_session_worker(args);
+    }
+    run_ssh2_session_worker(args)
+}
+
+fn run_ssh2_session_worker(args: &RustSshSessionArgs) -> Result<i32> {
     let config = match resolve_openssh_config(&args.ssh_executable, &args.ssh_args) {
         Ok(config) => config,
         Err(_) => {

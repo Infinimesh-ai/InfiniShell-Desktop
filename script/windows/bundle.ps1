@@ -230,7 +230,7 @@ if ($CHECK_ONLY) {
         exit 1
     }
     if (-not $IS_TUI -and -not $IS_CLI) {
-        cargo check -p warp --profile "$CARGO_PROFILE" --bin infinishell-ssh --features "$FEATURES,rust_ssh_worker" --target $PLATFORM_TARGET
+        cargo check -p warp --profile "$CARGO_PROFILE" --bin infinishell-ssh --features "$FEATURES,rust_ssh_worker,russh_transport" --target $PLATFORM_TARGET
         if (-Not $?) {
             Write-Error "Failed to verify InfiniShell SSH worker compilation with profile $CARGO_PROFILE"
             exit 1
@@ -265,7 +265,7 @@ if (-Not $SKIP_BUILD_BINARY) {
     }
 
     if (-not $IS_TUI -and -not $IS_CLI) {
-        cargo build -p warp --profile "$CARGO_PROFILE" --bin infinishell-ssh --features "$FEATURES,rust_ssh_worker" --target $PLATFORM_TARGET
+        cargo build -p warp --profile "$CARGO_PROFILE" --bin infinishell-ssh --features "$FEATURES,rust_ssh_worker,russh_transport" --target $PLATFORM_TARGET
         if (-Not $?) {
             Write-Error "Failed to build InfiniShell SSH worker with profile $CARGO_PROFILE"
             exit 1
