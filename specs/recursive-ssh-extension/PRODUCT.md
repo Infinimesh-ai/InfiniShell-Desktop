@@ -143,7 +143,7 @@ local -> bastion -> staging
 - 新增 `RecursiveSshExtension` Feature Flag；
 - 支持带作用域的 SSH 控制引用；
 - remote-server 协议支持一个父连接承载一个子连接字节流；
-- bash、zsh、fish 远端 wrapper 支持再发起一个交互式 SSH；
+- bash、zsh、fish、PowerShell 远端 wrapper 支持再发起一个交互式 SSH；
 - 子会话退出后恢复父级命令执行器；
 - 所有失败路径回退到普通 SSH；
 - 覆盖本地 -> A -> B。
@@ -165,12 +165,14 @@ local -> bastion -> staging
 
 首个完整版本支持：
 
-- 本地客户端：macOS、Linux；Windows 构建必须保持通过并安全禁用不支持路径；
-- 远端：当前 remote-server 已支持的平台；
-- shell：bash、zsh、fish。
+- 本地客户端：macOS、Linux、Windows；
+- 远端：当前 remote-server 已支持的 POSIX 和 Windows 平台；
+- shell：bash、zsh、fish、PowerShell；
+- 混合路径：POSIX 与 Windows 主机可以出现在同一条多级访问路径中。
 
-PowerShell 远端 wrapper 和 Windows remote-server 作为后续平台扩展，不阻塞 POSIX
-远端的完整多级能力。
+POSIX OpenSSH 优先复用 ControlMaster；Windows 或没有可复用 ControlMaster 的环境
+使用本机 Rust SSH broker。两类 transport 都只在其所在主机执行下一跳，且通过同一
+连接级隧道协议向客户端暴露不透明引用。
 
 ## 9. 验收标准
 
@@ -184,4 +186,5 @@ PowerShell 远端 wrapper 和 Windows remote-server 作为后续平台扩展，�
    A、B 上的 OpenSSH 凭据来源，不需要复制或转发私钥。
 7. 不自动启用 agent forwarding，不跳过 host key 变化警告。
 8. 同名内网主机不会仅因 `host:port` 相同而错误合并。
-9. Linux focused tests、Windows 编译预检与 `cargo check` 通过。
+9. POSIX focused tests、PowerShell bootstrap 测试、Windows 编译预检与
+   `cargo check` 通过。

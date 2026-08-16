@@ -270,7 +270,21 @@ if ([String]::IsNullOrEmpty($env:SSH_SOCKET_DIR)) {
 $env:WARP_SSH_REUSE_CONTROL_MASTER = '0'
 Warp-Invoke-EnhancedSsh -SshArgs @('remote-host', 'two words') 6>$null
 $fallbackStatus = $global:LASTEXITCODE
+$env:WARP_RECURSIVE_SSH_EXTENSION = '1'
+$env:WARP_SSH_HOP_DEPTH = 'invalid'
+$invalidHopDepth = Warp-Get-NextSshHopDepth
+$env:WARP_SSH_HOP_DEPTH = '4294967296'
+$overflowHopDepth = Warp-Get-NextSshHopDepth
+$env:WARP_SSH_HOP_DEPTH = '8'
+$maximumHopDepth = Warp-Get-NextSshHopDepth
+$env:WARP_SSH_HOP_DEPTH = '2'
+$env:WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH = '.infinishell/remote-server/infinishell.exe'
 $bootstrapCommand = Warp-New-RemoteBootstrapCommand -RemoteSessionId 42 -SshHookHex '7B7D'
+$windowsRecursiveCommand = Warp-New-WindowsBootstrapCommand -RemoteSessionId 43 -SshHookHex '7B7D'
+$encodedWindowsRecursive = ($windowsRecursiveCommand -split ' ')[-1]
+$decodedWindowsRecursive = [Text.Encoding]::Unicode.GetString(
+    [Convert]::FromBase64String($encodedWindowsRecursive)
+)
 $capabilityProbeCommand = Warp-New-PowerShellCapabilityProbeCommand
 $encodedCapabilityProbe = ($capabilityProbeCommand -split ' ')[-1]
 $decodedCapabilityProbe = [Text.Encoding]::Unicode.GetString(
@@ -311,7 +325,16 @@ ConvertTo-Json -Compress -Depth 4 -InputObject @{
     decoded_capability_probe = $decodedCapabilityProbe
     fallback_status = $fallbackStatus
     closed_owned_control_master = $script:closedOwnedControlMaster
+    guarded_hop_depths = @($invalidHopDepth, $overflowHopDepth, $maximumHopDepth)
+    safe_remote_relative_paths = @(
+        Warp-Get-SafeRemoteRelativePath '.infinishell/remote-server/infinishell.exe'
+        [bool][String]::IsNullOrEmpty((Warp-Get-SafeRemoteRelativePath '../outside.exe'))
+        [bool][String]::IsNullOrEmpty((Warp-Get-SafeRemoteRelativePath '/absolute.exe'))
+        [bool][String]::IsNullOrEmpty((Warp-Get-SafeRemoteRelativePath 'folder//worker.exe'))
+    )
     remote_bootstrap_syntax = $remoteBootstrapSyntax
+    posix_recursive_bootstrap = [bool]($bootstrapCommand.Contains("WARP_RECURSIVE_SSH_EXTENSION='1'") -and $bootstrapCommand.Contains("WARP_SSH_HOP_DEPTH='3'"))
+    windows_recursive_bootstrap = [bool]($decodedWindowsRecursive.Contains("WARP_RECURSIVE_SSH_EXTENSION = '1'") -and $decodedWindowsRecursive.Contains("WARP_SSH_HOP_DEPTH = '3'") -and $decodedWindowsRecursive.Contains("WARP_RUST_SSH_EXECUTABLE = Join-Path"))
 }
 "#;
 
@@ -420,13 +443,26 @@ ConvertTo-Json -Compress -Depth 4 -InputObject @{
     assert!(decoded_capability_probe.contains("__WARP_REMOTE_CAPS__v=1"));
     assert!(decoded_capability_probe.contains("os={0};shell=powershell"));
     assert_eq!(result["closed_owned_control_master"], json!(false));
+    assert_eq!(result["guarded_hop_depths"], json!([9, 9, 9]));
+    assert_eq!(
+        result["safe_remote_relative_paths"],
+        json!([
+            ".infinishell/remote-server/infinishell.exe",
+            true,
+            true,
+            true
+        ])
+    );
     assert!(
         result["remote_bootstrap_syntax"]
             .as_array()
             .expect("远端 bootstrap 语法检查结果应为数组")
             .iter()
-            .all(|value| value == &json!(true))
+            .all(|value| value == &json!(true)),
+        "远端 bootstrap 语法检查失败: {result}"
     );
+    assert_eq!(result["posix_recursive_bootstrap"], json!(true));
+    assert_eq!(result["windows_recursive_bootstrap"], json!(true));
 }
 
 fn powershell_executable() -> Option<&'static str> {

@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use instant::Instant;
 use remote_server::auth::RemoteServerAuthContext;
-use remote_server::proto::{RegisterSshControl, RemoteServerCapability, SshControlOwnership};
+use remote_server::proto::{
+    RegisterSshControl, RegisterSshTransport, RemoteServerCapability, SshControlOwnership,
+    SshRustBroker, SshTransportRemoteOs, register_ssh_transport,
+};
 use remote_server::setup::{
     PreinstallCheckResult, PreinstallStatus, RemoteLibc, RemoteOs, RemotePlatform,
     UnsupportedReason,
@@ -20,10 +23,12 @@ use crate::auth::AuthStateProvider;
 use crate::features::FeatureFlag;
 use crate::remote_server::auth_context::server_api_auth_context;
 use crate::remote_server::manager::{RemoteServerManager, RemoteServerManagerEvent};
-use crate::remote_server::remote_ssh_transport::RemoteSshTransport;
+use crate::remote_server::remote_ssh_transport::{
+    RemoteSshTransport, RemoteSshTransportRegistration,
+};
 use crate::remote_server::ssh_transport::SshTransport;
 use crate::terminal::model::session::{
-    ControlMasterOwnership, ScopedControlPath, SessionInfo, SshSessionTransportDescriptor,
+    ControlMasterOwnership, ScopedSshTransport, SessionInfo, SshSessionTransportDescriptor,
 };
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
 use crate::terminal::shell::ShellType;
@@ -38,7 +43,7 @@ use crate::{TelemetryEvent, send_telemetry_from_ctx};
 /// can be measured when the flow reaches `SessionConnected`.
 enum SshInitState {
     Idle,
-    /// 正在把远端 ControlMaster 注册到父级 daemon。
+    /// 正在把远端 SSH transport 注册到父级 daemon。
     AwaitingRegistration {
         session_info: SessionInfo,
         setup_start: Instant,
@@ -262,61 +267,35 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             .and_then(|connection| connection.port.as_deref())
             .and_then(|port| port.parse::<u16>().ok());
 
-        let control_path = match descriptor {
-            SshSessionTransportDescriptor::ControlMaster {
-                socket_path,
-                ownership,
-            } => info
-                .is_ssh_wrapper_session
-                .scoped_control_path()
-                .cloned()
-                .unwrap_or_else(|| {
-                    ScopedControlPath::local(
-                        socket_path,
-                        info.spawning_session_id.unwrap_or(session_id),
-                        ownership,
-                    )
-                }),
-            SshSessionTransportDescriptor::RustBroker {
-                endpoint,
-                capability,
-            } => {
-                let route_result = RemoteServerManager::handle(ctx).update(ctx, |manager, _| {
-                    manager.register_ssh_route(session_id, None, 1, target_alias, port)
-                });
-                if let Err(error) = route_result {
-                    log::warn!("SSH 路由注册失败：session={session_id:?} error={error}");
-                    self.flush_stashed_bootstrap(info, ctx);
-                    return;
-                }
-                let transport: Arc<dyn RemoteTransport> = Arc::new(SshTransport::new_rust_broker(
-                    endpoint,
-                    capability,
-                    self.auth_context.clone(),
-                    remote_os,
-                ));
-                self.start_check(info, transport, setup_start, ctx);
-                return;
-            }
-            SshSessionTransportDescriptor::Unavailable => {
-                self.flush_stashed_bootstrap(info, ctx);
-                return;
-            }
-        };
-
-        let warp_owns_control_master =
-            control_path.ownership() == ControlMasterOwnership::WarpManaged;
-        if !control_path.is_local() && !FeatureFlag::RecursiveSshExtension.is_enabled() {
+        if descriptor == SshSessionTransportDescriptor::Unavailable {
+            self.flush_stashed_bootstrap(info, ctx);
+            return;
+        }
+        let scoped_transport = info
+            .is_ssh_wrapper_session
+            .scoped_transport()
+            .cloned()
+            .unwrap_or_else(|| {
+                ScopedSshTransport::local(
+                    descriptor.clone(),
+                    info.spawning_session_id.unwrap_or(session_id),
+                )
+            });
+        if !scoped_transport.is_local() && !FeatureFlag::RecursiveSshExtension.is_enabled() {
             log::warn!("递归 SSH 功能未启用，嵌套 SSH 回退到带内执行");
             self.flush_stashed_bootstrap(info, ctx);
             return;
         }
-        let parent_session_id = (!control_path.is_local()).then(|| control_path.owner_session_id());
+        let parent_session_id = if scoped_transport.is_local() {
+            None
+        } else {
+            scoped_transport.owner_session_id()
+        };
         let route_result = RemoteServerManager::handle(ctx).update(ctx, |manager, _| {
             manager.register_ssh_route(
                 session_id,
                 parent_session_id,
-                control_path.hop_depth(),
+                scoped_transport.hop_depth(),
                 target_alias,
                 port,
             )
@@ -326,19 +305,40 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             self.flush_stashed_bootstrap(info, ctx);
             return;
         }
-        if control_path.is_local() {
-            let transport: Arc<dyn RemoteTransport> = Arc::new(SshTransport::new_control_master(
-                control_path.path().to_path_buf(),
-                self.auth_context.clone(),
-                warp_owns_control_master,
-                remote_os,
-            ));
+        if scoped_transport.is_local() {
+            let transport: Arc<dyn RemoteTransport> = match descriptor {
+                SshSessionTransportDescriptor::ControlMaster {
+                    socket_path,
+                    ownership,
+                } => Arc::new(SshTransport::new_control_master(
+                    socket_path,
+                    self.auth_context.clone(),
+                    ownership == ControlMasterOwnership::WarpManaged,
+                    remote_os,
+                )),
+                SshSessionTransportDescriptor::RustBroker {
+                    endpoint,
+                    capability,
+                } => Arc::new(SshTransport::new_rust_broker(
+                    endpoint,
+                    capability,
+                    self.auth_context.clone(),
+                    remote_os,
+                )),
+                SshSessionTransportDescriptor::Unavailable => unreachable!(
+                    "unavailable SSH transport returned before local transport creation"
+                ),
+            };
             self.start_check(info, transport, setup_start, ctx);
             return;
         }
 
-        let parent_session_id = control_path.owner_session_id();
-        let (parent_connection, supports_recursive_ssh) =
+        let Some(parent_session_id) = scoped_transport.owner_session_id() else {
+            log::warn!("远端 SSH transport 缺少父会话，回退到带内执行");
+            self.flush_stashed_bootstrap(info, ctx);
+            return;
+        };
+        let (parent_connection, supports_byte_stream, supports_cross_platform_transport) =
             RemoteServerManager::handle(ctx).update(ctx, |manager, _| {
                 (
                     manager.parent_connection_handle(parent_session_id),
@@ -346,9 +346,13 @@ impl<T: EventLoopSender> RemoteServerController<T> {
                         parent_session_id,
                         RemoteServerCapability::SshByteStreamV1,
                     ),
+                    manager.session_supports(
+                        parent_session_id,
+                        RemoteServerCapability::SshTransportV2,
+                    ),
                 )
             });
-        if !supports_recursive_ssh {
+        if !supports_byte_stream {
             log::warn!("父级 remote-server 不支持递归 SSH，嵌套 SSH 回退到带内执行");
             self.flush_stashed_bootstrap(info, ctx);
             return;
@@ -358,16 +362,84 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             self.flush_stashed_bootstrap(info, ctx);
             return;
         };
-        let ownership = if warp_owns_control_master {
-            SshControlOwnership::WarpManaged
-        } else {
-            SshControlOwnership::UserOwned
-        };
-        let registration = RegisterSshControl {
-            owner_session_id: u64::from(parent_session_id),
-            socket_path: control_path.path().to_string_lossy().into_owned(),
-            ownership: ownership.into(),
-            hop_depth: control_path.hop_depth(),
+        let (registration, warp_owns_control_master) = match descriptor {
+            SshSessionTransportDescriptor::ControlMaster {
+                socket_path,
+                ownership,
+            } => {
+                let protocol_ownership = match ownership {
+                    ControlMasterOwnership::WarpManaged => SshControlOwnership::WarpManaged,
+                    ControlMasterOwnership::UserOwned => SshControlOwnership::UserOwned,
+                };
+                let socket_path = socket_path.to_string_lossy().into_owned();
+                let registration = match &remote_os {
+                    RemoteOs::Linux | RemoteOs::MacOs => {
+                        RemoteSshTransportRegistration::ControlMaster(RegisterSshControl {
+                            owner_session_id: u64::from(parent_session_id),
+                            socket_path,
+                            ownership: protocol_ownership.into(),
+                            hop_depth: scoped_transport.hop_depth(),
+                        })
+                    }
+                    RemoteOs::Windows => {
+                        if !supports_cross_platform_transport {
+                            log::warn!(
+                                "父级 remote-server 不支持跨平台 SSH transport，嵌套 SSH 回退到带内执行"
+                            );
+                            self.flush_stashed_bootstrap(info, ctx);
+                            return;
+                        }
+                        RemoteSshTransportRegistration::CrossPlatform(RegisterSshTransport {
+                            owner_session_id: u64::from(parent_session_id),
+                            ownership: protocol_ownership.into(),
+                            hop_depth: scoped_transport.hop_depth(),
+                            remote_os: SshTransportRemoteOs::Windows.into(),
+                            transport: Some(
+                                register_ssh_transport::Transport::ControlMasterSocketPath(
+                                    socket_path,
+                                ),
+                            ),
+                        })
+                    }
+                };
+                (
+                    registration,
+                    ownership == ControlMasterOwnership::WarpManaged,
+                )
+            }
+            SshSessionTransportDescriptor::RustBroker {
+                endpoint,
+                capability,
+            } => {
+                if !supports_cross_platform_transport {
+                    log::warn!(
+                        "父级 remote-server 不支持跨平台 SSH transport，嵌套 SSH 回退到带内执行"
+                    );
+                    self.flush_stashed_bootstrap(info, ctx);
+                    return;
+                }
+                (
+                    RemoteSshTransportRegistration::CrossPlatform(RegisterSshTransport {
+                        owner_session_id: u64::from(parent_session_id),
+                        ownership: SshControlOwnership::UserOwned.into(),
+                        hop_depth: scoped_transport.hop_depth(),
+                        remote_os: match &remote_os {
+                            RemoteOs::Linux | RemoteOs::MacOs => SshTransportRemoteOs::Posix.into(),
+                            RemoteOs::Windows => SshTransportRemoteOs::Windows.into(),
+                        },
+                        transport: Some(register_ssh_transport::Transport::RustBroker(
+                            SshRustBroker {
+                                endpoint,
+                                capability,
+                            },
+                        )),
+                    }),
+                    false,
+                )
+            }
+            SshSessionTransportDescriptor::Unavailable => {
+                unreachable!("unavailable SSH transport returned before remote registration")
+            }
         };
         self.state = SshInitState::AwaitingRegistration {
             session_info: info,
@@ -377,7 +449,7 @@ impl<T: EventLoopSender> RemoteServerController<T> {
         let registration_for_transport = registration.clone();
         ctx.spawn(
             async move {
-                let result = parent_client.register_ssh_control(registration).await;
+                let result = registration.register(&parent_client).await;
                 (parent_client, result)
             },
             move |me, (parent_client, result), ctx| {
@@ -399,11 +471,12 @@ impl<T: EventLoopSender> RemoteServerController<T> {
                                 registration_for_transport,
                                 auth_context,
                                 warp_owns_control_master,
+                                remote_os,
                             ));
                         me.start_check(session_info, transport, setup_start, ctx);
                     }
                     Err(error) => {
-                        log::warn!("嵌套 SSH ControlMaster 注册失败：{error}");
+                        log::warn!("嵌套 SSH transport 注册失败：{error}");
                         me.flush_stashed_bootstrap(session_info, ctx);
                     }
                 }

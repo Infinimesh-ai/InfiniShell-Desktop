@@ -380,6 +380,12 @@ fn build_host_shell_command(
         },
     );
     builder.env("WARP_SSH_HOP_DEPTH", "0");
+    builder.env(
+        "WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH",
+        remote_server::setup::remote_server_relative_binary_path(
+            &remote_server::setup::RemoteOs::Windows,
+        ),
+    );
 
     // For integration tests, put SSH control master sockets under the actual
     // home directory, as the length of the path to sockets placed in the
@@ -907,6 +913,12 @@ fn build_docker_sandbox_command(
         },
     );
     builder.env("WARP_SSH_HOP_DEPTH", "0");
+    builder.env(
+        "WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH",
+        remote_server::setup::remote_server_relative_binary_path(
+            &remote_server::setup::RemoteOs::Windows,
+        ),
+    );
     builder.env("SSH_SOCKET_DIR", ssh_socket_dir());
     builder.env("WARP_IS_LOCAL_SHELL_SESSION", "1");
     if FeatureFlag::HOANotifications.is_enabled() {

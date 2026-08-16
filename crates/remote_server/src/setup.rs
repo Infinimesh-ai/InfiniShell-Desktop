@@ -293,17 +293,17 @@ pub struct RemoteSetupCommand {
 }
 
 impl RemoteSetupCommand {
-    fn posix(script: String) -> Self {
+    pub fn posix(script: impl Into<String>) -> Self {
         Self {
             dialect: RemoteShellDialect::Posix,
-            script,
+            script: script.into(),
         }
     }
 
-    fn powershell(script: String) -> Self {
+    pub fn powershell(script: impl Into<String>) -> Self {
         Self {
             dialect: RemoteShellDialect::PowerShell,
-            script,
+            script: script.into(),
         }
     }
 }
@@ -600,7 +600,7 @@ pub fn remote_server_proxy_command(os: &RemoteOs, identity_key: &str) -> RemoteS
     }
 }
 
-fn remote_server_relative_binary_path(os: &RemoteOs) -> String {
+pub fn remote_server_relative_binary_path(os: &RemoteOs) -> String {
     format!(
         "{}/{}",
         remote_server_relative_dir(),
@@ -690,6 +690,23 @@ pub fn install_command(
             &remote_server_binary_name(&platform.os),
             &download_archive_url(platform),
             staging_archive_path,
+            BUNDLED_RESOURCES_DIR_NAME,
+        )),
+    }
+}
+
+/// 返回从已上传归档安装 remote-server 的命令。此路径不需要再次选择下载资产，
+/// 因而只需要目标操作系统，不依赖远端架构。
+pub fn install_staged_command(os: &RemoteOs, staging_archive_path: &str) -> RemoteSetupCommand {
+    match os {
+        RemoteOs::Linux | RemoteOs::MacOs => {
+            RemoteSetupCommand::posix(install_script(Some(staging_archive_path)))
+        }
+        RemoteOs::Windows => RemoteSetupCommand::powershell(windows::install_script(
+            &remote_server_relative_dir(),
+            &remote_server_binary_name(os),
+            "",
+            Some(staging_archive_path),
             BUNDLED_RESOURCES_DIR_NAME,
         )),
     }

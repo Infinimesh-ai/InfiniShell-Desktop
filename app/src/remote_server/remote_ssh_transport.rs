@@ -9,8 +9,10 @@ use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use remote_server::auth::RemoteServerAuthContext;
 use remote_server::client::{ParentConnectionHandle, RemoteServerClient};
 use remote_server::manager::RemoteServerExitStatus;
-use remote_server::proto::{RegisterSshControl, SshStreamPurpose};
-use remote_server::setup::{PreinstallCheckResult, RemotePlatform, parse_uname_output};
+use remote_server::proto::{RegisterSshControl, RegisterSshTransport, SshStreamPurpose};
+use remote_server::setup::{
+    PreinstallCheckResult, RemoteOs, RemotePlatform, parse_platform_output,
+};
 use remote_server::transport::{
     Connection, ControlPath, Error, InstallOutcome, InstallSource, RemoteTransport,
 };
@@ -24,15 +26,34 @@ struct RoutedCommandOutput {
     exit_code: Option<i32>,
 }
 
-/// 通过父级 remote-server 上注册的 ControlMaster 访问下一跳。
+/// 通过父级 remote-server 上注册的 SSH transport 访问下一跳。
 #[derive(Clone)]
 pub struct RemoteSshTransport {
     parent_session_id: SessionId,
     parent_connection: ParentConnectionHandle,
-    registration: RegisterSshControl,
+    registration: RemoteSshTransportRegistration,
     routed_control: Arc<Mutex<RoutedControl>>,
     auth_context: Arc<RemoteServerAuthContext>,
     warp_owns_control_master: bool,
+    remote_os: RemoteOs,
+}
+
+#[derive(Clone)]
+pub(crate) enum RemoteSshTransportRegistration {
+    ControlMaster(RegisterSshControl),
+    CrossPlatform(RegisterSshTransport),
+}
+
+impl RemoteSshTransportRegistration {
+    pub(crate) async fn register(
+        self,
+        client: &RemoteServerClient,
+    ) -> Result<String, remote_server::client::ClientError> {
+        match self {
+            Self::ControlMaster(registration) => client.register_ssh_control(registration).await,
+            Self::CrossPlatform(registration) => client.register_ssh_transport(registration).await,
+        }
+    }
 }
 
 struct RoutedControl {
@@ -56,9 +77,10 @@ impl RemoteSshTransport {
         parent_connection: ParentConnectionHandle,
         parent_client: Arc<RemoteServerClient>,
         control_id: String,
-        registration: RegisterSshControl,
+        registration: RemoteSshTransportRegistration,
         auth_context: Arc<RemoteServerAuthContext>,
         warp_owns_control_master: bool,
+        remote_os: RemoteOs,
     ) -> Self {
         Self {
             parent_session_id,
@@ -70,6 +92,7 @@ impl RemoteSshTransport {
             })),
             auth_context,
             warp_owns_control_master,
+            remote_os,
         }
     }
 
@@ -139,8 +162,10 @@ impl RemoteSshTransport {
             return Ok((parent_client, control_id));
         }
 
-        let control_id = parent_client
-            .register_ssh_control(self.registration.clone())
+        let control_id = self
+            .registration
+            .clone()
+            .register(&parent_client)
             .await
             .map_err(|error| Error::Other(error.into()))?;
         let Some(current_parent) = self.parent_connection.client() else {
@@ -232,10 +257,10 @@ impl RemoteTransport for RemoteSshTransport {
                 )
                 .await?;
             if output.exit_code == Some(0) {
-                parse_uname_output(&String::from_utf8_lossy(&output.stdout))
+                parse_platform_output(&String::from_utf8_lossy(&output.stdout))
             } else {
                 Err(Error::Other(anyhow!(
-                    "uname -sm exited with {:?}: {}",
+                    "platform probe exited with {:?}: {}",
                     output.exit_code,
                     output.stderr
                 )))
@@ -248,6 +273,9 @@ impl RemoteTransport for RemoteSshTransport {
     ) -> Pin<Box<dyn Future<Output = Result<PreinstallCheckResult, Error>> + Send>> {
         let transport = self.clone();
         Box::pin(async move {
+            if transport.remote_os == RemoteOs::Windows {
+                return Ok(PreinstallCheckResult::parse(""));
+            }
             let output = transport
                 .run(
                     SshStreamPurpose::PreinstallCheck,

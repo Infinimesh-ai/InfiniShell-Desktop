@@ -28,6 +28,8 @@ pub mod server_buffer_tracker;
 pub mod server_model;
 #[cfg(not(target_family = "wasm"))]
 pub mod ssh_transport;
+#[path = "unix/tunnel.rs"]
+mod tunnel;
 #[cfg(unix)]
 pub mod unix;
 #[cfg(windows)]

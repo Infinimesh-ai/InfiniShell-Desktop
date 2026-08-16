@@ -197,6 +197,7 @@ message InitializeResponse {
 enum RemoteServerCapability {
   REMOTE_SERVER_CAPABILITY_UNSPECIFIED = 0;
   SSH_BYTE_STREAM_V1 = 1;
+  SSH_TRANSPORT_V2 = 2;
 }
 
 // ── SSH 字节流隧道 ───────────────────────────────────────────────
@@ -211,6 +212,7 @@ message TunnelClientMessage {
     TunnelWindowUpdate window_update = 6;
     TunnelHalfClose half_close = 7;
     TunnelReset reset = 8;
+    RegisterSshTransport register_transport = 9;
   }
 }
 
@@ -257,6 +259,30 @@ message RegisterSshControl {
   string socket_path = 2;
   SshControlOwnership ownership = 3;
   uint32 hop_depth = 4;
+}
+
+// 注册当前父主机上可复用的 SSH transport。ControlMaster 与 Rust broker
+// 共用同一个不透明引用，后续 tunnel 消息不会再携带路径或 capability。
+message RegisterSshTransport {
+  uint64 owner_session_id = 1;
+  SshControlOwnership ownership = 2;
+  uint32 hop_depth = 3;
+  SshTransportRemoteOs remote_os = 4;
+  oneof transport {
+    string control_master_socket_path = 5;
+    SshRustBroker rust_broker = 6;
+  }
+}
+
+message SshRustBroker {
+  string endpoint = 1;
+  string capability = 2;
+}
+
+enum SshTransportRemoteOs {
+  SSH_TRANSPORT_REMOTE_OS_UNSPECIFIED = 0;
+  POSIX = 1;
+  WINDOWS = 2;
 }
 
 message RegisterSshControlResponse {

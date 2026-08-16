@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use remote_server::proto::{OpenSshStream, SshStreamPurpose};
 use remote_server::protocol::INITIAL_TUNNEL_WINDOW;
+use remote_server::setup::RemoteOs;
 
 use super::{MAX_IDENTITY_KEY_BYTES, return_output_credit, ssh_stream_command};
 
@@ -20,6 +21,7 @@ fn stream_purpose_maps_to_a_daemon_owned_command() {
     let (command, stdin, accepts_client_stdin) = ssh_stream_command(
         &open(SshStreamPurpose::PreinstallCheck),
         "~/.warp/staged.tar.gz",
+        &RemoteOs::Linux,
     )
     .unwrap();
     assert_eq!(command, "bash -s");
@@ -29,7 +31,7 @@ fn stream_purpose_maps_to_a_daemon_owned_command() {
     let mut proxy = open(SshStreamPurpose::RemoteServerProxy);
     proxy.identity_key = "identity".to_string();
     let (command, stdin, accepts_client_stdin) =
-        ssh_stream_command(&proxy, "~/.warp/staged.tar.gz").unwrap();
+        ssh_stream_command(&proxy, "~/.warp/staged.tar.gz", &RemoteOs::Linux).unwrap();
     assert!(command.contains("remote-server-proxy"));
     assert!(stdin.is_none());
     assert!(accepts_client_stdin);
@@ -39,15 +41,16 @@ fn stream_purpose_maps_to_a_daemon_owned_command() {
 fn identity_key_is_rejected_outside_proxy_and_when_oversized() {
     let mut check = open(SshStreamPurpose::CheckBinary);
     check.identity_key = "unexpected".to_string();
-    assert!(ssh_stream_command(&check, "~/.warp/staged.tar.gz").is_err());
+    assert!(ssh_stream_command(&check, "~/.warp/staged.tar.gz", &RemoteOs::Linux).is_err());
 
     let mut proxy = open(SshStreamPurpose::RemoteServerProxy);
     proxy.identity_key = "x".repeat(MAX_IDENTITY_KEY_BYTES + 1);
-    assert!(ssh_stream_command(&proxy, "~/.warp/staged.tar.gz").is_err());
+    assert!(ssh_stream_command(&proxy, "~/.warp/staged.tar.gz", &RemoteOs::Linux).is_err());
 
     let (command, stdin, accepts_client_stdin) = ssh_stream_command(
         &open(SshStreamPurpose::StageBinary),
         "~/.warp/staged.tar.gz",
+        &RemoteOs::Linux,
     )
     .unwrap();
     assert!(command.contains("cat >"));
@@ -57,9 +60,32 @@ fn identity_key_is_rejected_outside_proxy_and_when_oversized() {
     let (_, stdin, accepts_client_stdin) = ssh_stream_command(
         &open(SshStreamPurpose::InstallStagedBinary),
         "~/.warp/staged.tar.gz",
+        &RemoteOs::Linux,
     )
     .unwrap();
     assert!(stdin.is_some());
+    assert!(!accepts_client_stdin);
+}
+
+#[test]
+fn windows_stream_purposes_use_powershell_and_client_staging() {
+    let (detect, stdin, _) = ssh_stream_command(
+        &open(SshStreamPurpose::DetectPlatform),
+        "~/.warp/staged.zip",
+        &RemoteOs::Windows,
+    )
+    .unwrap();
+    assert!(detect.starts_with("powershell.exe "));
+    assert!(stdin.is_none());
+
+    let (install, stdin, accepts_client_stdin) = ssh_stream_command(
+        &open(SshStreamPurpose::InstallStagedBinary),
+        "~/.warp/staged.zip",
+        &RemoteOs::Windows,
+    )
+    .unwrap();
+    assert!(install.starts_with("powershell.exe "));
+    assert!(stdin.is_none());
     assert!(!accepts_client_stdin);
 }
 

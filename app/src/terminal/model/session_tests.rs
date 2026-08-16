@@ -175,13 +175,36 @@ fn rust_broker_rejects_non_loopback_or_malformed_capability() {
 #[test]
 fn unavailable_transport_keeps_wrapper_identity_without_remote_server_support() {
     let wrapper = super::IsSSHWrapperSession::Yes {
-        transport: SshSessionTransportDescriptor::Unavailable,
-        control_path: None,
+        transport: super::ScopedSshTransport::local(
+            SshSessionTransportDescriptor::Unavailable,
+            1.into(),
+        ),
     };
 
     assert!(wrapper.transport().is_some());
     assert!(!wrapper.supports_ssh_remote_server());
     assert!(wrapper.control_master().is_none());
+}
+
+#[test]
+fn scoped_rust_broker_preserves_remote_parent_and_depth() {
+    let transport = super::ScopedSshTransport {
+        descriptor: SshSessionTransportDescriptor::RustBroker {
+            endpoint: "127.0.0.1:49152".to_string(),
+            capability: "ab".repeat(32),
+        },
+        owner_session_id: Some(7.into()),
+        scope: crate::terminal::model::ansi::SshControlScope::Remote,
+        hop_depth: 3,
+    };
+
+    assert!(!transport.is_local());
+    assert_eq!(transport.owner_session_id(), Some(7.into()));
+    assert_eq!(transport.hop_depth(), 3);
+    assert!(matches!(
+        transport.descriptor(),
+        SshSessionTransportDescriptor::RustBroker { .. }
+    ));
 }
 
 #[test]

@@ -29,7 +29,7 @@ fn enabled_features() -> HashSet<FeatureFlag> {
     // 显式开启,保证所有本地平台都能联调远端文件打开 / buffer-sync。
     #[cfg(debug_assertions)]
     flags.insert(FeatureFlag::SshRemoteServer);
-    #[cfg(all(debug_assertions, not(windows)))]
+    #[cfg(debug_assertions)]
     flags.insert(FeatureFlag::RecursiveSshExtension);
     #[cfg(debug_assertions)]
     flags.insert(FeatureFlag::ServerFileBrowser);

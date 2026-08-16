@@ -417,6 +417,9 @@ struct SshHookValue<'a> {
     remote_shell: &'static str,
     session_id: u64,
     remote_session_id: u64,
+    parent_session_id: u64,
+    control_scope: &'a str,
+    hop_depth: u32,
     external_control_master: bool,
 }
 
@@ -514,6 +517,8 @@ fn run_ssh2_session_worker(args: &RustSshSessionArgs) -> Result<i32> {
                 remote_shell,
                 args.session_id,
                 args.remote_session_id,
+                &args.control_scope,
+                args.hop_depth,
             )?;
             Some(spawn_broker(
                 listener,
@@ -1915,8 +1920,37 @@ fn emit_ssh_hook(
     remote_shell: RemoteShell,
     session_id: u64,
     remote_session_id: u64,
+    control_scope: &str,
+    hop_depth: u32,
 ) -> Result<()> {
-    let payload = serde_json::to_vec(&SshHook {
+    let payload = ssh_hook_payload(
+        endpoint,
+        capability,
+        remote_shell,
+        session_id,
+        remote_session_id,
+        control_scope,
+        hop_depth,
+    )?;
+    let mut stdout = io::stdout().lock();
+    write!(stdout, "\x1b]9278;d;{}\x07", hex::encode(payload))?;
+    stdout.flush()?;
+    Ok(())
+}
+
+fn ssh_hook_payload(
+    endpoint: SocketAddr,
+    capability: &str,
+    remote_shell: RemoteShell,
+    session_id: u64,
+    remote_session_id: u64,
+    control_scope: &str,
+    hop_depth: u32,
+) -> Result<Vec<u8>> {
+    if !matches!(control_scope, "local" | "remote") || !(1..=8).contains(&hop_depth) {
+        bail!("invalid SSH transport scope or hop depth");
+    }
+    serde_json::to_vec(&SshHook {
         hook: "SSH",
         value: SshHookValue {
             transport: SshHookTransport {
@@ -1928,13 +1962,13 @@ fn emit_ssh_hook(
             remote_shell: remote_shell.hook_name(),
             session_id,
             remote_session_id,
+            parent_session_id: session_id,
+            control_scope,
+            hop_depth,
             external_control_master: false,
         },
-    })?;
-    let mut stdout = io::stdout().lock();
-    write!(stdout, "\x1b]9278;d;{}\x07", hex::encode(payload))?;
-    stdout.flush()?;
-    Ok(())
+    })
+    .map_err(Into::into)
 }
 
 fn spawn_broker(

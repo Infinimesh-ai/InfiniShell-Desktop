@@ -1446,7 +1446,10 @@ impl ServerModel {
             InitializeResponse {
                 server_version,
                 host_id: self.host_id.clone(),
-                capabilities: vec![RemoteServerCapability::SshByteStreamV1.into()],
+                capabilities: vec![
+                    RemoteServerCapability::SshByteStreamV1.into(),
+                    RemoteServerCapability::SshTransportV2.into(),
+                ],
             },
         ))
     }

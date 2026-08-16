@@ -3,9 +3,11 @@ use prost::Message;
 use super::*;
 use crate::proto::{
     BundledSkillMetadata, ClientMessage, HomeSkillMetadata, Initialize, InitializeResponse,
-    OpenSshStream, RemoteAgentContextSnapshot, RemoteContextFileProto, RemoteSkillProto,
-    ServerMessage, SshStreamPurpose, TunnelClientMessage, client_message, remote_skill_proto,
-    server_message, session_scoped_request, tunnel_client_message,
+    OpenSshStream, RegisterSshControl, RegisterSshTransport, RemoteAgentContextSnapshot,
+    RemoteContextFileProto, RemoteSkillProto, ServerMessage, SshControlOwnership, SshRustBroker,
+    SshStreamPurpose, SshTransportRemoteOs, TunnelClientMessage, client_message,
+    register_ssh_transport, remote_skill_proto, server_message, session_scoped_request,
+    tunnel_client_message,
 };
 
 #[tokio::test]
@@ -61,6 +63,74 @@ async fn round_trip_ssh_tunnel_open_uses_a_fixed_purpose() {
     };
     assert_eq!(open.purpose(), SshStreamPurpose::RemoteServerProxy);
     assert_eq!(open.identity_key, "identity");
+}
+
+#[tokio::test]
+async fn round_trip_cross_platform_ssh_transport_registration() {
+    let capability = "ab".repeat(32);
+    let msg = ClientMessage::tunnel(
+        "register-1".to_string(),
+        String::new(),
+        tunnel_client_message::Message::RegisterTransport(RegisterSshTransport {
+            owner_session_id: 7,
+            ownership: SshControlOwnership::UserOwned.into(),
+            hop_depth: 3,
+            remote_os: SshTransportRemoteOs::Windows.into(),
+            transport: Some(register_ssh_transport::Transport::RustBroker(
+                SshRustBroker {
+                    endpoint: "127.0.0.1:49152".to_string(),
+                    capability: capability.clone(),
+                },
+            )),
+        }),
+    );
+
+    let mut buffer = Vec::new();
+    write_client_message(&mut buffer, &msg).await.unwrap();
+    let decoded = read_client_message(&mut &buffer[..]).await.unwrap();
+    let Some(client_message::Message::Tunnel(tunnel)) = decoded.message else {
+        panic!("期望隧道消息");
+    };
+    let Some(tunnel_client_message::Message::RegisterTransport(registration)) = tunnel.message
+    else {
+        panic!("期望跨平台 SSH transport 注册消息");
+    };
+    assert_eq!(registration.owner_session_id, 7);
+    assert_eq!(registration.hop_depth, 3);
+    assert_eq!(registration.remote_os(), SshTransportRemoteOs::Windows);
+    let Some(register_ssh_transport::Transport::RustBroker(broker)) = registration.transport else {
+        panic!("期望 Rust broker transport");
+    };
+    assert_eq!(broker.endpoint, "127.0.0.1:49152");
+    assert_eq!(broker.capability, capability);
+}
+
+#[tokio::test]
+async fn round_trip_legacy_control_registration_remains_compatible() {
+    let msg = ClientMessage::tunnel(
+        "register-legacy".to_string(),
+        String::new(),
+        tunnel_client_message::Message::RegisterControl(RegisterSshControl {
+            owner_session_id: 5,
+            socket_path: "/tmp/ssh-control".to_string(),
+            ownership: SshControlOwnership::WarpManaged.into(),
+            hop_depth: 2,
+        }),
+    );
+
+    let mut buffer = Vec::new();
+    write_client_message(&mut buffer, &msg).await.unwrap();
+    let decoded = read_client_message(&mut &buffer[..]).await.unwrap();
+    let Some(client_message::Message::Tunnel(tunnel)) = decoded.message else {
+        panic!("期望隧道消息");
+    };
+    let Some(tunnel_client_message::Message::RegisterControl(registration)) = tunnel.message else {
+        panic!("期望旧版 ControlMaster 注册消息");
+    };
+    assert_eq!(registration.owner_session_id, 5);
+    assert_eq!(registration.socket_path, "/tmp/ssh-control");
+    assert_eq!(registration.ownership(), SshControlOwnership::WarpManaged);
+    assert_eq!(registration.hop_depth, 2);
 }
 
 #[tokio::test]

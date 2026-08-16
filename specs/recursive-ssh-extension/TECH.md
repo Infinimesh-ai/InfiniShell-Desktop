@@ -19,29 +19,30 @@
 
 ### 2.1 控制引用
 
-将当前 `IsSSHWrapperSession::Yes { socket_path: PathBuf, ... }` 改为带作用域和所有权的
-`ScopedControlPath`：
+将当前 `IsSSHWrapperSession::Yes { socket_path: PathBuf, ... }` 改为带作用域、所有权
+和 transport 类型的 `ScopedSshTransport`：
 
 ```rust
-pub struct ScopedControlPath {
-    path: PathBuf,
-    owner_session_id: SessionId,
+pub struct ScopedSshTransport {
+    descriptor: SshSessionTransportDescriptor,
+    owner_session_id: Option<SessionId>,
     scope: SshControlScope,
-    ownership: ControlMasterOwnership,
     hop_depth: u32,
 }
 
 pub enum IsSSHWrapperSession {
     Yes {
-        control_path: ScopedControlPath,
+        transport: ScopedSshTransport,
     },
     No,
 }
 ```
 
-远端 wrapper 发出的 socket 路径只能由其所在 daemon 使用。客户端收到 SSH hook
-后立即向父 daemon 注册路径，换取不泄露路径语义的 `control_id`；后续 transport
-只保存这个不透明引用和可随父连接更新的 `ParentConnectionHandle`。
+`SshSessionTransportDescriptor` 可以表示 POSIX ControlMaster 或跨平台 Rust broker。
+远端 wrapper 发出的 socket 路径或 broker capability 只能由其所在 daemon 使用。
+客户端收到 SSH hook 后立即向父 daemon 注册 transport，换取不泄露路径或 capability
+语义的 `control_id`；后续 transport 只保存这个不透明引用和可随父连接更新的
+`ParentConnectionHandle`。
 
 ### 2.2 连接图
 
@@ -111,6 +112,7 @@ message TunnelClientMessage {
     TunnelWindowUpdate window_update = 6;
     TunnelHalfClose half_close = 7;
     TunnelReset reset = 8;
+    RegisterSshTransport register_transport = 9;
   }
 }
 
@@ -130,6 +132,10 @@ message TunnelServerMessage {
 字段编号在实现时以 proto 当前最高编号为准，只追加，不复用已有编号。
 低频的平台检测、安装检查等请求仍可使用 session-scoped request；字节流的
 Register/Open/Data/Window/Close 全部走上述连接级路径。
+
+`RegisterSshControl` 作为 `SSH_BYTE_STREAM_V1` 的向后兼容入口继续保留。跨平台
+`RegisterSshTransport` 由 `SSH_TRANSPORT_V2` capability 协商，携带目标 OS 与
+ControlMaster/RustBroker 二选一描述；客户端只有在父 daemon 宣告 v2 时才发送它。
 
 ### 3.2 隧道标识与竞态
 
@@ -164,18 +170,20 @@ Register/Open/Data/Window/Close 全部走上述连接级路径。
 
 ### 4.1 控制引用注册
 
-`RegisterSshControl` 接受：
+`RegisterSshControl` / `RegisterSshTransport` 接受：
 
 - 当前 shell session id；
-- ControlMaster socket 路径；
+- ControlMaster socket 路径，或 loopback Rust broker endpoint 与一次性 capability；
 - 所有权；
-- hop depth。
+- hop depth；
+- v2 注册中的目标 OS。
 
 daemon 校验：
 
-- 路径必须是绝对 Unix socket 路径；
+- ControlMaster 路径必须是绝对 Unix socket 路径；
 - 路径长度和字符串长度受限；
 - `ssh -O check -o ControlPath=... placeholder@placeholder` 成功；
+- Rust broker endpoint 必须是 loopback，capability 必须满足固定长度十六进制格式；
 - 注册项绑定当前 proxy connection 和 session；
 - 返回随机 `opaque_id`。
 
@@ -200,12 +208,16 @@ daemon 端复用现有 SSH 安装逻辑，但执行位置变成父主机：
 
 ### 4.3 隧道进程
 
-`OpenSshTunnel` 只允许启动固定用途：
+`OpenSshTunnel` 只允许启动固定用途。POSIX ControlMaster 使用：
 
 ```text
 ssh -S <registered-control-path> placeholder@placeholder \
   <remote-server-binary> remote-server-proxy --identity-key <key>
 ```
+
+Rust broker 则由 daemon 启动同版本 worker 的 `rust-ssh-broker-command`，通过进程环境
+传递注册时的 capability；远端命令仍由 daemon 根据 purpose 和目标 OS 固定生成。
+Windows 命令使用编码后的 PowerShell，安装归档使用 zip；POSIX 使用 shell 与 tar.gz。
 
 协议不提供“任意 remote_command”字段，避免把隧道 API 扩大成新的任意命令执行
 入口。
@@ -226,7 +238,8 @@ ssh -S <registered-control-path> placeholder@placeholder \
 连接产生的 `Arc<RemoteServerClient>`；父节点重连后 handle 原子切换到新 client。
 
 现有本地 `SshTransport` 行为不变。`RemoteServerController` 根据
-`ScopedControlPath.scope` 选择 transport。
+`ScopedSshTransport.scope` 选择 transport，并按父 daemon capability 在 v1 POSIX
+ControlMaster 注册与 v2 跨平台注册之间选择。
 
 ### 5.2 RemoteServerClient 隧道管理
 
@@ -286,13 +299,15 @@ daemon 释放注册；用户拥有的 control 两边都不得执行 `-O exit`。
 远端 bootstrap 注入：
 
 ```text
-WARP_SSH_PARENT_SESSION_ID
 WARP_SSH_HOP_DEPTH
 WARP_RECURSIVE_SSH_EXTENSION=1
+WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH
 ```
 
-`InitializeResponse` 增加显式 `SSH_BYTE_STREAM_V1` capability。只有父 daemon 宣告支持
-且运行时 Feature Flag 开启时才注入递归 wrapper 环境，不能仅按版本字符串推断。
+`InitializeResponse` 增加显式 `SSH_BYTE_STREAM_V1` 与 `SSH_TRANSPORT_V2` capability。
+只有父 daemon 宣告所需能力且运行时 Feature Flag 开启时才注入递归 wrapper 环境，
+不能仅按版本字符串推断。PowerShell wrapper 与 POSIX wrapper 使用相同的深度和父会话
+语义；Windows 下一跳通过 Rust worker 暴露 loopback broker。
 
 超过深度、父 daemon 不支持或 Feature Flag 关闭时调用 `command ssh`。
 
@@ -317,14 +332,14 @@ WARP_RECURSIVE_SSH_EXTENSION=1
 旧客户端缺少字段时仍按本地 scope 解析；新客户端只有在 Feature Flag 开启且父
 session 有已连接 daemon 时接受 `remote` scope。
 
-bash、zsh、fish 必须保持等价实现，公共生成内容优先放在已有 bootstrap 生成层，
-避免三个脚本长期漂移。
+bash、zsh、fish、PowerShell 必须保持等价语义，公共生成内容优先放在已有 bootstrap
+生成层，避免各脚本长期漂移。
 
 ## 7. 持久化
 
 ### 7.1 表
 
-阶段二新增 migration：
+阶段二 migration：
 
 ```sql
 ssh_routes(id, name, target_node_id, created_at, updated_at, last_connected_at)
@@ -353,7 +368,7 @@ ssh_route_hops(route_id, position, node_id, target_alias, port, execution_scope)
 
 - 密码和 passphrase；
 - 私钥内容与临时路径；
-- ControlMaster 路径；
+- ControlMaster 路径或 Rust broker capability；
 - agent socket；
 - host key 的未确认状态。
 
@@ -422,7 +437,7 @@ A      -X-> C
 3. C、B 逐级退出恢复；
 4. 父连接中断和有序恢复；
 5. B 不支持/安装失败时普通 SSH 可用；
-6. bash、zsh、fish wrapper；
+6. bash、zsh、fish、PowerShell wrapper；
 7. Feature Flag 关闭时行为完全等价于当前版本。
 
 ## 11. 验证顺序

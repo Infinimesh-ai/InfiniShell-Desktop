@@ -29,6 +29,7 @@ const IS_LOCAL_SESSION_NAME: &str = "WARP_IS_LOCAL_SHELL_SESSION";
 const SSH_SOCKET_DIR: &str = "SSH_SOCKET_DIR";
 const PATH_APPEND_NAME: &str = "WARP_PATH_APPEND";
 const RUST_SSH_EXECUTABLE_NAME: &str = "WARP_RUST_SSH_EXECUTABLE";
+const REMOTE_SSH_EXECUTABLE_RELATIVE_PATH_NAME: &str = "WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH";
 const WSLENV: &str = "WSLENV";
 const HISTIGNORE: &str = "HISTIGNORE";
 
@@ -102,6 +103,35 @@ pub(super) fn get_shell_environment_variables(options: &PtyOptions) -> Vec<u16> 
             },
         );
     }
+    env.insert(
+        map_key(REMOTE_SSH_EXECUTABLE_RELATIVE_PATH_NAME.into()),
+        EnvEntry {
+            preferred_key: REMOTE_SSH_EXECUTABLE_RELATIVE_PATH_NAME.into(),
+            value: remote_server::setup::remote_server_relative_binary_path(
+                &remote_server::setup::RemoteOs::Windows,
+            )
+            .into(),
+        },
+    );
+    env.insert(
+        map_key("WARP_RECURSIVE_SSH_EXTENSION".into()),
+        EnvEntry {
+            preferred_key: "WARP_RECURSIVE_SSH_EXTENSION".into(),
+            value: if FeatureFlag::RecursiveSshExtension.is_enabled() {
+                "1"
+            } else {
+                "0"
+            }
+            .into(),
+        },
+    );
+    env.insert(
+        map_key("WARP_SSH_HOP_DEPTH".into()),
+        EnvEntry {
+            preferred_key: "WARP_SSH_HOP_DEPTH".into(),
+            value: "0".into(),
+        },
+    );
     env.insert(
         map_key(SSH_REUSE_CONTROL_MASTER_NAME.into()),
         EnvEntry {

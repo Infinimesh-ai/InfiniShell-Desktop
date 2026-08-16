@@ -158,6 +158,8 @@ async fn run_session(
                 remote_shell,
                 args.session_id,
                 args.remote_session_id,
+                &args.control_scope,
+                args.hop_depth,
             )?;
             let handle = handle.clone();
             let channel_environment = channel_environment.clone();

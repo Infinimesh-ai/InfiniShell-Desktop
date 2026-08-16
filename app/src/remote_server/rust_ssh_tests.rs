@@ -433,6 +433,40 @@ fn broker_header_round_trips_multiline_commands() {
     assert_eq!(request.command, "first\nsecond");
 }
 
+#[test]
+fn recursive_rust_broker_hook_carries_scope_and_hop() {
+    let payload = ssh_hook_payload(
+        "127.0.0.1:49152".parse().unwrap(),
+        &"ab".repeat(32),
+        RemoteShell::PowerShell,
+        7,
+        8,
+        "remote",
+        3,
+    )
+    .unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&payload).unwrap();
+
+    assert_eq!(value["value"]["session_id"], 7);
+    assert_eq!(value["value"]["remote_session_id"], 8);
+    assert_eq!(value["value"]["parent_session_id"], 7);
+    assert_eq!(value["value"]["control_scope"], "remote");
+    assert_eq!(value["value"]["hop_depth"], 3);
+    assert_eq!(value["value"]["transport"]["type"], "rust_broker");
+    assert!(
+        ssh_hook_payload(
+            "127.0.0.1:49152".parse().unwrap(),
+            &"ab".repeat(32),
+            RemoteShell::PowerShell,
+            7,
+            8,
+            "remote",
+            9,
+        )
+        .is_err()
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn proxy_command_socket_carries_the_ssh_byte_stream_in_both_directions() {
@@ -459,6 +493,8 @@ fn native_fallback_preserves_a_remote_status_that_was_previously_reserved() {
     let args = RustSshSessionArgs {
         session_id: 1,
         remote_session_id: 2,
+        control_scope: "local".to_string(),
+        hop_depth: 1,
         ssh_executable: "/bin/sh".into(),
         posix_command: String::new(),
         windows_command: String::new(),
@@ -490,6 +526,8 @@ fn unknown_effective_config_falls_back_with_the_original_arguments_before_connec
     let args = RustSshSessionArgs {
         session_id: 1,
         remote_session_id: 2,
+        control_scope: "local".to_string(),
+        hop_depth: 1,
         ssh_executable: executable,
         posix_command: String::new(),
         windows_command: String::new(),

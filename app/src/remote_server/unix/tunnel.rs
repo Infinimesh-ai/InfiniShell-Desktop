@@ -1,6 +1,9 @@
 use std::collections::{HashMap, VecDeque};
+#[cfg(unix)]
 use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _};
-use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};
@@ -11,10 +14,10 @@ use futures::future::{AbortHandle, Abortable};
 use futures::io::{AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _};
 use remote_server::proto::{
     ClientMessage, ErrorCode, ErrorResponse, OpenSshStream, OpenSshStreamResponse,
-    RegisterSshControl, RegisterSshControlResponse, ServerMessage, SshControlOwnership,
-    SshStreamPurpose, TunnelChannel, TunnelData, TunnelExit, TunnelReset, TunnelServerMessage,
-    TunnelWindowUpdate, client_message, server_message, tunnel_client_message,
-    tunnel_server_message,
+    RegisterSshControl, RegisterSshControlResponse, RegisterSshTransport, ServerMessage,
+    SshControlOwnership, SshStreamPurpose, SshTransportRemoteOs, TunnelChannel, TunnelData,
+    TunnelExit, TunnelReset, TunnelServerMessage, TunnelWindowUpdate, client_message,
+    register_ssh_transport, server_message, tunnel_client_message, tunnel_server_message,
 };
 use remote_server::protocol::{
     INITIAL_TUNNEL_WINDOW, MAX_TUNNEL_CHUNK_SIZE, MAX_TUNNELS_PER_CONNECTION,
@@ -30,9 +33,21 @@ const CONTROL_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
 struct RegisteredControl {
-    path: PathBuf,
+    transport: RegisteredTransport,
     ownership: SshControlOwnership,
     staged_binary_path: String,
+    remote_os: remote_server::setup::RemoteOs,
+}
+
+#[derive(Clone)]
+enum RegisteredTransport {
+    ControlMaster {
+        path: PathBuf,
+    },
+    RustBroker {
+        endpoint: String,
+        capability: String,
+    },
 }
 
 struct TunnelProcess {
@@ -114,6 +129,9 @@ impl TunnelBroker {
             tunnel_client_message::Message::RegisterControl(registration) => {
                 self.register_control(request_id, registration).await;
             }
+            tunnel_client_message::Message::RegisterTransport(registration) => {
+                self.register_transport(request_id, registration).await;
+            }
             tunnel_client_message::Message::ReleaseControl(release) => {
                 let control = self
                     .inner
@@ -122,27 +140,38 @@ impl TunnelBroker {
                     .expect("SSH control mutex poisoned")
                     .remove(&release.control_id);
                 if let Some(control) = control {
-                    match control.ownership {
-                        SshControlOwnership::WarpManaged => {
+                    match (&control.transport, control.ownership) {
+                        (
+                            RegisteredTransport::ControlMaster { path },
+                            SshControlOwnership::WarpManaged,
+                        ) => {
                             if release.stop_control_master {
-                                let args = remote_server::ssh::ssh_args(&control.path);
-                                let stopped = Command::new("ssh")
-                                    .arg("-O")
-                                    .arg("exit")
-                                    .args(args)
-                                    .kill_on_drop(true)
-                                    .output()
-                                    .with_timeout(CONTROL_CHECK_TIMEOUT)
-                                    .await;
-                                if !matches!(stopped, Ok(Ok(output)) if output.status.success()) {
-                                    log::warn!("停止远端 SSH ControlMaster 失败");
+                                #[cfg(unix)]
+                                {
+                                    let args = remote_server::ssh::ssh_args(path);
+                                    let stopped = Command::new("ssh")
+                                        .arg("-O")
+                                        .arg("exit")
+                                        .args(args)
+                                        .kill_on_drop(true)
+                                        .output()
+                                        .with_timeout(CONTROL_CHECK_TIMEOUT)
+                                        .await;
+                                    if !matches!(stopped, Ok(Ok(output)) if output.status.success())
+                                    {
+                                        log::warn!("停止远端 SSH ControlMaster 失败");
+                                    }
                                 }
                             }
                         }
-                        SshControlOwnership::UserOwned => {
-                            log::debug!("释放用户拥有的 SSH ControlMaster 引用")
+                        (
+                            RegisteredTransport::ControlMaster { .. },
+                            SshControlOwnership::UserOwned,
+                        ) => {
+                            log::debug!("释放用户拥有的 SSH ControlMaster 引用");
                         }
-                        SshControlOwnership::Unspecified => {}
+                        (RegisteredTransport::RustBroker { .. }, _)
+                        | (_, SshControlOwnership::Unspecified) => {}
                     }
                 }
             }
@@ -181,12 +210,23 @@ impl TunnelBroker {
     }
 
     async fn register_control(&self, request_id: String, registration: RegisterSshControl) {
-        let path = PathBuf::from(&registration.socket_path);
+        let registration = RegisterSshTransport {
+            owner_session_id: registration.owner_session_id,
+            ownership: registration.ownership,
+            hop_depth: registration.hop_depth,
+            remote_os: SshTransportRemoteOs::Posix.into(),
+            transport: Some(register_ssh_transport::Transport::ControlMasterSocketPath(
+                registration.socket_path,
+            )),
+        };
+        self.register_transport(request_id, registration).await;
+    }
+
+    async fn register_transport(&self, request_id: String, registration: RegisterSshTransport) {
         let ownership = registration.ownership();
         if registration.owner_session_id == 0
             || registration.hop_depth == 0
             || registration.hop_depth > 8
-            || registration.socket_path.len() > MAX_CONTROL_PATH_BYTES
             || !matches!(
                 ownership,
                 SshControlOwnership::WarpManaged | SshControlOwnership::UserOwned
@@ -196,12 +236,15 @@ impl TunnelBroker {
                 .await;
             return;
         }
-        if let Err(error) = validate_control_socket(&path) {
-            log::warn!("拒绝注册 SSH ControlMaster：{error}");
-            self.send_error(request_id, "SSH ControlMaster socket is not valid")
-                .await;
-            return;
-        }
+        let remote_os = match registration.remote_os() {
+            SshTransportRemoteOs::Posix => remote_server::setup::RemoteOs::Linux,
+            SshTransportRemoteOs::Windows => remote_server::setup::RemoteOs::Windows,
+            SshTransportRemoteOs::Unspecified => {
+                self.send_error(request_id, "SSH transport remote OS is unspecified")
+                    .await;
+                return;
+            }
+        };
         let control_count = self
             .inner
             .controls
@@ -213,24 +256,82 @@ impl TunnelBroker {
                 .await;
             return;
         }
-        let args = remote_server::ssh::ssh_args(&path);
-        let checked = Command::new("ssh")
-            .arg("-O")
-            .arg("check")
-            .args(args)
-            .kill_on_drop(true)
-            .output()
-            .with_timeout(CONTROL_CHECK_TIMEOUT)
-            .await;
-        if !matches!(checked, Ok(Ok(output)) if output.status.success()) {
-            self.send_error(request_id, "SSH ControlMaster is not active")
+        let Some(transport) = registration.transport else {
+            self.send_error(request_id, "SSH transport is unspecified")
                 .await;
             return;
-        }
+        };
+        let transport = match transport {
+            register_ssh_transport::Transport::ControlMasterSocketPath(socket_path) => {
+                if socket_path.len() > MAX_CONTROL_PATH_BYTES {
+                    self.send_error(request_id, "SSH ControlMaster path is too long")
+                        .await;
+                    return;
+                }
+                let path = PathBuf::from(socket_path);
+                #[cfg(unix)]
+                {
+                    if let Err(error) = validate_control_socket(&path) {
+                        log::warn!("拒绝注册 SSH ControlMaster：{error}");
+                        self.send_error(request_id, "SSH ControlMaster socket is not valid")
+                            .await;
+                        return;
+                    }
+                    let args = remote_server::ssh::ssh_args(&path);
+                    let checked = Command::new("ssh")
+                        .arg("-O")
+                        .arg("check")
+                        .args(args)
+                        .kill_on_drop(true)
+                        .output()
+                        .with_timeout(CONTROL_CHECK_TIMEOUT)
+                        .await;
+                    if !matches!(checked, Ok(Ok(output)) if output.status.success()) {
+                        self.send_error(request_id, "SSH ControlMaster is not active")
+                            .await;
+                        return;
+                    }
+                }
+                #[cfg(not(unix))]
+                {
+                    let _ = path;
+                    self.send_error(request_id, "SSH ControlMaster is not supported here")
+                        .await;
+                    return;
+                }
+                RegisteredTransport::ControlMaster { path }
+            }
+            register_ssh_transport::Transport::RustBroker(broker) => {
+                let valid_endpoint = broker
+                    .endpoint
+                    .parse::<std::net::SocketAddr>()
+                    .is_ok_and(|address| address.ip().is_loopback());
+                let valid_capability = broker.capability.len() == 64
+                    && broker
+                        .capability
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit());
+                if !valid_endpoint || !valid_capability {
+                    self.send_error(request_id, "SSH Rust broker registration is invalid")
+                        .await;
+                    return;
+                }
+                RegisteredTransport::RustBroker {
+                    endpoint: broker.endpoint,
+                    capability: broker.capability,
+                }
+            }
+        };
 
         let control_id = uuid::Uuid::new_v4().to_string();
+        let archive_extension = match remote_os {
+            remote_server::setup::RemoteOs::Linux | remote_server::setup::RemoteOs::MacOs => {
+                "tar.gz"
+            }
+            remote_server::setup::RemoteOs::Windows => "zip",
+        };
         let staged_binary_path = format!(
-            "{}/infinishell-upload-{control_id}.tar.gz",
+            "{}/infinishell-upload-{control_id}.{archive_extension}",
             remote_server::setup::remote_server_dir()
         );
         self.inner
@@ -240,9 +341,10 @@ impl TunnelBroker {
             .insert(
                 control_id.clone(),
                 RegisteredControl {
-                    path,
+                    transport,
                     ownership,
                     staged_binary_path,
+                    remote_os,
                 },
             );
         self.send_tunnel(
@@ -295,7 +397,7 @@ impl TunnelBroker {
             return;
         };
         let (remote_command, initial_stdin, accepts_client_stdin) =
-            match ssh_stream_command(&open, &control.staged_binary_path) {
+            match ssh_stream_command(&open, &control.staged_binary_path, &control.remote_os) {
                 Ok(command) => command,
                 Err(message) => {
                     self.send_error(request_id, message).await;
@@ -303,10 +405,51 @@ impl TunnelBroker {
                 }
             };
 
-        let mut args = remote_server::ssh::ssh_args(&control.path);
-        args.push(remote_command);
-        let mut child = match Command::new("ssh")
-            .args(args)
+        let mut command = match &control.transport {
+            RegisteredTransport::ControlMaster { path } => {
+                #[cfg(unix)]
+                {
+                    let mut args = remote_server::ssh::ssh_args(path);
+                    args.push(remote_command);
+                    let mut command = Command::new("ssh");
+                    command.args(args);
+                    command
+                }
+                #[cfg(not(unix))]
+                {
+                    let _ = (path, remote_command);
+                    self.send_error(request_id, "SSH ControlMaster is not supported here")
+                        .await;
+                    return;
+                }
+            }
+            RegisteredTransport::RustBroker {
+                endpoint,
+                capability,
+            } => {
+                let executable = match crate::remote_server::rust_ssh::worker_executable() {
+                    Ok(executable) => executable,
+                    Err(_) => {
+                        self.send_error(request_id, "SSH broker worker is unavailable")
+                            .await;
+                        return;
+                    }
+                };
+                let mut command = Command::new(executable);
+                command
+                    .arg("rust-ssh-broker-command")
+                    .arg("--endpoint")
+                    .arg(endpoint)
+                    .arg("--command")
+                    .arg(remote_command)
+                    .env(
+                        crate::remote_server::rust_ssh::BROKER_CAPABILITY_ENV,
+                        capability,
+                    );
+                command
+            }
+        };
+        let mut child = match command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -599,6 +742,7 @@ impl TunnelBroker {
 fn ssh_stream_command(
     open: &OpenSshStream,
     staged_binary_path: &str,
+    remote_os: &remote_server::setup::RemoteOs,
 ) -> Result<(String, Option<Vec<u8>>, bool), &'static str> {
     let purpose = open.purpose();
     if purpose != SshStreamPurpose::RemoteServerProxy && !open.identity_key.is_empty() {
@@ -606,74 +750,99 @@ fn ssh_stream_command(
     }
     match purpose {
         SshStreamPurpose::Unspecified => Err("SSH tunnel purpose is unspecified"),
-        SshStreamPurpose::DetectPlatform => Ok(("uname -sm".to_string(), None, false)),
-        SshStreamPurpose::PreinstallCheck => Ok((
-            "bash -s".to_string(),
-            Some(
-                remote_server::setup::PREINSTALL_CHECK_SCRIPT
-                    .as_bytes()
-                    .to_vec(),
-            ),
-            false,
-        )),
-        SshStreamPurpose::CheckBinary => {
-            Ok((remote_server::setup::binary_check_command(), None, false))
-        }
-        SshStreamPurpose::CheckOldBinary => Ok((
-            format!(
-                "test -d {}",
-                shell_words::quote(&remote_server::setup::remote_server_dir())
+        SshStreamPurpose::DetectPlatform => Ok((
+            crate::remote_server::ssh_transport::setup_command_line(
+                &remote_server::setup::platform_probe_command(remote_os),
             ),
             None,
             false,
         )),
-        SshStreamPurpose::InstallBinary => Ok((
-            "bash -s".to_string(),
-            Some(remote_server::setup::install_script(None).into_bytes()),
+        SshStreamPurpose::PreinstallCheck => match remote_os {
+            remote_server::setup::RemoteOs::Linux | remote_server::setup::RemoteOs::MacOs => Ok((
+                "bash -s".to_string(),
+                Some(
+                    remote_server::setup::PREINSTALL_CHECK_SCRIPT
+                        .as_bytes()
+                        .to_vec(),
+                ),
+                false,
+            )),
+            remote_server::setup::RemoteOs::Windows => Ok((
+                crate::remote_server::ssh_transport::setup_command_line(
+                    &remote_server::setup::RemoteSetupCommand::powershell("exit 0"),
+                ),
+                None,
+                false,
+            )),
+        },
+        SshStreamPurpose::CheckBinary | SshStreamPurpose::CheckOldBinary => Ok((
+            crate::remote_server::ssh_transport::setup_command_line(
+                &remote_server::setup::binary_check_command_for(remote_os),
+            ),
+            None,
             false,
         )),
+        SshStreamPurpose::InstallBinary => match remote_os {
+            remote_server::setup::RemoteOs::Linux | remote_server::setup::RemoteOs::MacOs => Ok((
+                "bash -s".to_string(),
+                Some(remote_server::setup::install_script(None).into_bytes()),
+                false,
+            )),
+            remote_server::setup::RemoteOs::Windows => Ok((
+                crate::remote_server::ssh_transport::setup_command_line(
+                    &remote_server::setup::RemoteSetupCommand::powershell("exit 1"),
+                ),
+                None,
+                false,
+            )),
+        },
         SshStreamPurpose::RemoteServerProxy => {
             if open.identity_key.is_empty() || open.identity_key.len() > MAX_IDENTITY_KEY_BYTES {
                 return Err("invalid remote-server identity key");
             }
             Ok((
-                format!(
-                    "{} remote-server-proxy --identity-key {}",
-                    remote_server::setup::remote_server_binary(),
-                    shell_words::quote(&open.identity_key)
+                crate::remote_server::ssh_transport::setup_command_line(
+                    &remote_server::setup::remote_server_proxy_command(
+                        remote_os,
+                        &open.identity_key,
+                    ),
                 ),
                 None,
                 true,
             ))
         }
         SshStreamPurpose::RemoveBinary => Ok((
-            remote_server::setup::remote_server_removal_command(),
+            crate::remote_server::ssh_transport::setup_command_line(
+                &remote_server::setup::remote_server_removal_command_for(remote_os),
+            ),
             None,
             false,
         )),
-        SshStreamPurpose::StageBinary => {
-            let install_dir = remote_server::setup::remote_server_dir();
-            let partial_path = format!("{staged_binary_path}.part");
-            Ok((
-                format!(
-                    "mkdir -p {} && cat > {} && mv {} {}",
-                    shell_words::quote(&install_dir),
-                    shell_words::quote(&partial_path),
-                    shell_words::quote(&partial_path),
-                    shell_words::quote(staged_binary_path),
+        SshStreamPurpose::StageBinary => Ok((
+            crate::remote_server::ssh_transport::setup_command_line(
+                &crate::remote_server::ssh_transport::upload_command(remote_os, staged_binary_path),
+            ),
+            None,
+            true,
+        )),
+        SshStreamPurpose::InstallStagedBinary => match remote_os {
+            remote_server::setup::RemoteOs::Linux | remote_server::setup::RemoteOs::MacOs => Ok((
+                "bash -s".to_string(),
+                Some(remote_server::setup::install_script(Some(staged_binary_path)).into_bytes()),
+                false,
+            )),
+            remote_server::setup::RemoteOs::Windows => Ok((
+                crate::remote_server::ssh_transport::setup_command_line(
+                    &remote_server::setup::install_staged_command(remote_os, staged_binary_path),
                 ),
                 None,
-                true,
-            ))
-        }
-        SshStreamPurpose::InstallStagedBinary => Ok((
-            "bash -s".to_string(),
-            Some(remote_server::setup::install_script(Some(staged_binary_path)).into_bytes()),
-            false,
-        )),
+                false,
+            )),
+        },
     }
 }
 
+#[cfg(unix)]
 fn validate_control_socket(path: &Path) -> anyhow::Result<()> {
     anyhow::ensure!(path.is_absolute(), "ControlMaster path is not absolute");
     let metadata = std::fs::symlink_metadata(path)?;

@@ -22,12 +22,13 @@ use crate::proto::{
     DiffStateMetadataUpdate, DiffStateSnapshot, ErrorCode, GitStatusMetadata, Initialize,
     InitializeResponse, ListDirectory, ListDirectoryResponse, LoadRepoMetadataDirectoryResponse,
     NavigatedToDirectoryResponse, OpenSshStream, PrInfo, ReadFileChunk, ReadFileChunkResponse,
-    RegisterSshControl, ReleaseSshControl, RemoteAgentContextSnapshot, RepositoryInfo, ResolvePath,
-    ResolvePathResponse, RunCommandRequest, RunCommandResponse, ServerMessage, SessionBootstrapped,
-    SshStreamPurpose, TextEdit, TunnelReset, UnsubscribeDiffState, UpdateGitHubPrInfo,
-    UpdateGitHubRepoInfo, UpdateGitStatus, WriteFileChunk, WriteFileChunkResponse,
-    host_scoped_request, notification, read_file_chunk_response, server_message,
-    session_scoped_request, tunnel_client_message, tunnel_server_message,
+    RegisterSshControl, RegisterSshTransport, ReleaseSshControl, RemoteAgentContextSnapshot,
+    RepositoryInfo, ResolvePath, ResolvePathResponse, RunCommandRequest, RunCommandResponse,
+    ServerMessage, SessionBootstrapped, SshStreamPurpose, TextEdit, TunnelReset,
+    UnsubscribeDiffState, UpdateGitHubPrInfo, UpdateGitHubRepoInfo, UpdateGitStatus,
+    WriteFileChunk, WriteFileChunkResponse, host_scoped_request, notification,
+    read_file_chunk_response, server_message, session_scoped_request, tunnel_client_message,
+    tunnel_server_message,
 };
 use crate::repo_metadata_proto::{proto_snapshot_to_update, proto_to_repo_metadata_update};
 
@@ -458,6 +459,36 @@ impl RemoteServerClient {
                     Ok(response.control_id)
                 }
                 _ => Err(ClientError::UnexpectedResponse),
+            },
+            _ => Err(ClientError::UnexpectedResponse),
+        }
+    }
+
+    /// 在当前父连接上注册一个跨平台 SSH transport，并返回仅对该连接有效的引用。
+    pub async fn register_ssh_transport(
+        &self,
+        registration: RegisterSshTransport,
+    ) -> Result<String, ClientError> {
+        let request_id = RequestId::new();
+        let message = ClientMessage::tunnel(
+            request_id.to_string(),
+            String::new(),
+            tunnel_client_message::Message::RegisterTransport(registration),
+        );
+        let response = self.send_request_internal(request_id, message).await?;
+        match response.message {
+            Some(server_message::Message::Tunnel(tunnel)) => match tunnel.message {
+                Some(tunnel_server_message::Message::ControlRegistered(response)) => {
+                    Ok(response.control_id)
+                }
+                Some(
+                    tunnel_server_message::Message::Opened(_)
+                    | tunnel_server_message::Message::Data(_)
+                    | tunnel_server_message::Message::WindowUpdate(_)
+                    | tunnel_server_message::Message::Exit(_)
+                    | tunnel_server_message::Message::Reset(_),
+                )
+                | None => Err(ClientError::UnexpectedResponse),
             },
             _ => Err(ClientError::UnexpectedResponse),
         }

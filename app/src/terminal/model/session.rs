@@ -716,43 +716,33 @@ impl SshSessionTransportDescriptor {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ScopedControlPath {
-    path: PathBuf,
-    owner_session_id: SessionId,
+pub struct ScopedSshTransport {
+    descriptor: SshSessionTransportDescriptor,
+    owner_session_id: Option<SessionId>,
     scope: SshControlScope,
-    ownership: ControlMasterOwnership,
     hop_depth: u32,
 }
 
-impl ScopedControlPath {
-    pub fn local(
-        path: PathBuf,
-        owner_session_id: SessionId,
-        ownership: ControlMasterOwnership,
-    ) -> Self {
+impl ScopedSshTransport {
+    pub fn local(descriptor: SshSessionTransportDescriptor, owner_session_id: SessionId) -> Self {
         Self {
-            path,
-            owner_session_id,
+            descriptor,
+            owner_session_id: Some(owner_session_id),
             scope: SshControlScope::Local,
-            ownership,
             hop_depth: 1,
         }
     }
 
-    pub fn path(&self) -> &Path {
-        &self.path
+    pub fn descriptor(&self) -> &SshSessionTransportDescriptor {
+        &self.descriptor
     }
 
-    pub fn owner_session_id(&self) -> SessionId {
+    pub fn owner_session_id(&self) -> Option<SessionId> {
         self.owner_session_id
     }
 
     pub fn scope(&self) -> SshControlScope {
         self.scope
-    }
-
-    pub fn ownership(&self) -> ControlMasterOwnership {
-        self.ownership
     }
 
     pub fn hop_depth(&self) -> u32 {
@@ -774,34 +764,29 @@ impl ScopedControlPath {
 /// transport descriptor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IsSSHWrapperSession {
-    /// `transport` 描述实际承载连接的能力，`control_path` 只补充
-    /// ControlMaster 的本地/父级远端作用域和 hop 元数据。
-    Yes {
-        transport: SshSessionTransportDescriptor,
-        control_path: Option<ScopedControlPath>,
-    },
+    Yes { transport: ScopedSshTransport },
     No,
 }
 
 impl IsSSHWrapperSession {
     pub fn transport(&self) -> Option<&SshSessionTransportDescriptor> {
         match self {
-            Self::Yes { transport, .. } => Some(transport),
+            Self::Yes { transport } => Some(transport.descriptor()),
             Self::No => None,
         }
     }
 
-    pub fn scoped_control_path(&self) -> Option<&ScopedControlPath> {
+    pub fn scoped_transport(&self) -> Option<&ScopedSshTransport> {
         match self {
-            Self::Yes { control_path, .. } => control_path.as_ref(),
+            Self::Yes { transport } => Some(transport),
             Self::No => None,
         }
     }
 
     pub fn control_master(&self) -> Option<(&PathBuf, ControlMasterOwnership)> {
         if self
-            .scoped_control_path()
-            .is_some_and(|control_path| !control_path.is_local())
+            .scoped_transport()
+            .is_some_and(|transport| !transport.is_local())
         {
             return None;
         }
@@ -901,46 +886,19 @@ impl SessionInfo {
                     .map(SessionId::from)
                     .or(active_block_session_id);
                 let mut transport = SshSessionTransportDescriptor::from_ssh_value(&ssh_value);
-                if ssh_value.control_scope == SshControlScope::Remote
-                    && owner_session_id.is_none()
-                    && matches!(
-                        transport,
-                        SshSessionTransportDescriptor::ControlMaster { .. }
-                    )
+                if ssh_value.control_scope == SshControlScope::Remote && owner_session_id.is_none()
                 {
-                    log::warn!("Ignoring remote SSH ControlMaster without an owning session");
+                    log::warn!("忽略缺少所属会话的远端 SSH transport");
                     transport = SshSessionTransportDescriptor::Unavailable;
                 }
-                let control_path = match (&transport, owner_session_id) {
-                    (
-                        SshSessionTransportDescriptor::ControlMaster {
-                            socket_path,
-                            ownership,
-                        },
-                        Some(owner_session_id),
-                    ) => Some(ScopedControlPath {
-                        path: socket_path.clone(),
-                        owner_session_id,
-                        scope: ssh_value.control_scope,
-                        ownership: *ownership,
-                        hop_depth: ssh_value.hop_depth.max(1),
-                    }),
-                    (
-                        SshSessionTransportDescriptor::ControlMaster { .. }
-                        | SshSessionTransportDescriptor::RustBroker { .. }
-                        | SshSessionTransportDescriptor::Unavailable,
-                        None,
-                    )
-                    | (
-                        SshSessionTransportDescriptor::RustBroker { .. }
-                        | SshSessionTransportDescriptor::Unavailable,
-                        Some(_),
-                    ) => None,
-                };
                 (
                     IsSSHWrapperSession::Yes {
-                        transport,
-                        control_path,
+                        transport: ScopedSshTransport {
+                            descriptor: transport,
+                            owner_session_id,
+                            scope: ssh_value.control_scope,
+                            hop_depth: ssh_value.hop_depth.max(1),
+                        },
                     },
                     owner_session_id,
                 )
@@ -2109,17 +2067,12 @@ pub mod testing {
                 self.session_type = BootstrapSessionType::WarpifiedRemote;
             }
             let owner_session_id = self.spawning_session_id.unwrap_or(self.session_id);
-            let control_path = ScopedControlPath::local(
-                socket_path.clone(),
-                owner_session_id,
-                ControlMasterOwnership::WarpManaged,
-            );
+            let transport = SshSessionTransportDescriptor::ControlMaster {
+                socket_path,
+                ownership: ControlMasterOwnership::WarpManaged,
+            };
             self.is_ssh_wrapper_session = IsSSHWrapperSession::Yes {
-                transport: SshSessionTransportDescriptor::ControlMaster {
-                    socket_path,
-                    ownership: ControlMasterOwnership::WarpManaged,
-                },
-                control_path: Some(control_path),
+                transport: ScopedSshTransport::local(transport, owner_session_id),
             };
             self
         }

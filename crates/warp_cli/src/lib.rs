@@ -89,6 +89,12 @@ pub struct RustSshSessionArgs {
     /// 为远端 shell 生成的会话 ID。
     #[arg(long, hide = true)]
     pub remote_session_id: u64,
+    /// transport 对客户端可见的作用域：local 或 remote。
+    #[arg(long, default_value = "local", hide = true)]
+    pub control_scope: String,
+    /// 新会话在递归 SSH 路径中的深度。
+    #[arg(long, default_value_t = 1, hide = true)]
+    pub hop_depth: u32,
     /// wrapper 已解析出的真实 OpenSSH 可执行文件，仅用于读取 `ssh -G` 配置。
     #[arg(long, hide = true)]
     pub ssh_executable: std::path::PathBuf,

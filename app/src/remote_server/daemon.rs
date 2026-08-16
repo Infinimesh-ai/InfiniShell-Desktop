@@ -1,5 +1,8 @@
 //! remote-server daemon 的跨平台连接处理。
 
+use std::sync::Arc;
+
+use futures::FutureExt as _;
 use futures::io::{AsyncRead, AsyncWrite, AsyncWriteExt, BufReader, BufWriter};
 use warp_errors::report_error;
 use warpui::r#async::executor;
@@ -17,7 +20,10 @@ pub(super) async fn handle_daemon_connection<R, W>(
     R: AsyncRead + Unpin + Send + 'static,
     W: AsyncWrite + Unpin + Send + 'static,
 {
-    let (conn_tx, conn_rx) = async_channel::unbounded::<remote_server::proto::ServerMessage>();
+    let (conn_tx, conn_rx) = async_channel::bounded::<remote_server::proto::ServerMessage>(256);
+    let (tunnel_tx, tunnel_rx) = async_channel::bounded::<remote_server::proto::ServerMessage>(128);
+    let tunnel_broker =
+        super::tunnel::TunnelBroker::new(conn_tx.clone(), tunnel_tx, Arc::clone(&exec));
 
     let _ = spawner
         .spawn({
@@ -30,11 +36,16 @@ pub(super) async fn handle_daemon_connection<R, W>(
 
     let mut writer = BufWriter::new(write_half);
     let spawner_reader = spawner.clone();
+    let tunnel_broker_reader = tunnel_broker.clone();
     exec.spawn(async move {
         let mut reader = BufReader::new(read_half);
         loop {
             match remote_server::protocol::read_client_message(&mut reader).await {
                 Ok(msg) => {
+                    if super::tunnel::TunnelBroker::is_tunnel_message(&msg) {
+                        tunnel_broker_reader.handle_message(msg).await;
+                        continue;
+                    }
                     let result = spawner_reader
                         .spawn(move |me, ctx| {
                             me.handle_message(conn_id, msg, ctx);
@@ -74,8 +85,19 @@ pub(super) async fn handle_daemon_connection<R, W>(
             .await;
     })
     .detach();
+    drop(tunnel_broker);
 
-    while let Ok(msg) = conn_rx.recv().await {
+    loop {
+        let control_message = conn_rx.recv();
+        let tunnel_message = tunnel_rx.recv();
+        futures::pin_mut!(control_message, tunnel_message);
+        let msg = futures::select_biased! {
+            msg = control_message.fuse() => msg.ok(),
+            msg = tunnel_message.fuse() => msg.ok(),
+        };
+        let Some(msg) = msg else {
+            break;
+        };
         if let Err(e) = remote_server::protocol::write_server_message(&mut writer, &msg).await {
             if !e.is_write_recoverable() {
                 if is_disconnect_error(&e) {
