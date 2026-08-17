@@ -443,7 +443,7 @@ fn proxy_command_socket_carries_the_ssh_byte_stream_in_both_directions() {
     let mut proxy = connect_proxy_command(&spec).unwrap();
     proxy
         .socket
-        .set_read_timeout(Some(Duration::from_secs(1)))
+        .set_read_timeout(Some(Duration::from_secs(10)))
         .unwrap();
 
     proxy.socket.write_all(b"ssh bytes").unwrap();

@@ -420,12 +420,14 @@ ConvertTo-Json -Compress -Depth 4 -InputObject @{
     assert!(decoded_capability_probe.contains("__WARP_REMOTE_CAPS__v=1"));
     assert!(decoded_capability_probe.contains("os={0};shell=powershell"));
     assert_eq!(result["closed_owned_control_master"], json!(false));
+    let remote_bootstrap_syntax = result["remote_bootstrap_syntax"]
+        .as_array()
+        .expect("远端 bootstrap 语法检查结果应为数组");
     assert!(
-        result["remote_bootstrap_syntax"]
-            .as_array()
-            .expect("远端 bootstrap 语法检查结果应为数组")
+        remote_bootstrap_syntax
             .iter()
-            .all(|value| value == &json!(true))
+            .all(|value| value == &json!(true)),
+        "远端 bootstrap 语法检查失败: {remote_bootstrap_syntax:?}"
     );
 }
 

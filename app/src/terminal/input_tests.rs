@@ -4284,6 +4284,7 @@ fn test_open_slash_command_requires_path() {
 #[test]
 fn test_changelog_slash_command_clears_buffer_on_success() {
     App::test((), |mut app| async move {
+        let _changelog = FeatureFlag::Changelog.override_enabled(true);
         initialize_app(&mut app);
 
         let terminal = add_window_with_bootstrapped_terminal(

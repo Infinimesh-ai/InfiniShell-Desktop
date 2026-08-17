@@ -176,10 +176,16 @@ impl GuiSlashCommandDataSource {
             availability |= Availability::ACTIVE_CONVERSATION;
         }
 
-        // Zap:上游还会补 `CLOUD_MODE_V2_COMPOSER` / `CLOUD_AGENT` / `NOT_CLOUD_AGENT` 三个
-        // 可用性位。本地优先分支的 `Availability` 没有这几位(也没有任何命令要求它们),
-        // V2 composer 的唯一实际用途——隐藏 `/fork`——改为在 `command_passes_gui_gates`
-        // 里直接判定,见该函数。
+        if self.is_cloud_mode_v2_composer() {
+            availability |= Availability::CLOUD_MODE_V2_COMPOSER;
+        }
+
+        if self.is_cloud_mode(ctx) {
+            availability |= Availability::CLOUD_AGENT;
+        } else {
+            availability |= Availability::NOT_CLOUD_AGENT;
+        }
+
         availability
     }
 
@@ -199,8 +205,7 @@ impl GuiSlashCommandDataSource {
     /// Zap:上游在这里还会隐藏 `/continue-locally`(仅对云端 Oz 会话可见)。cloud→local
     /// 交接链路在本地优先分支已删除,该命令与其 harness 判定一并剥离。
     fn command_passes_gui_gates(&self, command: &StaticCommand) -> bool {
-        // `/fork` 在 V2 云端 composer 里不可用。上游通过 `CLOUD_MODE_V2_COMPOSER` 可用性位
-        // 表达,我方 `Availability` 没有该位,直接判定构造参数与特性开关。
+        // `/fork` 在 V2 云端 composer 里不可用。
         if command.name == commands::FORK.name && self.is_cloud_mode_v2_composer() {
             return false;
         }
