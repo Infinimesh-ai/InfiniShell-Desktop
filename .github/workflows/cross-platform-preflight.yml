@@ -155,9 +155,8 @@ jobs:
         shell: pwsh
         # warp_tui 仍依赖已移除的 Warp 云 API，也不属于桌面版发布产物。
         # integration 需要专用图形会话，此处完成跨平台编译后交由 GUI 测试流程执行。
-        # Windows 服务会话下并发 App 测试会竞争终端进程清理；测试逻辑完成后进程可能不退出。
-        # 编译仍由 Cargo 并行执行，只串行化 nextest 的测试进程，且不跳过任何用例。
-        run: cargo nextest run --test-threads=1 --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
+        # nextest 配置仅串行 Windows 的 warp 主应用测试，其他 crate 仍可并行执行。
+        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
 
       - name: Report sccache statistics
         if: ${{ always() }}

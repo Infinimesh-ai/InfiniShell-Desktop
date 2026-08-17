@@ -3,6 +3,17 @@
 # if it takes 2x as long as the slow timeout (i.e.: 60s total).
 slow-timeout = { period = "30s", terminate-after = 2 }
 
+[test-groups.windows-warp-tests]
+# Windows 服务会话下并发 App 测试会竞争终端进程清理；仅限制这组测试。
+max-threads = 1
+
+[[profile.default.overrides]]
+filter = 'package(warp)'
+platform = { host = 'cfg(target_os = "windows")' }
+test-group = 'windows-warp-tests'
+# Windows 服务会话偶尔会在测试逻辑通过后延迟退出；重试仍会保留真实失败。
+retries = 2
+
 [[profile.default.overrides]]
 filter = 'package(integration)'
 # Integration tests are heavier-weight than unit tests, so have each one

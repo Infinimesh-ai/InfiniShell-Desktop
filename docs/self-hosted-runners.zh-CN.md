@@ -146,6 +146,11 @@ cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2
 ```
 
+Windows 服务会话中的 `warp` 主应用测试由 `.config/nextest.toml` 中的
+`windows-warp-tests` 组限制为单并发，避免终端进程清理竞争；其余 crate 使用 nextest
+默认并发，不要在工作流命令上增加全局 `--test-threads=1`。该组允许最多重试两次，
+用于容忍测试逻辑通过后 Windows 服务会话偶发的进程退出延迟；持续失败仍会阻止发布。
+
 也可以使用 GitHub CLI：
 
 ```bash

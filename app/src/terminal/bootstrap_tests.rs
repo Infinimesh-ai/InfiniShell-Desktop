@@ -282,8 +282,15 @@ foreach ($shell in @('bash', 'zsh')) {
     $shellCommand = Get-Command -Name $shell -CommandType Application -ErrorAction SilentlyContinue |
         Select-Object -First 1
     if ($null -ne $shellCommand) {
-        & $shellCommand.Source -n -c $bootstrapCommand
-        $remoteBootstrapSyntax += $global:LASTEXITCODE -eq 0
+        $syntaxOutput = @(
+            $bootstrapCommand | & $shellCommand.Source -n -s 2>&1 |
+                ForEach-Object { [string]$_ }
+        )
+        $remoteBootstrapSyntax += @{
+            shell = $shell
+            valid = $global:LASTEXITCODE -eq 0
+            output = $syntaxOutput
+        }
     }
 }
 ConvertTo-Json -Compress -Depth 4 -InputObject @{
@@ -427,7 +434,7 @@ ConvertTo-Json -Compress -Depth 4 -InputObject @{
     assert!(
         remote_bootstrap_syntax
             .iter()
-            .all(|value| value == &json!(true)),
+            .all(|value| value["valid"] == json!(true)),
         "远端 bootstrap 语法检查失败: {remote_bootstrap_syntax:?}"
     );
 }
