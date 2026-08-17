@@ -1502,6 +1502,18 @@ fn proxy_destination(config: &OpenSshConfig) -> String {
     }
 }
 
+fn copy_proxy_stream(reader: &mut impl Read, writer: &mut impl Write) -> io::Result<()> {
+    let mut buffer = [0_u8; 8192];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => return Ok(()),
+            Ok(read) => writer.write_all(&buffer[..read])?,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 fn connect_proxy_command(spec: &ProxyProcessSpec) -> Result<ProxyCommandSocket> {
     let listener = TcpListener::bind(("127.0.0.1", 0))?;
     let socket = TcpStream::connect(listener.local_addr()?)?;
@@ -1520,11 +1532,11 @@ fn connect_proxy_command(spec: &ProxyProcessSpec) -> Result<ProxyCommandSocket> 
     let mut child_stdout = child.stdout.take().context("ProxyCommand has no stdout")?;
     let mut upload = relay.try_clone()?;
     thread::spawn(move || {
-        let _ = io::copy(&mut upload, &mut child_stdin);
+        let _ = copy_proxy_stream(&mut upload, &mut child_stdin);
     });
     thread::spawn(move || {
         let mut relay = relay;
-        let _ = io::copy(&mut child_stdout, &mut relay);
+        let _ = copy_proxy_stream(&mut child_stdout, &mut relay);
         let _ = relay.shutdown(Shutdown::Write);
     });
 
