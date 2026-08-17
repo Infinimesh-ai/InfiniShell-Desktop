@@ -183,6 +183,7 @@ fn powershell_ssh_wrapper_classifies_sessions_and_preserves_arguments() {
         "/assets/bundled/bootstrap/pwsh_ssh_wrapper.ps1"
     );
     let script = r#"
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 . $env:WARP_TEST_SSH_HELPER
 $interactive = @(
     [bool](Warp-Test-InteractiveSshSession -SshArgs @('host')),
