@@ -128,29 +128,18 @@ fn main() -> Result<()> {
         }
 
         // These values change copied assets and embedded version metadata without changing sources.
-        println!("cargo:rerun-if-env-changed=CARGO_FULL_PROFILE");
         println!("cargo:rerun-if-env-changed=CARGO_BIN_NAME");
         println!("cargo:rerun-if-env-changed=GIT_RELEASE_TAG");
         println!("cargo:rerun-if-env-changed=WARP_APP_NAME");
-        // Retrieve the Cargo profile name so that we can put a copy of ConPTY in
-        // the correct target subdirectory.
-        //
-        // `CARGO_FULL_PROFILE` is set by bundle scripts for custom profiles (e.g.
-        // release-lto). Fall back to Cargo's built-in `PROFILE` ("debug"/"release")
-        // for direct `cargo build` invocations. See also:
-        // https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
-        //
-        // Ideally we could access `CARGO_TARGET_DIR` but this doesn't exist at build time.
-        // See https://github.com/rust-lang/cargo/issues/9661.
-        let cargo_full_profile = env::var("CARGO_FULL_PROFILE")
-            .or_else(|_| env::var("PROFILE"))
-            .unwrap_or_else(|_| String::from("debug"));
-        let target_dir =
-            app_target_dir(&cargo_full_profile).expect("Could not get app target directory");
-        copy_windows_assets(&target_dir);
+        let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR must be set"));
+        let target_dir = out_dir
+            .ancestors()
+            .nth(3)
+            .expect("Could not get app target directory");
+        copy_windows_assets(target_dir);
 
         #[cfg(windows)]
-        embed_resource_file(&target_dir);
+        embed_resource_file(target_dir);
     }
 
     if target_family == "wasm" {
