@@ -317,14 +317,15 @@ impl<T: SyncQueueTaskTrait> SyncQueue<T> {
     /// causing receivers to resolve to `Err(Canceled)`. The currently executing task
     /// (if any) is aborted via its `AbortHandle`.
     pub fn cancel_all(&self) {
-        // Abort the currently executing task, if any.
+        // 中止活动任务时保持待处理任务表加锁，避免处理器在中止与清空之间提升下一个任务。
+        let mut task_map = self.task_map.lock().unwrap();
         if let Some(handle) = self.active_task_handle.lock().unwrap().take() {
             handle.abort();
         }
 
         // Drain all pending tasks from the map. Dropping the QueuedTask entries
         // drops their oneshot senders, signaling cancellation to receivers.
-        self.task_map.lock().unwrap().clear();
+        task_map.clear();
     }
 
     async fn retry_with_backoff<Fut>(
@@ -369,9 +370,16 @@ impl<T: SyncQueueTaskTrait> SyncQueue<T> {
         broadcast_sender: Option<BroadcastSender<BroadcastResult<T>>>,
     ) {
         while let Some(task_id) = receiver.next().await {
-            // Remove the task from the map. If it's missing, it was cancelled.
-            let Some(mut queued_task) = task_map.lock().unwrap().remove(&task_id) else {
-                continue;
+            // 在 cancel_all 使用的同一把锁内把任务从待处理状态提升为活动状态，
+            // 避免取消操作错过这个状态转换。
+            let (mut queued_task, abort_registration) = {
+                let mut task_map = task_map.lock().unwrap();
+                let Some(queued_task) = task_map.remove(&task_id) else {
+                    continue;
+                };
+                let (abort_handle, abort_registration) = AbortHandle::new_pair();
+                *active_task_handle.lock().unwrap() = Some(abort_handle);
+                (queued_task, abort_registration)
             };
 
             let retry_options = queued_task.retry_options;
@@ -380,9 +388,6 @@ impl<T: SyncQueueTaskTrait> SyncQueue<T> {
             // Wrap the task in Abortable so cancel_all can abort it.
             // Rate limiting is inside the abortable so cancellation also
             // interrupts a task waiting for a rate-limit token.
-            let (abort_handle, abort_registration) = AbortHandle::new_pair();
-            *active_task_handle.lock().unwrap() = Some(abort_handle);
-
             let abortable_result = Abortable::new(
                 async {
                     if let Some(ref rate_limiter) = rate_limit_config {

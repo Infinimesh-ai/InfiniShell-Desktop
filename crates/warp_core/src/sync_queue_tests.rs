@@ -21,6 +21,8 @@ impl IsTransientError for TestError {
 /// before completing.
 struct TestTask {
     id: u32,
+    /// 如果存在，任务开始运行后发送信号。
+    started: Option<oneshot::Sender<()>>,
     /// If set, the task waits for this signal before returning.
     gate: Option<oneshot::Receiver<()>>,
 }
@@ -32,8 +34,12 @@ impl SyncQueueTaskTrait for TestTask {
 
     fn run(&mut self) -> Self::Fut {
         let id = self.id;
+        let started = self.started.take();
         let gate = self.gate.take();
         Box::pin(async move {
+            if let Some(started) = started {
+                let _ = started.send(());
+            }
             if let Some(gate) = gate {
                 let _ = gate.await;
             }
@@ -49,12 +55,37 @@ fn create_queue() -> (SyncQueue<TestTask>, Arc<Background>) {
 }
 
 fn ungated_task(id: u32) -> TestTask {
-    TestTask { id, gate: None }
+    TestTask {
+        id,
+        started: None,
+        gate: None,
+    }
 }
 
 fn gated_task(id: u32) -> (TestTask, oneshot::Sender<()>) {
     let (tx, rx) = oneshot::channel();
-    (TestTask { id, gate: Some(rx) }, tx)
+    (
+        TestTask {
+            id,
+            started: None,
+            gate: Some(rx),
+        },
+        tx,
+    )
+}
+
+fn gated_task_with_start_signal(id: u32) -> (TestTask, oneshot::Sender<()>, oneshot::Receiver<()>) {
+    let (gate_tx, gate_rx) = oneshot::channel();
+    let (started_tx, started_rx) = oneshot::channel();
+    (
+        TestTask {
+            id,
+            started: Some(started_tx),
+            gate: Some(gate_rx),
+        },
+        gate_tx,
+        started_rx,
+    )
 }
 
 #[test]
@@ -116,9 +147,8 @@ fn has_queued_task_does_not_match_executing_task() {
 fn cancel_all_cancels_running_and_queued_tasks() {
     let (queue, _executor) = create_queue();
 
-    // Enqueue a task that blocks — this will be the "running" task.
-    // We intentionally drop gate_tx so the task will never complete on its own.
-    let (blocker, _gate_tx) = gated_task(1);
+    // 加入一个阻塞任务作为活动任务，并保持 gate_tx 存活，确保它不会自行结束。
+    let (blocker, _gate_tx, started_rx) = gated_task_with_start_signal(1);
     let running_rx =
         futures::executor::block_on(queue.enqueue_with_result(blocker, None, "running-task"));
 
@@ -129,8 +159,8 @@ fn cancel_all_cancels_running_and_queued_tasks() {
         "queued-task",
     ));
 
-    // Give the processor time to start executing the first task.
-    std::thread::sleep(Duration::from_millis(50));
+    // 等待第一个任务实际进入活动状态，不依赖调度器时序。
+    futures::executor::block_on(started_rx).expect("running task should start");
 
     // Cancel everything.
     queue.cancel_all();
