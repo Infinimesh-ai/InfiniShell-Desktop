@@ -894,20 +894,6 @@ end
 
 warp_precmd
 
-# Print the MotD if this is a login shell. Normally, login(1) or pam_motd(8)
-# would do this. However, Warp does not use login(1) for local sessions and for
-# remote sessions, SSHD thinks it is starting a non-interactive session, so it
-# does not print PAM messages.
-if status --is-login
-  and test ! -e "$HOME/.hushlogin"
-  for motd_file in /etc/motd /run/motd /run/motd.dynamic /usr/lib/motd /usr/lib/motd.dynamic;
-    if test -r "$motd_file"
-      command cat "$motd_file"
-      break
-    end
-  end
-end
-
 warp_bootstrapped
 
 set -g WARP_BOOTSTRAPPED 1

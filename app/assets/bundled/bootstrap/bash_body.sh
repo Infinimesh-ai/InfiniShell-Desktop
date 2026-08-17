@@ -1225,12 +1225,9 @@ esac
     # bootstrap logic pasted into the PTY and the output of shell startup files.
     warp_precmd
 
-    # Before calling rcfiles, print the MotD.
-    # In general, login(1) or pam_motd(8) is supposed to do this. However, we don't
-    # go through the normal login flow when bootstrapping a Warp session. In
-    # addition, Warp bash shells are _not_ login shells, because bash does not
-    # support custom rcfiles in login shells.
-    if [[ ! -e "$HOME/.hushlogin" ]]; then
+    # SSH wrapper 会绕过 SSHD/PAM 的正常 MotD 输出,因此只为远端会话补打印。
+    # 本地 GUI shell 应与系统终端一致,不主动模拟 login 流程。
+    if [[ "$WARP_IS_SSH" == "1" && ! -e "$HOME/.hushlogin" ]]; then
       for motd_file in /etc/motd /run/motd /run/motd.dynamic /usr/lib/motd /usr/lib/motd.dynamic; do
         if [[ -r "$motd_file" ]]; then
           command -p cat "$motd_file"

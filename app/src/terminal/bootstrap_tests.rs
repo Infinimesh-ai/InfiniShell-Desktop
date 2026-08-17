@@ -64,6 +64,27 @@ fn test_trims_powershell_specifics() {
 }
 
 #[test]
+fn motd_is_scoped_to_ssh_bootstrap() {
+    let bash = include_str!("../../assets/bundled/bootstrap/bash_body.sh");
+    let zsh = include_str!("../../assets/bundled/bootstrap/zsh_body.sh");
+    let fish = include_str!("../../assets/bundled/bootstrap/fish.sh");
+
+    assert!(bash.contains(
+        r#"if [[ "$WARP_IS_SSH" == "1" && ! -e "$HOME/.hushlogin" ]]; then"#
+    ));
+    assert!(zsh.contains(
+        r#"if [[ "$WARP_IS_SSH" == "1" && -o login && ! -e "$HOME/.hushlogin" ]]; then"#
+    ));
+    assert!(!fish.contains(
+        "if status --is-login\n  and test ! -e \"$HOME/.hushlogin\""
+    ));
+
+    for script in [bash, zsh, fish] {
+        assert!(script.contains("Emulate the SSHD logic to print the MotD."));
+    }
+}
+
+#[test]
 fn embeds_the_windows_remote_init_shell_as_bom_free_hex() {
     let script = embed_windows_remote_init_shell(
         format!("before {WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER} after"),
