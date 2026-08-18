@@ -135,6 +135,9 @@ fn remote_shell_probe_rejects_cmd_literal() {
     assert!(!remote_shell_probe_supports_bootstrap(
         "__WARP_REMOTE_SHELL__$SHELL\r\n"
     ));
+    assert!(remote_shell_probe_may_be_windows(
+        "__WARP_REMOTE_SHELL__$SHELL\r\n"
+    ));
 }
 
 #[cfg(unix)]
@@ -143,12 +146,18 @@ fn remote_shell_probe_rejects_empty_powershell_value() {
     assert!(!remote_shell_probe_supports_bootstrap(
         "__WARP_REMOTE_SHELL__\r\n"
     ));
+    assert!(remote_shell_probe_may_be_windows(
+        "__WARP_REMOTE_SHELL__\r\n"
+    ));
 }
 
 #[cfg(unix)]
 #[test]
 fn remote_shell_probe_rejects_unsupported_posix_shell() {
     assert!(!remote_shell_probe_supports_bootstrap(
+        "__WARP_REMOTE_SHELL__/usr/bin/fish\n"
+    ));
+    assert!(!remote_shell_probe_may_be_windows(
         "__WARP_REMOTE_SHELL__/usr/bin/fish\n"
     ));
 }
@@ -189,6 +198,22 @@ fn remote_shell_probe_supports_bootstrap(probe_output: &str) -> bool {
         .arg(probe_output)
         .status()
         .expect("bash 应能执行远端 shell 探测辅助函数")
+        .success()
+}
+
+#[cfg(unix)]
+fn remote_shell_probe_may_be_windows(probe_output: &str) -> bool {
+    let script = format!(
+        "{}\nremote_shell=$(warp_remote_shell_from_probe_output \"$1\")\nwarp_remote_shell_may_be_windows \"$remote_shell\"",
+        include_str!("../../assets/bundled/bootstrap/ssh_remote_shell_probe.sh")
+    );
+    Command::new("bash")
+        .arg("-c")
+        .arg(script)
+        .arg("bootstrap-test")
+        .arg(probe_output)
+        .status()
+        .expect("bash 应能判断远端 shell 是否可能是 Windows")
         .success()
 }
 

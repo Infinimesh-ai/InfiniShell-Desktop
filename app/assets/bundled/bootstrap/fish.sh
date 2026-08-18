@@ -758,7 +758,7 @@ for (\$i = 0; \$i -lt \$bytes.Length; \$i++) { \$bytes[\$i] = [Convert]::ToByte(
                 set control_master_mode "no"
             case '*'
                 set -l remote_powershell
-                if test -z "$remote_shell"; or test "$remote_shell" = '\$SHELL'
+                if test -z "$remote_shell"; or test "$remote_shell" = '$SHELL'
                     set -l capability_probe_command (warp_windows_powershell_capability_probe_command)
                     if test -n "$capability_probe_command"
                         set -l capability_probe_output (command ssh -o ControlMaster=no \

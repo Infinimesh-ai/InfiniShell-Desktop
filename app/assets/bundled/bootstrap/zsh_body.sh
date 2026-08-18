@@ -1057,7 +1057,7 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
           local remote_shell=$(warp_remote_shell_from_probe_output "$remote_shell_probe_output")
           if ! warp_remote_shell_supports_bootstrap "$remote_shell"; then
               local remote_powershell=""
-              if [[ -z "$remote_shell" || "$remote_shell" == '\$SHELL' ]]; then
+              if warp_remote_shell_may_be_windows "$remote_shell"; then
                   local capability_probe_command=$(warp_windows_powershell_capability_probe_command)
                   if [[ -n "$capability_probe_command" ]]; then
                       local capability_probe_output

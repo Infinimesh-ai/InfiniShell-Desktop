@@ -20,6 +20,10 @@ function warp_remote_shell_supports_bootstrap() {
     esac
 }
 
+function warp_remote_shell_may_be_windows() {
+    [[ -z "$1" || "$1" == '$SHELL' ]]
+}
+
 function warp_powershell_encoded_command() {
     if ! command -v iconv >/dev/null 2>&1 || ! command -v base64 >/dev/null 2>&1; then
         return 1
