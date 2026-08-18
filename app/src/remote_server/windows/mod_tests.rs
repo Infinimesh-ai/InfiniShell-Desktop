@@ -17,7 +17,7 @@ fn named_pipe_listener_binds_through_compat_runtime() {
 }
 
 #[test]
-fn named_pipe_round_trip_across_background_runtime() {
+fn named_pipe_multiple_round_trips_across_background_runtime() {
     let identity_key = format!("windows-round-trip-test-{}", uuid::Uuid::new_v4());
     let pipe_name = proxy::pipe_name(&identity_key);
     let listener = bind_listener(pipe_name.clone())
@@ -25,38 +25,54 @@ fn named_pipe_round_trip_across_background_runtime() {
     let executor = Arc::new(Background::default());
     let (server_result_tx, server_result_rx) = std::sync::mpsc::channel();
 
-    let server_task = executor.spawn(async move {
-        let result = async {
-            let stream = listener.accept().compat().await?;
-            let (mut reader, mut writer) = stream.into_split();
-            let mut request = [0; 4];
-            reader.read_exact(&mut request).await?;
-            assert_eq!(&request, b"ping");
-            writer.write_all(b"pong").await?;
-            writer.flush().await
+    let server_task = executor.spawn(
+        async move {
+            let result = async {
+                let stream = listener.accept().compat().await?;
+                let (mut reader, mut writer) = stream.into_split();
+                let mut first_request = [0; 4];
+                reader.read_exact(&mut first_request).await?;
+                assert_eq!(&first_request, b"ping");
+                writer.write_all(b"pong").await?;
+                writer.flush().await?;
+
+                let mut second_request = [0; 4];
+                reader.read_exact(&mut second_request).await?;
+                assert_eq!(&second_request, b"next");
+                writer.write_all(b"done").await?;
+                writer.flush().await
+            }
+            .await;
+            let _ = server_result_tx.send(result);
         }
-        .await;
-        let _ = server_result_tx.send(result);
-    });
+        .compat(),
+    );
 
     let (client_result_tx, client_result_rx) = std::sync::mpsc::channel();
     let client_thread = std::thread::spawn(move || {
-        let result = (|| -> std::io::Result<[u8; 4]> {
+        let result = (|| -> std::io::Result<([u8; 4], [u8; 4])> {
             let mut stream = LocalSocketStream::connect(pipe_name)?;
             stream.write_all(b"ping")?;
             stream.flush()?;
-            let mut response = [0; 4];
-            stream.read_exact(&mut response)?;
-            Ok(response)
+            let mut first_response = [0; 4];
+            stream.read_exact(&mut first_response)?;
+
+            stream.write_all(b"next")?;
+            stream.flush()?;
+            let mut second_response = [0; 4];
+            stream.read_exact(&mut second_response)?;
+
+            Ok((first_response, second_response))
         })();
         let _ = client_result_tx.send(result);
     });
 
-    let response = client_result_rx
+    let (first_response, second_response) = client_result_rx
         .recv_timeout(Duration::from_secs(5))
         .expect("named pipe client should receive a response")
         .expect("named pipe client round trip should succeed");
-    assert_eq!(&response, b"pong");
+    assert_eq!(&first_response, b"pong");
+    assert_eq!(&second_response, b"done");
     server_result_rx
         .recv_timeout(Duration::from_secs(5))
         .expect("named pipe server should finish the response")

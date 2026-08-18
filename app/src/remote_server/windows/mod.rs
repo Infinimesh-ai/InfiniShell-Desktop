@@ -58,13 +58,16 @@ pub(crate) fn launch_daemon(identity_key: &str, ctx: &mut warpui::AppContext) {
                         let (read_half, write_half) = stream.into_split();
                         let spawner = spawner_loop.clone();
                         background_executor
-                            .spawn(super::daemon::handle_daemon_connection(
-                                conn_id,
-                                read_half,
-                                write_half,
-                                spawner,
-                                background_executor.clone(),
-                            ))
+                            .spawn(
+                                super::daemon::handle_daemon_connection(
+                                    conn_id,
+                                    read_half,
+                                    write_half,
+                                    spawner,
+                                    background_executor.clone(),
+                                )
+                                .compat(),
+                            )
                             .detach();
                     }
                     Err(error) => {
