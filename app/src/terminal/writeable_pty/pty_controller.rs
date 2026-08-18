@@ -487,6 +487,21 @@ impl<T: EventLoopSender> PtyController<T> {
         self.write_terminating_bootstrap_bytes(ctx);
     }
 
+    #[cfg(feature = "local_fs")]
+    pub(super) fn source_remote_powershell_bootstrap(
+        &mut self,
+        path_relative_to_home: &str,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let escaped = ShellFamily::PowerShell
+            .escape(path_relative_to_home)
+            .into_owned();
+        self.write_bytes(b" . (Join-Path $HOME ", ctx);
+        self.write_bytes(escaped.into_bytes(), ctx);
+        self.write_bytes(b")", ctx);
+        self.write_terminating_bootstrap_bytes(ctx);
+    }
+
     #[cfg(not(feature = "local_fs"))]
     fn write_bootstrap_script_to_shell(
         &mut self,

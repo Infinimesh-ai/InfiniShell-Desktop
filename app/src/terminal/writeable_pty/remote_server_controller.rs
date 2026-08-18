@@ -9,6 +9,8 @@ use remote_server::setup::{
 use remote_server::transport::Error;
 use settings::Setting;
 use warp_core::SessionId;
+use warp_core::channel::ChannelState;
+use warp_core::safe_warn;
 use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity, WeakModelHandle};
 
 use super::pty_controller::{EventLoopSender, PtyController};
@@ -195,6 +197,25 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             }
             _ => {
                 log::warn!("Remote server PtyController dropped before bootstrap could be flushed");
+            }
+        }
+    }
+
+    fn source_staged_powershell_bootstrap(
+        &mut self,
+        path_relative_to_home: &str,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        match self.pty_controller.upgrade(ctx) {
+            Some(pty) => {
+                pty.update(ctx, |pty, ctx| {
+                    pty.source_remote_powershell_bootstrap(path_relative_to_home, ctx);
+                });
+            }
+            None => {
+                log::warn!(
+                    "Remote server PtyController dropped before staged PowerShell bootstrap could be sourced"
+                );
             }
         }
     }
@@ -451,11 +472,6 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             unreachable!("just matched AwaitingConnect above");
         };
 
-        // Flush the stashed bootstrap now that the server is connected.
-        // `client_for_session` will return `Some` when the session
-        // subsequently initializes, so it picks `RemoteServerCommandExecutor`.
-        self.flush_stashed_bootstrap(session_info, ctx);
-
         let duration_ms = Instant::now()
             .duration_since(setup_start)
             .as_millis()
@@ -484,6 +500,50 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             },
             ctx
         );
+
+        // PowerShell PTYs can drop characters from the large bootstrap script.
+        // Stage it through the already-connected remote server and send only a
+        // short dot-source command to the interactive shell.
+        if session_info.shell.shell_type() == ShellType::PowerShell {
+            let Some((remote_path, path_relative_to_home)) =
+                powershell_bootstrap_paths(ChannelState::app_version())
+            else {
+                self.flush_stashed_bootstrap(session_info, ctx);
+                return;
+            };
+            let Some(host_id) = RemoteServerManager::as_ref(ctx)
+                .host_id_for_session(session_id)
+                .cloned()
+            else {
+                self.flush_stashed_bootstrap(session_info, ctx);
+                return;
+            };
+            let handle = RemoteServerManager::as_ref(ctx).host_request_handle(&host_id);
+            let bootstrap = String::from_utf8(
+                crate::terminal::bootstrap::script_for_shell(ShellType::PowerShell, &crate::ASSETS)
+                    .into_owned(),
+            )
+            .expect("PowerShell bootstrap asset should be UTF-8");
+            ctx.spawn(
+                async move { handle.write_file(remote_path, bootstrap).await },
+                move |me, result, ctx| match result {
+                    Ok(()) => {
+                        me.source_staged_powershell_bootstrap(&path_relative_to_home, ctx);
+                    }
+                    Err(err) => {
+                        safe_warn!(
+                            safe: ("Remote PowerShell bootstrap upload failed; falling back to PTY bootstrap"),
+                            full: ("Remote PowerShell bootstrap upload failed for session {session_id:?}; falling back to PTY bootstrap: {err:#}")
+                        );
+                        me.flush_stashed_bootstrap(session_info, ctx);
+                    }
+                },
+            );
+        } else {
+            // `client_for_session` will return `Some` when the session
+            // subsequently initializes, so it picks `RemoteServerCommandExecutor`.
+            self.flush_stashed_bootstrap(session_info, ctx);
+        }
     }
 
     /// Called when the remote server connection failed. Flushes the stashed
@@ -605,6 +665,24 @@ fn connection_label_for_session_info(session_info: &SessionInfo) -> String {
         .and_then(|ssh| ssh.host.as_deref());
 
     connection_label_from_session_hosts(&session_info.user, &session_info.hostname, ssh_host)
+}
+
+fn powershell_bootstrap_paths(version: Option<&str>) -> Option<(String, String)> {
+    let remote_dir = remote_server::setup::remote_server_dir();
+    let relative_dir = remote_dir.strip_prefix("~/")?;
+    let version = version.unwrap_or("local");
+    let safe_version = version
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    let path_relative_to_home = format!("{relative_dir}/pwsh-bootstrap-{safe_version}.ps1");
+    Some((format!("~/{path_relative_to_home}"), path_relative_to_home))
 }
 
 fn connection_label_from_session_hosts(
