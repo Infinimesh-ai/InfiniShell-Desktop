@@ -18,12 +18,31 @@ pub fn run_daemon(identity_key: String) -> anyhow::Result<()> {
     result
 }
 
-async fn bind_listener(pipe_name: String) -> std::io::Result<LocalSocketListener> {
-    LocalSocketListener::bind(pipe_name)
+fn bind_listener(pipe_name: String) -> std::io::Result<LocalSocketListener> {
+    warpui_core::r#async::block_on(async move { LocalSocketListener::bind(pipe_name) }.compat())
 }
 
 pub(crate) fn launch_daemon(identity_key: &str, ctx: &mut warpui::AppContext) {
     let pipe_name = proxy::pipe_name(identity_key);
+    let listener = match bind_listener(pipe_name) {
+        Ok(listener) => listener,
+        Err(error) => {
+            report_error!(anyhow::Error::new(error).context("Daemon: failed to bind named pipe"));
+            return;
+        }
+    };
+    log::info!("Windows daemon bound to named pipe");
+
+    let timing_data =
+        warp_core::interval_timer::IntervalTimer::handle(ctx).update(ctx, |timer, _| {
+            timer.mark_interval_end("DAEMON_SOCKET_BOUND");
+            timer.compute_stats()
+        });
+    send_telemetry_from_app_ctx!(
+        TelemetryEvent::RemoteServerDaemonStartup { timing_data },
+        ctx
+    );
+
     ctx.add_singleton_model(move |ctx| {
         let spawner = ctx.spawner();
         let exec = ctx.background_executor();
@@ -31,35 +50,6 @@ pub(crate) fn launch_daemon(identity_key: &str, ctx: &mut warpui::AppContext) {
         let background_executor = exec.clone();
 
         exec.spawn(async move {
-            // Windows 的 Tokio named pipe 必须在 Tokio runtime 上下文内创建。
-            // WarpUI 的后台执行器由 Tokio 驱动，因此 bind 必须留在这个 task 内。
-            let listener = match bind_listener(pipe_name).await {
-                Ok(listener) => listener,
-                Err(error) => {
-                    report_error!(
-                        anyhow::Error::new(error).context("Daemon: failed to bind named pipe")
-                    );
-                    return;
-                }
-            };
-            log::info!("Windows daemon bound to named pipe");
-
-            let startup_spawner = spawner_loop.clone();
-            let _ =
-                startup_spawner
-                    .spawn(|_, ctx| {
-                        let timing_data = warp_core::interval_timer::IntervalTimer::handle(ctx)
-                            .update(ctx, |timer, _| {
-                                timer.mark_interval_end("DAEMON_SOCKET_BOUND");
-                                timer.compute_stats()
-                            });
-                        send_telemetry_from_app_ctx!(
-                            TelemetryEvent::RemoteServerDaemonStartup { timing_data },
-                            ctx
-                        );
-                    })
-                    .await;
-
             loop {
                 match listener.accept().compat().await {
                     Ok(stream) => {
