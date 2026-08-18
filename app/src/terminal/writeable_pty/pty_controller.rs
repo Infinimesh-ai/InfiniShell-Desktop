@@ -441,10 +441,15 @@ impl<T: EventLoopSender> PtyController<T> {
                     self.write_terminating_bootstrap_bytes(ctx);
                 }
             }
-        } else if bootstrap::is_container_subshell(pending_session_info) {
-            // Write in 4KB chunks with 50ms delays to avoid overwhelming
-            // PTY buffers in container exec sessions (podman/docker exec -it),
-            // where the double-PTY proxy drops data for large writes.
+        } else if bootstrap::is_container_subshell(pending_session_info)
+            || shell_type == ShellType::PowerShell
+                && pending_session_info
+                    .is_ssh_wrapper_session
+                    .transport()
+                    .is_some()
+        {
+            // 按 4KB 分块并间隔 50ms 写入，避免压垮 PTY 缓冲区。容器 exec
+            // 和 SSH 到 PowerShell 都经过双层 PTY 代理，单次大写入可能丢数据。
             const CHUNK_SIZE: usize = 4096;
             let bytes: Vec<u8> = bootstrap.into_owned();
             let chunks: Vec<Vec<u8>> = bytes.chunks(CHUNK_SIZE).map(|c| c.to_vec()).collect();
@@ -484,21 +489,6 @@ impl<T: EventLoopSender> PtyController<T> {
                 self.write_bytes(b"'", ctx);
             }
         }
-        self.write_terminating_bootstrap_bytes(ctx);
-    }
-
-    #[cfg(feature = "local_fs")]
-    pub(super) fn source_remote_powershell_bootstrap(
-        &mut self,
-        path_relative_to_home: &str,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let escaped = ShellFamily::PowerShell
-            .escape(path_relative_to_home)
-            .into_owned();
-        self.write_bytes(b" . (Join-Path $HOME ", ctx);
-        self.write_bytes(escaped.into_bytes(), ctx);
-        self.write_bytes(b")", ctx);
         self.write_terminating_bootstrap_bytes(ctx);
     }
 
