@@ -2072,7 +2072,7 @@ impl View for RequestedCommandView {
         root_stack.add_child(container);
 
         if self.is_accept_split_button_menu_open {
-            root_stack.add_positioned_child(
+            root_stack.add_positioned_overlay_child(
                 ChildView::new(&self.accept_split_button_menu).finish(),
                 OffsetPositioning::offset_from_save_position_element(
                     Self::get_position_id_for_accept_split_button(&self.position_id_prefix),
