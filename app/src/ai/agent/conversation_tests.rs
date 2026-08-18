@@ -7,8 +7,8 @@ use warpui::{App, SingletonEntity};
 
 use super::{
     AIConversation, AIConversationAutoexecuteMode, AIConversationId, ConversationStatus,
-    ConversationUsageTotals, RestoreConversationError, TaskId, artifact_from_fork_proto,
-    footer_model_token_usage,
+    ConversationTaskGraphDiagnostics, ConversationUsageTotals, RestoreConversationError, TaskId,
+    TaskSetDiagnostics, artifact_from_fork_proto, footer_model_token_usage,
 };
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::SerializedBlockListItem;
@@ -80,6 +80,45 @@ fn byop_silent_cli_subtask_is_reachable_from_root_task() {
             .count(),
         1,
         "silent CLI subtask must be included in the next request snapshot"
+    );
+}
+
+#[test]
+fn task_graph_diagnostics_identify_unreachable_cli_subtask() {
+    let mut conversation = restored_conversation(None);
+    let root_task_id = conversation.get_root_task_id().to_string();
+    let (subtask, _) = super::Task::new_byop_silent_cli_subtask(
+        BlockId::from("long-running-command".to_string()),
+        root_task_id,
+    );
+    conversation.optimistic_cli_subagent_subtask_id = Some(subtask.id().clone());
+    conversation.task_store.insert(subtask);
+
+    let diagnostics = conversation.task_graph_diagnostics();
+
+    assert_eq!(
+        diagnostics,
+        ConversationTaskGraphDiagnostics {
+            stored_task_count: 2,
+            initialized: TaskSetDiagnostics {
+                task_count: 2,
+                message_count: 0,
+                tool_call_count: 0,
+                tool_result_count: 0,
+                subagent_call_count: 0,
+            },
+            active: TaskSetDiagnostics {
+                task_count: 1,
+                message_count: 0,
+                tool_call_count: 0,
+                tool_result_count: 0,
+                subagent_call_count: 0,
+            },
+            tracked_cli_subtask_present: true,
+            tracked_cli_subtask_initialized: true,
+            tracked_cli_subtask_has_parent_edge: false,
+            tracked_cli_subtask_active: false,
+        }
     );
 }
 

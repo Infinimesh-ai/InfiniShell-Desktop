@@ -304,6 +304,62 @@ impl<'de> Deserialize<'de> for CliSubagentBlockSnapshot {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct TaskSetDiagnostics {
+    pub(crate) task_count: usize,
+    pub(crate) message_count: usize,
+    pub(crate) tool_call_count: usize,
+    pub(crate) tool_result_count: usize,
+    pub(crate) subagent_call_count: usize,
+}
+
+impl TaskSetDiagnostics {
+    fn from_tasks<'a>(tasks: impl IntoIterator<Item = &'a api::Task>) -> Self {
+        let mut diagnostics = Self::default();
+        for task in tasks {
+            diagnostics.task_count += 1;
+            diagnostics.message_count += task.messages.len();
+            for message in &task.messages {
+                if let Some(api::message::Message::ToolCall(tool_call)) = &message.message {
+                    diagnostics.tool_call_count += 1;
+                    if matches!(
+                        &tool_call.tool,
+                        Some(api::message::tool_call::Tool::Subagent(_))
+                    ) {
+                        diagnostics.subagent_call_count += 1;
+                    }
+                } else if matches!(
+                    &message.message,
+                    Some(api::message::Message::ToolCallResult(_))
+                ) {
+                    diagnostics.tool_result_count += 1;
+                }
+            }
+        }
+        diagnostics
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ConversationTaskGraphDiagnostics {
+    pub(crate) stored_task_count: usize,
+    pub(crate) initialized: TaskSetDiagnostics,
+    pub(crate) active: TaskSetDiagnostics,
+    pub(crate) tracked_cli_subtask_present: bool,
+    pub(crate) tracked_cli_subtask_initialized: bool,
+    pub(crate) tracked_cli_subtask_has_parent_edge: bool,
+    pub(crate) tracked_cli_subtask_active: bool,
+}
+
+impl ConversationTaskGraphDiagnostics {
+    fn tracked_cli_subtask_is_reachable(&self) -> bool {
+        self.tracked_cli_subtask_present
+            && self.tracked_cli_subtask_initialized
+            && self.tracked_cli_subtask_has_parent_edge
+            && self.tracked_cli_subtask_active
+    }
+}
+
 /// An Agent Mode conversation.
 #[derive(Debug, Clone)]
 pub struct AIConversation {
@@ -1578,6 +1634,49 @@ impl AIConversation {
             .filter(|task| active_task_ids.contains(task.id.as_str()))
             .cloned()
             .collect()
+    }
+
+    pub(crate) fn task_graph_diagnostics(&self) -> ConversationTaskGraphDiagnostics {
+        let initialized_tasks = self
+            .all_tasks()
+            .filter_map(Task::source)
+            .collect::<Vec<_>>();
+        let active_tasks = self.compute_active_tasks();
+        let tracked_cli_subtask = self.optimistic_cli_subagent_subtask_id.as_ref();
+        let tracked_cli_subtask_id = tracked_cli_subtask.map(ToString::to_string);
+        let tracked_cli_subtask_present =
+            tracked_cli_subtask.is_some_and(|task_id| self.task_store.get(task_id).is_some());
+        let tracked_cli_subtask_initialized = tracked_cli_subtask.is_some_and(|task_id| {
+            self.task_store
+                .get(task_id)
+                .and_then(Task::source)
+                .is_some()
+        });
+        let tracked_cli_subtask_has_parent_edge =
+            tracked_cli_subtask_id.as_deref().is_some_and(|task_id| {
+                initialized_tasks
+                    .iter()
+                    .flat_map(|task| task.messages.iter())
+                    .any(|message| {
+                        message
+                            .tool_call()
+                            .and_then(|tool_call| tool_call.subagent())
+                            .is_some_and(|subagent| subagent.task_id == task_id)
+                    })
+            });
+        let tracked_cli_subtask_active = tracked_cli_subtask_id
+            .as_deref()
+            .is_some_and(|task_id| active_tasks.iter().any(|task| task.id == task_id));
+
+        ConversationTaskGraphDiagnostics {
+            stored_task_count: self.task_store.task_count(),
+            initialized: TaskSetDiagnostics::from_tasks(initialized_tasks),
+            active: TaskSetDiagnostics::from_tasks(&active_tasks),
+            tracked_cli_subtask_present,
+            tracked_cli_subtask_initialized,
+            tracked_cli_subtask_has_parent_edge,
+            tracked_cli_subtask_active,
+        }
     }
 
     /// Returns the titles from the CreateDocuments request corresponding to the given action ID (if any).
@@ -3577,6 +3676,54 @@ impl AIConversation {
         // 与上游一致。该字段名仅指"未经 server 确认",和 task 内部存储格式无关。
         self.optimistic_cli_subagent_subtask_id = Some(new_task_id.clone());
         self.task_store.insert(new_task);
+        let diagnostics = self.task_graph_diagnostics();
+        if diagnostics.tracked_cli_subtask_is_reachable() {
+            log::info!(
+                "[byop-lrc] silent CLI subtask linked conversation_id={} parent_task_id={} \
+                 subtask_id={} stored_tasks={} initialized_tasks={} initialized_messages={} \
+                 initialized_tool_calls={} initialized_tool_results={} \
+                 initialized_subagent_calls={} active_tasks={} active_messages={} \
+                 active_tool_calls={} active_tool_results={} active_subagent_calls={}",
+                self.id,
+                parent_task_id,
+                new_task_id,
+                diagnostics.stored_task_count,
+                diagnostics.initialized.task_count,
+                diagnostics.initialized.message_count,
+                diagnostics.initialized.tool_call_count,
+                diagnostics.initialized.tool_result_count,
+                diagnostics.initialized.subagent_call_count,
+                diagnostics.active.task_count,
+                diagnostics.active.message_count,
+                diagnostics.active.tool_call_count,
+                diagnostics.active.tool_result_count,
+                diagnostics.active.subagent_call_count
+            );
+        } else {
+            report_error!(
+                "Silent CLI subtask is not reachable in the conversation task graph",
+                extra: {
+                    "conversation_id" => %self.id,
+                    "parent_task_id" => %parent_task_id,
+                    "subtask_id" => %new_task_id,
+                    "stored_tasks" => %diagnostics.stored_task_count,
+                    "initialized_tasks" => %diagnostics.initialized.task_count,
+                    "initialized_messages" => %diagnostics.initialized.message_count,
+                    "initialized_tool_calls" => %diagnostics.initialized.tool_call_count,
+                    "initialized_tool_results" => %diagnostics.initialized.tool_result_count,
+                    "initialized_subagent_calls" => %diagnostics.initialized.subagent_call_count,
+                    "active_tasks" => %diagnostics.active.task_count,
+                    "active_messages" => %diagnostics.active.message_count,
+                    "active_tool_calls" => %diagnostics.active.tool_call_count,
+                    "active_tool_results" => %diagnostics.active.tool_result_count,
+                    "active_subagent_calls" => %diagnostics.active.subagent_call_count,
+                    "tracked_cli_subtask_present" => %diagnostics.tracked_cli_subtask_present,
+                    "tracked_cli_subtask_initialized" => %diagnostics.tracked_cli_subtask_initialized,
+                    "tracked_cli_subtask_has_parent_edge" => %diagnostics.tracked_cli_subtask_has_parent_edge,
+                    "tracked_cli_subtask_active" => %diagnostics.tracked_cli_subtask_active,
+                }
+            );
+        }
         Ok(new_task_id)
     }
 
