@@ -177,10 +177,7 @@ impl ConversationSelection for AgentViewConversationSelection {
                 BlocklistAIHistoryModel::as_ref(app).conversation(conversation_id)
             })
             .map(|conversation| conversation.autoexecute_override())
-            .unwrap_or_else(|| {
-                BlocklistAIHistoryModel::as_ref(app)
-                    .default_autoexecute_mode(self.terminal_surface_id)
-            })
+            .unwrap_or_default()
     }
 
     fn set_pending_query_autoexecute_override(
@@ -211,11 +208,6 @@ impl ConversationSelection for AgentViewConversationSelection {
             AIConversationAutoexecuteMode::RunToCompletion
         };
         self.set_pending_query_autoexecute_override(mode, ctx);
-        if mode == AIConversationAutoexecuteMode::RespectUserSettings {
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, _| {
-                history.set_default_autoexecute_mode(self.terminal_surface_id, mode);
-            });
-        }
     }
 
     fn handle_history_event(

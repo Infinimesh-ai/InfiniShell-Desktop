@@ -65,8 +65,9 @@ pub enum AgentToolbarItemKind {
     // CLI agent only – opens settings to the Coding Agents section.
     Settings,
 
-    // Agent view only – shows fast-forward (auto-approve) toggle in the footer
-    FastForwardToggle,
+    // Agent view only – selects the current conversation's approval mode.
+    #[serde(alias = "FastForwardToggle", alias = "fast_forward_toggle")]
+    ApprovalModeSelector,
 }
 
 impl AgentToolbarItemKind {
@@ -78,7 +79,7 @@ impl AgentToolbarItemKind {
             Self::ModelSelector
             | Self::NLDToggle
             | Self::ContextWindowUsage
-            | Self::FastForwardToggle => ToolbarAvailability::AgentViewOnly,
+            | Self::ApprovalModeSelector => ToolbarAvailability::AgentViewOnly,
             Self::FileExplorer | Self::RichInput | Self::Settings => {
                 ToolbarAvailability::CLIAgentOnly
             }
@@ -96,7 +97,7 @@ impl AgentToolbarItemKind {
         match self {
             Self::Settings | Self::ShareSession | Self::FileExplorer => !status.is_viewer(),
             Self::FileAttach => !status.is_viewer() || is_ambient_mode,
-            Self::FastForwardToggle => !status.is_viewer() || status.is_executor(),
+            Self::ApprovalModeSelector => !status.is_viewer() || status.is_executor(),
             Self::ContextChip(_)
             | Self::ModelSelector
             | Self::NLDToggle
@@ -118,7 +119,7 @@ impl AgentToolbarItemKind {
             Self::RichInput => crate::t!("ai-toolbar-rich-input"),
             Self::ShareSession => "/remote-control".to_string(),
             Self::Settings => crate::t!("common-settings"),
-            Self::FastForwardToggle => crate::t!("ai-toolbar-fast-forward"),
+            Self::ApprovalModeSelector => crate::t!("ai-toolbar-approval-mode"),
         }
     }
 
@@ -136,7 +137,7 @@ impl AgentToolbarItemKind {
             Self::RichInput => Some(Icon::TextInput),
             Self::ShareSession => Some(Icon::Phone01),
             Self::Settings => Some(Icon::Settings),
-            Self::FastForwardToggle => Some(Icon::FastForward),
+            Self::ApprovalModeSelector => Some(Icon::FastForward),
         }
     }
 
@@ -171,6 +172,7 @@ impl AgentToolbarItemKind {
         let mut items = vec![
             Self::ContextChip(ContextChipKind::AgentPlanAndTodoList),
             Self::ContextWindowUsage,
+            Self::ApprovalModeSelector,
             Self::ModelSelector,
         ];
         items.push(Self::VoiceInput);
@@ -191,8 +193,8 @@ impl AgentToolbarItemKind {
             Self::FileAttach,
             Self::ContextWindowUsage,
         ]);
-        if FeatureFlag::FastForwardAutoexecuteButton.is_enabled() {
-            items.push(Self::FastForwardToggle);
+        if FeatureFlag::AgentApprovalModes.is_enabled() {
+            items.push(Self::ApprovalModeSelector);
         }
         items
     }

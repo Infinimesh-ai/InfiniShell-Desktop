@@ -920,7 +920,7 @@ fn render_auto_approve_button(
     } else if is_active {
         "Turn off auto-approve all agent actions".to_owned()
     } else {
-        "Auto-approve all agent actions for this task".to_owned()
+        crate::t!("ai-footer-auto-approve-agent-actions-for-conversation")
     };
 
     render_warping_indicator_button(

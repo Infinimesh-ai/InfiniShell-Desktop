@@ -215,9 +215,6 @@ pub struct BlocklistAIHistoryModel {
     /// lives in the surface's context/controller models.
     active_conversation_for_terminal_surface: HashMap<EntityId, AIConversationId>,
 
-    /// 当前应用会话内，各终端表面创建新任务时使用的审批模式。
-    default_autoexecute_mode_for_terminal_surface: HashMap<EntityId, AIConversationAutoexecuteMode>,
-
     /// The time at which each terminal surface was created. Note that this
     /// has no bearing on when any [`AIConversation`]s take place for that terminal surface.
     terminal_surface_created_at: HashMap<EntityId, DateTime<Local>>,
@@ -1235,7 +1232,7 @@ impl BlocklistAIHistoryModel {
         let autoexecute_mode = if is_autoexecute_override {
             AIConversationAutoexecuteMode::RunToCompletion
         } else {
-            self.default_autoexecute_mode(terminal_surface_id)
+            AIConversationAutoexecuteMode::RespectUserSettings
         };
         new_conversation.set_autoexecute_override(autoexecute_mode);
         let new_conversation_id = new_conversation.id();
@@ -2453,30 +2450,6 @@ impl BlocklistAIHistoryModel {
         });
     }
 
-    pub fn default_autoexecute_mode(
-        &self,
-        terminal_surface_id: EntityId,
-    ) -> AIConversationAutoexecuteMode {
-        self.default_autoexecute_mode_for_terminal_surface
-            .get(&terminal_surface_id)
-            .copied()
-            .unwrap_or_default()
-    }
-
-    pub fn set_default_autoexecute_mode(
-        &mut self,
-        terminal_surface_id: EntityId,
-        mode: AIConversationAutoexecuteMode,
-    ) {
-        if mode == AIConversationAutoexecuteMode::RespectUserSettings {
-            self.default_autoexecute_mode_for_terminal_surface
-                .remove(&terminal_surface_id);
-        } else {
-            self.default_autoexecute_mode_for_terminal_surface
-                .insert(terminal_surface_id, mode);
-        }
-    }
-
     /// Truncates a conversation from the given exchange ID, removing all exchanges
     /// from that exchange onwards (inclusive). This is a lossy operation.
     ///
@@ -2769,25 +2742,6 @@ impl BlocklistAIHistoryModel {
         }
 
         Ok(merged)
-    }
-
-    /// Clears all stored conversation-related data in memory.
-    /// This is used when logging out to ensure no AI history persists across users.
-    pub(crate) fn reset(&mut self) {
-        self.live_conversation_ids_for_terminal_surface.clear();
-        self.cleared_conversation_ids_for_terminal_surface.clear();
-        self.conversations_by_id.clear();
-        self.active_conversation_for_terminal_surface.clear();
-        self.default_autoexecute_mode_for_terminal_surface.clear();
-        self.ambient_agent_terminal_surface_ids.clear();
-        self.conversation_transcript_viewer_terminal_surface_ids
-            .clear();
-        self.persisted_queries.clear();
-        self.prompt_history.clear();
-        self.all_conversations_metadata.clear();
-        self.agent_id_to_conversation_id.clear();
-        self.server_token_to_conversation_id.clear();
-        self.children_by_parent.clear();
     }
 }
 
