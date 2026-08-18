@@ -197,7 +197,7 @@ pub fn script_for_shell(shell_type: ShellType, assets: &dyn AssetProvider) -> Co
                 })
                 .join("\n");
 
-            script = embed_windows_remote_init_shell(script, assets);
+            script = embed_windows_remote_init_shell(script, assets, shell_type);
 
             // Make sure there's a newline at the end of the bootstrap script,
             // otherwise we'll never submit the final line to the shell.
@@ -208,8 +208,14 @@ pub fn script_for_shell(shell_type: ShellType, assets: &dyn AssetProvider) -> Co
 }
 
 const WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER: &str = "@@WARP_WINDOWS_REMOTE_INIT_SHELL_HEX@@";
+// macOS canonical PTY 输入单行上限为 1024 字节；zsh bootstrap 仍在该模式下读取 heredoc。
+const ZSH_REMOTE_INIT_SHELL_HEX_CHUNK_SIZE: usize = 512;
 
-fn embed_windows_remote_init_shell(script: String, assets: &dyn AssetProvider) -> String {
+fn embed_windows_remote_init_shell(
+    script: String,
+    assets: &dyn AssetProvider,
+    shell_type: ShellType,
+) -> String {
     if !script.contains(WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER) {
         return script;
     }
@@ -221,10 +227,24 @@ fn embed_windows_remote_init_shell(script: String, assets: &dyn AssetProvider) -
         .expect("PowerShell init shell should be UTF-8")
         .trim_start_matches(BYTE_ORDER_MARK)
         .replace("@@USING_CON_PTY_BOOLEAN@@", &(cfg!(windows).to_string()));
-    script.replace(
-        WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER,
-        &hex::encode(init_shell),
-    )
+    let init_shell_hex = hex::encode(init_shell);
+    let init_shell_hex = match shell_type {
+        ShellType::Zsh => zsh_safe_remote_init_shell_hex(&init_shell_hex),
+        ShellType::Bash | ShellType::Fish | ShellType::PowerShell => init_shell_hex,
+    };
+    script.replace(WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER, &init_shell_hex)
+}
+
+fn zsh_safe_remote_init_shell_hex(init_shell_hex: &str) -> String {
+    let mut result = String::with_capacity(init_shell_hex.len());
+    for start in (0..init_shell_hex.len()).step_by(ZSH_REMOTE_INIT_SHELL_HEX_CHUNK_SIZE) {
+        if start > 0 {
+            result.push_str("'\n    init_shell_hex+='");
+        }
+        let end = (start + ZSH_REMOTE_INIT_SHELL_HEX_CHUNK_SIZE).min(init_shell_hex.len());
+        result.push_str(&init_shell_hex[start..end]);
+    }
+    result
 }
 
 /// Generates a cryptographically random session ID for use as both a session

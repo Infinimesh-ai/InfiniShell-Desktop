@@ -89,11 +89,27 @@ fn embeds_the_windows_remote_init_shell_as_bom_free_hex() {
     let script = embed_windows_remote_init_shell(
         format!("before {WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER} after"),
         &TestAssetProvider,
+        ShellType::Bash,
     );
 
     assert_eq!(
         script,
         "before 57726974652d4f7574707574202772656d6f746527 after"
+    );
+}
+
+#[test]
+fn zsh_windows_remote_init_shell_stays_within_macos_canonical_line_limit() {
+    let script = embed_windows_remote_init_shell(
+        format!("local init_shell_hex='{WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER}'"),
+        &crate::ASSETS,
+        ShellType::Zsh,
+    );
+
+    assert_eq!(
+        script.lines().find(|line| line.len() >= 1024),
+        None,
+        "zsh bootstrap lines must fit within macOS MAX_CANON"
     );
 }
 
