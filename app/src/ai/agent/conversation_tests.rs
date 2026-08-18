@@ -45,6 +45,44 @@ fn restored_conversation(conversation_data: Option<AgentConversationData>) -> AI
     .unwrap()
 }
 
+#[test]
+fn byop_silent_cli_subtask_is_reachable_from_root_task() {
+    use crate::ai::agent::task::helper::{MessageExt as _, ToolCallExt as _};
+
+    let mut conversation = restored_conversation(None);
+    let root_task_id = conversation.get_root_task_id().to_string();
+    let block_id = BlockId::from("long-running-command".to_string());
+
+    let subtask_id = conversation
+        .create_optimistic_cli_subagent_task_silent(&block_id)
+        .expect("silent CLI subtask should be created");
+    let subtask_id_string = subtask_id.to_string();
+
+    let active_tasks = conversation.compute_active_tasks();
+    let root_task = active_tasks
+        .iter()
+        .find(|task| task.id == root_task_id)
+        .expect("root task should remain active");
+    let linked_subtask_id = root_task
+        .messages
+        .iter()
+        .filter_map(|message| message.tool_call())
+        .filter_map(|tool_call| tool_call.subagent())
+        .find_map(|subagent| {
+            (subagent.task_id == subtask_id_string).then_some(subagent.task_id.as_str())
+        });
+
+    assert_eq!(linked_subtask_id, Some(subtask_id_string.as_str()));
+    assert_eq!(
+        active_tasks
+            .iter()
+            .filter(|task| task.id == subtask_id_string)
+            .count(),
+        1,
+        "silent CLI subtask must be included in the next request snapshot"
+    );
+}
+
 fn conversation_data_with_provider_cost(
     total_provider_cost_in_cents: Option<f32>,
 ) -> AgentConversationData {

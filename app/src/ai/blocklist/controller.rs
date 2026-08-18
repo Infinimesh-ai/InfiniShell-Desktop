@@ -2039,12 +2039,12 @@ impl BlocklistAIController {
                     filled_count += 1;
                 }
             }
-            log::info!(
+            log::debug!(
                 "[byop-diag] LRC running_command filled: {filled_count}/{total_inputs} \
-                 UserQuery slot(s); should_spawn={} grid_contents_len={} command={:?} is_alt_screen={}",
+                 UserQuery slot(s); should_spawn={} grid_contents_len={} command_len={} is_alt_screen={}",
                 request_params.lrc_should_spawn_subagent,
                 running_command.grid_contents.len(),
-                running_command.command,
+                running_command.command.len(),
                 running_command.is_alt_screen_active
             );
         } else {

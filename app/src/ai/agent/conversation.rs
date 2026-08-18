@@ -3547,24 +3547,37 @@ impl AIConversation {
     ///    自己控制 emit 时机。
     ///
     /// 实现:`Task::new_byop_silent_cli_subtask` 本地合成 `api::Task` + 合成
-    /// `SubagentParams { command_id }`,task 一开始就 Server-backed。dependencies 指向
-    /// root task 让 conversation tree 完整。**不 emit CreatedSubtask**,由调用方
-    /// (cli_controller)在升级 block 后手动 emit `SpawnedSubagent` 创建浮窗。
-    pub fn create_optimistic_cli_subagent_task_silent(&mut self, block_id: &BlockId) -> TaskId {
-        if self.optimistic_cli_subagent_subtask_id.take().is_some() {
-            log::error!(
+    /// `SubagentParams { command_id }`,task 一开始就 Server-backed;同时在 root task
+    /// 写入虚拟 `Subagent` ToolCall,让 `compute_active_tasks` 能沿任务图找到该 subtask。
+    /// **不 emit CreatedSubtask**,由调用方(cli_controller)在升级 block 后手动 emit
+    /// `SpawnedSubagent` 创建浮窗。
+    pub fn create_optimistic_cli_subagent_task_silent(
+        &mut self,
+        block_id: &BlockId,
+    ) -> Result<TaskId, UpdateConversationError> {
+        if self.optimistic_cli_subagent_subtask_id.is_some() {
+            report_error!(
                 "Tried to optimistically create new subtask for CLI agent when one exists already."
             );
         }
 
-        let parent_task_id = String::from(self.task_store.root_task_id().clone());
-        let new_task = Task::new_byop_silent_cli_subtask(block_id.clone(), parent_task_id);
+        let parent_task_id = self.task_store.root_task_id().clone();
+        let (new_task, parent_tool_call) = Task::new_byop_silent_cli_subtask(
+            block_id.clone(),
+            String::from(parent_task_id.clone()),
+        );
         let new_task_id = new_task.id().clone();
+        self.task_store
+            .modify_task(&parent_task_id, |task| {
+                task.append_source_messages(vec![parent_tool_call])
+            })
+            .ok_or(UpdateConversationError::TaskNotFound)??;
         // 仍然记录到 optimistic_cli_subagent_subtask_id,保持
         // `has_active_subagent`、`controller.rs:1107-1130` 的 LRC subtask 检测路径
-        // 与上游一致。该字段名仅指"未经 server 确认",和 task 内部存储格式无关。        self.optimistic_cli_subagent_subtask_id = Some(new_task_id.clone());
+        // 与上游一致。该字段名仅指"未经 server 确认",和 task 内部存储格式无关。
+        self.optimistic_cli_subagent_subtask_id = Some(new_task_id.clone());
         self.task_store.insert(new_task);
-        new_task_id
+        Ok(new_task_id)
     }
 
     /// Marks an optimistic CLI subagent active without emitting UI events.

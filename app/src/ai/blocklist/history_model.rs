@@ -1280,7 +1280,9 @@ impl BlocklistAIHistoryModel {
             .conversations_by_id
             .get_mut(&conversation_id)
             .ok_or(UpdateHistoryError::ConversationNotFound(conversation_id))?;
-        Ok(conversation.create_optimistic_cli_subagent_task_silent(&block_id))
+        conversation
+            .create_optimistic_cli_subagent_task_silent(&block_id)
+            .map_err(UpdateHistoryError::from)
     }
 
     pub fn update_conversation_status(
