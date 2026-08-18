@@ -1,7 +1,5 @@
 //! remote-server daemon 的跨平台连接处理。
 
-#[cfg(target_os = "windows")]
-use async_compat::CompatExt as _;
 use futures::io::{AsyncRead, AsyncWrite, AsyncWriteExt, BufReader, BufWriter};
 use warp_errors::report_error;
 use warpui::r#async::executor;
@@ -32,7 +30,7 @@ pub(super) async fn handle_daemon_connection<R, W>(
 
     let mut writer = BufWriter::new(write_half);
     let spawner_reader = spawner.clone();
-    let reader_task = async move {
+    exec.spawn(async move {
         let mut reader = BufReader::new(read_half);
         loop {
             match remote_server::protocol::read_client_message(&mut reader).await {
@@ -74,10 +72,8 @@ pub(super) async fn handle_daemon_connection<R, W>(
                 me.deregister_connection(conn_id, ctx);
             })
             .await;
-    };
-    #[cfg(target_os = "windows")]
-    let reader_task = reader_task.compat();
-    exec.spawn(reader_task).detach();
+    })
+    .detach();
 
     while let Ok(msg) = conn_rx.recv().await {
         if let Err(e) = remote_server::protocol::write_server_message(&mut writer, &msg).await {
