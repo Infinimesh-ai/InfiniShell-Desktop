@@ -451,7 +451,11 @@ impl<T: EventLoopSender> PtyController<T> {
             // 按 4KB 分块并间隔 50ms 写入，避免压垮 PTY 缓冲区。容器 exec
             // 和 SSH 到 PowerShell 都经过双层 PTY 代理，单次大写入可能丢数据。
             const CHUNK_SIZE: usize = 4096;
-            let bytes: Vec<u8> = bootstrap.into_owned();
+            let bytes = if shell_type == ShellType::PowerShell {
+                normalize_powershell_pty_line_endings(bootstrap.into_owned())
+            } else {
+                bootstrap.into_owned()
+            };
             let chunks: Vec<Vec<u8>> = bytes.chunks(CHUNK_SIZE).map(|c| c.to_vec()).collect();
             for (i, chunk) in chunks.into_iter().enumerate() {
                 ctx.spawn(
@@ -818,6 +822,15 @@ fn wrap_bytes_in_bracketed_paste(bytes: impl IntoIterator<Item = u8>) -> impl It
         .copied()
         .chain(bytes)
         .chain(escape_sequences::BRACKETED_PASTE_END.iter().copied())
+}
+
+/// PowerShell 的交互式 PTY 把 LF 解释为续行输入，只有 CR 会提交当前行。
+fn normalize_powershell_pty_line_endings(bytes: Vec<u8>) -> Vec<u8> {
+    let script = String::from_utf8(bytes).expect("PowerShell bootstrap should be UTF-8");
+    LINEFEED_REGEX
+        .replace_all(&script, "\r")
+        .into_owned()
+        .into_bytes()
 }
 
 #[cfg(test)]

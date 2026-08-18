@@ -61,3 +61,13 @@ fn powershell_command_execution_normalizes_linefeeds_to_carriage_returns() {
     assert_eq!(bytes, expected);
     assert!(!bytes.contains(&b'\n'));
 }
+
+#[test]
+fn powershell_ssh_bootstrap_normalizes_linefeeds_to_carriage_returns() {
+    let bootstrap = b"function Test-Warp {\r\n  Write-Output 'ready'\n}\n".to_vec();
+
+    let bytes = normalize_powershell_pty_line_endings(bootstrap);
+
+    assert_eq!(bytes, b"function Test-Warp {\r  Write-Output 'ready'\r}\r");
+    assert!(!bytes.contains(&b'\n'));
+}
