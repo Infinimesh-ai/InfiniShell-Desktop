@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use instant::Instant;
+use remote_server::HostId;
 use remote_server::auth::RemoteServerAuthContext;
+use remote_server::proto::{WriteFile, host_scoped_request};
 use remote_server::setup::{
     PreinstallCheckResult, PreinstallStatus, RemoteLibc, RemoteOs, RemotePlatform,
     UnsupportedReason,
@@ -136,8 +138,11 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             } => {
                 me.on_binary_install_complete(*session_id, result.clone(), ctx);
             }
-            RemoteServerManagerEvent::SessionConnected { session_id, .. } => {
-                me.on_session_connected(*session_id, ctx);
+            RemoteServerManagerEvent::SessionConnected {
+                session_id,
+                host_id,
+            } => {
+                me.on_session_connected(*session_id, host_id.clone(), ctx);
             }
             RemoteServerManagerEvent::SessionConnectionFailed { session_id, .. } => {
                 me.on_session_connection_failed(*session_id, ctx);
@@ -451,7 +456,12 @@ impl<T: EventLoopSender> RemoteServerController<T> {
     /// Called when the remote server session is connected. Flushes the
     /// stashed bootstrap (so the session initializes with a live client)
     /// and emits the `RemoteServerSetupDuration` telemetry event.
-    fn on_session_connected(&mut self, session_id: SessionId, ctx: &mut ModelContext<Self>) {
+    fn on_session_connected(
+        &mut self,
+        session_id: SessionId,
+        host_id: HostId,
+        ctx: &mut ModelContext<Self>,
+    ) {
         let SshInitState::AwaitingConnect {
             session_id: expected,
             ..
@@ -511,21 +521,29 @@ impl<T: EventLoopSender> RemoteServerController<T> {
                 self.flush_stashed_bootstrap(session_info, ctx);
                 return;
             };
-            let Some(host_id) = RemoteServerManager::as_ref(ctx)
-                .host_id_for_session(session_id)
-                .cloned()
-            else {
-                self.flush_stashed_bootstrap(session_info, ctx);
-                return;
-            };
-            let handle = RemoteServerManager::as_ref(ctx).host_request_handle(&host_id);
             let bootstrap = String::from_utf8(
                 crate::terminal::bootstrap::script_for_shell(ShellType::PowerShell, &crate::ASSETS)
                     .into_owned(),
             )
             .expect("PowerShell bootstrap asset should be UTF-8");
+            log::info!("Staging remote PowerShell bootstrap: session={session_id:?}");
+            let response = RemoteServerManager::handle(ctx).update(ctx, |mgr, _ctx| {
+                mgr.send_host_scoped_request(
+                    &host_id,
+                    host_scoped_request::Message::WriteFile(WriteFile {
+                        path: remote_path,
+                        content: bootstrap,
+                    }),
+                )
+            });
             ctx.spawn(
-                async move { handle.write_file(remote_path, bootstrap).await },
+                async move {
+                    let message = response
+                        .await
+                        .map_err(|_| "remote PowerShell bootstrap response channel closed".to_string())?
+                        .map_err(|err| err.to_string())?;
+                    remote_server::host_response::write_file_result(&message)
+                },
                 move |me, result, ctx| match result {
                     Ok(()) => {
                         me.source_staged_powershell_bootstrap(&path_relative_to_home, ctx);
