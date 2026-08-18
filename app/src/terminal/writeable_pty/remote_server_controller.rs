@@ -84,6 +84,8 @@ pub struct RemoteServerController<T: EventLoopSender> {
     /// Outcome of the preinstall check from the binary check phase,
     /// used for telemetry on the supported path.
     preinstall_check: Option<PreinstallCheckResult>,
+    /// 当前 SSH 初始化流程是否已经把 shell bootstrap 交给 PTY。
+    bootstrap_flushed: bool,
 }
 
 impl<T: EventLoopSender> Entity for RemoteServerController<T> {
@@ -181,12 +183,17 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             did_install: false,
             remote_platform: None,
             preinstall_check: None,
+            bootstrap_flushed: false,
         }
     }
 
     /// Extracts the `SessionInfo` from the stash and writes the bootstrap
     /// script to the PTY via `PtyController::initialize_shell`.
     fn flush_stashed_bootstrap(&mut self, session_info: SessionInfo, ctx: &mut ModelContext<Self>) {
+        if self.bootstrap_flushed {
+            return;
+        }
+        self.bootstrap_flushed = true;
         match self.pty_controller.upgrade(ctx) {
             Some(pty) => {
                 pty.update(ctx, |pty, ctx| {
@@ -233,6 +240,8 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             ),
             SshSessionTransportDescriptor::Unavailable => return,
         };
+        let early_bootstrap =
+            (info.shell.shell_type() == ShellType::PowerShell).then(|| info.clone());
         debug_assert!(matches!(self.state, SshInitState::Idle));
         match std::mem::replace(&mut self.state, SshInitState::Idle) {
             SshInitState::Idle => {}
@@ -255,6 +264,7 @@ impl<T: EventLoopSender> RemoteServerController<T> {
                 self.flush_stashed_bootstrap(old_info, ctx);
             }
         }
+        self.bootstrap_flushed = false;
         self.did_install = false;
         self.remote_platform = None;
         self.preinstall_check = None;
@@ -263,6 +273,9 @@ impl<T: EventLoopSender> RemoteServerController<T> {
             transport: transport.clone(),
             setup_start: Instant::now(),
         };
+        if let Some(session_info) = early_bootstrap {
+            self.flush_stashed_bootstrap(session_info, ctx);
+        }
         RemoteServerManager::handle(ctx).update(ctx, |mgr, ctx| {
             mgr.check_binary(session_id, transport, ctx);
         });
