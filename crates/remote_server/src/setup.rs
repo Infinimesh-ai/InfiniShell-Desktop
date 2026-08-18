@@ -564,6 +564,29 @@ pub fn binary_check_command_for(os: &RemoteOs) -> RemoteSetupCommand {
     }
 }
 
+/// 返回检查远端是否存在任一旧版 remote-server 二进制的命令。
+///
+/// 不能只检查安装目录：上传中的临时压缩包也会创建该目录，把它当成旧安装会让
+/// 同时打开的第二个 SSH 会话错误显示为“正在升级”。
+pub fn old_binary_check_command_for(os: &RemoteOs) -> RemoteSetupCommand {
+    match os {
+        RemoteOs::Linux | RemoteOs::MacOs => RemoteSetupCommand::posix(format!(
+            "for path in {}/{}*; do [ -f \"$path\" ] && exit 0; done; exit 1",
+            remote_server_dir(),
+            binary_name(),
+        )),
+        RemoteOs::Windows => {
+            let relative_dir = remote_server_relative_dir().replace('/', "\\");
+            let binary_pattern = format!("{}*.exe", binary_name());
+            RemoteSetupCommand::powershell(format!(
+                "$dir = Join-Path $HOME '{}'; $binary = Get-ChildItem -LiteralPath $dir -File -Filter '{}' -ErrorAction SilentlyContinue | Select-Object -First 1; if ($null -ne $binary) {{ exit 0 }} else {{ exit 1 }}",
+                relative_dir.replace('\'', "''"),
+                binary_pattern.replace('\'', "''"),
+            ))
+        }
+    }
+}
+
 /// Returns the shell command to remove the current remote-server binary.
 ///
 /// The global bundled resources directory is deliberately left in place:

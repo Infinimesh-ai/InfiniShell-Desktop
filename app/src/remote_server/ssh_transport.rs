@@ -315,12 +315,23 @@ impl SshTransport {
             uuid::Uuid::new_v4(),
             archive_extension,
         );
-        self.upload_file(
-            local_archive,
-            &remote_path,
-            remote_server::setup::SCP_INSTALL_TIMEOUT,
-        )
-        .await?;
+        if let Some((socket_path, _)) = self.control_master() {
+            remote_server::ssh::scp_upload(
+                socket_path,
+                local_archive,
+                &remote_path,
+                remote_server::setup::SCP_INSTALL_TIMEOUT,
+            )
+            .await
+            .map_err(Error::Other)?;
+        } else {
+            self.upload_file(
+                local_archive,
+                &remote_path,
+                remote_server::setup::SCP_INSTALL_TIMEOUT,
+            )
+            .await?;
+        }
         self.install_for_platform(platform, Some(&remote_path))
             .await
     }
@@ -840,29 +851,7 @@ impl RemoteTransport for SshTransport {
     fn check_has_old_binary(&self) -> Pin<Box<dyn Future<Output = anyhow::Result<bool>> + Send>> {
         let transport = self.clone();
         Box::pin(async move {
-            // Treat the existence of the remote-server install directory
-            // itself as evidence of a prior install. If `~/.warp-XX/remote-server`
-            // exists, something was installed there before, so any mismatch
-            // with the client's expected binary path should be auto-updated
-            // rather than surfaced as a first-time install prompt.
-            let command = match transport.remote_os {
-                RemoteOs::Linux | RemoteOs::MacOs => RemoteSetupCommand {
-                    dialect: RemoteShellDialect::Posix,
-                    script: format!("test -d {}", remote_server::setup::remote_server_dir()),
-                },
-                RemoteOs::Windows => {
-                    let relative_dir = remote_server::setup::remote_server_dir()
-                        .trim_start_matches("~/")
-                        .replace('/', "\\");
-                    RemoteSetupCommand {
-                        dialect: RemoteShellDialect::PowerShell,
-                        script: format!(
-                            "$dir = Join-Path $HOME '{}'; if (Test-Path -LiteralPath $dir -PathType Container) {{ exit 0 }} else {{ exit 1 }}",
-                            relative_dir.replace('\'', "''")
-                        ),
-                    }
-                }
-            };
+            let command = remote_server::setup::old_binary_check_command_for(&transport.remote_os);
             let output = transport
                 .run_setup_command(command, remote_server::setup::CHECK_TIMEOUT)
                 .await
