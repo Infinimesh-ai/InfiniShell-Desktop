@@ -919,6 +919,15 @@ pub enum FeatureFlag {
     /// 允许 BYOP OpenAI Responses provider 使用官方 Multi-agent Beta 协议。
     /// Provider 配置仍需显式开启，稳定通道默认不启用该实验能力。
     ResponsesMultiAgentBeta,
+
+    /// Observes Ctrl-C (`0x03`) written on the shared-session viewer input
+    /// path to a terminal with a working, rich-status-capable CLI agent
+    /// session (e.g. Claude Code). Arms a short grace window; if no further
+    /// plugin activity is seen, the session (and its ambient task) resolves
+    /// to `Cancelled`. Purely client-side status synthesis: the keystroke is
+    /// always forwarded unchanged and the harness process/sandbox are never
+    /// signaled or torn down.
+    CtrlCCancelsThirdPartyHarness,
 }
 
 static FLAG_STATES: [AtomicBool; cardinality::<FeatureFlag>()] =
@@ -996,6 +1005,7 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::WellKnownMcpIds,
     FeatureFlag::TuiCostTransparency,
     FeatureFlag::ResponsesMultiAgentBeta,
+    FeatureFlag::CtrlCCancelsThirdPartyHarness,
 ];
 
 /// Features enabled for feature preview build users (e.g.: Friends of Zap).

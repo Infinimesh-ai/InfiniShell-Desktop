@@ -1435,6 +1435,142 @@ fn focus_reporting_writes_focus_events_in_normal_screen() {
 // Zap:`input_operations_for_buffer_content` 只服务于已删除的 Cloud Mode Setup V2
 // 输入同步测试,随之移除。
 
+/// Registers a rich-status-capable, `InProgress` CLI agent session that has
+/// already observed a `prompt_submit` -- the state a real working third-party
+/// harness turn is in -- so `observe_ctrl_c_write` is able to arm.
+fn register_armable_cli_agent_session(app: &mut App, view_id: EntityId) {
+    let cli_sessions = CLIAgentSessionsModel::handle(app);
+    cli_sessions.update(app, |sessions, ctx| {
+        sessions.set_session(
+            view_id,
+            CLIAgentSession {
+                agent: CLIAgent::Claude,
+                status: CLIAgentSessionStatus::InProgress,
+                session_context: CLIAgentSessionContext::default(),
+                input_state: CLIAgentInputState::Closed,
+                should_auto_toggle_input: false,
+                listener: None,
+                plugin_version: None,
+                remote_host: None,
+                draft_text: None,
+                custom_command_prefix: None,
+                received_rich_notification: true,
+            },
+            ctx,
+        );
+    });
+    cli_sessions.update(app, |sessions, ctx| {
+        sessions.update_from_event(
+            view_id,
+            &CLIAgentEvent {
+                v: 1,
+                agent: CLIAgent::Claude,
+                event: CLIAgentEventType::PromptSubmit,
+                session_id: None,
+                cwd: None,
+                project: None,
+                payload: CLIAgentEventPayload::default(),
+                source: CLIAgentEventSource::RichPlugin,
+            },
+            ctx,
+        );
+    });
+}
+
+#[test]
+fn ctrl_c_from_shared_viewer_forwards_and_arms_cancel_window() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _flag = FeatureFlag::CtrlCCancelsThirdPartyHarness.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let view_id = terminal.id();
+        let pty_writes: Rc<RefCell<Vec<Vec<u8>>>> = Rc::new(RefCell::new(Vec::new()));
+        let writes = pty_writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::WriteBytesToPty { bytes } = event {
+                    writes.borrow_mut().push(bytes.to_vec());
+                }
+            });
+        });
+
+        register_armable_cli_agent_session(&mut app, view_id);
+        terminal.update(&mut app, |view, ctx| {
+            view.model.lock().simulate_long_running_block("claude", "");
+            view.write_viewer_bytes_to_pty(vec![0x03], ctx);
+        });
+
+        assert_eq!(
+            *pty_writes.borrow(),
+            vec![vec![0x03]],
+            "Ctrl-C must still be forwarded to the pty unchanged"
+        );
+        let armed = CLIAgentSessionsModel::handle(&app).read(&app, |sessions, _| {
+            sessions.has_pending_or_resolved_ctrl_c_cancel(view_id)
+        });
+        assert!(
+            armed,
+            "a forwarded Ctrl-C to a working rich-status session should arm the cancel window"
+        );
+    })
+}
+
+#[test]
+fn ctrl_c_from_shared_viewer_rejected_by_agent_in_control_does_not_arm_cancel_window() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _flag = FeatureFlag::CtrlCCancelsThirdPartyHarness.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let view_id = terminal.id();
+        let pty_writes: Rc<RefCell<Vec<Vec<u8>>>> = Rc::new(RefCell::new(Vec::new()));
+        let writes = pty_writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::WriteBytesToPty { bytes } = event {
+                    writes.borrow_mut().push(bytes.to_vec());
+                }
+            });
+        });
+
+        register_armable_cli_agent_session(&mut app, view_id);
+        terminal.update(&mut app, |view, ctx| {
+            {
+                let mut model = view.model.lock();
+                model.simulate_long_running_block("claude", "");
+                let task_id = TaskId::new("test-task".to_owned());
+                model
+                    .block_list_mut()
+                    .active_block_mut()
+                    .set_agent_interaction_mode_for_agent_monitored_command(
+                        &task_id,
+                        AIConversationId::new(),
+                    )
+                    .expect("user-mode block should become agent-monitored");
+                assert!(
+                    model.block_list().active_block().is_agent_in_control(),
+                    "active block should be agent-controlled for this test"
+                );
+            }
+
+            // `write_user_bytes_to_pty` rejects writes while the agent is in
+            // control of the command, so this Ctrl-C never reaches the pty.
+            view.write_viewer_bytes_to_pty(vec![0x03], ctx);
+        });
+
+        assert!(
+            pty_writes.borrow().is_empty(),
+            "a rejected write must not reach the pty"
+        );
+        let armed = CLIAgentSessionsModel::handle(&app).read(&app, |sessions, _| {
+            sessions.has_pending_or_resolved_ctrl_c_cancel(view_id)
+        });
+        assert!(
+            !armed,
+            "a Ctrl-C that never reached the pty must not arm the cancel window"
+        );
+    })
+}
+
 fn exchange_with_inputs(inputs: Vec<AIAgentInput>) -> AIAgentExchange {
     AIAgentExchange {
         id: AIAgentExchangeId::new(),
