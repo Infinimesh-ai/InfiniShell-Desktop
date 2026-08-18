@@ -1,6 +1,9 @@
 use super::*;
 
+use std::io::Read as _;
+
 use command::blocking::Command;
+use flate2::read::GzDecoder;
 use serde_json::json;
 
 struct TestAssetProvider;
@@ -85,23 +88,33 @@ fn motd_is_scoped_to_ssh_bootstrap() {
 }
 
 #[test]
-fn embeds_the_windows_remote_init_shell_as_bom_free_hex() {
+fn embeds_the_windows_remote_init_shell_as_bom_free_gzip_base64() {
     let script = embed_windows_remote_init_shell(
-        format!("before {WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER} after"),
+        format!("before {WINDOWS_REMOTE_INIT_SHELL_GZIP_BASE64_PLACEHOLDER} after"),
         &TestAssetProvider,
         ShellType::Bash,
     );
 
-    assert_eq!(
-        script,
-        "before 57726974652d4f7574707574202772656d6f746527 after"
-    );
+    let encoded = script
+        .strip_prefix("before ")
+        .and_then(|value| value.strip_suffix(" after"))
+        .expect("脚本中应包含压缩后的 PowerShell init payload");
+    let compressed = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .expect("PowerShell init payload 应为 Base64");
+    let mut decoded = String::new();
+    GzDecoder::new(compressed.as_slice())
+        .read_to_string(&mut decoded)
+        .expect("PowerShell init payload 应能解压");
+    assert_eq!(decoded, "Write-Output 'remote'");
 }
 
 #[test]
 fn zsh_windows_remote_init_shell_stays_within_macos_canonical_line_limit() {
     let script = embed_windows_remote_init_shell(
-        format!("local init_shell_hex='{WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER}'"),
+        format!(
+            "local init_shell_gzip_base64='{WINDOWS_REMOTE_INIT_SHELL_GZIP_BASE64_PLACEHOLDER}'"
+        ),
         &crate::ASSETS,
         ShellType::Zsh,
     );
@@ -110,6 +123,30 @@ fn zsh_windows_remote_init_shell_stays_within_macos_canonical_line_limit() {
         script.lines().find(|line| line.len() >= 1024),
         None,
         "zsh bootstrap lines must fit within macOS MAX_CANON"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn windows_remote_bootstrap_command_fits_cmd_exe_limit() {
+    let helper = embed_windows_remote_init_shell(
+        include_str!("../../assets/bundled/bootstrap/ssh_remote_shell_probe.sh").to_string(),
+        &crate::ASSETS,
+        ShellType::Bash,
+    );
+    let script = format!(
+        "{helper}\nwarp_windows_powershell_bootstrap_command 42 7b7d v0.2026.08.17.20.25.oss_00 1"
+    );
+    let output = Command::new("bash")
+        .arg("-c")
+        .arg(script)
+        .output()
+        .expect("bash 应能生成 Windows PowerShell bootstrap 命令");
+    assert!(output.status.success());
+    assert!(
+        output.stdout.len() < 4096,
+        "Windows bootstrap command is {} bytes",
+        output.stdout.len()
     );
 }
 
