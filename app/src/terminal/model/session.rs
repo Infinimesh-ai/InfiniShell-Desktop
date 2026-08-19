@@ -1916,7 +1916,13 @@ pub mod testing {
                 session_id: SessionId::from(0),
                 shell: Shell::new(shell_type, None, None, Default::default(), None),
                 launch_data: None,
-                histfile: None,
+                // 测试默认不应读取开发机的真实 shell history。
+                histfile: Some(
+                    std::env::temp_dir()
+                        .join(format!("infinishell-test-history-{}", uuid::Uuid::new_v4()))
+                        .to_string_lossy()
+                        .into_owned(),
+                ),
                 user: "local:user".to_owned(),
                 hostname: "local:host".to_owned(),
                 session_type: BootstrapSessionType::Local,

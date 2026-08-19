@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+#[cfg(unix)]
 use std::path::PathBuf;
 
 use chrono::Local;
