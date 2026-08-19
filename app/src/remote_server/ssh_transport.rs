@@ -336,7 +336,7 @@ impl SshTransport {
     }
 }
 
-fn setup_command_line(command: &RemoteSetupCommand) -> String {
+pub(crate) fn setup_command_line(command: &RemoteSetupCommand) -> String {
     match command.dialect {
         RemoteShellDialect::Posix | RemoteShellDialect::WindowsCmd => command.script.clone(),
         RemoteShellDialect::PowerShell => {
@@ -351,7 +351,7 @@ fn setup_command_line(command: &RemoteSetupCommand) -> String {
     }
 }
 
-fn upload_command(remote_os: &RemoteOs, remote_path: &str) -> RemoteSetupCommand {
+pub(crate) fn upload_command(remote_os: &RemoteOs, remote_path: &str) -> RemoteSetupCommand {
     let relative_path = remote_path
         .trim_start_matches("~/")
         .trim_start_matches("~\\");

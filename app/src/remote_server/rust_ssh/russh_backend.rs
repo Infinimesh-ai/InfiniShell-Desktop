@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Context as _, Result, bail};
+use remote_server::setup::RemoteOs;
 use russh::ChannelMsg;
 use russh::client::{self, Handle, KeyboardInteractiveAuthResponse};
 use russh::keys::agent::AgentIdentity;
@@ -25,8 +26,10 @@ use tokio::sync::{Mutex as AsyncMutex, mpsc};
 use warp_cli::RustSshSessionArgs;
 use zeroize::Zeroizing;
 
+use crate::remote_server::ssh_transport::{setup_command_line, upload_command};
+
 use super::{
-    BrokerRequest, CONNECT_TIMEOUT, FRAME_EXIT, FRAME_STDERR, FRAME_STDOUT,
+    BrokerOperation, BrokerRequest, CONNECT_TIMEOUT, FRAME_EXIT, FRAME_STDERR, FRAME_STDOUT,
     MAX_BROKER_HEADER_BYTES, OpenSshConfig, ProxyCommandSocket, ProxyProcessSpec,
     RESIZE_POLL_INTERVAL, RemoteShell, SshEscapeFilter, capabilities_match, connect_proxy_command,
     connect_tcp, emit_ssh_hook, is_windows_powershell_capability, new_capability,
@@ -850,6 +853,24 @@ async fn handle_broker_connection(
         stream.write_all(&[1]).await?;
         bail!("invalid SSH broker capability");
     }
+    let (command, mut remaining_upload_bytes) = match request.operation {
+        BrokerOperation::Exec { command } => (command, None),
+        BrokerOperation::Upload {
+            remote_path,
+            size,
+            windows,
+        } => {
+            let remote_os = if windows {
+                RemoteOs::Windows
+            } else {
+                RemoteOs::Linux
+            };
+            (
+                setup_command_line(&upload_command(&remote_os, &remote_path)),
+                Some(size),
+            )
+        }
+    };
     let mut channel = {
         let handle = handle.lock().await;
         handle.channel_open_session().await?
@@ -857,7 +878,7 @@ async fn handle_broker_connection(
     for (name, value) in environment {
         let _ = channel.set_env(false, name, value).await;
     }
-    channel.exec(true, request.command).await?;
+    channel.exec(true, command).await?;
     stream.write_all(&[0]).await?;
     stream.flush().await?;
 
@@ -869,10 +890,22 @@ async fn handle_broker_connection(
             read = stream.read(&mut buffer), if !local_eof => {
                 match read? {
                     0 => {
+                        if remaining_upload_bytes.is_some_and(|remaining| remaining != 0) {
+                            bail!("SSH broker upload ended before the declared file size");
+                        }
                         local_eof = true;
                         channel.eof().await?;
                     }
-                    read => channel.data_bytes(buffer[..read].to_vec()).await?,
+                    read => {
+                        if let Some(remaining) = remaining_upload_bytes.as_mut() {
+                            let read = read as u64;
+                            if read > *remaining {
+                                bail!("SSH broker upload exceeded the declared file size");
+                            }
+                            *remaining -= read;
+                        }
+                        channel.data_bytes(buffer[..read].to_vec()).await?;
+                    }
                 }
             }
             message = channel.wait() => {
