@@ -1,7 +1,18 @@
 use super::{
     connection_label_from_session_hosts, connection_label_from_ssh_host,
-    connection_label_from_user_and_host,
+    connection_label_from_user_and_host, powershell_bootstrap_paths,
 };
+
+#[test]
+fn powershell_bootstrap_path_is_relative_to_remote_home() {
+    assert_eq!(
+        powershell_bootstrap_paths(Some("v0.1.2+dev/test")),
+        Some((
+            "~/.infinishell/remote-server/pwsh-bootstrap-v0.1.2_dev_test.ps1".to_string(),
+            ".infinishell/remote-server/pwsh-bootstrap-v0.1.2_dev_test.ps1".to_string(),
+        ))
+    );
+}
 
 #[test]
 fn connection_label_prefers_ssh_host_over_reported_hostname() {

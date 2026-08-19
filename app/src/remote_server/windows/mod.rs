@@ -2,7 +2,8 @@
 
 pub(super) mod proxy;
 
-use interprocess::local_socket::tokio::LocalSocketListener;
+use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
+use tokio_util::compat::{TokioAsyncReadCompatExt as _, TokioAsyncWriteCompatExt as _};
 use warp_errors::report_error;
 use warpui::SingletonEntity;
 use warpui::r#async::executor;
@@ -18,14 +19,35 @@ pub fn run_daemon(identity_key: String) -> anyhow::Result<()> {
     result
 }
 
+struct NamedPipeListener {
+    path: String,
+    server: NamedPipeServer,
+}
+
+impl NamedPipeListener {
+    fn bind(pipe_name: String) -> std::io::Result<Self> {
+        let path = format!(r"\\.\pipe\{pipe_name}");
+        let server = ServerOptions::new()
+            .first_pipe_instance(true)
+            .create(&path)?;
+        Ok(Self { path, server })
+    }
+
+    async fn accept(&mut self) -> std::io::Result<NamedPipeServer> {
+        self.server.connect().await?;
+        let next = ServerOptions::new().create(&self.path)?;
+        Ok(std::mem::replace(&mut self.server, next))
+    }
+}
+
 fn bind_listener(
     pipe_name: String,
     background_executor: std::sync::Arc<executor::Background>,
-) -> std::io::Result<LocalSocketListener> {
+) -> std::io::Result<NamedPipeListener> {
     let (result_tx, result_rx) = std::sync::mpsc::sync_channel(1);
     background_executor
         .spawn(async move {
-            let _ = result_tx.send(LocalSocketListener::bind(pipe_name));
+            let _ = result_tx.send(NamedPipeListener::bind(pipe_name));
         })
         .detach();
     result_rx
@@ -35,7 +57,7 @@ fn bind_listener(
 
 pub(crate) fn launch_daemon(identity_key: &str, ctx: &mut warpui::AppContext) {
     let pipe_name = proxy::pipe_name(identity_key);
-    let listener = match bind_listener(pipe_name, ctx.background_executor().clone()) {
+    let mut listener = match bind_listener(pipe_name, ctx.background_executor().clone()) {
         Ok(listener) => listener,
         Err(error) => {
             report_error!(anyhow::Error::new(error).context("Daemon: failed to bind named pipe"));
@@ -66,13 +88,13 @@ pub(crate) fn launch_daemon(identity_key: &str, ctx: &mut warpui::AppContext) {
                     Ok(stream) => {
                         let conn_id = uuid::Uuid::new_v4();
                         log::info!("Windows daemon accepted connection {conn_id}");
-                        let (read_half, write_half) = stream.into_split();
+                        let (read_half, write_half) = tokio::io::split(stream);
                         let spawner = spawner_loop.clone();
                         background_executor
                             .spawn(super::daemon::handle_daemon_connection(
                                 conn_id,
-                                read_half,
-                                write_half,
+                                read_half.compat(),
+                                write_half.compat_write(),
                                 spawner,
                                 background_executor.clone(),
                             ))

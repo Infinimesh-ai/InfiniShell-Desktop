@@ -13,6 +13,10 @@ pub mod transport;
 
 pub use host_id::HostId;
 
+#[cfg(all(test, not(target_family = "wasm")))]
+#[path = "ssh_e2e_tests.rs"]
+mod ssh_e2e_tests;
+
 #[allow(clippy::large_enum_variant)]
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/remote_server.rs"));

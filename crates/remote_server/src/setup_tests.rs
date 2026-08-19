@@ -354,9 +354,10 @@ fn windows_binary_commands_use_exe_and_powershell_literal_paths() {
 #[test]
 fn windows_proxy_command_escapes_identity_key() {
     let command = remote_server_proxy_command(&RemoteOs::Windows, "user's identity");
-    assert_eq!(command.dialect, RemoteShellDialect::PowerShell);
+    assert_eq!(command.dialect, RemoteShellDialect::WindowsCmd);
     assert!(command.script.contains("remote-server-proxy"));
-    assert!(command.script.contains("'user''s identity'"));
+    assert!(command.script.contains(r#""user's identity""#));
+    assert!(command.script.contains(r#""%USERPROFILE%\"#));
 }
 
 #[test]
@@ -921,7 +922,6 @@ fn windows_powershell_commands_have_valid_syntax() {
         binary_check_command_for(&RemoteOs::Windows),
         old_binary_check_command_for(&RemoteOs::Windows),
         remote_server_removal_command_for(&RemoteOs::Windows),
-        remote_server_proxy_command(&RemoteOs::Windows, "identity's key"),
         install_command(&platform, Some("~/remote server/upload.zip")),
     ];
     let parser_script = r#"$tokens = $null

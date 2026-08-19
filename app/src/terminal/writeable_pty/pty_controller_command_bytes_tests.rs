@@ -63,11 +63,14 @@ fn powershell_command_execution_normalizes_linefeeds_to_carriage_returns() {
 }
 
 #[test]
-fn powershell_ssh_bootstrap_normalizes_linefeeds_to_carriage_returns() {
-    let bootstrap = b"function Test-Warp {\r\n  Write-Output 'ready'\n}\n".to_vec();
+#[cfg(feature = "local_fs")]
+fn remote_powershell_bootstrap_command_uses_carriage_return() {
+    let bytes =
+        remote_powershell_bootstrap_command(".infinishell/remote-server/pwsh-bootstrap-local.ps1");
 
-    let bytes = normalize_powershell_pty_line_endings(bootstrap);
-
-    assert_eq!(bytes, b"function Test-Warp {\r  Write-Output 'ready'\r}\r");
+    assert_eq!(
+        bytes,
+        b" . (Join-Path $HOME .infinishell/remote-server/pwsh-bootstrap-local.ps1)\r"
+    );
     assert!(!bytes.contains(&b'\n'));
 }

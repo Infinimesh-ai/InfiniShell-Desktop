@@ -56,6 +56,33 @@ class PrepareBundledRemoteServerResourcesTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "infinishell-windows-aarch64.zip"):
                 resources.create(source, source / "destination", "v-test")
 
+    def test_partial_bundle_accepts_one_explicit_platform(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = root / "source"
+            destination = root / "destination"
+            copied = root / "copied"
+            source.mkdir()
+            archive = source / "infinishell-windows-x86_64.zip"
+            archive.write_bytes(b"windows-x86_64")
+
+            resources.create(source, destination, "unversioned", allow_partial=True)
+            resources.verify(destination, "unversioned", allow_partial=True)
+            resources.copy(
+                destination,
+                copied,
+                "unversioned",
+                allow_partial=True,
+            )
+
+            manifest = json.loads((copied / "manifest.json").read_text())
+            self.assertEqual(
+                ["infinishell-windows-x86_64.zip"],
+                [artifact["file"] for artifact in manifest["artifacts"]],
+            )
+            with self.assertRaisesRegex(ValueError, "缺少 remote-server 产物"):
+                resources.verify(destination, "unversioned")
+
 
 if __name__ == "__main__":
     unittest.main()

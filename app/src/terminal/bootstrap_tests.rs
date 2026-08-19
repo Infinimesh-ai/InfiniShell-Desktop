@@ -72,15 +72,11 @@ fn motd_is_scoped_to_ssh_bootstrap() {
     let zsh = include_str!("../../assets/bundled/bootstrap/zsh_body.sh");
     let fish = include_str!("../../assets/bundled/bootstrap/fish.sh");
 
-    assert!(bash.contains(
-        r#"if [[ "$WARP_IS_SSH" == "1" && ! -e "$HOME/.hushlogin" ]]; then"#
-    ));
+    assert!(bash.contains(r#"if [[ "$WARP_IS_SSH" == "1" && ! -e "$HOME/.hushlogin" ]]; then"#));
     assert!(zsh.contains(
         r#"if [[ "$WARP_IS_SSH" == "1" && -o login && ! -e "$HOME/.hushlogin" ]]; then"#
     ));
-    assert!(!fish.contains(
-        "if status --is-login\n  and test ! -e \"$HOME/.hushlogin\""
-    ));
+    assert!(!fish.contains("if status --is-login\n  and test ! -e \"$HOME/.hushlogin\""));
 
     for script in [bash, zsh, fish] {
         assert!(script.contains("Emulate the SSHD logic to print the MotD."));

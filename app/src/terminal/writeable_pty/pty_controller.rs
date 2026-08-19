@@ -441,21 +441,10 @@ impl<T: EventLoopSender> PtyController<T> {
                     self.write_terminating_bootstrap_bytes(ctx);
                 }
             }
-        } else if bootstrap::is_container_subshell(pending_session_info)
-            || shell_type == ShellType::PowerShell
-                && pending_session_info
-                    .is_ssh_wrapper_session
-                    .transport()
-                    .is_some()
-        {
-            // 按 4KB 分块并间隔 50ms 写入，避免压垮 PTY 缓冲区。容器 exec
-            // 和 SSH 到 PowerShell 都经过双层 PTY 代理，单次大写入可能丢数据。
+        } else if bootstrap::is_container_subshell(pending_session_info) {
+            // 按 4KB 分块并间隔 50ms 写入，避免压垮容器 exec 的双层 PTY 缓冲区。
             const CHUNK_SIZE: usize = 4096;
-            let bytes = if shell_type == ShellType::PowerShell {
-                normalize_powershell_pty_line_endings(bootstrap.into_owned())
-            } else {
-                bootstrap.into_owned()
-            };
+            let bytes = bootstrap.into_owned();
             let chunks: Vec<Vec<u8>> = bytes.chunks(CHUNK_SIZE).map(|c| c.to_vec()).collect();
             for (i, chunk) in chunks.into_iter().enumerate() {
                 ctx.spawn(
@@ -494,6 +483,18 @@ impl<T: EventLoopSender> PtyController<T> {
             }
         }
         self.write_terminating_bootstrap_bytes(ctx);
+    }
+
+    #[cfg(feature = "local_fs")]
+    pub(super) fn source_remote_powershell_bootstrap(
+        &mut self,
+        path_relative_to_home: &str,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        self.write_bytes(
+            remote_powershell_bootstrap_command(path_relative_to_home),
+            ctx,
+        );
     }
 
     #[cfg(not(feature = "local_fs"))]
@@ -814,6 +815,12 @@ fn bytes_to_execute_command(
     command_bytes
 }
 
+#[cfg(feature = "local_fs")]
+fn remote_powershell_bootstrap_command(path_relative_to_home: &str) -> Vec<u8> {
+    let escaped = ShellFamily::PowerShell.escape(path_relative_to_home);
+    format!(" . (Join-Path $HOME {escaped})\r").into_bytes()
+}
+
 /// Returns a vector containing the given `bytes` wrapped in bracketed paste start and end
 /// sequences.
 fn wrap_bytes_in_bracketed_paste(bytes: impl IntoIterator<Item = u8>) -> impl Iterator<Item = u8> {
@@ -822,15 +829,6 @@ fn wrap_bytes_in_bracketed_paste(bytes: impl IntoIterator<Item = u8>) -> impl It
         .copied()
         .chain(bytes)
         .chain(escape_sequences::BRACKETED_PASTE_END.iter().copied())
-}
-
-/// PowerShell 的交互式 PTY 把 LF 解释为续行输入，只有 CR 会提交当前行。
-fn normalize_powershell_pty_line_endings(bytes: Vec<u8>) -> Vec<u8> {
-    let script = String::from_utf8(bytes).expect("PowerShell bootstrap should be UTF-8");
-    LINEFEED_REGEX
-        .replace_all(&script, "\r")
-        .into_owned()
-        .into_bytes()
 }
 
 #[cfg(test)]

@@ -76,11 +76,12 @@ pub(super) fn removal_script(relative_binary_path: &str) -> String {
     )
 }
 
-pub(super) fn proxy_script(relative_binary_path: &str, identity_key: &str) -> String {
-    let relative_binary_path = single_quoted(relative_binary_path);
-    let identity_key = single_quoted(identity_key);
+pub(super) fn proxy_command(relative_binary_path: &str, identity_key: &str) -> String {
+    let binary_path = format!(r"%USERPROFILE%\{}", relative_binary_path.replace('/', r"\"));
     format!(
-        "$binaryPath = Join-Path $HOME {relative_binary_path}; & $binaryPath remote-server-proxy --identity-key {identity_key}; exit $LASTEXITCODE"
+        "{} remote-server-proxy --identity-key {}",
+        windows_command_line_arg(&binary_path),
+        windows_command_line_arg(identity_key),
     )
 }
 
@@ -111,4 +112,28 @@ pub(super) fn install_script(
 
 fn single_quoted(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
+}
+
+fn windows_command_line_arg(value: &str) -> String {
+    let mut quoted = String::with_capacity(value.len() + 2);
+    quoted.push('"');
+    let mut backslashes = 0;
+    for character in value.chars() {
+        match character {
+            '\\' => backslashes += 1,
+            '"' => {
+                quoted.extend(std::iter::repeat_n('\\', backslashes * 2 + 1));
+                quoted.push('"');
+                backslashes = 0;
+            }
+            character => {
+                quoted.extend(std::iter::repeat_n('\\', backslashes));
+                quoted.push(character);
+                backslashes = 0;
+            }
+        }
+    }
+    quoted.extend(std::iter::repeat_n('\\', backslashes * 2));
+    quoted.push('"');
+    quoted
 }

@@ -279,6 +279,7 @@ impl RemoteArch {
 pub enum RemoteShellDialect {
     Posix,
     PowerShell,
+    WindowsCmd,
 }
 
 /// transport 可执行的远端命令或脚本。
@@ -286,6 +287,8 @@ pub enum RemoteShellDialect {
 /// `PowerShell` 脚本应由 transport 编码成 UTF-16LE Base64，并通过
 /// `powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand` 执行，
 /// 避免把脚本直接拼进远端默认 shell。
+/// `WindowsCmd` 只用于必须保留原始 stdio 字节的原生命令；PowerShell 会把
+/// 非交互命令的 stdout 缓冲到进程退出，不能承载 remote-server 协议。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RemoteSetupCommand {
     pub dialect: RemoteShellDialect,
@@ -303,6 +306,13 @@ impl RemoteSetupCommand {
     fn powershell(script: String) -> Self {
         Self {
             dialect: RemoteShellDialect::PowerShell,
+            script,
+        }
+    }
+
+    fn windows_cmd(script: String) -> Self {
+        Self {
+            dialect: RemoteShellDialect::WindowsCmd,
             script,
         }
     }
@@ -616,7 +626,7 @@ pub fn remote_server_proxy_command(os: &RemoteOs, identity_key: &str) -> RemoteS
             remote_server_binary_for(os),
             posix_single_quoted(identity_key),
         )),
-        RemoteOs::Windows => RemoteSetupCommand::powershell(windows::proxy_script(
+        RemoteOs::Windows => RemoteSetupCommand::windows_cmd(windows::proxy_command(
             &remote_server_relative_binary_path(os),
             identity_key,
         )),

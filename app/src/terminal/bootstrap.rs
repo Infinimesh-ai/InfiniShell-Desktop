@@ -261,9 +261,7 @@ fn embed_windows_remote_init_shell(
 
 fn zsh_safe_remote_init_shell_payload(init_shell_payload: &str) -> String {
     let mut result = String::with_capacity(init_shell_payload.len());
-    for start in
-        (0..init_shell_payload.len()).step_by(ZSH_REMOTE_INIT_SHELL_PAYLOAD_CHUNK_SIZE)
-    {
+    for start in (0..init_shell_payload.len()).step_by(ZSH_REMOTE_INIT_SHELL_PAYLOAD_CHUNK_SIZE) {
         if start > 0 {
             result.push_str("'\n    init_shell_gzip_base64+='");
         }
