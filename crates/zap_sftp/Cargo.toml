@@ -2,6 +2,8 @@
 name = "zap_sftp"
 version = "0.1.0"
 edition = "2021"
+publish.workspace = true
+license.workspace = true
 
 [dependencies]
 ssh2 = { version = "0.9", features = ["openssl-on-win32"] }
