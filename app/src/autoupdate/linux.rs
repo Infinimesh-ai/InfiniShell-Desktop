@@ -91,13 +91,13 @@ mod appimage {
                         release.tag_name
                     );
                     format!(
-                        "https://github.com/zerx-lab/warp/releases/download/v{}/{asset}",
+                        "https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/download/v{}/{asset}",
                         version_info.version
                     )
                 }
             } else {
                 format!(
-                    "https://github.com/zerx-lab/warp/releases/download/v{}/{asset}",
+                    "https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/download/v{}/{asset}",
                     version_info.version
                 )
             }

@@ -134,7 +134,7 @@ if ("$CHANNEL" -eq 'local') {
     $BINARY_NAME = 'infinishell.exe'
     $APP_NAME = 'InfiniShell'
     # OSS channel 使用本地 crash reporting,不启用 release 默认特性集合。
-    # autoupdate 走 GitHub Release(zerx-lab/warp),仅下载到 Downloads,不调 Inno Setup。
+    # autoupdate 走 InfiniShell GitHub Release,仅下载到 Downloads,不调 Inno Setup。
     # NLD 分类器跟随上游:所有 app 渠道统一在下方追加 nld_classifier_v3/nld_heuristic_v2。
     $FEATURES = 'release_bundle,gui,autoupdate'
 }

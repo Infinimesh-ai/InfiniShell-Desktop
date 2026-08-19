@@ -857,7 +857,9 @@ fn update_url(channel: Channel, version: &str) -> String {
                 release.tag_name
             );
         }
-        return format!("https://github.com/zerx-lab/warp/releases/download/v{version}/{asset}");
+        return format!(
+            "https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/download/v{version}/{asset}"
+        );
     }
     format!(
         "{}/{}",
