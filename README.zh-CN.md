@@ -63,7 +63,9 @@ shell 探测、交互终端与 remote-server 命令 channel;新的 `russh` 后�
 受开关控制,便于在兼容性成熟前分阶段放量。
 
 架构、兼容边界、验证命令与合并后观察清单见
-[跨平台 SSH transport 技术文档](docs/cross-platform-ssh-transport.zh-CN.md)。
+[跨平台 SSH transport 技术文档](docs/cross-platform-ssh-transport.zh-CN.md)。Windows
+远端扩展的原生开发闭环、协议测试、版本化打包与故障定位见
+[Windows SSH 扩展开发指南](docs/windows-ssh-extension-development.zh-CN.md)。
 
 ## 项目级 Agent 运维
 
