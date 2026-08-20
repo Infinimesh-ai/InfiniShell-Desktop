@@ -6,7 +6,7 @@ Recommends: libgl1-mesa-dri, yaru-icon-theme | adwaita-icon-theme-full
 Priority: optional
 Architecture: @@ARCH@@
 Maintainer: InfiniShell Maintainers <infinishell-maintainers@localhost>
-Homepage: https://github.com/zerx-lab/warp
+Homepage: https://github.com/Infinimesh-ai/InfiniShell-Desktop
 Description: InfiniShell, a community fork of the Rust-based Warp terminal
  InfiniShell strips the mandatory cloud dependency from Warp, opens up the AI
  provider layer, ships a built-in SSH host manager, and lets you plug in

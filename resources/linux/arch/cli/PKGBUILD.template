@@ -3,7 +3,7 @@ pkgver=@@PKGVER@@
 pkgrel=@@RELEASE@@
 pkgdesc="InfiniShell CLI — community fork of Warp's local orchestration platform"
 arch=('@@ARCH@@')
-url="https://github.com/zerx-lab/warp"
+url="https://github.com/Infinimesh-ai/InfiniShell-Desktop"
 license=('custom')
 depends=(
 	'curl'
