@@ -7,7 +7,7 @@ Name:        @@PACKAGE_NAME@@
 Version:     @@VERSION@@
 Release:     @@RELEASE@@
 Vendor:      InfiniShell Maintainers
-Url:         https://github.com/zerx-lab/warp
+Url:         https://github.com/Infinimesh-ai/InfiniShell-Desktop
 Packager:    InfiniShell Maintainers <infinishell-maintainers@localhost>
 License:     AGPL-3.0-only AND MIT
 

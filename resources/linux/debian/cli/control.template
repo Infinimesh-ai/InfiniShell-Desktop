@@ -5,7 +5,7 @@ Depends: zlib1g
 Priority: optional
 Architecture: @@ARCH@@
 Maintainer: InfiniShell Maintainers <infinishell-maintainers@localhost>
-Homepage: https://github.com/zerx-lab/warp
+Homepage: https://github.com/Infinimesh-ai/InfiniShell-Desktop
 Replaces: warp-cli (<< @@VERSION@@)
 Conflicts: warp-cli (<< @@VERSION@@)
 Description: InfiniShell CLI — community fork of Warp's local orchestration platform

@@ -1,9 +1,10 @@
-use super::*;
+#[cfg(unix)]
+use std::fs;
 
 #[cfg(unix)]
 use command::blocking::Command;
-#[cfg(unix)]
-use std::fs;
+
+use super::*;
 
 #[test]
 fn scan_parser_only_accepts_managed_version_files() {

@@ -39,10 +39,10 @@ fn main() -> Result<()> {
     if cfg!(debug_assertions) {
         state = state.with_additional_features(DEBUG_FLAGS);
     }
-    // 始终启用 IME marked-text 渲染:winit 的 IME 路径在 macOS / Windows 都支持,
+    // 始终启用 IME marked-text 渲染:winit 的 IME 路径在 Linux / macOS / Windows 都支持,
     // 但若不在此处显式开启,Zap 会把 preedit / 输入合成更新整体丢弃,只剩 OS 的候选窗
-    // 可见 —— 在 Windows 上对日文 / 中文 / 韩文输入都属于实质性损坏。
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    // 可见 —— 对日文 / 中文 / 韩文输入都属于实质性损坏。
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
     {
         use warp_core::features::FeatureFlag;
         state = state.with_additional_features(&[FeatureFlag::ImeMarkedText]);

@@ -26,8 +26,6 @@ use tokio::sync::{Mutex as AsyncMutex, mpsc};
 use warp_cli::RustSshSessionArgs;
 use zeroize::Zeroizing;
 
-use crate::remote_server::ssh_transport::{setup_command_line, upload_command};
-
 use super::{
     BrokerOperation, BrokerRequest, CONNECT_TIMEOUT, FRAME_EXIT, FRAME_STDERR, FRAME_STDOUT,
     MAX_BROKER_HEADER_BYTES, OpenSshConfig, ProxyCommandSocket, ProxyProcessSpec,
@@ -36,6 +34,7 @@ use super::{
     print_ssh_escape_help, proxy_process_spec, resolve_channel_environment, resolve_openssh_config,
     run_ssh2_session_worker, terminal_dimensions,
 };
+use crate::remote_server::ssh_transport::{setup_command_line, upload_command};
 
 type RusshHandle = Handle<HostKeyHandler>;
 type SharedHandle = Arc<AsyncMutex<RusshHandle>>;

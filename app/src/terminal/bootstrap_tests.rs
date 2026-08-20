@@ -1,10 +1,10 @@
-use super::*;
-
 use std::io::Read as _;
 
 use command::blocking::Command;
 use flate2::read::GzDecoder;
 use serde_json::json;
+
+use super::*;
 
 struct TestAssetProvider;
 
