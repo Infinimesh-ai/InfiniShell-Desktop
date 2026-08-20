@@ -9,9 +9,8 @@ use remote_server::setup::{
 };
 use remote_server::transport::Error;
 use settings::Setting;
-use warp_core::SessionId;
 use warp_core::channel::ChannelState;
-use warp_core::safe_warn;
+use warp_core::{SessionId, safe_warn};
 use warpui::r#async::FutureExt as _;
 use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity, WeakModelHandle};
 

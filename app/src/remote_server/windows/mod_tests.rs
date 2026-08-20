@@ -1,11 +1,13 @@
-use super::{bind_listener, proxy};
-use futures::{AsyncReadExt as _, AsyncWriteExt as _};
-use interprocess::local_socket::LocalSocketStream;
 use std::io::{Read as _, Write as _};
 use std::sync::Arc;
 use std::time::Duration;
+
+use futures::{AsyncReadExt as _, AsyncWriteExt as _};
+use interprocess::local_socket::LocalSocketStream;
 use tokio_util::compat::{TokioAsyncReadCompatExt as _, TokioAsyncWriteCompatExt as _};
 use warpui_core::r#async::executor::Background;
+
+use super::{bind_listener, proxy};
 
 #[test]
 fn named_pipe_listener_binds_on_background_runtime() {

@@ -32,8 +32,6 @@ use ssh2::{
 use warp_cli::{RustSshBrokerCommandArgs, RustSshSessionArgs};
 #[cfg(feature = "russh_transport")]
 use warp_core::features::FeatureFlag;
-use zeroize::Zeroizing;
-
 #[cfg(windows)]
 use windows::Win32::Foundation::HANDLE;
 #[cfg(windows)]
@@ -46,6 +44,7 @@ use windows::Win32::System::Console::{
     CONSOLE_MODE, ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT,
     ENABLE_VIRTUAL_TERMINAL_INPUT, GetConsoleMode, GetStdHandle, STD_INPUT_HANDLE, SetConsoleMode,
 };
+use zeroize::Zeroizing;
 
 pub const BROKER_CAPABILITY_ENV: &str = "WARP_SSH_BROKER_CAPABILITY";
 

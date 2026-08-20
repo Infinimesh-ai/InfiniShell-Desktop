@@ -151,11 +151,11 @@ use super::{ActiveSession, TabBarDropTargetData, TabBarLocation, WorkspaceRegist
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
 use crate::ai::agent::{AIAgentInput, EntrypointType};
-#[cfg(target_family = "wasm")]
-use crate::ai::agent_conversations_model::AgentConversationsModelEvent;
 // Zap:上游把 `ConversationOrTask` 重构成了 `AgentConversationEntry` 体系,
 // 会话导航数据改从 `ConversationNavigationData::all_conversations` 取。
 use crate::ai::agent_conversations_model::AgentConversationsModel;
+#[cfg(target_family = "wasm")]
+use crate::ai::agent_conversations_model::AgentConversationsModelEvent;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::agent_view::agent_input_footer::editor::AgentToolbarEditorMode;
