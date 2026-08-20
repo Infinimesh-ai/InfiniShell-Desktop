@@ -142,6 +142,12 @@ ControlMaster/RustBroker 二选一描述；客户端只有在父 daemon 宣告 v
 `tunnel_id` 由客户端生成，并在发送 `OpenSshTunnel` 前注册本地接收状态。这样服务端
 即使在 open response 后立即推送数据，也不会出现“数据先于本地 map”竞态。
 
+`OpenSshStream` 的 `stdin_size_bytes` 只用于 `StageBinary`。新客户端在上传前读取归档
+大小，使父 daemon 可以复用定长 SCP 上传：Rust broker 直接使用 upload operation，
+ControlMaster 则先写入权限受限的临时文件再走既有 `scp`/`ControlPath`；字段为 0 时
+保留旧客户端的 exec stdin 路径，新字段也会被旧 daemon 忽略，因此升级顺序不影响
+已安装的递归链路。daemon 同时限制最大归档大小，并拒绝溢出或提前 half-close。
+
 ### 3.3 流控
 
 每个 channel 维护独立 credit 和连续 offset：
@@ -218,6 +224,9 @@ ssh -S <registered-control-path> placeholder@placeholder \
 Rust broker 则由 daemon 启动同版本 worker 的 `rust-ssh-broker-command`，通过进程环境
 传递注册时的 capability；远端命令仍由 daemon 根据 purpose 和目标 OS 固定生成。
 Windows 命令使用编码后的 PowerShell，安装归档使用 zip；POSIX 使用 shell 与 tar.gz。
+`StageBinary` 携带非零声明大小时，daemon 必须调用对应 transport 的 SCP 上传路径，
+并把 tunnel stdin 作为有限输入转发；这样 ControlMaster、Windows 与 russh 后端沿
+任意递归深度都使用和本地第一跳相同的完整性检查及 SCP 上传实现。
 
 协议不提供“任意 remote_command”字段，避免把隧道 API 扩大成新的任意命令执行
 入口。

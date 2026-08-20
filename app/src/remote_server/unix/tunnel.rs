@@ -29,6 +29,7 @@ const MAX_CONTROLS_PER_CONNECTION: usize = 64;
 const MAX_CONTROL_PATH_BYTES: usize = 1024;
 const MAX_IDENTITY_KEY_BYTES: usize = 4 * 1024;
 const MAX_STDERR_TAIL_BYTES: usize = 64 * 1024;
+const MAX_STAGED_BINARY_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const CONTROL_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
@@ -50,11 +51,22 @@ enum RegisteredTransport {
     },
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum SshStreamOperation {
+    Exec(String),
+    Upload {
+        remote_path: String,
+        size: u64,
+        windows: bool,
+    },
+}
+
 struct TunnelProcess {
     stdin_tx: async_channel::Sender<Vec<u8>>,
     stdout_credit_tx: async_channel::Sender<()>,
     stderr_credit_tx: async_channel::Sender<()>,
     expected_stdin_offset: AtomicU64,
+    expected_stdin_size: Option<u64>,
     stdin_credit: AtomicUsize,
     stdout_in_flight: AtomicUsize,
     stderr_in_flight: AtomicUsize,
@@ -198,6 +210,17 @@ impl TunnelBroker {
                 if stream.stdin_closed.swap(true, Ordering::AcqRel) {
                     self.reset_stream(&stream_id, "duplicate SSH tunnel half-close")
                         .await;
+                    return;
+                }
+                if !stdin_is_complete(
+                    stream.expected_stdin_size,
+                    stream.expected_stdin_offset.load(Ordering::Acquire),
+                ) {
+                    self.reset_stream(
+                        &stream_id,
+                        "SSH tunnel stdin ended before its declared size",
+                    )
+                    .await;
                     return;
                 }
                 stream.stdin_tx.close();
@@ -368,6 +391,19 @@ impl TunnelBroker {
                 .await;
             return;
         }
+        if open.stdin_size_bytes != 0 && open.purpose() != SshStreamPurpose::StageBinary {
+            self.send_error(
+                request_id,
+                "declared SSH tunnel stdin size is only valid for binary staging",
+            )
+            .await;
+            return;
+        }
+        if open.stdin_size_bytes > MAX_STAGED_BINARY_BYTES {
+            self.send_error(request_id, "declared SSH tunnel stdin size is too large")
+                .await;
+            return;
+        }
         let stream_limit_reached = {
             let streams = self
                 .inner
@@ -404,20 +440,61 @@ impl TunnelBroker {
                     return;
                 }
             };
+        let operation = ssh_stream_operation(
+            &open,
+            remote_command,
+            &control.staged_binary_path,
+            &control.remote_os,
+        );
 
         let mut command = match &control.transport {
             RegisteredTransport::ControlMaster { path } => {
                 #[cfg(unix)]
                 {
-                    let mut args = remote_server::ssh::ssh_args(path);
-                    args.push(remote_command);
-                    let mut command = Command::new("ssh");
-                    command.args(args);
-                    command
+                    match operation {
+                        SshStreamOperation::Exec(remote_command) => {
+                            let mut args = remote_server::ssh::ssh_args(path);
+                            args.push(remote_command);
+                            let mut command = Command::new("ssh");
+                            command.args(args);
+                            command
+                        }
+                        SshStreamOperation::Upload {
+                            remote_path,
+                            size,
+                            windows,
+                        } => {
+                            let executable =
+                                match crate::remote_server::rust_ssh::worker_executable() {
+                                    Ok(executable) => executable,
+                                    Err(_) => {
+                                        self.send_error(
+                                            request_id,
+                                            "SSH ControlMaster upload worker is unavailable",
+                                        )
+                                        .await;
+                                        return;
+                                    }
+                                };
+                            let mut command = Command::new(executable);
+                            command
+                                .arg("rust-ssh-broker-command")
+                                .arg("--control-path")
+                                .arg(path)
+                                .arg("--upload-path")
+                                .arg(remote_path)
+                                .arg("--stdin-size")
+                                .arg(size.to_string());
+                            if windows {
+                                command.arg("--upload-windows");
+                            }
+                            command
+                        }
+                    }
                 }
                 #[cfg(not(unix))]
                 {
-                    let _ = (path, remote_command);
+                    let _ = (path, operation);
                     self.send_error(request_id, "SSH ControlMaster is not supported here")
                         .await;
                     return;
@@ -439,13 +516,30 @@ impl TunnelBroker {
                 command
                     .arg("rust-ssh-broker-command")
                     .arg("--endpoint")
-                    .arg(endpoint)
-                    .arg("--command")
-                    .arg(remote_command)
-                    .env(
-                        crate::remote_server::rust_ssh::BROKER_CAPABILITY_ENV,
-                        capability,
-                    );
+                    .arg(endpoint);
+                match operation {
+                    SshStreamOperation::Exec(remote_command) => {
+                        command.arg("--command").arg(remote_command);
+                    }
+                    SshStreamOperation::Upload {
+                        remote_path,
+                        size,
+                        windows,
+                    } => {
+                        command
+                            .arg("--upload-path")
+                            .arg(remote_path)
+                            .arg("--stdin-size")
+                            .arg(size.to_string());
+                        if windows {
+                            command.arg("--upload-windows");
+                        }
+                    }
+                }
+                command.env(
+                    crate::remote_server::rust_ssh::BROKER_CAPABILITY_ENV,
+                    capability,
+                );
                 command
             }
         };
@@ -491,6 +585,7 @@ impl TunnelBroker {
             stdout_credit_tx,
             stderr_credit_tx,
             expected_stdin_offset: AtomicU64::new(0),
+            expected_stdin_size: (open.stdin_size_bytes != 0).then_some(open.stdin_size_bytes),
             stdin_credit: AtomicUsize::new(INITIAL_TUNNEL_WINDOW),
             stdout_in_flight: AtomicUsize::new(0),
             stderr_in_flight: AtomicUsize::new(0),
@@ -605,6 +700,13 @@ impl TunnelBroker {
                 .await;
             return;
         };
+        let Some(next_offset) =
+            next_stdin_offset(stream.expected_stdin_size, data.offset, data.data.len())
+        else {
+            self.reset_stream(stream_id, "SSH tunnel stdin exceeded its declared size")
+                .await;
+            return;
+        };
         if stream.expected_stdin_offset.load(Ordering::Acquire) != data.offset
             || stream
                 .stdin_credit
@@ -619,7 +721,7 @@ impl TunnelBroker {
         }
         stream
             .expected_stdin_offset
-            .fetch_add(data.data.len() as u64, Ordering::Release);
+            .store(next_offset, Ordering::Release);
         if stream.stdin_tx.try_send(data.data).is_err() {
             self.reset_stream(stream_id, "SSH tunnel stdin queue overflowed")
                 .await;
@@ -842,6 +944,23 @@ fn ssh_stream_command(
     }
 }
 
+fn ssh_stream_operation(
+    open: &OpenSshStream,
+    remote_command: String,
+    staged_binary_path: &str,
+    remote_os: &remote_server::setup::RemoteOs,
+) -> SshStreamOperation {
+    if open.purpose() == SshStreamPurpose::StageBinary && open.stdin_size_bytes > 0 {
+        SshStreamOperation::Upload {
+            remote_path: staged_binary_path.to_string(),
+            size: open.stdin_size_bytes,
+            windows: *remote_os == remote_server::setup::RemoteOs::Windows,
+        }
+    } else {
+        SshStreamOperation::Exec(remote_command)
+    }
+}
+
 #[cfg(unix)]
 fn validate_control_socket(path: &Path) -> anyhow::Result<()> {
     anyhow::ensure!(path.is_absolute(), "ControlMaster path is not absolute");
@@ -1010,6 +1129,19 @@ fn return_output_credit(
                 .filter(|updated| *updated <= INITIAL_TUNNEL_WINDOW)
         })
         .is_ok()
+}
+
+fn next_stdin_offset(expected_size: Option<u64>, offset: u64, data_len: usize) -> Option<u64> {
+    let next_offset = offset.checked_add(data_len as u64)?;
+    if expected_size.is_some_and(|expected_size| next_offset > expected_size) {
+        None
+    } else {
+        Some(next_offset)
+    }
+}
+
+fn stdin_is_complete(expected_size: Option<u64>, received_size: u64) -> bool {
+    expected_size.is_none_or(|expected_size| received_size == expected_size)
 }
 
 fn server_tunnel_message(

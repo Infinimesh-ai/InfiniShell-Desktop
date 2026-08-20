@@ -520,6 +520,7 @@ impl RemoteServerClient {
         control_id: String,
         purpose: SshStreamPurpose,
         identity_key: String,
+        stdin_size_bytes: u64,
     ) -> Result<TunnelStream, ClientError> {
         let stream_id = uuid::Uuid::new_v4().to_string();
         let stream = self.tunnel_multiplexer.register(stream_id.clone());
@@ -533,6 +534,7 @@ impl RemoteServerClient {
                 stdout_window_bytes: protocol::INITIAL_TUNNEL_WINDOW as u32,
                 stderr_window_bytes: protocol::INITIAL_TUNNEL_WINDOW as u32,
                 identity_key,
+                stdin_size_bytes,
             }),
         );
         let response = match self.send_request_internal(request_id, message).await {

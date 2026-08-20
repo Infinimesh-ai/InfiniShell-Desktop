@@ -22,6 +22,65 @@ fn identifies_worker_subcommands() {
 }
 
 #[test]
+fn rust_ssh_broker_command_parses_a_loopback_endpoint() {
+    let args = Args::try_parse_from([
+        "warp",
+        "rust-ssh-broker-command",
+        "--endpoint",
+        "127.0.0.1:49152",
+        "--command",
+        "true",
+    ])
+    .unwrap();
+    let Some(Command::Worker(WorkerCommand::RustSshBrokerCommand(worker))) = args.command() else {
+        panic!("期望 Rust SSH broker worker");
+    };
+
+    assert_eq!(worker.endpoint.as_deref(), Some("127.0.0.1:49152"));
+    assert!(worker.control_path.is_none());
+}
+
+#[test]
+fn rust_ssh_control_upload_parses_a_declared_stdin_size() {
+    let args = Args::try_parse_from([
+        "warp",
+        "rust-ssh-broker-command",
+        "--control-path",
+        "/tmp/ssh-control",
+        "--upload-path",
+        "~/.infinishell/remote-server/archive.zip",
+        "--stdin-size",
+        "8192",
+    ])
+    .unwrap();
+    let Some(Command::Worker(WorkerCommand::RustSshBrokerCommand(worker))) = args.command() else {
+        panic!("期望 SSH ControlMaster upload worker");
+    };
+
+    assert_eq!(
+        worker.control_path.as_deref(),
+        Some(std::path::Path::new("/tmp/ssh-control"))
+    );
+    assert_eq!(worker.stdin_size, Some(8192));
+}
+
+#[test]
+fn rust_ssh_worker_rejects_multiple_transports() {
+    let result = Args::try_parse_from([
+        "warp",
+        "rust-ssh-broker-command",
+        "--endpoint",
+        "127.0.0.1:49152",
+        "--control-path",
+        "/tmp/ssh-control",
+        "--command",
+        "true",
+    ]);
+
+    assert!(result.is_err());
+}
+
+#[test]
 #[serial_test::serial]
 fn help_hides_api_key_env_value() {
     const API_KEY: &str = "warp-cli-test-api-key-NOT-REAL";

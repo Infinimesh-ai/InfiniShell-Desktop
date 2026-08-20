@@ -468,11 +468,13 @@ fn broker_command_streams_a_local_stdin_file() {
         received
     });
     let args = RustSshBrokerCommandArgs {
-        endpoint: endpoint.to_string(),
+        endpoint: Some(endpoint.to_string()),
+        control_path: None,
         command: None,
         upload_path: Some("~/.infinishell/remote-server/archive.zip".to_string()),
         upload_windows: true,
         stdin_file: Some(stdin_file),
+        stdin_size: None,
     };
 
     assert_eq!(
@@ -495,6 +497,63 @@ fn broker_exec_does_not_wait_for_inherited_stdin_after_remote_exit() {
 
     release_tx.send(()).unwrap();
     input_thread.take().unwrap().join().unwrap().unwrap();
+}
+
+#[test]
+fn broker_stream_upload_uses_the_declared_stdin_size() {
+    let args = RustSshBrokerCommandArgs {
+        endpoint: Some("127.0.0.1:1".to_string()),
+        control_path: None,
+        command: None,
+        upload_path: Some("~/.infinishell/remote-server/archive.zip".to_string()),
+        upload_windows: true,
+        stdin_file: None,
+        stdin_size: Some(8192),
+    };
+
+    let operation = broker_operation(&args, None).unwrap();
+
+    assert!(matches!(
+        operation,
+        BrokerOperation::Upload {
+            remote_path,
+            size: 8192,
+            windows: true,
+        } if remote_path == "~/.infinishell/remote-server/archive.zip"
+    ));
+}
+
+#[test]
+fn broker_stream_upload_rejects_a_missing_or_empty_size() {
+    let mut args = RustSshBrokerCommandArgs {
+        endpoint: Some("127.0.0.1:1".to_string()),
+        control_path: None,
+        command: None,
+        upload_path: Some("~/.infinishell/remote-server/archive.zip".to_string()),
+        upload_windows: true,
+        stdin_file: None,
+        stdin_size: None,
+    };
+
+    assert!(broker_operation(&args, None).is_err());
+    args.stdin_size = Some(0);
+    assert!(broker_operation(&args, None).is_err());
+}
+
+#[test]
+fn control_master_upload_stages_exactly_the_declared_input() {
+    let payload = b"recursive windows archive";
+
+    let archive = stage_control_upload(&payload[..], payload.len() as u64).unwrap();
+
+    assert_eq!(std::fs::read(archive.path()).unwrap(), payload);
+}
+
+#[test]
+fn control_master_upload_rejects_truncated_input() {
+    let payload = b"short";
+
+    assert!(stage_control_upload(&payload[..], 10).is_err());
 }
 
 /// 真实验证当前 Rust SSH session 上的 SCP broker 上传。
@@ -549,11 +608,13 @@ fn windows_broker_scp_uploads_the_complete_archive() {
         uuid::Uuid::new_v4()
     );
     let args = RustSshBrokerCommandArgs {
-        endpoint: endpoint.to_string(),
+        endpoint: Some(endpoint.to_string()),
+        control_path: None,
         command: None,
         upload_path: Some(format!("~/{remote_relative}")),
         upload_windows: true,
         stdin_file: Some(local_archive),
+        stdin_size: None,
     };
 
     let upload = run_broker_command_with_capability(&args, capability);

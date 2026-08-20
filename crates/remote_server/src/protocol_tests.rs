@@ -48,6 +48,7 @@ async fn round_trip_ssh_tunnel_open_uses_a_fixed_purpose() {
                 stdout_window_bytes: INITIAL_TUNNEL_WINDOW as u32,
                 stderr_window_bytes: INITIAL_TUNNEL_WINDOW as u32,
                 identity_key: "identity".to_string(),
+                stdin_size_bytes: 0,
             })),
         })),
     };

@@ -300,6 +300,9 @@ message OpenSshStream {
   uint32 stdout_window_bytes = 3;
   uint32 stderr_window_bytes = 4;
   string identity_key = 5;
+  // STAGE_BINARY 的有限输入大小。新 daemon 据此复用 Rust broker 的
+  // upload operation；0 保留旧客户端的 exec stdin 兼容路径。
+  uint64 stdin_size_bytes = 6;
 }
 
 message OpenSshStreamResponse {

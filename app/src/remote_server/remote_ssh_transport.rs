@@ -104,7 +104,7 @@ impl RemoteSshTransport {
     ) -> Result<RoutedCommandOutput, Error> {
         let operation = async {
             let mut stream = parent_client
-                .open_ssh_stream(control_id.to_string(), purpose, String::new())
+                .open_ssh_stream(control_id.to_string(), purpose, String::new(), 0)
                 .await
                 .map_err(|error| Error::Other(error.into()))?;
             stream
@@ -199,9 +199,19 @@ impl RemoteSshTransport {
             let mut file = async_fs::File::open(&tarball)
                 .await
                 .map_err(|error| Error::Other(error.into()))?;
+            let archive_size = file
+                .metadata()
+                .await
+                .map_err(|error| Error::Other(error.into()))?
+                .len();
             let (parent_client, control_id) = self.current_route().await?;
             let mut stream = parent_client
-                .open_ssh_stream(control_id, SshStreamPurpose::StageBinary, String::new())
+                .open_ssh_stream(
+                    control_id,
+                    SshStreamPurpose::StageBinary,
+                    String::new(),
+                    archive_size,
+                )
                 .await
                 .map_err(|error| Error::Other(error.into()))?;
             futures_lite::io::copy(&mut file, &mut stream)
@@ -392,6 +402,7 @@ impl RemoteTransport for RemoteSshTransport {
                     control_id.clone(),
                     SshStreamPurpose::RemoteServerProxy,
                     transport.auth_context.remote_server_identity_key(),
+                    0,
                 )
                 .await?;
             let resource = stream.connection_handle();

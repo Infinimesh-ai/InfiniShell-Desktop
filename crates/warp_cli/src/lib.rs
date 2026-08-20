@@ -112,8 +112,21 @@ pub struct RustSshSessionArgs {
 /// 本地 broker proxy 的参数。认证 capability 只通过环境变量传递，避免进入进程列表。
 #[derive(Debug, Clone, clap::Args)]
 pub struct RustSshBrokerCommandArgs {
-    #[arg(long, hide = true)]
-    pub endpoint: String,
+    #[arg(
+        long,
+        hide = true,
+        required_unless_present = "control_path",
+        conflicts_with = "control_path"
+    )]
+    pub endpoint: Option<String>,
+    /// 通过远端 daemon 所在主机的 ControlMaster 上传 tunnel stdin。
+    #[arg(
+        long,
+        hide = true,
+        required_unless_present = "endpoint",
+        conflicts_with = "endpoint"
+    )]
+    pub control_path: Option<std::path::PathBuf>,
     #[arg(
         long,
         hide = true,
@@ -126,16 +139,28 @@ pub struct RustSshBrokerCommandArgs {
         long,
         hide = true,
         required_unless_present = "command",
-        conflicts_with = "command",
-        requires = "stdin_file"
+        conflicts_with = "command"
     )]
     pub upload_path: Option<String>,
     /// 上传目标使用 Windows PowerShell 命令行语义。
     #[arg(long, hide = true, requires = "upload_path")]
     pub upload_windows: bool,
     /// 上传请求使用的本地文件；普通 exec 请求省略时沿用 stdin。
-    #[arg(long, hide = true)]
+    #[arg(
+        long,
+        hide = true,
+        requires = "upload_path",
+        conflicts_with = "stdin_size"
+    )]
     pub stdin_file: Option<std::path::PathBuf>,
+    /// 从 stdin 流式上传时由 tunnel 声明的精确字节数。
+    #[arg(
+        long,
+        hide = true,
+        requires = "upload_path",
+        conflicts_with = "stdin_file"
+    )]
+    pub stdin_size: Option<u64>,
 }
 
 /// Global options that apply to all CLI commands.

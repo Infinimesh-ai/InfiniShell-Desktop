@@ -641,9 +641,48 @@ fn run_native_ssh(args: &RustSshSessionArgs) -> Result<i32> {
 
 /// 连接本机 broker，把一个远端 exec channel 映射为本进程 stdio。
 pub fn run_broker_command(args: &RustSshBrokerCommandArgs) -> Result<i32> {
+    if let (None, Some(control_path)) = (&args.endpoint, &args.control_path) {
+        return run_control_master_upload(args, control_path);
+    }
+    if args.endpoint.is_none() || args.control_path.is_some() {
+        bail!("SSH broker command requires exactly one transport");
+    }
     let capability =
         std::env::var(BROKER_CAPABILITY_ENV).context("missing SSH broker capability")?;
     run_broker_command_with_capability(args, capability)
+}
+
+fn run_control_master_upload(args: &RustSshBrokerCommandArgs, control_path: &Path) -> Result<i32> {
+    let BrokerOperation::Upload {
+        remote_path, size, ..
+    } = broker_operation(args, None)?
+    else {
+        bail!("SSH ControlMaster worker only supports uploads");
+    };
+    let stdin = io::stdin();
+    let archive = stage_control_upload(stdin.lock(), size)?;
+    futures_lite::future::block_on(remote_server::ssh::scp_upload(
+        control_path,
+        archive.path(),
+        &remote_path,
+        remote_server::setup::SCP_INSTALL_TIMEOUT,
+    ))?;
+    Ok(0)
+}
+
+fn stage_control_upload(mut reader: impl Read, size: u64) -> Result<tempfile::NamedTempFile> {
+    let mut archive = tempfile::NamedTempFile::new()
+        .context("failed to create SSH ControlMaster upload staging file")?;
+    let copied = io::copy(&mut reader.by_ref().take(size), archive.as_file_mut())
+        .context("failed to stage SSH ControlMaster upload")?;
+    if copied != size {
+        bail!("SSH ControlMaster upload ended before the declared file size");
+    }
+    archive
+        .as_file_mut()
+        .flush()
+        .context("failed to flush SSH ControlMaster upload staging file")?;
+    Ok(archive)
 }
 
 fn run_broker_command_with_capability(
@@ -658,35 +697,22 @@ fn run_broker_command_with_capability(
         .context("failed to open SSH broker stdin file")?;
     let endpoint: SocketAddr = args
         .endpoint
+        .as_deref()
+        .context("missing SSH broker endpoint")?
         .parse()
         .context("invalid SSH broker endpoint")?;
     if !endpoint.ip().is_loopback() {
         bail!("SSH broker endpoint is not loopback");
     }
+    let operation = broker_operation(args, stdin_file.as_ref())?;
+    let wait_for_input = matches!(&operation, BrokerOperation::Upload { .. });
     let mut stream = TcpStream::connect_timeout(&endpoint, CONNECT_TIMEOUT)?;
     stream.set_nodelay(true)?;
     write_header(
         &mut stream,
         &BrokerRequest {
             capability,
-            operation: match (&args.command, &args.upload_path) {
-                (Some(command), None) => BrokerOperation::Exec {
-                    command: command.clone(),
-                },
-                (None, Some(remote_path)) => BrokerOperation::Upload {
-                    remote_path: remote_path.clone(),
-                    size: stdin_file
-                        .as_ref()
-                        .context("SSH broker upload requires a local file")?
-                        .metadata()
-                        .context("failed to read SSH broker upload metadata")?
-                        .len(),
-                    windows: args.upload_windows,
-                },
-                (Some(_), Some(_)) | (None, None) => {
-                    bail!("SSH broker requires exactly one operation")
-                }
-            },
+            operation,
         },
     )?;
 
@@ -696,10 +722,9 @@ fn run_broker_command_with_capability(
         bail!("SSH broker rejected the command");
     }
 
-    // 本地文件是有限输入，收到远端退出帧前必须确认它已完整发送。普通 exec
+    // 上传是有限输入，收到远端退出帧前必须确认声明的内容已完整发送。普通 exec
     // 继承的 stdin 可能仍阻塞等待用户输入；远端命令结束后不能 join 该线程，
     // 否则一个不读取 stdin 的命令会让 broker 永远无法退出。
-    let wait_for_input = stdin_file.is_some();
     let mut input = stream.try_clone()?;
     let mut input_thread = Some(thread::spawn(move || {
         let result = match stdin_file.as_mut() {
@@ -739,6 +764,37 @@ fn run_broker_command_with_capability(
             }
             FRAME_EXIT => bail!("invalid SSH broker exit frame"),
             _ => bail!("unknown SSH broker frame"),
+        }
+    }
+}
+
+fn broker_operation(
+    args: &RustSshBrokerCommandArgs,
+    stdin_file: Option<&std::fs::File>,
+) -> Result<BrokerOperation> {
+    match (&args.command, &args.upload_path) {
+        (Some(command), None) => Ok(BrokerOperation::Exec {
+            command: command.clone(),
+        }),
+        (None, Some(remote_path)) => {
+            let size = match (stdin_file, args.stdin_size) {
+                (Some(file), None) => file
+                    .metadata()
+                    .context("failed to read SSH broker upload metadata")?
+                    .len(),
+                (None, Some(size @ 1..)) => size,
+                (Some(_), Some(_)) | (None, None) | (None, Some(0)) => {
+                    bail!("SSH broker upload requires exactly one non-empty input source")
+                }
+            };
+            Ok(BrokerOperation::Upload {
+                remote_path: remote_path.clone(),
+                size,
+                windows: args.upload_windows,
+            })
+        }
+        (Some(_), Some(_)) | (None, None) => {
+            bail!("SSH broker requires exactly one operation")
         }
     }
 }
