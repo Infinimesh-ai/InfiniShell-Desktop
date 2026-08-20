@@ -16545,7 +16545,7 @@ impl Workspace {
                 if let (Some(sid), Some(cwd), Some(s)) =
                     (session_id, pwd.clone(), server_file_browser_session)
                 {
-                    // 加上 `ServerFileBrowser` 守卫,确保该功能被 `ZAP_UNSTABLE_FEATURES`
+                    // 加上 `ServerFileBrowser` 守卫,确保该功能被 `INFINISHELL_UNSTABLE_FEATURES`
                     // 关闭时不要在 SSH 会话激活后偷偷拉取远程目录,避免任何相关后台活动。
                     if is_remote
                         && FeatureFlag::ServerFileBrowser.is_enabled()

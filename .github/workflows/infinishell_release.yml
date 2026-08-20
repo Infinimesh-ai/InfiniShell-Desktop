@@ -40,6 +40,9 @@ env:
   # channel_config::load_config!() 宏 → build.rs 调 warp-channel-config 失败 →
   # *_config.json 不生成 → include_str! 编译失败。
   CHANNEL: oss
+  # 递归 SSH 预发布分支的完整编译特性。客户端需要编译期 flag
+  # 默认打开产品入口，各平台 remote-server 则需要 russh 后端保证混合路径。
+  RECURSIVE_SSH_FEATURES: recursive_ssh_extension,russh_transport
 
 jobs:
   prepare_metadata:
@@ -73,7 +76,9 @@ jobs:
             TAG="${GITHUB_REF#refs/tags/}"
             BRANCH="$TAG"
           else
-            TAG="v0.$(date +%Y.%m.%d.%H%M)"
+            # 保持与正式版本相同的 plist/package 版本格式；是否为
+            # Pre-release 由 GitHub Release 元数据表达，不向版本号塞非数字段。
+            TAG="v0.$(date +%Y.%m.%d.%H.%M).oss_01"
             BRANCH="${GITHUB_REF#refs/heads/}"
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
@@ -176,7 +181,8 @@ jobs:
       - name: Build CLI
         id: bundle_cli
         run: |
-          script/bundle --channel "$CHANNEL" --arch ${{ matrix.arch }} --artifact cli --nosign
+          script/bundle --channel "$CHANNEL" --arch ${{ matrix.arch }} --artifact cli --nosign \
+            --features "$RECURSIVE_SSH_FEATURES"
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
@@ -241,7 +247,7 @@ jobs:
         id: bundle_cli_x86_64
         run: |
           script/bundle --channel "$CHANNEL" --arch x86_64 --artifact cli --packages none \
-            --target x86_64-unknown-linux-musl
+            --target x86_64-unknown-linux-musl --features "$RECURSIVE_SSH_FEATURES"
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
@@ -267,7 +273,7 @@ jobs:
         id: bundle_cli_aarch64
         run: |
           script/bundle --channel "$CHANNEL" --arch aarch64 --artifact cli --packages none \
-            --target aarch64-unknown-linux-musl
+            --target aarch64-unknown-linux-musl --features "$RECURSIVE_SSH_FEATURES"
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
@@ -333,6 +339,7 @@ jobs:
           -Channel $env:CHANNEL
           -Artifact cli
           -Arch ${{ matrix.bundle_arch }}
+          -Features $env:RECURSIVE_SSH_FEATURES
         shell: pwsh
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
@@ -438,7 +445,8 @@ jobs:
 
       - name: Check ${{ matrix.arch }} release compile
         run: |
-          script/bundle --check-only --channel "$CHANNEL" --arch ${{ matrix.arch }} --dmg-name-suffix "${{ matrix.dmg_name_suffix }}" --selfsign
+          script/bundle --check-only --channel "$CHANNEL" --arch ${{ matrix.arch }} --dmg-name-suffix "${{ matrix.dmg_name_suffix }}" --selfsign \
+            --features "$RECURSIVE_SSH_FEATURES"
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
@@ -467,7 +475,8 @@ jobs:
       - name: Build ${{ matrix.arch }} bundle (ad-hoc signed)
         id: bundle_app
         run: |
-          script/bundle --channel "$CHANNEL" --arch ${{ matrix.arch }} --dmg-name-suffix "${{ matrix.dmg_name_suffix }}" --selfsign
+          script/bundle --channel "$CHANNEL" --arch ${{ matrix.arch }} --dmg-name-suffix "${{ matrix.dmg_name_suffix }}" --selfsign \
+            --features "$RECURSIVE_SSH_FEATURES"
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
@@ -509,15 +518,25 @@ jobs:
 
       - name: Build binary (unsigned)
         id: build_binary
-        run: script/bundle -Channel $CHANNEL -skip_build_installer --arch x64
-        shell: bash
+        run: >-
+          ./script/windows/bundle.ps1
+          -Channel $env:CHANNEL
+          -Features $env:RECURSIVE_SSH_FEATURES
+          -SKIP_BUILD_INSTALLER
+          -Arch x64
+        shell: pwsh
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
 
       - name: Bundle app (unsigned installer)
         id: bundle_app
-        run: script/bundle -Channel $CHANNEL -skip_build_binary --arch x64
-        shell: bash
+        run: >-
+          ./script/windows/bundle.ps1
+          -Channel $env:CHANNEL
+          -Features $env:RECURSIVE_SSH_FEATURES
+          -SKIP_BUILD_BINARY
+          -Arch x64
+        shell: pwsh
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
 
@@ -580,7 +599,7 @@ jobs:
         shell: bash
 
       - name: Check Linux release compile
-        run: script/bundle --check-only --channel "$CHANNEL" --arch x86_64 --packages appimage,deb
+        run: script/bundle --check-only --channel "$CHANNEL" --arch x86_64 --packages appimage,deb --features "$RECURSIVE_SSH_FEATURES"
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
@@ -595,7 +614,7 @@ jobs:
 
       - name: Build AppImage (unsigned)
         id: bundle_app
-        run: script/bundle --channel "$CHANNEL" --arch x86_64 --packages appimage,deb
+        run: script/bundle --channel "$CHANNEL" --arch x86_64 --packages appimage,deb --features "$RECURSIVE_SSH_FEATURES"
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
@@ -611,7 +630,7 @@ jobs:
       # continue-on-error: 即便 rpmbuild 失败也不应阻塞 AppImage/deb 已经成功的发布。
       - name: Build RPM package (reuse release-lto binary)
         continue-on-error: true
-        run: script/bundle --skip-build --channel "$CHANNEL" --arch x86_64 --packages rpm
+        run: script/bundle --skip-build --channel "$CHANNEL" --arch x86_64 --packages rpm --features "$RECURSIVE_SSH_FEATURES"
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
@@ -649,6 +668,7 @@ jobs:
             -w /work \
             -e GIT_RELEASE_TAG="${{ needs.prepare_metadata.outputs.release_tag }}" \
             -e WARP_BUNDLED_REMOTE_SERVER_DIR=/work/_bundled_remote_server/remote-server \
+            -e RECURSIVE_SSH_FEATURES="$RECURSIVE_SSH_FEATURES" \
             -e SKIP_SETTINGS_SCHEMA=1 \
             -e HOST_UID="$HOST_UID" \
             -e HOST_GID="$HOST_GID" \
@@ -675,7 +695,8 @@ jobs:
                   cd /work
                   # 容器里没透传 GITHUB_ACTIONS,所以显式带 --noconfirm。
                   MAKEPKG_EXTRA_ARGS='\''--noconfirm'\'' \
-                    script/bundle --skip-build --channel oss --arch x86_64 --packages arch
+                    script/bundle --skip-build --channel oss --arch x86_64 --packages arch \
+                      --features \"\$RECURSIVE_SSH_FEATURES\"
                 "
             '
         shell: bash
@@ -726,7 +747,7 @@ jobs:
           tag_name: ${{ needs.prepare_metadata.outputs.release_tag }}
           body_path: ./release-body.md
           draft: true
-          prerelease: false
+          prerelease: true
           make_latest: "false"
           files: dist/*
           token: ${{ secrets.GITHUB_TOKEN }}

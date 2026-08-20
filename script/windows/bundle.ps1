@@ -16,7 +16,8 @@ Param (
 
     [Alias('release-tag')]
     [String]$RELEASE_TAG = '',
-    [String]$FEATURES = 'release_bundle,crash_reporting,gui',
+    [Alias('features')]
+    [String]$EXTRA_FEATURES = '',
 
     # Builds only the InfiniShell binary, skips the installer.
     [Switch]$SKIP_BUILD_INSTALLER = $False,
@@ -61,6 +62,7 @@ if ($ARCH -eq 'arm64') {
 }
 
 $ErrorActionPreference = 'Stop'
+$FEATURES = 'release_bundle,crash_reporting,gui'
 
 function Assert-ValidSignature {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
@@ -177,6 +179,10 @@ if ($IS_TUI) {
 } else {
     # All app channels ship the v3 classifier and v2 heuristic.
     $FEATURES = "$FEATURES,nld_classifier_v3,nld_heuristic_v2"
+}
+
+if ($EXTRA_FEATURES) {
+    $FEATURES = "$FEATURES,$EXTRA_FEATURES"
 }
 
 $BINARY_PATH = "$CARGO_TARGET_OUTPUT_DIR\$BINARY_NAME"
