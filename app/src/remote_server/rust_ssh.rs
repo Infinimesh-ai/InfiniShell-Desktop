@@ -449,11 +449,34 @@ enum BrokerOperation {
 
 /// 建立单个 SSH session，启动本地 broker，并把交互 channel 映射到 stdio。
 pub fn run_session_worker(args: &RustSshSessionArgs) -> Result<i32> {
+    let args = resolve_session_worker_args(args)?;
     #[cfg(feature = "russh_transport")]
     if FeatureFlag::RusshTransport.is_enabled() {
-        return russh_backend::run_session_worker(args);
+        return russh_backend::run_session_worker(&args);
     }
-    run_ssh2_session_worker(args)
+    run_ssh2_session_worker(&args)
+}
+
+fn resolve_session_worker_args(args: &RustSshSessionArgs) -> Result<RustSshSessionArgs> {
+    let mut resolved = args.clone();
+    if !resolved.commands_base64 {
+        return Ok(resolved);
+    }
+
+    resolved.posix_command = decode_bootstrap_command(&resolved.posix_command, "POSIX")?;
+    resolved.windows_command = decode_bootstrap_command(&resolved.windows_command, "Windows")?;
+    resolved.commands_base64 = false;
+    Ok(resolved)
+}
+
+fn decode_bootstrap_command(encoded: &str, command_name: &str) -> Result<String> {
+    let decoded = base64::Engine::decode(
+        &base64::engine::general_purpose::STANDARD,
+        encoded.as_bytes(),
+    )
+    .with_context(|| format!("invalid base64 {command_name} bootstrap command"))?;
+    String::from_utf8(decoded)
+        .with_context(|| format!("{command_name} bootstrap command is not valid UTF-8"))
 }
 
 fn run_ssh2_session_worker(args: &RustSshSessionArgs) -> Result<i32> {

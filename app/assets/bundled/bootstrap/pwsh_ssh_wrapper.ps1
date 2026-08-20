@@ -179,6 +179,38 @@ function Warp-Get-SafeRemoteEnvironmentValue {
     return ''
 }
 
+function Warp-Encode-NativeCommandArgument {
+    param([string]$Command)
+
+    return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Command))
+}
+
+function Warp-New-RustSshWorkerArguments {
+    param(
+        [UInt64]$SessionId,
+        [UInt64]$RemoteSessionId,
+        [string]$SshExecutable,
+        [string]$PosixCommand,
+        [string]$WindowsCommand,
+        [object[]]$SshArgs
+    )
+
+    # Windows PowerShell 5.1 会用 legacy 规则重建 native command line。原始脚本中的
+    # 双引号会打断参数边界，例如把 `command -p mktemp` 的 `-p` 暴露给 clap。
+    $posixCommandBase64 = Warp-Encode-NativeCommandArgument $PosixCommand
+    $windowsCommandBase64 = Warp-Encode-NativeCommandArgument $WindowsCommand
+    return @(
+        'rust-ssh-session',
+        '--session-id', [string]$SessionId,
+        '--remote-session-id', [string]$RemoteSessionId,
+        '--ssh-executable', $SshExecutable,
+        '--commands-base64',
+        '--posix-command', $posixCommandBase64,
+        '--windows-command', $windowsCommandBase64,
+        '--'
+    ) + $SshArgs
+}
+
 function Warp-New-RemoteBootstrapCommand {
     param(
         [UInt64]$RemoteSessionId,
@@ -335,13 +367,14 @@ function Warp-Invoke-DirectEnhancedSsh {
         -RemoteSessionId $RemoteSessionId `
         -SshHookHex '' `
         -EmitSshHook $false
-    & $workerPath rust-ssh-session `
-        --session-id ([string]$global:_warpSessionId) `
-        --remote-session-id ([string]$RemoteSessionId) `
-        --ssh-executable $script:WarpSshExecutablePath `
-        --posix-command $posixBootstrapCommand `
-        --windows-command $windowsBootstrapCommand `
-        -- @SshArgs
+    $workerArgs = Warp-New-RustSshWorkerArguments `
+        -SessionId $global:_warpSessionId `
+        -RemoteSessionId $RemoteSessionId `
+        -SshExecutable $script:WarpSshExecutablePath `
+        -PosixCommand $posixBootstrapCommand `
+        -WindowsCommand $windowsBootstrapCommand `
+        -SshArgs $SshArgs
+    & $workerPath @workerArgs
 }
 
 function Warp-Invoke-EnhancedSsh {

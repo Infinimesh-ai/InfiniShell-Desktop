@@ -89,6 +89,9 @@ pub struct RustSshSessionArgs {
     /// 为远端 shell 生成的会话 ID。
     #[arg(long, hide = true)]
     pub remote_session_id: u64,
+    /// bootstrap 命令是否使用 UTF-8 Base64 编码，以安全穿过 PowerShell native argv。
+    #[arg(long, hide = true)]
+    pub commands_base64: bool,
     /// wrapper 已解析出的真实 OpenSSH 可执行文件，仅用于读取 `ssh -G` 配置。
     #[arg(long, hide = true)]
     pub ssh_executable: std::path::PathBuf,

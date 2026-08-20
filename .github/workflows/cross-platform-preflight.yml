@@ -137,9 +137,15 @@ jobs:
         shell: pwsh
         run: cargo check -p warp --lib
 
-      - name: Check InfiniShell SSH worker
+      - name: Build InfiniShell SSH worker
         shell: pwsh
-        run: cargo check -p warp --bin infinishell-ssh --features release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker,russh_transport
+        run: cargo build -p warp --bin infinishell-ssh --features release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker,russh_transport
+
+      - name: Test Windows PowerShell SSH worker arguments
+        shell: powershell
+        run: >-
+          .\script\windows\test_pwsh_ssh_worker.ps1
+          -WorkerPath "$env:CARGO_TARGET_DIR\debug\infinishell-ssh.exe"
 
       - name: Test Responses integration
         shell: pwsh

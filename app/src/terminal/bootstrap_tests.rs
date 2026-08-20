@@ -367,6 +367,25 @@ $env:WARP_SSH_REUSE_CONTROL_MASTER = '0'
 Warp-Invoke-EnhancedSsh -SshArgs @('remote-host', 'two words') 6>$null
 $fallbackStatus = $global:LASTEXITCODE
 $bootstrapCommand = Warp-New-RemoteBootstrapCommand -RemoteSessionId 42 -SshHookHex '7B7D'
+$windowsCommand = Warp-New-WindowsBootstrapCommand -RemoteSessionId 42 -SshHookHex '7B7D'
+$workerArgs = @(Warp-New-RustSshWorkerArguments `
+    -SessionId 99 `
+    -RemoteSessionId 42 `
+    -SshExecutable 'C:\Program Files\OpenSSH\ssh.exe' `
+    -PosixCommand $bootstrapCommand `
+    -WindowsCommand $windowsCommand `
+    -SshArgs @('-p', '2222', 'user@host'))
+$posixCommandIndex = [Array]::IndexOf($workerArgs, '--posix-command')
+$windowsCommandIndex = [Array]::IndexOf($workerArgs, '--windows-command')
+$separatorIndex = [Array]::IndexOf($workerArgs, '--')
+$encodedPosixCommand = $workerArgs[$posixCommandIndex + 1]
+$encodedWindowsCommand = $workerArgs[$windowsCommandIndex + 1]
+$decodedWorkerPosixCommand = [Text.Encoding]::UTF8.GetString(
+    [Convert]::FromBase64String($encodedPosixCommand)
+)
+$decodedWorkerWindowsCommand = [Text.Encoding]::UTF8.GetString(
+    [Convert]::FromBase64String($encodedWindowsCommand)
+)
 $capabilityProbeCommand = Warp-New-PowerShellCapabilityProbeCommand
 $encodedCapabilityProbe = ($capabilityProbeCommand -split ' ')[-1]
 $decodedCapabilityProbe = [Text.Encoding]::Unicode.GetString(
@@ -414,6 +433,13 @@ ConvertTo-Json -Compress -Depth 4 -InputObject @{
     decoded_capability_probe = $decodedCapabilityProbe
     fallback_status = $fallbackStatus
     closed_owned_control_master = $script:closedOwnedControlMaster
+    rust_worker_arguments = @{
+        uses_base64 = $workerArgs -contains '--commands-base64'
+        posix_round_trip = $decodedWorkerPosixCommand -ceq $bootstrapCommand
+        windows_round_trip = $decodedWorkerWindowsCommand -ceq $windowsCommand
+        native_safe = $encodedPosixCommand -cmatch '^[A-Za-z0-9+/]*={0,2}$' -and $encodedWindowsCommand -cmatch '^[A-Za-z0-9+/]*={0,2}$'
+        ssh_args = @($workerArgs[($separatorIndex + 1)..($workerArgs.Count - 1)])
+    }
     remote_bootstrap_syntax = $remoteBootstrapSyntax
 }
 "#;
@@ -523,6 +549,16 @@ ConvertTo-Json -Compress -Depth 4 -InputObject @{
     assert!(decoded_capability_probe.contains("__WARP_REMOTE_CAPS__v=1"));
     assert!(decoded_capability_probe.contains("os={0};shell=powershell"));
     assert_eq!(result["closed_owned_control_master"], json!(false));
+    assert_eq!(
+        result["rust_worker_arguments"],
+        json!({
+            "uses_base64": true,
+            "posix_round_trip": true,
+            "windows_round_trip": true,
+            "native_safe": true,
+            "ssh_args": ["-p", "2222", "user@host"]
+        })
+    );
     let remote_bootstrap_syntax = result["remote_bootstrap_syntax"]
         .as_array()
         .expect("远端 bootstrap 语法检查结果应为数组");

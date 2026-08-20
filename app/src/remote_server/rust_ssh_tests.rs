@@ -595,6 +595,7 @@ fn native_fallback_preserves_a_remote_status_that_was_previously_reserved() {
     let args = RustSshSessionArgs {
         session_id: 1,
         remote_session_id: 2,
+        commands_base64: false,
         ssh_executable: "/bin/sh".into(),
         posix_command: String::new(),
         windows_command: String::new(),
@@ -626,6 +627,7 @@ fn unknown_effective_config_falls_back_with_the_original_arguments_before_connec
     let args = RustSshSessionArgs {
         session_id: 1,
         remote_session_id: 2,
+        commands_base64: false,
         ssh_executable: executable,
         posix_command: String::new(),
         windows_command: String::new(),
@@ -636,5 +638,66 @@ fn unknown_effective_config_falls_back_with_the_original_arguments_before_connec
     assert_eq!(
         std::fs::read_to_string(recorded_arguments).unwrap(),
         "-F\nconfig with spaces\nalice@test\n"
+    );
+}
+
+#[test]
+fn base64_session_commands_are_decoded_before_use() {
+    let args = RustSshSessionArgs {
+        session_id: 1,
+        remote_session_id: 2,
+        commands_base64: true,
+        ssh_executable: "ssh.exe".into(),
+        posix_command: "cHJpbnRmICclc1xuJyAiJDEiIHwgY29tbWFuZCAtcCB4eGQgLXAgLXI=".into(),
+        windows_command: "cG93ZXJzaGVsbC5leGUgLU5vTG9nbyAtTm9FeGl0".into(),
+        ssh_args: Vec::new(),
+    };
+
+    let resolved = resolve_session_worker_args(&args).unwrap();
+
+    assert!(!resolved.commands_base64);
+    assert_eq!(
+        resolved.posix_command,
+        "printf '%s\\n' \"$1\" | command -p xxd -p -r"
+    );
+    assert_eq!(resolved.windows_command, "powershell.exe -NoLogo -NoExit");
+}
+
+#[test]
+fn raw_session_commands_remain_supported_for_running_shells_during_update() {
+    let args = RustSshSessionArgs {
+        session_id: 1,
+        remote_session_id: 2,
+        commands_base64: false,
+        ssh_executable: "ssh.exe".into(),
+        posix_command: "printf '%s\\n' \"$1\" | command -p xxd -p -r".into(),
+        windows_command: "powershell.exe -NoLogo -NoExit".into(),
+        ssh_args: Vec::new(),
+    };
+
+    let resolved = resolve_session_worker_args(&args).unwrap();
+
+    assert_eq!(resolved.posix_command, args.posix_command);
+    assert_eq!(resolved.windows_command, args.windows_command);
+}
+
+#[test]
+fn invalid_base64_session_command_is_rejected_before_connecting() {
+    let args = RustSshSessionArgs {
+        session_id: 1,
+        remote_session_id: 2,
+        commands_base64: true,
+        ssh_executable: "ssh.exe".into(),
+        posix_command: "not base64".into(),
+        windows_command: "cG93ZXJzaGVsbA==".into(),
+        ssh_args: Vec::new(),
+    };
+
+    let error = resolve_session_worker_args(&args).unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("invalid base64 POSIX bootstrap command")
     );
 }
