@@ -1674,6 +1674,13 @@ fn add_overflow_menu_items_as_editable_binding(app: &mut AppContext) {
         .with_context_predicate(id!("Workspace")),
         #[cfg(not(target_family = "wasm"))]
         EditableBinding::new(
+            "workspace:cleanup_storage",
+            crate::t!("keybinding-desc-workspace-cleanup-storage"),
+            WorkspaceAction::CleanupStorage,
+        )
+        .with_context_predicate(id!("Workspace")),
+        #[cfg(not(target_family = "wasm"))]
+        EditableBinding::new(
             "workspace:view_logs",
             crate::t!("keybinding-desc-workspace-view-logs"),
             WorkspaceAction::ViewLogs,

@@ -94,6 +94,8 @@ use warpui::elements::{
 use warpui::fonts::{Properties, Weight};
 use warpui::geometry::vector::{Vector2F, vec2f};
 use warpui::keymap::Context;
+#[cfg(not(target_family = "wasm"))]
+use warpui::modals::ModalButton;
 use warpui::modals::{AlertDialogWithCallbacks, AppModalCallback};
 use warpui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
 use warpui::platform::{
@@ -356,6 +358,8 @@ use crate::terminal::model::blockgrid::BlockGrid;
 #[cfg(feature = "local_fs")]
 use crate::terminal::model::session::Session;
 use crate::terminal::model::session::SessionId;
+#[cfg(all(not(target_family = "wasm"), feature = "local_fs"))]
+use crate::terminal::model::session::command_executor::{ExecuteCommandOptions, shell_quote_arg};
 use crate::terminal::model::terminal_model::ConversationTranscriptViewerStatus;
 use crate::terminal::resizable_data::{
     DEFAULT_LEFT_PANEL_WIDTH, DEFAULT_RIGHT_PANEL_WIDTH, ModalSizes, ModalType, ResizableData,
@@ -6443,6 +6447,227 @@ impl Workspace {
 
     fn send_feedback(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.open_url(&links::feedback_form_url());
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    fn show_storage_cleanup_message(&mut self, message: String, ctx: &mut ViewContext<Self>) {
+        let dialog = AlertDialogWithCallbacks::for_view(
+            crate::t!("storage-cleanup-title"),
+            message,
+            vec![ModalButton::for_view(
+                crate::t!("common-ok"),
+                |_: &mut Workspace, _| {},
+            )],
+            |_, _| {},
+        );
+        ctx.show_native_platform_modal(dialog);
+    }
+
+    #[cfg(all(not(target_family = "wasm"), feature = "local_fs"))]
+    fn cleanup_storage(&mut self, ctx: &mut ViewContext<Self>) {
+        use crate::remote_server::setup::{RemoteOs, remote_server_binary_name};
+        use crate::storage_cleanup::remote_extensions::{parse_scan_output, scan_script};
+        use crate::terminal::model::session::SessionType;
+
+        let Some(session) = self.get_active_session(ctx).filter(|session| {
+            matches!(session.session_type(), SessionType::WarpifiedRemote { .. })
+                && session.is_ssh_wrapper_session()
+        }) else {
+            self.show_storage_cleanup_message(crate::t!("storage-cleanup-no-remote"), ctx);
+            return;
+        };
+        let shell_type = session.shell().shell_type();
+        if shell_type == ShellType::PowerShell {
+            self.show_storage_cleanup_message(crate::t!("storage-cleanup-unsupported-shell"), ctx);
+            return;
+        }
+
+        let host = format!("{}@{}", session.user(), session.hostname());
+        let current_file_name = remote_server_binary_name(&RemoteOs::Linux);
+        let command = format!("sh -c {}", shell_quote_arg(scan_script(), shell_type));
+        let session_for_cleanup = session.clone();
+        ctx.spawn(
+            async move {
+                let output = session
+                    .execute_command(
+                        &command,
+                        None,
+                        None,
+                        ExecuteCommandOptions {
+                            run_command_in_same_shell_as_session: false,
+                        },
+                    )
+                    .await?;
+                if !output.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(anyhow::anyhow!("{stderr}"));
+                }
+                let stdout = String::from_utf8(output.stdout)?;
+                Ok(parse_scan_output(&stdout, &current_file_name))
+            },
+            move |me, result, ctx| {
+                let versions = match result {
+                    Ok(versions) => versions,
+                    Err(error) => {
+                        let error = format!("{error:#}");
+                        me.show_storage_cleanup_message(
+                            crate::t!("storage-cleanup-scan-failed", error = error.as_str()),
+                            ctx,
+                        );
+                        return;
+                    }
+                };
+                let candidates = versions
+                    .into_iter()
+                    .filter(|version| version.can_remove())
+                    .collect::<Vec<_>>();
+                if candidates.is_empty() {
+                    me.show_storage_cleanup_message(
+                        crate::t!("storage-cleanup-no-unused", host = host.as_str()),
+                        ctx,
+                    );
+                    return;
+                }
+
+                let size_bytes = candidates.iter().map(|version| version.size_bytes).sum();
+                let size = crate::storage_cleanup::format_bytes(size_bytes);
+                let version_list = candidates
+                    .iter()
+                    .map(|version| {
+                        format!(
+                            "• {} ({})",
+                            version.file_name,
+                            crate::storage_cleanup::format_bytes(version.size_bytes)
+                        )
+                    })
+                    .join("\n");
+                let info = format!(
+                    "{}\n\n{version_list}",
+                    crate::t!("storage-cleanup-confirm-info", size = size.as_str())
+                );
+                let title = crate::t!("storage-cleanup-confirm-title", host = host.as_str());
+                let dialog = AlertDialogWithCallbacks::for_view(
+                    title,
+                    info,
+                    vec![
+                        ModalButton::for_view(
+                            crate::t!("storage-cleanup-confirm-button"),
+                            move |me: &mut Workspace, ctx| {
+                                me.cleanup_remote_versions_confirmed(
+                                    session_for_cleanup,
+                                    candidates,
+                                    ctx,
+                                );
+                            },
+                        ),
+                        ModalButton::for_view(
+                            crate::t!("common-cancel"),
+                            |_: &mut Workspace, _| {},
+                        ),
+                    ],
+                    |_, _| {},
+                );
+                ctx.show_native_platform_modal(dialog);
+            },
+        );
+    }
+
+    #[cfg(all(not(target_family = "wasm"), feature = "local_fs"))]
+    fn cleanup_remote_versions_confirmed(
+        &mut self,
+        session: Arc<Session>,
+        candidates: Vec<crate::storage_cleanup::remote_extensions::InstalledVersion>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        use crate::remote_server::setup::{RemoteOs, remote_server_binary_name};
+        use crate::storage_cleanup::remote_extensions::{cleanup_script, parse_cleanup_output};
+
+        let file_names = candidates
+            .iter()
+            .map(|version| version.file_name.clone())
+            .collect::<Vec<_>>();
+        let current_file_name = remote_server_binary_name(&RemoteOs::Linux);
+        let script = match cleanup_script(&file_names, &current_file_name) {
+            Ok(script) => script,
+            Err(error) => {
+                let error = format!("{error:#}");
+                self.show_storage_cleanup_message(
+                    crate::t!("storage-cleanup-failed", error = error.as_str()),
+                    ctx,
+                );
+                return;
+            }
+        };
+        let shell_type = session.shell().shell_type();
+        let command = format!("sh -c {}", shell_quote_arg(&script, shell_type));
+        ctx.spawn(
+            async move {
+                let output = session
+                    .execute_command(
+                        &command,
+                        None,
+                        None,
+                        ExecuteCommandOptions {
+                            run_command_in_same_shell_as_session: false,
+                        },
+                    )
+                    .await?;
+                if !output.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(anyhow::anyhow!("{stderr}"));
+                }
+                let stdout = String::from_utf8(output.stdout)?;
+                Ok(parse_cleanup_output(&stdout))
+            },
+            move |me, result, ctx| match result {
+                Ok(result) => {
+                    let removed = result.removed.iter().collect::<HashSet<_>>();
+                    let removed_size = candidates
+                        .iter()
+                        .filter(|version| removed.contains(&version.file_name))
+                        .map(|version| version.size_bytes)
+                        .sum();
+                    let skipped = result.skipped_current.len()
+                        + result.skipped_running.len()
+                        + result.missing.len()
+                        + result.failed.len();
+                    let toast = if skipped == 0 && result.removed.len() == candidates.len() {
+                        let count = result.removed.len();
+                        let size = crate::storage_cleanup::format_bytes(removed_size);
+                        DismissibleToast::success(crate::t!(
+                            "storage-cleanup-success",
+                            count = count,
+                            size = size.as_str()
+                        ))
+                    } else {
+                        DismissibleToast::error(crate::t!(
+                            "storage-cleanup-partial",
+                            removed = result.removed.len(),
+                            skipped = skipped
+                        ))
+                    };
+                    me.toast_stack.update(ctx, |stack, ctx| {
+                        if skipped == 0 {
+                            stack.add_ephemeral_toast(toast, ctx);
+                        } else {
+                            stack.add_persistent_toast(toast, ctx);
+                        }
+                    });
+                }
+                Err(error) => {
+                    let error = format!("{error:#}");
+                    me.toast_stack.update(ctx, |stack, ctx| {
+                        stack.add_persistent_toast(
+                            DismissibleToast::error(crate::t!(
+                                "storage-cleanup-failed",
+                                error = error.as_str()
+                            )),
+                            ctx,
+                        );
+                    });
+                }
+            },
+        );
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -22748,6 +22973,12 @@ impl TypedActionView for Workspace {
             ViewLatestChangelog => self.view_latest_changelog(ctx),
             ViewPrivacyPolicy => self.view_privacy_policy(ctx),
             SendFeedback => self.send_feedback(ctx),
+            #[cfg(all(not(target_family = "wasm"), feature = "local_fs"))]
+            CleanupStorage => self.cleanup_storage(ctx),
+            #[cfg(all(not(target_family = "wasm"), not(feature = "local_fs")))]
+            CleanupStorage => {
+                self.show_storage_cleanup_message(crate::t!("storage-cleanup-no-remote"), ctx)
+            }
             #[cfg(not(target_family = "wasm"))]
             ViewLogs => self.view_logs(ctx),
             #[cfg(not(target_family = "wasm"))]

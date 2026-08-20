@@ -211,6 +211,18 @@ app-menu-help = 帮助
 app-menu-warp-documentation = InfiniShell 文档...
 app-menu-github-issues = GitHub Issues...
 app-menu-warp-slack-community = InfiniShell Slack 社区...
+app-menu-cleanup-storage = 清理存储空间...
+storage-cleanup-title = 清理存储空间
+storage-cleanup-no-remote = 请打开并聚焦一个已连接的 SSH 会话，以扫描该远端安装的 InfiniShell 扩展版本。
+storage-cleanup-unsupported-shell = 远端存储清理目前仅支持 POSIX SSH 主机。
+storage-cleanup-scan-failed = 无法扫描远端服务器：{ $error }
+storage-cleanup-no-unused = { $host } 上没有可清理的远端扩展版本。
+storage-cleanup-confirm-title = 清理 { $host } 上未使用的扩展？
+storage-cleanup-confirm-info = 以下版本既不是当前版本，也没有正在运行，将被删除（{ $size }）：
+storage-cleanup-confirm-button = 清理
+storage-cleanup-success = 已删除 { $count } 个未使用的远端扩展版本，释放 { $size }。
+storage-cleanup-failed = 清理远端扩展版本失败：{ $error }
+storage-cleanup-partial = 已删除 { $removed } 个版本；另有 { $skipped } 个版本受保护或无法删除。
 workspace-update-and-relaunch-warp = 更新并重启 InfiniShell
 workspace-updating-to-version = 正在更新到（{ $version }）
 workspace-update-warp-manually = 手动更新 InfiniShell
@@ -1799,6 +1811,7 @@ keybinding-desc-workspace-link-to-user-docs = 查看用户文档（打开外部�
 keybinding-desc-workspace-send-feedback = 发送反馈（打开外部链接）
 keybinding-desc-workspace-send-feedback-oz = 用 InfiniShell Agent 发送反馈
 keybinding-desc-workspace-view-logs = 查看 InfiniShell 日志
+keybinding-desc-workspace-cleanup-storage = 清理本机和远端存储空间
 keybinding-desc-workspace-link-to-privacy-policy = 查看隐私政策（打开外部链接）
 
 # 输入 / 终端 / 项目相关 binding（注册在 workspace/mod.rs 之外）

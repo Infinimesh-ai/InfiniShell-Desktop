@@ -78,6 +78,8 @@ mod sftp_manager;
 mod shell_indicator;
 mod skill_manager;
 mod ssh_manager;
+#[cfg(not(target_family = "wasm"))]
+mod storage_cleanup;
 mod suggestions;
 mod system;
 mod tab;

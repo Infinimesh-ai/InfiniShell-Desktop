@@ -216,6 +216,18 @@ app-menu-help = Help
 app-menu-warp-documentation = InfiniShell Documentation...
 app-menu-github-issues = GitHub Issues...
 app-menu-warp-slack-community = InfiniShell Slack Community...
+app-menu-cleanup-storage = Clean Up Storage...
+storage-cleanup-title = Clean Up Storage
+storage-cleanup-no-remote = Open and focus a connected SSH session to scan its installed InfiniShell extension versions.
+storage-cleanup-unsupported-shell = Remote storage cleanup currently supports POSIX SSH hosts only.
+storage-cleanup-scan-failed = Could not scan the remote server: { $error }
+storage-cleanup-no-unused = No unused remote extension versions were found on { $host }.
+storage-cleanup-confirm-title = Clean up unused extensions on { $host }?
+storage-cleanup-confirm-info = The following versions are not current or running and will be removed ({ $size }):
+storage-cleanup-confirm-button = Clean Up
+storage-cleanup-success = Removed { $count } unused remote extension versions and freed { $size }.
+storage-cleanup-failed = Failed to clean up remote extension versions: { $error }
+storage-cleanup-partial = Removed { $removed } versions; { $skipped } were protected or could not be removed.
 workspace-update-and-relaunch-warp = Update and relaunch InfiniShell
 workspace-updating-to-version = Updating to ({ $version })
 workspace-update-warp-manually = Update InfiniShell manually
@@ -1876,6 +1888,7 @@ keybinding-desc-workspace-link-to-user-docs = View user docs (opens external lin
 keybinding-desc-workspace-send-feedback = Send feedback (opens external link)
 keybinding-desc-workspace-send-feedback-oz = Send feedback with InfiniShell Agent
 keybinding-desc-workspace-view-logs = View InfiniShell logs
+keybinding-desc-workspace-cleanup-storage = Clean up local and remote storage
 keybinding-desc-workspace-link-to-privacy-policy = View privacy policy (opens external link)
 
 # Input / terminal / project bindings (registered outside workspace/mod.rs)
