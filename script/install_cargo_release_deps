@@ -24,9 +24,6 @@ if [ "$NO_BUILD_DEPS" = false ]; then
   "$PWD"/script/install_cargo_build_deps
 fi
 
-# Needed even with --no-build-deps, which skips the script that would otherwise
-# provide binstall.
-"$PWD"/script/install_cargo_binstall
-
-# Install cargo-about for generating third-party license attribution.
-cargo binstall --no-confirm cargo-about@0.9.1
+# cargo-about 0.9.1 把可执行文件放在 `cli` feature 后；cargo-binstall 从源码
+# fallback 时不会启用该 feature，因此这里显式安装。
+cargo install --locked --version 0.9.1 --features cli cargo-about
