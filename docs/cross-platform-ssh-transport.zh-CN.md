@@ -5,6 +5,9 @@
 最后更新:2026-08-16  
 英文版:[cross-platform-ssh-transport.md](cross-platform-ssh-transport.md)
 
+Windows 远端扩展的原生构建、协议 E2E、fast-dev `.app`、版本化归档和排障流程见
+[Windows SSH 扩展开发指南](windows-ssh-extension-development.zh-CN.md)。
+
 ## 目标与不变条件
 
 目标是将 InfiniShell 的 shell 集成和 remote-server 扩展到 Windows,同时不破坏

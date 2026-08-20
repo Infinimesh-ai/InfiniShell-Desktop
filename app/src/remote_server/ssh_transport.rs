@@ -205,13 +205,15 @@ impl SshTransport {
         timeout: std::time::Duration,
     ) -> Result<(), Error> {
         let command = setup_command_line(&upload_command(&self.remote_os, remote_path));
-        let mut child = match &self.backend {
+        let child = match &self.backend {
             SshTransportBackend::ControlMaster { socket_path, .. } => {
+                let file =
+                    std::fs::File::open(local_path).map_err(|error| Error::Other(error.into()))?;
                 let mut args = ssh_args(socket_path);
                 args.push(command);
                 command::r#async::Command::new("ssh")
                     .args(&args)
-                    .stdin(std::process::Stdio::piped())
+                    .stdin(std::process::Stdio::from(file))
                     .stdout(std::process::Stdio::piped())
                     .stderr(std::process::Stdio::piped())
                     .kill_on_drop(true)
@@ -224,17 +226,24 @@ impl SshTransport {
             } => {
                 let executable = crate::remote_server::rust_ssh::worker_executable()
                     .map_err(|error| Error::Other(error.into()))?;
-                command::r#async::Command::new(executable)
+                let mut child = command::r#async::Command::new(executable);
+                child
                     .arg("rust-ssh-broker-command")
                     .arg("--endpoint")
                     .arg(endpoint)
-                    .arg("--command")
-                    .arg(command)
+                    .arg("--upload-path")
+                    .arg(remote_path)
+                    .arg("--stdin-file")
+                    .arg(local_path);
+                if self.remote_os == RemoteOs::Windows {
+                    child.arg("--upload-windows");
+                }
+                child
                     .env(
                         crate::remote_server::rust_ssh::BROKER_CAPABILITY_ENV,
                         capability,
                     )
-                    .stdin(std::process::Stdio::piped())
+                    .stdin(std::process::Stdio::null())
                     .stdout(std::process::Stdio::piped())
                     .stderr(std::process::Stdio::piped())
                     .kill_on_drop(true)
@@ -242,22 +251,12 @@ impl SshTransport {
                     .map_err(|error| Error::Other(error.into()))?
             }
         };
-        let mut stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| Error::Other(anyhow!("SSH upload process has no stdin")))?;
-        let mut file = async_fs::File::open(local_path)
+        let output = child
+            .output()
+            .with_timeout(timeout)
             .await
+            .map_err(|_| Error::TimedOut)?
             .map_err(|error| Error::Other(error.into()))?;
-        let output = async move {
-            futures_lite::io::copy(&mut file, &mut stdin).await?;
-            drop(stdin);
-            child.output().await
-        }
-        .with_timeout(timeout)
-        .await
-        .map_err(|_| Error::TimedOut)?
-        .map_err(|error| Error::Other(error.into()))?;
         if output.status.success() {
             Ok(())
         } else {
@@ -316,12 +315,23 @@ impl SshTransport {
             uuid::Uuid::new_v4(),
             archive_extension,
         );
-        self.upload_file(
-            local_archive,
-            &remote_path,
-            remote_server::setup::SCP_INSTALL_TIMEOUT,
-        )
-        .await?;
+        if let Some((socket_path, _)) = self.control_master() {
+            remote_server::ssh::scp_upload(
+                socket_path,
+                local_archive,
+                &remote_path,
+                remote_server::setup::SCP_INSTALL_TIMEOUT,
+            )
+            .await
+            .map_err(Error::Other)?;
+        } else {
+            self.upload_file(
+                local_archive,
+                &remote_path,
+                remote_server::setup::SCP_INSTALL_TIMEOUT,
+            )
+            .await?;
+        }
         self.install_for_platform(platform, Some(&remote_path))
             .await
     }
@@ -329,7 +339,7 @@ impl SshTransport {
 
 pub(crate) fn setup_command_line(command: &RemoteSetupCommand) -> String {
     match command.dialect {
-        RemoteShellDialect::Posix => command.script.clone(),
+        RemoteShellDialect::Posix | RemoteShellDialect::WindowsCmd => command.script.clone(),
         RemoteShellDialect::PowerShell => {
             let bytes = command
                 .script
@@ -841,29 +851,7 @@ impl RemoteTransport for SshTransport {
     fn check_has_old_binary(&self) -> Pin<Box<dyn Future<Output = anyhow::Result<bool>> + Send>> {
         let transport = self.clone();
         Box::pin(async move {
-            // Treat the existence of the remote-server install directory
-            // itself as evidence of a prior install. If `~/.warp-XX/remote-server`
-            // exists, something was installed there before, so any mismatch
-            // with the client's expected binary path should be auto-updated
-            // rather than surfaced as a first-time install prompt.
-            let command = match transport.remote_os {
-                RemoteOs::Linux | RemoteOs::MacOs => RemoteSetupCommand {
-                    dialect: RemoteShellDialect::Posix,
-                    script: format!("test -d {}", remote_server::setup::remote_server_dir()),
-                },
-                RemoteOs::Windows => {
-                    let relative_dir = remote_server::setup::remote_server_dir()
-                        .trim_start_matches("~/")
-                        .replace('/', "\\");
-                    RemoteSetupCommand {
-                        dialect: RemoteShellDialect::PowerShell,
-                        script: format!(
-                            "$dir = Join-Path $HOME '{}'; if (Test-Path -LiteralPath $dir -PathType Container) {{ exit 0 }} else {{ exit 1 }}",
-                            relative_dir.replace('\'', "''")
-                        ),
-                    }
-                }
-            };
+            let command = remote_server::setup::old_binary_check_command_for(&transport.remote_os);
             let output = transport
                 .run_setup_command(command, remote_server::setup::CHECK_TIMEOUT)
                 .await

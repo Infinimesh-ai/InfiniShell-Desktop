@@ -249,6 +249,18 @@ impl BlockType {
     pub fn is_bootstrap_block(&self) -> bool {
         matches!(self, Self::BootstrapHidden | Self::BootstrapVisible(_))
     }
+
+    pub(crate) fn session_restoration_data(&self) -> Option<(&Arc<SerializedBlock>, Option<&str>)> {
+        match self {
+            Self::User(block) => Some((&block.serialized_block, Some(&block.command))),
+            Self::Background(block) => Some((block, None)),
+            Self::BootstrapHidden
+            | Self::BootstrapVisible(_)
+            | Self::Restored
+            | Self::InBandCommand
+            | Self::Static => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

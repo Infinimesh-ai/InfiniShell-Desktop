@@ -1,7 +1,6 @@
-//! Unit tests for the `ai_queries` persistence layer in [`super`].
+//! Unit tests for the block-list persistence layer in [`super`].
 //!
-//! Covers the FIFO eviction cap added to [`super::upsert_ai_query`] and the empty-input filter
-//! that drives the persistence skip in `handle_ai_history_event`.
+//! Covers session restoration and AI query history persistence behavior.
 
 use std::sync::Arc;
 
@@ -11,13 +10,20 @@ use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 use diesel_migrations::MigrationHarness;
 
 use super::{
-    process_ai_queries_for_nld_history_match, process_ai_queries_for_uparrow_prompt,
-    read_recent_ai_queries, upsert_ai_query_with_limit,
+    get_all_restored_blocks, process_ai_queries_for_nld_history_match,
+    process_ai_queries_for_uparrow_prompt, read_recent_ai_queries, save_block,
+    upsert_ai_query_with_limit,
 };
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{AIAgentExchangeId, AIAgentInput, UserQueryMode};
-use crate::ai::blocklist::{AIQueryHistoryOutputStatus, PersistedAIInput, PersistedAIInputType};
+use crate::ai::blocklist::{
+    AIQueryHistoryOutputStatus, PersistedAIInput, PersistedAIInputType, SerializedBlockListItem,
+};
 use crate::ai::llms::LLMId;
+use crate::persistence::{model, schema};
+use crate::terminal::ShellHost;
+use crate::terminal::model::block::SerializedBlock;
+use crate::terminal::shell::ShellType;
 
 /// Builds an in-memory SQLite database with all migrations applied.
 fn test_connection() -> SqliteConnection {
@@ -26,6 +32,93 @@ fn test_connection() -> SqliteConnection {
     conn.run_pending_migrations(::persistence::MIGRATIONS)
         .expect("migrations should run");
     conn
+}
+
+#[test]
+fn restoration_ignores_legacy_visible_bootstrap_blocks() {
+    let mut conn = test_connection();
+    let pane_uuid = vec![7; 16];
+    diesel::insert_into(schema::windows::table)
+        .values(model::NewWindow {
+            active_tab_index: 0,
+            window_width: None,
+            window_height: None,
+            origin_x: None,
+            origin_y: None,
+            quake_mode: false,
+            universal_search_width: None,
+            warp_ai_width: None,
+            voltron_width: None,
+            warp_drive_index_width: None,
+            fullscreen_state: 0,
+            agent_management_filters: None,
+            left_panel_open: None,
+            vertical_tabs_panel_open: None,
+            theme_override: None,
+            team_uid: None,
+        })
+        .execute(&mut conn)
+        .expect("window should be inserted");
+    diesel::insert_into(schema::tabs::table)
+        .values(model::NewTab {
+            window_id: 1,
+            custom_title: None,
+            color: None,
+            tab_group_id: None,
+            pinned: false,
+        })
+        .execute(&mut conn)
+        .expect("tab should be inserted");
+    diesel::insert_into(schema::pane_nodes::table)
+        .values(model::NewPaneNode {
+            tab_id: 1,
+            parent_pane_node_id: None,
+            flex: None,
+            is_leaf: true,
+        })
+        .execute(&mut conn)
+        .expect("pane node should be inserted");
+    diesel::insert_into(schema::pane_leaves::table)
+        .values((
+            schema::pane_leaves::pane_node_id.eq(1),
+            schema::pane_leaves::kind.eq(model::TERMINAL_PANE_KIND),
+            schema::pane_leaves::is_focused.eq(true),
+            schema::pane_leaves::custom_vertical_tabs_title.eq(None::<String>),
+        ))
+        .execute(&mut conn)
+        .expect("pane leaf should be inserted");
+    diesel::insert_into(schema::terminal_panes::table)
+        .values(model::NewTerminalPane {
+            id: 1,
+            uuid: pane_uuid.clone(),
+            cwd: Some("/tmp".to_owned()),
+            is_active: true,
+            shell_launch_data: None,
+            input_config: None,
+            llm_model_override: None,
+            active_profile_id: None,
+            conversation_ids: None,
+            active_conversation_id: None,
+        })
+        .execute(&mut conn)
+        .expect("terminal pane should be inserted");
+    let bootstrap = SerializedBlock::new_for_test(b"Welcome to Ubuntu".to_vec(), Vec::new());
+    let mut user_command = SerializedBlock::new_for_test(b"echo ready".to_vec(), Vec::new());
+    user_command.shell_host = Some(ShellHost {
+        shell_type: ShellType::Bash,
+        user: "test-user".to_owned(),
+        hostname: "test-host".to_owned(),
+    });
+    save_block(&mut conn, pane_uuid.clone(), &bootstrap, true)
+        .expect("bootstrap block should be inserted");
+    save_block(&mut conn, pane_uuid, &user_command, true).expect("user block should be inserted");
+
+    let restored = get_all_restored_blocks(&mut conn).expect("blocks should be restored");
+    let restored_blocks: Vec<_> = restored.into_values().flatten().collect();
+
+    assert_eq!(restored_blocks.len(), 1);
+    let SerializedBlockListItem::Command { block } = &restored_blocks[0];
+    assert_eq!(block.stylized_command, b"echo ready");
 }
 
 /// Builds a query-bearing [`PersistedAIInput`] with a fresh, unique `exchange_id`.

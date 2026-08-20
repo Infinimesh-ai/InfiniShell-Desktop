@@ -1109,17 +1109,6 @@ impl AgentConversationsModel {
     pub fn is_task_manually_opened(&self, task_id: &AmbientAgentTaskId) -> bool {
         self.manually_opened_task_ids.contains(task_id)
     }
-
-    /// Clears all stored conversation and task data in memory.
-    #[allow(dead_code)]
-    pub(crate) fn reset(&mut self) {
-        self.tasks.clear();
-        self.conversations.clear();
-        self.active_data_consumers_per_window.clear();
-        self.manually_opened_task_ids.clear();
-        // Zap:没有云端阶段需要重新等待,清空后即视为已完成本地加载。
-        self.has_finished_initial_load = true;
-    }
 }
 
 #[cfg(test)]

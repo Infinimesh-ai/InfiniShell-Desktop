@@ -659,7 +659,7 @@ impl Input {
             return Empty::new().finish();
         };
         let ambient_agent_model = ambient_agent_model.as_ref(app);
-        let mut stack = Stack::new().with_constrain_absolute_children();
+        let stack = Stack::new().with_constrain_absolute_children();
 
         // Don't render status bar when agent has failed or is waiting for session
         let show_status_bar = ambient_agent_model.error_message().is_none()

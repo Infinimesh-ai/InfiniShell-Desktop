@@ -1,16 +1,15 @@
 //! Windows `remote-server-proxy`:通过 named pipe 连接常驻 daemon。
 
 use std::hash::{Hash, Hasher};
-use std::io::{Read, Write};
-use std::os::windows::io::{AsRawHandle, FromRawHandle};
+use std::io::{Read as _, Write as _};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
-use interprocess::local_socket::LocalSocketStream;
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeClient};
 use windows::Win32::Foundation::{
     CloseHandle, HANDLE, WAIT_ABANDONED, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
-use windows::Win32::System::IO::CancelIoEx;
 use windows::Win32::System::Threading::{CreateMutexW, ReleaseMutex, WaitForSingleObject};
 use windows::core::PCWSTR;
 
@@ -77,20 +76,25 @@ impl Drop for StartupMutex {
 }
 
 pub fn run(identity_key: &str) -> anyhow::Result<()> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_io()
+        .build()?;
+    let runtime_guard = runtime.enter();
     let startup_mutex = StartupMutex::acquire(identity_key)?;
     let pipe_name = pipe_name(identity_key);
-    let stream = match LocalSocketStream::connect(pipe_name.as_str()) {
+    let stream = match connect_pipe(&pipe_name) {
         Ok(stream) => stream,
         Err(_) => start_daemon_and_connect(identity_key, &pipe_name)?,
     };
     drop(startup_mutex);
-    bridge_stdio_to_pipe(stream)
+    drop(runtime_guard);
+    runtime.block_on(bridge_stdio_to_pipe(stream))
 }
 
 fn start_daemon_and_connect(
     identity_key: &str,
     pipe_name: &str,
-) -> anyhow::Result<LocalSocketStream> {
+) -> anyhow::Result<NamedPipeClient> {
     let exe = std::env::current_exe()?;
     let mut command = command::blocking::Command::new(exe);
     command
@@ -108,7 +112,7 @@ fn start_daemon_and_connect(
 
     let start = Instant::now();
     loop {
-        match LocalSocketStream::connect(pipe_name) {
+        match connect_pipe(pipe_name) {
             Ok(stream) => return Ok(stream),
             Err(error) if start.elapsed() >= DAEMON_STARTUP_TIMEOUT => {
                 return Err(anyhow::Error::new(error)
@@ -125,79 +129,83 @@ fn start_daemon_and_connect(
     }
 }
 
-#[derive(Clone, Copy)]
-struct ShareableHandle(usize);
-
-impl ShareableHandle {
-    fn cancel_io(self) {
-        unsafe {
-            let _ = CancelIoEx(HANDLE(self.0 as *mut std::ffi::c_void), None);
-        }
-    }
+pub(super) fn connect_pipe(pipe_name: &str) -> std::io::Result<NamedPipeClient> {
+    ClientOptions::new().open(format!(r"\\.\pipe\{pipe_name}"))
 }
 
-fn bridge_stdio_to_pipe(mut write_stream: LocalSocketStream) -> anyhow::Result<()> {
-    let mut read_stream = duplicate_stream(&write_stream)?;
-    let read_handle = ShareableHandle(read_stream.as_raw_handle() as usize);
-    let write_handle = ShareableHandle(write_stream.as_raw_handle() as usize);
-    let (finished_tx, finished_rx) = std::sync::mpsc::channel();
-
-    let finished_tx_stdin = finished_tx.clone();
+async fn bridge_stdio_to_pipe(stream: NamedPipeClient) -> anyhow::Result<()> {
+    let (mut pipe_reader, mut pipe_writer) = tokio::io::split(stream);
+    let (stdin_tx, stdin_rx) = async_channel::bounded::<std::io::Result<Vec<u8>>>(8);
     let _stdin_thread = std::thread::Builder::new()
         .name("proxy-stdin-fwd".into())
         .spawn(move || {
-            let result = std::io::copy(&mut std::io::stdin(), &mut write_stream).map(|_| ());
-            read_handle.cancel_io();
-            let _ = finished_tx_stdin.send(result);
+            let mut stdin = std::io::stdin().lock();
+            let mut buffer = [0u8; 8192];
+            loop {
+                let result = stdin.read(&mut buffer).map(|read| buffer[..read].to_vec());
+                let should_finish = !matches!(result, Ok(ref bytes) if !bytes.is_empty());
+                if stdin_tx.send_blocking(result).is_err() || should_finish {
+                    break;
+                }
+            }
         })?;
+
+    let (stdout_tx, stdout_rx) = async_channel::bounded::<Vec<u8>>(8);
+    let (stdout_result_tx, stdout_result_rx) = async_channel::bounded(1);
     let _stdout_thread = std::thread::Builder::new()
         .name("proxy-stdout-fwd".into())
         .spawn(move || {
-            let mut stdout = std::io::stdout().lock();
-            let mut buffer = [0u8; 8192];
-            let result = loop {
-                let read = match read_stream.read(&mut buffer) {
-                    Ok(0) => break Ok(()),
-                    Ok(read) => read,
-                    Err(error) => break Err(error),
-                };
-                if let Err(error) = stdout.write_all(&buffer[..read]) {
-                    break Err(error);
+            let result = (|| {
+                let mut stdout = std::io::stdout().lock();
+                while let Ok(bytes) = stdout_rx.recv_blocking() {
+                    stdout.write_all(&bytes)?;
+                    stdout.flush()?;
                 }
-                if let Err(error) = stdout.flush() {
-                    break Err(error);
-                }
-            };
-            write_handle.cancel_io();
-            let _ = finished_tx.send(result);
+                Ok::<_, std::io::Error>(())
+            })();
+            let _ = stdout_result_tx.send_blocking(result);
         })?;
 
-    // 任一方向结束都意味着 SSH 通道应关闭。返回 worker 主线程即可结束进程，
-    // 不等待另一个可能仍阻塞在同步 stdin 读取上的线程。
-    finished_rx
-        .recv()
-        .map_err(|error| anyhow::anyhow!("Windows proxy bridge threads exited: {error}"))??;
-    Ok(())
-}
-
-fn duplicate_stream(stream: &LocalSocketStream) -> std::io::Result<LocalSocketStream> {
-    use windows::Win32::Foundation::{DUPLICATE_SAME_ACCESS, DuplicateHandle};
-    use windows::Win32::System::Threading::GetCurrentProcess;
-
-    let process = unsafe { GetCurrentProcess() };
-    let source = HANDLE(stream.as_raw_handle());
-    let mut target = HANDLE::default();
-    unsafe {
-        DuplicateHandle(
-            process,
-            source,
-            process,
-            &mut target,
-            0,
-            false,
-            DUPLICATE_SAME_ACCESS,
-        )
-        .map_err(std::io::Error::other)?;
-        Ok(LocalSocketStream::from_raw_handle(target.0))
-    }
+    let mut pipe_buffer = [0u8; 8192];
+    let result = loop {
+        tokio::select! {
+            input = stdin_rx.recv() => {
+                match input {
+                    Ok(Ok(bytes)) if bytes.is_empty() => break Ok(()),
+                    Ok(Ok(bytes)) => {
+                        if let Err(error) = pipe_writer.write_all(&bytes).await {
+                            break Err(error);
+                        }
+                        if let Err(error) = pipe_writer.flush().await {
+                            break Err(error);
+                        }
+                    }
+                    Ok(Err(error)) => break Err(error),
+                    Err(_) => break Ok(()),
+                }
+            }
+            read = pipe_reader.read(&mut pipe_buffer) => {
+                match read {
+                    Ok(0) => {
+                        stdout_tx.close();
+                        break stdout_result_rx
+                            .recv()
+                            .await
+                            .unwrap_or_else(|_| Ok(()));
+                    }
+                    Ok(read) => {
+                        if stdout_tx.send(pipe_buffer[..read].to_vec()).await.is_err() {
+                            break Ok(());
+                        }
+                    }
+                    Err(error) => break Err(error),
+                }
+            }
+            stdout_result = stdout_result_rx.recv() => {
+                break stdout_result.unwrap_or_else(|_| Ok(()));
+            }
+        }
+    };
+    stdout_tx.close();
+    result.map_err(anyhow::Error::new)
 }

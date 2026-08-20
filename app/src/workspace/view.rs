@@ -43,8 +43,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use ::settings::{Setting, ToggleableSetting};
 // Zap:`ai::index::full_source_code_embedding`(代码库向量索引)整条链路已下线。
-#[cfg(not(target_family = "wasm"))]
-use anyhow::Context as _;
 #[cfg(target_os = "macos")]
 use anyhow::Result;
 use autoupdate::AutoupdateStage;
@@ -64,7 +62,6 @@ use repo_metadata::repositories::DetectedRepositories;
 use serde_json;
 #[cfg(target_family = "wasm")]
 use url::Url;
-use warp_cli::agent::Harness;
 use warp_core::HostId;
 use warp_core::context_flag::ContextFlag;
 use warp_core::execution_mode::AppExecutionMode;
@@ -97,19 +94,21 @@ use warpui::elements::{
 use warpui::fonts::{Properties, Weight};
 use warpui::geometry::vector::{Vector2F, vec2f};
 use warpui::keymap::Context;
+#[cfg(not(target_family = "wasm"))]
+use warpui::modals::ModalButton;
 use warpui::modals::{AlertDialogWithCallbacks, AppModalCallback};
 use warpui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
 use warpui::platform::{
     Cursor, FilePickerConfiguration, FullscreenState, SystemTheme, TerminationMode,
 };
 use warpui::text_layout::ClipConfig;
-use warpui::ui_components::button::{Button, ButtonVariant};
+use warpui::ui_components::button::Button;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::windowing::state::ApplicationStage;
 use warpui::windowing::{StateEvent, WindowManager};
 use warpui::{
     AppContext, Entity, EntityId, FocusContext, ModelHandle, SingletonEntity, TypedActionView,
-    UpdateModel, UpdateView, View, ViewAsRef, ViewContext, ViewHandle, WeakViewHandle, WindowId,
+    UpdateModel, UpdateView, View, ViewAsRef, ViewContext, ViewHandle, WindowId,
 };
 
 use self::vertical_tabs::telemetry::{VerticalTabsDisplayOption, VerticalTabsTelemetryEvent};
@@ -150,17 +149,13 @@ use super::util::{
 };
 use super::{ActiveSession, TabBarDropTargetData, TabBarLocation, WorkspaceRegistry, util};
 use crate::ai::agent::api::ServerConversationToken;
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::agent::conversation::AIAgentHarness;
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
 use crate::ai::agent::{AIAgentInput, EntrypointType};
 #[cfg(target_family = "wasm")]
 use crate::ai::agent_conversations_model::AgentConversationsModelEvent;
 // Zap:上游把 `ConversationOrTask` 重构成了 `AgentConversationEntry` 体系,
 // 会话导航数据改从 `ConversationNavigationData::all_conversations` 取。
-use crate::ai::agent_conversations_model::{
-    AgentConversationNavigationSubject, AgentConversationsModel,
-};
+use crate::ai::agent_conversations_model::AgentConversationsModel;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::agent_view::agent_input_footer::editor::AgentToolbarEditorMode;
@@ -250,8 +245,8 @@ use crate::experiments::{BlockOnboarding, Experiment};
 use crate::launch_configs::launch_config::WindowTemplate;
 use crate::launch_configs::save_modal::{LaunchConfigModalEvent, LaunchConfigSaveModal};
 use crate::menu::{
-    DEFAULT_WIDTH as MENU_DEFAULT_WIDTH, Event as MenuEvent, MENU_VERTICAL_PADDING, Menu, MenuItem,
-    MenuItemFields, MenuSelectionSource, MenuVariant,
+    Event as MenuEvent, MENU_VERTICAL_PADDING, Menu, MenuItem, MenuItemFields, MenuSelectionSource,
+    MenuVariant,
 };
 use crate::modal::{Modal, ModalEvent, ModalViewState};
 use crate::network::{NetworkStatus, NetworkStatusEvent};
@@ -287,7 +282,7 @@ use crate::resource_center::{
     ResourceCenterEvent, ResourceCenterPage, ResourceCenterView, Tip, TipAction, TipsCompleted,
     mark_feature_used_and_write_to_user_defaults, skip_tips_and_write_to_user_defaults,
 };
-use crate::root_view::{NewWorkspaceSource, OpenLaunchConfigArg, quake_mode_window_id};
+use crate::root_view::{NewWorkspaceSource, OpenLaunchConfigArg};
 use crate::search::command_palette::view::{
     Event as CommandPaletteEvent, NavigationMode, View as CommandPalette,
 };
@@ -314,12 +309,9 @@ use crate::settings::{
     AppEditorSettings, BlockVisibilitySettings, CodeSettings, CodeSettingsChangedEvent,
     CtrlTabBehavior, CursorBlink, DebugSettings, DefaultSessionMode, FontSettings, GPUSettings,
     InputModeSettings, InputSettings, MonospaceFontSize, PaneSettings, PrivacySettings,
-    SelectionSettings, Settings, SshSettings, ThemeSettings, active_theme_kind,
-    respect_system_theme,
+    SelectionSettings, SshSettings, ThemeSettings, active_theme_kind, respect_system_theme,
 };
-use crate::settings_view::handoff_environment_creation_modal::{
-    HandoffEnvironmentCreationModal, HandoffEnvironmentCreationModalEvent,
-};
+use crate::settings_view::handoff_environment_creation_modal::HandoffEnvironmentCreationModal;
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
 use crate::settings_view::mcp_servers_page::MCPServersSettingsPage;
 use crate::settings_view::pane_manager::SettingsPaneManager;
@@ -366,6 +358,8 @@ use crate::terminal::model::blockgrid::BlockGrid;
 #[cfg(feature = "local_fs")]
 use crate::terminal::model::session::Session;
 use crate::terminal::model::session::SessionId;
+#[cfg(all(not(target_family = "wasm"), feature = "local_fs"))]
+use crate::terminal::model::session::command_executor::{ExecuteCommandOptions, shell_quote_arg};
 use crate::terminal::model::terminal_model::ConversationTranscriptViewerStatus;
 use crate::terminal::resizable_data::{
     DEFAULT_LEFT_PANEL_WIDTH, DEFAULT_RIGHT_PANEL_WIDTH, ModalSizes, ModalType, ResizableData,
@@ -385,9 +379,8 @@ use crate::terminal::view::load_ai_conversation::{
 };
 use crate::terminal::view::ssh_file_upload::FileUploadId;
 use crate::terminal::view::{
-    AgentOnboardingVersion, ConversationRestorationInNewPaneType, LeftPanelTargetView,
-    NOTIFICATIONS_TROUBLESHOOT_URL, OnboardingIntention, OnboardingVersion, SyncEvent,
-    SyncInputType, TerminalAction,
+    ConversationRestorationInNewPaneType, LeftPanelTargetView, NOTIFICATIONS_TROUBLESHOOT_URL,
+    OnboardingIntention, SyncEvent, SyncInputType, TerminalAction,
 };
 use crate::terminal::warpify::settings::WarpifySettings;
 use crate::terminal::{self, BlockListSettings, CLIAgent, SizeInfo, TerminalModel, TerminalView};
@@ -411,9 +404,7 @@ use crate::user_config::{
     find_unused_worktree_config_path, materialize_default_worktree_config, sanitize_toml_base_name,
     tab_configs_dir,
 };
-use crate::util::bindings::{
-    keybinding_name_to_display_string, keybinding_name_to_keystroke, trigger_to_keystroke,
-};
+use crate::util::bindings::{keybinding_name_to_display_string, keybinding_name_to_keystroke};
 #[cfg(feature = "local_fs")]
 use crate::util::file::external_editor::Editor;
 #[cfg(feature = "local_fs")]
@@ -433,9 +424,7 @@ use crate::view_components::action_button::ActionButton;
 use crate::view_components::callout_bubble::{
     CalloutArrowDirection, CalloutArrowPosition, CalloutBubbleConfig, render_callout_bubble,
 };
-use crate::view_components::{
-    AgentToast, AgentToastStack, DismissibleToast, DismissibleToastStack, ToastLink,
-};
+use crate::view_components::{AgentToastStack, DismissibleToast, DismissibleToastStack, ToastLink};
 #[cfg(target_family = "wasm")]
 use crate::wasm_nux_dialog::WasmNUXDialog;
 use crate::window_settings::{WindowSettings, WindowSettingsChangedEvent, ZoomLevel};
@@ -6513,6 +6502,227 @@ impl Workspace {
     }
 
     #[cfg(not(target_family = "wasm"))]
+    fn show_storage_cleanup_message(&mut self, message: String, ctx: &mut ViewContext<Self>) {
+        let dialog = AlertDialogWithCallbacks::for_view(
+            crate::t!("storage-cleanup-title"),
+            message,
+            vec![ModalButton::for_view(
+                crate::t!("common-ok"),
+                |_: &mut Workspace, _| {},
+            )],
+            |_, _| {},
+        );
+        ctx.show_native_platform_modal(dialog);
+    }
+
+    #[cfg(all(not(target_family = "wasm"), feature = "local_fs"))]
+    fn cleanup_storage(&mut self, ctx: &mut ViewContext<Self>) {
+        use crate::remote_server::setup::{RemoteOs, remote_server_binary_name};
+        use crate::storage_cleanup::remote_extensions::{parse_scan_output, scan_script};
+        use crate::terminal::model::session::SessionType;
+
+        let Some(session) = self.get_active_session(ctx).filter(|session| {
+            matches!(session.session_type(), SessionType::WarpifiedRemote { .. })
+                && session.is_ssh_wrapper_session()
+        }) else {
+            self.show_storage_cleanup_message(crate::t!("storage-cleanup-no-remote"), ctx);
+            return;
+        };
+        let shell_type = session.shell().shell_type();
+        if shell_type == ShellType::PowerShell {
+            self.show_storage_cleanup_message(crate::t!("storage-cleanup-unsupported-shell"), ctx);
+            return;
+        }
+
+        let host = format!("{}@{}", session.user(), session.hostname());
+        let current_file_name = remote_server_binary_name(&RemoteOs::Linux);
+        let command = format!("sh -c {}", shell_quote_arg(scan_script(), shell_type));
+        let session_for_cleanup = session.clone();
+        ctx.spawn(
+            async move {
+                let output = session
+                    .execute_command(
+                        &command,
+                        None,
+                        None,
+                        ExecuteCommandOptions {
+                            run_command_in_same_shell_as_session: false,
+                        },
+                    )
+                    .await?;
+                if !output.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(anyhow::anyhow!("{stderr}"));
+                }
+                let stdout = String::from_utf8(output.stdout)?;
+                Ok(parse_scan_output(&stdout, &current_file_name))
+            },
+            move |me, result, ctx| {
+                let versions = match result {
+                    Ok(versions) => versions,
+                    Err(error) => {
+                        let error = format!("{error:#}");
+                        me.show_storage_cleanup_message(
+                            crate::t!("storage-cleanup-scan-failed", error = error.as_str()),
+                            ctx,
+                        );
+                        return;
+                    }
+                };
+                let candidates = versions
+                    .into_iter()
+                    .filter(|version| version.can_remove())
+                    .collect::<Vec<_>>();
+                if candidates.is_empty() {
+                    me.show_storage_cleanup_message(
+                        crate::t!("storage-cleanup-no-unused", host = host.as_str()),
+                        ctx,
+                    );
+                    return;
+                }
+
+                let size_bytes = candidates.iter().map(|version| version.size_bytes).sum();
+                let size = crate::storage_cleanup::format_bytes(size_bytes);
+                let version_list = candidates
+                    .iter()
+                    .map(|version| {
+                        format!(
+                            "• {} ({})",
+                            version.file_name,
+                            crate::storage_cleanup::format_bytes(version.size_bytes)
+                        )
+                    })
+                    .join("\n");
+                let info = format!(
+                    "{}\n\n{version_list}",
+                    crate::t!("storage-cleanup-confirm-info", size = size.as_str())
+                );
+                let title = crate::t!("storage-cleanup-confirm-title", host = host.as_str());
+                let dialog = AlertDialogWithCallbacks::for_view(
+                    title,
+                    info,
+                    vec![
+                        ModalButton::for_view(
+                            crate::t!("storage-cleanup-confirm-button"),
+                            move |me: &mut Workspace, ctx| {
+                                me.cleanup_remote_versions_confirmed(
+                                    session_for_cleanup,
+                                    candidates,
+                                    ctx,
+                                );
+                            },
+                        ),
+                        ModalButton::for_view(
+                            crate::t!("common-cancel"),
+                            |_: &mut Workspace, _| {},
+                        ),
+                    ],
+                    |_, _| {},
+                );
+                ctx.show_native_platform_modal(dialog);
+            },
+        );
+    }
+
+    #[cfg(all(not(target_family = "wasm"), feature = "local_fs"))]
+    fn cleanup_remote_versions_confirmed(
+        &mut self,
+        session: Arc<Session>,
+        candidates: Vec<crate::storage_cleanup::remote_extensions::InstalledVersion>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        use crate::remote_server::setup::{RemoteOs, remote_server_binary_name};
+        use crate::storage_cleanup::remote_extensions::{cleanup_script, parse_cleanup_output};
+
+        let file_names = candidates
+            .iter()
+            .map(|version| version.file_name.clone())
+            .collect::<Vec<_>>();
+        let current_file_name = remote_server_binary_name(&RemoteOs::Linux);
+        let script = match cleanup_script(&file_names, &current_file_name) {
+            Ok(script) => script,
+            Err(error) => {
+                let error = format!("{error:#}");
+                self.show_storage_cleanup_message(
+                    crate::t!("storage-cleanup-failed", error = error.as_str()),
+                    ctx,
+                );
+                return;
+            }
+        };
+        let shell_type = session.shell().shell_type();
+        let command = format!("sh -c {}", shell_quote_arg(&script, shell_type));
+        ctx.spawn(
+            async move {
+                let output = session
+                    .execute_command(
+                        &command,
+                        None,
+                        None,
+                        ExecuteCommandOptions {
+                            run_command_in_same_shell_as_session: false,
+                        },
+                    )
+                    .await?;
+                if !output.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(anyhow::anyhow!("{stderr}"));
+                }
+                let stdout = String::from_utf8(output.stdout)?;
+                Ok(parse_cleanup_output(&stdout))
+            },
+            move |me, result, ctx| match result {
+                Ok(result) => {
+                    let removed = result.removed.iter().collect::<HashSet<_>>();
+                    let removed_size = candidates
+                        .iter()
+                        .filter(|version| removed.contains(&version.file_name))
+                        .map(|version| version.size_bytes)
+                        .sum();
+                    let skipped = result.skipped_current.len()
+                        + result.skipped_running.len()
+                        + result.missing.len()
+                        + result.failed.len();
+                    let toast = if skipped == 0 && result.removed.len() == candidates.len() {
+                        let count = result.removed.len();
+                        let size = crate::storage_cleanup::format_bytes(removed_size);
+                        DismissibleToast::success(crate::t!(
+                            "storage-cleanup-success",
+                            count = count,
+                            size = size.as_str()
+                        ))
+                    } else {
+                        DismissibleToast::error(crate::t!(
+                            "storage-cleanup-partial",
+                            removed = result.removed.len(),
+                            skipped = skipped
+                        ))
+                    };
+                    me.toast_stack.update(ctx, |stack, ctx| {
+                        if skipped == 0 {
+                            stack.add_ephemeral_toast(toast, ctx);
+                        } else {
+                            stack.add_persistent_toast(toast, ctx);
+                        }
+                    });
+                }
+                Err(error) => {
+                    let error = format!("{error:#}");
+                    me.toast_stack.update(ctx, |stack, ctx| {
+                        stack.add_persistent_toast(
+                            DismissibleToast::error(crate::t!(
+                                "storage-cleanup-failed",
+                                error = error.as_str()
+                            )),
+                            ctx,
+                        );
+                    });
+                }
+            },
+        );
+    }
+
+    #[cfg(not(target_family = "wasm"))]
     fn view_logs(&mut self, ctx: &mut ViewContext<Self>) {
         // 在调用线程同步采集诊断信息(版本、平台、channel、执行模式、MCP/更新日志路径等),
         // 真正的 zip 打包在阻塞线程上完成,避免读取 `AppContext` 全局状态时跨线程。
@@ -11671,20 +11881,7 @@ impl Workspace {
             right_panel_width,
             agent_management_filters: None,
             theme_override: self.theme_override.clone(),
-            tab_groups: if FeatureFlag::GroupedTabs.is_enabled() {
-                self.tab_groups
-                    .values()
-                    .map(|group| TabGroupSnapshot {
-                        id: group.id,
-                        name: group.name.clone(),
-                        color: group.color,
-                        collapsed: group.collapsed,
-                        pinned: group.pinned,
-                    })
-                    .collect()
-            } else {
-                Vec::new()
-            },
+            tab_groups,
         }
     }
 
@@ -16276,7 +16473,6 @@ impl Workspace {
                 let (
                     session,
                     pwd_location,
-                    path_if_local,
                     is_local,
                     is_wsl_session,
                     session_id,
@@ -16287,7 +16483,6 @@ impl Workspace {
                     let session = active_session_id
                         .and_then(|id| terminal.sessions_model().as_ref(ctx).get(id));
                     let pwd_location = terminal.pwd_as_local_or_remote(ctx);
-                    let path_if_local = terminal.active_session_path_if_local(ctx);
                     let is_local = terminal.active_session_is_local(ctx);
                     let is_wsl_session = session.as_ref().map(|s| s.is_wsl()).unwrap_or(false);
                     let pwd = terminal.pwd();
@@ -16295,7 +16490,6 @@ impl Workspace {
                     (
                         session,
                         pwd_location,
-                        path_if_local,
                         is_local,
                         is_wsl_session,
                         active_session_id,
@@ -16338,7 +16532,7 @@ impl Workspace {
                 if has_remote_server {
                     if let (Some(sid), Some(cwd)) = (session_id, pwd.clone()) {
                         RemoteServerManager::handle(ctx).update(ctx, |mgr, ctx| {
-                            mgr.navigate_to_directory(sid, cwd.clone(), ctx);
+                            let _ = mgr.navigate_to_directory(sid, cwd.clone(), ctx);
                         });
                     }
                 }
@@ -22831,6 +23025,12 @@ impl TypedActionView for Workspace {
             ViewLatestChangelog => self.view_latest_changelog(ctx),
             ViewPrivacyPolicy => self.view_privacy_policy(ctx),
             SendFeedback => self.send_feedback(ctx),
+            #[cfg(all(not(target_family = "wasm"), feature = "local_fs"))]
+            CleanupStorage => self.cleanup_storage(ctx),
+            #[cfg(all(not(target_family = "wasm"), not(feature = "local_fs")))]
+            CleanupStorage => {
+                self.show_storage_cleanup_message(crate::t!("storage-cleanup-no-remote"), ctx)
+            }
             #[cfg(not(target_family = "wasm"))]
             ViewLogs => self.view_logs(ctx),
             #[cfg(not(target_family = "wasm"))]

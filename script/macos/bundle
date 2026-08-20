@@ -461,7 +461,7 @@ elif [[ $RELEASE_CHANNEL = "oss" ]]; then
     BUNDLE_ID="dev.infinishell.InfiniShell"
     WARP_APP_NAME="InfiniShell"
     WARP_SCHEME_NAME="infinishell"
-    # autoupdate 走 GitHub Release(zerx-lab/warp),仅下载 DMG 到 Downloads,不自动覆盖 .app。
+    # autoupdate 走 InfiniShell GitHub Release,仅下载 DMG 到 Downloads,不自动覆盖 .app。
     FEATURES="release_bundle,extern_plist,autoupdate"
 fi
 

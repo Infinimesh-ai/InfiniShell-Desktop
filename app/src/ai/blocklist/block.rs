@@ -2937,7 +2937,6 @@ impl AIBlock {
     fn set_autoexecute_override(
         &mut self,
         mode: AIConversationAutoexecuteMode,
-        set_session_default: bool,
         ctx: &mut ViewContext<Self>,
     ) {
         BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
@@ -2947,14 +2946,11 @@ impl AIBlock {
                 mode,
                 ctx,
             );
-            if set_session_default {
-                history.set_default_autoexecute_mode(self.terminal_view_id, mode);
-            }
         });
     }
 
     fn enable_autoexecute_override(&mut self, ctx: &mut ViewContext<Self>) {
-        self.set_autoexecute_override(AIConversationAutoexecuteMode::RunToCompletion, false, ctx);
+        self.set_autoexecute_override(AIConversationAutoexecuteMode::RunToCompletion, ctx);
     }
 
     fn mark_ask_user_question_speedbump_as_shown(ctx: &mut ViewContext<Self>) {
@@ -3367,11 +3363,8 @@ impl AIBlock {
                 self.yield_requested_action_focus_if_focused(&view, ctx);
                 ctx.notify();
             }
-            RequestedCommandViewEvent::SetAutoexecuteMode {
-                mode,
-                set_session_default,
-            } => {
-                self.set_autoexecute_override(*mode, *set_session_default, ctx);
+            RequestedCommandViewEvent::SetAutoexecuteMode { mode } => {
+                self.set_autoexecute_override(*mode, ctx);
             }
             RequestedCommandViewEvent::Rejected => {
                 self.cancel_action(action_id, ctx);
@@ -3542,11 +3535,8 @@ impl AIBlock {
                 // Actions within the editor should clear all other text selections
                 self.clear_other_selections(Some(view.id()), ctx.window_id(), ctx);
             }
-            RequestedCommandViewEvent::SetAutoexecuteMode {
-                mode,
-                set_session_default,
-            } => {
-                self.set_autoexecute_override(*mode, *set_session_default, ctx);
+            RequestedCommandViewEvent::SetAutoexecuteMode { mode } => {
+                self.set_autoexecute_override(*mode, ctx);
             }
             // There's nothing to do here for MCP tool calls; their expanded state
             // doesn't change the blocklist like it does for requested commands.

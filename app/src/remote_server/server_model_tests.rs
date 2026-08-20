@@ -88,6 +88,22 @@ fn test_bundled_skill_proto(id: &str) -> RemoteSkillProto {
 }
 
 #[test]
+fn daemon_file_path_expands_home_prefix_only() {
+    let Some(home) = dirs::home_dir() else {
+        return;
+    };
+
+    assert_eq!(
+        super::resolve_daemon_file_path("~/.infinishell/remote-server/pwsh-bootstrap.ps1"),
+        home.join(".infinishell/remote-server/pwsh-bootstrap.ps1")
+    );
+    assert_eq!(
+        super::resolve_daemon_file_path("~other/pwsh-bootstrap.ps1"),
+        std::path::PathBuf::from("~other/pwsh-bootstrap.ps1")
+    );
+}
+
+#[test]
 fn remote_agent_context_snapshot_broadcasts_replacements_and_initializes_once() {
     App::test((), |mut app| async move {
         let mut model = test_model(&mut app);

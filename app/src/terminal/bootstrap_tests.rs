@@ -1,6 +1,9 @@
 use super::*;
 
+use std::io::Read as _;
+
 use command::blocking::Command;
+use flate2::read::GzDecoder;
 use serde_json::json;
 
 struct TestAssetProvider;
@@ -64,15 +67,82 @@ fn test_trims_powershell_specifics() {
 }
 
 #[test]
-fn embeds_the_windows_remote_init_shell_as_bom_free_hex() {
+fn motd_is_scoped_to_ssh_bootstrap() {
+    let bash = include_str!("../../assets/bundled/bootstrap/bash_body.sh");
+    let zsh = include_str!("../../assets/bundled/bootstrap/zsh_body.sh");
+    let fish = include_str!("../../assets/bundled/bootstrap/fish.sh");
+
+    assert!(bash.contains(r#"if [[ "$WARP_IS_SSH" == "1" && ! -e "$HOME/.hushlogin" ]]; then"#));
+    assert!(zsh.contains(
+        r#"if [[ "$WARP_IS_SSH" == "1" && -o login && ! -e "$HOME/.hushlogin" ]]; then"#
+    ));
+    assert!(!fish.contains("if status --is-login\n  and test ! -e \"$HOME/.hushlogin\""));
+
+    for script in [bash, zsh, fish] {
+        assert!(script.contains("Emulate the SSHD logic to print the MotD."));
+    }
+}
+
+#[test]
+fn embeds_the_windows_remote_init_shell_as_bom_free_gzip_base64() {
     let script = embed_windows_remote_init_shell(
-        format!("before {WINDOWS_REMOTE_INIT_SHELL_HEX_PLACEHOLDER} after"),
+        format!("before {WINDOWS_REMOTE_INIT_SHELL_GZIP_BASE64_PLACEHOLDER} after"),
         &TestAssetProvider,
+        ShellType::Bash,
+    );
+
+    let encoded = script
+        .strip_prefix("before ")
+        .and_then(|value| value.strip_suffix(" after"))
+        .expect("脚本中应包含压缩后的 PowerShell init payload");
+    let compressed = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .expect("PowerShell init payload 应为 Base64");
+    let mut decoded = String::new();
+    GzDecoder::new(compressed.as_slice())
+        .read_to_string(&mut decoded)
+        .expect("PowerShell init payload 应能解压");
+    assert_eq!(decoded, "Write-Output 'remote'");
+}
+
+#[test]
+fn zsh_windows_remote_init_shell_stays_within_macos_canonical_line_limit() {
+    let script = embed_windows_remote_init_shell(
+        format!(
+            "local init_shell_gzip_base64='{WINDOWS_REMOTE_INIT_SHELL_GZIP_BASE64_PLACEHOLDER}'"
+        ),
+        &crate::ASSETS,
+        ShellType::Zsh,
     );
 
     assert_eq!(
-        script,
-        "before 57726974652d4f7574707574202772656d6f746527 after"
+        script.lines().find(|line| line.len() >= 1024),
+        None,
+        "zsh bootstrap lines must fit within macOS MAX_CANON"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn windows_remote_bootstrap_command_fits_cmd_exe_limit() {
+    let helper = embed_windows_remote_init_shell(
+        include_str!("../../assets/bundled/bootstrap/ssh_remote_shell_probe.sh").to_string(),
+        &crate::ASSETS,
+        ShellType::Bash,
+    );
+    let script = format!(
+        "{helper}\nwarp_windows_powershell_bootstrap_command 42 7b7d v0.2026.08.17.20.25.oss_00 1"
+    );
+    let output = Command::new("bash")
+        .arg("-c")
+        .arg(script)
+        .output()
+        .expect("bash 应能生成 Windows PowerShell bootstrap 命令");
+    assert!(output.status.success());
+    assert!(
+        output.stdout.len() < 4096,
+        "Windows bootstrap command is {} bytes",
+        output.stdout.len()
     );
 }
 
@@ -98,6 +168,9 @@ fn remote_shell_probe_rejects_cmd_literal() {
     assert!(!remote_shell_probe_supports_bootstrap(
         "__WARP_REMOTE_SHELL__$SHELL\r\n"
     ));
+    assert!(remote_shell_probe_may_be_windows(
+        "__WARP_REMOTE_SHELL__$SHELL\r\n"
+    ));
 }
 
 #[cfg(unix)]
@@ -106,12 +179,18 @@ fn remote_shell_probe_rejects_empty_powershell_value() {
     assert!(!remote_shell_probe_supports_bootstrap(
         "__WARP_REMOTE_SHELL__\r\n"
     ));
+    assert!(remote_shell_probe_may_be_windows(
+        "__WARP_REMOTE_SHELL__\r\n"
+    ));
 }
 
 #[cfg(unix)]
 #[test]
 fn remote_shell_probe_rejects_unsupported_posix_shell() {
     assert!(!remote_shell_probe_supports_bootstrap(
+        "__WARP_REMOTE_SHELL__/usr/bin/fish\n"
+    ));
+    assert!(!remote_shell_probe_may_be_windows(
         "__WARP_REMOTE_SHELL__/usr/bin/fish\n"
     ));
 }
@@ -156,6 +235,22 @@ fn remote_shell_probe_supports_bootstrap(probe_output: &str) -> bool {
 }
 
 #[cfg(unix)]
+fn remote_shell_probe_may_be_windows(probe_output: &str) -> bool {
+    let script = format!(
+        "{}\nremote_shell=$(warp_remote_shell_from_probe_output \"$1\")\nwarp_remote_shell_may_be_windows \"$remote_shell\"",
+        include_str!("../../assets/bundled/bootstrap/ssh_remote_shell_probe.sh")
+    );
+    Command::new("bash")
+        .arg("-c")
+        .arg(script)
+        .arg("bootstrap-test")
+        .arg(probe_output)
+        .status()
+        .expect("bash 应能判断远端 shell 是否可能是 Windows")
+        .success()
+}
+
+#[cfg(unix)]
 fn remote_windows_powershell_from_probe_output(probe_output: &str) -> String {
     let script = format!(
         "{}\nwarp_windows_powershell_from_probe_output \"$1\"",
@@ -183,6 +278,7 @@ fn powershell_ssh_wrapper_classifies_sessions_and_preserves_arguments() {
         "/assets/bundled/bootstrap/pwsh_ssh_wrapper.ps1"
     );
     let script = r#"
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 . $env:WARP_TEST_SSH_HELPER
 $interactive = @(
     [bool](Warp-Test-InteractiveSshSession -SshArgs @('host')),
@@ -295,8 +391,15 @@ foreach ($shell in @('bash', 'zsh')) {
     $shellCommand = Get-Command -Name $shell -CommandType Application -ErrorAction SilentlyContinue |
         Select-Object -First 1
     if ($null -ne $shellCommand) {
-        & $shellCommand.Source -n -c $bootstrapCommand
-        $remoteBootstrapSyntax += $global:LASTEXITCODE -eq 0
+        $syntaxOutput = @(
+            $bootstrapCommand | & $shellCommand.Source -n -s 2>&1 |
+                ForEach-Object { [string]$_ }
+        )
+        $remoteBootstrapSyntax += @{
+            shell = $shell
+            valid = $global:LASTEXITCODE -eq 0
+            output = $syntaxOutput
+        }
     }
 }
 ConvertTo-Json -Compress -Depth 4 -InputObject @{
@@ -453,13 +556,14 @@ ConvertTo-Json -Compress -Depth 4 -InputObject @{
             true
         ])
     );
+    let remote_bootstrap_syntax = result["remote_bootstrap_syntax"]
+        .as_array()
+        .expect("远端 bootstrap 语法检查结果应为数组");
     assert!(
-        result["remote_bootstrap_syntax"]
-            .as_array()
-            .expect("远端 bootstrap 语法检查结果应为数组")
+        remote_bootstrap_syntax
             .iter()
-            .all(|value| value == &json!(true)),
-        "远端 bootstrap 语法检查失败: {result}"
+            .all(|value| value["valid"] == json!(true)),
+        "远端 bootstrap 语法检查失败: {remote_bootstrap_syntax:?}"
     );
     assert_eq!(result["posix_recursive_bootstrap"], json!(true));
     assert_eq!(result["windows_recursive_bootstrap"], json!(true));

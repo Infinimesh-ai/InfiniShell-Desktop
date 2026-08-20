@@ -20,6 +20,20 @@ const MAX_TERMINAL_BLOCKS_TO_PERSIST_PER_SESSION: i64 = 100;
 
 type PersistedBlocks = HashMap<PaneUuid, Vec<SerializedBlockListItem>>;
 
+/// 识别旧版本曾持久化的可见 shell 启动 block。
+fn is_legacy_visible_bootstrap_block(block: &model::Block) -> bool {
+    !block.stylized_command.is_empty()
+        && block.stylized_output.is_empty()
+        && block.ps1.is_none()
+        && block.rprompt.is_none()
+        && block.shell.is_none()
+        && block.user.is_none()
+        && block.host.is_none()
+        && block.ai_metadata.is_none()
+        && block.did_execute
+        && !block.is_background
+}
+
 /// An AI query read from the SQLite DB.
 #[derive(Identifiable, Insertable, Queryable, Selectable)]
 #[diesel(table_name = ai_queries)]
@@ -227,7 +241,11 @@ pub(super) fn get_all_restored_blocks(
         .map(|(blocks, terminal_pane)| {
             (
                 PaneUuid(terminal_pane.uuid),
-                blocks.into_iter().map(Into::into).collect(),
+                blocks
+                    .into_iter()
+                    .filter(|block| !is_legacy_visible_bootstrap_block(block))
+                    .map(Into::into)
+                    .collect(),
             )
         })
         .collect::<HashMap<_, Vec<SerializedBlockListItem>>>();

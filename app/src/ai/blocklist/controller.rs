@@ -33,7 +33,9 @@ use super::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use super::input_model::InputConfig;
 use super::{BlocklistAIInputModel, InputType, ResponseStreamId};
 use crate::ai::agent::api::{self, ServerConversationToken};
-use crate::ai::agent::conversation::{AIConversation, AIConversationId, ConversationStatus};
+use crate::ai::agent::conversation::{
+    AIConversation, AIConversationId, ConversationStatus, ConversationTaskGraphDiagnostics,
+};
 use crate::ai::agent::task::TaskId;
 use crate::ai::agent::{
     AIAgentActionResult, AIAgentActionResultType, AIAgentAttachment, AIAgentContext,
@@ -2028,23 +2030,41 @@ impl BlocklistAIController {
         if let Some(running_command) = byop_get_running_command_for_lrc(&terminal_model) {
             request_params.lrc_running_command = Some(running_command.clone());
             let total_inputs = request_params.input.len();
+            let mut user_query_count = 0usize;
             let mut filled_count = 0usize;
             for input in request_params.input.iter_mut() {
                 if let crate::ai::agent::AIAgentInput::UserQuery {
-                    running_command: rc_slot @ None,
+                    running_command: running_command_slot,
                     ..
                 } = input
                 {
-                    *rc_slot = Some(running_command.clone());
-                    filled_count += 1;
+                    user_query_count += 1;
+                    if running_command_slot.is_none() {
+                        *running_command_slot = Some(running_command.clone());
+                        filled_count += 1;
+                    }
                 }
             }
-            log::info!(
-                "[byop-diag] LRC running_command filled: {filled_count}/{total_inputs} \
-                 UserQuery slot(s); should_spawn={} grid_contents_len={} command={:?} is_alt_screen={}",
+            let already_filled_count = user_query_count.saturating_sub(filled_count);
+            let command_line_count = running_command.command.lines().count();
+            let grid_line_count = running_command.grid_contents.lines().count();
+            let grid_has_cursor = running_command
+                .grid_contents
+                .contains(&running_command.cursor);
+            log::debug!(
+                "[byop-diag] LRC snapshot attached conversation_id={conversation_id} \
+                 block_id={} input_count={total_inputs} user_query_inputs={user_query_count} \
+                 newly_filled={filled_count} already_filled={already_filled_count} \
+                 should_spawn={} command_bytes={} command_lines={command_line_count} \
+                 command_multiline={} grid_bytes={} grid_lines={grid_line_count} \
+                 grid_has_cursor={grid_has_cursor} requested_command_id_present={} \
+                 is_alt_screen={}",
+                running_command.block_id,
                 request_params.lrc_should_spawn_subagent,
+                running_command.command.len(),
+                running_command.command.contains('\n'),
                 running_command.grid_contents.len(),
-                running_command.command,
+                running_command.requested_command_id.is_some(),
                 running_command.is_alt_screen_active
             );
         } else {
@@ -2298,12 +2318,39 @@ impl BlocklistAIController {
                         ReadinessDiagnosticLevel::Error,
                     );
                     diagnostics.finish(&diagnostic_context, ReadinessDiagnosticLevel::Error);
+                    let task_graph =
+                        self.conversation_task_graph_diagnostics(conversation_data.id, ctx);
+                    let task_graph_available = task_graph.is_some();
+                    let task_graph = task_graph.unwrap_or_default();
                     log::error!(
                         "[byop-readiness] controller blocked request category={category:?} \
                          conversation_id={} trigger_layer=controller_preflight \
-                         request_attempt_id={} iteration={iteration}",
+                         request_attempt_id={} iteration={iteration} task_graph_available={} \
+                         stored_tasks={} \
+                         initialized_tasks={} initialized_messages={} initialized_tool_calls={} \
+                         initialized_tool_results={} initialized_subagent_calls={} active_tasks={} \
+                         active_messages={} active_tool_calls={} active_tool_results={} \
+                         active_subagent_calls={} tracked_cli_subtask_present={} \
+                         tracked_cli_subtask_initialized={} \
+                         tracked_cli_subtask_has_parent_edge={} tracked_cli_subtask_active={}",
                         conversation_id_for_log,
-                        readiness_attempt_id
+                        readiness_attempt_id,
+                        task_graph_available,
+                        task_graph.stored_task_count,
+                        task_graph.initialized.task_count,
+                        task_graph.initialized.message_count,
+                        task_graph.initialized.tool_call_count,
+                        task_graph.initialized.tool_result_count,
+                        task_graph.initialized.subagent_call_count,
+                        task_graph.active.task_count,
+                        task_graph.active.message_count,
+                        task_graph.active.tool_call_count,
+                        task_graph.active.tool_result_count,
+                        task_graph.active.subagent_call_count,
+                        task_graph.tracked_cli_subtask_present,
+                        task_graph.tracked_cli_subtask_initialized,
+                        task_graph.tracked_cli_subtask_has_parent_edge,
+                        task_graph.tracked_cli_subtask_active
                     );
                     return Err(BlockedByopReadinessError::new(category).into());
                 }
@@ -2329,6 +2376,18 @@ impl BlocklistAIController {
             readiness_attempt_id
         );
         Err(BlockedByopReadinessError::new(ReadinessCategory::ReadinessLoopDidNotConverge).into())
+    }
+
+    fn conversation_task_graph_diagnostics(
+        &self,
+        conversation_id: AIConversationId,
+        ctx: &AppContext,
+    ) -> Option<ConversationTaskGraphDiagnostics> {
+        let history_model = BlocklistAIHistoryModel::handle(ctx);
+        history_model
+            .as_ref(ctx)
+            .conversation(&conversation_id)
+            .map(AIConversation::task_graph_diagnostics)
     }
 
     fn rebuild_request_after_byop_preflight(

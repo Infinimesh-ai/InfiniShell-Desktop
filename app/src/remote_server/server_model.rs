@@ -116,6 +116,13 @@ fn daemon_bundled_resources_dir() -> Option<PathBuf> {
     let dir = dirs::home_dir()?.join(suffix);
     dir.is_dir().then_some(dir)
 }
+
+fn resolve_daemon_file_path(path: &str) -> PathBuf {
+    path.strip_prefix("~/")
+        .and_then(|suffix| dirs::home_dir().map(|home| home.join(suffix)))
+        .unwrap_or_else(|| PathBuf::from(path))
+}
+
 fn remote_agent_context_snapshot(
     revision: u64,
     bundled_skills: &[RemoteSkillProto],
@@ -2052,11 +2059,15 @@ impl ServerModel {
             "Handling WriteFile path={} (request_id={request_id})",
             msg.path
         );
-        let path = Path::new(&msg.path);
+        let path = resolve_daemon_file_path(&msg.path);
 
-        let (file_id, version) =
-            self.pending_file_ops
-                .insert(path, request_id.clone(), conn_id, FileOpKind::Write, ctx);
+        let (file_id, version) = self.pending_file_ops.insert(
+            &path,
+            request_id.clone(),
+            conn_id,
+            FileOpKind::Write,
+            ctx,
+        );
 
         let file_model = FileModel::handle(ctx);
         if let Err(err) =

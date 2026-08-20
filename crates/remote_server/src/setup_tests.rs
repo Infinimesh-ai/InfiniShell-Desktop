@@ -338,6 +338,12 @@ fn windows_binary_commands_use_exe_and_powershell_literal_paths() {
     assert!(check.script.contains(&binary_name));
     assert!(check.script.contains("--version"));
 
+    let old_binary_check = old_binary_check_command_for(&RemoteOs::Windows);
+    assert_eq!(old_binary_check.dialect, RemoteShellDialect::PowerShell);
+    assert!(old_binary_check.script.contains("Get-ChildItem"));
+    assert!(old_binary_check.script.contains("infinishell*.exe"));
+    assert!(!old_binary_check.script.contains("Test-Path"));
+
     let removal = remote_server_removal_command_for(&RemoteOs::Windows);
     assert_eq!(removal.dialect, RemoteShellDialect::PowerShell);
     assert!(removal.script.contains("Remove-Item -LiteralPath"));
@@ -348,9 +354,10 @@ fn windows_binary_commands_use_exe_and_powershell_literal_paths() {
 #[test]
 fn windows_proxy_command_escapes_identity_key() {
     let command = remote_server_proxy_command(&RemoteOs::Windows, "user's identity");
-    assert_eq!(command.dialect, RemoteShellDialect::PowerShell);
+    assert_eq!(command.dialect, RemoteShellDialect::WindowsCmd);
     assert!(command.script.contains("remote-server-proxy"));
-    assert!(command.script.contains("'user''s identity'"));
+    assert!(command.script.contains(r#""user's identity""#));
+    assert!(command.script.contains(r#""%USERPROFILE%\"#));
 }
 
 #[test]
@@ -358,6 +365,11 @@ fn posix_command_helpers_preserve_existing_behavior() {
     let check = binary_check_command_for(&RemoteOs::Linux);
     assert_eq!(check.dialect, RemoteShellDialect::Posix);
     assert_eq!(check.script, binary_check_command());
+
+    let old_binary_check = old_binary_check_command_for(&RemoteOs::Linux);
+    assert_eq!(old_binary_check.dialect, RemoteShellDialect::Posix);
+    assert!(old_binary_check.script.contains("[ -f \"$path\" ]"));
+    assert!(!old_binary_check.script.contains("test -d"));
 
     let removal = remote_server_removal_command_for(&RemoteOs::MacOs);
     assert_eq!(removal.dialect, RemoteShellDialect::Posix);
@@ -908,8 +920,8 @@ fn windows_powershell_commands_have_valid_syntax() {
     let commands = [
         platform_probe_command(&RemoteOs::Windows),
         binary_check_command_for(&RemoteOs::Windows),
+        old_binary_check_command_for(&RemoteOs::Windows),
         remote_server_removal_command_for(&RemoteOs::Windows),
-        remote_server_proxy_command(&RemoteOs::Windows, "identity's key"),
         install_command(&platform, Some("~/remote server/upload.zip")),
     ];
     let parser_script = r#"$tokens = $null

@@ -33,11 +33,15 @@ First, ensure you've set up your environment.
 ### Option 1: Use the CLI
 1. Add the Inno Setup Command-line Compiler executable to your shell path.
 By default, it is located at `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`.
-2. Compile the installer:
+2. 生成已展开 include 的 PowerShell bootstrap:
+```shell
+.\script\windows\prepare_pwsh_bootstrap.ps1 -DestinationPath .\target\release-lto-debug_assertions\pwsh.ps1
+```
+3. Compile the installer:
 ```shell
 iscc .\script\windows\windows-installer.iss
 ```
-3. Run the generated executable:
+4. Run the generated executable:
 ```shell
 .\script\windows\Output\Warp-Windows-Setup.exe
 ```

@@ -388,7 +388,9 @@ zbus.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
 bytemuck.workspace = true
-interprocess = { version = "1.2.1", features = ["tokio_support"] }
+interprocess = "1.2.1"
+tokio = { workspace = true, features = ["io-util", "macros", "net", "rt"] }
+tokio-util = { workspace = true, features = ["compat"] }
 windows = { workspace = true, features = [
     "Wdk_Foundation",
     "Wdk_Storage_FileSystem",

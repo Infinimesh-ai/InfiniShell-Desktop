@@ -5,9 +5,7 @@ use std::time::Duration;
 use ai::agent::UnknownCitationTypeError;
 use ai::agent::action::ReadSkillRequest;
 use ai::agent::convert::ToolToAIAgentActionError;
-use ai::skills::{
-    SkillPathOrigin, skill_reference_from_api_skill_ref, skill_reference_from_read_skill_ref,
-};
+use ai::skills::{SkillPathOrigin, skill_reference_from_read_skill_ref};
 use api::ask_user_question::question::QuestionType;
 use warp_core::channel::ChannelState;
 use warp_multi_agent_api as api;

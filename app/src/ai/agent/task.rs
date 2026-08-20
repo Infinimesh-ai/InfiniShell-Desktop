@@ -202,12 +202,12 @@ impl Task {
     /// 回 `ApplyClientAction::CreateTask` 把 optimistic 升级为 server;BYOP 没有
     /// server,需要本地直接构造 `api::Task` 作为 source,task 一开始就 Server-backed。
     ///
-    /// `subagent_params` 用合成的 `Subagent { command_id, ... }`,让
-    /// `is_subagent_task_finished` 等查询不至于全部走 `SubagentTaskNotFound` 分支。
-    /// `tool_call_id` 用新 uuid,实际上 root.messages 里没有对应 ToolCall,所以
-    /// `is_subagent_task_finished` 会一直返回 `Ok(false)`(未完成)—— LRC 在跑期间
-    /// 语义上确实是"未完成",`BlockCompleted` 钩子会在 LRC 真结束时清理。
-    pub(super) fn new_byop_silent_cli_subtask(block_id: BlockId, parent_task_id: String) -> Self {
+    /// 同时返回应写入父 task 的虚拟 `Subagent` ToolCall。只有父 task 持有这条边，
+    /// `compute_active_tasks` 才会把新 subtask 纳入下一轮请求快照。
+    pub(super) fn new_byop_silent_cli_subtask(
+        block_id: BlockId,
+        parent_task_id: String,
+    ) -> (Self, api::Message) {
         let task_id_str = Uuid::new_v4().to_string();
         let subagent_call = api::message::tool_call::Subagent {
             task_id: task_id_str.clone(),
@@ -219,6 +219,22 @@ impl Task {
             )),
         };
         let tool_call_id = Uuid::new_v4().to_string();
+        let message_id = Uuid::new_v4().to_string();
+        let parent_tool_call = api::Message {
+            id: message_id.clone(),
+            task_id: parent_task_id.clone(),
+            server_message_data: String::new(),
+            citations: vec![],
+            message: Some(api::message::Message::ToolCall(api::message::ToolCall {
+                tool_call_id: tool_call_id.clone(),
+                tool: Some(api::message::tool_call::Tool::Subagent(
+                    subagent_call.clone(),
+                )),
+            })),
+            request_id: format!("byop-lrc-fallback:{message_id}"),
+            timestamp: None,
+            fetched_memories: vec![],
+        };
         let api_task = api::Task {
             id: task_id_str.clone(),
             description: String::new(),
@@ -227,17 +243,20 @@ impl Task {
             summary: String::new(),
             server_data: String::new(),
         };
-        Self {
-            id: TaskId(task_id_str),
-            data: TaskImpl::Server(ServerTask {
-                source: api_task,
-                subagent_params: Some(SubagentParams {
-                    call: subagent_call,
-                    tool_call_id,
+        (
+            Self {
+                id: TaskId(task_id_str),
+                data: TaskImpl::Server(ServerTask {
+                    source: api_task,
+                    subagent_params: Some(SubagentParams {
+                        call: subagent_call,
+                        tool_call_id,
+                    }),
                 }),
-            }),
-            exchanges: vec![],
-        }
+                exchanges: vec![],
+            },
+            parent_tool_call,
+        )
     }
 
     #[allow(clippy::unwrap_in_result)]

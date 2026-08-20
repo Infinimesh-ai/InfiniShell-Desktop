@@ -114,8 +114,28 @@ pub struct RustSshSessionArgs {
 pub struct RustSshBrokerCommandArgs {
     #[arg(long, hide = true)]
     pub endpoint: String,
+    #[arg(
+        long,
+        hide = true,
+        required_unless_present = "upload_path",
+        conflicts_with = "upload_path"
+    )]
+    pub command: Option<String>,
+    /// 通过当前 Rust SSH session 的 SCP channel 上传文件。
+    #[arg(
+        long,
+        hide = true,
+        required_unless_present = "command",
+        conflicts_with = "command",
+        requires = "stdin_file"
+    )]
+    pub upload_path: Option<String>,
+    /// 上传目标使用 Windows PowerShell 命令行语义。
+    #[arg(long, hide = true, requires = "upload_path")]
+    pub upload_windows: bool,
+    /// 上传请求使用的本地文件；普通 exec 请求省略时沿用 stdin。
     #[arg(long, hide = true)]
-    pub command: String,
+    pub stdin_file: Option<std::path::PathBuf>,
 }
 
 /// Global options that apply to all CLI commands.

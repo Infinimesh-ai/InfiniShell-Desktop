@@ -78,6 +78,8 @@ mod sftp_manager;
 mod shell_indicator;
 mod skill_manager;
 mod ssh_manager;
+#[cfg(not(target_family = "wasm"))]
+mod storage_cleanup;
 mod suggestions;
 mod system;
 mod tab;
@@ -521,6 +523,11 @@ impl LaunchMode {
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     fn should_start_local_http_server(&self) -> bool {
         !self.is_headless()
+    }
+
+    /// 只有普通桌面 GUI 进程才能向操作系统发布应用服务。
+    fn should_initialize_app_services(&self) -> bool {
+        matches!(self, LaunchMode::App { .. })
     }
 
     /// Returns `true` if this process can build and sync codebase indices.
@@ -1152,6 +1159,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     } else {
         app_callbacks(
             launch_mode.is_integration_test(),
+            launch_mode.should_initialize_app_services(),
             tracing_initialization.take(),
         )
     };
@@ -1893,7 +1901,9 @@ pub(crate) fn initialize_app(
 
     // Register initial keybindings prior to creating menus
     ai::init(ctx);
-    app_services::init(ctx);
+    if launch_mode.should_initialize_app_services() {
+        app_services::init(ctx);
+    }
     // // TODO: Temporarily disabling keybindings for WASM builds. Will be implemented in future WASM support.
     #[cfg(not(target_family = "wasm"))]
     code::editor::find::view::init(ctx);
@@ -2280,6 +2290,7 @@ pub(crate) fn initialize_app(
 
 pub(crate) fn app_callbacks(
     is_integration_test: bool,
+    should_teardown_app_services: bool,
     mut tracing_initialization: Option<tracing::Initialization>,
 ) -> warpui::platform::AppCallbacks {
     warpui::platform::AppCallbacks {
@@ -2363,7 +2374,9 @@ pub(crate) fn app_callbacks(
             // Tear down app services before spawning the new process, to
             // ensure that the new process doesn't find the old process while
             // attempting to enforce our single-instance policy on Linux.
-            app_services::teardown(ctx);
+            if should_teardown_app_services {
+                app_services::teardown(ctx);
+            }
             autoupdate::spawn_child_if_necessary(ctx);
 
             // Tear down any application profilers that are running, writing

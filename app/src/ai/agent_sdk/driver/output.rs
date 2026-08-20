@@ -478,7 +478,6 @@ pub mod json {
     use std::borrow::Cow;
     use std::io::{self, Write};
     use std::ops::Range;
-    use std::path::Path;
 
     use serde::Serialize;
 

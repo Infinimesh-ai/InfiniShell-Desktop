@@ -24,8 +24,6 @@ use warp_util::remote_path::RemotePath;
 use warp_util::standardized_path::StandardizedPath;
 
 use crate::ai::block_context::BlockContext;
-#[cfg(feature = "local_fs")]
-use crate::ai::skills::SkillOpenOrigin;
 use crate::global_resource_handles::GlobalResourceHandlesProvider;
 use crate::ssh_manager::onekey::{OneKeyCredentialKind, load_saved_ssh_credentials};
 use crate::ssh_manager::password_prompt::bytes_look_like_password_prompt;
@@ -134,7 +132,6 @@ use warp_util::path::LineAndColumnArg;
 use warp_util::path::ShellFamily;
 use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
 use warpui::assets::asset_cache::{AssetCache, AssetCacheEvent};
-use warpui::r#async::executor::Background;
 use warpui::r#async::{SpawnedFutureHandle, Timer};
 use warpui::clipboard::ClipboardContent;
 use warpui::clipboard_utils::get_image_filepaths_from_paths;
@@ -305,7 +302,6 @@ use crate::context_chips::prompt::{Prompt, PromptSelection};
 use crate::context_chips::prompt_type::PromptType;
 use crate::drive::ObjectTypeAndId;
 use crate::drive::settings::WarpDriveSettings;
-use crate::drive::sharing::ShareableObject;
 use crate::editor::{
     AutosuggestionType, CrdtOperation, EditorAction, EditorView, Event as EditorEvent,
     PropagateAndNoOpEscapeKey, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
@@ -6567,7 +6563,7 @@ impl TerminalView {
         &mut self,
         cli_subagent_view_id: EntityId,
         event: &CLISubagentViewEvent,
-        should_forward_windows_ctrl_c: bool,
+        #[cfg_attr(not(windows), allow(unused_variables))] should_forward_windows_ctrl_c: bool,
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
@@ -12207,36 +12203,19 @@ impl TerminalView {
                     crate::system::SystemInfo::handle(ctx).update(ctx, |system_info, _ctx| {
                         system_info.handle_block_created();
                     });
-
-                    // Emit the event to the parent view. This will save the block to sqlite if
-                    // session restoration is enabled.
-                    ctx.emit(Event::BlockCompleted {
-                        block: block_completed.serialized_block.clone(),
-                        is_local: !self.is_block_considered_remote(
-                            block_completed.serialized_block.session_id,
-                            Some(&block_completed.command),
-                            ctx,
-                        ),
-                    });
-                } else if let BlockType::Background(serialized_block) = block_type {
-                    // Because background output blocks are before the active block, they need to be saved
-                    // via a BlockCompleted event but don't affect focus or input.
-                    ctx.emit(Event::BlockCompleted {
-                        block: serialized_block.clone(),
-                        is_local: !self.is_block_considered_remote(
-                            serialized_block.session_id,
-                            None,
-                            ctx,
-                        ),
-                    });
-                } else if let BlockType::BootstrapVisible(serialized_block) = block_type {
-                    // Re-compute the focus after the visible bootstrap block has completed.
+                } else if let BlockType::BootstrapVisible(_) = block_type {
+                    // 可见的 shell 启动输出(例如 Linux MotD)只属于当前 shell,
+                    // 不向父视图发送 BlockCompleted,避免它被会话恢复持久化。
                     self.redetermine_terminal_focus(ctx);
+                }
+
+                // 用户命令和后台输出需要保存以支持会话恢复;启动输出不应跨 shell 恢复。
+                if let Some((serialized_block, command)) = block_type.session_restoration_data() {
                     ctx.emit(Event::BlockCompleted {
                         block: serialized_block.clone(),
                         is_local: !self.is_block_considered_remote(
                             serialized_block.session_id,
-                            None,
+                            command,
                             ctx,
                         ),
                     });

@@ -500,7 +500,7 @@ fn test_submit_queued_prompt_routes_plain_text_to_conversation() {
 }
 
 #[test]
-fn test_submit_queued_prompt_detects_slash_command() {
+fn test_submit_queued_prompt_handles_feedback_command() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
 
@@ -511,35 +511,19 @@ fn test_submit_queued_prompt_detects_slash_command() {
             input.set_input_mode_natural_language_detection(ctx);
         });
 
-        // Verify that submit_queued_prompt correctly detects slash commands.
-        // Find a command that exists and has an optional argument.
-        let command_with_arg = input.read(&app, |input, ctx| {
-            let ds = &input.slash_command_data_source;
-            ds.as_ref(ctx).active_commands().find_map(|(_, command)| {
-                (command.argument.as_ref().is_some_and(|a| a.is_optional)
-                    && ds.as_ref(ctx).parse_slash_command(command.name).is_some())
-                .then(|| command.name.to_owned())
-            })
-        });
-
-        if let Some(command_text) = command_with_arg {
-            // submit_queued_prompt should detect the slash command and route through
-            // execute_slash_command. This should not panic.
-            input.update(&mut app, |input, ctx| {
-                let conversation_id = AIConversationId::new();
-                let query_id = QueuedQueryModel::handle(ctx).update(ctx, |model, ctx| {
-                    model.append(
-                        conversation_id,
-                        QueuedQuery::new(
-                            command_text.clone(),
-                            QueuedQueryOrigin::QueueSlashCommand,
-                        ),
-                        ctx,
-                    )
-                });
-                input.submit_queued_prompt(command_text, conversation_id, query_id, ctx);
+        // /feedback 接受可选参数，并且必须路由到对应的工作区 action。
+        let command_text = commands::FEEDBACK.name.to_owned();
+        input.update(&mut app, |input, ctx| {
+            let conversation_id = AIConversationId::new();
+            let query_id = QueuedQueryModel::handle(ctx).update(ctx, |model, ctx| {
+                model.append(
+                    conversation_id,
+                    QueuedQuery::new(command_text.clone(), QueuedQueryOrigin::QueueSlashCommand),
+                    ctx,
+                )
             });
-        }
+            input.submit_queued_prompt(command_text, conversation_id, query_id, ctx);
+        });
     });
 }
 

@@ -253,14 +253,9 @@ impl RequestedActionViewType {
 #[derive(Debug, Clone)]
 pub enum RequestedCommandViewEvent {
     Accepted,
-    SetAutoexecuteMode {
-        mode: AIConversationAutoexecuteMode,
-        set_session_default: bool,
-    },
+    SetAutoexecuteMode { mode: AIConversationAutoexecuteMode },
     Rejected,
-    UpdatedExpansionState {
-        is_expanded: bool,
-    },
+    UpdatedExpansionState { is_expanded: bool },
     TextSelected,
     CopiedEmptyText,
     EditorFocused,
@@ -272,8 +267,6 @@ pub enum RequestedCommandViewAction {
     Accept,
     AcceptAndAutoExecute,
     AcceptAndFullAccess,
-    AcceptAndAutoExecuteForSession,
-    AcceptAndFullAccessForSession,
     ToggleAcceptMenu,
     Reject,
     OpenEditMode,
@@ -767,7 +760,7 @@ impl RequestedCommandView {
 
             let auto_item = MenuItemFields::new_with_label(
                 if FeatureFlag::AgentApprovalModes.is_enabled() {
-                    crate::t!("ai-block-auto-approve-this-task")
+                    crate::t!("ai-block-auto-approve-this-conversation")
                 } else {
                     crate::t!("ai-block-auto-approve")
                 },
@@ -780,32 +773,11 @@ impl RequestedCommandView {
             if FeatureFlag::AgentApprovalModes.is_enabled() {
                 items.push(
                     MenuItemFields::new_with_label(
-                        crate::t!("ai-block-full-access-this-task"),
+                        crate::t!("ai-block-full-access-this-conversation"),
                         String::new(),
                     )
                     .with_tooltip(crate::t!("ai-block-full-access-tooltip"))
                     .with_on_select_action(RequestedCommandViewAction::AcceptAndFullAccess)
-                    .into_item(),
-                );
-                items.push(
-                    MenuItemFields::new_with_label(
-                        crate::t!("ai-block-auto-approve-this-session"),
-                        String::new(),
-                    )
-                    .with_on_select_action(
-                        RequestedCommandViewAction::AcceptAndAutoExecuteForSession,
-                    )
-                    .into_item(),
-                );
-                items.push(
-                    MenuItemFields::new_with_label(
-                        crate::t!("ai-block-full-access-this-session"),
-                        String::new(),
-                    )
-                    .with_tooltip(crate::t!("ai-block-full-access-tooltip"))
-                    .with_on_select_action(
-                        RequestedCommandViewAction::AcceptAndFullAccessForSession,
-                    )
                     .into_item(),
                 );
             }
@@ -2072,7 +2044,7 @@ impl View for RequestedCommandView {
         root_stack.add_child(container);
 
         if self.is_accept_split_button_menu_open {
-            root_stack.add_positioned_child(
+            root_stack.add_positioned_overlay_child(
                 ChildView::new(&self.accept_split_button_menu).finish(),
                 OffsetPositioning::offset_from_save_position_element(
                     Self::get_position_id_for_accept_split_button(&self.position_id_prefix),
@@ -2134,7 +2106,6 @@ impl TypedActionView for RequestedCommandView {
                 ctx.emit(RequestedCommandViewEvent::Accepted);
                 ctx.emit(RequestedCommandViewEvent::SetAutoexecuteMode {
                     mode: AIConversationAutoexecuteMode::RunToCompletion,
-                    set_session_default: false,
                 });
             }
             RequestedCommandViewAction::AcceptAndFullAccess => {
@@ -2142,23 +2113,6 @@ impl TypedActionView for RequestedCommandView {
                 ctx.emit(RequestedCommandViewEvent::Accepted);
                 ctx.emit(RequestedCommandViewEvent::SetAutoexecuteMode {
                     mode: AIConversationAutoexecuteMode::FullAccess,
-                    set_session_default: false,
-                });
-            }
-            RequestedCommandViewAction::AcceptAndAutoExecuteForSession => {
-                self.commit_editor_contents(ctx);
-                ctx.emit(RequestedCommandViewEvent::Accepted);
-                ctx.emit(RequestedCommandViewEvent::SetAutoexecuteMode {
-                    mode: AIConversationAutoexecuteMode::RunToCompletion,
-                    set_session_default: true,
-                });
-            }
-            RequestedCommandViewAction::AcceptAndFullAccessForSession => {
-                self.commit_editor_contents(ctx);
-                ctx.emit(RequestedCommandViewEvent::Accepted);
-                ctx.emit(RequestedCommandViewEvent::SetAutoexecuteMode {
-                    mode: AIConversationAutoexecuteMode::FullAccess,
-                    set_session_default: true,
                 });
             }
             RequestedCommandViewAction::ToggleAcceptMenu => {

@@ -104,6 +104,14 @@ if [ -n "${WARP_BUNDLED_REMOTE_SERVER_DIR:-}" ]; then
     "$WARP_BUNDLED_REMOTE_SERVER_DIR" \
     "$GIT_RELEASE_TAG" \
     "$DEST_DIR/remote-server"
+elif [ -n "${WARP_BUNDLED_REMOTE_SERVER_PARTIAL_DIR:-}" ]; then
+  REMOTE_SERVER_VERSION="${GIT_RELEASE_TAG:-unversioned}"
+  echo "Copying partial bundled remote-server resources to $DEST_DIR/remote-server"
+  python3 "$SCRIPT_DIR/prepare_bundled_remote_server_resources.py" copy \
+    --allow-partial \
+    "$WARP_BUNDLED_REMOTE_SERVER_PARTIAL_DIR" \
+    "$REMOTE_SERVER_VERSION" \
+    "$DEST_DIR/remote-server"
 fi
 
 # Copy channel-gated skills matching the current release channel.

@@ -61,8 +61,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::SelectablePrompt,
         #[cfg(feature = "agent_mode")]
         FeatureFlag::AgentMode,
-        #[cfg(feature = "shared_session_long_running_commands")]
-        FeatureFlag::SharedSessionWriteToLongRunningCommands,
         #[cfg(feature = "resize_fix")]
         FeatureFlag::ResizeFix,
         #[cfg(feature = "richtext_multiselect")]
@@ -71,8 +69,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::DefaultWaterfallMode,
         #[cfg(feature = "settings_file")]
         FeatureFlag::SettingsFile,
-        #[cfg(feature = "file_backed_execution_profiles")]
-        FeatureFlag::FileBackedExecutionProfiles,
         #[cfg(feature = "rect_selection")]
         FeatureFlag::RectSelection,
         #[cfg(feature = "russh_transport")]
@@ -89,16 +85,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::AIRules,
         #[cfg(feature = "shell_selector")]
         FeatureFlag::ShellSelector,
-        #[cfg(feature = "cloud_runners")]
-        FeatureFlag::CloudRunners,
-        #[cfg(feature = "cloud_agent_runners")]
-        FeatureFlag::CloudAgentRunners,
-        #[cfg(feature = "account_first_onboarding")]
-        FeatureFlag::AccountFirstOnboarding,
         #[cfg(all(feature = "simulate_github_unauthed", debug_assertions))]
         FeatureFlag::SimulateGithubUnauthed,
-        #[cfg(feature = "session_sharing_acls")]
-        FeatureFlag::SessionSharingAcls,
         #[cfg(feature = "full_screen_zen_mode")]
         FeatureFlag::FullScreenZenMode,
         #[cfg(feature = "minimalist_ui")]
@@ -141,8 +129,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::AgentModePrePlanXML,
         #[cfg(feature = "agent_onboarding")]
         FeatureFlag::AgentOnboarding,
-        #[cfg(feature = "agent_shared_sessions")]
-        FeatureFlag::AgentSharedSessions,
         #[cfg(feature = "suggested_rules")]
         FeatureFlag::SuggestedRules,
         #[cfg(feature = "suggested_agent_mode_workflows")]
@@ -151,10 +137,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::CommandCorrectionKey,
         #[cfg(feature = "predict_am_queries")]
         FeatureFlag::PredictAMQueries,
-        #[cfg(feature = "full_source_code_embedding")]
-        FeatureFlag::FullSourceCodeEmbedding,
-        #[cfg(feature = "remote_codebase_indexing")]
-        FeatureFlag::RemoteCodebaseIndexing,
         #[cfg(feature = "use_tantivy_search")]
         FeatureFlag::UseTantivySearch,
         #[cfg(feature = "grep_tool")]
@@ -219,8 +201,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::TabCloseButtonOnLeft,
         #[cfg(feature = "profiles_design_revamp")]
         FeatureFlag::ProfilesDesignRevamp,
-        #[cfg(feature = "search_codebase_ui")]
-        FeatureFlag::SearchCodebaseUI,
         #[cfg(feature = "linked_code_blocks")]
         FeatureFlag::LinkedCodeBlocks,
         #[cfg(feature = "tabbed_editor_view")]
@@ -327,12 +307,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::BackgroundComputerUse,
         #[cfg(feature = "local_claude_codex_child_harnesses")]
         FeatureFlag::LocalClaudeCodexChildHarnesses,
-        #[cfg(feature = "team_api_keys")]
-        FeatureFlag::TeamApiKeys,
-        #[cfg(feature = "named_agents")]
-        FeatureFlag::NamedAgents,
-        #[cfg(feature = "cloud_conversations")]
-        FeatureFlag::CloudConversations,
         #[cfg(feature = "agent_toolbar_editor")]
         FeatureFlag::AgentToolbarEditor,
         #[cfg(feature = "configurable_toolbar")]
@@ -417,8 +391,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::WarpControlCli,
         #[cfg(feature = "agent_harness")]
         FeatureFlag::AgentHarness,
-        #[cfg(feature = "handoff_local_cloud")]
-        FeatureFlag::HandoffLocalCloud,
         #[cfg(feature = "hoa_notifications")]
         FeatureFlag::HOANotifications,
         #[cfg(feature = "open_code_notifications")]
@@ -447,28 +419,12 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::CodexPlugin,
         #[cfg(feature = "trim_trailing_blank_lines")]
         FeatureFlag::TrimTrailingBlankLines,
-        #[cfg(feature = "cloud_mode_input_v2")]
-        FeatureFlag::CloudModeInputV2,
-        #[cfg(feature = "handoff_cloud_cloud")]
-        FeatureFlag::HandoffCloudCloud,
-        #[cfg(feature = "git_credential_refresh")]
-        FeatureFlag::GitCredentialRefresh,
         #[cfg(feature = "remote_code_review")]
         FeatureFlag::RemoteCodeReview,
-        #[cfg(feature = "custom_model_routers")]
-        FeatureFlag::CustomModelRouters,
-        #[cfg(feature = "supergrok")]
-        FeatureFlag::SuperGrok,
-        #[cfg(feature = "gemini_enterprise")]
-        FeatureFlag::GeminiEnterprise,
         #[cfg(feature = "nld_prompt_history_match")]
         FeatureFlag::NldPromptHistoryMatch,
-        #[cfg(feature = "prompt_cache_expiry_warning")]
-        FeatureFlag::PromptCacheExpiryWarning,
         #[cfg(feature = "osc_hyperlinks")]
         FeatureFlag::OscHyperlinks,
-        #[cfg(feature = "terminal_lifecycle_recovery")]
-        FeatureFlag::TerminalLifecycleRecovery,
         #[cfg(feature = "onekey_prompt")]
         FeatureFlag::OneKeyPrompt,
         #[cfg(feature = "recursive_ssh_extension")]

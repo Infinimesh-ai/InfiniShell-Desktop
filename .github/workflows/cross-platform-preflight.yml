@@ -89,6 +89,11 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.run_windows)
     runs-on: [self-hosted, windows, x64, infinishell-ci]
     timeout-minutes: 180
+    env:
+      CARGO_TARGET_DIR: 'C:\infinishell-ci\cargo-target'
+      RUSTC_WRAPPER: 'C:\infinishell-ci\tools\sccache-v0.17.0\sccache.exe'
+      SCCACHE_DIR: 'C:\infinishell-ci\sccache'
+      SCCACHE_CACHE_SIZE: 80G
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -125,10 +130,16 @@ jobs:
           cargo --version
           cmake --version
           protoc --version
+          & $env:RUSTC_WRAPPER --version
+          & $env:RUSTC_WRAPPER --zero-stats
 
       - name: Check InfiniShell-Desktop
         shell: pwsh
         run: cargo check -p warp --lib
+
+      - name: Check InfiniShell SSH worker
+        shell: pwsh
+        run: cargo check -p warp --bin infinishell-ssh --features release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker,russh_transport
 
       - name: Test Responses integration
         shell: pwsh
@@ -148,6 +159,10 @@ jobs:
         shell: pwsh
         # warp_tui 仍依赖已移除的 Warp 云 API，也不属于桌面版发布产物。
         # integration 需要专用图形会话，此处完成跨平台编译后交由 GUI 测试流程执行。
-        # Windows 服务会话下并发 App 测试会竞争终端进程清理；测试逻辑完成后进程可能不退出。
-        # 编译仍由 Cargo 并行执行，只串行化 nextest 的测试进程，且不跳过任何用例。
-        run: cargo nextest run --test-threads=1 --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
+        # nextest 配置仅串行 Windows 的 warp 主应用测试，其他 crate 仍可并行执行。
+        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
+
+      - name: Report sccache statistics
+        if: ${{ always() }}
+        shell: pwsh
+        run: '& $env:RUSTC_WRAPPER --show-stats'

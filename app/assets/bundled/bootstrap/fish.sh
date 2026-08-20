@@ -660,7 +660,7 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1" -a "$
         set -l ssh_hook_hex "$argv[2]"
         set -l client_version "$argv[3]"
         set -l protocol_version "$argv[4]"
-        set -l init_shell_hex '@@WARP_WINDOWS_REMOTE_INIT_SHELL_HEX@@'
+        set -l init_shell_gzip_base64 '@@WARP_WINDOWS_REMOTE_INIT_SHELL_GZIP_BASE64@@'
 
         if not string match --quiet --regex '^[A-Za-z0-9._+-]*$' -- "$client_version"
             set client_version ''
@@ -669,16 +669,17 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1" -a "$
             set protocol_version ''
         end
 
-        set -l bootstrap_script "\$env:TERM_PROGRAM = 'WarpTerminal'
-\$env:WARP_IS_SSH = '1'
-\$env:WARP_CLIENT_VERSION = '$client_version'
-\$env:WARP_CLI_AGENT_PROTOCOL_VERSION = '$protocol_version'
-[Console]::Out.Write(([char]27) + ']9278;d;$ssh_hook_hex' + ([char]7))
-\$h = '$init_shell_hex'
-\$bytes = New-Object byte[] (\$h.Length / 2)
-for (\$i = 0; \$i -lt \$bytes.Length; \$i++) { \$bytes[\$i] = [Convert]::ToByte(\$h.Substring(\$i * 2, 2), 16) }
-\$initShell = [Text.Encoding]::UTF8.GetString(\$bytes).Replace('@@WARP_SESSION_ID@@', '$remote_session_id')
-. ([ScriptBlock]::Create(\$initShell))"
+        set -l bootstrap_script "\$env:TERM_PROGRAM='WarpTerminal'
+\$env:WARP_IS_SSH='1'
+\$env:WARP_CLIENT_VERSION='$client_version'
+\$env:WARP_CLI_AGENT_PROTOCOL_VERSION='$protocol_version'
+[Console]::Out.Write(([char]27)+']9278;d;$ssh_hook_hex'+[char]7)
+\$c=[Convert]::FromBase64String('$init_shell_gzip_base64')
+\$m=[IO.MemoryStream]::new(\$c)
+\$g=[IO.Compression.GZipStream]::new(\$m,[IO.Compression.CompressionMode]::Decompress)
+\$r=[IO.StreamReader]::new(\$g)
+\$s=\$r.ReadToEnd().Replace('@@WARP_SESSION_ID@@','$remote_session_id');\$r.Dispose()
+. ([ScriptBlock]::Create(\$s))"
         warp_powershell_encoded_command "$bootstrap_script" '-NoExit '
     end
 
@@ -780,7 +781,7 @@ for (\$i = 0; \$i -lt \$bytes.Length; \$i++) { \$bytes[\$i] = [Convert]::ToByte(
                 set control_master_mode "no"
             case '*'
                 set -l remote_powershell
-                if test -z "$remote_shell"; or test "$remote_shell" = '\$SHELL'
+                if test -z "$remote_shell"; or test "$remote_shell" = '$SHELL'
                     set -l capability_probe_command (warp_windows_powershell_capability_probe_command)
                     if test -n "$capability_probe_command"
                         set -l capability_probe_output (command ssh -o ControlMaster=no \
@@ -923,20 +924,6 @@ esac
 end
 
 warp_precmd
-
-# Print the MotD if this is a login shell. Normally, login(1) or pam_motd(8)
-# would do this. However, Warp does not use login(1) for local sessions and for
-# remote sessions, SSHD thinks it is starting a non-interactive session, so it
-# does not print PAM messages.
-if status --is-login
-  and test ! -e "$HOME/.hushlogin"
-  for motd_file in /etc/motd /run/motd /run/motd.dynamic /usr/lib/motd /usr/lib/motd.dynamic;
-    if test -r "$motd_file"
-      command cat "$motd_file"
-      break
-    end
-  end
-end
 
 warp_bootstrapped
 

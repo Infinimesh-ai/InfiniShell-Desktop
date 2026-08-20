@@ -20,6 +20,10 @@ function warp_remote_shell_supports_bootstrap() {
     esac
 }
 
+function warp_remote_shell_may_be_windows() {
+    [[ -z "$1" || "$1" == '$SHELL' ]]
+}
+
 function warp_powershell_encoded_command() {
     if ! command -v iconv >/dev/null 2>&1 || ! command -v base64 >/dev/null 2>&1; then
         return 1
@@ -62,20 +66,21 @@ function warp_windows_powershell_bootstrap_command() {
     local ssh_hook_hex="$2"
     local client_version="$3"
     local protocol_version="$4"
-    local init_shell_hex='@@WARP_WINDOWS_REMOTE_INIT_SHELL_HEX@@'
+    local init_shell_gzip_base64='@@WARP_WINDOWS_REMOTE_INIT_SHELL_GZIP_BASE64@@'
 
     case "$client_version" in *[![:alnum:]._+-]*) client_version="" ;; esac
     case "$protocol_version" in *[![:alnum:]._+-]*) protocol_version="" ;; esac
 
-    local bootstrap_script="\$env:TERM_PROGRAM = 'WarpTerminal'
-\$env:WARP_IS_SSH = '1'
-\$env:WARP_CLIENT_VERSION = '$client_version'
-\$env:WARP_CLI_AGENT_PROTOCOL_VERSION = '$protocol_version'
-[Console]::Out.Write(([char]27) + ']9278;d;$ssh_hook_hex' + ([char]7))
-\$h = '$init_shell_hex'
-\$bytes = New-Object byte[] (\$h.Length / 2)
-for (\$i = 0; \$i -lt \$bytes.Length; \$i++) { \$bytes[\$i] = [Convert]::ToByte(\$h.Substring(\$i * 2, 2), 16) }
-\$initShell = [Text.Encoding]::UTF8.GetString(\$bytes).Replace('@@WARP_SESSION_ID@@', '$remote_session_id')
-. ([ScriptBlock]::Create(\$initShell))"
+    local bootstrap_script="\$env:TERM_PROGRAM='WarpTerminal'
+\$env:WARP_IS_SSH='1'
+\$env:WARP_CLIENT_VERSION='$client_version'
+\$env:WARP_CLI_AGENT_PROTOCOL_VERSION='$protocol_version'
+[Console]::Out.Write(([char]27)+']9278;d;$ssh_hook_hex'+[char]7)
+\$c=[Convert]::FromBase64String('$init_shell_gzip_base64')
+\$m=[IO.MemoryStream]::new(\$c)
+\$g=[IO.Compression.GZipStream]::new(\$m,[IO.Compression.CompressionMode]::Decompress)
+\$r=[IO.StreamReader]::new(\$g)
+\$s=\$r.ReadToEnd().Replace('@@WARP_SESSION_ID@@','$remote_session_id');\$r.Dispose()
+. ([ScriptBlock]::Create(\$s))"
     warp_powershell_encoded_command "$bootstrap_script" '-NoExit '
 }

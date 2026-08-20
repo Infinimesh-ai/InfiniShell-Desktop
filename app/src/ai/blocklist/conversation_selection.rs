@@ -93,7 +93,7 @@ pub trait ConversationSelection: AgentConversationListPolicy {
     fn pending_query_autoexecute_override(&self, app: &AppContext)
     -> AIConversationAutoexecuteMode;
 
-    /// 设置待发送查询所对应任务的审批模式。
+    /// 设置待发送查询所对应对话的审批模式。
     fn set_pending_query_autoexecute_override(
         &mut self,
         mode: AIConversationAutoexecuteMode,

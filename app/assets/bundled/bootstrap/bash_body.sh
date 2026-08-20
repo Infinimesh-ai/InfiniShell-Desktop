@@ -1089,7 +1089,7 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
             local remote_shell=$(warp_remote_shell_from_probe_output "$remote_shell_probe_output")
             if ! warp_remote_shell_supports_bootstrap "$remote_shell"; then
                 local remote_powershell=""
-                if [[ -z "$remote_shell" || "$remote_shell" == '\$SHELL' ]]; then
+                if warp_remote_shell_may_be_windows "$remote_shell"; then
                     local capability_probe_command=$(warp_windows_powershell_capability_probe_command)
                     if [[ -n "$capability_probe_command" ]]; then
                         local capability_probe_output
@@ -1241,12 +1241,9 @@ esac
     # bootstrap logic pasted into the PTY and the output of shell startup files.
     warp_precmd
 
-    # Before calling rcfiles, print the MotD.
-    # In general, login(1) or pam_motd(8) is supposed to do this. However, we don't
-    # go through the normal login flow when bootstrapping a Warp session. In
-    # addition, Warp bash shells are _not_ login shells, because bash does not
-    # support custom rcfiles in login shells.
-    if [[ ! -e "$HOME/.hushlogin" ]]; then
+    # SSH wrapper 会绕过 SSHD/PAM 的正常 MotD 输出,因此只为远端会话补打印。
+    # 本地 GUI shell 应与系统终端一致,不主动模拟 login 流程。
+    if [[ "$WARP_IS_SSH" == "1" && ! -e "$HOME/.hushlogin" ]]; then
       for motd_file in /etc/motd /run/motd /run/motd.dynamic /usr/lib/motd /usr/lib/motd.dynamic; do
         if [[ -r "$motd_file" ]]; then
           command -p cat "$motd_file"

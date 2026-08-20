@@ -80,21 +80,22 @@ jobs:
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           echo "Release tag: $TAG / build ref: $BRANCH"
 
-      # 找上一个 release tag(匹配 v*),用于限定 git-cliff 的 commit 范围。
-      # tag-触发:HEAD == 当前 tag,要从 HEAD^ 起找最近的 v* tag。
-      # dispatch:HEAD 不是 tag,直接从 HEAD 起找。
+      # 只把 GitHub 上实际发布过的 Latest Release 当作 changelog 基线。
+      # 失败、撤回或仅保留审计用途的 tag 不代表用户拿到过该版本,不能截断发布说明。
       # 找不到(首次发布)时输出空字符串,后面 git-cliff 不限定范围。
-      - name: Compute previous release tag
+      - name: Compute previous published release tag
         id: prev_tag
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            PREV=$(git describe --tags --abbrev=0 --match='v*' HEAD^ 2>/dev/null || echo "")
-          else
-            PREV=$(git describe --tags --abbrev=0 --match='v*' HEAD 2>/dev/null || echo "")
+          PREV=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null || true)
+          if [[ -n "$PREV" ]] && ! git merge-base --is-ancestor "${PREV}^{commit}" HEAD; then
+            echo "Latest published release $PREV is not an ancestor of HEAD" >&2
+            exit 1
           fi
           echo "prev=$PREV" >> $GITHUB_OUTPUT
-          echo "Previous tag: ${PREV:-<none, first release>}"
+          echo "Previous published release tag: ${PREV:-<none, first release>}"
 
       # 用官方推荐的 orhun/git-cliff-action 生成「上个 tag 到 HEAD」的变更说明。
       # --strip header 去掉模板顶部空 header;--tag 把 unreleased 段标记为本次发布版本。

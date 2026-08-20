@@ -137,6 +137,41 @@ fn startup_auth_is_non_blocking_only_for_tui() {
 }
 
 #[test]
+fn only_desktop_app_initializes_app_services() {
+    let app = LaunchMode::App {
+        args: Default::default(),
+        api_key: None,
+    };
+    let command_line = LaunchMode::CommandLine {
+        command: CliCommand::Whoami,
+        global_options: GlobalOptions::default(),
+        debug: false,
+        is_sandboxed: false,
+        computer_use_override: None,
+    };
+    let test = LaunchMode::Test {
+        driver: Box::new(None),
+        is_integration_test: false,
+    };
+    let remote_server_daemon = LaunchMode::RemoteServerDaemon {
+        identity_key: "test".to_owned(),
+    };
+    let tui = LaunchMode::Tui {
+        entrypoint: TuiEntryPoint::Interactive {
+            mount: Box::new(|_| {}),
+            api_key: None,
+        },
+    };
+
+    assert!(app.should_initialize_app_services());
+    assert!(!command_line.should_initialize_app_services());
+    assert!(!test.should_initialize_app_services());
+    assert!(!LaunchMode::RemoteServerProxy.should_initialize_app_services());
+    assert!(!remote_server_daemon.should_initialize_app_services());
+    assert!(!tui.should_initialize_app_services());
+}
+
+#[test]
 fn launch_modes_select_expected_logging_frontend() {
     let tui = LaunchMode::Tui {
         entrypoint: TuiEntryPoint::Interactive {

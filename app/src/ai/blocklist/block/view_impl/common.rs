@@ -30,12 +30,11 @@ use warpui::elements::shimmering_text::ShimmeringTextStateHandle;
 use warpui::elements::{
     Align, Axis, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty, EventHandler,
-    Expanded, Fill, Flex, FormattedTextElement, HeadingFontSizeMultipliers, Highlight,
-    HighlightedRange, Hoverable, Image as WarpImage, MainAxisAlignment, MainAxisSize,
-    MouseStateHandle, NewScrollable, OffsetPositioning, ParentAnchor, ParentElement,
-    ParentOffsetBounds, Radius, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth,
-    Shrinkable, Stack, Table, TableColumnWidth, TableConfig, TableHeader, TableVerticalSizing,
-    Text, Wrap,
+    Expanded, Fill, Flex, FormattedTextElement, Highlight, HighlightedRange, Hoverable,
+    Image as WarpImage, MainAxisAlignment, MainAxisSize, MouseStateHandle, NewScrollable,
+    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, SavePosition,
+    ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack, Table, TableColumnWidth,
+    TableConfig, TableHeader, TableVerticalSizing, Text, Wrap,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::image_cache::{CacheOption, ImageType};
@@ -921,7 +920,7 @@ fn render_auto_approve_button(
     } else if is_active {
         "Turn off auto-approve all agent actions".to_owned()
     } else {
-        "Auto-approve all agent actions for this task".to_owned()
+        crate::t!("ai-footer-auto-approve-agent-actions-for-conversation")
     };
 
     render_warping_indicator_button(

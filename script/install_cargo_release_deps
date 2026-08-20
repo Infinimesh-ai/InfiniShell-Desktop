@@ -29,4 +29,4 @@ fi
 "$PWD"/script/install_cargo_binstall
 
 # Install cargo-about for generating third-party license attribution.
-cargo binstall --no-confirm cargo-about@0.8.4
+cargo binstall --no-confirm cargo-about@0.9.1

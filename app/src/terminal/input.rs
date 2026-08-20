@@ -51,7 +51,6 @@ use parking_lot::FairMutex;
 use parking_lot::Mutex;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use settings::{Setting as _, ToggleableSetting};
 use string_offset::{ByteOffset, CharOffset};
 use vec1::Vec1;
@@ -68,7 +67,6 @@ use warp_completer::parsers::simple::command_at_cursor_position;
 use warp_completer::signatures::CommandRegistry;
 use warp_completer::util::parse_current_commands_and_tokens;
 use warp_core::r#async::debounce;
-use warp_core::context_flag::ContextFlag;
 use warp_core::ui::theme::AnsiColorIdentifier;
 use warp_core::ui::theme::color::internal_colors;
 use warp_core::user_preferences::GetUserPreferences as _;
@@ -78,7 +76,6 @@ use warp_util::path::ShellFamily;
 pub use warpui::WindowId;
 use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
 #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
-use warpui::r#async::FutureExt as _;
 use warpui::r#async::SpawnedFutureHandle;
 use warpui::clipboard::{ClipboardContent, ImageData};
 use warpui::clipboard_utils::CLIPBOARD_IMAGE_MIME_TYPES;
@@ -341,7 +338,6 @@ use crate::workspace::{
     CommandSearchOptions, ForkFromExchange, ForkedConversationDestination, InitContent,
     RestoreConversationLayout, ToastStack, WorkspaceAction,
 };
-use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 #[allow(unused_imports)]
 use crate::{AgentModeEntrypoint, cmd_or_ctrl_shift, send_telemetry_from_ctx};
 
@@ -2555,6 +2551,7 @@ impl Input {
                 menu_positioning_provider.clone(),
                 terminal_view_id,
                 ai_input_model.clone(),
+                ai_context_model.clone(),
                 model.clone(),
                 // Wired post-construction via `attach_ambient_agent_view_model`.
                 None,

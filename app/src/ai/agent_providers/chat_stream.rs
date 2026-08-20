@@ -782,6 +782,38 @@ impl SerializerProjectionBuilder {
         ));
     }
 
+    fn push_response_items(&mut self, task_id: &str, message_id: &str, response_items: &[Value]) {
+        self.flush_tool_calls();
+        let tool_calls = response_items
+            .iter()
+            .filter(|item| item.get("type").and_then(Value::as_str) == Some("function_call"))
+            .filter_map(|item| {
+                let call_id = item.get("call_id")?.as_str()?;
+                Some(ProjectedToolCall::new(
+                    task_id,
+                    message_id,
+                    call_id,
+                    item.get("name")
+                        .and_then(Value::as_str)
+                        .map(RedactedToolKind::new)
+                        .unwrap_or_default(),
+                ))
+            })
+            .collect::<Vec<_>>();
+        if tool_calls.is_empty() {
+            self.items.push(ProjectionItem::assistant_boundary(
+                task_id.to_owned(),
+                message_id.to_owned(),
+            ));
+        } else {
+            self.items.push(ProjectionItem::assistant_tool_calls(
+                task_id.to_owned(),
+                message_id.to_owned(),
+                tool_calls,
+            ));
+        }
+    }
+
     fn push_tool_result(&mut self, result: ProjectedToolResult) {
         self.flush_tool_calls();
         self.items.push(ProjectionItem::tool_result(result));
@@ -881,6 +913,19 @@ fn current_input_task_id(params: &RequestParams) -> String {
         .unwrap_or_else(|| "current_input".to_owned())
 }
 
+fn response_requests_with_raw_items<'a>(
+    messages: impl IntoIterator<Item = &'a api::Message>,
+) -> HashSet<String> {
+    messages
+        .into_iter()
+        .filter_map(|message| {
+            decode_provider_response_state(&message.server_message_data)
+                .filter(|state| !state.response_items.is_empty())
+                .map(|_| message.request_id.clone())
+        })
+        .collect()
+}
+
 fn build_serializer_readiness_projection(
     params: &RequestParams,
     all_msgs: &[&api::Message],
@@ -890,6 +935,7 @@ fn build_serializer_readiness_projection(
     compacted_tool_msg_ids: &std::collections::HashSet<String>,
 ) -> Vec<ProjectionItem> {
     let mut builder = SerializerProjectionBuilder::new();
+    let raw_response_request_ids = response_requests_with_raw_items(all_msgs.iter().copied());
 
     for (idx, msg) in all_msgs.iter().enumerate() {
         if let Some(head_end) = summarize_head_end {
@@ -909,9 +955,26 @@ fn build_serializer_readiness_projection(
             continue;
         }
 
+        if let Some(state) = decode_provider_response_state(&msg.server_message_data)
+            && !state.response_items.is_empty()
+        {
+            builder.push_response_items(&msg.task_id, &msg.id, &state.response_items);
+        }
+
         let Some(inner) = &msg.message else {
             continue;
         };
+
+        if raw_response_request_ids.contains(msg.request_id.as_str())
+            && matches!(
+                inner,
+                api::message::Message::AgentReasoning(_)
+                    | api::message::Message::AgentOutput(_)
+                    | api::message::Message::ToolCall(_)
+            )
+        {
+            continue;
+        }
 
         match inner {
             api::message::Message::UserQuery(_) => {
@@ -1013,6 +1076,9 @@ pub(crate) fn classify_byop_controller_readiness_with_live_tool_calls(
     let mut live_tool_calls_for_context =
         cancellation_live_tool_calls(params, &skipped_cancellation_results);
     live_tool_calls_for_context.extend(live_tool_calls);
+    let response_state_aliases =
+        response_state_live_tool_call_aliases(params, &live_tool_calls_for_context);
+    live_tool_calls_for_context.extend(response_state_aliases);
     let context = ReadinessContext {
         repair_records: params.byop_repair_state.repair_records().to_vec(),
         live_tool_calls: live_tool_calls_for_context,
@@ -1069,16 +1135,78 @@ fn cancellation_live_tool_calls(
         .collect()
 }
 
+// Responses sidecar 是出站顺序的权威来源，显式 ToolCall carrier 则是 action model
+// 跟踪运行状态的来源。两者的 message_id 不同，因此给 sidecar 调用补一份 live key 别名。
+fn response_state_live_tool_call_aliases(
+    params: &RequestParams,
+    live_tool_calls: &[LiveToolCall],
+) -> Vec<LiveToolCall> {
+    let mut aliases = Vec::new();
+    for message in params.tasks.iter().flat_map(|task| task.messages.iter()) {
+        let Some(state) = decode_provider_response_state(&message.server_message_data) else {
+            continue;
+        };
+        for item in &state.response_items {
+            if item.get("type").and_then(Value::as_str) != Some("function_call") {
+                continue;
+            }
+            let Some(tool_call_id) = item.get("call_id").and_then(Value::as_str) else {
+                continue;
+            };
+            let Some(live_tool_call) = live_tool_calls.iter().find(|live_tool_call| {
+                live_tool_call.tool_call.key.task_id == message.task_id
+                    && live_tool_call.tool_call.key.tool_call_id == tool_call_id
+            }) else {
+                continue;
+            };
+            if live_tool_call.tool_call.key.assistant_tool_call_message_id == message.id {
+                continue;
+            }
+            aliases.push(LiveToolCall::new(
+                ToolCallRef::new(
+                    ToolCallKey::new(&message.task_id, &message.id, tool_call_id),
+                    live_tool_call.tool_call.redacted_tool_kind.clone(),
+                ),
+                live_tool_call.state,
+            ));
+        }
+    }
+    aliases
+}
+
 fn build_controller_readiness_projection(
     params: &RequestParams,
     skipped_current_action_results: &HashSet<(String, String)>,
 ) -> Vec<ProjectionItem> {
     let mut builder = SerializerProjectionBuilder::new();
+    let all_msgs = params
+        .tasks
+        .iter()
+        .flat_map(|task| task.messages.iter())
+        .collect::<Vec<_>>();
+    let raw_response_request_ids = response_requests_with_raw_items(all_msgs.iter().copied());
 
-    for msg in params.tasks.iter().flat_map(|task| task.messages.iter()) {
+    for msg in all_msgs {
+        if let Some(state) = decode_provider_response_state(&msg.server_message_data)
+            && !state.response_items.is_empty()
+        {
+            builder.push_response_items(&msg.task_id, &msg.id, &state.response_items);
+        }
+
         let Some(inner) = &msg.message else {
             continue;
         };
+
+        if raw_response_request_ids.contains(msg.request_id.as_str())
+            && matches!(
+                inner,
+                api::message::Message::AgentReasoning(_)
+                    | api::message::Message::AgentOutput(_)
+                    | api::message::Message::ToolCall(_)
+            )
+        {
+            continue;
+        }
 
         match inner {
             api::message::Message::UserQuery(_) => {
@@ -1475,14 +1603,7 @@ fn build_chat_request(
         &compacted_tool_msg_ids,
     )?;
 
-    let raw_response_request_ids: HashSet<&str> = all_msgs
-        .iter()
-        .filter_map(|message| {
-            decode_provider_response_state(&message.server_message_data)
-                .filter(|state| !state.response_items.is_empty())
-                .map(|_| message.request_id.as_str())
-        })
-        .collect();
+    let raw_response_request_ids = response_requests_with_raw_items(all_msgs.iter().copied());
     let response_tool_callers: HashMap<String, (Option<Value>, Option<String>)> = all_msgs
         .iter()
         .filter_map(|message| decode_provider_response_state(&message.server_message_data))
@@ -1728,6 +1849,69 @@ fn build_chat_request(
         }
     }
     flush_assistant_buffer(&mut buf, &mut messages, &mut outbound_tool_groups);
+
+    // Responses 的 `previous_response_id` / Conversation 只替代服务端已经保存的输入，
+    // 不会自动补上该 response 中 `function_call` 的本地执行结果。用户在 Web Search
+    // 执行期间提交新输入时，preflight 会把取消结果持久化到历史；状态续接请求必须把
+    // 这些结果显式放在新用户输入之前，否则 provider 会返回
+    // `No tool output found for function call ...`。
+    if !include_history {
+        let latest_response_call_ids = all_msgs
+            .iter()
+            .rev()
+            .find_map(|message| {
+                decode_provider_response_state(&message.server_message_data).and_then(|state| {
+                    (!state.response_items.is_empty()).then(|| {
+                        state
+                            .response_items
+                            .into_iter()
+                            .filter(|item| {
+                                item.get("type").and_then(Value::as_str) == Some("function_call")
+                            })
+                            .filter_map(|item| {
+                                item.get("call_id")
+                                    .and_then(Value::as_str)
+                                    .map(str::to_owned)
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                })
+            })
+            .unwrap_or_default();
+        for call_id in latest_response_call_ids {
+            let Some(result_message) = all_msgs.iter().rev().find(|message| {
+                matches!(
+                    message.message.as_ref(),
+                    Some(api::message::Message::ToolCallResult(result))
+                        if result.tool_call_id == call_id
+                )
+            }) else {
+                continue;
+            };
+            let Some(api::message::Message::ToolCallResult(result)) =
+                result_message.message.as_ref()
+            else {
+                continue;
+            };
+            let content = if compacted_tool_msg_ids.contains(&result_message.id) {
+                r#"{"status":"compacted","note":"tool output was pruned by local compaction"}"#
+                    .to_owned()
+            } else if result.result.is_some() {
+                tools::serialize_result(result)
+            } else if !result_message.server_message_data.is_empty() {
+                result_message.server_message_data.clone()
+            } else {
+                r#"{"status":"empty"}"#.to_owned()
+            };
+            let (caller, caller_id) = response_tool_callers
+                .get(&call_id)
+                .cloned()
+                .unwrap_or_default();
+            messages.push(ChatMessage::from(
+                ToolResponse::new(call_id, content).with_response_caller(caller, caller_id),
+            ));
+        }
+    }
 
     // 当前轮新输入 → 追加。
     for input in &params.input {

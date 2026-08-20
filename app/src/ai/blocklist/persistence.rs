@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use chrono::{DateTime, Local};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use warpui::{AppContext, EntityId, SingletonEntity};
 

@@ -12065,6 +12065,7 @@ dependencies = [
  "async-channel",
  "async-io",
  "async-process",
+ "base64 0.22.1",
  "bounded-vec-deque",
  "command",
  "dashmap",

@@ -7,7 +7,7 @@ use warp_editor::content::buffer::InitialBufferState;
 use warp_editor::render::element::VerticalExpansionBehavior;
 use warpui::elements::Empty;
 use warpui::platform::WindowStyle;
-use warpui::{App, Element as _, ModelHandle, SingletonEntity, ViewHandle};
+use warpui::{App, Element as _, ModelHandle, ViewHandle};
 
 use super::*;
 use crate::NotebookKeybindings;

@@ -106,6 +106,19 @@ if ($env:WARP_BUNDLED_REMOTE_SERVER_DIR) {
         Write-Error 'Failed to prepare bundled remote-server resources'
         exit 1
     }
+} elseif ($env:WARP_BUNDLED_REMOTE_SERVER_PARTIAL_DIR) {
+    $RemoteServerVersion = if ($env:GIT_RELEASE_TAG) { $env:GIT_RELEASE_TAG } else { 'unversioned' }
+    $RemoteServerDestination = Join-Path $DestinationDir 'remote-server'
+    Write-Output "Copying partial bundled remote-server resources to $RemoteServerDestination"
+    python "$RepoRoot\script\prepare_bundled_remote_server_resources.py" copy `
+        --allow-partial `
+        $env:WARP_BUNDLED_REMOTE_SERVER_PARTIAL_DIR `
+        $RemoteServerVersion `
+        $RemoteServerDestination
+    if (-Not $?) {
+        Write-Error 'Failed to prepare partial bundled remote-server resources'
+        exit 1
+    }
 }
 
 # Copy channel-gated skills matching the current release channel.

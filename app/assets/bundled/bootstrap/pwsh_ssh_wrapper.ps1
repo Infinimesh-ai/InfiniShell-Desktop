@@ -213,9 +213,9 @@ function Warp-New-RemoteBootstrapCommand {
 
     $honorPs1 = if ($env:WARP_HONOR_PS1 -eq '1') { '1' } else { '0' }
     $bashInitShell = "WARP_HONOR_PS1='$honorPs1'`n" +
-        $script:WarpBashInitShell.Replace('@@WARP_SESSION_ID@@', [string]$RemoteSessionId)
+        $script:WarpBashInitShell.Replace('@@WARP_SESSION_ID@@', [string]$RemoteSessionId).Replace("`r`n", "`n")
     $zshInitShell = "unsetopt RCS GLOBAL_RCS`nWARP_HONOR_PS1='$honorPs1'`n" +
-        $script:WarpZshInitShell.Replace('@@WARP_SESSION_ID@@', [string]$RemoteSessionId)
+        $script:WarpZshInitShell.Replace('@@WARP_SESSION_ID@@', [string]$RemoteSessionId).Replace("`r`n", "`n")
     $bashInitShellHex = Warp-Encode-HexString $bashInitShell
     $zshInitShellHex = Warp-Encode-HexString $zshInitShell
     $clientVersion = Warp-Get-SafeRemoteEnvironmentValue $env:WARP_CLIENT_VERSION
@@ -277,7 +277,8 @@ esac
     $remoteCommand = $remoteCommand.Replace('__WARP_SSH_HOP_DEPTH__', [string]$nextHopDepth)
     $remoteCommand = $remoteCommand.Replace('__WARP_SSH_HOOK_COMMAND__', $sshHookCommand)
     $remoteCommand = $remoteCommand.Replace('__WARP_BASH_INIT_SHELL_HEX__', $bashInitShellHex)
-    return $remoteCommand.Replace('__WARP_ZSH_INIT_SHELL_HEX__', $zshInitShellHex).Replace("`r`n", "`n")
+    $remoteCommand = $remoteCommand.Replace('__WARP_ZSH_INIT_SHELL_HEX__', $zshInitShellHex)
+    return $remoteCommand.Replace("`r`n", "`n")
 }
 
 function Warp-New-WindowsBootstrapCommand {

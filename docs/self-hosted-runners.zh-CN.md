@@ -101,6 +101,27 @@ Protobuf 25.1 可用。Runner 建议安装到 `C:\actions-runner`。在 GitHub �
 Windows 服务必须使用刚才完成工具链安装的专用账号，否则用户级 Rust、`PROTOC` 等环境
 变量不可见。安装完成后在 Services 中确认 GitHub Actions Runner 服务正在运行。
 
+### 4.1 Windows 构建缓存与主机配置
+
+Windows job 使用 checkout 外的固定目录，避免 `actions/checkout` 的 `clean: true` 每轮删除
+全部 Rust 编译产物：
+
+```text
+C:\infinishell-ci\cargo-target
+C:\infinishell-ci\sccache
+C:\infinishell-ci\tools\sccache-v0.17.0\sccache.exe
+```
+
+从 Mozilla 官方 Release 安装 `sccache 0.17.0`；Windows x64 压缩包的 SHA-256 应为
+`e94cfc5b58cbe439302f586c1d1bd7980c2cd371d47bdf385ade657411e6f3ac`。给专用 runner
+账户授予 `C:\infinishell-ci` 的继承式 Modify 权限。工作流通过 `CARGO_TARGET_DIR`、
+`RUSTC_WRAPPER`、`SCCACHE_DIR` 和 `SCCACHE_CACHE_SIZE` 使用这些目录，并在每轮结束输出
+sccache 统计。
+
+在管理员 PowerShell 中启用 Win32 长路径并切换到高性能电源方案。Microsoft Defender
+只排除 `cargo-target` 和 `sccache` 两个缓存目录；不要排除源码、Runner 根目录或编译器进程。
+缓存目录应定期检查容量，清理前必须确认没有 Cargo、rustc、MSVC 或 Runner job 正在运行。
+
 ## 5. 触发验证
 
 工作流尚未合并到默认分支时，推送 `ci/**` 分支即可同时运行 Linux 和 Windows 聚焦
@@ -124,6 +145,11 @@ cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 ```text
 cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2
 ```
+
+Windows 服务会话中的 `warp` 主应用测试由 `.config/nextest.toml` 中的
+`windows-warp-tests` 组限制为单并发，避免终端进程清理竞争；其余 crate 使用 nextest
+默认并发，不要在工作流命令上增加全局 `--test-threads=1`。该组允许最多重试两次，
+用于容忍测试逻辑通过后 Windows 服务会话偶发的进程退出延迟；持续失败仍会阻止发布。
 
 也可以使用 GitHub CLI：
 

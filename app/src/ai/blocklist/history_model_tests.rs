@@ -2178,18 +2178,14 @@ fn test_all_cleared_conversations_includes_terminal_view_id() {
 }
 
 #[test]
-fn test_session_default_autoexecute_mode_applies_only_to_new_conversations() {
+fn test_new_conversations_do_not_inherit_autoexecute_mode() {
     App::test((), |mut app| async move {
         let history_model = app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
         let terminal_view_id = EntityId::new();
 
-        let (current_task_id, inherited_task_id, approval_id) =
+        let (full_access_conversation_id, new_conversation_id) =
             history_model.update(&mut app, |history_model, ctx| {
-                history_model.set_default_autoexecute_mode(
-                    terminal_view_id,
-                    AIConversationAutoexecuteMode::FullAccess,
-                );
-                let current_task_id = history_model.start_new_conversation(
+                let full_access_conversation_id = history_model.start_new_conversation(
                     terminal_view_id,
                     false,
                     false,
@@ -2197,49 +2193,31 @@ fn test_session_default_autoexecute_mode_applies_only_to_new_conversations() {
                     ctx,
                 );
                 history_model
-                    .conversation_mut(&current_task_id)
-                    .expect("current conversation should exist")
-                    .set_autoexecute_override(AIConversationAutoexecuteMode::RespectUserSettings);
-                let inherited_task_id = history_model.start_new_conversation(
+                    .conversation_mut(&full_access_conversation_id)
+                    .expect("full access conversation should exist")
+                    .set_autoexecute_override(AIConversationAutoexecuteMode::FullAccess);
+                let new_conversation_id = history_model.start_new_conversation(
                     terminal_view_id,
                     false,
                     false,
                     false,
                     ctx,
                 );
-                history_model.set_default_autoexecute_mode(
-                    terminal_view_id,
-                    AIConversationAutoexecuteMode::RespectUserSettings,
-                );
-                let approval_id = history_model.start_new_conversation(
-                    terminal_view_id,
-                    false,
-                    false,
-                    false,
-                    ctx,
-                );
-                (current_task_id, inherited_task_id, approval_id)
+                (full_access_conversation_id, new_conversation_id)
             });
 
         history_model.read(&app, |history_model, _| {
             assert_eq!(
                 history_model
-                    .conversation(&current_task_id)
-                    .expect("current conversation should exist")
-                    .autoexecute_override(),
-                AIConversationAutoexecuteMode::RespectUserSettings
-            );
-            assert_eq!(
-                history_model
-                    .conversation(&inherited_task_id)
-                    .expect("inherited conversation should exist")
+                    .conversation(&full_access_conversation_id)
+                    .expect("full access conversation should exist")
                     .autoexecute_override(),
                 AIConversationAutoexecuteMode::FullAccess
             );
             assert_eq!(
                 history_model
-                    .conversation(&approval_id)
-                    .expect("approval conversation should exist")
+                    .conversation(&new_conversation_id)
+                    .expect("new conversation should exist")
                     .autoexecute_override(),
                 AIConversationAutoexecuteMode::RespectUserSettings
             );
@@ -3164,39 +3142,6 @@ fn test_find_by_token_returns_none_after_remove_conversation() {
                 None,
                 "reverse index must be cleared when the conversation is removed",
             );
-        });
-    });
-}
-
-#[test]
-fn test_find_by_token_returns_none_after_reset() {
-    use crate::ai::agent::conversation::AIConversation;
-
-    App::test((), |mut app| async move {
-        initialize_history_persistence_for_tests(&mut app);
-
-        let history_model =
-            app.add_singleton_model(|_| BlocklistAIHistoryModel::new(vec![], vec![], &[]));
-        let terminal_view_id = EntityId::new();
-
-        let mut conversation = AIConversation::new(false, false);
-        conversation.set_server_conversation_token("reset-token".to_string());
-
-        history_model.update(&mut app, |model, ctx| {
-            model.restore_conversations(terminal_view_id, vec![conversation], ctx);
-        });
-
-        let token = ServerConversationToken::new("reset-token".to_string());
-        history_model.read(&app, |model, _| {
-            assert!(model.find_conversation_id_by_server_token(&token).is_some());
-        });
-
-        history_model.update(&mut app, |model, _| {
-            model.reset();
-        });
-
-        history_model.read(&app, |model, _| {
-            assert_eq!(model.find_conversation_id_by_server_token(&token), None);
         });
     });
 }

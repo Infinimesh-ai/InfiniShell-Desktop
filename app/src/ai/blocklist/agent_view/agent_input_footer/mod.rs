@@ -1,6 +1,7 @@
 pub(super) mod chips;
 pub mod editor;
 // Zap Wave 7-3:`environment_selector` was removed with the hosted-mode footer.
+mod approval_mode_selector;
 mod reasoning_depth_selector;
 pub mod toolbar_item;
 
@@ -11,11 +12,11 @@ use std::sync::atomic::{self, AtomicBool};
 use toolbar_item::AgentToolbarItemKind;
 
 use crate::ai::AIRequestUsageModel;
-use crate::ai::agent::conversation::AIConversationAutoexecuteMode;
-use crate::ai::blocklist::BlocklistAIInputModel;
+use crate::ai::blocklist::agent_view::is_in_cloud_context;
 use crate::ai::blocklist::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use crate::ai::blocklist::prompt::prompt_alert::PromptAlertView;
 use crate::ai::blocklist::usage::icon_for_context_window_usage;
+use crate::ai::blocklist::{BlocklistAIContextModel, BlocklistAIInputModel};
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::appearance::Appearance;
 use crate::completer::SessionContext;
@@ -40,7 +41,6 @@ use crate::terminal::session_settings::{
     SessionSettings, SessionSettingsChangedEvent, ToolbarChipSelection,
 };
 use crate::terminal::shared_session::SharedSessionStatus;
-use crate::terminal::view::TerminalAction;
 use crate::terminal::view::ambient_agent::{AmbientAgentViewModel, ModelSelector};
 use crate::terminal::view::init::OPEN_CLI_AGENT_RICH_INPUT_KEYBINDING;
 use crate::terminal::{CLIAgent, TerminalModel};
@@ -70,7 +70,9 @@ use ai::document::{AIDocumentId, AIDocumentVersion};
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
-use settings::{Setting as _, ToggleableSetting};
+#[cfg(feature = "voice_input")]
+use settings::Setting;
+use settings::ToggleableSetting;
 #[cfg(not(target_family = "wasm"))]
 use tokio::fs;
 #[cfg(feature = "voice_input")]
@@ -99,6 +101,7 @@ use warpui::{
 
 // Zap Wave 7-3:`EnvironmentSelector` / `EnvironmentSelectorEvent` re-export was removed
 // with the hosted-mode footer.
+use self::approval_mode_selector::{ApprovalModeSelector, ApprovalModeSelectorEvent};
 pub(crate) use self::reasoning_depth_selector::{
     ReasoningDepthSelector, ReasoningDepthSelectorEvent,
 };
@@ -183,6 +186,7 @@ pub struct AgentInputFooter {
     model_selector: ViewHandle<ProfileModelSelector>,
     ftu_callout_close_button: ViewHandle<ActionButton>,
     // Zap Wave 7-3:`environment_selector` field was removed with the hosted-mode footer.
+    approval_mode_selector: ViewHandle<ApprovalModeSelector>,
     reasoning_depth_selector: ViewHandle<ReasoningDepthSelector>,
     prompt_alert: ViewHandle<PromptAlertView>,
     /// 构造时可能还没有 ambient agent view model(共享会话 link-join 是懒路径),
@@ -215,9 +219,6 @@ pub struct AgentInputFooter {
     /// Reset to `false` when a listener connects.
     plugin_chip_ready: bool,
 
-    // Fast-forward (auto-approve) toggle button shown in the agent view footer.
-    fast_forward_button: ViewHandle<ActionButton>,
-
     // CLI agent voice input state (self-contained, bypasses editor voice flow).
     #[cfg(feature = "voice_input")]
     cli_voice_input_state: CLIVoiceInputState,
@@ -232,6 +233,7 @@ impl AgentInputFooter {
         menu_positioning_provider: Arc<dyn MenuPositioningProvider>,
         terminal_view_id: EntityId,
         ai_input_model: ModelHandle<BlocklistAIInputModel>,
+        ai_context_model: ModelHandle<BlocklistAIContextModel>,
         terminal_model: Arc<FairMutex<TerminalModel>>,
         ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
         prompt: ModelHandle<PromptType>,
@@ -322,20 +324,6 @@ impl AgentInputFooter {
                 .with_tooltip_alignment(TooltipAlignment::Left)
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(AgentInputFooterAction::SelectFile);
-                })
-        });
-
-        // Fast-forward (auto-approve) toggle button.
-        // Uses FastForwardButtonTheme so the button keeps its one-off semantics.
-        // The theme still delegates its fill to the shared chip background.
-        let fast_forward_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("", FastForwardButtonTheme)
-                .with_icon(Icon::FastForward)
-                .with_tooltip(crate::t!("ai-footer-auto-approve-agent-actions-for-task"))
-                .with_size(button_size)
-                .with_tooltip_alignment(TooltipAlignment::Left)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(TerminalAction::ToggleAutoexecuteMode);
                 })
         });
 
@@ -585,6 +573,19 @@ impl AgentInputFooter {
             }
         });
 
+        let approval_mode_selector = ctx.add_typed_action_view(|ctx| {
+            ApprovalModeSelector::new(
+                menu_positioning_provider.clone(),
+                ai_context_model.clone(),
+                ctx,
+            )
+        });
+        ctx.subscribe_to_view(&approval_mode_selector, |_, _, event, ctx| match event {
+            ApprovalModeSelectorEvent::MenuVisibilityChanged { open } => {
+                ctx.emit(AgentInputFooterEvent::ToggledChipMenu { open: *open });
+            }
+        });
+
         let prompt_alert = ctx.add_typed_action_view(PromptAlertView::new);
 
         ctx.subscribe_to_model(&NetworkStatus::handle(ctx), |_, _, _, ctx| {
@@ -645,7 +646,6 @@ impl AgentInputFooter {
                     | BlocklistAIHistoryEvent::ClearedConversationsForTerminalSurface { .. }
                     | BlocklistAIHistoryEvent::RemoveConversation { .. }
                     | BlocklistAIHistoryEvent::UpdatedAutoexecuteOverride { .. } => {
-                        me.sync_fast_forward_button(ctx);
                         me.update_context_window_button(ctx);
                         me.model_selector.update(ctx, |_, ctx| ctx.notify());
                         ctx.notify();
@@ -695,6 +695,7 @@ impl AgentInputFooter {
             model_selector: profile_model_selector_full,
             // Zap Wave 7-3:`environment_selector` field init was removed with hosted-mode UI.
             // 子系统物理删。
+            approval_mode_selector,
             reasoning_depth_selector,
             prompt_alert,
             terminal_model,
@@ -703,7 +704,6 @@ impl AgentInputFooter {
             right_display_chips: vec![],
             cli_display_chips: vec![],
             display_chip_config,
-            fast_forward_button,
             #[cfg(feature = "voice_input")]
             cli_voice_input_state: CLIVoiceInputState::default(),
             #[cfg(feature = "voice_input")]
@@ -718,7 +718,6 @@ impl AgentInputFooter {
             }),
             v2_model_selector,
         };
-        me.sync_fast_forward_button(ctx);
         me.update_context_window_button(ctx);
         me.update_display_chips(&prompt, ctx);
         me.update_ftu_callout_render_state(ctx);
@@ -1232,7 +1231,7 @@ impl AgentInputFooter {
             AgentToolbarItemKind::ModelSelector
             | AgentToolbarItemKind::NLDToggle
             | AgentToolbarItemKind::ContextWindowUsage
-            | AgentToolbarItemKind::FastForwardToggle => None,
+            | AgentToolbarItemKind::ApprovalModeSelector => None,
         }
     }
 
@@ -1683,37 +1682,6 @@ impl AgentInputFooter {
         });
     }
 
-    fn sync_fast_forward_button(&self, ctx: &mut ViewContext<Self>) {
-        // Read directly from the conversation, same data source as the warping
-        // indicator footer's auto-approve chip.
-        let mode = BlocklistAIHistoryModel::as_ref(ctx)
-            .active_conversation(self.terminal_view_id)
-            .map(|conversation| conversation.autoexecute_override())
-            .unwrap_or_default();
-        let (icon, tooltip, is_active) = match mode {
-            AIConversationAutoexecuteMode::RespectUserSettings => (
-                Icon::FastForward,
-                crate::t!("ai-footer-auto-approve-agent-actions-for-task"),
-                false,
-            ),
-            AIConversationAutoexecuteMode::RunToCompletion => (
-                Icon::FastForwardFilled,
-                crate::t!("ai-footer-turn-off-auto-approve-agent-actions"),
-                true,
-            ),
-            AIConversationAutoexecuteMode::FullAccess => (
-                Icon::FastForwardFilled,
-                crate::t!("ai-footer-turn-off-full-access"),
-                true,
-            ),
-        };
-        self.fast_forward_button.update(ctx, |button, ctx| {
-            button.set_icon(Some(icon), ctx);
-            button.set_tooltip(Some(tooltip), ctx);
-            button.set_active(is_active, ctx);
-        });
-    }
-
     fn update_context_window_button(&mut self, ctx: &mut ViewContext<Self>) {
         if let Some(conversation) =
             BlocklistAIHistoryModel::as_ref(ctx).active_conversation(self.terminal_view_id)
@@ -1749,6 +1717,7 @@ impl AgentInputFooter {
         &self,
         item: &AgentToolbarItemKind,
         shared_status: &SharedSessionStatus,
+        is_cloud_context: bool,
         app: &AppContext,
     ) -> Option<Box<dyn Element>> {
         if !item.available_in().is_available_for_agent_view()
@@ -1808,9 +1777,10 @@ impl AgentInputFooter {
                 let _ = shared_status;
                 None
             }
-            AgentToolbarItemKind::FastForwardToggle => FeatureFlag::FastForwardAutoexecuteButton
-                .is_enabled()
-                .then(|| ChildView::new(&self.fast_forward_button).finish()),
+            AgentToolbarItemKind::ApprovalModeSelector => {
+                (FeatureFlag::AgentApprovalModes.is_enabled() && !is_cloud_context)
+                    .then(|| ChildView::new(&self.approval_mode_selector).finish())
+            }
             // Handled by the available_in() guard above; included for exhaustiveness.
             AgentToolbarItemKind::FileExplorer
             | AgentToolbarItemKind::RichInput
@@ -1878,9 +1848,12 @@ impl View for AgentInputFooter {
 
         let terminal_model = self.terminal_model.lock();
         let shared_status = terminal_model.shared_session_status();
+        let is_cloud_context = is_in_cloud_context(&terminal_model);
 
         for item in &left_items {
-            if let Some(element) = self.render_toolbar_item(item, shared_status, app) {
+            if let Some(element) =
+                self.render_toolbar_item(item, shared_status, is_cloud_context, app)
+            {
                 left_buttons.add_child(element);
             }
         }
@@ -1901,7 +1874,9 @@ impl View for AgentInputFooter {
             );
         } else {
             for item in &right_items {
-                if let Some(element) = self.render_toolbar_item(item, shared_status, app) {
+                if let Some(element) =
+                    self.render_toolbar_item(item, shared_status, is_cloud_context, app)
+                {
                     right_buttons.add_child(element);
                 }
             }
@@ -2436,35 +2411,6 @@ async fn write_install_log(agent: CLIAgent, err: &PluginInstallError) -> Option<
     );
     fs::write(&log_path, contents).await.ok()?;
     Some(log_path)
-}
-
-/// Keeps the auto-approve chip's muted text semantics while using the shared opaque chip fill.
-struct FastForwardButtonTheme;
-
-impl ActionButtonTheme for FastForwardButtonTheme {
-    fn background(&self, hovered: bool, appearance: &Appearance) -> Option<Fill> {
-        AgentInputButtonTheme.background(hovered, appearance)
-    }
-
-    fn text_color(
-        &self,
-        _hovered: bool,
-        _background: Option<Fill>,
-        appearance: &Appearance,
-    ) -> ColorU {
-        appearance
-            .theme()
-            .sub_text_color(appearance.theme().surface_1())
-            .into_solid()
-    }
-
-    fn border(&self, appearance: &Appearance) -> Option<ColorU> {
-        AgentInputButtonTheme.border(appearance)
-    }
-
-    fn should_opt_out_of_contrast_adjustment(&self) -> bool {
-        true
-    }
 }
 
 /// Same as `AgentInputButtonTheme`, except with one-off special active styling for the NLD button.

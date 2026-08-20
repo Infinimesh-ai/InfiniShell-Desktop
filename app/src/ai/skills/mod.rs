@@ -59,8 +59,6 @@ impl ActiveSkillLookupError {
 
 #[cfg(not(target_family = "wasm"))]
 mod global_skills;
-#[cfg(not(target_family = "wasm"))]
-pub use global_skills::{filter_skills_by_spec, resolve_skill_repos};
 
 mod listed_skill;
 pub use listed_skill::SkillDescriptor;

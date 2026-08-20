@@ -53,9 +53,7 @@ use crate::ui_components::icons::Icon;
 use crate::ui_components::item_highlight::{ImageOrIcon, ItemHighlightState};
 #[cfg(feature = "local_fs")]
 use crate::util::file::external_editor::EditorSettings;
-use crate::util::openable_file_type::{
-    EditorLayout, FileTarget, is_file_content_binary, is_jupyter_notebook_file, is_markdown_file,
-};
+use crate::util::openable_file_type::{EditorLayout, FileTarget, is_file_content_binary};
 #[cfg(feature = "local_fs")]
 use crate::util::openable_file_type::{
     resolve_file_target_to_open_in_warp, resolve_file_target_with_editor_choice,

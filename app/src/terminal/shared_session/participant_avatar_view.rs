@@ -18,7 +18,7 @@ use warpui::{
 use super::render_util::non_hoverable_participant_avatar;
 use crate::appearance::Appearance;
 use crate::menu::{Event as MenuEvent, Menu, MenuItem, MenuItemFields};
-use crate::pane_group::{PaneHeaderAction, PaneHeaderCustomAction};
+use crate::pane_group::PaneHeaderAction;
 // Zap:session-sharing-protocol crate 已剥离,改用本地 protocol 模块;
 // 角色变更(RoleUpdateReason)随云端 shared session 管理一并移除
 use crate::terminal::shared_session::protocol::{ParticipantId, ParticipantInfo, Role};

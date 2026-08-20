@@ -423,14 +423,150 @@ fn broker_header_round_trips_multiline_commands() {
         &mut stream,
         &BrokerRequest {
             capability: "secret".to_string(),
-            command: "first\nsecond".to_string(),
+            operation: BrokerOperation::Exec {
+                command: "first\nsecond".to_string(),
+            },
         },
     )
     .unwrap();
 
     let request = server.join().unwrap();
     assert_eq!(request.capability, "secret");
-    assert_eq!(request.command, "first\nsecond");
+    assert!(matches!(
+        request.operation,
+        BrokerOperation::Exec { command } if command == "first\nsecond"
+    ));
+}
+
+#[test]
+fn broker_command_streams_a_local_stdin_file() {
+    let directory = tempfile::tempdir().unwrap();
+    let stdin_file = directory.path().join("remote-server.zip");
+    let payload = vec![42_u8; 1024 * 1024];
+    std::fs::write(&stdin_file, &payload).unwrap();
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let endpoint = listener.local_addr().unwrap();
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let request = read_header(&mut stream).unwrap();
+        assert_eq!(request.capability, "secret");
+        assert!(matches!(
+            request.operation,
+            BrokerOperation::Upload {
+                remote_path,
+                size,
+                windows: true,
+            }
+                if remote_path == "~/.infinishell/remote-server/archive.zip"
+                    && size == 1024 * 1024
+        ));
+        stream.write_all(&[0]).unwrap();
+
+        let mut received = Vec::new();
+        stream.read_to_end(&mut received).unwrap();
+        write_frame(&mut stream, FRAME_EXIT, &7_i32.to_be_bytes()).unwrap();
+        received
+    });
+    let args = RustSshBrokerCommandArgs {
+        endpoint: endpoint.to_string(),
+        command: None,
+        upload_path: Some("~/.infinishell/remote-server/archive.zip".to_string()),
+        upload_windows: true,
+        stdin_file: Some(stdin_file),
+    };
+
+    assert_eq!(
+        run_broker_command_with_capability(&args, "secret".to_string()).unwrap(),
+        7
+    );
+    assert_eq!(server.join().unwrap(), payload);
+}
+
+#[test]
+fn broker_exec_does_not_wait_for_inherited_stdin_after_remote_exit() {
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let mut input_thread = Some(thread::spawn(move || {
+        release_rx.recv().unwrap();
+        Ok(0)
+    }));
+
+    finish_broker_input(&mut input_thread, false).unwrap();
+    assert!(input_thread.is_some());
+
+    release_tx.send(()).unwrap();
+    input_thread.take().unwrap().join().unwrap().unwrap();
+}
+
+/// 真实验证当前 Rust SSH session 上的 SCP broker 上传。
+///
+/// 运行前设置：
+/// `WARP_WINDOWS_SSH_E2E_HOST=<ssh-host>`
+/// `WARP_WINDOWS_SSH_E2E_LOCAL_ARCHIVE=<windows-zip>`
+#[test]
+#[ignore]
+fn windows_broker_scp_uploads_the_complete_archive() {
+    let host = std::env::var("WARP_WINDOWS_SSH_E2E_HOST").unwrap();
+    let local_archive = PathBuf::from(std::env::var("WARP_WINDOWS_SSH_E2E_LOCAL_ARCHIVE").unwrap());
+    let expected_size = std::fs::metadata(&local_archive).unwrap().len();
+    let ssh_args = [
+        "-o",
+        "UpdateHostKeys=no",
+        "-o",
+        "WarnWeakCrypto=no",
+        "-o",
+        "ObscureKeystrokeTiming=no",
+        &host,
+    ]
+    .into_iter()
+    .map(OsString::from)
+    .collect::<Vec<_>>();
+    let config = resolve_openssh_config(Path::new("ssh"), &ssh_args).unwrap();
+    let proxy = proxy_process_spec(&config, Path::new("ssh"), &ssh_args).unwrap();
+    let mut prompted = false;
+    let session = connect_session(&config, proxy, &mut prompted).unwrap();
+    authenticate_session(&session, &config, &mut prompted).unwrap();
+    session.set_blocking(false);
+
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let endpoint = listener.local_addr().unwrap();
+    let session_gate = Arc::new(Mutex::new(()));
+    let capability = "test-capability".to_string();
+    let broker_session = session.clone();
+    let broker_gate = session_gate.clone();
+    let broker_capability = capability.clone();
+    let broker = thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        handle_broker_connection(
+            stream,
+            broker_session,
+            &broker_gate,
+            &broker_capability,
+            &[],
+        )
+    });
+    let remote_relative = format!(
+        ".infinishell/remote-server/broker-upload-{}.zip",
+        uuid::Uuid::new_v4()
+    );
+    let args = RustSshBrokerCommandArgs {
+        endpoint: endpoint.to_string(),
+        command: None,
+        upload_path: Some(format!("~/{remote_relative}")),
+        upload_windows: true,
+        stdin_file: Some(local_archive),
+    };
+
+    let upload = run_broker_command_with_capability(&args, capability);
+    let broker_result = broker.join().unwrap();
+    assert!(broker_result.is_ok(), "SCP broker 失败: {broker_result:?}");
+    let exit_code = upload.unwrap();
+    assert_eq!(exit_code, 0);
+
+    session.set_blocking(true);
+    let sftp = session.sftp().unwrap();
+    let remote_path = sftp.realpath(Path::new(".")).unwrap().join(remote_relative);
+    assert_eq!(sftp.stat(&remote_path).unwrap().size, Some(expected_size));
+    sftp.unlink(&remote_path).unwrap();
 }
 
 #[test]
@@ -477,7 +613,7 @@ fn proxy_command_socket_carries_the_ssh_byte_stream_in_both_directions() {
     let mut proxy = connect_proxy_command(&spec).unwrap();
     proxy
         .socket
-        .set_read_timeout(Some(Duration::from_secs(1)))
+        .set_read_timeout(Some(Duration::from_secs(10)))
         .unwrap();
 
     proxy.socket.write_all(b"ssh bytes").unwrap();

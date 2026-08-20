@@ -51,13 +51,13 @@ pub(super) async fn download_update_and_cleanup(
                     release.tag_name
                 );
                 format!(
-                    "https://github.com/zerx-lab/warp/releases/download/v{}/{installer_file_name}",
+                    "https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/download/v{}/{installer_file_name}",
                     version_info.version
                 )
             }
         } else {
             format!(
-                "https://github.com/zerx-lab/warp/releases/download/v{}/{installer_file_name}",
+                "https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/download/v{}/{installer_file_name}",
                 version_info.version
             )
         }

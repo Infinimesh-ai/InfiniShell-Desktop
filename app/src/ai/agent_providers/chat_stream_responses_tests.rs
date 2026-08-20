@@ -137,3 +137,242 @@ fn responses工具调用在本地解析前删除可选null() {
     assert_eq!(call.fn_arguments, json!({"command": "pwd"}));
     parse_incoming_tool_call(&call, None).expect("恢复缺省参数后应能转换为内部工具调用");
 }
+
+#[test]
+fn responses混合本地与审批工具结果保持就绪() {
+    let task_id = "task-1";
+    let request_id = "request-1";
+    let web_call_1 = "web-call-1";
+    let web_call_2 = "web-call-2";
+    let shell_call_1 = "shell-call-1";
+    let shell_call_2 = "shell-call-2";
+    let state = ProviderResponseState {
+        response_items: vec![
+            json!({"type": "function_call", "call_id": web_call_1, "name": "websearch", "arguments": "{}"}),
+            json!({"type": "function_call", "call_id": web_call_2, "name": "websearch", "arguments": "{}"}),
+            json!({"type": "function_call", "call_id": shell_call_1, "name": "run_shell_command", "arguments": "{}"}),
+            json!({"type": "function_call", "call_id": shell_call_2, "name": "run_shell_command", "arguments": "{}"}),
+        ],
+        ..Default::default()
+    };
+    let mut state_message = make_reasoning_message(task_id, request_id, String::new());
+    state_message.server_message_data = encode_provider_response_state(&state).expect("应编码状态");
+    let messages = vec![
+        state_message,
+        make_tool_call_carrier_message(
+            task_id,
+            request_id,
+            shell_call_1,
+            "run_shell_command",
+            "{}",
+        ),
+        make_tool_call_carrier_message(
+            task_id,
+            request_id,
+            shell_call_2,
+            "run_shell_command",
+            "{}",
+        ),
+        make_tool_call_carrier_message(task_id, request_id, web_call_1, "websearch", "{}"),
+        make_tool_call_result_message(
+            task_id,
+            request_id,
+            web_call_1.to_owned(),
+            json!({"_byop_intercepted": true, "status": "ok"}).to_string(),
+        ),
+        make_tool_call_carrier_message(task_id, request_id, web_call_2, "websearch", "{}"),
+        make_tool_call_result_message(
+            task_id,
+            request_id,
+            web_call_2.to_owned(),
+            json!({"_byop_intercepted": true, "status": "ok"}).to_string(),
+        ),
+        make_tool_call_result_message(
+            task_id,
+            "byop-preflight",
+            shell_call_1.to_owned(),
+            json!({"status": "ok"}).to_string(),
+        ),
+        make_tool_call_result_message(
+            task_id,
+            "byop-preflight",
+            shell_call_2.to_owned(),
+            json!({"status": "ok"}).to_string(),
+        ),
+    ];
+    let params = RequestParams::new_for_test(
+        Vec::new(),
+        vec![api::Task {
+            id: task_id.to_owned(),
+            messages,
+            dependencies: None,
+            description: String::new(),
+            summary: String::new(),
+            server_data: String::new(),
+        }],
+    );
+
+    let report = classify_byop_controller_readiness(&params);
+
+    assert_eq!(report.state, ReadinessState::Ready);
+
+    let request = build_chat_request(
+        &params,
+        true,
+        false,
+        false,
+        AgentProviderApiType::OpenAiResp,
+        attachment_caps::AttachmentCaps::default(),
+    )
+    .expect("Responses 原始条目和工具结果应形成合法请求");
+    let result_ids = request
+        .messages
+        .iter()
+        .flat_map(|message| message.content.tool_responses())
+        .map(|response| response.call_id.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        result_ids,
+        [web_call_1, web_call_2, shell_call_1, shell_call_2]
+    );
+}
+
+#[test]
+fn responses原始调用沿用本地载体的运行状态() {
+    let task_id = "task-1";
+    let request_id = "request-1";
+    let call_id = "shell-call-1";
+    let state = ProviderResponseState {
+        response_items: vec![json!({
+            "type": "function_call",
+            "call_id": call_id,
+            "name": "run_shell_command",
+            "arguments": "{}"
+        })],
+        ..Default::default()
+    };
+    let mut state_message = make_reasoning_message(task_id, request_id, String::new());
+    state_message.server_message_data = encode_provider_response_state(&state).expect("应编码状态");
+    let tool_call_message =
+        make_tool_call_carrier_message(task_id, request_id, call_id, "run_shell_command", "{}");
+    let tool_call_message_id = tool_call_message.id.clone();
+    let params = RequestParams::new_for_test(
+        Vec::new(),
+        vec![api::Task {
+            id: task_id.to_owned(),
+            messages: vec![state_message, tool_call_message],
+            dependencies: None,
+            description: String::new(),
+            summary: String::new(),
+            server_data: String::new(),
+        }],
+    );
+
+    let report = classify_byop_controller_readiness_with_live_tool_calls(
+        &params,
+        vec![LiveToolCall::new(
+            ToolCallRef::new(
+                ToolCallKey::new(task_id, tool_call_message_id, call_id),
+                RedactedToolKind::new("run_shell_command"),
+            ),
+            LiveToolCallState::Running,
+        )],
+    );
+
+    assert!(matches!(
+        report.state,
+        ReadinessState::PendingToolResults { .. }
+    ));
+}
+
+#[test]
+fn responses状态续接包含已持久化的工具输出() {
+    let task_id = "task-1";
+    let request_id = "request-1";
+    let call_id = "fc_websearch";
+    let state = ProviderResponseState {
+        response_id: Some("resp-1".to_owned()),
+        response_items: vec![json!({
+            "type": "function_call",
+            "call_id": call_id,
+            "name": "websearch",
+            "arguments": "{}"
+        })],
+        ..Default::default()
+    };
+    let mut state_message = make_reasoning_message(task_id, request_id, String::new());
+    state_message.server_message_data = encode_provider_response_state(&state).expect("应编码状态");
+    let messages = vec![
+        state_message,
+        make_tool_call_result_message(
+            task_id,
+            "byop-preflight",
+            call_id.to_owned(),
+            json!({"status": "cancelled"}).to_string(),
+        ),
+    ];
+    let input = AIAgentInput::UserQuery {
+        query: "继续".to_owned(),
+        context: Arc::<[AIAgentContext]>::from([]),
+        static_query_type: None,
+        referenced_attachments: HashMap::new(),
+        user_query_mode: UserQueryMode::default(),
+        running_command: None,
+        intended_agent: None,
+    };
+    let params = RequestParams::new_for_test(
+        vec![input],
+        vec![api::Task {
+            id: task_id.to_owned(),
+            messages,
+            dependencies: None,
+            description: String::new(),
+            summary: String::new(),
+            server_data: String::new(),
+        }],
+    );
+
+    let request = build_chat_request(
+        &params,
+        false,
+        false,
+        false,
+        AgentProviderApiType::OpenAiResp,
+        attachment_caps::AttachmentCaps::default(),
+    )
+    .expect("状态续接请求应合法");
+
+    assert_eq!(
+        request
+            .messages
+            .first()
+            .expect("工具输出应位于新用户输入之前")
+            .content
+            .tool_responses()
+            .first()
+            .map(|response| response.call_id.as_str()),
+        Some(call_id)
+    );
+    assert!(
+        request
+            .messages
+            .iter()
+            .any(|message| message.role == ChatRole::User),
+        "状态续接仍应包含用户的新输入"
+    );
+
+    let payload = genai::responses::build_request_payload(
+        "gpt-5.6",
+        request.with_previous_response_id("resp-1"),
+        &ChatOptions::default(),
+        true,
+    )
+    .expect("应构造 Responses 请求体");
+    let input = payload["input"].as_array().expect("input 应为数组");
+    let output = input
+        .iter()
+        .find(|item| item["type"] == "function_call_output")
+        .expect("previous_response_id 续接必须携带工具输出");
+    assert_eq!(output["call_id"], call_id);
+    assert_eq!(payload["previous_response_id"], "resp-1");
+}

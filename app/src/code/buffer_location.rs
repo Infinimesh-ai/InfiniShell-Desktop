@@ -1,10 +1,6 @@
 use warp_util::content_version::ContentVersion;
 // Re-export from warp_util so existing app-level imports continue to work.
 pub use warp_util::local_or_remote_path::LocalOrRemotePath;
-/// 兼容别名:Zap 早期把该类型叫 `BufferLocation`,上游重构后统一为
-/// `warp_util::local_or_remote_path::LocalOrRemotePath`。保留别名以兼容
-/// 尚未迁移的调用点,新代码请直接用 `LocalOrRemotePath`。
-pub use warp_util::local_or_remote_path::LocalOrRemotePath as BufferLocation;
 pub use warp_util::remote_path::RemotePath;
 
 /// Tracks sync state between client and server for a single remote buffer.

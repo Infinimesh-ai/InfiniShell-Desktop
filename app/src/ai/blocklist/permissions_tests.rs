@@ -8,7 +8,6 @@ use warp_util::path::EscapeChar;
 use warpui::{App, EntityId, ModelHandle, SingletonEntity};
 
 use super::{BlocklistAIHistoryModel, BlocklistAIPermissions};
-use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent::conversation::{AIConversationAutoexecuteMode, AIConversationId};
 use crate::ai::blocklist::CommandExecutionPermissionAllowedReason;
 use crate::ai::blocklist::permissions::{

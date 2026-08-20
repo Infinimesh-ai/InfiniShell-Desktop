@@ -1035,15 +1035,14 @@ fn upsert_rule_priority_agents_beats_claude() {
 }
 
 #[test]
-fn remove_rule_recognizes_claude_md() {
+fn retain_rule_paths_removes_claude_md() {
     let mut rules = ProjectRules::default();
     rules.upsert_rule(&local_path("/a/CLAUDE.md"), "x".to_string());
     rules.upsert_rule(&local_path("/a/AGENTS.md"), "y".to_string());
 
-    let removed = rules.remove_rule(&local_path("/a/CLAUDE.md"));
-    assert!(removed.is_some(), "能移除 CLAUDE.md");
+    rules.retain_rule_paths(&HashSet::from([local_path("/a/AGENTS.md")]));
 
-    // 移除 CLAUDE 后 AGENTS 仍保留为该目录的生效规则
+    // 清理 CLAUDE 后 AGENTS 仍保留为该目录的生效规则
     let result = rules
         .find_active_or_applicable_rules(&local_path("/a/x.rs"))
         .active_rules;

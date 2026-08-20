@@ -330,6 +330,9 @@ pub enum WorkspaceAction {
     ViewLatestChangelog,
     ViewPrivacyPolicy,
     SendFeedback,
+    /// 扫描并清理本机或已连接远端中不再使用的受管文件。
+    #[cfg(not(target_family = "wasm"))]
+    CleanupStorage,
     /// Open the log directory in the system file explorer with the current log file selected.
     #[cfg(not(target_family = "wasm"))]
     ViewLogs,
@@ -1128,6 +1131,8 @@ impl WorkspaceAction {
             | ShowCloudModeV2EnvironmentCreationModal
             | OpenCreateAuthSecretModal { .. }
             | OpenNetworkLogPane => false,
+            #[cfg(not(target_family = "wasm"))]
+            CleanupStorage => false,
             #[cfg(debug_assertions)]
             ShowHoaOnboardingFlow => false,
             #[cfg(target_family = "wasm")]

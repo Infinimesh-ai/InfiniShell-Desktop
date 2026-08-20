@@ -93,6 +93,17 @@ fn powershell_setup_commands_use_utf16_encoded_command() {
 }
 
 #[test]
+fn windows_cmd_proxy_command_preserves_raw_standard_io() {
+    let script = r#""%USERPROFILE%\.infinishell\remote-server\infinishell.exe" remote-server-proxy --identity-key "identity key""#;
+    let command = RemoteSetupCommand {
+        dialect: RemoteShellDialect::WindowsCmd,
+        script: script.to_owned(),
+    };
+
+    assert_eq!(setup_command_line(&command), script);
+}
+
+#[test]
 fn posix_upload_command_streams_to_a_home_relative_file() {
     let command = upload_command(
         &RemoteOs::Linux,

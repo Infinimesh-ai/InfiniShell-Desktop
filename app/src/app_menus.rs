@@ -857,6 +857,15 @@ fn make_new_help_menu() -> Menu {
                 crate::t!("app-menu-warp-slack-community"),
                 links::SLACK_URL.into(),
             ),
+            #[cfg(not(target_family = "wasm"))]
+            MenuItem::Separator,
+            #[cfg(not(target_family = "wasm"))]
+            MenuItem::Custom(CustomMenuItem::new(
+                &crate::t!("app-menu-cleanup-storage"),
+                |ctx| ctx.dispatch_global_action("workspace:cleanup_storage", &()),
+                no_updates,
+                None,
+            )),
         ],
     )
 }

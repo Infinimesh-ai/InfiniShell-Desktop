@@ -1968,7 +1968,6 @@ fn handle_ai_history_event(
         | BlocklistAIHistoryEvent::UpdatedConversationMetadata { .. }
         | BlocklistAIHistoryEvent::UpdatedConversationArtifacts { .. }
         | BlocklistAIHistoryEvent::ConversationServerTokenAssigned { .. }
-        | BlocklistAIHistoryEvent::ConversationServerTokenAssigned { .. }
         | BlocklistAIHistoryEvent::ConversationTransferredBetweenTerminalSurfaces { .. }
         | BlocklistAIHistoryEvent::NewConversationRequestComplete { .. }
         | BlocklistAIHistoryEvent::OrchestrationConfigUpdated { .. }

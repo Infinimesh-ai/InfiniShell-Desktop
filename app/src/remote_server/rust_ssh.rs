@@ -435,7 +435,20 @@ struct SshHookTransport<'a> {
 #[derive(Serialize, Deserialize)]
 struct BrokerRequest {
     capability: String,
-    command: String,
+    operation: BrokerOperation,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum BrokerOperation {
+    Exec {
+        command: String,
+    },
+    Upload {
+        remote_path: String,
+        size: u64,
+        windows: bool,
+    },
 }
 
 /// 建立单个 SSH session，启动本地 broker，并把交互 channel 映射到 stdio。
@@ -630,6 +643,19 @@ fn run_native_ssh(args: &RustSshSessionArgs) -> Result<i32> {
 pub fn run_broker_command(args: &RustSshBrokerCommandArgs) -> Result<i32> {
     let capability =
         std::env::var(BROKER_CAPABILITY_ENV).context("missing SSH broker capability")?;
+    run_broker_command_with_capability(args, capability)
+}
+
+fn run_broker_command_with_capability(
+    args: &RustSshBrokerCommandArgs,
+    capability: String,
+) -> Result<i32> {
+    let mut stdin_file = args
+        .stdin_file
+        .as_ref()
+        .map(std::fs::File::open)
+        .transpose()
+        .context("failed to open SSH broker stdin file")?;
     let endpoint: SocketAddr = args
         .endpoint
         .parse()
@@ -643,7 +669,24 @@ pub fn run_broker_command(args: &RustSshBrokerCommandArgs) -> Result<i32> {
         &mut stream,
         &BrokerRequest {
             capability,
-            command: args.command.clone(),
+            operation: match (&args.command, &args.upload_path) {
+                (Some(command), None) => BrokerOperation::Exec {
+                    command: command.clone(),
+                },
+                (None, Some(remote_path)) => BrokerOperation::Upload {
+                    remote_path: remote_path.clone(),
+                    size: stdin_file
+                        .as_ref()
+                        .context("SSH broker upload requires a local file")?
+                        .metadata()
+                        .context("failed to read SSH broker upload metadata")?
+                        .len(),
+                    windows: args.upload_windows,
+                },
+                (Some(_), Some(_)) | (None, None) => {
+                    bail!("SSH broker requires exactly one operation")
+                }
+            },
         },
     )?;
 
@@ -653,12 +696,22 @@ pub fn run_broker_command(args: &RustSshBrokerCommandArgs) -> Result<i32> {
         bail!("SSH broker rejected the command");
     }
 
+    // 本地文件是有限输入，收到远端退出帧前必须确认它已完整发送。普通 exec
+    // 继承的 stdin 可能仍阻塞等待用户输入；远端命令结束后不能 join 该线程，
+    // 否则一个不读取 stdin 的命令会让 broker 永远无法退出。
+    let wait_for_input = stdin_file.is_some();
     let mut input = stream.try_clone()?;
-    thread::spawn(move || {
-        let mut stdin = io::stdin().lock();
-        let _ = io::copy(&mut stdin, &mut input);
+    let mut input_thread = Some(thread::spawn(move || {
+        let result = match stdin_file.as_mut() {
+            Some(file) => io::copy(file, &mut input),
+            None => {
+                let mut stdin = io::stdin().lock();
+                io::copy(&mut stdin, &mut input)
+            }
+        };
         let _ = input.shutdown(Shutdown::Write);
-    });
+        result
+    }));
 
     loop {
         let mut kind = [0_u8; 1];
@@ -681,12 +734,29 @@ pub fn run_broker_command(args: &RustSshBrokerCommandArgs) -> Result<i32> {
                 stderr.flush()?;
             }
             FRAME_EXIT if payload.len() == 4 => {
+                finish_broker_input(&mut input_thread, wait_for_input)?;
                 return Ok(i32::from_be_bytes(payload.try_into().unwrap()));
             }
             FRAME_EXIT => bail!("invalid SSH broker exit frame"),
             _ => bail!("unknown SSH broker frame"),
         }
     }
+}
+
+fn finish_broker_input(
+    input_thread: &mut Option<thread::JoinHandle<io::Result<u64>>>,
+    wait_for_input: bool,
+) -> Result<()> {
+    if !wait_for_input {
+        return Ok(());
+    }
+    input_thread
+        .take()
+        .expect("SSH broker input thread should exist")
+        .join()
+        .map_err(|_| anyhow!("SSH broker input thread panicked"))?
+        .context("failed to forward SSH broker input")?;
+    Ok(())
 }
 
 fn resolve_openssh_config(ssh_executable: &Path, ssh_args: &[OsString]) -> Result<OpenSshConfig> {
@@ -1507,6 +1577,18 @@ fn proxy_destination(config: &OpenSshConfig) -> String {
     }
 }
 
+fn copy_proxy_stream(reader: &mut impl Read, writer: &mut impl Write) -> io::Result<()> {
+    let mut buffer = [0_u8; 8192];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => return Ok(()),
+            Ok(read) => writer.write_all(&buffer[..read])?,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 fn connect_proxy_command(spec: &ProxyProcessSpec) -> Result<ProxyCommandSocket> {
     let listener = TcpListener::bind(("127.0.0.1", 0))?;
     let socket = TcpStream::connect(listener.local_addr()?)?;
@@ -1525,11 +1607,11 @@ fn connect_proxy_command(spec: &ProxyProcessSpec) -> Result<ProxyCommandSocket> 
     let mut child_stdout = child.stdout.take().context("ProxyCommand has no stdout")?;
     let mut upload = relay.try_clone()?;
     thread::spawn(move || {
-        let _ = io::copy(&mut upload, &mut child_stdin);
+        let _ = copy_proxy_stream(&mut upload, &mut child_stdin);
     });
     thread::spawn(move || {
         let mut relay = relay;
-        let _ = io::copy(&mut child_stdout, &mut relay);
+        let _ = copy_proxy_stream(&mut child_stdout, &mut relay);
         let _ = relay.shutdown(Shutdown::Write);
     });
 
@@ -2020,12 +2102,185 @@ fn handle_broker_connection(
         bail!("invalid SSH broker capability");
     }
 
-    let mut channel = retry_ssh(session_gate, || session.channel_session())?;
-    apply_channel_environment(&mut channel, channel_environment);
-    retry_ssh(session_gate, || channel.exec(&request.command))?;
+    match request.operation {
+        BrokerOperation::Exec { command } => {
+            let mut channel = retry_ssh(session_gate, || session.channel_session())?;
+            apply_channel_environment(&mut channel, channel_environment);
+            retry_ssh(session_gate, || channel.exec(&command))?;
+            stream.write_all(&[0])?;
+            stream.flush()?;
+            bridge_broker_channel(stream, channel, session_gate)
+        }
+        BrokerOperation::Upload {
+            remote_path,
+            size,
+            windows,
+        } => handle_broker_upload(stream, session, session_gate, &remote_path, size, windows),
+    }
+}
+
+fn handle_broker_upload(
+    mut stream: TcpStream,
+    session: Session,
+    session_gate: &SessionGate,
+    remote_path: &str,
+    size: u64,
+    windows: bool,
+) -> Result<()> {
+    let upload = prepare_scp_upload(&session, session_gate, remote_path, size, windows);
+    let (mut channel, _sftp) = match upload {
+        Ok(upload) => upload,
+        Err(error) => {
+            stream.write_all(&[1])?;
+            return Err(error);
+        }
+    };
     stream.write_all(&[0])?;
     stream.flush()?;
-    bridge_broker_channel(stream, channel, session_gate)
+    stream.set_read_timeout(Some(remote_server::setup::SCP_INSTALL_TIMEOUT))?;
+
+    let mut remaining = size;
+    let mut buffer = [0_u8; 64 * 1024];
+    while remaining > 0 {
+        let limit = usize::try_from(remaining.min(buffer.len() as u64)).unwrap();
+        let read = stream.read(&mut buffer[..limit])?;
+        if read == 0 {
+            bail!("SSH broker upload ended before the declared file size");
+        }
+        write_channel_all(&mut channel, &buffer[..read], session_gate)?;
+        remaining -= read as u64;
+    }
+    write_channel_all(&mut channel, &[0], session_gate)?;
+    read_scp_ack(&mut channel, session_gate)?;
+    retry_ssh(session_gate, || channel.send_eof())?;
+    retry_ssh(session_gate, || channel.wait_eof())?;
+    retry_ssh(session_gate, || channel.close())?;
+    retry_ssh(session_gate, || channel.wait_close())?;
+    let exit_code = retry_ssh(session_gate, || channel.exit_status())?;
+    write_frame(&mut stream, FRAME_EXIT, &exit_code.to_be_bytes())?;
+    let _ = stream.shutdown(Shutdown::Both);
+    Ok(())
+}
+
+fn prepare_scp_upload(
+    session: &Session,
+    session_gate: &SessionGate,
+    remote_path: &str,
+    size: u64,
+    windows: bool,
+) -> Result<(ssh2::Channel, ssh2::Sftp)> {
+    let relative_path = remote_path
+        .trim_start_matches("~/")
+        .trim_start_matches("~\\")
+        .replace('\\', "/");
+    let components = relative_path
+        .split('/')
+        .filter(|component| !component.is_empty())
+        .collect::<Vec<_>>();
+    if components.is_empty()
+        || components.iter().any(|component| {
+            matches!(*component, "." | "..")
+                || !component
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte))
+        })
+    {
+        bail!("invalid relative SSH upload path");
+    }
+
+    let sftp = retry_ssh(session_gate, || session.sftp())?;
+    let mut path = retry_ssh(session_gate, || sftp.realpath(Path::new(".")))?;
+    for component in &components[..components.len() - 1] {
+        path.push(component);
+        let stat = retry_ssh(session_gate, || sftp.stat(&path));
+        if stat.is_err() {
+            retry_ssh(session_gate, || sftp.mkdir(&path, 0o700))?;
+        }
+    }
+    path.push(components.last().unwrap());
+    let path = path
+        .to_str()
+        .context("SSH upload target is not valid UTF-8")?;
+    if path.contains(['\r', '\n', '\0']) {
+        bail!("SSH upload target contains an invalid character");
+    }
+    let quoted_path = if windows {
+        path.replace('`', "``")
+            .replace('$', "`$")
+            .replace('"', "`\"")
+    } else {
+        path.replace('\\', "\\\\")
+            .replace('$', "\\$")
+            .replace('`', "\\`")
+            .replace('"', "\\\"")
+    };
+    let mut channel = retry_ssh(session_gate, || session.channel_session())?;
+    retry_ssh(session_gate, || {
+        channel.exec(&format!("scp -t \"{quoted_path}\""))
+    })?;
+    read_scp_ack(&mut channel, session_gate)?;
+    let file_name = components.last().unwrap();
+    write_channel_all(
+        &mut channel,
+        format!("C0600 {size} {file_name}\n").as_bytes(),
+        session_gate,
+    )?;
+    read_scp_ack(&mut channel, session_gate)?;
+    Ok((channel, sftp))
+}
+
+fn write_channel_all(
+    channel: &mut ssh2::Channel,
+    mut bytes: &[u8],
+    session_gate: &SessionGate,
+) -> Result<()> {
+    let deadline = Instant::now() + remote_server::setup::SCP_INSTALL_TIMEOUT;
+    while !bytes.is_empty() {
+        let result = {
+            let _guard = lock_session_gate(session_gate);
+            channel.write(bytes)
+        };
+        match result {
+            Ok(0) => bail!("SSH upload channel made no progress"),
+            Ok(written) => bytes = &bytes[written..],
+            Err(error)
+                if error.kind() == io::ErrorKind::WouldBlock && Instant::now() < deadline =>
+            {
+                thread::sleep(POLL_INTERVAL)
+            }
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                bail!("SSH upload channel timed out")
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
+}
+
+fn read_scp_ack(channel: &mut ssh2::Channel, session_gate: &SessionGate) -> Result<()> {
+    let mut ack = [0_u8; 1];
+    let deadline = Instant::now() + remote_server::setup::SCP_INSTALL_TIMEOUT;
+    loop {
+        let result = {
+            let _guard = lock_session_gate(session_gate);
+            channel.read(&mut ack)
+        };
+        match result {
+            Ok(1) if ack[0] == 0 => return Ok(()),
+            Ok(1) => bail!("remote SCP process rejected the upload"),
+            Ok(0) => bail!("remote SCP process closed before acknowledging the upload"),
+            Ok(_) => unreachable!(),
+            Err(error)
+                if error.kind() == io::ErrorKind::WouldBlock && Instant::now() < deadline =>
+            {
+                thread::sleep(POLL_INTERVAL)
+            }
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                bail!("remote SCP process acknowledgement timed out")
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
 }
 
 fn bridge_broker_channel(

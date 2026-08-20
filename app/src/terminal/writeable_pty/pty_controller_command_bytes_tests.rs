@@ -61,3 +61,16 @@ fn powershell_command_execution_normalizes_linefeeds_to_carriage_returns() {
     assert_eq!(bytes, expected);
     assert!(!bytes.contains(&b'\n'));
 }
+
+#[test]
+#[cfg(feature = "local_fs")]
+fn remote_powershell_bootstrap_command_uses_carriage_return() {
+    let bytes =
+        remote_powershell_bootstrap_command(".infinishell/remote-server/pwsh-bootstrap-local.ps1");
+
+    assert_eq!(
+        bytes,
+        b" . (Join-Path $HOME .infinishell/remote-server/pwsh-bootstrap-local.ps1)\r"
+    );
+    assert!(!bytes.contains(&b'\n'));
+}
