@@ -113,7 +113,7 @@ Source: "..\..\app\channels\{#ReleaseChannel}\icon\padded\icon.ico"; DestDir: "{
 Source: "{#AssetsDir}\{#Arch}\vcruntime140.dll"; DestDir: "{app}"
 Source: "{#AssetsDir}\{#Arch}\vcruntime140_1.dll"; DestDir: "{app}"
 Source: "{#AssetsDir}\{#Arch}\msvcp140.dll"; DestDir: "{app}"
-Source: "..\..\app\assets\bundled\bootstrap\pwsh.ps1"; DestDir: "{app}"
+Source: "{#TargetProfileDir}\pwsh.ps1"; DestDir: "{app}"
 Source: "{#AssetsDir}\{#Arch}\dxcompiler.dll"; DestDir: "{app}"
 Source: "{#AssetsDir}\{#Arch}\dxil.dll"; DestDir: "{app}"
 Source: "{#TargetProfileDir}\resources\*"; DestDir: "{app}\resources"; Flags: ignoreversion recursesubdirs

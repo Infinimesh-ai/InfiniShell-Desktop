@@ -345,6 +345,15 @@ if ($IS_TUI) {
     }
 }
 
+if (-not $IS_TUI) {
+    $PWSH_BOOTSTRAP_PATH = Join-Path $CARGO_TARGET_OUTPUT_DIR 'pwsh.ps1'
+    & "$WINDOWS_INSTALLER_DIR\prepare_pwsh_bootstrap.ps1" -DestinationPath $PWSH_BOOTSTRAP_PATH
+    if (-Not $?) {
+        Write-Error 'Failed to prepare PowerShell bootstrap'
+        exit 1
+    }
+}
+
 Write-Output 'Building InfiniShell installer'
 # Inno Setup `AppId` 决定注册表 Uninstall 条目与升级跟踪键。TUI 统一使用
 # `infinishell-tui[-{channel}]`；GUI 的 OSS 版固定为 `infinishell`，其他 GUI
