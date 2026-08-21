@@ -1,12 +1,17 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
-use remote_server::proto::{OpenSshStream, SshStreamPurpose};
+use futures::future::AbortHandle;
+use remote_server::proto::{OpenSshStream, SshStreamPurpose, TunnelChannel, TunnelData};
 use remote_server::protocol::INITIAL_TUNNEL_WINDOW;
 use remote_server::setup::RemoteOs;
+use warpui::r#async::executor;
 
 use super::{
-    MAX_IDENTITY_KEY_BYTES, SshStreamOperation, next_stdin_offset, return_output_credit,
-    ssh_stream_command, ssh_stream_operation, stdin_is_complete,
+    MAX_IDENTITY_KEY_BYTES, SshStreamOperation, TunnelBroker, TunnelBrokerInner, TunnelProcess,
+    next_stdin_offset, return_output_credit, ssh_stream_command, ssh_stream_operation,
+    stdin_is_complete,
 };
 
 fn open(purpose: SshStreamPurpose) -> OpenSshStream {
@@ -39,6 +44,94 @@ fn stream_purpose_maps_to_a_daemon_owned_command() {
     assert!(command.contains("remote-server-proxy"));
     assert!(stdin.is_none());
     assert!(accepts_client_stdin);
+}
+
+#[test]
+fn old_binary_check_uses_the_legacy_binary_probe() {
+    let (current_binary_check, _, _) = ssh_stream_command(
+        &open(SshStreamPurpose::CheckBinary),
+        "~/.infinishell/remote-server/staged.tar.gz",
+        &RemoteOs::Linux,
+    )
+    .unwrap();
+    let (old_binary_check, _, _) = ssh_stream_command(
+        &open(SshStreamPurpose::CheckOldBinary),
+        "~/.infinishell/remote-server/staged.tar.gz",
+        &RemoteOs::Linux,
+    )
+    .unwrap();
+    let expected = crate::remote_server::ssh_transport::setup_command_line(
+        &remote_server::setup::old_binary_check_command_for(&RemoteOs::Linux),
+    );
+
+    assert_ne!(old_binary_check, current_binary_check);
+    assert_eq!(old_binary_check, expected);
+}
+
+#[tokio::test]
+async fn stdin_byte_window_accepts_more_than_eight_small_frames_before_pump_progress() {
+    let (broker, stdin_rx) = broker_with_pending_stdin();
+
+    send_stdin_frame(&broker, 0).await;
+    send_stdin_frame(&broker, 8192).await;
+    send_stdin_frame(&broker, 16384).await;
+    send_stdin_frame(&broker, 24576).await;
+    send_stdin_frame(&broker, 32768).await;
+    send_stdin_frame(&broker, 40960).await;
+    send_stdin_frame(&broker, 49152).await;
+    send_stdin_frame(&broker, 57344).await;
+    send_stdin_frame(&broker, 65536).await;
+
+    assert!(broker.stream("stream").is_some());
+    assert_eq!(stdin_rx.len(), 9);
+}
+
+fn broker_with_pending_stdin() -> (TunnelBroker, async_channel::Receiver<Vec<u8>>) {
+    let (control_outbound_tx, _control_outbound_rx) = async_channel::unbounded();
+    let (outbound_tx, _outbound_rx) = async_channel::unbounded();
+    let (stdin_tx, stdin_rx) = async_channel::unbounded();
+    let (stdout_credit_tx, _stdout_credit_rx) = async_channel::unbounded();
+    let (stderr_credit_tx, _stderr_credit_rx) = async_channel::unbounded();
+    let (abort_handle, _) = AbortHandle::new_pair();
+    let process = Arc::new(TunnelProcess {
+        stdin_tx,
+        stdout_credit_tx,
+        stderr_credit_tx,
+        expected_stdin_offset: AtomicU64::new(0),
+        expected_stdin_size: Some(INITIAL_TUNNEL_WINDOW as u64),
+        stdin_credit: AtomicUsize::new(INITIAL_TUNNEL_WINDOW),
+        stdout_in_flight: AtomicUsize::new(0),
+        stderr_in_flight: AtomicUsize::new(0),
+        stdout_returned_credit: AtomicUsize::new(0),
+        stderr_returned_credit: AtomicUsize::new(0),
+        stderr_tail: Mutex::new(VecDeque::new()),
+        abort_handle,
+        stdin_closed: AtomicBool::new(false),
+        finished: AtomicBool::new(false),
+    });
+    let broker = TunnelBroker {
+        inner: Arc::new(TunnelBrokerInner {
+            controls: Mutex::new(HashMap::new()),
+            streams: Mutex::new(HashMap::from([("stream".to_string(), process)])),
+            control_outbound_tx,
+            outbound_tx,
+            executor: Arc::new(executor::Background::default()),
+        }),
+    };
+    (broker, stdin_rx)
+}
+
+async fn send_stdin_frame(broker: &TunnelBroker, offset: u64) {
+    broker
+        .handle_data(
+            "stream",
+            TunnelData {
+                channel: TunnelChannel::Stdin.into(),
+                offset,
+                data: vec![0; 8192],
+            },
+        )
+        .await;
 }
 
 #[test]

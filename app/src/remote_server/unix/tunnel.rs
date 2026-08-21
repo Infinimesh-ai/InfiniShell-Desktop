@@ -574,7 +574,10 @@ impl TunnelBroker {
             return;
         };
 
-        let (stdin_tx, stdin_rx) = async_channel::bounded::<Vec<u8>>(8);
+        // stdin 的内存上限由 `stdin_credit` 的字节窗口约束。这里不能再叠加一个按
+        // 消息数量计算的小队列：合法调用可以把 256 KiB 窗口拆成超过 8 个小帧，
+        // 在 pump 来得及消费前就会被误判为队列溢出并重置隧道。
+        let (stdin_tx, stdin_rx) = async_channel::unbounded::<Vec<u8>>();
         // credit 数量在原子计数器中合并，channel 只负责唤醒输出 pump。这样客户端
         // 即使连续消费很多小块，也不会因通知队列瞬时填满而误判为协议溢出。
         let (stdout_credit_tx, stdout_credit_rx) = async_channel::bounded::<()>(1);
@@ -723,7 +726,7 @@ impl TunnelBroker {
             .expected_stdin_offset
             .store(next_offset, Ordering::Release);
         if stream.stdin_tx.try_send(data.data).is_err() {
-            self.reset_stream(stream_id, "SSH tunnel stdin queue overflowed")
+            self.reset_stream(stream_id, "SSH tunnel stdin pump is closed")
                 .await;
         }
     }
@@ -877,9 +880,16 @@ fn ssh_stream_command(
                 false,
             )),
         },
-        SshStreamPurpose::CheckBinary | SshStreamPurpose::CheckOldBinary => Ok((
+        SshStreamPurpose::CheckBinary => Ok((
             crate::remote_server::ssh_transport::setup_command_line(
                 &remote_server::setup::binary_check_command_for(remote_os),
+            ),
+            None,
+            false,
+        )),
+        SshStreamPurpose::CheckOldBinary => Ok((
+            crate::remote_server::ssh_transport::setup_command_line(
+                &remote_server::setup::old_binary_check_command_for(remote_os),
             ),
             None,
             false,
