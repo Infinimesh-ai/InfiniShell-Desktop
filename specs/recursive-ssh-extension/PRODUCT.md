@@ -1,5 +1,12 @@
 # Recursive SSH Extension
 
+实现状态(2026-08-21):两个交付阶段已落地,但发布状态仍是测试 / preview,
+尚未承诺稳定兼容性。POSIX 多级链路、隧道协议、流控和失败回退已有
+聚焦覆盖;Windows worker 构建与 PowerShell 参数边界已通过原生 Windows
+runner,但 Windows 客户端、Windows 中间跳点 / 远端和混合系统路径仍需要更完整的
+手工端到端矩阵。Release 构建需用
+`INFINISHELL_UNSTABLE_FEATURES=recursive_ssh_extension` 显式加入测试。
+
 ## 1. 问题
 
 InfiniShell 当前可以把本地 shell 发起的一次交互式 SSH 会话升级为带

@@ -2,6 +2,11 @@
 
 对应产品规格：`PRODUCT.md`。
 
+当前实现已包含两阶段的共享数据模型、隧道协议、多级路由和失败回退,
+但功能仍受 `RecursiveSshExtension` 运行时开关保护。稳定放量前需完成
+Windows 发起、Windows 中间跳点 / 远端和 POSIX/Windows 混合链的手工端到端矩阵;
+自动化 Windows worker 构建与 PowerShell 参数测试通过不等于该运行时矩阵已完成。
+
 ## 1. 总体结构
 
 递归 SSH 保留两条相互独立的数据路径：

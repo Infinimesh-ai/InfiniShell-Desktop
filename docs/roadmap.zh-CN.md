@@ -38,6 +38,9 @@ InfiniShell Desktop 是 [InfiniShell 产品线](https://infinishell.dev/#lineup)
 - 稳定 macOS、Linux、Windows 客户端连接 POSIX 与 Windows PowerShell 远端的
   SSH、shell integration 和 remote-server 链路，并保留复杂 OpenSSH 配置的
   安全回退。
+- 递归多级 SSH 当前保持 preview；只有在现有 POSIX 与自动协议检查之外，
+  完整记录 Windows 发起、Windows 中间跳点 / 远端和混合系统端到端矩阵后，
+  才进入稳定放量。
 - 完善 SSH 主机管理、项目清单、仓库与规则上下文，让 Agent 能可靠理解目标机器。
 - 强化单机与跨主机执行的审批、金丝雀、超时、结果聚合和失败边界。
 - 逐步完善完全本地的项目与机器记忆，让历史经验可以复用但始终由用户掌控。

@@ -1,8 +1,8 @@
 # 跨平台 SSH transport
 
-状态:已实现,分阶段放量  
-实现基线:`2082841bb`、`1e6fdfaa4`、`363914f1d`  
-最后更新:2026-08-16  
+状态:已实现,分阶段放量;递归链路仍在测试<br>
+实现基线:`2082841bb`、`1e6fdfaa4`、`363914f1d`、`beeaeb85b`<br>
+最后更新:2026-08-21<br>
 英文版:[cross-platform-ssh-transport.md](cross-platform-ssh-transport.md)
 
 Windows 远端扩展的原生构建、协议 E2E、fast-dev `.app`、版本化归档和排障流程见
@@ -32,6 +32,25 @@ Windows 远端扩展的原生构建、协议 E2E、fast-dev `.app`、版本化�
 这个矩阵描述的是兼容的、交互式的单目标会话。每一格在不适用增强链路时
 仍保留原生 SSH。发生回退可能表示终端连接仍然正常,但当前会话无法使用
 InfiniShell shell 集成或 remote-server。
+
+## 递归与多级 SSH 预览
+
+已增强的远端 shell 可以拦截下一条兼容的交互式 `ssh` 命令,并通过父
+remote-server 继续增强新目标。每一跳仍由用户输入命令所在主机的 OpenSSH
+建立,因此以该主机的 DNS、`~/.ssh/config`、凭据和网络可达性为准。
+InfiniShell 只通过父 daemon 传递受作用域和 capability 保护的控制引用;
+不复制私钥,也不静默开启 agent forwarding。
+
+隧道协议包含每流字节 credit、有界数据帧、half-close/reset、父级所有的取消、
+跳数保护和安全回退。重复同一协议即可支持 `local -> A -> B -> C`,而不是
+为第二跳维护一套特例。安装或增强失败时,普通交互式 shell 必须仍然可用。
+
+该能力尚未达到稳定状态。Debug 构建自动开启;release 构建需要在 InfiniShell
+启动时设置 `INFINISHELL_UNSTABLE_FEATURES=recursive_ssh_extension`。已有聚焦的
+POSIX 多级、协议、流控和回退检查。Windows 原生自动化会构建真实 SSH worker,
+并检查 PowerShell 是否保留 bootstrap 参数边界,但它不能取代 Windows 发起、
+Windows 远端和混合系统多级拓扑的人工端到端覆盖。这些 Windows 链路仍是预览
+阶段风险最高的部分,不得宣称为生产成熟。
 
 ## 选路与连接流程
 
@@ -147,26 +166,26 @@ pwsh -File script/windows/test_package_remote_server.ps1
 | 严格 `ask` 下的新主机 | 只有明确同意后才记录密钥 |
 | `ProxyJump` 和进程形式 `ProxyCommand` | 目标可连接,增强命令复用 session |
 | POSIX 与 Windows 远端 | 选择正确 bootstrap 和 remote-server 产物 |
+| POSIX `local -> A -> B` 和 `local -> A -> B -> C` | 每跳都获得增强,`exit` 后恢复父级上下文 |
+| Windows 发起、Windows 远端和混合系统多级 | 参数边界、bootstrap、安装、嵌套 shell 和父级恢复全部正常 |
 | 不支持的 SSH 选项 | 原生 SSH 收到原始命令并仍可用 |
 | remote-server 安装失败 | 交互 shell 在无增强状态下仍可用 |
 
 精确的 merge commit 在远端可用后,应使用 Linux 与 Windows runner 运行跨平台
 云验证。如果 commit 尚只在本地,未获明确授权时不应仅为触发验证而 push。
 
-### 基线验证记录(2026-08-16)
+### 基线验证记录(2026-08-21)
 
-整合当前本地 `main` 后的功能树已通过:
+提交 `beeaeb85b` 已通过仓库本地聚焦检查以及
+[Linux x64 与 Windows x64 预检](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/32457514532)。
+Windows 任务构建了真实 SSH worker,并在共享检查之外通过 PowerShell worker 参数
+测试。递归隧道测试覆盖字节窗口、上传兼容与失败路径,包括曾经导致安装
+已实际成功却显示失败的流控问题。
 
-- `cargo check -p warp --lib --locked`;
-- 同时启用两个 Rust transport feature 的 `infinishell-ssh` worker check;
-- 全部 38 个 `remote_server::rust_ssh` 聚焦测试;
-- `cargo fmt --all -- --check`;
-- PowerShell 下的 `script/windows/test_package_remote_server.ps1`。
-
-在 macOS 上面向 `x86_64-pc-windows-msvc` 交叉编译 worker 时,在进入项目 Rust
-代码前就停在 `aws-lc-sys 0.39.1`,原因是 macOS 主机没有 Windows SDK 头文件
-(`stdlib.h` 与 `windows.h`)。原生 Windows 和 Linux 云任务需等精确 merge commit
-push 后才能运行;这是环境/授权缺口,不代表 Windows 运行时已验证通过。
+这是自动化构建与协议证据,不代表 Windows 运行时矩阵已完整。稳定放量前,
+必须人工验证 Windows 作为客户端、中间跳点与最终远端的情况,包括 POSIX/Windows
+混合链、冷安装、嵌套 `exit`、父连接中断和原生回退。在该矩阵有记录前,
+Windows 递归 SSH 仍明确属于实验功能。
 
 ## 合并后观察记录
 

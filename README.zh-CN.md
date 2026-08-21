@@ -32,7 +32,9 @@
 - 🖥️ **跨平台 SSH 增强** — 在终端内管理主机、配置与会话,并为
   macOS、Linux、Windows 客户端连接 POSIX 或 Windows PowerShell 远端
   提供 shell 集成与 remote-server。原有 OpenSSH 配置(包括
-  ProxyJump/ProxyCommand)继续通过兼容处理和安全原生回退保留。详见
+  ProxyJump/ProxyCommand)继续通过兼容处理和安全原生回退保留。测试中的
+  递归链路还可以自动增强已增强远端 shell 中再次发起的交互式
+  `ssh`,包括重复的多级会话。详见
   [下文](#跨平台-ssh-扩展)。
 - 🗂️ **项目级 Agent 模式** — 用「项目」组织 SSH 服务器、Git 仓库与运维规则;
   Agent 对话自动携带项目上下文,可在项目主机上执行命令,并支持金丝雀先行的
@@ -56,11 +58,24 @@ SSH 服务端都是 POSIX。这既保留了原有基于 OpenSSH 的连接方式,
 | macOS / Linux | 原有 OpenSSH ControlMaster 链路 | 版本化能力探测 + PowerShell bootstrap |
 | Windows | Rust SSH worker + POSIX bootstrap | Rust SSH worker + PowerShell bootstrap |
 
-增强链路只处理兼容的、交互式的单目标会话。端口转发、远端命令、
-尚未支持的认证或主机密钥策略,以及其他 SSH 模式仍原样交给用户的
-原生 OpenSSH。Windows worker 在一个已认证的目标 session 内复用远端
-shell 探测、交互终端与 remote-server 命令 channel;新的 `russh` 后端仍单独
-受开关控制,便于在兼容性成熟前分阶段放量。
+递归 / 多级 SSH 目前是**测试中的功能**。在已增强的主机 A 上执行
+`ssh B` 时,连接使用 A 自己的 OpenSSH、DNS、`~/.ssh/config` 和凭据,
+InfiniShell 则通过父 daemon 继续承载 remote-server 控制链路。后续跳点
+重复同一套协议。InfiniShell 不会复制私钥、静默开启 agent forwarding,
+也不会绕过 host key 策略;增强失败时,普通交互式 SSH shell 仍可使用。
+
+Debug 构建会自动开启该链路。Release 构建需要在启动 InfiniShell 时设置
+`INFINISHELL_UNSTABLE_FEATURES=recursive_ssh_extension` 显式加入测试。
+POSIX 多级链路和协议失败处理已有聚焦覆盖;Windows worker 构建与
+PowerShell 参数保留已通过 Windows runner 自动化检查,但 Windows 发起、
+Windows 远端和混合系统多级链路仍在进行端到端测试。请将该能力视为
+preview,尤其是 Windows 场景,并在报告问题时仅提供脱敏日志。
+
+增强链路只处理每一跳中兼容的、交互式单目标命令。端口转发、
+远端命令、尚未支持的认证或主机密钥策略,以及其他 SSH 模式仍原样
+交给用户的原生 OpenSSH。Windows worker 在一个已认证的目标 session 内复用
+远端 shell 探测、交互终端与 remote-server 命令 channel;新的 `russh` 后端仍
+单独受开关控制,便于在兼容性成熟前分阶段放量。
 
 架构、兼容边界、验证命令与合并后观察清单见
 [跨平台 SSH transport 技术文档](docs/cross-platform-ssh-transport.zh-CN.md)。Windows

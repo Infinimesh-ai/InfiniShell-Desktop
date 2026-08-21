@@ -45,6 +45,9 @@ boundaries.
 - Stabilize SSH, shell integration and remote-server paths from macOS, Linux and
   Windows clients to POSIX and Windows PowerShell remotes, while preserving safe
   fallback for complex OpenSSH configurations.
+- Graduate recursive multi-hop SSH from its current preview only after the
+  Windows-origin, Windows-intermediate, Windows-remote and mixed-OS end-to-end
+  matrix is recorded alongside the existing POSIX and automated protocol checks.
 - Improve SSH host management, project inventories, repositories and rules so the
   agent can understand target machines reliably.
 - Strengthen approvals, canary execution, timeouts, result aggregation and failure

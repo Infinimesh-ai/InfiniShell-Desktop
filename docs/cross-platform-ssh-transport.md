@@ -1,8 +1,8 @@
 # Cross-platform SSH transport
 
-Status: implemented with staged rollout  
-Implementation baseline: `2082841bb`, `1e6fdfaa4`, `363914f1d`  
-Last updated: 2026-08-16  
+Status: implemented with staged rollout; recursive paths remain in testing<br>
+Implementation baseline: `2082841bb`, `1e6fdfaa4`, `363914f1d`, `beeaeb85b`<br>
+Last updated: 2026-08-21<br>
 Chinese version: [cross-platform-ssh-transport.zh-CN.md](cross-platform-ssh-transport.zh-CN.md)
 
 ## Goal and invariants
@@ -33,6 +33,32 @@ Native SSH remains available for every row when the enhanced path is not
 applicable. A fallback can mean that the terminal connection works normally
 while InfiniShell shell integration or remote-server features are unavailable
 for that session.
+
+## Recursive and multi-hop SSH preview
+
+An enhanced remote shell can intercept another compatible interactive `ssh`
+command and extend the new target through its parent remote-server. Each hop is
+still created by OpenSSH on the machine where the user typed the command, so
+that machine's DNS, `~/.ssh/config`, credentials and network reachability remain
+authoritative. InfiniShell carries only a scoped, capability-protected control
+reference through the parent daemon; it does not copy private keys or silently
+enable agent forwarding.
+
+The tunnel protocol uses per-stream byte credit, bounded frames, half-close and
+reset semantics, parent-owned cancellation, hop-depth protection and safe
+fallback. Repeating the same protocol supports `local -> A -> B -> C` rather
+than treating the second hop as a special case. A failed install or extension
+must leave the ordinary interactive shell usable.
+
+This capability is not stable yet. Debug builds enable it automatically;
+release builds require
+`INFINISHELL_UNSTABLE_FEATURES=recursive_ssh_extension` when InfiniShell starts.
+Focused POSIX multi-hop, protocol, flow-control and fallback checks are in
+place. Native Windows automation builds the real SSH worker and verifies that
+PowerShell preserves bootstrap argument boundaries, but it does not replace
+manual end-to-end coverage of Windows-origin, Windows-remote and mixed-OS
+multi-hop topologies. Those Windows paths remain the highest-risk part of the
+preview and must not be described as production-mature.
 
 ## Selection and connection flow
 
@@ -171,6 +197,8 @@ Manual release coverage should include at least:
 | New host with strict `ask` | Explicit approval is required before learning the key |
 | `ProxyJump` and process-style `ProxyCommand` | Target connects and enhanced commands reuse the session |
 | POSIX and Windows remotes | Correct bootstrap and remote-server artifact are selected |
+| POSIX `local -> A -> B` and `local -> A -> B -> C` | Every hop is enhanced and `exit` restores the parent context |
+| Windows-origin, Windows-remote and mixed-OS multi-hop | Argument boundaries, bootstrap, install, nested shell and parent restore all work |
 | Unsupported SSH option | Native SSH receives the original command and remains usable |
 | Remote-server install failure | Interactive shell remains usable without enhancement |
 
@@ -178,21 +206,21 @@ Cross-platform cloud verification should use Linux and Windows runners after
 the exact merge commit is available remotely. A local-only commit must not be
 pushed solely to trigger verification without explicit authorization.
 
-### Baseline verification record (2026-08-16)
+### Baseline verification record (2026-08-21)
 
-The feature tree after integrating the current local `main` passed:
+Commit `beeaeb85b` passed the repository's focused local checks and the
+[Linux x64 and Windows x64 preflight](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/32457514532).
+The Windows job built the real SSH worker and passed the PowerShell worker
+argument test in addition to the shared checks. Recursive tunnel tests cover
+the byte window, upload compatibility and failure paths that previously caused
+an extension-install attempt to report a false failure.
 
-- `cargo check -p warp --lib --locked`;
-- the `infinishell-ssh` worker check with both Rust transport features;
-- all 38 focused `remote_server::rust_ssh` tests;
-- `cargo fmt --all -- --check`; and
-- `script/windows/test_package_remote_server.ps1` under PowerShell.
-
-Cross-compiling the worker from macOS for `x86_64-pc-windows-msvc` stops in
-`aws-lc-sys 0.39.1` before project Rust code because the macOS host has no
-Windows SDK headers (`stdlib.h` and `windows.h`). Native Windows and Linux
-cloud jobs remain pending until the exact merge commit is pushed; this is an
-environment/authorization gap, not a passing Windows runtime result.
+This is automated build and protocol evidence, not a claim that the Windows
+runtime matrix is complete. Before stable rollout, manually verify Windows as
+the client, an intermediate hop and the final remote, including mixed
+POSIX/Windows chains, cold installation, nested `exit`, parent disconnect and
+native fallback. Until that matrix is recorded, Windows recursive SSH remains
+explicitly experimental.
 
 ## Post-merge observation log
 
