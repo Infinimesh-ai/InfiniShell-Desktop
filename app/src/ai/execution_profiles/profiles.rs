@@ -43,7 +43,7 @@ impl AIExecutionProfileInfo {
         &self.id
     }
 
-    /// The Zap Drive sync ID of this profile, if it has been synced.
+    /// The InfiniShell Drive sync ID of this profile, if it has been synced.
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     pub fn sync_id(&self) -> Option<SyncId> {
         self.sync_id

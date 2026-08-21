@@ -12,7 +12,7 @@ use crate::ai::agent_conversations_model::AgentManagementFilters;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::{InputConfig, SerializedBlockListItem};
 use crate::code::editor_management::CodeSource;
-use crate::drive::ZapDriveObjectSettings;
+use crate::drive::InfiniShellDriveObjectSettings;
 use crate::root_view::quake_mode_window_id;
 use crate::server::ids::{ServerId, SyncId};
 use crate::settings_view::SettingsSection;
@@ -175,7 +175,7 @@ pub enum LeafContents {
     Sftp {
         node_id: String,
     },
-    /// 项目详情编辑器 pane(openWarp 独有)。引用 `zap_projects.id` 主键
+    /// 项目详情编辑器 pane(openWarp 独有)。引用 `infinishell_projects.id` 主键
     /// 加载/保存。**不持久化** — 重启后用户从左侧项目管理器重新打开。
     Project {
         project_id: String,
@@ -201,7 +201,7 @@ impl LeafContents {
             LeafContents::SshServer { .. } => false,
             // SFTP 浏览器:远端文件系统依赖活跃 SSH 连接,pane 不可恢复。
             LeafContents::Sftp { .. } => false,
-            // 项目详情编辑器:数据持久化在 zap_projects 表里,pane 只是 view,
+            // 项目详情编辑器:数据持久化在 infinishell_projects 表里,pane 只是 view,
             // 逻辑同 SshServer。
             LeafContents::Project { .. } => false,
             // Network log: the backing log is an in-memory ring buffer that
@@ -273,7 +273,7 @@ pub enum NotebookPaneSnapshot {
         ///    server ID.
         notebook_id: Option<SyncId>,
         // Settings for the notebook pane when it's opened (such as a folder to focus upon opening)
-        settings: ZapDriveObjectSettings,
+        settings: InfiniShellDriveObjectSettings,
     },
     LocalFileNotebook {
         /// The path to the local file that was open in this pane. This may be `None` if
@@ -312,7 +312,7 @@ pub enum WorkflowPaneSnapshot {
     WorkflowObject {
         workflow_id: Option<SyncId>,
         // Settings for the workflow pane when it's opened (such as a folder to focus upon opening)
-        settings: ZapDriveObjectSettings,
+        settings: InfiniShellDriveObjectSettings,
     },
 }
 
@@ -352,7 +352,8 @@ pub enum CodeReviewPaneSnapshot {
 pub enum LeftPanelDisplayedTab {
     FileTree,
     GlobalSearch,
-    ZapDrive,
+    #[serde(alias = "ZapDrive")]
+    InfiniShellDrive,
     ConversationListView,
     SshManager,
     ServerFileBrowser,
@@ -365,7 +366,7 @@ impl From<ToolPanelView> for LeftPanelDisplayedTab {
         match view {
             ToolPanelView::ProjectExplorer => LeftPanelDisplayedTab::FileTree,
             ToolPanelView::GlobalSearch { .. } => LeftPanelDisplayedTab::GlobalSearch,
-            ToolPanelView::ZapDrive => LeftPanelDisplayedTab::ZapDrive,
+            ToolPanelView::InfiniShellDrive => LeftPanelDisplayedTab::InfiniShellDrive,
             ToolPanelView::ConversationListView => LeftPanelDisplayedTab::ConversationListView,
             ToolPanelView::SshManager => LeftPanelDisplayedTab::SshManager,
             ToolPanelView::ServerFileBrowser => LeftPanelDisplayedTab::ServerFileBrowser,

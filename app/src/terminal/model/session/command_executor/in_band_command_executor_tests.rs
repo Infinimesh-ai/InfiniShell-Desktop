@@ -2,6 +2,17 @@ use futures_util::future::{AbortHandle, Abortable, Aborted};
 use warpui::App;
 
 use super::*;
+
+#[test]
+fn recognizes_current_and_legacy_powershell_generator_commands() {
+    assert!(is_in_band_command(
+        "InfiniShell-Run-GeneratorCommand 42 'ssh host'"
+    ));
+    assert!(is_in_band_command("Zap-Run-GeneratorCommand 42 'ssh host'"));
+    assert!(is_in_band_command(
+        "Warp-Run-GeneratorCommand 42 'ssh host'"
+    ));
+}
 use crate::terminal::model::session::ExecuteCommandOptions;
 
 impl InBandCommandExecutor {

@@ -2,7 +2,7 @@
 //!
 //! 逐行仿 `ssh_server_pane.rs` 的极简壳:PaneView 包装 + PaneId + attach +
 //! LeafContents 序列化。pane 不持久化(`LeafContents::Project { .. }` 在
-//! `is_persisted()` 返回 false),业务数据走 `zap_projects::ProjectRepository`。
+//! `is_persisted()` 返回 false),业务数据走 `infinishell_projects::ProjectRepository`。
 
 use warpui::{AppContext, ModelHandle, View, ViewContext, ViewHandle};
 

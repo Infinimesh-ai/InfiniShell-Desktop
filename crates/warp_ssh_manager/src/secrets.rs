@@ -7,7 +7,8 @@
 use thiserror::Error;
 use zeroize::Zeroizing;
 
-const SERVICE: &str = "zap.ssh";
+const SERVICE: &str = "infinishell.ssh";
+const LEGACY_SERVICE: &str = "zap.ssh";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SecretKind {
@@ -87,21 +88,39 @@ impl SshSecretStore for KeychainSecretStore {
         node_id: &str,
         kind: SecretKind,
     ) -> Result<Option<Zeroizing<String>>, SshSecretStoreError> {
-        let entry = keyring::Entry::new(SERVICE, &account_key(node_id, kind))?;
+        let account = account_key(node_id, kind);
+        let entry = keyring::Entry::new(SERVICE, &account)?;
         match entry.get_password() {
             Ok(s) => Ok(Some(Zeroizing::new(s))),
-            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(keyring::Error::NoEntry) => {
+                let legacy_entry = keyring::Entry::new(LEGACY_SERVICE, &account)?;
+                match legacy_entry.get_password() {
+                    Ok(secret) => {
+                        if entry.set_password(&secret).is_ok() {
+                            let _ = legacy_entry.delete_credential();
+                        }
+                        Ok(Some(Zeroizing::new(secret)))
+                    }
+                    Err(keyring::Error::NoEntry) => Ok(None),
+                    Err(e) => Err(e.into()),
+                }
+            }
             Err(e) => Err(e.into()),
         }
     }
 
     fn delete(&self, node_id: &str, kind: SecretKind) -> Result<(), SshSecretStoreError> {
-        let entry = keyring::Entry::new(SERVICE, &account_key(node_id, kind))?;
-        match entry.delete_credential() {
-            Ok(()) => Ok(()),
-            Err(keyring::Error::NoEntry) => Ok(()),
-            Err(e) => Err(e.into()),
-        }
+        let account = account_key(node_id, kind);
+        delete_keyring_entry(SERVICE, &account)?;
+        delete_keyring_entry(LEGACY_SERVICE, &account)
+    }
+}
+
+fn delete_keyring_entry(service: &str, account: &str) -> Result<(), SshSecretStoreError> {
+    let entry = keyring::Entry::new(service, account)?;
+    match entry.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.into()),
     }
 }
 

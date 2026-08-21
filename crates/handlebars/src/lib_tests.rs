@@ -12,19 +12,19 @@ fn create_map(pairs: &[(&str, &str)]) -> HashMap<String, String> {
 #[test]
 fn renders_simple_substitution() {
     let template = "Hello, {{name}}!".to_string();
-    let context = create_map(&[("name", "Zap")]);
+    let context = create_map(&[("name", "InfiniShell")]);
 
     let args = get_arguments(&template);
     assert_eq!(args, vec!["name".to_string()]);
 
     let out = render_template(&template, &context);
-    assert_eq!(out, "Hello, Zap!");
+    assert_eq!(out, "Hello, InfiniShell!");
 }
 
 #[test]
 fn leaves_unknown_placeholder_unchanged() {
     let template = "Hello, {{name}} and {{unknown}}!".to_string();
-    let context = create_map(&[("name", "Zap")]);
+    let context = create_map(&[("name", "InfiniShell")]);
 
     let args = get_arguments(&template);
     assert_eq!(
@@ -33,7 +33,7 @@ fn leaves_unknown_placeholder_unchanged() {
     );
 
     let out = render_template(&template, &context);
-    assert_eq!(out, "Hello, Zap and {{unknown}}!");
+    assert_eq!(out, "Hello, InfiniShell and {{unknown}}!");
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn unicode_in_names_and_text() {
 #[test]
 fn preserves_escaped_triple_braces() {
     let template = "{{{name}}} {{name}}";
-    let context = create_map(&[("name", "Zap")]);
+    let context = create_map(&[("name", "InfiniShell")]);
 
     let args = get_arguments(template);
     // Only the double-braced arg should be returned
@@ -75,7 +75,7 @@ fn preserves_escaped_triple_braces() {
 
     let out = render_template(template, &context);
     // Triple braces should not be substituted by our parser; double braces should.
-    assert_eq!(out, "{{{name}}} Zap");
+    assert_eq!(out, "{{{name}}} InfiniShell");
 }
 
 #[test]

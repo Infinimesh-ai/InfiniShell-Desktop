@@ -83,7 +83,7 @@ use crate::code::view::{CodeView, CodeViewAction};
 use crate::code_review::comments::{AttachedReviewComment, PendingImportedReviewComment};
 use crate::code_review::diff_state::DiffMode;
 use crate::drive::items::WarpDriveItemId;
-use crate::drive::{ObjectTypeAndId, ZapDriveObjectArgs};
+use crate::drive::{InfiniShellDriveObjectArgs, ObjectTypeAndId};
 use crate::env_vars::EnvVarCollectionType;
 use crate::features::FeatureFlag;
 use crate::launch_configs::launch_config::{self, PaneMode, PaneTemplateType};
@@ -125,7 +125,7 @@ use crate::terminal::model::terminal_model::ConversationTranscriptViewerStatus;
 #[cfg(feature = "remote_tty")]
 use crate::terminal::remote_tty::TerminalManager as RemoteTtyTerminalManager;
 use crate::terminal::session_settings::{NewSessionSource, SessionSettings};
-// Zap:删除 ShareSessionModal / RoleChangeModal / ParticipantAvatarParams import
+// InfiniShell:删除 ShareSessionModal / RoleChangeModal / ParticipantAvatarParams import
 // (云端 shared session 弹窗)
 use crate::terminal::shared_session::{self, IsSharedSessionCreator};
 use crate::terminal::view::inline_banner::{
@@ -158,7 +158,7 @@ use crate::workspace::{
 };
 use crate::{cmd_or_ctrl_shift, send_telemetry_from_ctx};
 
-// Zap:上游的 `ambient_pane_restoration` 模块整套走云端 shared session,
+// InfiniShell:上游的 `ambient_pane_restoration` 模块整套走云端 shared session,
 // 我方保留 mod.rs 内的本地实现,不引入该模块。
 mod child_agent;
 pub mod focus_state;
@@ -172,7 +172,7 @@ pub use pane::code_diff_pane::CodeDiffPane;
 pub use pane::code_pane::CodePane;
 pub use pane::custom_router_editor_pane::CustomRouterEditorPane;
 pub use pane::env_var_collection_pane::EnvVarCollectionPane;
-// Zap Wave 7-3:`EnvironmentManagementPane` 随 ambient-agent UI 子系统物理删。
+// InfiniShell Wave 7-3:`EnvironmentManagementPane` 随 ambient-agent UI 子系统物理删。
 pub use pane::execution_profile_editor_pane::ExecutionProfileEditorPane;
 pub use pane::file_pane::FilePane;
 pub use pane::image_pane::ImagePane;
@@ -524,8 +524,8 @@ pub enum Event {
         /// The session that the path was opened from.
         session: Arc<Session>,
     },
-    ZapDriveLink {
-        open_warp_drive_args: ZapDriveObjectArgs,
+    InfiniShellDriveLink {
+        open_warp_drive_args: InfiniShellDriveObjectArgs,
     },
     #[cfg(feature = "local_fs")]
     OpenCodeInWarp {
@@ -602,7 +602,7 @@ pub enum Event {
     },
     /// Clears the hovered tab index so it no longer appears as highlighted drop target
     ClearHoveredTabIndex,
-    ZapDriveObjectInPane(ObjectUid),
+    InfiniShellDriveObjectInPane(ObjectUid),
     /// Tell the workspace to open the given child agent conversation in a
     /// fresh tab. Bubbled up by `TerminalView::Event::OpenChildAgentInNewTab`
     /// from the orchestration pill bar's 3-dot menu.
@@ -666,7 +666,7 @@ pub enum Event {
         initial_content: Option<String>,
     },
     OpenAddRulePane,
-    // Zap Wave 7-3:`OpenEnvironmentManagementPane` event 随 ambient-agent UI
+    // InfiniShell Wave 7-3:`OpenEnvironmentManagementPane` event 随 ambient-agent UI
     // 子系统物理删。
     OpenFilesPalette {
         source: PaletteSource,
@@ -681,7 +681,7 @@ pub enum Event {
         target: FileTarget,
         line_col: Option<LineAndColumnArg>,
     },
-    /// Zap:在终端里 Ctrl/Cmd+点击远端 SSH 会话输出中的文件路径时发出,
+    /// InfiniShell:在终端里 Ctrl/Cmd+点击远端 SSH 会话输出中的文件路径时发出,
     /// 由 workspace 走 buffer-sync 协议在编辑器中打开远端文件。
     #[cfg(all(feature = "local_tty", feature = "local_fs"))]
     OpenRemoteFileFromTerminal {
@@ -734,7 +734,7 @@ pub enum Event {
     RunTabConfigSkill {
         path: PathBuf,
     },
-    // Zap:上游还有 `ShowCloudAgentCapacityModal { variant }` —— 云端 agent 配额
+    // InfiniShell:上游还有 `ShowCloudAgentCapacityModal { variant }` —— 云端 agent 配额
     // (capacity)提示弹窗的转发事件。承载类型
     // `crate::workspace::view::cloud_agent_capacity_modal::CloudAgentCapacityModalVariant`
     // 属于云端 agent 管理入口,我方从未引入,故该事件一并移除。
@@ -865,18 +865,18 @@ pub struct PaneGroup {
     /// Mapping from pane IDs to their contents.
     pane_contents: HashMap<PaneId, Box<dyn AnyPaneContent>>,
 
-    // Zap:删除 terminal_with_open_share_block_modal / share_block_modal 字段(云端 share block)
+    // InfiniShell:删除 terminal_with_open_share_block_modal / share_block_modal 字段(云端 share block)
     dragged_border: Option<DraggedBorder>,
     user_default_shell_changed_banner: ViewHandle<Banner<PaneGroupAction>>,
 
-    // Zap:删除 terminal_with_open_share_session_modal / share_session_modal 字段(云端 shared session)
+    // InfiniShell:删除 terminal_with_open_share_session_modal / share_session_modal 字段(云端 shared session)
     /// Model that tracks the currently active file.
     active_file_model: ModelHandle<ActiveFileModel>,
     /// If there is an open summarization cancel dialog, the terminal pane ID where summarization is active.
     terminal_with_open_summarization_dialog: Option<TerminalPaneId>,
 
     /// Pane with an open environment setup mode selector modal (rendered at tab level).
-    // Zap Wave 7-3:`pane_with_open_environment_setup_mode_selector` /
+    // InfiniShell Wave 7-3:`pane_with_open_environment_setup_mode_selector` /
     // `pane_with_open_agent_assisted_environment_modal` 随 ambient-agent UI 子系统
     // 物理删。
 
@@ -1835,7 +1835,7 @@ impl PaneGroup {
                 });
 
                 let restore_kind = match &task_data {
-                    // Zap:上游的 shared-session 附着路径已删(无云端 session)。
+                    // InfiniShell:上游的 shared-session 附着路径已删(无云端 session)。
                     // 无论任务数据是否就绪都统一走 pending-restoration,由异步元数据
                     // 到达后再决定是 transcript viewer 还是新建会话。
                     // Transcript viewer and other non-session actions depend on conversation
@@ -1911,7 +1911,7 @@ impl PaneGroup {
                 ))
             }
             LeafContents::Project { .. } => {
-                // 项目详情编辑器 pane 不持久化 — 它只是持久化 `zap_projects`
+                // 项目详情编辑器 pane 不持久化 — 它只是持久化 `infinishell_projects`
                 // 表之上的临时编辑面,重启后从左侧项目管理器重新打开。
                 Err(anyhow::anyhow!(
                     "Project pane should not have been persisted, as it cannot be restored"
@@ -1960,7 +1960,7 @@ impl PaneGroup {
                     };
                     Ok((PaneData::new(pane_id), focus))
                 }
-            } // Zap Wave 7-3:`EnvironmentManagement` LeafContents arm 随 ambient-agent UI
+            } // InfiniShell Wave 7-3:`EnvironmentManagement` LeafContents arm 随 ambient-agent UI
               // 子系统物理删。
         };
 
@@ -2548,17 +2548,17 @@ impl PaneGroup {
         _terminal_pane_id: TerminalPaneId,
         ctx: &mut ViewContext<Self>,
     ) {
-        // Zap:share_session_modal 已删,no-op
+        // InfiniShell:share_session_modal 已删,no-op
         ctx.notify();
     }
 
     /// Closes the share session modal if it is open. Does nothing otherwise. Does not change
     /// which element is focused.
     fn close_share_session_modal(&mut self, _ctx: &mut ViewContext<Self>) {
-        // Zap:share_session_modal 已删,no-op
+        // InfiniShell:share_session_modal 已删,no-op
     }
 
-    // Zap:删除 handle_share_session_modal_event(云端 shared session 弹窗)
+    // InfiniShell:删除 handle_share_session_modal_event(云端 shared session 弹窗)
 
     fn new_internal(
         tips_completed: ModelHandle<TipsCompleted>,
@@ -2609,7 +2609,7 @@ impl PaneGroup {
             me.handle_focus_state_event(event, ctx);
         });
 
-        // Zap:删除 share_block_modal 注册(云端 share block)
+        // InfiniShell:删除 share_block_modal 注册(云端 share block)
 
         ctx.subscribe_to_model(&PaneSettings::handle(ctx), |_, _, _, ctx| {
             ctx.notify();
@@ -2653,7 +2653,7 @@ impl PaneGroup {
             },
         );
 
-        // Zap:删除 share_session_modal 注册(云端 shared session 弹窗)
+        // InfiniShell:删除 share_session_modal 注册(云端 shared session 弹窗)
 
         ctx.subscribe_to_model(&UndoCloseStack::handle(ctx), |me, _, event, ctx| {
             let UndoCloseStackEvent::DiscardPane(pane_id) = event;
@@ -2691,7 +2691,7 @@ impl PaneGroup {
             user_default_shell_changed_banner,
             active_file_model,
             terminal_with_open_summarization_dialog: None,
-            // Zap Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
+            // InfiniShell Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
             // 字段随 UI 物理删。
             right_panel_open: false,
             left_panel_open: false,
@@ -2780,7 +2780,7 @@ impl PaneGroup {
         ViewHandle<TerminalView>,
         ModelHandle<Box<dyn TerminalManager>>,
     ) {
-        // Zap:上游在这里创建云端 cloud-mode view(`create_cloud_mode_view`),
+        // InfiniShell:上游在这里创建云端 cloud-mode view(`create_cloud_mode_view`),
         // 该路径已删除,统一退回本地 loading 终端,orchestration 轮询开关无意义。
         let _ = enable_orchestration_polling;
         let window_id = ctx.window_id();
@@ -2905,7 +2905,7 @@ impl PaneGroup {
                             .insert(task_id, pane_id);
                     }
                 }
-                // Zap:云端 shared session 附着分支已删,其余情况一律回落到新建本地会话。
+                // InfiniShell:云端 shared session 附着分支已删,其余情况一律回落到新建本地会话。
                 _ => {
                     self.replace_pane_with_new_agent_conversation(pane_id, ctx);
                 }
@@ -3318,7 +3318,7 @@ impl PaneGroup {
             .and_then(|tpid| self.terminal_session_by_id(tpid))
             .map(|session| session.terminal_manager(ctx));
 
-        // Zap:上游在这里会把 loading pane 换成云端 cloud-mode pane
+        // InfiniShell:上游在这里会把 loading pane 换成云端 cloud-mode pane
         // (`create_cloud_mode_terminal` / shared session),该路径已删除,
         // 这里直接在当前 transcript viewer 里就地还原。
         let ambient_agent_task_id =
@@ -3437,7 +3437,7 @@ impl PaneGroup {
         }
     }
 
-    // Zap:删除 handle_share_block_modal_event(云端 share block)
+    // InfiniShell:删除 handle_share_block_modal_event(云端 share block)
 
     /// Used to add a new pane but not splitting panes.
     pub fn add_terminal_pane(
@@ -4342,8 +4342,8 @@ impl PaneGroup {
                 self.hide_closed_pane(pane_id, ctx);
             }
 
-            // Zap:删除 share_block_modal cleanup(云端 share block)
-            // Zap Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
+            // InfiniShell:删除 share_block_modal cleanup(云端 share block)
+            // InfiniShell Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
             // 字段 cleanup 随 UI 物理删。
 
             self.focus_next_terminal_pane_and_activate_session(
@@ -4366,8 +4366,8 @@ impl PaneGroup {
 
             self.clean_up_pane(pane_id, ctx);
 
-            // Zap:删除 share_block_modal cleanup(云端 share block)
-            // Zap Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
+            // InfiniShell:删除 share_block_modal cleanup(云端 share block)
+            // InfiniShell Wave 7-3:ambient-agent UI 子系统中的 pane-level modal 跟踪
             // 字段 cleanup 随 UI 物理删。
 
             self.focus_next_terminal_pane_and_activate_session(
@@ -4847,7 +4847,7 @@ impl PaneGroup {
         }
     }
 
-    // Zap:上游的 `replace_loading_pane_with_restored_ambient_cloud_mode_pane` /
+    // InfiniShell:上游的 `replace_loading_pane_with_restored_ambient_cloud_mode_pane` /
     // `load_data_into_restored_ambient_cloud_mode_view` 走云端 cloud-mode pane
     // (`create_cloud_mode_terminal` + shared session 状态机),该子系统已删除,
     // 这两个 helper 一并删除。
@@ -5644,7 +5644,7 @@ impl PaneGroup {
         cloud_conversation: LoadedConversationData,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
-        // Zap:上游在这里会走 cloud-mode pane 还原(HandoffCloudCloud),
+        // InfiniShell:上游在这里会走 cloud-mode pane 还原(HandoffCloudCloud),
         // 该路径已删除,统一按本地会话还原。
         let restoration = match cloud_conversation {
             LoadedConversationData::Oz(conversation) => {
@@ -6251,7 +6251,7 @@ impl PaneGroup {
             .map(|session| session.terminal_view(ctx))
     }
 
-    // Zap:上游的 `attach_execution_session_to_ambient_pane` 依赖已删除的
+    // InfiniShell:上游的 `attach_execution_session_to_ambient_pane` 依赖已删除的
     // `shared_session::viewer::TerminalManager`(云端 shared session viewer),
     // 该函数一并删除。
 
@@ -7169,7 +7169,7 @@ impl PaneGroup {
         );
 
         self.close_share_session_modal(ctx);
-        // Zap:删除 terminal_with_open_share_block_modal 清空(字段已不存在)
+        // InfiniShell:删除 terminal_with_open_share_block_modal 清空(字段已不存在)
         ctx.notify();
     }
 
@@ -7291,7 +7291,7 @@ impl View for PaneGroup {
         // "circular view reference". The per-pane views (and their backing
         // terminal/editor views) are reached via the structural parent graph
         // and `PaneView::child_view_ids`.
-        // Zap:share_block_modal / share_session_modal /
+        // InfiniShell:share_block_modal / share_session_modal /
         // shared_session_role_change_modal 三个字段随云端 share block 与
         // shared session 弹窗一并删除,这里只上报仍存在的 banner。
         vec![self.user_default_shell_changed_banner.id()]
@@ -7330,7 +7330,7 @@ impl View for PaneGroup {
 
         let mut stack = Stack::new().with_child(column.finish());
 
-        // Zap:删除 share_block_modal / share_session_modal / role-change modal 渲染分支(字段已不存在)
+        // InfiniShell:删除 share_block_modal / share_session_modal / role-change modal 渲染分支(字段已不存在)
 
         // Render the summarization cancel dialog at tab level when open.
         if let Some(terminal_pane_id) = self.terminal_with_open_summarization_dialog
@@ -7342,7 +7342,7 @@ impl View for PaneGroup {
             stack.add_child(ChildView::new(&dialog_handle).finish());
         }
 
-        // Zap Wave 7-3:environment setup mode selector / agent-assisted environment
+        // InfiniShell Wave 7-3:environment setup mode selector / agent-assisted environment
         // modal 在 tab 层级的覆盖渲染随 ambient-agent UI 子系统物理删。
 
         stack.finish()

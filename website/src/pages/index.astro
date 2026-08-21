@@ -1,7 +1,7 @@
 ---
 import LandingLayout from '../layouts/LandingLayout.astro';
 
-const repo = 'https://github.com/zerx-lab/zap';
+const repo = 'https://github.com/Infinimesh-ai/InfiniShell-Desktop';
 
 // 文案集中管理,避免三语 data-lang 标签散落各处
 const t = {
@@ -10,11 +10,11 @@ const t = {
     h1a:    { en: 'The terminal,',         zh: '把终端,',              ja: 'ターミナルを、' },
     h1b:    { en: 'rebuilt around you.',   zh: '重新交还给你。',         ja: 'あなたの手元に戻す。' },
     lede:   {
-      en: 'Zap is a derivative product built on Warp — a fully open, local-first take on the agentic terminal. Every credential, conversation and key stays on your machine. Bring your own provider, your own keys, your own rules.',
-      zh: 'Zap 是基于 Warp 的衍生产品 — 完全开放、本地优先的 agentic 终端。凭证、会话与密钥全部保存在本地。自带服务商、自带密钥、自带规则。',
-      ja: 'Zap は Warp を基にした派生プロダクト — 完全オープンでローカルファーストな agentic ターミナル。認証情報、会話、鍵はすべて手元のマシンに残ります。プロバイダーも鍵もルールも自分のもの。',
+      en: 'InfiniShell is a derivative product built on Warp — a fully open, local-first take on the agentic terminal. Every credential, conversation and key stays on your machine. Bring your own provider, your own keys, your own rules.',
+      zh: 'InfiniShell 是基于 Warp 的衍生产品 — 完全开放、本地优先的 agentic 终端。凭证、会话与密钥全部保存在本地。自带服务商、自带密钥、自带规则。',
+      ja: 'InfiniShell は Warp を基にした派生プロダクト — 完全オープンでローカルファーストな agentic ターミナル。認証情報、会話、鍵はすべて手元のマシンに残ります。プロバイダーも鍵もルールも自分のもの。',
     },
-    primary:   { en: 'Install Zap',     zh: '安装 Zap',     ja: 'Zap をインストール' },
+    primary:   { en: 'Install InfiniShell',     zh: '安装 InfiniShell',     ja: 'InfiniShell をインストール' },
     secondary: { en: 'View on GitHub',  zh: '在 GitHub 查看', ja: 'GitHub で見る' },
   },
   logos: {
@@ -56,9 +56,9 @@ const t = {
   },
   quote: {
     text: {
-      en: 'The terminal was always a local tool. Zap keeps it that way — even when the AI joins.',
-      zh: '终端从来都是本地工具。即便引入 AI,Zap 也让它继续如此。',
-      ja: 'ターミナルはずっとローカルなツールでした。AI が入っても、Zap はそのままにします。',
+      en: 'The terminal was always a local tool. InfiniShell keeps it that way — even when the AI joins.',
+      zh: '终端从来都是本地工具。即便引入 AI,InfiniShell 也让它继续如此。',
+      ja: 'ターミナルはずっとローカルなツールでした。AI が入っても、InfiniShell はそのままにします。',
     },
     cite: { en: 'Project ethos', zh: '项目理念', ja: 'プロジェクトの理念' },
   },
@@ -66,9 +66,9 @@ const t = {
     eyebrow: { en: 'INSTALL',    zh: '安装',           ja: 'インストール' },
     h:       { en: 'Build it yourself in two commands.', zh: '两条命令,自行构建。',          ja: '2 つのコマンドで自分でビルド。' },
     p:       {
-      en: 'No installer in preview — Zap is source-available and ships only as a build script. Clone, bootstrap, run.',
-      zh: 'preview 阶段不提供安装包 — Zap 完全源码公开,只通过构建脚本发布。Clone、bootstrap、run。',
-      ja: 'preview 段階ではインストーラーはありません。Zap はソース公開で、ビルドスクリプトのみが配布物です。Clone、bootstrap、run。',
+      en: 'No installer in preview — InfiniShell is source-available and ships only as a build script. Clone, bootstrap, run.',
+      zh: 'preview 阶段不提供安装包 — InfiniShell 完全源码公开,只通过构建脚本发布。Clone、bootstrap、run。',
+      ja: 'preview 段階ではインストーラーはありません。InfiniShell はソース公開で、ビルドスクリプトのみが配布物です。Clone、bootstrap、run。',
     },
     tabMac: 'macOS', tabLinux: 'Linux', tabWin: 'Windows',
   },
@@ -247,7 +247,7 @@ const eqRight = makeEqBars(16, 2);
             <div class="app-titlebar">
               <div class="tb-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M6 3v10"/></svg></div>
               <div class="app-tabs">
-                <div class="app-tab active">~/zap - fish</div>
+                <div class="app-tab active">~/infinishell - fish</div>
                 <div class="app-tab add">
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>
                 </div>
@@ -256,7 +256,7 @@ const eqRight = makeEqBars(16, 2);
             <div class="app-body">
               <div class="term-stage">
                 <div class="typing-line"><span class="p">$</span> cargo build --release</div>
-                <div class="typing-line dim">   Compiling zap v0.1.0</div>
+                <div class="typing-line dim">   Compiling infinishell v0.1.0</div>
                 <div class="typing-line dim">   Compiling warp_terminal v0.1.0</div>
                 <div class="typing-line"><span class="ok">✓</span> <span class="dim">Finished in 12.4s</span></div>
               </div>
@@ -319,7 +319,7 @@ const eqRight = makeEqBars(16, 2);
                 <div class="ss-group">
                   <span>Agents</span><span class="chev">▾</span>
                 </div>
-                <a class="ss-item" data-lang="en">Zap agent</a><a class="ss-item" data-lang="zh">Zap 智能体</a><a class="ss-item" data-lang="ja">Zap エージェント</a>
+                <a class="ss-item" data-lang="en">InfiniShell agent</a><a class="ss-item" data-lang="zh">InfiniShell 智能体</a><a class="ss-item" data-lang="ja">InfiniShell エージェント</a>
                 <a class="ss-item" data-lang="en">Config</a><a class="ss-item" data-lang="zh">配置</a><a class="ss-item" data-lang="ja">設定</a>
                 <a class="ss-item active" data-lang="en">Providers</a><a class="ss-item active" data-lang="zh">提供商</a><a class="ss-item active" data-lang="ja">プロバイダー</a>
                 <a class="ss-item" data-lang="en">MCP servers</a><a class="ss-item" data-lang="zh">MCP 服务器</a><a class="ss-item" data-lang="ja">MCP サーバー</a>
@@ -421,9 +421,9 @@ const eqRight = makeEqBars(16, 2);
                 <div class="lb-row">
                   <div class="lb-text">
                     <div class="t" data-lang="en">Language</div><div class="t" data-lang="zh">语言</div><div class="t" data-lang="ja">言語</div>
-                    <div class="d" data-lang="en">Restart Zap to fully apply this change.</div>
-                    <div class="d" data-lang="zh">重启 Zap 以让此更改完全生效。</div>
-                    <div class="d" data-lang="ja">Zap を再起動すると完全に反映されます。</div>
+                    <div class="d" data-lang="en">Restart InfiniShell to fully apply this change.</div>
+                    <div class="d" data-lang="zh">重启 InfiniShell 以让此更改完全生效。</div>
+                    <div class="d" data-lang="ja">InfiniShell を再起動すると完全に反映されます。</div>
                   </div>
                   <div class="lb-select" id="hero-lang-select">
                     <span class="lb-current" data-locale-current="en">System default</span>
@@ -493,8 +493,8 @@ const eqRight = makeEqBars(16, 2);
 
         <div class="pre-wrap" data-pane="macos">
           <pre class="code"><span class="com"># 1. Bootstrap dependencies (Xcode CLT + cargo helpers)</span>
-git clone https://github.com/zerx-lab/zap.git zap
-<span class="key">cd</span> zap
+git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
+<span class="key">cd</span> infinishell
 ./script/bootstrap
 
 <span class="com"># 2. Build &amp; run</span>
@@ -504,8 +504,8 @@ git clone https://github.com/zerx-lab/zap.git zap
 
         <div class="pre-wrap" data-pane="linux" hidden>
           <pre class="code"><span class="com"># Debian / Ubuntu (apt + cargo)</span>
-git clone https://github.com/zerx-lab/zap.git zap
-<span class="key">cd</span> zap
+git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
+<span class="key">cd</span> infinishell
 ./script/bootstrap
 
 <span class="com"># Build &amp; run</span>
@@ -515,8 +515,8 @@ git clone https://github.com/zerx-lab/zap.git zap
 
         <div class="pre-wrap" data-pane="windows" hidden>
           <pre class="code"><span class="com"># Run from PowerShell (winget + rustup)</span>
-git clone https://github.com/zerx-lab/zap.git zap
-<span class="key">cd</span> zap
+git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
+<span class="key">cd</span> infinishell
 ./script/bootstrap
 
 <span class="com"># Build &amp; run</span>
@@ -570,11 +570,11 @@ git clone https://github.com/zerx-lab/zap.git zap
     const initLinesByLocale: Record<'en' | 'zh' | 'ja', string[]> = {
       en: [
         `<span class="p">$</span> cargo build --release`,
-        `<span class="dim">   Compiling zap v0.1.0</span>`,
+        `<span class="dim">   Compiling infinishell v0.1.0</span>`,
         `<span class="err">error[E0433]: failed to resolve: use of undeclared crate \`openssl\`</span>`,
         `<span class="err">  --&gt; src/tls.rs:4:5</span>`,
         `<div class="stage-turn">
-          <div class="st-chip">block · cwd ~/zap · exit 101</div>
+          <div class="st-chip">block · cwd ~/infinishell · exit 101</div>
           <div class="st-prompt">▌ Why did this fail?</div>
           <div class="st-think">Reading block context <span class="dots"><span></span><span></span><span></span></span></div>
           <div class="st-answer"><code>openssl</code> isn't in Cargo.toml. Run <code>cargo add openssl --features vendored</code>, then rebuild.</div>
@@ -583,11 +583,11 @@ git clone https://github.com/zerx-lab/zap.git zap
       ],
       zh: [
         `<span class="p">$</span> cargo build --release`,
-        `<span class="dim">   正在编译 zap v0.1.0</span>`,
+        `<span class="dim">   正在编译 infinishell v0.1.0</span>`,
         `<span class="err">error[E0433]: 无法解析:未声明的 crate \`openssl\`</span>`,
         `<span class="err">  --&gt; src/tls.rs:4:5</span>`,
         `<div class="stage-turn">
-          <div class="st-chip">block · cwd ~/zap · exit 101</div>
+          <div class="st-chip">block · cwd ~/infinishell · exit 101</div>
           <div class="st-prompt">▌ 为什么会失败?</div>
           <div class="st-think">正在读取 block 上下文 <span class="dots"><span></span><span></span><span></span></span></div>
           <div class="st-answer">Cargo.toml 里没有 <code>openssl</code>。运行 <code>cargo add openssl --features vendored</code> 后重新构建即可。</div>
@@ -596,11 +596,11 @@ git clone https://github.com/zerx-lab/zap.git zap
       ],
       ja: [
         `<span class="p">$</span> cargo build --release`,
-        `<span class="dim">   zap v0.1.0 をコンパイル中</span>`,
+        `<span class="dim">   infinishell v0.1.0 をコンパイル中</span>`,
         `<span class="err">error[E0433]: 解決できません: 宣言されていないクレート \`openssl\`</span>`,
         `<span class="err">  --&gt; src/tls.rs:4:5</span>`,
         `<div class="stage-turn">
-          <div class="st-chip">block · cwd ~/zap · exit 101</div>
+          <div class="st-chip">block · cwd ~/infinishell · exit 101</div>
           <div class="st-prompt">▌ なぜ失敗したの?</div>
           <div class="st-think">block コンテキストを読み取り中 <span class="dots"><span></span><span></span><span></span></span></div>
           <div class="st-answer">Cargo.toml に <code>openssl</code> がありません。<code>cargo add openssl --features vendored</code> を実行して再ビルドしてください。</div>
@@ -697,7 +697,7 @@ git clone https://github.com/zerx-lab/zap.git zap
         zh: ['Cargo.toml  CHANGELOG.md  README.md  app/  crates/  docs/  scripts/  website/'],
         ja: ['Cargo.toml  CHANGELOG.md  README.md  app/  crates/  docs/  scripts/  website/'],
       },
-      pwd: { en: ['/home/you/zap'], zh: ['/home/you/zap'], ja: ['/home/you/zap'] },
+      pwd: { en: ['/home/you/infinishell'], zh: ['/home/you/infinishell'], ja: ['/home/you/infinishell'] },
       whoami: { en: ['you'], zh: ['you'], ja: ['you'] },
       providerList: {
         en: [
@@ -749,7 +749,7 @@ git clone https://github.com/zerx-lab/zap.git zap
         `<span class="k">[agent]</span> <span class="dim">routing to</span> anthropic/claude-4-7`,
         `<span class="k">[agent]</span> <span class="dim">prompt</span>: ${escape(cleaned)}`,
         `<span class="dim">thinking...</span>`,
-        `<span class="s">→</span> This is a simulated response. In real Zap this would call your configured provider locally.`,
+        `<span class="s">→</span> This is a simulated response. In real InfiniShell this would call your configured provider locally.`,
         `<span class="dim">Credentials, conversation and context all stay on your machine.</span>`,
       ];
     }
@@ -781,7 +781,7 @@ git clone https://github.com/zerx-lab/zap.git zap
         const cur = document.documentElement.getAttribute('data-theme') || 'dark';
         const next = cur === 'dark' ? 'light' : 'dark';
         document.documentElement.setAttribute('data-theme', next);
-        try { localStorage.setItem('zap:theme', next); } catch (_) {}
+        try { localStorage.setItem('infinishell:theme', next); } catch (_) {}
         const themeName = lc === 'zh'
           ? (next === 'dark' ? '深色' : '浅色')
           : lc === 'ja'
@@ -803,10 +803,10 @@ git clone https://github.com/zerx-lab/zap.git zap
 
       // 未知命令
       const errMsg = lc === 'zh'
-        ? `zap: 未知命令: ${escape(head)}。输入 <span class="s">help</span> 查看可用命令。`
+        ? `infinishell: 未知命令: ${escape(head)}。输入 <span class="s">help</span> 查看可用命令。`
         : lc === 'ja'
-        ? `zap: コマンドが見つかりません: ${escape(head)}。<span class="s">help</span> で一覧。`
-        : `zap: command not found: ${escape(head)}. Type <span class="s">help</span> to list commands.`;
+        ? `infinishell: コマンドが見つかりません: ${escape(head)}。<span class="s">help</span> で一覧。`
+        : `infinishell: command not found: ${escape(head)}. Type <span class="s">help</span> to list commands.`;
       printRaw(errMsg, 'err');
     }
 
@@ -853,7 +853,7 @@ git clone https://github.com/zerx-lab/zap.git zap
       // 3. <html> data-locale(供 CSS 其他场景使用)
       document.documentElement.setAttribute('data-locale', actual);
       // 4. 持久化 — 所以下一次打开也记住
-      try { localStorage.setItem('zap:locale', actual); } catch (_) {}
+      try { localStorage.setItem('infinishell:locale', actual); } catch (_) {}
       // 5. 同步更新 nav lang 下拉中的 active 状态
       document.querySelectorAll('[data-set-lang]').forEach((opt) => {
         const active = opt.getAttribute('data-set-lang') === actual;
@@ -863,7 +863,7 @@ git clone https://github.com/zerx-lab/zap.git zap
       // 6. 同步 mock dropdown 里的 active(高亮当前选项)
       document.querySelectorAll('[data-mock-lang]').forEach((opt) => {
         const v = opt.getAttribute('data-mock-lang');
-        opt.classList.toggle('active', v === actual || (v === 'system' && !localStorage.getItem('zap:locale')));
+        opt.classList.toggle('active', v === actual || (v === 'system' && !(localStorage.getItem('infinishell:locale') || localStorage.getItem('zap:locale'))));
       });
     }
     document.querySelectorAll('[data-mock-lang]').forEach((btn) => {

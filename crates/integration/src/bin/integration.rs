@@ -31,7 +31,7 @@ pub fn main() -> Result<()> {
                 "dev",
                 "warp",
                 if cfg!(target_os = "macos") {
-                    "Zap-Integration"
+                    "InfiniShell-Integration"
                 } else {
                     "WarpIntegration"
                 },

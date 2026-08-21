@@ -6,7 +6,7 @@ use super::open_workflow_count;
 use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::cloud_object::update_manager::UpdateManager;
 use crate::cloud_object::{Space, StoredObjectEventEntrypoint};
-use crate::drive::ZapDriveObjectSettings;
+use crate::drive::InfiniShellDriveObjectSettings;
 use crate::integration_testing::view_getters::workspace_view;
 use crate::server::ids::{ClientId, SyncId};
 use crate::workflows::WorkflowViewMode;
@@ -68,7 +68,7 @@ pub fn open_workflow(window_key: impl Into<String>, workflow_key: impl Into<Stri
                 WindowManager::as_ref(ctx).show_window_and_focus_app(*window_id);
                 workspace.open_workflow_in_pane(
                     &WorkflowOpenSource::Existing(*workflow_id),
-                    &ZapDriveObjectSettings::default(),
+                    &InfiniShellDriveObjectSettings::default(),
                     WorkflowViewMode::View,
                     ctx,
                 );

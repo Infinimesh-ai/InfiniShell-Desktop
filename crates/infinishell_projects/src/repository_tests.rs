@@ -1,8 +1,42 @@
 use super::*;
 use crate::types::Project;
+use diesel::connection::SimpleConnection;
 
 fn sample(conn: &mut diesel::SqliteConnection, name: &str) -> Project {
     ProjectRepository::create(conn, name).unwrap()
+}
+
+#[test]
+fn migration_preserves_legacy_projects_and_server_links() {
+    let mut conn = diesel::SqliteConnection::establish(":memory:").unwrap();
+    conn.batch_execute(include_str!(
+        "../../persistence/migrations/2026-08-11-000000_add_zap_projects/up.sql"
+    ))
+    .unwrap();
+    conn.batch_execute(
+        "INSERT INTO zap_projects (id, name, rules, notes, sort_order) \
+         VALUES ('project-1', '生产集群', '先冒烟', '保留备注', 3); \
+         INSERT INTO zap_project_servers (project_id, node_id, sort_order) \
+         VALUES ('project-1', 'node-1', 0);",
+    )
+    .unwrap();
+
+    conn.batch_execute(include_str!(
+        "../../persistence/migrations/2026-08-20-000000_rename_zap_projects_to_infinishell/up.sql"
+    ))
+    .unwrap();
+
+    let project = ProjectRepository::get(&mut conn, "project-1")
+        .unwrap()
+        .unwrap();
+    assert_eq!(project.name, "生产集群");
+    assert_eq!(project.rules, "先冒烟");
+    assert_eq!(project.notes, "保留备注");
+    assert_eq!(project.sort_order, 3);
+    assert_eq!(
+        ProjectRepository::servers_for_project(&mut conn, "project-1").unwrap(),
+        vec!["node-1"]
+    );
 }
 
 #[test]

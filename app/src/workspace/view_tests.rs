@@ -1358,7 +1358,7 @@ fn test_notebook_pane_tracking() {
                     owner: Owner::mock_current_user(),
                     initial_folder_id: None,
                 },
-                &ZapDriveObjectSettings::default(),
+                &InfiniShellDriveObjectSettings::default(),
                 ctx,
                 true,
             );
@@ -1398,7 +1398,7 @@ fn test_notebook_pane_tracking() {
             // Re-opening the notebook should not create a new view.
             workspace.open_notebook(
                 &NotebookSource::Existing(notebook_id),
-                &ZapDriveObjectSettings::default(),
+                &InfiniShellDriveObjectSettings::default(),
                 ctx,
                 true,
             );
@@ -1515,7 +1515,7 @@ fn test_open_or_toggle_warp_drive() {
 
         let workspace = mock_workspace(&mut app);
         workspace.update(&mut app, |workspace, ctx| {
-            // First, unconditionally open Zap Drive as a system action. WD should be open and welcome tips should not have opening zap drive.
+            // First, unconditionally open InfiniShell Drive as a system action. WD should be open and welcome tips should not have opening zap drive.
             workspace.open_or_toggle_warp_drive(
                 false, /* toggle */
                 false, /* explicit_user_action */
@@ -1530,7 +1530,7 @@ fn test_open_or_toggle_warp_drive() {
                     .tips_completed
                     .as_ref(ctx)
                     .features_used
-                    .contains(&Tip::Action(TipAction::ZapDrive)),
+                    .contains(&Tip::Action(TipAction::InfiniShellDrive)),
                 "InfiniShell drive welcome tip should not be completed"
             );
 
@@ -1549,7 +1549,7 @@ fn test_open_or_toggle_warp_drive() {
                     .tips_completed
                     .as_ref(ctx)
                     .features_used
-                    .contains(&Tip::Action(TipAction::ZapDrive)),
+                    .contains(&Tip::Action(TipAction::InfiniShellDrive)),
                 "InfiniShell drive welcome tip should not be completed"
             );
 
@@ -1568,7 +1568,7 @@ fn test_open_or_toggle_warp_drive() {
                     .tips_completed
                     .as_ref(ctx)
                     .features_used
-                    .contains(&Tip::Action(TipAction::ZapDrive)),
+                    .contains(&Tip::Action(TipAction::InfiniShellDrive)),
                 "InfiniShell drive welcome tip should not be completed"
             );
         });
@@ -3594,15 +3594,15 @@ fn test_tools_panel_warp_drive_toggle_updates_available_views() {
             assert!(
                 workspace
                     .left_panel_views
-                    .contains(&ToolPanelView::ZapDrive),
+                    .contains(&ToolPanelView::InfiniShellDrive),
                 "Warp Drive should be an available tools-panel tab by default"
             );
             workspace.left_panel_view.update(ctx, |lp, ctx| {
-                lp.handle_action_with_force_open(&LeftPanelAction::ZapDrive, false, ctx);
+                lp.handle_action_with_force_open(&LeftPanelAction::InfiniShellDrive, false, ctx);
             });
             assert_eq!(
                 workspace.left_panel_view.as_ref(ctx).active_view(),
-                ToolPanelView::ZapDrive,
+                ToolPanelView::InfiniShellDrive,
                 "Warp Drive should be selectable as the active view"
             );
         });
@@ -3622,13 +3622,13 @@ fn test_tools_panel_warp_drive_toggle_updates_available_views() {
             assert!(
                 !workspace
                     .left_panel_views
-                    .contains(&ToolPanelView::ZapDrive),
+                    .contains(&ToolPanelView::InfiniShellDrive),
                 "Disabling the setting should remove Warp Drive from the tools panel"
             );
             if !workspace.left_panel_views.is_empty() {
                 assert_ne!(
                     workspace.left_panel_view.as_ref(ctx).active_view(),
-                    ToolPanelView::ZapDrive,
+                    ToolPanelView::InfiniShellDrive,
                     "Active view should fall back to a remaining tab when Warp Drive is removed"
                 );
             }
@@ -3647,15 +3647,15 @@ fn test_tools_panel_warp_drive_toggle_updates_available_views() {
             assert!(
                 workspace
                     .left_panel_views
-                    .contains(&ToolPanelView::ZapDrive),
+                    .contains(&ToolPanelView::InfiniShellDrive),
                 "Re-enabling the setting should restore Warp Drive to the tools panel"
             );
             workspace.left_panel_view.update(ctx, |lp, ctx| {
-                lp.handle_action_with_force_open(&LeftPanelAction::ZapDrive, false, ctx);
+                lp.handle_action_with_force_open(&LeftPanelAction::InfiniShellDrive, false, ctx);
             });
             assert_eq!(
                 workspace.left_panel_view.as_ref(ctx).active_view(),
-                ToolPanelView::ZapDrive,
+                ToolPanelView::InfiniShellDrive,
                 "Warp Drive should be selectable again after re-enabling"
             );
         });

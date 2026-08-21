@@ -18,7 +18,7 @@ pub enum Channel {
     /// The internal-only HEAD build.
     Local,
 
-    /// The open-source build of Zap.
+    /// The open-source build of InfiniShell.
     Oss,
 
     /// The integration test build.
@@ -67,7 +67,7 @@ impl fmt::Display for Channel {
             Channel::Dev => "dev",
             Channel::Integration => "integration",
             Channel::Local => "local",
-            Channel::Oss => "zap-oss",
+            Channel::Oss => "infinishell-oss",
         })
     }
 }

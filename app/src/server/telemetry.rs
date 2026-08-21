@@ -130,7 +130,7 @@ pub struct BlockLatencyInfo {
     pub execution_ms: u64,
 }
 
-// Compatibility metadata for local Zap Drive object event shells.
+// Compatibility metadata for local InfiniShell Drive object event shells.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TelemetryObjectType {
     Workflow,
@@ -173,7 +173,7 @@ impl From<Space> for TelemetrySpace {
     }
 }
 
-/// Common metadata retained for local Zap Drive event call sites that act on a specific object.
+/// Common metadata retained for local InfiniShell Drive event call sites that act on a specific object.
 /// Events that only apply to a single object type may use specific metadata like [`WorkflowTelemetryMetadata`],
 /// [`NotebookTelemetryMetadata`], or [`EnvVarTelemetryMetadata`] instead.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -385,8 +385,11 @@ pub enum CommandXRayTrigger {
 pub enum PaletteSource {
     PrefixChange,
     Keybinding,
-    CtrlTab { shift_pressed_initially: bool },
-    ZapDrive,
+    CtrlTab {
+        shift_pressed_initially: bool,
+    },
+    #[serde(alias = "ZapDrive")]
+    InfiniShellDrive,
     QuitModal,
     LogOutModal,
     IntegrationTest,
@@ -516,7 +519,8 @@ pub enum CommandCorrectionEvent {
 pub enum CommandSearchResultType {
     History,
     Workflow,
-    ZapAI,
+    #[serde(alias = "ZapAI")]
+    InfiniShellAI,
     TranslateUsingWarpAI,
     Notebook,
     EnvVarCollection,
@@ -533,7 +537,7 @@ impl From<&CommandSearchItemAction> for CommandSearchResultType {
             AcceptWorkflow(_) => Self::Workflow,
             AcceptNotebook(_) => Self::Notebook,
             AcceptEnvVarCollection(_) => Self::EnvVarCollection,
-            ZapAI => Self::ZapAI,
+            InfiniShellAI => Self::InfiniShellAI,
             TranslateUsingWarpAI => Self::TranslateUsingWarpAI,
             AcceptAIQuery(_) | RunAIQuery(_) => Self::AIQuery,
         }
@@ -656,7 +660,7 @@ pub enum KnowledgePaneEntrypoint {
     Settings,
 
     #[serde(rename = "warp_drive")]
-    ZapDrive,
+    InfiniShellDrive,
 
     #[serde(rename = "ai_blocklist")]
     AIBlocklist,
@@ -675,7 +679,7 @@ pub enum MCPServerCollectionPaneEntrypoint {
     Settings,
 
     #[serde(rename = "warp_drive")]
-    ZapDrive,
+    InfiniShellDrive,
 
     #[serde(rename = "slash_command")]
     SlashCommand,
@@ -1538,11 +1542,11 @@ pub enum TelemetryEvent {
     InitialWorkingDirectoryConfigurationChanged {
         advanced_mode_enabled: bool,
     },
-    /// Opened legacy Zap AI.
+    /// Opened legacy InfiniShell AI.
     OpenedWarpAI {
         source: OpenedWarpAISource,
     },
-    /// Issued legacy Zap AI request.
+    /// Issued legacy InfiniShell AI request.
     WarpAIRequestIssued {
         result: WarpAIRequestResult,
     },
@@ -1645,7 +1649,7 @@ pub enum TelemetryEvent {
         source: WarpDriveSource,
         is_code_mode_v2: bool,
     },
-    // Toggled the legacy Zap AI side panel.
+    // Toggled the legacy InfiniShell AI side panel.
     ToggleWarpAI {
         opened: bool,
     },

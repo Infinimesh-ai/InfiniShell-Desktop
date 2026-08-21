@@ -243,7 +243,7 @@ impl UpdateManager {
         object_type_and_id: &ObjectTypeAndId,
         ctx: &mut ModelContext<Self>,
     ) {
-        // Zap(Wave 4):resync 原语义是“重新入 SyncQueue 向服务端推上本地变更”。
+        // InfiniShell(Wave 4):resync 原语义是“重新入 SyncQueue 向服务端推上本地变更”。
         // 本地化后本身就是单向 sqlite 写入,调用点仅需轻量检查。
         let _ = (object_type_and_id, ctx);
     }
@@ -459,7 +459,7 @@ impl UpdateManager {
         _current_metadata_last_updated_ts: Option<ServerTimestamp>,
         ctx: &mut ModelContext<Self>,
     ) {
-        // Zap:云端移动 RPC 已删除,这里折叠为本地直写并清
+        // InfiniShell:云端移动 RPC 已删除,这里折叠为本地直写并清
         // has_pending_metadata_change 位。
         let _ = (object_type, owner, destination_folder);
         ObjectStoreModel::handle(ctx).update(ctx, |object_store_model, ctx| {
@@ -1087,7 +1087,7 @@ impl UpdateManager {
             + 'static,
         M: StoredObjectModel<IdType = K, StoredObjectType = GenericStoredObject<K, M>> + 'static,
     {
-        // Zap:上云队列腿被砍,两个参数仅用于 `create_object_queue_item` 构造;
+        // InfiniShell:上云队列腿被砍,两个参数仅用于 `create_object_queue_item` 构造;
         // 保留接口以避免冲击 30+ 调用点签名。
         let _ = entrypoint;
         let _ = initiated_by;
@@ -1143,7 +1143,7 @@ impl UpdateManager {
             + 'static,
         M: StoredObjectModel<IdType = K, StoredObjectType = GenericStoredObject<K, M>> + 'static,
     {
-        let _ = revision_ts; // Zap: 无服务端 revision 协调,忽略。
+        let _ = revision_ts; // InfiniShell: 无服务端 revision 协调,忽略。
 
         // Update in-memory model.
         ObjectStoreModel::handle(ctx).update(ctx, |object_store_model, ctx| {
@@ -1184,7 +1184,7 @@ impl UpdateManager {
         // Update sqlite.
         self.save_to_db([ModelEvent::InsertObjectAction { object_action }]);
 
-        // Zap(Wave 4):原末尾入 SyncQueue 上报 RecordObjectAction,SyncQueue 整删后
+        // InfiniShell(Wave 4):原末尾入 SyncQueue 上报 RecordObjectAction,SyncQueue 整删后
         // 本地 sqlite 记录即是“已完成”。
         let _ = (id_and_type, action_type, data, action_timestamp);
     }
@@ -1245,7 +1245,7 @@ impl UpdateManager {
         });
     }
 
-    /// Zap:云端 notebook edit lease 已删除。这里折叠为本地授予编辑位,
+    /// InfiniShell:云端 notebook edit lease 已删除。这里折叠为本地授予编辑位,
     /// 保留 method 签名给 `notebooks/notebook.rs` 调用点。
     pub fn grab_notebook_edit_access(
         &mut self,
@@ -1261,7 +1261,7 @@ impl UpdateManager {
         self.set_notebook_current_editor(&notebook_id, Some(TEST_USER_UID.to_string()), ctx);
     }
 
-    /// Zap:云端 notebook edit lease 已删除,这里折叠为本地直接清编辑权。
+    /// InfiniShell:云端 notebook edit lease 已删除,这里折叠为本地直接清编辑权。
     pub fn give_up_notebook_edit_access(
         &mut self,
         notebook_id: SyncId,
@@ -1328,7 +1328,7 @@ impl UpdateManager {
         let Some(server_id) = id.server_id() else {
             let hashed_id = id.uid();
             self.mark_object_trashed_and_return_timestamps(&hashed_id, ctx);
-            // Zap:本地对象永远没有服务端 ack 来清 has_pending_metadata_change。
+            // InfiniShell:本地对象永远没有服务端 ack 来清 has_pending_metadata_change。
             // 必须在落 sqlite 前手动清掉,否则 upsert_stored_object 中
             // `if !has_pending_metadata_change` 分支会跳过 trashed_ts 字段写入,
             // 导致重启后从 sqlite 加载到的 trashed_ts 为 NULL,对象重新出现在 PERSONAL。
@@ -1392,11 +1392,11 @@ impl UpdateManager {
     }
 
     pub fn untrash_object(&mut self, id: ObjectTypeAndId, ctx: &mut ModelContext<Self>) {
-        // Zap:本地对象 untrash —— 清掉 trashed_ts + emit ObjectUntrashed + 写 sqlite。
+        // InfiniShell:本地对象 untrash —— 清掉 trashed_ts + emit ObjectUntrashed + 写 sqlite。
         // 不 emit ObjectOperationComplete(同 trash_object 的注释)。
         let Some(server_id) = id.server_id() else {
             let hashed_id = id.uid();
-            // Zap:本地对象 untrash —— 清 trashed_ts 同时把
+            // InfiniShell:本地对象 untrash —— 清 trashed_ts 同时把
             // has_pending_metadata_change 清掉(本地分支无服务端 ack),
             // 否则 upsert_stored_object 跳过 trashed_ts 写入,sqlite 仍为旧值。
             ObjectStoreModel::handle(ctx).update(ctx, |object_store_model, ctx| {
@@ -1435,7 +1435,7 @@ impl UpdateManager {
             return;
         }
 
-        // Zap:云端 untrash RPC 已删除,这里折叠为本地直写并清 pending_untrash 位。
+        // InfiniShell:云端 untrash RPC 已删除,这里折叠为本地直写并清 pending_untrash 位。
         ObjectStoreModel::handle(ctx).update(ctx, |object_store_model, ctx| {
             if let Some(object) = object_store_model.get_mut_by_uid(&hashed_id) {
                 object.metadata_mut().trashed_ts = None;
@@ -1503,7 +1503,7 @@ impl UpdateManager {
             return;
         }
 
-        // Zap:云端 delete RPC 已删除,这里折叠为本地直接清除。
+        // InfiniShell:云端 delete RPC 已删除,这里折叠为本地直接清除。
         let num_deleted_objects =
             self.on_object_delete_success(vec![SyncId::ServerId(server_id)], ctx);
         ctx.emit(UpdateManagerEvent::ObjectOperationComplete {
@@ -1519,7 +1519,7 @@ impl UpdateManager {
     }
 
     pub fn empty_trash(&mut self, space: Space, ctx: &mut ModelContext<Self>) {
-        // Zap:Empty Trash 走纯本地路径。原实现调用上游云端 empty_trash 接口,
+        // InfiniShell:Empty Trash 走纯本地路径。原实现调用上游云端 empty_trash 接口,
         // 无 auth/无服务端时直接 `Failed to get access token` 重试 3 次后失败,Trash UI 不动。
         // 本地分支:直接遍历 ObjectStoreModel 找出 owner 匹配 + is_trashed 的对象,
         // 收集 SyncId 后复用 `on_object_delete_success`(它已经做了内存 + sqlite 双删 + actions 清理)。

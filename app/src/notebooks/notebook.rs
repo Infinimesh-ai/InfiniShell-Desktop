@@ -54,7 +54,7 @@ use crate::cloud_object::{ObjectType, Owner, Space, StoredObject, StoredObjectEv
 use crate::drive::drive_helpers::has_feature_gated_anonymous_user_reached_notebook_limit;
 use crate::drive::export::ExportManager;
 use crate::drive::items::WarpDriveItemId;
-use crate::drive::{ObjectTypeAndId, ZapDriveObjectSettings};
+use crate::drive::{InfiniShellDriveObjectSettings, ObjectTypeAndId};
 use crate::editor::{
     EditOrigin, EditorView, Event as EditorEvent, InteractionState, PropagateAndNoOpNavigationKeys,
     SingleLineEditorOptions, TextColors, TextOptions,
@@ -1495,7 +1495,7 @@ impl NotebookView {
     pub fn wait_for_initial_load_then_load(
         &mut self,
         notebook_id: SyncId,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         window_id: WindowId,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -1542,7 +1542,7 @@ impl NotebookView {
     fn fetch_and_load_notebook(
         &mut self,
         notebook_id: ServerId,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         window_id: WindowId,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -1586,7 +1586,7 @@ impl NotebookView {
     pub fn load(
         &mut self,
         notebook: NotebookObject,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
     ) -> SpawnedFutureHandle {
         self.set_title(&notebook.model().title, ctx);
@@ -1835,7 +1835,11 @@ impl NotebookView {
         // Load the server's version of the notebook now that the object store has been updated.
         // This will also switch back to edit mode if there isn't an active editor.
         if let Some(notebook) = ObjectStoreModel::as_ref(ctx).get_notebook(&id) {
-            self.load(notebook.clone(), &ZapDriveObjectSettings::default(), ctx);
+            self.load(
+                notebook.clone(),
+                &InfiniShellDriveObjectSettings::default(),
+                ctx,
+            );
         }
         ctx.notify();
     }

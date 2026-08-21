@@ -22,7 +22,7 @@ use self::docker::open_docker_container;
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::ambient_agents::github_auth_notifier::GitHubAuthNotifier;
 use crate::cloud_object::ObjectType;
-use crate::drive::{ZapDriveObjectArgs, ZapDriveObjectSettings};
+use crate::drive::{InfiniShellDriveObjectArgs, InfiniShellDriveObjectSettings};
 use crate::features::FeatureFlag;
 use crate::launch_configs::launch_config::LaunchConfig;
 use crate::linear::{LinearAction, LinearIssueWork};
@@ -245,10 +245,10 @@ impl UriHost {
                         ctx.root_view_id(window_id)
                             .map(|view_id| (window_id, view_id))
                     });
-                    let args = ZapDriveObjectArgs {
+                    let args = InfiniShellDriveObjectArgs {
                         object_type,
                         server_id,
-                        settings: ZapDriveObjectSettings {
+                        settings: InfiniShellDriveObjectSettings {
                             focused_folder_id,
                             invitee_email,
                         },

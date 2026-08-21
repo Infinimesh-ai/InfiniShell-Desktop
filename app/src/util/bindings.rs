@@ -113,9 +113,9 @@ pub enum CustomAction {
     WindowsPaste,
     #[cfg(windows)]
     WindowsCopy,
-    /// Also applies to legacy Zap AI (toggles the panel)
+    /// Also applies to legacy InfiniShell AI (toggles the panel)
     NewAgentModePane,
-    /// Also applies to legacy Zap AI (attaches the selection to the panel editor)
+    /// Also applies to legacy InfiniShell AI (attaches the selection to the panel editor)
     AttachSelectionAsAgentModeContext,
     OpenAIFactCollection,
     OpenMCPServerCollection,

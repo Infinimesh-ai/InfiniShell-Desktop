@@ -7265,6 +7265,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "infinishell_projects"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "diesel",
+ "libsqlite3-sys",
+ "log",
+ "persistence",
+ "thiserror 2.0.20",
+ "uuid",
+]
+
+[[package]]
+name = "infinishell_sftp"
+version = "0.1.0"
+dependencies = [
+ "openssl-sys",
+ "smol",
+ "ssh2",
+ "tempfile",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "infinishell_sync"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm 0.10.3",
+ "anyhow",
+ "base64 0.22.1",
+ "chrono",
+ "log",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "inotify"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16177,6 +16220,9 @@ dependencies = [
  "image",
  "indexmap 2.12.0",
  "infer",
+ "infinishell_projects",
+ "infinishell_sftp",
+ "infinishell_sync",
  "input_classifier",
  "inquire",
  "instant",
@@ -16365,9 +16411,6 @@ dependencies = [
  "winit",
  "winreg",
  "x11rb",
- "zap_projects",
- "zap_sftp",
- "zap_sync",
  "zbus 5.9.0",
  "zeroize",
 ]
@@ -16820,6 +16863,7 @@ dependencies = [
  "diesel_migrations",
  "dirs 6.0.0",
  "futures-lite 1.13.0",
+ "infinishell_sync",
  "instant",
  "keyring",
  "libsqlite3-sys",
@@ -16833,7 +16877,6 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "uuid",
- "zap_sync",
  "zeroize",
 ]
 
@@ -18832,49 +18875,6 @@ dependencies = [
  "quote",
  "syn 2.0.117",
  "synstructure",
-]
-
-[[package]]
-name = "zap_projects"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "diesel",
- "libsqlite3-sys",
- "log",
- "persistence",
- "thiserror 2.0.20",
- "uuid",
-]
-
-[[package]]
-name = "zap_sftp"
-version = "0.1.0"
-dependencies = [
- "openssl-sys",
- "smol",
- "ssh2",
- "tempfile",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "zap_sync"
-version = "0.1.0"
-dependencies = [
- "aes-gcm 0.10.3",
- "anyhow",
- "base64 0.22.1",
- "chrono",
- "log",
- "reqwest",
- "rustls",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 2.0.20",
- "tokio",
 ]
 
 [[package]]

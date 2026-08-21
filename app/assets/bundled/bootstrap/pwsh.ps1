@@ -269,7 +269,7 @@ $script:WarpPwshInitShell = @'
 
         # If this preexec is called for user command, kill ongoing generator command jobs and clean
         # up the bookkeeping temp files used to bookkeep.
-        if (-not "$command" -match '^Warp-Run-GeneratorCommand') {
+        if (-not "$command" -match '^(InfiniShell|Warp|Zap)-Run-GeneratorCommand') {
             Warp-Stop-ActiveThread
         }
 
@@ -277,8 +277,10 @@ $script:WarpPwshInitShell = @'
         # commands
         Warp-Clean-CompletedThread
 
-        # Remove any instance of the 'Warp-Run-GeneratorCommand' call from the user's history
+        # Remove current and legacy generator wrapper calls from the user's history.
+        Clear-History -CommandLine 'InfiniShell-Run-GeneratorCommand*'
         Clear-History -CommandLine 'Warp-Run-GeneratorCommand*'
+        Clear-History -CommandLine 'Zap-Run-GeneratorCommand*'
     }
 
     function Warp-Finish-Update([string]$updateId) {
@@ -410,7 +412,7 @@ $script:WarpPwshInitShell = @'
         Set-PSReadLineOption -AddToHistoryHandler {
             param([string]$line)
 
-            if ($line -match '^Warp-Run-GeneratorCommand') {
+            if ($line -match '^(InfiniShell|Warp|Zap)-Run-GeneratorCommand') {
                 return $false
             }
             return $true
@@ -765,7 +767,7 @@ $script:WarpPwshInitShell = @'
         }
     }
 
-    function Warp-Run-GeneratorCommand {
+    function InfiniShell-Run-GeneratorCommand {
         [CmdletBinding()]
         param(
             [parameter(ValueFromRemainingArguments = $true)][string[]]$passedArgs
@@ -813,6 +815,23 @@ $script:WarpPwshInitShell = @'
             }
         }
 
+    }
+
+    # 兼容旧客户端和旧 bootstrap 已写入的命令名；新客户端只发送 InfiniShell 名称。
+    function Warp-Run-GeneratorCommand {
+        [CmdletBinding()]
+        param(
+            [parameter(ValueFromRemainingArguments = $true)][string[]]$passedArgs
+        )
+        InfiniShell-Run-GeneratorCommand @passedArgs
+    }
+
+    function Zap-Run-GeneratorCommand {
+        [CmdletBinding()]
+        param(
+            [parameter(ValueFromRemainingArguments = $true)][string[]]$passedArgs
+        )
+        InfiniShell-Run-GeneratorCommand @passedArgs
     }
 
     function Warp-Render-Prompt {
@@ -1013,7 +1032,7 @@ $script:WarpPwshInitShell = @'
     # bootstrap logic pasted into the PTY and the output of shell startup files.
     Warp-Precmd -status $global:? -code $global:LASTEXITCODE
 
-    Export-ModuleMember -Function clear, Clear-Host, Get-EpochTime, Warp-Finish-Update, Warp-Handle-DistUpgrade, Warp-Run-GeneratorCommand, Warp-Finish-Bootstrap, Warp-Ssh
+    Export-ModuleMember -Function clear, Clear-Host, Get-EpochTime, Warp-Finish-Update, Warp-Handle-DistUpgrade, InfiniShell-Run-GeneratorCommand, Warp-Run-GeneratorCommand, Zap-Run-GeneratorCommand, Warp-Finish-Bootstrap, Warp-Ssh
 }
 
 # Finally, get ready to source the user's RC files. This must be done in the global scope (not

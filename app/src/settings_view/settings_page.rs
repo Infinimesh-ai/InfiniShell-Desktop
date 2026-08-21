@@ -106,7 +106,7 @@ pub enum SettingsPageViewHandle {
     Warpify(ViewHandle<WarpifyPageView>),
     AI(ViewHandle<AISettingsPageView>),
     MCPServers(ViewHandle<MCPServersSettingsPageView>),
-    ZapDrive(ViewHandle<WarpDriveSettingsPageView>),
+    InfiniShellDrive(ViewHandle<WarpDriveSettingsPageView>),
     /// 全局 HTTP 代理设置页。
     Network(ViewHandle<NetworkPageView>),
     /// 云同步设置页。
@@ -128,7 +128,7 @@ impl SettingsPageViewHandle {
             Warpify(view_handle) => ChildView::new(view_handle).finish(),
             AI(view_handle) => ChildView::new(view_handle).finish(),
             MCPServers(view_handle) => ChildView::new(view_handle).finish(),
-            ZapDrive(view_handle) => ChildView::new(view_handle).finish(),
+            InfiniShellDrive(view_handle) => ChildView::new(view_handle).finish(),
             Network(view_handle) => ChildView::new(view_handle).finish(),
             CloudSync(view_handle) => ChildView::new(view_handle).finish(),
         }

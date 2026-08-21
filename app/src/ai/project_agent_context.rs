@@ -9,9 +9,9 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
+use infinishell_projects::{Project, ProjectRepository};
 use warp_core::features::FeatureFlag;
 use warp_ssh_manager::SshRepository;
-use zap_projects::{Project, ProjectRepository};
 
 use crate::ai::blocklist::SessionContext;
 use crate::terminal::ssh::util::InteractiveSshCommand;
@@ -66,7 +66,7 @@ struct ProjectRecord {
 /// 仅为可定位主机的 legacy SSH 会话加载项目上下文。
 pub fn load_for_session(session_context: &SessionContext) -> Option<ProjectAgentContext> {
     load_with(
-        FeatureFlag::ZapProjects.is_enabled(),
+        FeatureFlag::InfiniShellProjects.is_enabled(),
         session_context.is_legacy_ssh(),
         session_context.ssh_connection_info(),
         |host, port| {
@@ -77,7 +77,7 @@ pub fn load_for_session(session_context: &SessionContext) -> Option<ProjectAgent
             })
         },
         |node_id| {
-            zap_projects::with_conn(|conn| {
+            infinishell_projects::with_conn(|conn| {
                 let mut records = Vec::new();
                 for project_id in ProjectRepository::projects_for_node(conn, node_id)? {
                     let Some(project) = ProjectRepository::get(conn, &project_id)? else {

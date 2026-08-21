@@ -186,7 +186,7 @@ if [[ "$CHECK_ONLY" == "true" ]]; then
 fi
 
 # Build the wasm binary.
-echo "Building and bundling Zap for channel $RELEASE_CHANNEL"
+echo "Building and bundling InfiniShell for channel $RELEASE_CHANNEL"
 ASSET_TARGET_DIR="$ASSET_TARGET_DIR" cargo build --target wasm32-unknown-unknown --profile "$CARGO_PROFILE" --bin "$WARP_BIN" --features "$FEATURES"
 
 # Generate linked JS and wasm files that can be run in the browser.

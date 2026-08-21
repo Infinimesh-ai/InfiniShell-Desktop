@@ -113,7 +113,7 @@ fn prompt_ids_for_query(
 }
 
 /// The `#` menu's empty-query path reads the object store directly rather than going
-/// through the Zap Drive data source, so it needs its own window scoping.
+/// through the InfiniShell Drive data source, so it needs its own window scoping.
 #[test]
 fn test_prompts_menu_empty_query_only_returns_prompts_in_the_window() {
     App::test((), |mut app| async move {

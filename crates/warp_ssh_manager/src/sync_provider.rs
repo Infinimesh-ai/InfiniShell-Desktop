@@ -9,8 +9,10 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 use chrono::{DateTime, Utc};
 use diesel::connection::{Connection, SimpleConnection};
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
+use infinishell_sync::{
+    ApplyDataOutcome, SyncDataProvider, SyncEngineError, SyncVersionStore, crypto,
+};
 use serde::{Deserialize, Serialize};
-use zap_sync::{ApplyDataOutcome, SyncDataProvider, SyncEngineError, SyncVersionStore, crypto};
 use zeroize::Zeroizing;
 
 use crate::db::with_conn;

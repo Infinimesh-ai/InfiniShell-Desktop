@@ -264,7 +264,7 @@ while (( "$#" )); do
       LOCAL_CODESIGN=false
       shift
       ;;
-    # Sign with a local Apple Development cert instead of the official Zap cert.
+    # Sign with a local Apple Development cert instead of an official distribution cert.
     # Useful for local debug builds when you don't have access to the company signing key.
     # Falls back to ad-hoc signing if no Apple Development cert is found.
     --selfsign)
@@ -422,16 +422,16 @@ fi
 
 if [[ $RELEASE_CHANNEL = "local" ]]; then
     WARP_BIN="warp"
-    BUNDLE_ID="dev.warp.Zap-Local"
-    WARP_APP_NAME="WarpLocal"
+    BUNDLE_ID="dev.infinishell.InfiniShell-Local"
+    WARP_APP_NAME="InfiniShellLocal"
     WARP_SCHEME_NAME="warplocal"
     FEATURES="$FEATURES,agent_mode_debug"
     # 本地构建可覆盖 bundled framework 版本,供 app/build.rs 在 cargo bundle 期间读取。
     export FRAMEWORK_OVERRIDE="dev"
 elif [[ $RELEASE_CHANNEL = "dev" ]]; then
     WARP_BIN="dev"
-    BUNDLE_ID="dev.warp.Zap-Dev"
-    WARP_APP_NAME="WarpDev"
+    BUNDLE_ID="dev.infinishell.InfiniShell-Dev"
+    WARP_APP_NAME="InfiniShellDev"
     WARP_SCHEME_NAME="warpdev"
     FEATURES="$FEATURES,agent_mode_debug"
     # Enable heap usage tracking & profiling using jemalloc through pprof.
@@ -443,15 +443,15 @@ elif [[ $RELEASE_CHANNEL = "dev" ]]; then
     export HANDLE_MARKDOWN=1
 elif [[ $RELEASE_CHANNEL = "preview" ]]; then
     WARP_BIN="preview"
-    BUNDLE_ID="dev.warp.Zap-Preview"
-    WARP_APP_NAME="WarpPreview"
+    BUNDLE_ID="dev.infinishell.InfiniShell-Preview"
+    WARP_APP_NAME="InfiniShellPreview"
     WARP_SCHEME_NAME="warppreview"
     FEATURES="$FEATURES,preview_channel"
     # Enable heap usage tracking & profiling using jemalloc through pprof.
     FEATURES="$FEATURES,jemalloc_pprof,heap_usage_tracking"
 elif [[ $RELEASE_CHANNEL = "stable" ]]; then
     WARP_BIN="stable"
-    BUNDLE_ID="dev.warp.Zap-Stable"
+    BUNDLE_ID="dev.infinishell.InfiniShell-Stable"
     WARP_APP_NAME="InfiniShell"
     WARP_SCHEME_NAME="warp"
     # Enable heap usage tracking & profiling using jemalloc through pprof.
@@ -620,7 +620,7 @@ if [[ "$ARTIFACT" == "app" ]]; then
     </array>" "$BUNDLE_DIR"/$WARP_APP_NAME.app/Contents/Info.plist
   fi
 
-  # Temporary key that ChatGPT Desktop can use to determine if the latest version of Zap supports the ChatGPT integration.
+  # Temporary key that ChatGPT Desktop can use to determine if this InfiniShell build supports the ChatGPT integration.
   # Once support has been rolled out for a sufficient amount of time we (and ChatGPT) can remove this.
   plutil -insert SUPPORTS_CHAT_GPT_WORK_WITH_APPS -bool true "$BUNDLE_DIR"/$WARP_APP_NAME.app/Contents/Info.plist
 

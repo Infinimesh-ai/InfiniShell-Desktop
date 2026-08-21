@@ -503,7 +503,7 @@ impl AgentOnboardingView {
 
         // Preload customize-slide images so they're ready when the user reaches that slide.
         if FeatureFlag::AccountFirstOnboarding.is_enabled()
-            || FeatureFlag::ZapNewSettingsModes.is_enabled()
+            || FeatureFlag::InfiniShellNewSettingsModes.is_enabled()
         {
             Self::preload_onboarding_images(ctx);
         }

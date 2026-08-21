@@ -20,7 +20,7 @@ use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::cloud_object::model::view::{Editor, EditorState, ObjectStoreViewModel};
 use crate::cloud_object::update_manager::UpdateManager;
 use crate::cloud_object::{Owner, StoredObjectMetadata, StoredObjectPermissions};
-use crate::drive::ZapDriveObjectSettings;
+use crate::drive::InfiniShellDriveObjectSettings;
 use crate::editor::{DisplayPoint, EditorAction, SelectAction};
 use crate::network::NetworkStatus;
 use crate::notebooks::active_notebook_data::Mode;
@@ -118,7 +118,7 @@ fn open_notebook(
     notebook: NotebookObject,
 ) -> BoxFuture<'static, ()> {
     let load_future = handle.update(app, |view, ctx| {
-        view.load(notebook, &ZapDriveObjectSettings::default(), ctx)
+        view.load(notebook, &InfiniShellDriveObjectSettings::default(), ctx)
     });
     app.update(|ctx| ctx.await_spawned_future(load_future.future_id()))
 }

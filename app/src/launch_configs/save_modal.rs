@@ -683,7 +683,7 @@ impl TypedActionView for LaunchConfigSaveModal {
         // TODO(vorporeal): We should figure out a better way to handle the
         // interactions with the filesystem here, whether it's compiling out
         // the save modal more completely or doing something else.  Perhaps
-        // this will become moot when we put launch configs in Zap Drive.
+        // this will become moot when we put launch configs in InfiniShell Drive.
         let action = match action {
             ActionRequest::Action(action) => action.clone(),
             ActionRequest::Enter => LaunchConfigSaveAction::from_state(&self.save_state),

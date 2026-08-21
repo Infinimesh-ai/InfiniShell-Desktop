@@ -87,7 +87,7 @@ where
     button_with_menu
 }
 
-/// Variant with surface_1 hover background for Zap Drive items
+/// Variant with surface_1 hover background for InfiniShell Drive items
 #[allow(clippy::too_many_arguments)]
 pub fn icon_button_with_context_menu_drive<F, V: View>(
     icon: Icon,
@@ -123,7 +123,7 @@ where
     button_with_menu
 }
 
-/// Variant with surface_1 hover background for Zap Drive items (highlighted)
+/// Variant with surface_1 hover background for InfiniShell Drive items (highlighted)
 pub fn highlight_icon_button_with_context_menu_drive<F, V: View>(
     icon: Icon,
     on_click_action: F,

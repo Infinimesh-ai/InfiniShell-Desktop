@@ -66,7 +66,7 @@ const TRANSFER_CHUNK_BYTES: u64 = 1024 * 1024;
 const UPLOAD_PROGRESS_POLL_MS: u64 = 100;
 const UPLOAD_PROGRESS_PANEL_TOP_OFFSET: f32 = 46.0;
 const UPLOAD_PROGRESS_PANEL_MAX_HEIGHT: f32 = 240.0;
-const UPLOAD_STAGING_DIR_NAME: &str = ".zap-upload-staging";
+const UPLOAD_STAGING_DIR_NAME: &str = ".infinishell-upload-staging";
 
 #[derive(Clone, Debug)]
 pub enum ServerFileBrowserAction {
@@ -4833,13 +4833,13 @@ mod tests {
     fn rebases_loaded_directory_entries_to_parent_depth() {
         let entries = vec![
             entry(
-                "/root/.openwarp/remote-server/warp-oss",
-                "warp-oss",
+                "/root/.infinishell/remote-server/infinishell",
+                "infinishell",
                 FileSystemEntryKind::File,
                 0,
             ),
             entry(
-                "/root/.openwarp/remote-server/logs",
+                "/root/.infinishell/remote-server/logs",
                 "logs",
                 FileSystemEntryKind::Directory,
                 0,
@@ -4862,11 +4862,11 @@ mod tests {
         );
         assert_eq!(
             remap_path_after_rename(
-                "/root/test/old/bin/warp-oss",
+                "/root/test/old/bin/infinishell",
                 "/root/test/old",
                 "/root/test/new"
             ),
-            "/root/test/new/bin/warp-oss"
+            "/root/test/new/bin/infinishell"
         );
         assert_eq!(
             remap_path_after_rename("/root/other", "/root/test/old", "/root/test/new"),
@@ -4905,14 +4905,14 @@ mod tests {
     #[test]
     fn rebuild_entries_does_not_promote_loaded_children_to_roots() {
         let root = entry(
-            "/root/.openwarp/remote-server",
+            "/root/.infinishell/remote-server",
             "remote-server",
             FileSystemEntryKind::Directory,
             0,
         );
         let child = entry(
-            "/root/.openwarp/remote-server/warp-oss",
-            "warp-oss",
+            "/root/.infinishell/remote-server/infinishell",
+            "infinishell",
             FileSystemEntryKind::File,
             0,
         );
@@ -4934,8 +4934,8 @@ mod tests {
                 .map(|entry| (entry.path.as_str(), entry.depth))
                 .collect::<Vec<_>>(),
             vec![
-                ("/root/.openwarp/remote-server", 0),
-                ("/root/.openwarp/remote-server/warp-oss", 1),
+                ("/root/.infinishell/remote-server", 0),
+                ("/root/.infinishell/remote-server/infinishell", 1),
             ]
         );
     }
@@ -4956,13 +4956,13 @@ mod tests {
     fn selected_index_preserves_matching_path_after_rebuild() {
         let entries = vec![
             entry(
-                "/root/.openwarp",
-                ".openwarp",
+                "/root/.infinishell",
+                ".infinishell",
                 FileSystemEntryKind::Directory,
                 0,
             ),
             entry(
-                "/root/.openwarp/remote-server",
+                "/root/.infinishell/remote-server",
                 "remote-server",
                 FileSystemEntryKind::Directory,
                 1,
@@ -4970,7 +4970,11 @@ mod tests {
         ];
 
         assert_eq!(
-            selected_index_after_rebuild(&entries, Some("/root/.openwarp/remote-server"), Some(0)),
+            selected_index_after_rebuild(
+                &entries,
+                Some("/root/.infinishell/remote-server"),
+                Some(0)
+            ),
             Some(1)
         );
     }
@@ -5066,14 +5070,18 @@ mod tests {
     #[test]
     fn selected_index_falls_back_when_collapsed_child_disappears() {
         let entries = vec![entry(
-            "/root/.openwarp",
-            ".openwarp",
+            "/root/.infinishell",
+            ".infinishell",
             FileSystemEntryKind::Directory,
             0,
         )];
 
         assert_eq!(
-            selected_index_after_rebuild(&entries, Some("/root/.openwarp/remote-server"), Some(4),),
+            selected_index_after_rebuild(
+                &entries,
+                Some("/root/.infinishell/remote-server"),
+                Some(4),
+            ),
             Some(0)
         );
     }

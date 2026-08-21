@@ -11,7 +11,7 @@ interface Props {
   description?: string;
 }
 const {
-  title = 'Zap — Bring any AI model into your terminal',
+  title = 'InfiniShell — Bring any AI model into your terminal',
   description = 'A derivative product built on Warp — a fully open, local-first agentic terminal that brings any AI model into your shell.',
 } = Astro.props;
 ---
@@ -31,7 +31,7 @@ const {
     <script is:inline>
       (function () {
         try {
-          var stored = localStorage.getItem('zap:theme');
+          var stored = (localStorage.getItem('infinishell:theme') || localStorage.getItem('zap:theme'));
           var theme = stored;
           if (!theme || (theme !== 'light' && theme !== 'dark')) {
             theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
@@ -39,7 +39,7 @@ const {
           document.documentElement.setAttribute('data-theme', theme);
         } catch (_) {}
         try {
-          var lc = localStorage.getItem('zap:locale');
+          var lc = (localStorage.getItem('infinishell:locale') || localStorage.getItem('zap:locale'));
           if (!lc) {
             var nav = (navigator.language || 'en').toLowerCase();
             lc = nav.startsWith('zh') ? 'zh' : nav.startsWith('ja') ? 'ja' : 'en';
@@ -98,7 +98,7 @@ const {
         function setLocale(l: string) {
           // 仅在用户显式选择语言时持久化;自动检测应在后续访问继续跟随系统/浏览器。
           const locale = normalizeLocale(l) || 'en';
-          localStorage.setItem('zap:locale', locale);
+          localStorage.setItem('infinishell:locale', locale);
           applyLocale(locale);
         }
         const initialLocale = (document.body.dataset.locale as string) || 'en';
@@ -142,7 +142,7 @@ const {
         // 主题切换
         function applyTheme(theme) {
           document.documentElement.setAttribute('data-theme', theme);
-          try { localStorage.setItem('zap:theme', theme); } catch (_) {}
+          try { localStorage.setItem('infinishell:theme', theme); } catch (_) {}
         }
         document.querySelectorAll('[data-theme-toggle]').forEach((btn) => {
           btn.addEventListener('click', () => {

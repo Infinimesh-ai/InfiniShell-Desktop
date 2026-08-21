@@ -1,4 +1,4 @@
-//! 项目领域类型。把 ORM 行结构(`persistence::model::ZapProjectRow`)挡在
+//! 项目领域类型。把 ORM 行结构(`persistence::model::InfiniShellProjectRow`)挡在
 //! repository 边界内,对 UI/Agent 层只暴露这里的 plain 数据结构。
 
 use chrono::NaiveDateTime;

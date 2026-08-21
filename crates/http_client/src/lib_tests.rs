@@ -77,3 +77,20 @@ fn request_carries_trace_link_header_on_warp_header_path() {
     let value = value.expect("trace-link header should be added on the warp-header path");
     assert!(value.starts_with("00-"), "unexpected header value: {value}");
 }
+
+#[test]
+fn request_carries_current_and_legacy_trace_headers() {
+    install_test_crypto_provider();
+    let headers = with_active_span(|| {
+        Client::new()
+            .get("http://example.com/")
+            .build()
+            .expect("request should build")
+            .wrapped
+            .headers()
+            .clone()
+    });
+
+    assert!(headers.contains_key(headers::TRACE_LINK_HEADER));
+    assert!(headers.contains_key(headers::LEGACY_TRACE_LINK_HEADER));
+}

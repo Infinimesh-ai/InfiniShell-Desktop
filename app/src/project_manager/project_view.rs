@@ -1,7 +1,7 @@
 //! 项目详情编辑器中央 pane 的 BackingView 实现(M2 part B)。
 //!
 //! 表单字段:名称 / Git 地址 / 本地目录 / 项目规则 / 备注 + 关联服务器
-//! 勾选列表。「保存」写 `zap_projects` 数据层并广播
+//! 勾选列表。「保存」写 `infinishell_projects` 数据层并广播
 //! [`ProjectsChangedNotifier`];「删除项目」走 confirmation → 软删 → 关 pane。
 //!
 //! default_profile_id 字段 MVP 阶段不提供 UI(执行 profile 集成在 M3),
@@ -9,6 +9,7 @@
 
 use std::collections::HashSet;
 
+use infinishell_projects::{Project, ProjectRepository};
 use pathfinder_geometry::vector::vec2f;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
@@ -27,7 +28,6 @@ use warpui::{
     AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
-use zap_projects::{Project, ProjectRepository};
 
 use crate::editor::{
     EditorOptions, EditorView, EnterAction, EnterSettings, Event as EditorEvent,
@@ -194,7 +194,7 @@ impl ProjectView {
     /// 从 DB 读项目 + 服务器候选 + 已关联集合,把当前值写入各 editor。
     fn reload(&mut self, ctx: &mut ViewContext<Self>) {
         let id = self.project_id.clone();
-        let project_result = zap_projects::with_conn(|conn| {
+        let project_result = infinishell_projects::with_conn(|conn| {
             let project = ProjectRepository::get(conn, &id)?;
             let linked = ProjectRepository::servers_for_project(conn, &id)?;
             Ok((project, linked))
@@ -341,7 +341,7 @@ impl ProjectView {
         let linked = linked_ids_in_tree_order(&self.servers, &self.linked_node_ids);
 
         let project_for_db = project.clone();
-        let result = zap_projects::with_conn(move |conn| {
+        let result = infinishell_projects::with_conn(move |conn| {
             ProjectRepository::update(conn, &project_for_db)?;
             ProjectRepository::set_servers(conn, &project_for_db.id, &linked)?;
             Ok(())
@@ -376,7 +376,7 @@ impl ProjectView {
     fn on_confirm_delete(&mut self, ctx: &mut ViewContext<Self>) {
         self.show_delete_confirmation = false;
         let id = self.project_id.clone();
-        let result = zap_projects::with_conn(move |conn| {
+        let result = infinishell_projects::with_conn(move |conn| {
             ProjectRepository::soft_delete(conn, &id)?;
             Ok(())
         });

@@ -30,8 +30,8 @@ use crate::workspaces::workspace::CustomerType;
 /// a modal is currently being shown and automatically triggers the modal when appropriate
 /// conditions are met (e.g., user becomes onboarded).
 pub struct OneTimeModalModel {
-    /// Whether the Zap launch modal is currently being shown.
-    is_zap_launch_modal_open: bool,
+    /// Whether the InfiniShell launch modal is currently being shown.
+    is_infinishell_launch_modal_open: bool,
     is_orchestration_launch_modal_open: bool,
     /// Whether the InfiniShell TUI launch modal is currently being shown.
     is_agent_cli_launch_modal_open: bool,
@@ -123,7 +123,7 @@ impl OneTimeModalModel {
                 mark_free_ai_removal_notice_seen(ctx);
                 GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
                     if let Err(e) = settings
-                        .did_check_to_trigger_zap_launch_modal
+                        .did_check_to_trigger_infinishell_launch_modal
                         .set_value(true, ctx)
                     {
                         log::warn!("Failed to mark InfiniShell launch modal as dismissed: {e}");
@@ -138,7 +138,7 @@ impl OneTimeModalModel {
         auto_handoff_sleep_modal_closed.set();
 
         Self {
-            is_zap_launch_modal_open: false,
+            is_infinishell_launch_modal_open: false,
             is_orchestration_launch_modal_open: false,
             is_agent_cli_launch_modal_open: false,
             is_auto_handoff_sleep_modal_open: false,
@@ -157,13 +157,13 @@ impl OneTimeModalModel {
         self.target_window_id
     }
 
-    /// Returns whether the Zap launch modal is currently open.
-    pub fn is_zap_launch_modal_open(&self) -> bool {
-        self.is_zap_launch_modal_open && self.target_window_id.is_some()
+    /// Returns whether the InfiniShell launch modal is currently open.
+    pub fn is_infinishell_launch_modal_open(&self) -> bool {
+        self.is_infinishell_launch_modal_open && self.target_window_id.is_some()
     }
 
-    pub fn mark_zap_launch_modal_dismissed(&mut self, ctx: &mut ModelContext<Self>) {
-        self.set_zap_launch_modal_open(false, ctx);
+    pub fn mark_infinishell_launch_modal_dismissed(&mut self, ctx: &mut ModelContext<Self>) {
+        self.set_infinishell_launch_modal_open(false, ctx);
     }
 
     pub fn is_orchestration_launch_modal_open(&self) -> bool {
@@ -315,7 +315,7 @@ impl OneTimeModalModel {
 
     /// Returns true if any one-time modal is currently open.
     pub fn is_any_modal_open(&self) -> bool {
-        (self.is_zap_launch_modal_open
+        (self.is_infinishell_launch_modal_open
             || self.is_orchestration_launch_modal_open
             || self.is_agent_cli_launch_modal_open
             || self.is_auto_handoff_sleep_modal_open
@@ -325,8 +325,8 @@ impl OneTimeModalModel {
     }
 
     #[cfg(debug_assertions)]
-    pub fn force_open_zap_launch_modal(&mut self, ctx: &mut ModelContext<Self>) {
-        self.set_zap_launch_modal_open(true, ctx);
+    pub fn force_open_infinishell_launch_modal(&mut self, ctx: &mut ModelContext<Self>) {
+        self.set_infinishell_launch_modal_open(true, ctx);
     }
 
     #[cfg(debug_assertions)]
@@ -360,9 +360,13 @@ impl OneTimeModalModel {
         }
     }
 
-    fn set_zap_launch_modal_open(&mut self, is_open: bool, ctx: &mut ModelContext<Self>) -> bool {
-        if self.is_zap_launch_modal_open != is_open {
-            self.is_zap_launch_modal_open = is_open;
+    fn set_infinishell_launch_modal_open(
+        &mut self,
+        is_open: bool,
+        ctx: &mut ModelContext<Self>,
+    ) -> bool {
+        if self.is_infinishell_launch_modal_open != is_open {
+            self.is_infinishell_launch_modal_open = is_open;
             ctx.emit(OneTimeModalEvent::VisibilityChanged { is_open });
             return true;
         }
@@ -411,7 +415,7 @@ impl OneTimeModalModel {
             }
         });
 
-        if self.check_and_trigger_zap_launch_modal(ctx) {
+        if self.check_and_trigger_infinishell_launch_modal(ctx) {
             return;
         }
 
@@ -474,9 +478,9 @@ impl OneTimeModalModel {
     }
 
     fn check_and_trigger_free_ai_removal_modal(&mut self, ctx: &mut ModelContext<Self>) -> bool {
-        // Gated on the ZapNewSettingsModes rollout flag (the server experiment
+        // Gated on the InfiniShellNewSettingsModes rollout flag (the server experiment
         // that previously gated this was removed in C1).
-        if !FeatureFlag::ZapNewSettingsModes.is_enabled() {
+        if !FeatureFlag::InfiniShellNewSettingsModes.is_enabled() {
             return false;
         }
 
@@ -568,33 +572,34 @@ impl OneTimeModalModel {
         self.set_hoa_onboarding_open(true, ctx)
     }
 
-    fn check_and_trigger_zap_launch_modal(&mut self, ctx: &mut ModelContext<Self>) -> bool {
+    fn check_and_trigger_infinishell_launch_modal(&mut self, ctx: &mut ModelContext<Self>) -> bool {
         // Only show if the feature flag is enabled.
-        if !FeatureFlag::ZapLaunchModal.is_enabled() {
+        if !FeatureFlag::InfiniShellLaunchModal.is_enabled() {
             return false;
         }
 
         let general_settings = GeneralSettings::as_ref(ctx);
-        let zap_modal_shown = *general_settings
-            .did_check_to_trigger_zap_launch_modal
+        let infinishell_modal_shown = *general_settings
+            .did_check_to_trigger_infinishell_launch_modal
             .value();
 
-        if zap_modal_shown {
+        if infinishell_modal_shown {
             return false;
         }
 
         GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
             if let Err(e) = settings
-                .did_check_to_trigger_zap_launch_modal
+                .did_check_to_trigger_infinishell_launch_modal
                 .set_value(true, ctx)
             {
                 log::warn!("Failed to mark InfiniShell launch modal as dismissed: {e}");
             }
         });
 
-        let should_show_zap_modal = !matches!(ChannelState::channel(), Channel::Integration);
-        self.set_zap_launch_modal_open(should_show_zap_modal, ctx);
-        should_show_zap_modal
+        let should_show_infinishell_modal =
+            !matches!(ChannelState::channel(), Channel::Integration);
+        self.set_infinishell_launch_modal_open(should_show_infinishell_modal, ctx);
+        should_show_infinishell_modal
     }
 
     fn check_and_trigger_orchestration_launch_modal(

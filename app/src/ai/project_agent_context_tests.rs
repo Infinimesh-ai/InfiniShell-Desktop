@@ -136,7 +136,7 @@ fn database_errors_degrade_to_none() {
             true,
             Some(&info),
             |_host, _port| Ok::<_, anyhow::Error>(Some("node-1".to_owned())),
-            |_node_id| Err::<Vec<ProjectRecord>, _>(anyhow!("no such table: zap_projects")),
+            |_node_id| Err::<Vec<ProjectRecord>, _>(anyhow!("no such table: infinishell_projects")),
             |_node_ids| Vec::new(),
         ),
         None

@@ -923,7 +923,7 @@ impl CommentListView {
             ReviewDestination::None => false,
             // CLI agents don't consume AI credits, so bypass the ai check.
             ReviewDestination::Cli(_) => has_sendable_comments,
-            ReviewDestination::Zap => {
+            ReviewDestination::InfiniShell => {
                 AIRequestUsageModel::as_ref(ctx).has_any_ai_remaining(ctx) && has_sendable_comments
             }
         }

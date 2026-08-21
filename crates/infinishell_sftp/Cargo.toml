@@ -1,5 +1,5 @@
 [package]
-name = "zap_sftp"
+name = "infinishell_sftp"
 version = "0.1.0"
 edition = "2021"
 publish.workspace = true

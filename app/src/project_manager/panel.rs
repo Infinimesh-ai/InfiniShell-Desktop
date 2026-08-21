@@ -8,11 +8,12 @@
 //! - **单击主机行**:emit `OpenHostSession`(workspace 复用 SSH 连接链路)。
 //! - **重命名/编辑字段不在本面板做** — 全部走详情编辑器。
 //!
-//! 数据层在独立 crate `zap_projects`;主机显示信息经 `warp_ssh_manager` 解析,
+//! 数据层在独立 crate `infinishell_projects`;主机显示信息经 `warp_ssh_manager` 解析,
 //! 悬挂引用(主机已被删除)在加载时静默过滤。
 
 use std::collections::{HashMap, HashSet};
 
+use infinishell_projects::{Project, ProjectRepository};
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
 use warp_ssh_manager::{NodeKind, SshRepository, SshServerInfo};
@@ -25,7 +26,6 @@ use warpui::platform::Cursor;
 use warpui::text_layout::ClipConfig;
 use warpui::ui_components::components::UiComponent;
 use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
-use zap_projects::{Project, ProjectRepository};
 
 use crate::project_manager::{ProjectsChangedEvent, ProjectsChangedNotifier};
 use crate::ui_components::buttons::icon_button;
@@ -188,7 +188,8 @@ impl ProjectManagerPanel {
 
     fn on_create_project(&mut self, ctx: &mut ViewContext<Self>) {
         let name = crate::t!("project-manager-default-name").to_string();
-        let result = zap_projects::with_conn(|conn| Ok(ProjectRepository::create(conn, &name)?));
+        let result =
+            infinishell_projects::with_conn(|conn| Ok(ProjectRepository::create(conn, &name)?));
         match result {
             Ok(project) => {
                 let project_id = project.id.clone();
@@ -645,7 +646,7 @@ fn resolve_host_rows(
 /// 一次性读全:项目列表 + 每个项目的已解析主机行。
 fn load_projects_with_hosts() -> anyhow::Result<(Vec<Project>, HashMap<String, Vec<ProjectHostRow>>)>
 {
-    let (projects, links) = zap_projects::with_conn(|conn| {
+    let (projects, links) = infinishell_projects::with_conn(|conn| {
         let projects = ProjectRepository::list(conn)?;
         let mut links: HashMap<String, Vec<String>> = HashMap::new();
         for project in &projects {

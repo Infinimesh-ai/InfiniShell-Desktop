@@ -39,7 +39,7 @@ mod binary_detection {
         let path = write_file(
             &dir,
             "bundle",
-            b"#!/usr/bin/env bash\n#\n# Builds a Zap binary and bundles it up for distribution.\n\nset -e\n",
+            b"#!/usr/bin/env bash\n#\n# Builds an InfiniShell binary and bundles it up for distribution.\n\nset -e\n",
         );
         assert!(!block_on(should_read_as_binary(&path)));
     }

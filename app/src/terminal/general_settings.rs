@@ -113,16 +113,18 @@ define_settings_group!(GeneralSettings, settings: [
         surface: settings::SettingSurfaces::GUI,
         private: true,
     },
-    // One-time flag tracking whether the Zap launch modal has already been
+    // One-time flag tracking whether the InfiniShell launch modal has already been
     // shown to the user. Not user-visible; modeled as a setting so it's only
     // shown once per user regardless of the number of devices they use.
-    did_check_to_trigger_zap_launch_modal: DidShowZapLaunchModal {
+    did_check_to_trigger_infinishell_launch_modal: DidShowInfiniShellLaunchModal {
         type: bool,
         default: false,
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
         surface: settings::SettingSurfaces::GUI,
         private: true,
+        // 保留旧 storage key，避免升级后再次向既有用户展示一次性弹窗。
+        storage_key: "did_check_to_trigger_zap_launch_modal",
     },
     auto_open_code_review_pane_on_first_agent_change: AutoOpenCodeReviewPaneOnFirstAgentChange {
         type: bool,

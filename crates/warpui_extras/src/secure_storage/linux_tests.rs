@@ -24,6 +24,41 @@ fn test_encrypt_decrypt_works_across_storage_instances() {
 }
 
 #[test]
+fn decrypts_legacy_zap_fallback_values() {
+    let storage = SecureStorage::new("darmok");
+    let encrypted = SecureStorage::fallback_encrypt_with_key(
+        "legacy secret",
+        storage.legacy_encryption_key().unwrap(),
+    )
+    .unwrap();
+
+    let output = storage.fallback_decrypt(&encrypted).unwrap();
+
+    assert_eq!(output, "legacy secret");
+}
+
+#[test]
+fn rewrites_legacy_fallback_values_with_the_current_key() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let storage = SecureStorage::new_with_fallback("darmok", temp_dir.path().to_path_buf());
+    let encrypted = SecureStorage::fallback_encrypt_with_key(
+        "legacy secret",
+        storage.legacy_encryption_key().unwrap(),
+    )
+    .unwrap();
+    std::fs::write(storage.fallback_file("key").unwrap(), encrypted).unwrap();
+
+    assert_eq!(storage.read_fallback_value("key").unwrap(), "legacy secret");
+
+    let migrated = std::fs::read(storage.fallback_file("key").unwrap()).unwrap();
+    assert_eq!(
+        SecureStorage::fallback_decrypt_with_key(&migrated, storage.encryption_key().unwrap())
+            .unwrap(),
+        "legacy secret"
+    );
+}
+
+#[test]
 fn test_decrypt_fails_on_malformed_data() {
     let storage = SecureStorage::new("darmok");
 

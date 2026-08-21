@@ -42,7 +42,7 @@ use crate::appearance::Appearance;
 use crate::auth::UserUid;
 use crate::channel::ChannelState;
 use crate::drive::items::WarpDriveItem;
-use crate::drive::{ObjectTypeAndId, ZapDriveObjectArgs, ZapDriveObjectSettings};
+use crate::drive::{InfiniShellDriveObjectArgs, InfiniShellDriveObjectSettings, ObjectTypeAndId};
 use crate::persistence::ModelEvent;
 use crate::server::ids::{
     ClientId, HashableId, HashedSqliteId, ObjectUid, ServerId, SyncId, ToServerId,
@@ -193,8 +193,8 @@ pub trait StoredObject: Debug {
         true
     }
 
-    /// Creates a new Zap Drive item for this object.  Returns None if this
-    /// object is not rendered in Zap Drive.
+    /// Creates a new InfiniShell Drive item for this object.  Returns None if this
+    /// object is not rendered in InfiniShell Drive.
     fn to_warp_drive_item(&self, appearance: &Appearance) -> Option<Box<dyn WarpDriveItem>>;
 
     /// Returns the web link of this object. Will return none if we do not support web links
@@ -480,7 +480,7 @@ pub trait StoredObjectModel: Debug + Clone + Send + Sync {
     }
 
     /// Creates a new zap drive item for this model type. Returns None
-    /// if this object does not render in Zap Drive.
+    /// if this object does not render in InfiniShell Drive.
     fn to_warp_drive_item(
         &self,
         id: SyncId,
@@ -488,10 +488,10 @@ pub trait StoredObjectModel: Debug + Clone + Send + Sync {
         object: &Self::StoredObjectType,
     ) -> Option<Box<dyn WarpDriveItem>>;
 
-    /// Returns the display name for this model (e.g. to show in the Zap Drive index)
+    /// Returns the display name for this model (e.g. to show in the InfiniShell Drive index)
     fn display_name(&self) -> String;
 
-    /// Sets the display name to show in the Zap Drive Index.  Setting the name
+    /// Sets the display name to show in the InfiniShell Drive Index.  Setting the name
     /// is not currently supported by all object types, hence the default empty
     /// implementation.
     fn set_display_name(&mut self, _name: &str) {}
@@ -828,7 +828,7 @@ where
 /// can be opened natively in Zap with no web interaction.
 pub fn extract_server_id_and_object_type_from_warp_drive_link(
     url: &Url,
-) -> Option<ZapDriveObjectArgs> {
+) -> Option<InfiniShellDriveObjectArgs> {
     let server_id = url
         .path_segments()
         .and_then(|mut segments| segments.next_back())
@@ -851,13 +851,13 @@ pub fn extract_server_id_and_object_type_from_warp_drive_link(
 
     let invitee_email: Option<String> = query_string.get("invitee_email").map(|s| s.to_string());
 
-    Some(ZapDriveObjectArgs {
+    Some(InfiniShellDriveObjectArgs {
         object_type,
         server_id: match server_id {
             Some(server_id) => server_id.try_into().ok()?,
             _ => return None,
         },
-        settings: ZapDriveObjectSettings {
+        settings: InfiniShellDriveObjectSettings {
             focused_folder_id,
             invitee_email,
         },

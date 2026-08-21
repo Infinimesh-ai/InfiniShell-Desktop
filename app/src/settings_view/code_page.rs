@@ -66,24 +66,25 @@ impl CodeSettingsPageView {
     fn build_page(
         ctx: &mut ViewContext<Self>,
     ) -> (PageType<Self>, Option<ViewHandle<ExternalEditorView>>) {
-        let (widgets, external_editor_view) = if FeatureFlag::ZapNewSettingsModes.is_enabled() {
-            let editor_view = ctx.add_typed_action_view(ExternalEditorView::new);
-            let widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
-                Box::new(ExternalEditorCodeWidget),
-                Box::new(AutoOpenCodeReviewPaneCodeWidget::default()),
-                Box::new(CodeReviewPanelToggleWidget::default()),
-                Box::new(CodeReviewDiffStatsToggleWidget::default()),
-                Box::new(ProjectExplorerToggleWidget::default()),
-                Box::new(GlobalSearchToggleWidget::default()),
-                Box::new(ShowHiddenFilesToggleWidget::default()),
-                Box::new(AutoSaveToggleWidget::default()),
-            ];
-            (widgets, Some(editor_view))
-        } else {
-            // legacy 视图:旧设置模式下 Code 页不渲染任何内容(原 CodePageWidget
-            // 仅渲染一个 LSP 时代的 header,无实际意义,直接返回空页面)。
-            (vec![], None)
-        };
+        let (widgets, external_editor_view) =
+            if FeatureFlag::InfiniShellNewSettingsModes.is_enabled() {
+                let editor_view = ctx.add_typed_action_view(ExternalEditorView::new);
+                let widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
+                    Box::new(ExternalEditorCodeWidget),
+                    Box::new(AutoOpenCodeReviewPaneCodeWidget::default()),
+                    Box::new(CodeReviewPanelToggleWidget::default()),
+                    Box::new(CodeReviewDiffStatsToggleWidget::default()),
+                    Box::new(ProjectExplorerToggleWidget::default()),
+                    Box::new(GlobalSearchToggleWidget::default()),
+                    Box::new(ShowHiddenFilesToggleWidget::default()),
+                    Box::new(AutoSaveToggleWidget::default()),
+                ];
+                (widgets, Some(editor_view))
+            } else {
+                // legacy 视图:旧设置模式下 Code 页不渲染任何内容(原 CodePageWidget
+                // 仅渲染一个 LSP 时代的 header,无实际意义,直接返回空页面)。
+                (vec![], None)
+            };
         (
             PageType::new_uncategorized(widgets, None),
             external_editor_view,
@@ -96,7 +97,7 @@ impl CodeSettingsPageView {
         _ctx: &mut ViewContext<Self>,
     ) -> (PageType<Self>, Option<ViewHandle<ExternalEditorView>>) {
         let widgets: Vec<Box<dyn SettingsWidget<View = Self>>> =
-            if FeatureFlag::ZapNewSettingsModes.is_enabled() {
+            if FeatureFlag::InfiniShellNewSettingsModes.is_enabled() {
                 vec![
                     Box::new(AutoOpenCodeReviewPaneCodeWidget::default()),
                     Box::new(CodeReviewPanelToggleWidget::default()),
@@ -225,7 +226,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     builder: fn(SettingsAction) -> T,
 ) {
     // Zap 没有 codebase indexing / LSP,只注册编辑器与代码评审相关的开关命令。
-    if FeatureFlag::ZapNewSettingsModes.is_enabled() {
+    if FeatureFlag::InfiniShellNewSettingsModes.is_enabled() {
         ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
             vec![
                 ToggleSettingActionPair::new(
@@ -356,7 +357,7 @@ impl SettingsPageMeta for CodeSettingsPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        FeatureFlag::ZapNewSettingsModes.is_enabled()
+        FeatureFlag::InfiniShellNewSettingsModes.is_enabled()
     }
 
     fn on_page_selected(&mut self, _: bool, _ctx: &mut ViewContext<Self>) {}

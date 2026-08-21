@@ -15,7 +15,7 @@ use crate::server::telemetry::{TelemetryEvent, WarpAIRequestResult};
 /// Not wiring through Settings for now since this data is only needed by the panel view.
 pub const REQUEST_LIMIT_INFO_CACHE_KEY: &str = "AIAssistantRequestLimitInfo";
 
-/// Tracks the current request status for making Zap AI requests against server.
+/// Tracks the current request status for making InfiniShell AI requests against server.
 pub enum RequestStatus {
     /// There isn't a request in flight right now.
     NotInFlight,
@@ -126,7 +126,7 @@ impl Requests {
         }
     }
 
-    /// Starts a Zap AI request against the server with the given request prompt.
+    /// Starts an InfiniShell AI request against the server with the given request prompt.
     pub fn issue_request(&mut self, request: String, ctx: &mut ModelContext<Self>) {
         let raw_request = request.trim();
         let transcript_part_index = self.current_transcript.len();

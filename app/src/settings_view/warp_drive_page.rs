@@ -39,7 +39,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                     "Enable InfiniShell Drive",
                     "Disable InfiniShell Drive",
                 ),
-                builder(SettingsAction::ZapDrive(
+                builder(SettingsAction::InfiniShellDrive(
                     WarpDriveSettingsPageAction::ToggleShowWarpDrive,
                 )),
                 // Zap:本地无账号体系,不再按 IsAnonymousUser 过滤。
@@ -49,7 +49,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 ),
                 None,
             )
-            .with_enabled(|| FeatureFlag::ZapNewSettingsModes.is_enabled()),
+            .with_enabled(|| FeatureFlag::InfiniShellNewSettingsModes.is_enabled()),
         ],
         app,
     );
@@ -109,11 +109,11 @@ impl View for WarpDriveSettingsPageView {
 
 impl SettingsPageMeta for WarpDriveSettingsPageView {
     fn section() -> SettingsSection {
-        SettingsSection::ZapDrive
+        SettingsSection::InfiniShellDrive
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        FeatureFlag::ZapNewSettingsModes.is_enabled()
+        FeatureFlag::InfiniShellNewSettingsModes.is_enabled()
     }
 
     fn update_filter(&mut self, query: &str, ctx: &mut ViewContext<Self>) -> MatchData {
@@ -131,7 +131,7 @@ impl SettingsPageMeta for WarpDriveSettingsPageView {
 
 impl From<ViewHandle<WarpDriveSettingsPageView>> for SettingsPageViewHandle {
     fn from(view_handle: ViewHandle<WarpDriveSettingsPageView>) -> Self {
-        SettingsPageViewHandle::ZapDrive(view_handle)
+        SettingsPageViewHandle::InfiniShellDrive(view_handle)
     }
 }
 
@@ -145,7 +145,7 @@ impl SettingsWidget for WarpDriveToggleWidget {
     type View = WarpDriveSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "zap drive tools panel command palette search workflows prompts notebooks environment variables"
+        "infinishell drive tools panel command palette search workflows prompts notebooks environment variables"
     }
 
     // Zap 本地优先:Drive 不依赖云端账号可用性(上游的 `is_warp_drive_available`

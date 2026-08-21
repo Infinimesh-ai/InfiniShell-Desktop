@@ -19,7 +19,7 @@ fn test_search_cjk_literal() {
     // CJK literal search
     App::test((), |mut app| async move {
         let (buffer, _selection) = Buffer::mock_from_markdown(
-            "Zap 是基于 Zap 的社区分支，保留账户与同步能力。",
+            "InfiniShell 社区版保留账户与同步能力。",
             None,
             Box::new(|_, _| IndentBehavior::Ignore),
             &mut app,
@@ -34,7 +34,7 @@ fn test_search_cjk_literal() {
                     skip_hidden: false,
                     hidden_ranges: None,
                 },
-                [(21, 23, "账户")],
+                [(18, 20, "账户")],
             );
         });
     });

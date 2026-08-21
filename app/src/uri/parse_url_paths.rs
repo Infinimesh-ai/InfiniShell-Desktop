@@ -2,12 +2,12 @@ use url::Url;
 
 use crate::ChannelState;
 use crate::cloud_object::extract_server_id_and_object_type_from_warp_drive_link;
-use crate::drive::ZapDriveObjectArgs;
+use crate::drive::InfiniShellDriveObjectArgs;
 
 #[derive(PartialEq, Debug)]
 pub enum WarpWebLink {
     Session,
-    DriveObject(Box<ZapDriveObjectArgs>),
+    DriveObject(Box<InfiniShellDriveObjectArgs>),
 }
 
 pub fn get_item_data_from_warp_link(url: &Url) -> Option<WarpWebLink> {

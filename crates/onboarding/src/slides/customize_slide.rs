@@ -38,7 +38,7 @@ pub enum ToolsPanelSubSetting {
     ConversationHistory,
     ProjectExplorer,
     GlobalSearch,
-    ZapDrive,
+    InfiniShellDrive,
 }
 
 #[derive(Debug, Clone)]
@@ -334,13 +334,13 @@ impl CustomizeUISlide {
                 mouse_state: self.chip_warp_drive_mouse.clone(),
                 on_click: Box::new(|ctx, _, _| {
                     ctx.dispatch_typed_action(CustomizeSlideAction::ToggleToolsSubSetting {
-                        setting: ToolsPanelSubSetting::ZapDrive,
+                        setting: ToolsPanelSubSetting::InfiniShellDrive,
                     });
                 }),
                 on_hover: Some(Box::new(|is_hovered, ctx, _, _| {
                     if is_hovered {
                         ctx.dispatch_typed_action(CustomizeSlideAction::HoverToolsChip {
-                            setting: ToolsPanelSubSetting::ZapDrive,
+                            setting: ToolsPanelSubSetting::InfiniShellDrive,
                         });
                     }
                 })),
@@ -498,7 +498,7 @@ impl CustomizeUISlide {
     ];
 
     /// Returns the image path for the current visual state.
-    /// When `ZapNewSettingsModes` is enabled, assets depend on the tab layout setting.
+    /// When `InfiniShellNewSettingsModes` is enabled, assets depend on the tab layout setting.
     fn visual_image_path(
         selected_setting: Option<SettingCard>,
         hovered_chip: Option<ToolsPanelSubSetting>,
@@ -571,10 +571,10 @@ impl CustomizeUISlide {
                             (ToolsPanelSubSetting::GlobalSearch, false) => {
                                 "async/png/onboarding/agent_intention/customize_filesearch_horizontal.png"
                             }
-                            (ToolsPanelSubSetting::ZapDrive, true) => {
+                            (ToolsPanelSubSetting::InfiniShellDrive, true) => {
                                 "async/png/onboarding/agent_intention/customize_warpdrive_vertical.png"
                             }
-                            (ToolsPanelSubSetting::ZapDrive, false) => {
+                            (ToolsPanelSubSetting::InfiniShellDrive, false) => {
                                 "async/png/onboarding/agent_intention/customize_warpdrive_horizontal.png"
                             }
                         }
@@ -601,10 +601,10 @@ impl CustomizeUISlide {
                             (ToolsPanelSubSetting::GlobalSearch, false) => {
                                 "async/png/onboarding/terminal_intention/terminal_customize_filesearch_horizontal.png"
                             }
-                            (ToolsPanelSubSetting::ZapDrive, true) => {
+                            (ToolsPanelSubSetting::InfiniShellDrive, true) => {
                                 "async/png/onboarding/terminal_intention/terminal_customize_warpdrive_vertical.png"
                             }
-                            (ToolsPanelSubSetting::ZapDrive, false) => {
+                            (ToolsPanelSubSetting::InfiniShellDrive, false) => {
                                 "async/png/onboarding/terminal_intention/terminal_customize_warpdrive_horizontal.png"
                             }
                         }
@@ -644,7 +644,7 @@ impl CustomizeUISlide {
     ) -> Box<dyn Element> {
         let theme = appearance.theme();
 
-        if FeatureFlag::ZapNewSettingsModes.is_enabled() {
+        if FeatureFlag::InfiniShellNewSettingsModes.is_enabled() {
             let path =
                 Self::visual_image_path(self.selected_setting, self.hovered_chip, intention, ui);
             let fg_layout = match self.selected_setting {
@@ -843,7 +843,7 @@ impl TypedActionView for CustomizeUISlide {
                             let current = model.ui_customization().show_global_search;
                             model.set_show_global_search(!current, ctx);
                         }
-                        ToolsPanelSubSetting::ZapDrive => {
+                        ToolsPanelSubSetting::InfiniShellDrive => {
                             let current = model.ui_customization().show_warp_drive;
                             model.set_show_warp_drive(!current, ctx);
                         }

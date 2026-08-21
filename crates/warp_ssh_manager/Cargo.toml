@@ -24,7 +24,7 @@ shell-escape.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
 uuid.workspace = true
-zap_sync = { path = "../zap_sync" }
+infinishell_sync = { path = "../infinishell_sync" }
 zeroize = "1.8"
 
 [dev-dependencies]

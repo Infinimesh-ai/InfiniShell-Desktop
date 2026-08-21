@@ -75,7 +75,7 @@ fn apply_changes_local_pool_memory_behavior() {
 
         for _ in 0..APPLY_CHANGES_ITERS {
             let changes = MenuItemPropertyChanges {
-                name: Some("Zap Menu Item".to_string()),
+                name: Some("InfiniShell Menu Item".to_string()),
                 keystroke: Some(Some(Keystroke {
                     cmd: true,
                     key: "k".to_string(),

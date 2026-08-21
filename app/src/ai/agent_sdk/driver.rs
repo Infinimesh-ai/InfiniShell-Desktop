@@ -1507,7 +1507,7 @@ impl AgentDriver {
             }
         });
 
-        // openWarp 不同步 plan 到 Zap Drive,原 "plan_artifact_created" CLI 输出依赖云 notebook_link,
+        // openWarp 不同步 plan 到 InfiniShell Drive,原 "plan_artifact_created" CLI 输出依赖云 notebook_link,
         // 这里不再订阅 AIDocumentModel 的 SaveStatusUpdated 事件。
 
         // Submit the AI query.

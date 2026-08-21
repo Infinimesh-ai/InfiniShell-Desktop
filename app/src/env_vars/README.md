@@ -10,19 +10,19 @@ The core data model for EVCs is defined in `mod.rs`. The motivations behind our 
 
 ## Local Object Store Compatibility
 
-Context: EVCs are built on GenericStringObjects (GSOs). In Zap, that means the object is stored in the local object store and persisted through SQLite. The historical `JsonObjectType::EnvVarCollection` discriminator is still used for backwards-compatible deserialization.
+Context: EVCs are built on GenericStringObjects (GSOs). In InfiniShell, that means the object is stored in the local object store and persisted through SQLite. The historical `JsonObjectType::EnvVarCollection` discriminator is still used for backwards-compatible deserialization.
 
-The `EnvVarCollectionObject` implementation in `mod.rs` specifies local object-store behavior such as rendering in Zap Drive and supporting export.
+The `EnvVarCollectionObject` implementation in `mod.rs` specifies local object-store behavior such as rendering in InfiniShell Drive and supporting export.
 
-The implementation of EVCs as a Zap Drive object is in `app/src/drive/items/env_var_collection.rs`, where code for the Zap Drive preview and click action is located.
+The implementation of EVCs as an InfiniShell Drive object is in `app/src/drive/items/env_var_collection.rs`, where code for the InfiniShell Drive preview and click action is located.
 
-Edit-collision and liveness behavior now lives in the local object-store/update-manager path. Legacy cloud/server file names in older docs should be read as historical context, not as active Zap network behavior.
+Edit-collision and liveness behavior now lives in the local object-store/update-manager path. Legacy cloud/server file names in older docs should be read as historical context, not as active InfiniShell network behavior.
 
 ## Client Side
 
 ### Panes
 
-EVCs, like most objects in Zap, are children of a pane. Our implementation is defined in `app/src/pane_group/pane/env_var_collection_pane.rs`, which is essentially identical to other pane implementations. The `EnvVarCollectionPane` is closely coupled with the `EnvVarCollectionManager`, defined in `manager.rs`. The manager is responsible for creating, destroying, and registering all EVC panes, whereas the pane itself contains the EVC view.
+EVCs, like most objects in InfiniShell, are children of a pane. Our implementation is defined in `app/src/pane_group/pane/env_var_collection_pane.rs`, which is essentially identical to other pane implementations. The `EnvVarCollectionPane` is closely coupled with the `EnvVarCollectionManager`, defined in `manager.rs`. The manager is responsible for creating, destroying, and registering all EVC panes, whereas the pane itself contains the EVC view.
 
 ### Core UI
 

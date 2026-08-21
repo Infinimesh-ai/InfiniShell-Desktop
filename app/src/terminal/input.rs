@@ -163,7 +163,7 @@ use crate::ai::blocklist::agent_view::{
 use crate::ai::blocklist::block::cli_controller::{CLISubagentController, CLISubagentEvent};
 use crate::ai::blocklist::block::status_bar::BlocklistAIStatusBar;
 use crate::ai::blocklist::conversation_selection::ConversationSelectionHandle;
-// Zap:`ai::blocklist::handoff`(local→cloud 交接)整条链路已删除。
+// InfiniShell:`ai::blocklist::handoff`(local→cloud 交接)整条链路已删除。
 use crate::ai::blocklist::prompt::prompt_alert::PromptAlertView;
 use crate::ai::blocklist::telemetry_banner::should_collect_ai_ugc_telemetry;
 use crate::ai::blocklist::{
@@ -177,7 +177,7 @@ use crate::ai::blocklist::{
     drive_object_attachment_for_reference, plan_attachment_for_reference,
     render_ai_agent_mode_icon, render_ai_follow_up_icon,
 };
-// Zap:`ai::cloud_agent_settings` / `ai::cloud_environments` 已删除。
+// InfiniShell:`ai::cloud_agent_settings` / `ai::cloud_environments` 已删除。
 use crate::ai::connected_self_hosted_workers::{
     ConnectedSelfHostedWorkersEvent, ConnectedSelfHostedWorkersModel,
 };
@@ -245,7 +245,7 @@ use crate::search::ai_context_menu::search::is_valid_search_query;
 use crate::search::ai_context_menu::view::AIContextMenuAction;
 use crate::search::slash_command_menu::static_commands::commands::{self, COMMAND_REGISTRY};
 use crate::server::ids::SyncId;
-// Zap:`server::server_api`(云端 API 网关)已删除,附件预签名上传链路一并移除。
+// InfiniShell:`server::server_api`(云端 API 网关)已删除,附件预签名上传链路一并移除。
 use crate::server::telemetry::{
     AICommandSearchEntrypoint, AgentModeAutoDetectionFalsePositivePayload,
     AgentModeAutoDetectionSettingOrigin, CommandXRayTrigger, EnvVarTelemetryMetadata,
@@ -369,7 +369,7 @@ pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_MAX_HEIGHT: f32 = 236.;
 pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_TOP_PADDING: f32 = 10.;
 pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_BOTTOM_PADDING: f32 = 8.;
 pub(super) const CLI_AGENT_RICH_INPUT_HINT_KEY: &str = "terminal-input-cli-agent-rich-input-hint";
-/// Zap:合并时该常量定义随上游 hunk 丢失,这里按上游原文补回。
+/// InfiniShell:合并时该常量定义随上游 hunk 丢失,这里按上游原文补回。
 const CLOUD_MODE_V2_HINT_TEXT: &str = "Kick off a cloud agent";
 const SHORT_CIRCUIT_HIGHLIGHTING_ACTIONS: [Option<PlainTextEditorViewAction>; 7] = [
     Some(PlainTextEditorViewAction::Space),
@@ -865,7 +865,7 @@ struct ViewerCommandExecutionRequest {
 /// Where a command execution request originates from.
 #[derive(Clone)]
 pub enum CommandExecutionSource {
-    /// A non-shared command execution request from Zap AI++.
+    /// A non-shared command execution request from InfiniShell AI++.
     /// Shared commands use the SharedSession variant instead.
     AI {
         /// Metadata associated with the execution.
@@ -1800,7 +1800,7 @@ impl DeferredRemoteOperations {
     }
 }
 
-// Zap:向云端 task 存储上传附件的整条链路(`ServerApi` 预签名上传 +
+// InfiniShell:向云端 task 存储上传附件的整条链路(`ServerApi` 预签名上传 +
 // `AIClient::prepare_attachments_for_upload`)随 `server::server_api` 网关删除,
 // `TaskAttachmentUploadOutcome` 与 `upload_pending_attachments_to_task` 一并移除。
 
@@ -2126,7 +2126,7 @@ impl Input {
                     });
                 }
             });
-            // Zap:local→cloud 交接(`ai::blocklist::handoff`)已下线,
+            // InfiniShell:local→cloud 交接(`ai::blocklist::handoff`)已下线,
             // `PendingHandoffChanged` / `HandoffSnapshotUploadFailed` 事件不再存在,
             // 相应的快照上传失败 toast 一并移除。
 
@@ -2191,7 +2191,7 @@ impl Input {
         menu_positioning_provider: Arc<dyn MenuPositioningProvider>,
         ctx: &mut ViewContext<Self>,
     ) -> ViewHandle<HostSelector> {
-        // Zap:上游的 worker host 体系(`WARP_CLOUD_MODE_DEFAULT_HOST` 环境变量、
+        // InfiniShell:上游的 worker host 体系(`WARP_CLOUD_MODE_DEFAULT_HOST` 环境变量、
         // 工作区 `default_host_slug`、`HostSelector::set_default_host` /
         // `AmbientAgentViewModel::set_worker_host` / `HostSelectorEvent::HostSelected`)
         // 全部服务于云端调度器,本地优先版本已剥离。这里只保留选择器本身与失焦回收逻辑。
@@ -2266,7 +2266,7 @@ impl Input {
         // `last_selected_auth_secret`, mark FTUX completed.
         let vm_for_events = view_model.clone();
         ctx.subscribe_to_view(&ftux_view, move |_me, _, event, ctx| match event {
-            // Zap:`ai::cloud_agent_settings::CloudAgentSettings`(云端 agent 设置的
+            // InfiniShell:`ai::cloud_agent_settings::CloudAgentSettings`(云端 agent 设置的
             // `harness_auth_ftux_completed` / `last_selected_auth_secret` 持久化)未随
             // 本地化保留,这里只更新当前 pane 的 harness auth secret,不再落盘。
             AuthSecretFtuxViewEvent::SecretSelected { harness, name }
@@ -2283,7 +2283,7 @@ impl Input {
                 });
             }
             AuthSecretFtuxViewEvent::Skipped { harness } => {
-                // Zap:同上,FTUX 完成标记无处持久化。
+                // InfiniShell:同上,FTUX 完成标记无处持久化。
                 let _ = harness;
             }
             AuthSecretFtuxViewEvent::Failed { .. } => {}
@@ -2598,7 +2598,7 @@ impl Input {
                 AgentInputFooterEvent::ModelSelectorOpened => {
                     me.close_overlays(false, ctx);
                 }
-                // Zap Wave 7-3:hosted-mode footer 的 environment selector 已删除,
+                // InfiniShell Wave 7-3:hosted-mode footer 的 environment selector 已删除,
                 // 随之 `EnvironmentSelectorClosed` 事件也不复存在。
                 AgentInputFooterEvent::ModelSelectorClosed => {
                     me.focus_input_box(ctx);
@@ -2636,12 +2636,12 @@ impl Input {
                 AgentInputFooterEvent::PluginInstalled(agent) => {
                     ctx.emit(Event::RegisterPluginListener(*agent));
                 }
-                // Zap Wave 7-3:`AgentInputFooterEvent::OpenEnvironmentManagementPane` handler
+                // InfiniShell Wave 7-3:`AgentInputFooterEvent::OpenEnvironmentManagementPane` handler
                 // 随 ambient-agent UI 子系统物理删。
                 #[cfg(not(target_family = "wasm"))]
                 AgentInputFooterEvent::OpenPluginInstructionsPane(agent, kind) => {
                     ctx.emit(Event::OpenPluginInstructionsPane(*agent, *kind));
-                } // Zap:footer 的 handoff chip(local→cloud 交接入口)已随
+                } // InfiniShell:footer 的 handoff chip(local→cloud 交接入口)已随
                   // `AgentInputFooterEvent::HandoffChipClicked` 一起删除;
                   // 交接 compose 仍可由输入框的 `&` 前缀触发
                   // (见 `activate_cloud_handoff_compose(HandoffEntryPoint::Ampersand, ..)`)。
@@ -3958,7 +3958,7 @@ impl Input {
                         .as_ref(ctx)
                         .pending_attachments()
                         .to_vec();
-                    // Zap:附件预签名上传依赖已删除的云端 `server_api`,
+                    // InfiniShell:附件预签名上传依赖已删除的云端 `server_api`,
                     // 云端跟进只发送纯文本 prompt,附件丢弃并给出日志。
                     let _ = task_id;
                     if !pending_attachments.is_empty() {
@@ -4032,14 +4032,14 @@ impl Input {
             .and_then(|state| state.auth_secret_ftux_view.as_ref())
     }
 
-    // Zap:上游的 `open_v2_host_selector` / `open_v2_harness_selector` /
+    // InfiniShell:上游的 `open_v2_host_selector` / `open_v2_harness_selector` /
     // `open_v2_environment_selector` 是给 `/host`、`/harness`、`/environment` 三个
     // 云端 slash command 用来程序化打开 V2 footer 弹层的。这三个 slash command 已随
     // hosted-mode UI 删除,工作区内再无调用点;而且 `HostSelector` / `HarnessSelector`
     // 只保留私有的 `set_menu_visibility`(没有 `open_menu`),footer 也不再有
     // environment selector。因此三个方法整体删除。
 
-    // Zap:`restore_cloud_handoff_draft` 用于交接面板打开失败后回填草稿,
+    // InfiniShell:`restore_cloud_handoff_draft` 用于交接面板打开失败后回填草稿,
     // 其载荷 `handoff::PendingCloudLaunch` 与交接链路一并删除,已无调用点。
 
     fn prefix_mode(&self, ctx: &AppContext) -> InputPrefixMode {
@@ -4088,7 +4088,7 @@ impl Input {
         ctx.notify();
     }
 
-    // Zap:`auto_select_environment_from_pwd` 依赖 `handoff::suggest_handoff_environment`
+    // InfiniShell:`auto_select_environment_from_pwd` 依赖 `handoff::suggest_handoff_environment`
     // 与云端环境目录,两者均已删除,`&` compose 不再自动预选环境。
 
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
@@ -4206,7 +4206,7 @@ impl Input {
         &self,
         ctx: &mut ViewContext<Self>,
     ) -> Vec<AttachmentInput> {
-        // Zap:返回类型原为 `handoff::HandoffLaunchAttachments`(request + display 两份),
+        // InfiniShell:返回类型原为 `handoff::HandoffLaunchAttachments`(request + display 两份),
         // 交接链路删除后只剩 Cloud Mode V2 spawn 路径消费 `request_attachments`,
         // 因此直接返回请求侧附件列表。
         if !FeatureFlag::CloudModeImageContext.is_enabled() {
@@ -4302,7 +4302,7 @@ impl Input {
         true
     }
 
-    /// Zap:local→cloud 交接的提交路径依赖 `handoff::PendingCloudLaunch`、云端环境目录
+    /// InfiniShell:local→cloud 交接的提交路径依赖 `handoff::PendingCloudLaunch`、云端环境目录
     /// (`ai::cloud_environments`)与 `WorkspaceAction::OpenLocalToCloudHandoffPane`,
     /// 三者均已随云端交接链路删除。保留该钩子返回 `false`,让 Enter 继续走本地提交路径。
     fn maybe_launch_cloud_handoff_request(&mut self, _ctx: &mut ViewContext<Self>) -> bool {
@@ -5516,7 +5516,7 @@ impl Input {
         }
 
         let is_queued_prompt = queued_query_id.is_some();
-        // Zap:我方 `BlocklistAIController` 没有上游的 `resolve_skill_for_invocation`
+        // InfiniShell:我方 `BlocklistAIController` 没有上游的 `resolve_skill_for_invocation`
         // 包装,这里直接按同样语义(以控制器当前执行宿主的 path origin 解析)展开。
         let skill_lookup = {
             let path_origin = self.ai_controller.as_ref(ctx).skill_path_origin(ctx);
@@ -5567,7 +5567,7 @@ impl Input {
         }
 
         self.ai_controller.update(ctx, move |controller, ctx| {
-            // Zap:我方 controller 只提供 `send_(queued_)slash_command_request`,
+            // InfiniShell:我方 controller 只提供 `send_(queued_)slash_command_request`,
             // 没有上游的 `send_resolved_skill_invocation` 包装,也不接受
             // `queued_query_id` / `conversation_id_override`(上游用它们在多个并发
             // queued prompt 之间消歧,我方 queued 路径只有"是否 queued"这一位信息)。
@@ -6616,7 +6616,7 @@ impl Input {
             let conversation_is_empty = BlocklistAIHistoryModel::as_ref(ctx)
                 .active_conversation(self.terminal_view_id)
                 .is_none_or(|c| c.is_empty());
-            // Zap:云端环境目录已删除,无法按环境名生成 "Hand off to <env>" 文案,
+            // InfiniShell:云端环境目录已删除,无法按环境名生成 "Hand off to <env>" 文案,
             // 非空会话统一回落到通用提示。
             let hint = if conversation_is_empty {
                 CLOUD_MODE_V2_HINT_TEXT.to_owned()
@@ -7317,7 +7317,7 @@ impl Input {
         }
     }
 
-    // Zap:`restore_cloud_followup_input_after_upload_failure` 只服务于附件预签名上传
+    // InfiniShell:`restore_cloud_followup_input_after_upload_failure` 只服务于附件预签名上传
     // 失败的回滚,上传链路随 `server_api` 删除后已无调用点,一并移除。
 
     pub fn reset_after_cloud_followup_submission(&mut self, ctx: &mut ViewContext<Self>) {
@@ -8879,7 +8879,7 @@ impl Input {
             // Handle AI context menu escape specifically to ensure proper state reset
             self.close_ai_context_menu(ctx);
         } else if self.suggestions_mode_model.as_ref(ctx).is_slash_commands() {
-            // Zap:上游这里先尝试清掉 V2 cloud-mode slash 菜单的 section 过滤器
+            // InfiniShell:上游这里先尝试清掉 V2 cloud-mode slash 菜单的 section 过滤器
             // (`maybe_clear_v2_slash_section_filter`)。该 V2 菜单
             // (`cloud_mode_v2_slash_commands_view`)随 hosted-mode UI 删除,
             // helper 已不存在,原本也总是返回 false,直接走下面的关闭逻辑。
@@ -12849,7 +12849,7 @@ impl Input {
             });
         }
         self.ai_controller.update(ctx, move |controller, ctx| {
-            // Zap:我方 controller 没有上游的 `send_create_new_project_request` 便捷包装,
+            // InfiniShell:我方 controller 没有上游的 `send_create_new_project_request` 便捷包装,
             // 直接构造对应的 slash-command 请求(语义完全一致)。
             controller.send_slash_command_request(
                 SlashCommandRequest::CreateNewProject { query: ai_query },
@@ -13140,7 +13140,7 @@ impl Input {
                     return;
                 }
 
-                // Zap:上游在这里检查 `AmbientAgentViewModel::selected_environment_id()`,
+                // InfiniShell:上游在这里检查 `AmbientAgentViewModel::selected_environment_id()`,
                 // 没选云端环境就先弹环境创建弹窗。我方 ambient agent 只在本地跑,
                 // model 上没有 `environment_id` 字段,该前置检查整体删除。
 
@@ -13511,7 +13511,7 @@ impl Input {
             commands::strip_command_prefix(&prompt, commands::COMPACT_AND.name).map(Some)
         };
         if let Some(argument) = compact_and_argument {
-            // Zap:我方 `slash_commands` 模块没有上游的 `execute_queued_compact_and`
+            // InfiniShell:我方 `slash_commands` 模块没有上游的 `execute_queued_compact_and`
             // helper(那条路径依赖 `send_queued_slash_command_request` 额外接收
             // queued_query_id / conversation_id 来消歧,我方签名只有两参),
             // 这里按 `workspace/view.rs` 的 `/compact-and` 处理方式就地展开:
@@ -13554,7 +13554,7 @@ impl Input {
         // should be sent as a regular AI query — fall through in that case.
         let handled = match detected {
             SlashCommandEntryState::SlashCommand(detected_command) => {
-                // Zap:我方 `execute_slash_command` 没有上游用于排队消歧的
+                // InfiniShell:我方 `execute_slash_command` 没有上游用于排队消歧的
                 // `conversation_id` / `queued_query_id` 两个尾参(我方
                 // `send_queued_slash_command_request` 也不接受它们),只传
                 // `is_queued_prompt` 这一位信息。
@@ -13584,7 +13584,7 @@ impl Input {
         // submit into that conversation directly rather than re-deriving from the current UI
         // selection (which may point at a different conversation the user navigated to).
         //
-        // Zap:上游给 `send_queued_user_query_in_conversation` 加了 `queued_query_id`
+        // InfiniShell:上游给 `send_queued_user_query_in_conversation` 加了 `queued_query_id`
         // 尾参(用于云端排队侧的请求消歧),我方 controller 的签名仍是四参
         // (query / conversation_id / participant_id / ctx),内部的
         // `send_user_query_in_conversation_internal` 也不接收该 id。与本函数上面
@@ -13636,7 +13636,7 @@ impl Input {
         query_id: QueuedQueryId,
         ctx: &mut ViewContext<Self>,
     ) {
-        // Zap:上游在这里先走 "cloud follow-up" 分支 —— 云端 run 结束一次执行后,
+        // InfiniShell:上游在这里先走 "cloud follow-up" 分支 —— 云端 run 结束一次执行后,
         // 下一条排队 prompt 会开一个新的云端执行。我方 `AmbientAgentViewModel` 没有
         // `active_execution_session_id` / `pending_followup_prompt` 这些云端字段
         // (也就没有 `is_ready_for_cloud_followup_prompt`),ambient agent 全程本地跑,
@@ -14175,7 +14175,7 @@ impl Input {
         );
     }
 
-    // Zap:`upload_files_then_submit_cloud_followup` 依赖云端预签名上传,
+    // InfiniShell:`upload_files_then_submit_cloud_followup` 依赖云端预签名上传,
     // 随 `server_api` 删除;云端跟进现在只发送纯文本 prompt。
 
     /// Uploads `images`/`files` (when the cloud pane supports it) and emits `Event::SendAgentPrompt`
@@ -14192,7 +14192,7 @@ impl Input {
         queued_query_retry: Option<(AIConversationId, usize, QueuedQuery)>,
         ctx: &mut ViewContext<Self>,
     ) {
-        // Zap:附件预签名上传随 `server_api` 删除,这里恒定走 "直接发送" 分支;
+        // InfiniShell:附件预签名上传随 `server_api` 删除,这里恒定走 "直接发送" 分支;
         // `queued_query_retry` 只在上传失败回滚时才需要,现在没有失败路径。
         let _ = queued_query_retry;
         if !images.is_empty() || !files.is_empty() {
@@ -14207,7 +14207,7 @@ impl Input {
         });
     }
 
-    // Zap:`upload_files_then_send_prompt` 走 GCS 预签名上传(`server_api`),
+    // InfiniShell:`upload_files_then_send_prompt` 走 GCS 预签名上传(`server_api`),
     // 该网关已删除,viewer 提交路径改为直接发送 prompt + 既有附件。
 
     /// Returns true if toggling the input mode is disabled.
@@ -14750,7 +14750,7 @@ impl Input {
                                 .cloned(),
                             workflow_selection_source: selected_workflow_state
                                 .workflow_selection_source,
-                            // This is only `Some()` for ZapDrive workflows; we don't track
+                            // This is only `Some()` for InfiniShellDrive workflows; we don't track
                             // ID for execution of local workflows because they have no such
                             // unique ID.
                             workflow_id: selected_workflow_state.workflow_type.server_id(),
@@ -15533,7 +15533,7 @@ impl TypedActionView for Input {
 
                 if FeatureFlag::AgentView.is_enabled() {
                     // 键位触发的新建会话要过一次二次确认,避免肌肉记忆误按把当前会话重置掉。
-                    // Zap:我方 `AgentViewEntryOrigin::Keybinding` 是单元变体(上游那份带
+                    // InfiniShell:我方 `AgentViewEntryOrigin::Keybinding` 是单元变体(上游那份带
                     // `Keystroke`),所以这里直接用注册该 FixedBinding 时的同一个常量取键位。
                     if matches!(origin, AgentViewEntryOrigin::Keybinding) {
                         let keystroke = ENTER_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE.clone();
@@ -15718,7 +15718,7 @@ impl View for Input {
         let is_v2_harness_selector_open = self
             .harness_selector()
             .is_some_and(|view| view.as_ref(app).is_menu_open());
-        // Zap Wave 7-3:footer 的 environment selector 已删除,不再参与该判定。
+        // InfiniShell Wave 7-3:footer 的 environment selector 已删除,不再参与该判定。
         if is_profile_model_selector_open
             || is_agent_footer_model_selector_open
             || is_v2_model_selector_open

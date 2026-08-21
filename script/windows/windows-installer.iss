@@ -3,7 +3,7 @@
 #include "environment.iss"
 
 #define MyAppPublisher "InfiniShell"
-#define MyAppURL "https://zap.zerx.dev/"
+#define MyAppURL "https://github.com/Infinimesh-ai/InfiniShell-Desktop/"
 #ifndef MyAppName
   #define MyAppName "WarpDev"
 #endif

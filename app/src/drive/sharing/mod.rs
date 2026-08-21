@@ -158,11 +158,11 @@ impl PartialEq for UserKind {
     }
 }
 
-/// Identifier for an object that's shareable via the Zap Drive ACL model. Not all sharing in Zap
+/// Identifier for an object that's shareable via the InfiniShell Drive ACL model. Not all sharing in Zap
 /// is _currently_ tied into this model (e.g. block sharing).
 #[derive(Debug, Clone)]
 pub enum ShareableObject {
-    /// A shareable Zap Drive object.
+    /// A shareable InfiniShell Drive object.
     WarpDriveObject(ServerId),
 }
 

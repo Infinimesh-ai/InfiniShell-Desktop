@@ -56,7 +56,8 @@ pub enum WorkflowSource {
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, Eq, PartialEq, Hash, PartialOrd)]
 pub enum WorkflowSelectionSource {
-    ZapDrive,
+    #[serde(alias = "ZapDrive")]
+    InfiniShellDrive,
     CommandPalette,
     UniversalSearch,
     Voltron,
@@ -145,7 +146,7 @@ pub enum WorkflowType {
     Local(Workflow),
     /// Saved workflows from the local object store.
     Cloud(Box<WorkflowObject>),
-    /// Ephemeral/transient workflows created from Zap AI output
+    /// Ephemeral/transient workflows created from InfiniShell AI output
     AIGenerated {
         workflow: Workflow,
         origin: AIWorkflowOrigin,

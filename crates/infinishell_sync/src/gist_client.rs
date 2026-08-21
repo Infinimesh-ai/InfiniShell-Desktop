@@ -11,14 +11,22 @@ use thiserror::Error;
 
 use crate::types::{GistDetail, GistEntry, SyncPlatform};
 
-const GIST_DESCRIPTION: &str = "ZAP_CONFIG";
-const GIST_FILENAME: &str = "zap_config.json";
+const GIST_DESCRIPTION: &str = "INFINISHELL_CONFIG";
+const GIST_FILENAME: &str = "infinishell_config.json";
+const LEGACY_GIST_DESCRIPTION: &str = "ZAP_CONFIG";
+const LEGACY_GIST_FILENAME: &str = "zap_config.json";
 /// HTTP 整体请求超时（含 connect + read），避免网络挂起让 UI 永远卡在 Syncing
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// find_gist 翻页上限。100/page,上限 20 页 = 2000 个 gist 已远超任何正常用户需要;
 /// 超过则提早返回 None,避免 API 分页 quirk 引起死循环 / 触发 rate limit
 const FIND_GIST_MAX_PAGES: u32 = 20;
+
+fn sync_file(detail: &serde_json::Value) -> Option<&serde_json::Value> {
+    detail["files"]
+        .get(GIST_FILENAME)
+        .or_else(|| detail["files"].get(LEGACY_GIST_FILENAME))
+}
 
 /// Gist API 客户端错误
 #[derive(Debug, Error)]
@@ -42,7 +50,7 @@ pub trait GistOps: Send + Sync {
         token: String,
     ) -> impl std::future::Future<Output = Result<String, GistClientError>> + Send;
 
-    /// 查找 description 为 ZAP_CONFIG 的 Gist
+    /// 查找 InfiniShell 配置 Gist；同时识别 Zap 时期创建的旧 Gist。
     fn find_gist(
         &self,
         platform: SyncPlatform,
@@ -136,7 +144,10 @@ impl GistClient {
         Ok(login.to_string())
     }
 
-    /// 查找 description 为 ZAP_CONFIG 的 Gist，返回其 ID
+    /// 查找 InfiniShell 配置 Gist，返回其 ID。
+    ///
+    /// 若账号中同时存在新旧 Gist，始终使用新 Gist；仅存在旧 Gist 时复用旧 ID，
+    /// 后续更新会把 description 和主文件名升级为 InfiniShell。
     pub async fn find_gist(
         &self,
         platform: SyncPlatform,
@@ -147,6 +158,7 @@ impl GistClient {
         }
         let base_url = platform.base_url();
 
+        let mut legacy_gist_id = None;
         for page in 1..=FIND_GIST_MAX_PAGES {
             let url = format!("{base_url}/gists?page={page}&per_page=100");
             let resp = self
@@ -166,7 +178,7 @@ impl GistClient {
             let gists: Vec<GistEntry> = resp.json().await?;
 
             if gists.is_empty() {
-                return Ok(None);
+                return Ok(legacy_gist_id);
             }
 
             if let Some(found) = gists
@@ -175,13 +187,20 @@ impl GistClient {
             {
                 return Ok(Some(found.id.clone()));
             }
+
+            if legacy_gist_id.is_none() {
+                legacy_gist_id = gists
+                    .iter()
+                    .find(|g| g.description.as_deref() == Some(LEGACY_GIST_DESCRIPTION))
+                    .map(|gist| gist.id.clone());
+            }
         }
 
         // 超过 MAX_PAGES 仍未找到,视作不存在 — 上层会触发 create_gist
         log::warn!(
             "find_gist: 已翻 {FIND_GIST_MAX_PAGES} 页仍未找到 {GIST_DESCRIPTION},放弃以避免死循环 / rate limit"
         );
-        Ok(None)
+        Ok(legacy_gist_id)
     }
 
     /// 创建新 Gist
@@ -290,7 +309,7 @@ impl GistClient {
         }
 
         let detail: serde_json::Value = resp.json().await?;
-        let file_obj = &detail["files"][GIST_FILENAME];
+        let file_obj = sync_file(&detail).ok_or(GistClientError::NotFound)?;
 
         if file_obj["truncated"].as_bool() == Some(true) {
             let raw_url = file_obj["raw_url"]
@@ -365,53 +384,5 @@ impl GistOps for GistClient {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_auth_header_github() {
-        let header = GistClient::auth_header(SyncPlatform::GitHub, "mytoken");
-        assert_eq!(header, "Bearer mytoken");
-    }
-
-    #[test]
-    fn test_auth_header_gitee() {
-        let header = GistClient::auth_header(SyncPlatform::Gitee, "mytoken");
-        assert_eq!(header, "token mytoken");
-    }
-
-    #[tokio::test]
-    async fn test_empty_token_returns_no_token_error() {
-        // 测试环境下 rustls 默认 provider 未安装,先安装(忽略重复安装失败)
-        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-        let client = GistClient::new();
-        // validate_token / find_gist / create_gist / update_gist / get_gist_content 应当在 token 为空时立即返回 NoToken,不发起任何 HTTP 请求
-        for platform in [SyncPlatform::GitHub, SyncPlatform::Gitee] {
-            let r = client.validate_token(platform, "").await;
-            assert!(
-                matches!(r, Err(GistClientError::NoToken)),
-                "validate_token 空 token"
-            );
-            let r = client.find_gist(platform, "").await;
-            assert!(
-                matches!(r, Err(GistClientError::NoToken)),
-                "find_gist 空 token"
-            );
-            let r = client.create_gist(platform, "", "{}").await;
-            assert!(
-                matches!(r, Err(GistClientError::NoToken)),
-                "create_gist 空 token"
-            );
-            let r = client.update_gist(platform, "", "x", "{}").await;
-            assert!(
-                matches!(r, Err(GistClientError::NoToken)),
-                "update_gist 空 token"
-            );
-            let r = client.get_gist_content(platform, "", "x").await;
-            assert!(
-                matches!(r, Err(GistClientError::NoToken)),
-                "get_gist_content 空 token"
-            );
-        }
-    }
-}
+#[path = "gist_client_tests.rs"]
+mod tests;

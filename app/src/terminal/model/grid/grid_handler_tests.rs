@@ -779,7 +779,8 @@ fn test_find_url_omits_trailing_periods() {
     );
 
     // Test that it handles a period in the middle of the URL path somewhere.
-    let blockgrid = mock_blockgrid("Visit https://github.com/warp.dev/Zap/issues.");
+    let blockgrid =
+        mock_blockgrid("Visit https://github.com/Infinimesh-ai/InfiniShell-Desktop/issues.");
     assert_eq!(
         blockgrid
             .grid_handler

@@ -30,31 +30,38 @@ pub mod proxy;
 pub use proxy::{ProxyConfig, ProxyMode, current_proxy_config, set_global_proxy_config};
 
 pub mod headers {
-    /// Custom Zap header indicating the version of the Zap app.
-    pub const CLIENT_RELEASE_VERSION_HEADER_KEY: &str = "X-Zap-Client-Version";
+    /// Custom InfiniShell header indicating the client version.
+    pub const CLIENT_RELEASE_VERSION_HEADER_KEY: &str = "X-InfiniShell-Client-Version";
+    pub(crate) const LEGACY_CLIENT_RELEASE_VERSION_HEADER_KEY: &str = "X-Zap-Client-Version";
 
-    /// Custom Zap header indicating the OS category the request was sent from.
-    pub(crate) const WARP_OS_CATEGORY: &str = "X-Zap-OS-Category";
-    /// Custom Zap header indicating the OS name the request was sent from. On Linux this is the
+    /// Custom InfiniShell header indicating the OS category the request was sent from.
+    pub(crate) const WARP_OS_CATEGORY: &str = "X-InfiniShell-OS-Category";
+    pub(crate) const LEGACY_WARP_OS_CATEGORY: &str = "X-Zap-OS-Category";
+    /// Custom InfiniShell header indicating the OS name the request was sent from. On Linux this is the
     /// name of the distribution. On all other platforms it should be equivalent to
     /// `WARP_OS_CATEGORY`.
-    pub(crate) const WARP_OS_NAME: &str = "X-Zap-OS-Name";
-    /// Custom Zap header indicating the version of the operating system. On Linux this is the
+    pub(crate) const WARP_OS_NAME: &str = "X-InfiniShell-OS-Name";
+    pub(crate) const LEGACY_WARP_OS_NAME: &str = "X-Zap-OS-Name";
+    /// Custom InfiniShell header indicating the version of the operating system. On Linux this is the
     /// version of the distribution, not the Linux kernel version.
-    pub(crate) const WARP_OS_VERSION: &str = "X-Zap-OS-Version";
+    pub(crate) const WARP_OS_VERSION: &str = "X-InfiniShell-OS-Version";
+    pub(crate) const LEGACY_WARP_OS_VERSION: &str = "X-Zap-OS-Version";
 
-    /// Custom Zap header indicating the linux kernel version. This is only sent from Linux.
-    pub(crate) const WARP_OS_LINUX_KERNEL_VERSION: &str = "X-Zap-OS-Linux-Kernel-Version";
+    /// Custom InfiniShell header indicating the linux kernel version. This is only sent from Linux.
+    pub(crate) const WARP_OS_LINUX_KERNEL_VERSION: &str = "X-InfiniShell-OS-Linux-Kernel-Version";
+    pub(crate) const LEGACY_WARP_OS_LINUX_KERNEL_VERSION: &str = "X-Zap-OS-Linux-Kernel-Version";
 
-    /// Custom Zap header indicating the client role. We don't use the User-Agent header
+    /// Custom InfiniShell header indicating the client role. We don't use the User-Agent header
     /// because it can't be set from WASM.
-    pub(crate) const WARP_CLIENT_ID: &str = "X-Zap-Client-ID";
+    pub(crate) const WARP_CLIENT_ID: &str = "X-InfiniShell-Client-ID";
+    pub(crate) const LEGACY_WARP_CLIENT_ID: &str = "X-Zap-Client-ID";
 
-    /// Custom Zap header carrying the client's current OTEL span context in W3C
+    /// Custom InfiniShell header carrying the client's current OTEL span context in W3C
     /// `traceparent` wire format. It is deliberately distinct from the standard
     /// `traceparent` header so the server links its request span to the client
     /// span rather than reparenting the server span under the client trace.
-    pub(crate) const TRACE_LINK_HEADER: &str = "X-Zap-Traceparent";
+    pub(crate) const TRACE_LINK_HEADER: &str = "X-InfiniShell-Traceparent";
+    pub(crate) const LEGACY_TRACE_LINK_HEADER: &str = "X-Zap-Traceparent";
 }
 
 /// The environment variable containing extra HTTP headers to attach to requests.
@@ -264,7 +271,7 @@ impl Client {
         provider.cached_token()
     }
 
-    /// 判断 request 是否应携带 Zap-specific headers。只有 same-origin 请求才携带自定义 header。
+    /// 判断 request 是否应携带 InfiniShell-specific headers。只有 same-origin 请求才携带自定义 header。
     #[cfg(target_family = "wasm")]
     fn include_warp_http_headers<U: IntoUrl + Clone>(url: U) -> bool {
         url.into_url().is_ok_and(|url| {
@@ -291,11 +298,16 @@ impl Client {
         // Include the client ID header.
         if let Some(client_id) = execution_mode::current_client_id() {
             builder = builder.header(headers::WARP_CLIENT_ID, client_id);
+            builder = builder.header(headers::LEGACY_WARP_CLIENT_ID, client_id);
         }
 
         // If there's an app version, include it as an HTTP request header.
         if let Some(app_version) = ChannelState::app_version() {
             builder = builder.header(headers::CLIENT_RELEASE_VERSION_HEADER_KEY, app_version);
+            builder = builder.header(
+                headers::LEGACY_CLIENT_RELEASE_VERSION_HEADER_KEY,
+                app_version,
+            );
         }
 
         // On integration builds, attach any extra headers from the environment.
@@ -332,21 +344,22 @@ impl Client {
             // Operating system category.
             let category = os_system_info.category().to_string();
             if let Ok(category) = HeaderValue::from_str(&category) {
-                builder = builder.header(headers::WARP_OS_CATEGORY, category);
+                builder = builder.header(headers::WARP_OS_CATEGORY, category.clone());
+                builder = builder.header(headers::LEGACY_WARP_OS_CATEGORY, category);
             }
 
             // Operating system name.
-            builder = builder.header(
-                headers::WARP_OS_NAME,
-                HeaderValue::from_static(os_system_info.name()),
-            );
+            let os_name = HeaderValue::from_static(os_system_info.name());
+            builder = builder.header(headers::WARP_OS_NAME, os_name.clone());
+            builder = builder.header(headers::LEGACY_WARP_OS_NAME, os_name);
 
             // Operating system version.
             if let Some(version) = os_system_info
                 .version()
                 .and_then(|version| HeaderValue::from_str(version).ok())
             {
-                builder = builder.header(headers::WARP_OS_VERSION, version);
+                builder = builder.header(headers::WARP_OS_VERSION, version.clone());
+                builder = builder.header(headers::LEGACY_WARP_OS_VERSION, version);
             }
 
             // Linux kernel version.
@@ -354,8 +367,14 @@ impl Client {
                 .linux_kernel_version()
                 .and_then(|kernel_version| HeaderValue::from_str(kernel_version).ok())
             {
-                builder =
-                    builder.header(headers::WARP_OS_LINUX_KERNEL_VERSION, linux_kernel_version);
+                builder = builder.header(
+                    headers::WARP_OS_LINUX_KERNEL_VERSION,
+                    linux_kernel_version.clone(),
+                );
+                builder = builder.header(
+                    headers::LEGACY_WARP_OS_LINUX_KERNEL_VERSION,
+                    linux_kernel_version,
+                );
             }
         }
 
@@ -363,7 +382,8 @@ impl Client {
         // back to this client (cloud-agent) span. Only present when a valid OTEL
         // span context exists; omitted otherwise (e.g. non-cloud-agent or wasm).
         if let Some(trace_link) = current_trace_link_header() {
-            builder = builder.header(headers::TRACE_LINK_HEADER, trace_link);
+            builder = builder.header(headers::TRACE_LINK_HEADER, trace_link.clone());
+            builder = builder.header(headers::LEGACY_TRACE_LINK_HEADER, trace_link);
         }
 
         builder

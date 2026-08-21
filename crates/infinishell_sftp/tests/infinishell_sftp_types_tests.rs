@@ -1,9 +1,9 @@
-//! zap_sftp::types 模块单元测试
+//! infinishell_sftp::types 模块单元测试
 //!
 //! author: logic
 //! date: 2026/05/26
 
-use zap_sftp::types::*;
+use infinishell_sftp::types::*;
 
 // ============================================================
 // FileType::from_mode 测试

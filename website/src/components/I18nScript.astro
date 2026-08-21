@@ -1,7 +1,7 @@
 ---
 // 内联语言脚本会在首屏渲染前设置 data-locale,避免文案闪烁。
 // 判定顺序:
-//   1. localStorage('zap:locale')  — 用户显式选择后才写入
+//   1. localStorage('infinishell:locale')  — 用户显式选择后才写入
 //   2. navigator.languages / navigator.language — 跟随系统/浏览器语言
 //   3. 回退到 'en'
 ---
@@ -27,11 +27,11 @@
         }
         return 'en';
       }
-      var saved = localStorage.getItem('zap:locale');
+      var saved = (localStorage.getItem('infinishell:locale') || localStorage.getItem('zap:locale'));
       var savedLocale = normalizeLocale(saved);
       var locale = savedLocale || detectFromNavigator();
-      window.__zapLocale = locale;
-      window.__zapLocaleSource = savedLocale ? 'saved' : 'auto';
+      window.__infinishellLocale = locale;
+      window.__infinishellLocaleSource = savedLocale ? 'saved' : 'auto';
       document.documentElement.lang = htmlLang[locale] || 'en';
       if (document.body) document.body.dataset.locale = locale;
       document.addEventListener('DOMContentLoaded', function () {

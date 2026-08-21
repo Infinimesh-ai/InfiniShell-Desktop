@@ -62,7 +62,7 @@ use crate::drive::workflows::workflow_arg_selector::{
     WorkflowArgSelector, WorkflowArgSelectorEvent,
 };
 use crate::drive::workflows::workflow_arg_type_helpers::{self, ArgumentEditorRowIndex};
-use crate::drive::{DriveObjectType, ObjectTypeAndId, ZapDriveObjectSettings};
+use crate::drive::{DriveObjectType, InfiniShellDriveObjectSettings, ObjectTypeAndId};
 use crate::editor::{
     EditorOptions, EditorView, EnterAction, EnterSettings, Event as EditorEvent, InteractionState,
     PlainTextEditorViewAction as EditorAction, PropagateAndNoOpNavigationKeys,
@@ -559,7 +559,7 @@ impl WorkflowView {
             {
                 self.load(
                     workflow.clone(),
-                    &ZapDriveObjectSettings::default(),
+                    &InfiniShellDriveObjectSettings::default(),
                     self.workflow_view_mode,
                     ctx,
                 );
@@ -578,7 +578,7 @@ impl WorkflowView {
             {
                 self.load(
                     workflow,
-                    &ZapDriveObjectSettings::default(),
+                    &InfiniShellDriveObjectSettings::default(),
                     self.workflow_view_mode,
                     ctx,
                 );
@@ -595,7 +595,7 @@ impl WorkflowView {
         if let Some(workflow) = workflow {
             self.load(
                 workflow,
-                &ZapDriveObjectSettings::default(),
+                &InfiniShellDriveObjectSettings::default(),
                 self.workflow_view_mode,
                 ctx,
             );
@@ -605,7 +605,7 @@ impl WorkflowView {
     pub fn wait_for_initial_load_then_load(
         &mut self,
         workflow_id: SyncId,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         mode: WorkflowViewMode,
         window_id: WindowId,
         ctx: &mut ViewContext<Self>,
@@ -654,7 +654,7 @@ impl WorkflowView {
     fn fetch_and_load_workflow(
         &mut self,
         workflow_id: ServerId,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         mode: WorkflowViewMode,
         window_id: WindowId,
         ctx: &mut ViewContext<Self>,
@@ -692,7 +692,7 @@ impl WorkflowView {
     pub fn load(
         &mut self,
         workflow: WorkflowObject,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         mode: WorkflowViewMode,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -1545,7 +1545,7 @@ impl WorkflowView {
     }
 
     /// Save the workflow and associated state. This makes a best-effort attempt to not
-    /// unnecessarily modify the backing Zap Drive object.
+    /// unnecessarily modify the backing InfiniShell Drive object.
     fn save(&mut self, ctx: &mut ViewContext<Self>) {
         if FeatureFlag::WorkflowAliases.is_enabled() && self.are_aliases_dirty(ctx) {
             self.save_aliases(ctx);

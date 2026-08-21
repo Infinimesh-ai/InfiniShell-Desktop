@@ -91,8 +91,8 @@ warp_search_core = { path = "crates/warp_search_core" }
 warp_ssh_manager = { path = "crates/warp_ssh_manager" }
 warp_terminal = { path = "crates/warp_terminal" }
 warp_util = { path = "crates/warp_util" }
-zap_projects = { path = "crates/zap_projects" }
-zap_sync = { path = "crates/zap_sync" }
+infinishell_projects = { path = "crates/infinishell_projects" }
+infinishell_sync = { path = "crates/infinishell_sync" }
 warp_web_event_bus = { path = "crates/warp_web_event_bus" }
 warpui = { path = "crates/warpui" }
 warpui_core = { path = "crates/warpui_core" }

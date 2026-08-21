@@ -29,7 +29,7 @@ use crate::{
     workspace::WorkspaceAction,
 };
 
-/// Singleton model for exporting from Zap Drive.
+/// Singleton model for exporting from InfiniShell Drive.
 pub struct ExportManager {
     exports: HashMap<ExportId, Export>,
 }
@@ -52,7 +52,7 @@ pub enum ExportEvent {
     Completed { id: ExportId, path: PathBuf },
 }
 
-/// A single Zap Drive export.
+/// A single InfiniShell Drive export.
 struct Export {
     /// The ID of the window that started this export, for showing toasts.
     window_id: WindowId,

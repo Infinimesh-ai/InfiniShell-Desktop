@@ -22,43 +22,50 @@ use unix_constants::*;
 #[test]
 fn test_split_path() {
     let path = TypedPathBuf::from_unix("/Users/warpuser");
-    let split_path = SplitPath::new(path.to_path(), "~/Zap.app", Some("/Users/warpuser"), &['/']);
+    let split_path = SplitPath::new(
+        path.to_path(),
+        "~/InfiniShell.app",
+        Some("/Users/warpuser"),
+        &['/'],
+    );
 
     assert_eq!(
         split_path,
         SplitPath {
             directory_absolute_path: path.clone(),
             directory_relative_path_name: "~/".to_owned(),
-            file_name: "Zap.app".to_owned()
+            file_name: "InfiniShell.app".to_owned()
         }
     );
 
     let split_path = SplitPath::new(
         path.to_path(),
-        "Zap.app/Contents",
+        "InfiniShell.app/Contents",
         Some("/Users/warpuser"),
         &['/'],
     );
     assert_eq!(
         split_path,
         SplitPath {
-            directory_absolute_path: TypedPathBuf::from("/Users/warpuser/Zap.app/"),
-            directory_relative_path_name: "Zap.app/".to_owned(),
+            directory_absolute_path: TypedPathBuf::from("/Users/warpuser/InfiniShell.app/"),
+            directory_relative_path_name: "InfiniShell.app/".to_owned(),
             file_name: "Contents".to_owned()
         }
     );
 
     let split_path = SplitPath::new(
         path.to_path(),
-        "Zap.app/macOS/bin/warp.o",
+        "InfiniShell.app/macOS/bin/warp.o",
         Some("/Users/warpuser"),
         &['/'],
     );
     assert_eq!(
         split_path,
         SplitPath {
-            directory_absolute_path: TypedPathBuf::from("/Users/warpuser/Zap.app/macOS/bin/"),
-            directory_relative_path_name: "Zap.app/macOS/bin/".to_owned(),
+            directory_absolute_path: TypedPathBuf::from(
+                "/Users/warpuser/InfiniShell.app/macOS/bin/"
+            ),
+            directory_relative_path_name: "InfiniShell.app/macOS/bin/".to_owned(),
             file_name: "warp.o".to_owned()
         }
     );

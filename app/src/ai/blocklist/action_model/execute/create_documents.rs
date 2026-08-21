@@ -133,7 +133,7 @@ impl CreateDocumentsExecutor {
             model.clear_streaming_documents_for_action(&conversation_id, action_id, ctx);
         });
 
-        // openWarp 不再把 plan 推送到 Zap Drive；plan 内容已通过
+        // openWarp 不再把 plan 推送到 InfiniShell Drive；plan 内容已通过
         // AIDocumentModel::enqueue_save 写入本地 SQLite ai_document_panes 表,
         // 用户在右侧 pane 中可直接查看与编辑。
 

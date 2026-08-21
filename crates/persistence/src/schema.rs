@@ -197,6 +197,30 @@ diesel::table! {
 }
 
 diesel::table! {
+    infinishell_project_servers (project_id, node_id) {
+        project_id -> Text,
+        node_id -> Text,
+        sort_order -> Integer,
+    }
+}
+
+diesel::table! {
+    infinishell_projects (id) {
+        id -> Text,
+        name -> Text,
+        git_url -> Nullable<Text>,
+        root_path -> Nullable<Text>,
+        rules -> Text,
+        notes -> Text,
+        default_profile_id -> Nullable<Text>,
+        sort_order -> Integer,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+        deleted_at -> Nullable<Timestamp>,
+    }
+}
+
+diesel::table! {
     mcp_environment_variables (mcp_server_uuid) {
         mcp_server_uuid -> Binary,
         environment_variables -> Text,
@@ -572,33 +596,10 @@ diesel::table! {
     }
 }
 
-diesel::table! {
-    zap_project_servers (project_id, node_id) {
-        project_id -> Text,
-        node_id -> Text,
-        sort_order -> Integer,
-    }
-}
-
-diesel::table! {
-    zap_projects (id) {
-        id -> Text,
-        name -> Text,
-        git_url -> Nullable<Text>,
-        root_path -> Nullable<Text>,
-        rules -> Text,
-        notes -> Text,
-        default_profile_id -> Nullable<Text>,
-        sort_order -> Integer,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
-        deleted_at -> Nullable<Timestamp>,
-    }
-}
-
 diesel::joinable!(ambient_agent_panes -> pane_nodes (id));
 diesel::joinable!(app -> windows (active_window_id));
 diesel::joinable!(code_pane_tabs -> code_panes (code_pane_id));
+diesel::joinable!(infinishell_project_servers -> infinishell_projects (project_id));
 diesel::joinable!(object_permissions -> object_metadata (object_metadata_id));
 diesel::joinable!(pane_branches -> pane_nodes (pane_node_id));
 diesel::joinable!(pane_leaves -> pane_nodes (pane_node_id));
@@ -614,7 +615,6 @@ diesel::joinable!(tabs -> tab_groups (tab_group_id));
 diesel::joinable!(tabs -> windows (window_id));
 diesel::joinable!(team_members -> teams (team_id));
 diesel::joinable!(team_settings -> teams (team_id));
-diesel::joinable!(zap_project_servers -> zap_projects (project_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     ambient_agent_panes,
@@ -628,6 +628,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     windows,
 );
 diesel::allow_tables_to_appear_in_same_query!(code_pane_tabs, code_panes,);
+diesel::allow_tables_to_appear_in_same_query!(infinishell_project_servers, infinishell_projects,);
 diesel::allow_tables_to_appear_in_same_query!(object_metadata, object_permissions,);
 diesel::allow_tables_to_appear_in_same_query!(
     ssh_nodes,
@@ -637,4 +638,3 @@ diesel::allow_tables_to_appear_in_same_query!(
     ssh_servers,
 );
 diesel::allow_tables_to_appear_in_same_query!(team_members, team_settings, teams,);
-diesel::allow_tables_to_appear_in_same_query!(zap_project_servers, zap_projects,);

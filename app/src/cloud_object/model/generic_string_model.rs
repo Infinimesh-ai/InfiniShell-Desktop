@@ -79,7 +79,7 @@ pub trait StringModel: Clone + Debug + PartialEq + Send + Sync + 'static {
     fn set_display_name(&mut self, _name: &str) {}
 
     /// Creates a new zap drive item for this model type. Returns None
-    /// if this object does not render in Zap Drive.
+    /// if this object does not render in InfiniShell Drive.
     fn to_warp_drive_item(
         &self,
         _id: SyncId,

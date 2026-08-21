@@ -45,7 +45,7 @@ impl SearchItem for WarpAISearchItem {
         highlight_state: ItemHighlightState,
         appearance: &Appearance,
     ) -> Box<dyn Element> {
-        // Since the Zap AI logo color is hardcoded, let's find the best
+        // Since the InfiniShell AI logo color is hardcoded, let's find the best
         // contrasting color depending on the user's theme and the item's selected state.
         let command_search_background = appearance.theme().surface_1();
         let item_background_color = match highlight_state.container_background_fill(appearance) {
@@ -108,14 +108,14 @@ impl SearchItem for WarpAISearchItem {
     fn accept_result(&self) -> CommandSearchItemAction {
         match self {
             WarpAISearchItem::Translate => CommandSearchItemAction::TranslateUsingWarpAI,
-            WarpAISearchItem::Open => CommandSearchItemAction::ZapAI,
+            WarpAISearchItem::Open => CommandSearchItemAction::InfiniShellAI,
         }
     }
 
     fn execute_result(&self) -> CommandSearchItemAction {
         match self {
             WarpAISearchItem::Translate => CommandSearchItemAction::TranslateUsingWarpAI,
-            WarpAISearchItem::Open => CommandSearchItemAction::ZapAI,
+            WarpAISearchItem::Open => CommandSearchItemAction::InfiniShellAI,
         }
     }
 

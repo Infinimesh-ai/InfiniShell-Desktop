@@ -1,8 +1,8 @@
 # Tokyo Night (Night 变体)
 # 配色源: folke/tokyonight.nvim — extras/wezterm/tokyonight_night.toml
-# 安装方式 (Windows / openWarp OSS):
-#   将本文件复制到 %APPDATA%\zap\Zap\data\themes\tokyo_night.yaml
-#   重启 openWarp 后, 在 Settings → Appearance → Themes 选择 "Tokyo Night"
+# 安装方式 (Windows / InfiniShell OSS):
+#   将本文件复制到 %APPDATA%\infinishell\InfiniShell\data\themes\tokyo_night.yaml
+#   重启 InfiniShell 后, 在 Settings → Appearance → Themes 选择 "Tokyo Night"
 ---
 name: Tokyo Night
 background: '#1a1b26'

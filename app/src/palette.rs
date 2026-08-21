@@ -5,7 +5,8 @@ pub enum PaletteMode {
     Command,
     Navigation,
     LaunchConfig,
-    ZapDrive,
+    #[serde(alias = "ZapDrive")]
+    InfiniShellDrive,
     Files,
     Conversations,
 }

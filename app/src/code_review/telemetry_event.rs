@@ -139,7 +139,7 @@ pub enum CodeReviewContextDestination {
     /// Written directly to the terminal PTY for an active CLI agent.
     #[serde(rename = "pty")]
     Pty,
-    /// Inserted into the Zap AI input buffer as plain text.
+    /// Inserted into the InfiniShell AI input buffer as plain text.
     #[serde(rename = "agent_input")]
     AgentInput,
     /// Registered as an AI attachment and referenced from the input.
@@ -148,7 +148,7 @@ pub enum CodeReviewContextDestination {
     /// Inserted into the active command buffer while a command is running.
     #[serde(rename = "active_command_buffer")]
     ActiveCommandBuffer,
-    /// Submitted as an inline code review request through the Zap AI path.
+    /// Submitted as an inline code review request through the InfiniShell AI path.
     #[serde(rename = "agent_review")]
     AgentReview,
     /// Inserted into CLI agent rich input.

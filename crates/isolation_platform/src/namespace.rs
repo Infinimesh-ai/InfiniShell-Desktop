@@ -7,7 +7,7 @@ use command::r#async::Command;
 
 use crate::{IsolationPlatformError, WorkloadToken};
 
-const ZAP_WORKLOAD_AUDIENCE: &str = "http://192.0.2.0:9";
+const INFINISHELL_WORKLOAD_AUDIENCE: &str = "http://192.0.2.0:9";
 
 /// Detect whether or not we are running in a Namespace instance.
 pub fn is_in_namespace_instance() -> bool {
@@ -25,7 +25,7 @@ pub async fn issue_workload_token(
         .arg("auth")
         .arg("issue-id-token")
         .arg("--audience")
-        .arg(ZAP_WORKLOAD_AUDIENCE)
+        .arg(INFINISHELL_WORKLOAD_AUDIENCE)
         .arg("--output")
         .arg("json");
 

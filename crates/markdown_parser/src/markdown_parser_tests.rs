@@ -2862,7 +2862,8 @@ fn test_parse_table_with_empty_cells() {
 
 #[test]
 fn test_parse_table_with_links() {
-    let source = "| Link | Text |\n| --- | --- |\n| [Zap](https://warp.dev) | normal |\n";
+    let source =
+        "| Link | Text |\n| --- | --- |\n| [InfiniShell](https://infinishell.dev) | normal |\n";
     let result = test_parse_markdown_with_gfm_tables(source);
     assert_eq!(result.len(), 1);
 
@@ -2870,10 +2871,10 @@ fn test_parse_table_with_links() {
         assert_eq!(table.rows.len(), 1);
         let link_cell = &table.rows[0][0];
         assert_eq!(link_cell.len(), 1);
-        assert_eq!(link_cell[0].text, "Zap");
+        assert_eq!(link_cell[0].text, "InfiniShell");
         assert!(matches!(
             &link_cell[0].styles.hyperlink,
-            Some(Hyperlink::Url(url)) if url == "https://warp.dev"
+            Some(Hyperlink::Url(url)) if url == "https://infinishell.dev"
         ));
     } else {
         panic!("Expected table");

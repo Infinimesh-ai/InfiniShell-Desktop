@@ -9,7 +9,7 @@ use pathfinder_geometry::vector::{Vector2F, vec2f};
 use url::Url;
 use warp_core::context_flag::ContextFlag;
 use warp_core::settings::Setting;
-// Zap:`crate::util::sync` 已下沉到 `warp_util::sync`,与 `one_time_modal_model.rs` 保持一致。
+// InfiniShell:`crate::util::sync` 已下沉到 `warp_util::sync`,与 `one_time_modal_model.rs` 保持一致。
 use warp_util::sync::Condition;
 use warpui::clipboard::ClipboardContent;
 use warpui::elements::{
@@ -143,7 +143,7 @@ const OFFLINE_BANNER_PADDING_VERTICAL: f32 = 4.;
 
 pub const DRIVE_INDEX_VIEW_POSITION_ID: &str = "drive_index_view_id";
 
-// Sets the speed of the autoscroll that occurs when you drag an item near the Zap Drive border.
+// Sets the speed of the autoscroll that occurs when you drag an item near the InfiniShell Drive border.
 pub const AUTOSCROLL_SPEED_MULTIPLIER: f32 = 10.;
 // Sets the distance from a border at which scroll events start to occur.
 pub const AUTOSCROLL_DETECTION_DISTANCE: f32 = 30.0;
@@ -178,7 +178,7 @@ pub enum DriveIndexSection {
     Space(Space),
 }
 
-// Zap:跟随上游补 `PartialEq`——`Dropdown<A>` 的 `DropdownItemAction` blanket impl 要求它。
+// InfiniShell:跟随上游补 `PartialEq`——`Dropdown<A>` 的 `DropdownItemAction` blanket impl 要求它。
 #[derive(Debug, Clone, PartialEq)]
 pub enum DriveIndexAction {
     OpenObject(ObjectTypeAndId),
@@ -281,10 +281,10 @@ pub enum DriveIndexAction {
     CloseTrashIndex,
     FocusPreviousItem,
     FocusNextItem,
-    /// Hitting one of the l/r arrow keys on a Zap Drive item.
+    /// Hitting one of the l/r arrow keys on an InfiniShell Drive item.
     LeftArrowKey,
     RightArrowKey,
-    /// Hitting enter key on a Zap Drive item.
+    /// Hitting enter key on an InfiniShell Drive item.
     EnterKey,
     /// Hitting escape key from trash index returns to main drive index.
     EscapeKey,
@@ -415,10 +415,10 @@ struct SpaceMenuState {
     offset: Vector2F,
 }
 
-/// The main view for the Zap Drive sidebar.
+/// The main view for the InfiniShell Drive sidebar.
 /// `DriveIndex` is different from `DrivePanel` in that it is responsible for
-/// all the logic within Zap Drive, whereas `DrivePanel` is responsible for
-/// how Zap Drive interacts with the workspace and the rest of the app.
+/// all the logic within InfiniShell Drive, whereas `DrivePanel` is responsible for
+/// how InfiniShell Drive interacts with the workspace and the rest of the app.
 #[derive(Clone)]
 pub struct DriveIndex {
     window_id: WindowId,
@@ -426,7 +426,7 @@ pub struct DriveIndex {
     /// default, should get the menu fields on open, example: + button to add notebook)
     menu: ViewHandle<Menu<DriveIndexAction>>,
 
-    /// Variant of the index, determines whether base Zap Drive or trash is viewed.
+    /// Variant of the index, determines whether base InfiniShell Drive or trash is viewed.
     index_variant: DriveIndexVariant,
     /// If None, the context menu is closed. Otherwise, this contains the ID of the object it's open on.
     menu_object_id_if_open: Option<WarpDriveItemId>,
@@ -451,7 +451,7 @@ pub struct DriveIndex {
     /// A hashmap of location (space/folder) to a list of hashed IDs of objects inside
     /// the space/folder, used for rendering our objects
     sorted_orders_by_location: HashMap<StoredObjectLocation, Vec<ObjectUid>>,
-    /// A sorted list of all the items (spaces + objects) in Zap Drive
+    /// A sorted list of all the items (spaces + objects) in InfiniShell Drive
     /// Unlike sorted_orders_by_location, this is not used for rendering
     /// This is used for object focusing and WD keyboard navigation
     ordered_items: Vec<WarpDriveItemId>,
@@ -461,7 +461,7 @@ pub struct DriveIndex {
     /// from links before everything has been set up.
     has_initialized_sections: Condition,
 
-    /// The number of objects in Zap Drive that have errored.
+    /// The number of objects in InfiniShell Drive that have errored.
     /// This value is cached so that we can determine whether to render the "retry all"
     /// objects button in the case of syncing failures.
     num_errored_objects: usize,
@@ -2338,7 +2338,7 @@ impl DriveIndex {
             share_dialog_open,
             is_selected,
             is_focused,
-            false, /* Zap(Wave 4):SyncQueue 整删,is_dequeueing 永远 false */
+            false, /* InfiniShell(Wave 4):SyncQueue 整删,is_dequeueing 永远 false */
             tools_panel_menu_direction(app),
             appearance,
         )?;
@@ -2561,7 +2561,7 @@ impl DriveIndex {
             }
         };
 
-        // This icon should render the same as other ZapDrive icons but with no click or hover states.
+        // This icon should render the same as other InfiniShellDrive icons but with no click or hover states.
         Container::new(
             ConstrainedBox::new(icon.to_warpui_icon(icon_color).finish())
                 .with_width(SECTION_HEADER_FONT_SIZE)
@@ -2744,7 +2744,7 @@ impl DriveIndex {
         if self.focused_index.is_some() {
             let DriveIndexSection::Space(space) = *section;
             self.set_focused_item(WarpDriveItemId::Space(space), true, ctx);
-            // Need to re-render focused index in Zap Drive after a space has been toggled
+            // Need to re-render focused index in InfiniShell Drive after a space has been toggled
             if let Some(focused_index) = self.focused_index {
                 self.update_focused_params(focused_index, ObjectStoreModel::as_ref(ctx));
             }
@@ -3373,7 +3373,7 @@ impl DriveIndex {
     }
 
     fn retry_all_failed(&mut self, ctx: &mut ViewContext<Self>) {
-        // Zap(Wave 4):SyncQueue 整删后,“重试”原语义(重新上报服务端)
+        // InfiniShell(Wave 4):SyncQueue 整删后,“重试”原语义(重新上报服务端)
         // 不再适用;本地化后对象不会进入 errored 态,这个路径是 dead code。
         let _ = ctx;
     }
@@ -3755,7 +3755,7 @@ impl DriveIndex {
         let object = ObjectStoreModel::as_ref(app).get_by_uid(&object_type_and_id.uid());
 
         if let ObjectTypeAndId::Folder(folder_id) = object_type_and_id {
-            // Zap:本地 folder(ClientId,SyncQueue 上行无 auth no-op)永远拿不到 server_id,
+            // InfiniShell:本地 folder(ClientId,SyncQueue 上行无 auth no-op)永远拿不到 server_id,
             // 原 `SyncId::ServerId(_) && is_online` 双重门槛会让本地文件夹永远没有"新建子项/Rename"右键菜单。
             // 这里把"本地 folder"视为永远 ready。
             let is_local_folder = matches!(folder_id, SyncId::ClientId(_));
@@ -4136,7 +4136,7 @@ impl DriveIndex {
         menu_items
     }
 
-    /// Builder for a menu item to open a Zap Drive object in a pane. The icon and label depend
+    /// Builder for a menu item to open an InfiniShell Drive object in a pane. The icon and label depend
     /// on whether the object is editable or not.
     ///
     /// If `prefer_open` is `true`, the item defaults to view/open mode rather than edit mode.

@@ -25,7 +25,7 @@
             NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
             [formatter setDateFormat:@"yyyy-MM-dd_HH-mm-ss"];
             NSString *timestamp = [formatter stringFromDate:[NSDate date]];
-            NSString *logPath = [NSString stringWithFormat:@"/tmp/zap_docktile_%@.log", timestamp];
+            NSString *logPath = [NSString stringWithFormat:@"/tmp/infinishell_docktile_%@.log", timestamp];
             NSError *error = nil;
             [[NSFileManager defaultManager] createFileAtPath:logPath contents:nil attributes:nil];
             _logFileHandle = [NSFileHandle fileHandleForWritingAtPath:logPath];
@@ -137,7 +137,7 @@
     return [[NSImage alloc] initWithContentsOfFile:imagePath];
 }
 
-// Protocol method that is invoked by the system when the dock for Zap is updated.
+// Protocol method that is invoked by the system when the dock for InfiniShell is updated.
 // Note that we listen for direct changes to the AppIcon key in the user defaults.
 - (void)setDockTile:(NSDockTile *)dockTile {
     @try {

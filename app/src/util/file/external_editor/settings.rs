@@ -20,7 +20,7 @@ pub use crate::util::openable_file_type::EditorLayout;
 )]
 pub enum EditorChoice {
     SystemDefault,
-    Zap,
+    InfiniShell,
     EnvEditor,
     #[schemars(description = "A specific external code editor.")]
     ExternalEditor(super::Editor),
@@ -45,7 +45,8 @@ impl<'de> Deserialize<'de> for EditorChoice {
         #[derive(Deserialize)]
         enum EditorChoiceInner {
             SystemDefault,
-            Zap,
+            #[serde(alias = "Zap")]
+            InfiniShell,
             EnvEditor,
             ExternalEditor(super::Editor),
         }
@@ -53,7 +54,7 @@ impl<'de> Deserialize<'de> for EditorChoice {
         match EditorChoiceCompat::deserialize(deserializer)? {
             EditorChoiceCompat::New(inner) => match inner {
                 EditorChoiceInner::SystemDefault => Ok(EditorChoice::SystemDefault),
-                EditorChoiceInner::Zap => Ok(EditorChoice::Zap),
+                EditorChoiceInner::InfiniShell => Ok(EditorChoice::InfiniShell),
                 EditorChoiceInner::EnvEditor => Ok(EditorChoice::EnvEditor),
                 EditorChoiceInner::ExternalEditor(editor) => {
                     Ok(EditorChoice::ExternalEditor(editor))
@@ -81,7 +82,7 @@ define_settings_group!(EditorSettings, settings: [
     },
     open_code_panels_file_editor: OpenCodePanelsFileEditor {
         type: EditorChoice,
-        default: EditorChoice::Zap,
+        default: EditorChoice::InfiniShell,
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Never,
         surface: settings::SettingSurfaces::GUI,
@@ -131,6 +132,10 @@ define_settings_group!(EditorSettings, settings: [
         description: "Whether to open agent conversations in a new tab or a split pane.",
     },
 ]);
+
+#[cfg(test)]
+#[path = "settings_tests.rs"]
+mod tests;
 
 #[derive(
     Debug,

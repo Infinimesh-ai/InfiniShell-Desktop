@@ -234,7 +234,7 @@ winget install jqlang.jq
 # CMake is needed to build native dependencies.
 winget install -e --id Kitware.CMake
 
-# Strawberry Perl 用于从源码编译 OpenSSL。zap_sftp → ssh2(openssl-on-win32)→
+# Strawberry Perl 用于从源码编译 OpenSSL。infinishell_sftp → ssh2(openssl-on-win32)→
 # openssl-sys 的 vendored 构建会调用 perl 运行 OpenSSL 的 Configure 脚本。
 # 必须用原生 Windows perl(Strawberry),Git for Windows 自带的 cygwin perl 不适用于 MSVC 构建。
 winget install -e --id StrawberryPerl.StrawberryPerl `

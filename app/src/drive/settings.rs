@@ -24,7 +24,7 @@ define_settings_group!(WarpDriveSettings, settings: [
         surface: settings::SettingSurfaces::GUI,
         private: true,
     },
-    // Controls whether Zap Drive appears in the tools panel, command palette, and command search.
+    // Controls whether InfiniShell Drive appears in the tools panel, command palette, and command search.
     enable_warp_drive: EnableWarpDrive {
         type: bool,
         default: true,
@@ -38,7 +38,7 @@ define_settings_group!(WarpDriveSettings, settings: [
 ]);
 
 impl WarpDriveSettings {
-    /// Returns whether Zap Drive should be considered enabled.
+    /// Returns whether InfiniShell Drive should be considered enabled.
     /// Returns `false` when the user is anonymous or fully logged out,
     /// regardless of the user setting.
     pub fn is_warp_drive_enabled(app: &warpui::AppContext) -> bool {

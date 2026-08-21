@@ -9,7 +9,7 @@ use warpui::{App, SingletonEntity, ViewHandle, WindowId, async_assert};
 use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::cloud_object::update_manager::UpdateManager;
 use crate::cloud_object::{Space, StoredObjectEventEntrypoint};
-use crate::drive::ZapDriveObjectSettings;
+use crate::drive::InfiniShellDriveObjectSettings;
 use crate::integration_testing::view_getters::{notebook_view, workspace_view};
 use crate::notebooks::manager::NotebookSource;
 use crate::server::ids::{ClientId, SyncId};
@@ -79,7 +79,7 @@ pub fn open_notebook(window_key: impl Into<String>, notebook_key: impl Into<Stri
             WindowManager::as_ref(ctx).show_window_and_focus_app(*window_id);
             workspace.open_notebook(
                 &NotebookSource::Existing(*notebook_id),
-                &ZapDriveObjectSettings::default(),
+                &InfiniShellDriveObjectSettings::default(),
                 ctx,
                 true,
             );

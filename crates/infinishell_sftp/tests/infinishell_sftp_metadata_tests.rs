@@ -1,4 +1,4 @@
-//! zap_sftp::types::Metadata::from_ssh2 模块单元测试
+//! infinishell_sftp::types::Metadata::from_ssh2 模块单元测试
 //!
 //! 验证从 ssh2::FileStat 创建 Metadata 的逻辑，
 //! 重点覆盖符号链接检测修复和各字段 Some/None 回退。
@@ -7,7 +7,7 @@
 
 use std::time::{Duration, SystemTime};
 
-use zap_sftp::types::*;
+use infinishell_sftp::types::*;
 
 /// 构造所有字段为 None 的空 ssh2::FileStat
 fn empty_stat() -> ssh2::FileStat {

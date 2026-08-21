@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Zap · Docs</title>
+        <title>InfiniShell · Docs</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
@@ -843,34 +843,34 @@
 
         <header class="nav">
             <div class="nav-inner">
-                <a class="brand" href="Zap.html">
+                <a class="brand" href="InfiniShell.html">
                     <span class="brand-mark">O</span>
-                    Zap
+                    InfiniShell
                 </a>
                 <nav class="nav-links">
-                    <a href="Zap.html">README</a>
-                    <a href="Zap Docs.html" class="active">Docs</a>
+                    <a href="InfiniShell.html">README</a>
+                    <a href="InfiniShell Docs.html" class="active">Docs</a>
                     <a
-                        href="https://github.com/zerx-lab/zap"
+                        href="https://github.com/Infinimesh-ai/InfiniShell-Desktop"
                         target="_blank"
                         rel="noopener"
                         data-lang="en"
                         >Providers</a
                     ><a
-                        href="https://github.com/zerx-lab/zap"
+                        href="https://github.com/Infinimesh-ai/InfiniShell-Desktop"
                         target="_blank"
                         rel="noopener"
                         data-lang="zh"
                         >提供方</a
                     >
                     <a
-                        href="https://github.com/zerx-lab/zap/blob/main/CHANGELOG.md"
+                        href="https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/main/CHANGELOG.md"
                         target="_blank"
                         rel="noopener"
                         data-lang="en"
                         >Changelog</a
                     ><a
-                        href="https://github.com/zerx-lab/zap/blob/main/CHANGELOG.md"
+                        href="https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/main/CHANGELOG.md"
                         target="_blank"
                         rel="noopener"
                         data-lang="zh"
@@ -885,7 +885,7 @@
                     </div>
                     <a
                         class="gh-link"
-                        href="https://github.com/zerx-lab/zap"
+                        href="https://github.com/Infinimesh-ai/InfiniShell-Desktop"
                         target="_blank"
                         rel="noopener"
                     >
@@ -987,7 +987,7 @@
                                 <path d="M6 3v3a3 3 0 0 0 6 0V3M9 13v-4" />
                             </svg>
                             <span data-lang="en">Why this product?</span
-                            ><span data-lang="zh">为什么做 Zap</span>
+                            ><span data-lang="zh">为什么做 InfiniShell</span>
                         </a>
                         <a href="#install">
                             <svg
@@ -1356,7 +1356,7 @@
                             ><span data-lang="zh">复制 MD</span>
                         </button>
                         <a
-                            href="https://github.com/zerx-lab/zap"
+                            href="https://github.com/Infinimesh-ai/InfiniShell-Desktop"
                             target="_blank"
                             rel="noopener"
                         >
@@ -1378,20 +1378,20 @@
                 <h1 class="doc-title" data-lang="en">Introduction</h1>
                 <h1 class="doc-title" data-lang="zh">介绍</h1>
                 <p class="doc-lede" data-lang="en">
-                    Zap is a derivative product built on Warp that keeps the
+                    InfiniShell is a derivative product built on Warp that keeps the
                     full terminal experience and opens up the AI layer. This
                     page covers what it is, what's different from upstream, and
                     where to go next.
                 </p>
                 <p class="doc-lede" data-lang="zh">
-                    Zap 是基于 Warp 构建的衍生产品,完整保留终端体验,把 AI
+                    InfiniShell 是基于 Warp 构建的衍生产品,完整保留终端体验,把 AI
                     层完全打开。这一页讲清楚:它是什么、与上游的差异、接下来该读什么。
                 </p>
 
-                <h2 id="introduction" data-lang="en">What is Zap?</h2>
-                <h2 id="introduction" data-lang="zh">Zap 是什么</h2>
+                <h2 id="introduction" data-lang="en">What is InfiniShell?</h2>
+                <h2 id="introduction" data-lang="zh">InfiniShell 是什么</h2>
                 <p data-lang="en">
-                    Zap is a Rust-based terminal that reuses the upstream Warp
+                    InfiniShell is a Rust-based terminal that reuses the upstream Warp
                     UI &mdash; <code>Blocks</code>, <code>Workflows</code>,
                     command suggestions, the keymap layer &mdash; and replaces
                     the closed AI gateway with explicit, local, editable
@@ -1399,7 +1399,7 @@
                     product, and it is not affiliated with Warp Inc.
                 </p>
                 <p data-lang="zh">
-                    Zap 是基于 Rust 的终端,复用上游 Warp 的 UI ──
+                    InfiniShell 是基于 Rust 的终端,复用上游 Warp 的 UI ──
                     <code>Blocks</code
                     >、<code>Workflows</code>、命令建议、keymap 层 ── 把封闭的
                     AI gateway
@@ -1479,19 +1479,19 @@
                 </div>
 
                 <h2 id="why-fork" data-lang="en">Why this product?</h2>
-                <h2 id="why-fork" data-lang="zh">为什么做 Zap</h2>
+                <h2 id="why-fork" data-lang="zh">为什么做 InfiniShell</h2>
                 <p data-lang="en">
                     Upstream Warp routes AI traffic through its own gateway.
                     That works for most people, but it doesn't work for users
                     who want to bring their own keys, point at a self-hosted
                     model, or audit the system prompt that's getting sent on
-                    their behalf. Zap changes <em>five</em> things; everything
+                    their behalf. InfiniShell changes <em>five</em> things; everything
                     else stays.
                 </p>
                 <p data-lang="zh">
                     上游 Warp 把 AI 流量经过自己的
                     gateway。对大部分人没问题,但对要自带
-                    key、指向自托管模型、审计系统提示词的用户来说不够。Zap 只改
+                    key、指向自托管模型、审计系统提示词的用户来说不够。InfiniShell 只改
                     <em>五件事</em>,其他全留。
                 </p>
 
@@ -1502,8 +1502,8 @@
                             <th data-lang="zh">维度</th>
                             <th data-lang="en">Upstream Warp</th>
                             <th data-lang="zh">上游 Warp</th>
-                            <th data-lang="en">Zap</th>
-                            <th data-lang="zh">Zap</th>
+                            <th data-lang="en">InfiniShell</th>
+                            <th data-lang="zh">InfiniShell</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1561,12 +1561,12 @@
                 <h2 id="install" data-lang="en">Install</h2>
                 <h2 id="install" data-lang="zh">安装</h2>
                 <p data-lang="en">
-                    There are no binary installers yet &mdash; Zap is in early
+                    There are no binary installers yet &mdash; InfiniShell is in early
                     development. Build from source via either the bootstrap
                     script or cargo directly.
                 </p>
                 <p data-lang="zh">
-                    目前没有发布安装包 ── Zap
+                    目前没有发布安装包 ── InfiniShell
                     处于早期开发阶段。请从源码构建,推荐使用 bootstrap
                     脚本,也可以直接用 cargo。
                 </p>
@@ -1582,8 +1582,8 @@
                         <pre
                             class="code"
                         ><span class="com"># Clone &amp; bootstrap (recommended)</span>
-git clone https://github.com/zerx-lab/zap.git zap
-<span class="key">cd</span> zap
+git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
+<span class="key">cd</span> infinishell
 
 <span class="com"># installs deps, builds dev profile, launches</span>
 ./script/run</pre>
@@ -1592,10 +1592,10 @@ git clone https://github.com/zerx-lab/zap.git zap
                         <pre
                             class="code"
                         ><span class="com"># OSS users only need this binary</span>
-git clone https://github.com/zerx-lab/zap.git zap
-<span class="key">cd</span> zap
+git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
+<span class="key">cd</span> infinishell
 
-cargo run --release <span class="acc">--bin zap-oss</span></pre>
+cargo run --release <span class="acc">--bin infinishell</span></pre>
                     </div>
                 </div>
 
@@ -1613,13 +1613,13 @@ cargo run --release <span class="acc">--bin zap-oss</span></pre>
                     <div>
                         <span data-lang="en"
                             ><strong>OSS users:</strong>
-                            <code>--bin zap-oss</code> is the binary without any
+                            <code>--bin infinishell</code> is the binary without any
                             cloud-bound features compiled in. It's the right
                             target for self-hosters and most contributors.</span
                         >
                         <span data-lang="zh"
                             ><strong>OSS 用户:</strong
-                            ><code>--bin zap-oss</code> 是不带任何云端能力的
+                            ><code>--bin infinishell</code> 是不带任何云端能力的
                             binary,自托管和大多数贡献者都用这个。</span
                         >
                     </div>
@@ -1641,7 +1641,7 @@ cargo run --release <span class="acc">--bin zap-oss</span></pre>
                     <div class="code-head">
                         <span class="dot"></span>
                         <span class="file mono"
-                            >~/.config/zap/settings.toml</span
+                            >~/.config/infinishell/settings.toml</span
                         >
                         <span class="lang-tag">TOML</span>
                         <button class="copy" data-copy>Copy</button>
@@ -1673,13 +1673,13 @@ output  = <span class="num">384000</span></pre>
                 <h2 id="ssh-config" data-lang="en">SSH manager</h2>
                 <h2 id="ssh-config" data-lang="zh">SSH 管理器</h2>
                 <p data-lang="en">
-                    Zap adds a first-class SSH manager &mdash; net-new on top of
+                    InfiniShell adds a first-class SSH manager &mdash; net-new on top of
                     upstream. Hosts live in their own file, jump-host chains are
                     supported, and the remote session renders as Blocks just
                     like a local shell.
                 </p>
                 <p data-lang="zh">
-                    Zap 在上游基础上新增了一等公民的 SSH
+                    InfiniShell 在上游基础上新增了一等公民的 SSH
                     管理器。主机定义放在独立文件,支持跳板机链路,远端会话同样以
                     Blocks 形式呈现,体验与本地 shell 一致。
                 </p>
@@ -1687,7 +1687,7 @@ output  = <span class="num">384000</span></pre>
                 <div class="code-card">
                     <div class="code-head">
                         <span class="dot"></span>
-                        <span class="file mono">~/.config/zap/ssh.toml</span>
+                        <span class="file mono">~/.config/infinishell/ssh.toml</span>
                         <span class="lang-tag">TOML</span>
                         <button class="copy" data-copy>Copy</button>
                     </div>
@@ -1717,13 +1717,13 @@ forward_agent = <span class="acc">true</span></pre>
                     <div>
                         <span data-lang="en"
                             >SSH credentials are read from your existing
-                            <code>~/.ssh</code> &mdash; Zap does not duplicate
+                            <code>~/.ssh</code> &mdash; InfiniShell does not duplicate
                             them or upload them anywhere. The
                             <code>ssh.toml</code> file holds
                             <em>connection metadata only</em>.</span
                         >
                         <span data-lang="zh"
-                            >SSH 凭证沿用你现有的 <code>~/.ssh</code> ── Zap
+                            >SSH 凭证沿用你现有的 <code>~/.ssh</code> ── InfiniShell
                             不复制、不上传。<code>ssh.toml</code>
                             只保存<em>连接元数据</em>。</span
                         >
@@ -1733,11 +1733,11 @@ forward_agent = <span class="acc">true</span></pre>
                 <h2 id="privacy-defaults" data-lang="en">Privacy defaults</h2>
                 <h2 id="privacy-defaults" data-lang="zh">隐私默认</h2>
                 <p data-lang="en">
-                    Anything that touches Zap's servers ships disabled. To
+                    Anything that touches InfiniShell's servers ships disabled. To
                     verify, the matrix below is checked against a fresh install:
                 </p>
                 <p data-lang="zh">
-                    任何牵涉 Zap 云端的能力默认关闭。下表是全新安装后的实际状态:
+                    任何牵涉 InfiniShell 云端的能力默认关闭。下表是全新安装后的实际状态:
                 </p>
 
                 <table class="props">
@@ -1779,7 +1779,7 @@ forward_agent = <span class="acc">true</span></pre>
                                         &quot;Geist Mono&quot;, monospace;
                                 "
                             >
-                                ~/.config/zap/settings.toml
+                                ~/.config/infinishell/settings.toml
                             </td>
                         </tr>
                     </tbody>
@@ -1790,12 +1790,12 @@ forward_agent = <span class="acc">true</span></pre>
                 <p data-lang="en">
                     English and Simplified Chinese ship in-tree. The locale
                     switcher is in
-                    <code>Settings → Appearance → Language</code>; restart Zap
+                    <code>Settings → Appearance → Language</code>; restart InfiniShell
                     for the change to take full effect.
                 </p>
                 <p data-lang="zh">
                     英文与简体中文随发行包一起提供。语言切换位于
-                    <code>设置 → 外观 → 语言</code>;切换后需要重启 Zap
+                    <code>设置 → 外观 → 语言</code>;切换后需要重启 InfiniShell
                     完全生效。
                 </p>
 
@@ -1804,7 +1804,7 @@ forward_agent = <span class="acc">true</span></pre>
                         <div class="lbl" data-lang="en">← Previous</div>
                         <div class="lbl" data-lang="zh">← 上一篇</div>
                         <div class="ttl" data-lang="en">Why this product?</div>
-                        <div class="ttl" data-lang="zh">为什么做 Zap</div>
+                        <div class="ttl" data-lang="zh">为什么做 InfiniShell</div>
                     </a>
                     <a class="next" href="#install">
                         <div class="lbl" data-lang="en">Next →</div>
@@ -1830,12 +1830,12 @@ forward_agent = <span class="acc">true</span></pre>
                     ><span data-lang="zh">本页内容</span>
                 </div>
                 <a href="#introduction" class="active" data-lang="en"
-                    >What is Zap?</a
+                    >What is InfiniShell?</a
                 ><a href="#introduction" class="active" data-lang="zh"
-                    >Zap 是什么</a
+                    >InfiniShell 是什么</a
                 >
                 <a href="#why-fork" data-lang="en">Why this product?</a
-                ><a href="#why-fork" data-lang="zh">为什么做 Zap</a>
+                ><a href="#why-fork" data-lang="zh">为什么做 InfiniShell</a>
                 <a href="#install" data-lang="en">Install</a
                 ><a href="#install" data-lang="zh">安装</a>
                 <a href="#first-run" data-lang="en">First run</a
@@ -1852,7 +1852,7 @@ forward_agent = <span class="acc">true</span></pre>
         <script>
             (function () {
                 function detectLocale() {
-                    var saved = localStorage.getItem("zap:locale");
+                    var saved = localStorage.getItem("infinishell:locale");
                     if (saved === "en" || saved === "zh") return saved;
                     var n = (navigator.language || "en").toLowerCase();
                     return n.startsWith("zh") ? "zh" : "en";
@@ -1860,7 +1860,7 @@ forward_agent = <span class="acc">true</span></pre>
                 function setLocale(l) {
                     document.body.dataset.locale = l;
                     document.documentElement.lang = l === "zh" ? "zh-CN" : "en";
-                    localStorage.setItem("zap:locale", l);
+                    localStorage.setItem("infinishell:locale", l);
                     document
                         .querySelectorAll(".lang button")
                         .forEach(function (b) {

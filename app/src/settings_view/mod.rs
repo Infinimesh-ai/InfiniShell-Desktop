@@ -202,7 +202,7 @@ pub(super) fn render_model_chips(
 pub enum SettingsViewEvent {
     Pane(PaneEvent),
     StartResize,
-    // Zap 去中心化分支:`CheckForUpdate` / `ZapDrive` 变体随 Account
+    // Zap 去中心化分支:`CheckForUpdate` / `InfiniShellDrive` 变体随 Account
     // 主设置页唯一发射者(`MainSettingsPageView`)一同物理删。
     ShowToast {
         message: String,
@@ -227,7 +227,7 @@ pub enum SettingsSection {
     Appearance,
     Features,
     Keybindings,
-    ZapDrive,
+    InfiniShellDrive,
     Warpify,
     /// Internal backing-page identifier for AISettingsPageView. Multiple subpages
     /// (WarpAgent, AgentProfiles, Knowledge, ThirdPartyCLIAgents) share this single
@@ -271,7 +271,7 @@ impl Display for SettingsSection {
             SettingsSection::Appearance => crate::t!("settings-section-appearance"),
             SettingsSection::Features => crate::t!("settings-section-features"),
             SettingsSection::Keybindings => crate::t!("settings-section-keybindings"),
-            SettingsSection::ZapDrive => crate::t!("settings-section-warp-drive"),
+            SettingsSection::InfiniShellDrive => crate::t!("settings-section-warp-drive"),
             SettingsSection::Warpify => crate::t!("settings-section-warpify"),
             SettingsSection::AI => crate::t!("settings-section-ai"),
             SettingsSection::WarpAgent => crate::t!("settings-section-warp-agent"),
@@ -357,7 +357,7 @@ impl FromStr for SettingsSection {
             "Features" => Ok(Self::Features),
             "Keyboard shortcuts" => Ok(Self::Keybindings),
             "Warpify" => Ok(Self::Warpify),
-            "InfiniShellDrive" | "InfiniShell Drive" => Ok(Self::ZapDrive),
+            "InfiniShellDrive" | "InfiniShell Drive" => Ok(Self::InfiniShellDrive),
             // "Oz" 是上游对该页的旧称,保留以兼容上游深链;不保留 zap 时期的拼写。
             "Oz" | "InfiniShell Agent" => Ok(Self::WarpAgent),
             "Profiles" | "AgentProfiles" => Ok(Self::AgentProfiles),
@@ -913,7 +913,7 @@ pub enum SettingsAction {
     FeaturesPageToggle(FeaturesPageAction),
     AI(AISettingsPageAction),
     Code(CodeSettingsPageAction),
-    ZapDrive(warp_drive_page::WarpDriveSettingsPageAction),
+    InfiniShellDrive(warp_drive_page::WarpDriveSettingsPageAction),
     CloudSync(cloud_sync_page::CloudSyncPageAction),
     WarpifyPageToggle(WarpifyPageAction),
     Tab,
@@ -1070,7 +1070,7 @@ macro_rules! update_page {
             SettingsPageViewHandle::About(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Code(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::MCPServers(handle) => $ctx.update_view(handle, $update),
-            SettingsPageViewHandle::ZapDrive(handle) => $ctx.update_view(handle, $update),
+            SettingsPageViewHandle::InfiniShellDrive(handle) => $ctx.update_view(handle, $update),
             // Issue #72: 全局 HTTP 代理设置页。
             SettingsPageViewHandle::Network(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::CloudSync(handle) => $ctx.update_view(handle, $update),
@@ -1172,7 +1172,7 @@ impl SettingsView {
         // Zap Wave 6-8:Referrals 设置页随 `ReferralsPageView` / `ReferralsClient`
         // 物理删,handle / 事件订阅一同移除。
 
-        // Zap Drive page
+        // InfiniShell Drive page
         let warp_drive_page_handle =
             ctx.add_typed_action_view(warp_drive_page::WarpDriveSettingsPageView::new);
 
@@ -1970,7 +1970,7 @@ impl SettingsView {
             SettingsPageViewHandle::AI(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::MCPServers(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Code(v) => v.as_ref(app).should_render(app),
-            SettingsPageViewHandle::ZapDrive(v) => v.as_ref(app).should_render(app),
+            SettingsPageViewHandle::InfiniShellDrive(v) => v.as_ref(app).should_render(app),
             // Issue #72: 全局 HTTP 代理设置页。
             SettingsPageViewHandle::Network(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::CloudSync(v) => v.as_ref(app).should_render(app),
@@ -2565,9 +2565,10 @@ impl TypedActionView for SettingsView {
                     })
                 }
             }
-            SettingsAction::ZapDrive(warp_drive_action) => {
-                if let Some(warp_drive_page) = self.settings_page(SettingsSection::ZapDrive)
-                    && let SettingsPageViewHandle::ZapDrive(view) = &warp_drive_page.view_handle
+            SettingsAction::InfiniShellDrive(warp_drive_action) => {
+                if let Some(warp_drive_page) = self.settings_page(SettingsSection::InfiniShellDrive)
+                    && let SettingsPageViewHandle::InfiniShellDrive(view) =
+                        &warp_drive_page.view_handle
                 {
                     view.update(ctx, |view, ctx| {
                         view.handle_action(warp_drive_action, ctx);

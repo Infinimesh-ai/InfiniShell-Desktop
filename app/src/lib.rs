@@ -1464,7 +1464,7 @@ pub(crate) fn initialize_app(
     // SshManager 操作可能撞 missing-table。
     warp_ssh_manager::set_database_path(persistence::database_file_path_for_current_scope());
     // 项目管理器同款:独立写连接,路径同样要等 migration 之后再设。
-    zap_projects::set_database_path(persistence::database_file_path_for_current_scope());
+    infinishell_projects::set_database_path(persistence::database_file_path_for_current_scope());
 
     let persistence_writer = PersistenceWriter::new(writer_handles);
 

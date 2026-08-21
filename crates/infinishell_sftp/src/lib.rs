@@ -1,4 +1,4 @@
-//! zap_sftp — SFTP 协议层封装
+//! infinishell_sftp — SFTP 协议层封装
 //!
 //! 基于 ssh2 crate 封装 SFTP 文件传输协议，提供会话管理、
 //! 远程文件读写、目录操作等功能。

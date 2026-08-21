@@ -1,8 +1,8 @@
 //! 项目管理器 UI。M2 part A:项目列表面板(左侧 Tool Panel);part B:项目
 //! 详情编辑 pane(中央区,`project_view`);项目级 Agent 对话在 M3 落地。
 //!
-//! 数据层在独立 crate `zap_projects`(`crates/zap_projects/`)。
-//! 入口统一由 `FeatureFlag::ZapProjects` 运行时门控。
+//! 数据层在独立 crate `infinishell_projects`(`crates/infinishell_projects/`)。
+//! 入口统一由 `FeatureFlag::InfiniShellProjects` 运行时门控。
 
 pub mod notifier;
 pub mod panel;

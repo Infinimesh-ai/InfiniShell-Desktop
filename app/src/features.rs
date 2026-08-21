@@ -340,9 +340,9 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         #[cfg(feature = "bundled_skills")]
         FeatureFlag::BundledSkills,
         #[cfg(feature = "project_manager")]
-        FeatureFlag::ZapProjects,
-        #[cfg(feature = "open_warp_launch_modal")]
-        FeatureFlag::ZapLaunchModal,
+        FeatureFlag::InfiniShellProjects,
+        #[cfg(feature = "infinishell_launch_modal")]
+        FeatureFlag::InfiniShellLaunchModal,
         #[cfg(feature = "orchestration_launch_modal")]
         FeatureFlag::OrchestrationLaunchModal,
         #[cfg(feature = "agent_cli_launch_modal")]
@@ -373,8 +373,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::RestorePromptOnInlineModelSelectorSearch,
         #[cfg(feature = "directory_tab_colors")]
         FeatureFlag::DirectoryTabColors,
-        #[cfg(feature = "open_warp_new_settings_modes")]
-        FeatureFlag::ZapNewSettingsModes,
+        #[cfg(feature = "infinishell_new_settings_modes")]
+        FeatureFlag::InfiniShellNewSettingsModes,
         #[cfg(feature = "hoa_code_review")]
         FeatureFlag::HoaCodeReview,
         #[cfg(feature = "vertical_tabs")]

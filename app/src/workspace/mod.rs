@@ -105,7 +105,7 @@ pub fn init(app: &mut AppContext) {
     crate::tab_configs::remove_confirmation_dialog::init(app);
     hoa_onboarding::init(app);
     tab_configs::session_config_modal::init(app);
-    view::zap_launch_modal::init(app);
+    view::infinishell_launch_modal::init(app);
     view::orchestration_launch_modal::init(app);
     view::agent_cli_launch_modal::init(app);
     view::feature_intro_modal::init(app);
@@ -194,15 +194,15 @@ pub fn init(app: &mut AppContext) {
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
-                    "workspace:open_zap_launch_modal",
-                    crate::t!("keybinding-desc-workspace-open-zap-launch-modal"),
-                    WorkspaceAction::OpenZapLaunchModal,
+                    "workspace:open_infinishell_launch_modal",
+                    crate::t!("keybinding-desc-workspace-open-infinishell-launch-modal"),
+                    WorkspaceAction::OpenInfiniShellLaunchModal,
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
-                    "workspace:reset_zap_launch_modal_state",
-                    crate::t!("keybinding-desc-workspace-reset-zap-launch-modal-state"),
-                    WorkspaceAction::ResetZapLaunchModalState,
+                    "workspace:reset_infinishell_launch_modal_state",
+                    crate::t!("keybinding-desc-workspace-reset-infinishell-launch-modal-state"),
+                    WorkspaceAction::ResetInfiniShellLaunchModalState,
                 )
                 .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
@@ -833,7 +833,7 @@ pub fn init(app: &mut AppContext) {
         )
         .with_group(bindings::BindingGroup::Navigation.as_str())
         .with_context_predicate(id!("Workspace"))
-        .with_enabled(|| FeatureFlag::ZapProjects.is_enabled())
+        .with_enabled(|| FeatureFlag::InfiniShellProjects.is_enabled())
         .with_mac_key_binding("ctrl-7")
         .with_linux_or_windows_key_binding("alt-7"),
         EditableBinding::new(
@@ -1231,7 +1231,7 @@ pub fn init(app: &mut AppContext) {
             "workspace:search_drive",
             crate::t!("keybinding-desc-workspace-search-drive"),
             WorkspaceAction::OpenPalette {
-                mode: PaletteMode::ZapDrive,
+                mode: PaletteMode::InfiniShellDrive,
                 source: PaletteSource::Keybinding,
                 query: None,
             },
@@ -1376,7 +1376,7 @@ pub fn init(app: &mut AppContext) {
         .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED))
         .with_group(bindings::BindingGroup::WarpAi.as_str())
         // We use the same custom action as AM so that we don't have
-        // two mac menu items for AM vs Zap AI since they are mutually exclusive.
+        // two mac menu items for AM vs InfiniShell AI since they are mutually exclusive.
         .with_custom_action(CustomAction::NewAgentModePane),
     ]);
 

@@ -26,11 +26,11 @@ use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use futures::channel::oneshot;
+use infinishell_projects::ProjectRepository;
 use serde_json::{Value, json};
 use warp_ssh_manager::{SshRepository, resolve_machine_key};
 use warpui::r#async::Timer;
 use warpui::{Entity, ModelContext, SingletonEntity, ViewHandle, WeakViewHandle};
-use zap_projects::ProjectRepository;
 
 use crate::ai::agent::AIAgentActionId;
 use crate::ai::agent::conversation::AIConversationId;
@@ -556,9 +556,10 @@ fn resolve_target(node_id: &str) -> Result<CurrentHost, String> {
         Err(err) => return Err(format!("SSH 节点查询失败: {err}")),
     };
     // 项目归属校验:不属于任何项目的 node 拒绝执行(工具仅面向项目会话)。
-    let in_project =
-        zap_projects::with_conn(|conn| Ok(ProjectRepository::projects_for_node(conn, node_id)?))
-            .map(|projects: Vec<String>| !projects.is_empty());
+    let in_project = infinishell_projects::with_conn(|conn| {
+        Ok(ProjectRepository::projects_for_node(conn, node_id)?)
+    })
+    .map(|projects: Vec<String>| !projects.is_empty());
     match in_project {
         Ok(true) => {}
         Ok(false) => return Err("node 不属于任何项目,拒绝执行".to_owned()),

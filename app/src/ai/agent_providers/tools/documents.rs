@@ -1,4 +1,4 @@
-//! Zap Drive 本地文档系统的 read / edit / create 三件套。
+//! InfiniShell Drive 本地文档系统的 read / edit / create 三件套。
 //!
 //! 与 `read_files` / `apply_file_diffs` 区别:这些操作的目标是 **AIDocumentModel
 //! 管理的文档**(Drive 内部本地文档,通过 `document_id` 引用),而不是文件系统

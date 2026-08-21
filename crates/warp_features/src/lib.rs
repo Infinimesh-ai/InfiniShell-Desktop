@@ -615,11 +615,11 @@ pub enum FeatureFlag {
 
     /// 项目 (Project) + 项目级 Agent 模式:项目面板、项目↔SSH 服务器关联、
     /// 项目上下文注入与跨主机批量执行工具。
-    ZapProjects,
+    InfiniShellProjects,
 
     /// Enables the Zap launch modal announcing Zap going open-source.
     /// When enabled, the HOA onboarding flow is suppressed.
-    ZapLaunchModal,
+    InfiniShellLaunchModal,
 
     /// Enables the orchestration launch modal announcing multi-agent orchestration features.
     OrchestrationLaunchModal,
@@ -703,7 +703,7 @@ pub enum FeatureFlag {
 
     /// Enables the new settings to control visibility of Zap Drive, Code Review Panel,
     /// and Project Explorer & Global Search features.
-    ZapNewSettingsModes,
+    InfiniShellNewSettingsModes,
 
     /// Enables vertical tab layout as an alternative to the horizontal tab bar.
     VerticalTabs,

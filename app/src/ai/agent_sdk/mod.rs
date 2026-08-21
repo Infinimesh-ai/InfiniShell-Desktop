@@ -319,7 +319,7 @@ impl AgentDriverRunner {
         // Ensure we've synced team state before starting the driver.
         Self::refresh_team_metadata(&foreground).await?;
 
-        // Wait for Zap Drive to sync before building the task config, since
+        // Wait for InfiniShell Drive to sync before building the task config, since
         // prompt resolution (SavedPrompt -> workflow lookup) depends on it.
         // edition 2024:`common::refresh_warp_drive` 的 RPIT 定义处没写 `+ use<>`,
         // 会隐式捕获 `&AppContext` 的生命周期,于是闭包返回类型带上了生命周期参数,

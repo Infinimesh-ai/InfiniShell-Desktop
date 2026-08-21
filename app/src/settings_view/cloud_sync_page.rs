@@ -3,6 +3,7 @@
 // author: logic
 // date: 2026-05-25
 
+use infinishell_sync::{GistClient, SyncEngine, SyncPlatform, SyncResult};
 use pathfinder_geometry::vector::vec2f;
 use settings::Setting;
 use warp_ssh_manager::{DbVersionStore, SshSyncProvider, SyncMetaRepository, with_conn};
@@ -15,7 +16,6 @@ use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::switch::SwitchStateHandle;
 use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
-use zap_sync::{GistClient, SyncEngine, SyncPlatform, SyncResult};
 
 use super::SettingsSection;
 use super::settings_page::{

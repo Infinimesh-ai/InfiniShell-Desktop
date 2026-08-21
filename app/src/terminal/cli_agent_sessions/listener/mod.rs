@@ -330,7 +330,7 @@ impl CLIAgentSessionListener {
 mod tests;
 
 #[cfg(test)]
-mod zap_tests {
+mod infinishell_tests {
     use super::*;
     use crate::terminal::cli_agent_sessions::event::CLIAgentEventType;
 

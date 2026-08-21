@@ -86,7 +86,7 @@ pub fn apply_onboarding_settings(selected_settings: &SelectedSettings, app: &mut
             cli_agent_toolbar_enabled,
             show_agent_notifications,
         } => {
-            if FeatureFlag::ZapNewSettingsModes.is_enabled() {
+            if FeatureFlag::InfiniShellNewSettingsModes.is_enabled() {
                 if let Some(ui) = ui_customization {
                     apply_ui_customization_settings(ui, false, app);
                 }
@@ -116,7 +116,7 @@ fn apply_ui_customization_settings(
 ) {
     // Customize UI slide should only exist with this flag enabled.
     if !FeatureFlag::AccountFirstOnboarding.is_enabled()
-        && !FeatureFlag::ZapNewSettingsModes.is_enabled()
+        && !FeatureFlag::InfiniShellNewSettingsModes.is_enabled()
     {
         return;
     }

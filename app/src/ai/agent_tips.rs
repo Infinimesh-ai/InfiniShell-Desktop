@@ -68,7 +68,7 @@ pub trait AITip: Clone {
 /// Kinds of agent tips for organizing and filtering.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AgentTipKind {
-    ZapDrive,
+    InfiniShellDrive,
     General,
     Mcp,
     SlashCommands,
@@ -116,8 +116,8 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             description: crate::t!("agent-tip-warp-drive"),
             link: Some("".to_string()),
             binding_name: None,
-            action: Some(WorkspaceAction::ZapDrive),
-            kind: AgentTipKind::ZapDrive,
+            action: Some(WorkspaceAction::InfiniShellDrive),
+            kind: AgentTipKind::InfiniShellDrive,
         },
         AgentTip {
             description: crate::t!("agent-tip-redirect-running-agent"),
@@ -201,7 +201,7 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             link: None,
             binding_name: None,
             action: None,
-            kind: AgentTipKind::ZapDrive,
+            kind: AgentTipKind::InfiniShellDrive,
         },
         AgentTip {
             description: crate::t!("agent-tip-add-rule"),
@@ -399,7 +399,7 @@ impl WorkspaceAction {
     pub fn display_text(&self) -> Option<String> {
         match self {
             WorkspaceAction::OpenPalette { .. } => Some(crate::t!("agent-tip-action-open-palette")),
-            WorkspaceAction::ZapDrive => Some(crate::t!("agent-tip-action-warp-drive")),
+            WorkspaceAction::InfiniShellDrive => Some(crate::t!("agent-tip-action-warp-drive")),
             WorkspaceAction::ToggleRightPanel => Some(crate::t!("agent-tip-action-show-diff-view")),
             _ => None,
         }

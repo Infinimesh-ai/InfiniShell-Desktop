@@ -228,7 +228,7 @@ warp_editor.workspace = true
 warp_js = { workspace = true, optional = true }
 warp_search_core.workspace = true
 warp_ssh_manager.workspace = true
-zap_sftp = { path = "../crates/zap_sftp" }
+infinishell_sftp = { path = "../crates/infinishell_sftp" }
 warp_util.workspace = true
 warpui = { workspace = true, features = ["schema_gen", "settings_value"] }
 warpui_core.workspace = true
@@ -258,8 +258,8 @@ rmcp.workspace = true
 warp_isolation_platform.workspace = true
 warp_ripgrep.workspace = true
 warp_managed_secrets.workspace = true
-zap_projects.workspace = true
-zap_sync = { path = "../crates/zap_sync" }
+infinishell_projects.workspace = true
+infinishell_sync = { path = "../crates/infinishell_sync" }
 warp_multi_agent_client.workspace = true
 local_control.workspace = true
 
@@ -592,7 +592,7 @@ default = [
     "inline_slash_commands",
     "inline_history_menu",
     "inline_model_selector",
-    "open_warp_launch_modal",
+    "infinishell_launch_modal",
     "orchestration_launch_modal",
     "agent_cli_launch_modal",
     "new_tab_styling",
@@ -636,7 +636,7 @@ default = [
     "codex_notifications",
     "codex_plugin",
     "trim_trailing_blank_lines",
-    "open_warp_new_settings_modes",
+    "infinishell_new_settings_modes",
     "settings_file",
     "ssh_tmux_wrapper",
     "onekey_prompt",
@@ -893,7 +893,9 @@ inline_model_selector = ["agent_view"]
 inline_profile_selector = ["agent_view"]
 restore_prompt_on_inline_model_selector_search = []
 oz_platform_skills = []
-open_warp_launch_modal = []
+infinishell_launch_modal = []
+# 兼容历史构建命令；产品代码只检查当前 feature 名称。
+open_warp_launch_modal = ["infinishell_launch_modal"]
 orchestration_launch_modal = []
 agent_cli_launch_modal = []
 new_tab_styling = []
@@ -907,7 +909,9 @@ queue_slash_command = []
 queued_prompts_v2 = ["queue_slash_command"]
 inline_menu_headers = []
 directory_tab_colors = []
-open_warp_new_settings_modes = []
+infinishell_new_settings_modes = []
+# 兼容历史构建命令；产品代码只检查当前 feature 名称。
+open_warp_new_settings_modes = ["infinishell_new_settings_modes"]
 hoa_code_review = []
 vertical_tabs = []
 vertical_tabs_summary_mode = []

@@ -13,7 +13,7 @@ const WARP_HOME_CONTENT: &str = r#"
 Welcome to InfiniShell.
 
 Use this local workspace to:
-* Create, view, and edit Zap Drive objects
+* Create, view, and edit InfiniShell Drive objects
 * Manage local settings
 * Work with local agent sessions, notebooks, and workflows"#;
 

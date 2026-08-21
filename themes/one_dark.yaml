@@ -1,8 +1,8 @@
 # One Dark (Zed 官方移植)
 # 配色源: zed-industries/zed — assets/themes/one/one.json (theme "One Dark")
-# 安装方式 (Windows / openWarp OSS):
-#   将本文件复制到 %APPDATA%\zap\Zap\data\themes\one_dark.yaml
-#   重启 openWarp 后, 在 Settings → Appearance → Themes 选择 "One Dark"
+# 安装方式 (Windows / InfiniShell OSS):
+#   将本文件复制到 %APPDATA%\infinishell\InfiniShell\data\themes\one_dark.yaml
+#   重启 InfiniShell 后, 在 Settings → Appearance → Themes 选择 "One Dark"
 ---
 name: One Dark
 background: '#282c34'

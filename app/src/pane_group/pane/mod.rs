@@ -479,7 +479,7 @@ impl PaneId {
         false
     }
 
-    /// Returns true if this pane contains a Zap Drive object (notebook, workflow, etc.).
+    /// Returns true if this pane contains an InfiniShell Drive object (notebook, workflow, etc.).
     pub fn is_warp_drive_object_pane(&self) -> bool {
         matches!(
             self.0.pane_type,

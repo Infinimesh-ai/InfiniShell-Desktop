@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Zap 官网部署脚本(在服务器上执行)
+# InfiniShell 官网部署脚本(在服务器上执行)
 #
 # 场景:站点由 1Panel 托管,nginx root 固定指向站点目录(例如
-#   /opt/1panel/www/sites/zap.zerx.dev/index),无法改 root 用 symlink 方案。
+#   /opt/1panel/www/sites/infinishell.zerx.dev/index),无法改 root 用 symlink 方案。
 # 故这里做"原子目录替换":CI 已把最新产物 rsync 到 <site>/.incoming,
 # 本脚本把 .incoming 重命名为正式 index 目录,并保留上一版用于回滚。
 #
-# 约定布局($DEPLOY_PATH = 站点 index 目录,例如 .../zap.zerx.dev/index):
+# 约定布局($DEPLOY_PATH = 站点 index 目录,例如 .../infinishell.zerx.dev/index):
 #   <parent>/.incoming   ← CI rsync 推上来的最新 dist 内容
 #   <parent>/index       ← nginx 实际服务的目录(= $DEPLOY_PATH)
 #   <parent>/.index.bak  ← 上一版,用于回滚

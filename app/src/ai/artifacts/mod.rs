@@ -15,7 +15,7 @@ pub enum Artifact {
     #[serde(rename = "PLAN")]
     Plan {
         document_uid: String,
-        /// None until the plan is synced to Zap Drive.
+        /// None until the plan is synced to InfiniShell Drive.
         notebook_uid: Option<NotebookId>,
         title: Option<String>,
     },

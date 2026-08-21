@@ -926,12 +926,13 @@ fn command_starts_non_terminating_session(command: &str) -> bool {
         })
 }
 
-/// 解开 Zap 自身的 generator wrapper,把里面真正要跑的命令抽出来。
+/// 解开 InfiniShell 自身的 generator wrapper,把里面真正要跑的命令抽出来。
 ///
 /// wrapper 协议形如:`<wrapper> <generator_id> '<inner_command>' [extra flags...]`
 /// 其中:
 /// - `<wrapper>` 是 `warp_run_generator_command`(POSIX shell)或
-///   `Zap-Run-GeneratorCommand`(PowerShell,大小写不敏感)。
+///   `InfiniShell-Run-GeneratorCommand`(PowerShell,大小写不敏感)。旧的 Zap/Warp
+///   拼写仍作为升级兼容入口接受。
 /// - `<generator_id>` 是数字 id,这里不解析,直接跳过。
 /// - `<inner_command>` 是被单引号包裹的真实命令字符串,也就是我们要返回的内容。
 ///
@@ -940,7 +941,9 @@ fn command_starts_non_terminating_session(command: &str) -> bool {
 fn in_band_generator_command(command: &str) -> Option<String> {
     let tokens = shell_words::split(command.trim_start()).ok()?;
     if tokens.len() >= 3
-        && (tokens[0].eq_ignore_ascii_case("Zap-Run-GeneratorCommand")
+        && (tokens[0].eq_ignore_ascii_case("InfiniShell-Run-GeneratorCommand")
+            || tokens[0].eq_ignore_ascii_case("Zap-Run-GeneratorCommand")
+            || tokens[0].eq_ignore_ascii_case("Warp-Run-GeneratorCommand")
             || tokens[0] == "warp_run_generator_command")
     {
         Some(tokens[2].clone())

@@ -67,7 +67,7 @@ impl WarpDriveItemId {
         }
     }
 }
-/// This uniquely identifies an item in Zap Drive index
+/// This uniquely identifies an item in InfiniShell Drive index
 /// Includes spaces (which ObjectTypeAndId does not entail)
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum WarpDriveItemId {

@@ -1,8 +1,8 @@
 # VS Code 2026 Dark (从 vscode 源码迁移)
 # 配色源: vscode/extensions/theme-defaults/themes/2026-dark.json
-# 安装方式 (Windows / openWarp OSS):
-#   将本文件复制到 %APPDATA%\zap\Zap\data\themes\vscode_2026_dark.yaml
-#   重启 openWarp 后, 在 Settings → Appearance → Themes 选择 "VS Code 2026 Dark"
+# 安装方式 (Windows / InfiniShell OSS):
+#   将本文件复制到 %APPDATA%\infinishell\InfiniShell\data\themes\vscode_2026_dark.yaml
+#   重启 InfiniShell 后, 在 Settings → Appearance → Themes 选择 "VS Code 2026 Dark"
 ---
 name: VS Code 2026 Dark
 background: '#191A1B'

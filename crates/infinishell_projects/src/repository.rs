@@ -1,4 +1,4 @@
-//! Diesel CRUD over `zap_projects` + `zap_project_servers`。返回的全部是
+//! Diesel CRUD over `infinishell_projects` + `infinishell_project_servers`。返回的全部是
 //! `crate::types` 里的 plain 数据结构,把 ORM 细节挡在 crate 边界内。
 //!
 //! 与 `warp_ssh_manager::SshRepository` 同款约定:每个方法接受
@@ -8,8 +8,10 @@ use chrono::Utc;
 use diesel::prelude::*;
 use diesel::result::Error as DieselError;
 use diesel::sqlite::SqliteConnection;
-use persistence::model::{NewZapProject, NewZapProjectServer, ZapProjectRow};
-use persistence::schema::{zap_project_servers, zap_projects};
+use persistence::model::{
+    InfiniShellProjectRow, NewInfiniShellProject, NewInfiniShellProjectServer,
+};
+use persistence::schema::{infinishell_project_servers, infinishell_projects};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -29,11 +31,11 @@ pub struct ProjectRepository;
 impl ProjectRepository {
     /// 列出全部未删除项目,按 sort_order、created_at 排序。
     pub fn list(conn: &mut SqliteConnection) -> Result<Vec<Project>, ProjectRepositoryError> {
-        let rows: Vec<ZapProjectRow> = zap_projects::table
-            .filter(zap_projects::deleted_at.is_null())
+        let rows: Vec<InfiniShellProjectRow> = infinishell_projects::table
+            .filter(infinishell_projects::deleted_at.is_null())
             .order((
-                zap_projects::sort_order.asc(),
-                zap_projects::created_at.asc(),
+                infinishell_projects::sort_order.asc(),
+                infinishell_projects::created_at.asc(),
             ))
             .load(conn)?;
         Ok(rows.into_iter().map(project_from_row).collect())
@@ -43,9 +45,9 @@ impl ProjectRepository {
         conn: &mut SqliteConnection,
         project_id: &str,
     ) -> Result<Option<Project>, ProjectRepositoryError> {
-        let row: Option<ZapProjectRow> = zap_projects::table
+        let row: Option<InfiniShellProjectRow> = infinishell_projects::table
             .find(project_id)
-            .filter(zap_projects::deleted_at.is_null())
+            .filter(infinishell_projects::deleted_at.is_null())
             .first(conn)
             .optional()?;
         Ok(row.map(project_from_row))
@@ -58,8 +60,8 @@ impl ProjectRepository {
     ) -> Result<Project, ProjectRepositoryError> {
         let id = Uuid::new_v4().to_string();
         let sort = next_sort_order(conn)?;
-        diesel::insert_into(zap_projects::table)
-            .values(NewZapProject {
+        diesel::insert_into(infinishell_projects::table)
+            .values(NewInfiniShellProject {
                 id: &id,
                 name,
                 git_url: None,
@@ -80,19 +82,19 @@ impl ProjectRepository {
     ) -> Result<(), ProjectRepositoryError> {
         let now = Utc::now().naive_utc();
         let affected = diesel::update(
-            zap_projects::table
+            infinishell_projects::table
                 .find(&project.id)
-                .filter(zap_projects::deleted_at.is_null()),
+                .filter(infinishell_projects::deleted_at.is_null()),
         )
         .set((
-            zap_projects::name.eq(&project.name),
-            zap_projects::git_url.eq(project.git_url.as_deref()),
-            zap_projects::root_path.eq(project.root_path.as_deref()),
-            zap_projects::rules.eq(&project.rules),
-            zap_projects::notes.eq(&project.notes),
-            zap_projects::default_profile_id.eq(project.default_profile_id.as_deref()),
-            zap_projects::sort_order.eq(project.sort_order),
-            zap_projects::updated_at.eq(now),
+            infinishell_projects::name.eq(&project.name),
+            infinishell_projects::git_url.eq(project.git_url.as_deref()),
+            infinishell_projects::root_path.eq(project.root_path.as_deref()),
+            infinishell_projects::rules.eq(&project.rules),
+            infinishell_projects::notes.eq(&project.notes),
+            infinishell_projects::default_profile_id.eq(project.default_profile_id.as_deref()),
+            infinishell_projects::sort_order.eq(project.sort_order),
+            infinishell_projects::updated_at.eq(now),
         ))
         .execute(conn)?;
         if affected == 0 {
@@ -108,17 +110,18 @@ impl ProjectRepository {
     ) -> Result<(), ProjectRepositoryError> {
         let now = Utc::now().naive_utc();
         let affected = diesel::update(
-            zap_projects::table
+            infinishell_projects::table
                 .find(project_id)
-                .filter(zap_projects::deleted_at.is_null()),
+                .filter(infinishell_projects::deleted_at.is_null()),
         )
-        .set(zap_projects::deleted_at.eq(now))
+        .set(infinishell_projects::deleted_at.eq(now))
         .execute(conn)?;
         if affected == 0 {
             return Err(ProjectRepositoryError::NotFound(project_id.to_string()));
         }
         diesel::delete(
-            zap_project_servers::table.filter(zap_project_servers::project_id.eq(project_id)),
+            infinishell_project_servers::table
+                .filter(infinishell_project_servers::project_id.eq(project_id)),
         )
         .execute(conn)?;
         Ok(())
@@ -134,19 +137,20 @@ impl ProjectRepository {
             return Err(ProjectRepositoryError::NotFound(project_id.to_string()));
         }
         diesel::delete(
-            zap_project_servers::table.filter(zap_project_servers::project_id.eq(project_id)),
+            infinishell_project_servers::table
+                .filter(infinishell_project_servers::project_id.eq(project_id)),
         )
         .execute(conn)?;
-        let values: Vec<NewZapProjectServer> = node_ids
+        let values: Vec<NewInfiniShellProjectServer> = node_ids
             .iter()
             .enumerate()
-            .map(|(index, node_id)| NewZapProjectServer {
+            .map(|(index, node_id)| NewInfiniShellProjectServer {
                 project_id,
                 node_id,
                 sort_order: index as i32,
             })
             .collect();
-        diesel::insert_into(zap_project_servers::table)
+        diesel::insert_into(infinishell_project_servers::table)
             .values(&values)
             .execute(conn)?;
         Ok(())
@@ -158,10 +162,10 @@ impl ProjectRepository {
         conn: &mut SqliteConnection,
         project_id: &str,
     ) -> Result<Vec<String>, ProjectRepositoryError> {
-        let ids: Vec<String> = zap_project_servers::table
-            .filter(zap_project_servers::project_id.eq(project_id))
-            .order(zap_project_servers::sort_order.asc())
-            .select(zap_project_servers::node_id)
+        let ids: Vec<String> = infinishell_project_servers::table
+            .filter(infinishell_project_servers::project_id.eq(project_id))
+            .order(infinishell_project_servers::sort_order.asc())
+            .select(infinishell_project_servers::node_id)
             .load(conn)?;
         Ok(ids)
     }
@@ -171,18 +175,18 @@ impl ProjectRepository {
         conn: &mut SqliteConnection,
         node_id: &str,
     ) -> Result<Vec<String>, ProjectRepositoryError> {
-        let ids: Vec<String> = zap_project_servers::table
-            .inner_join(zap_projects::table)
-            .filter(zap_project_servers::node_id.eq(node_id))
-            .filter(zap_projects::deleted_at.is_null())
-            .order(zap_projects::sort_order.asc())
-            .select(zap_projects::id)
+        let ids: Vec<String> = infinishell_project_servers::table
+            .inner_join(infinishell_projects::table)
+            .filter(infinishell_project_servers::node_id.eq(node_id))
+            .filter(infinishell_projects::deleted_at.is_null())
+            .order(infinishell_projects::sort_order.asc())
+            .select(infinishell_projects::id)
             .load(conn)?;
         Ok(ids)
     }
 }
 
-fn project_from_row(row: ZapProjectRow) -> Project {
+fn project_from_row(row: InfiniShellProjectRow) -> Project {
     Project {
         id: row.id,
         name: row.name,
@@ -199,8 +203,8 @@ fn project_from_row(row: ZapProjectRow) -> Project {
 
 fn next_sort_order(conn: &mut SqliteConnection) -> Result<i32, ProjectRepositoryError> {
     use diesel::dsl::max;
-    let current: Option<i32> = zap_projects::table
-        .select(max(zap_projects::sort_order))
+    let current: Option<i32> = infinishell_projects::table
+        .select(max(infinishell_projects::sort_order))
         .first(conn)?;
     Ok(current.map_or(0, |value| value + 1))
 }
@@ -212,6 +216,10 @@ pub(crate) fn setup_in_memory() -> SqliteConnection {
     conn.batch_execute("PRAGMA foreign_keys = ON;").unwrap();
     conn.batch_execute(include_str!(
         "../../persistence/migrations/2026-08-11-000000_add_zap_projects/up.sql"
+    ))
+    .unwrap();
+    conn.batch_execute(include_str!(
+        "../../persistence/migrations/2026-08-20-000000_rename_zap_projects_to_infinishell/up.sql"
     ))
     .unwrap();
     conn

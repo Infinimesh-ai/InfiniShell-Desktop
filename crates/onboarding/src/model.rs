@@ -93,10 +93,10 @@ impl SelectedSettings {
             // account (see `apply_onboarding_settings`).
             SelectedSettings::AgentDrivenDevelopment { .. } => true,
             SelectedSettings::Terminal { .. } => {
-                // With old onboarding (no ZapNewSettingsModes), Terminal
+                // With old onboarding (no InfiniShellNewSettingsModes), Terminal
                 // intent still leaves AI enabled; with new onboarding,
                 // Terminal intent explicitly disables AI.
-                !FeatureFlag::ZapNewSettingsModes.is_enabled()
+                !FeatureFlag::InfiniShellNewSettingsModes.is_enabled()
             }
         }
     }
@@ -427,7 +427,7 @@ impl OnboardingStateModel {
     pub(crate) fn settings(&self) -> SelectedSettings {
         use warp_core::features::FeatureFlag;
         let ui_customization = if FeatureFlag::AccountFirstOnboarding.is_enabled()
-            || FeatureFlag::ZapNewSettingsModes.is_enabled()
+            || FeatureFlag::InfiniShellNewSettingsModes.is_enabled()
         {
             Some(self.ui_customization.clone())
         } else {
@@ -491,7 +491,7 @@ impl OnboardingStateModel {
     /// is enabled, since new users always enter a world where Warp-provided AI is not free.
     pub(crate) fn ai_setup_flow_active(&self) -> bool {
         use warp_core::features::FeatureFlag;
-        FeatureFlag::ZapNewSettingsModes.is_enabled()
+        FeatureFlag::InfiniShellNewSettingsModes.is_enabled()
     }
 
     pub(crate) fn ai_setup_choice(&self) -> AiSetupChoice {
@@ -1033,7 +1033,7 @@ impl OnboardingStateModel {
                     | OnboardingStep::ThemePicker
                     | OnboardingStep::PostAuthOffer
             )
-        } else if FeatureFlag::ZapNewSettingsModes.is_enabled() {
+        } else if FeatureFlag::InfiniShellNewSettingsModes.is_enabled() {
             matches!(
                 self.step,
                 OnboardingStep::ThirdParty
@@ -1165,7 +1165,7 @@ impl OnboardingStateModel {
     pub(crate) fn back(&mut self, ctx: &mut ModelContext<Self>) {
         use warp_core::features::FeatureFlag;
         let account_first = FeatureFlag::AccountFirstOnboarding.is_enabled();
-        let theme_picker_last = FeatureFlag::ZapNewSettingsModes.is_enabled();
+        let theme_picker_last = FeatureFlag::InfiniShellNewSettingsModes.is_enabled();
         let ai_setup_flow = self.ai_setup_flow_active();
         let agent_intention = matches!(self.intention, OnboardingIntention::AgentDrivenDevelopment);
 
@@ -1238,7 +1238,7 @@ impl OnboardingStateModel {
     pub(crate) fn next(&mut self, ctx: &mut ModelContext<Self>) {
         use warp_core::features::FeatureFlag;
         let account_first = FeatureFlag::AccountFirstOnboarding.is_enabled();
-        let theme_picker_last = FeatureFlag::ZapNewSettingsModes.is_enabled();
+        let theme_picker_last = FeatureFlag::InfiniShellNewSettingsModes.is_enabled();
         let is_last_step = if account_first || theme_picker_last {
             matches!(
                 self.step,
@@ -1399,7 +1399,7 @@ impl OnboardingStateModel {
         }
 
         let is_terminal = matches!(self.intention, OnboardingIntention::Terminal);
-        if !FeatureFlag::ZapNewSettingsModes.is_enabled() {
+        if !FeatureFlag::InfiniShellNewSettingsModes.is_enabled() {
             // Legacy flow: ThemePicker → Intention → Agent → Project.
             return match self.step {
                 OnboardingStep::Intro | OnboardingStep::ThemePicker => (0, 4),

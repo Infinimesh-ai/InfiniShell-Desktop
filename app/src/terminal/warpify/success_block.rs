@@ -28,13 +28,13 @@ const VERTICAL_TEXT_MARGIN: f32 = 16.;
 
 #[derive(Debug, Clone)]
 pub enum WarpifySuccessBlockEvent {
-    ZapifySettings,
+    OpenWarpifySettings,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum WarpifySuccessBlockAction {
     ClearAutoWarpifySnippet,
-    ZapifySettings,
+    OpenWarpifySettings,
     OpenUrl(String),
 }
 
@@ -341,8 +341,8 @@ impl TypedActionView for WarpifySuccessBlock {
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
-            WarpifySuccessBlockAction::ZapifySettings => {
-                ctx.emit(WarpifySuccessBlockEvent::ZapifySettings);
+            WarpifySuccessBlockAction::OpenWarpifySettings => {
+                ctx.emit(WarpifySuccessBlockEvent::OpenWarpifySettings);
             }
             WarpifySuccessBlockAction::OpenUrl(url) => {
                 ctx.open_url(url);

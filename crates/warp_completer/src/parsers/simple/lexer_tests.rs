@@ -165,7 +165,7 @@ fn test_multiple_whitespace() {
 
 #[test]
 fn test_backtick_escape_char() {
-    let source = r#"& "$HOME\Downloads\Zap` Setup.exe" /SP- /SILENT `t`"#;
+    let source = r#"& "$HOME\Downloads\InfiniShell` Setup.exe" /SP- /SILENT `t`"#;
     let tokens: Vec<_> = Lexer::new(source, EscapeChar::Backtick, false)
         .map(|t| (t.item, t.span))
         .collect();
@@ -177,19 +177,22 @@ fn test_backtick_escape_char() {
             (Token::Whitespace(" "), Span::new(1, 2)),
             (Token::DoubleQuote, Span::new(2, 3)),
             (Token::Dollar, Span::new(3, 4)),
-            (Token::Literal(r"HOME\Downloads\Zap"), Span::new(4, 22)),
-            (Token::EscapeChar("`"), Span::new(22, 23)),
-            (Token::Whitespace(" "), Span::new(23, 24)),
-            (Token::Literal("Setup.exe"), Span::new(24, 33)),
-            (Token::DoubleQuote, Span::new(33, 34)),
-            (Token::Whitespace(" "), Span::new(34, 35)),
-            (Token::Literal("/SP-"), Span::new(35, 39)),
-            (Token::Whitespace(" "), Span::new(39, 40)),
-            (Token::Literal("/SILENT"), Span::new(40, 47)),
+            (
+                Token::Literal(r"HOME\Downloads\InfiniShell"),
+                Span::new(4, 30)
+            ),
+            (Token::EscapeChar("`"), Span::new(30, 31)),
+            (Token::Whitespace(" "), Span::new(31, 32)),
+            (Token::Literal("Setup.exe"), Span::new(32, 41)),
+            (Token::DoubleQuote, Span::new(41, 42)),
+            (Token::Whitespace(" "), Span::new(42, 43)),
+            (Token::Literal("/SP-"), Span::new(43, 47)),
             (Token::Whitespace(" "), Span::new(47, 48)),
-            (Token::EscapeChar("`"), Span::new(48, 49)),
-            (Token::Literal("t"), Span::new(49, 50)),
-            (Token::EscapeChar("`"), Span::new(50, 51)),
+            (Token::Literal("/SILENT"), Span::new(48, 55)),
+            (Token::Whitespace(" "), Span::new(55, 56)),
+            (Token::EscapeChar("`"), Span::new(56, 57)),
+            (Token::Literal("t"), Span::new(57, 58)),
+            (Token::EscapeChar("`"), Span::new(58, 59)),
         ]
     )
 }

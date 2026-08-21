@@ -82,7 +82,7 @@ pub fn refresh_workspace_metadata<C>(
     async { Ok(()) }
 }
 
-/// Refresh Zap Drive before executing an operation.
+/// Refresh InfiniShell Drive before executing an operation.
 pub fn refresh_warp_drive(
     ctx: &AppContext,
 ) -> impl Future<Output = anyhow::Result<()>> + Send + 'static {

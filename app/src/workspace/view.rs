@@ -7,6 +7,7 @@ mod crash_recovery;
 pub(crate) mod feature_intro_modal;
 pub(crate) mod free_ai_removal_modal;
 pub mod global_search;
+pub(crate) mod infinishell_launch_modal;
 pub(crate) mod launch_modal;
 pub(crate) mod left_panel;
 pub(crate) mod onboarding;
@@ -21,7 +22,6 @@ pub(crate) mod tests;
 mod vertical_tabs;
 #[cfg(target_family = "wasm")]
 mod wasm_view;
-pub(crate) mod zap_launch_modal;
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -42,7 +42,7 @@ use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use ::settings::{Setting, ToggleableSetting};
-// Zap:`ai::index::full_source_code_embedding`(代码库向量索引)整条链路已下线。
+// InfiniShell:`ai::index::full_source_code_embedding`(代码库向量索引)整条链路已下线。
 #[cfg(target_os = "macos")]
 use anyhow::Result;
 use autoupdate::AutoupdateStage;
@@ -151,7 +151,7 @@ use super::{ActiveSession, TabBarDropTargetData, TabBarLocation, WorkspaceRegist
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
 use crate::ai::agent::{AIAgentInput, EntrypointType};
-// Zap:上游把 `ConversationOrTask` 重构成了 `AgentConversationEntry` 体系,
+// InfiniShell:上游把 `ConversationOrTask` 重构成了 `AgentConversationEntry` 体系,
 // 会话导航数据改从 `ConversationNavigationData::all_conversations` 取。
 use crate::ai::agent_conversations_model::AgentConversationsModel;
 #[cfg(target_family = "wasm")]
@@ -180,7 +180,7 @@ use crate::ai::conversation_utils;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentModel};
 use crate::ai::execution_profiles::ExecutionProfileId;
 use crate::ai::execution_profiles::editor::ExecutionProfileEditorManager;
-// Zap:`ClientProfileId` 是上游云端 profile 同步引入的类型,我方无此类型且此处未使用。
+// InfiniShell:`ClientProfileId` 是上游云端 profile 同步引入的类型,我方无此类型且此处未使用。
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::facts::view::AIFactPage;
 use crate::ai::facts::{AIFactManager, AIFactView, AIFactViewEvent};
@@ -233,7 +233,7 @@ use crate::drive::settings::{WarpDriveSettings, WarpDriveSettingsChangedEvent};
 use crate::drive::workflows::arguments::ArgumentsState;
 use crate::drive::workflows::modal::{WorkflowModal, WorkflowModalEvent};
 use crate::drive::{
-    DriveObjectType, DrivePanel, DrivePanelEvent, ObjectTypeAndId, ZapDriveObjectSettings,
+    DriveObjectType, DrivePanel, DrivePanelEvent, InfiniShellDriveObjectSettings, ObjectTypeAndId,
 };
 use crate::editor::{
     EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
@@ -466,6 +466,9 @@ use crate::workspace::view::free_ai_removal_modal::{
     FreeAiRemovalModalVariant,
 };
 use crate::workspace::view::global_search::view::GlobalSearchEntryFocus;
+use crate::workspace::view::infinishell_launch_modal::{
+    InfiniShellLaunchModal, InfiniShellLaunchModalEvent,
+};
 use crate::workspace::view::left_panel::{
     LeftPanelAction, LeftPanelEvent, LeftPanelView, ToolPanelView,
 };
@@ -473,11 +476,10 @@ use crate::workspace::view::orchestration_launch_modal::{
     OrchestrationLaunchModal, OrchestrationLaunchModalEvent,
 };
 use crate::workspace::view::right_panel::{RightPanelEvent, RightPanelView};
-use crate::workspace::view::zap_launch_modal::{ZapLaunchModal, ZapLaunchModalEvent};
 use crate::workspace::{ForkFromExchange, ForkedConversationDestination};
 use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::workspaces::workspace::AdminEnablementSetting;
-// Zap:上游的 `AgentNotificationsModel` 随 agent-management UI 删除,
+// InfiniShell:上游的 `AgentNotificationsModel` 随 agent-management UI 删除,
 // 通知中心由 `crate::notifications::model` 承接,本文件不再引用该类型。
 use crate::{
     BlocklistAIHistoryModel, GlobalResourceHandles, TelemetryEvent, autoupdate,
@@ -741,7 +743,7 @@ impl ShowTabBar {
 #[cfg(target_family = "wasm")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SimplifiedWasmTabBarContent {
-    /// Viewing a Zap Drive object (notebook, workflow, env vars, AI facts, MCP servers)
+    /// Viewing an InfiniShell Drive object (notebook, workflow, env vars, AI facts, MCP servers)
     WarpDriveObject,
     /// Participating in a shared session (viewer or writer). Contains the optional ambient agent task ID.
     SharedSession { task_id: Option<AmbientAgentTaskId> },
@@ -994,7 +996,7 @@ pub struct Workspace {
     theme_deletion_modal: ViewHandle<ThemeDeletionModal>,
     suggested_agent_mode_workflow_modal: ViewHandle<SuggestedAgentModeWorkflowModal>,
     suggested_rule_modal: ViewHandle<SuggestedRuleModal>,
-    zap_launch_modal: ViewHandle<ZapLaunchModal>,
+    infinishell_launch_modal: ViewHandle<InfiniShellLaunchModal>,
     orchestration_launch_modal: ViewHandle<OrchestrationLaunchModal>,
     agent_cli_launch_modal: ViewHandle<AgentCliLaunchModal>,
     feature_intro_modal: ViewHandle<FeatureIntroModal>,
@@ -1492,7 +1494,7 @@ impl Workspace {
                 if let Some(id) = id_to_force_expand {
                     self.open_notebook(
                         &NotebookSource::Existing(id),
-                        &ZapDriveObjectSettings::default(),
+                        &InfiniShellDriveObjectSettings::default(),
                         ctx,
                         true,
                     );
@@ -1507,7 +1509,11 @@ impl Workspace {
                     id_to_force_expand = Some(workflow.id);
                 }
                 if let Some(id) = id_to_force_expand {
-                    self.open_workflow_with_existing(id, &ZapDriveObjectSettings::default(), ctx);
+                    self.open_workflow_with_existing(
+                        id,
+                        &InfiniShellDriveObjectSettings::default(),
+                        ctx,
+                    );
                     ObjectStoreModel::handle(ctx).update(ctx, |object_store_model, ctx| {
                         object_store_model.force_expand_object_and_ancestors(id, ctx);
                     });
@@ -2770,9 +2776,9 @@ impl Workspace {
 
         let suggested_rule_modal = Self::build_suggested_rule_modal(ctx);
 
-        let zap_launch_view = ctx.add_typed_action_view(ZapLaunchModal::new);
-        ctx.subscribe_to_view(&zap_launch_view, |me, _, event, ctx| {
-            me.handle_zap_launch_modal_event(event, ctx);
+        let infinishell_launch_view = ctx.add_typed_action_view(InfiniShellLaunchModal::new);
+        ctx.subscribe_to_view(&infinishell_launch_view, |me, _, event, ctx| {
+            me.handle_infinishell_launch_modal_event(event, ctx);
         });
 
         let orchestration_launch_view = ctx.add_typed_action_view(OrchestrationLaunchModal::new);
@@ -2911,7 +2917,7 @@ impl Workspace {
             me.handle_window_settings_changed_event(event, ctx);
         });
 
-        // Show the Zap AI warm welcome iff the user hasn't dismissed it nor interacted with Zap AI before.
+        // Show the InfiniShell AI warm welcome iff the user hasn't dismissed it nor interacted with InfiniShell AI before.
         // Also, avoid showing it in integration tests to prevent interaction with other tests.
         let mut should_show_ai_assistant_warm_welcome: bool = !FeatureFlag::AgentMode.is_enabled()
             && AISettings::as_ref(ctx).is_any_ai_enabled(ctx)
@@ -2924,7 +2930,7 @@ impl Workspace {
                 .map(|dismissed: bool| !dismissed)
                 .unwrap_or(true);
 
-        // Don't automatically show the Zap AI welcome during onboarding if the block onboarding flow is being used.
+        // Don't automatically show the InfiniShell AI welcome during onboarding if the block onboarding flow is being used.
         // This way, we can delay the reveal until the end of the onboarding flow so as not to overwhelm the user.
         if matches!(
             BlockOnboarding::get_group(ctx),
@@ -3077,7 +3083,7 @@ impl Workspace {
         });
 
         let native_modal = Self::build_native_modal_view(ctx);
-        // Zap:删除 SharedObjectsCreationDeniedModal 注册(云端 Drive 配额拒绝弹窗)
+        // InfiniShell:删除 SharedObjectsCreationDeniedModal 注册(云端 Drive 配额拒绝弹窗)
 
         ctx.subscribe_to_model(&AISettings::handle(ctx), |me, _, event, ctx| match event {
             AISettingsChangedEvent::IsAnyAIEnabled { .. }
@@ -3108,8 +3114,8 @@ impl Workspace {
                 // The model has already determined which window should show the modal.
                 let model_ref = model.as_ref(ctx);
                 if model_ref.target_window_id() == Some(ctx.window_id()) {
-                    if model_ref.is_zap_launch_modal_open() {
-                        me.focus_zap_launch_modal(ctx);
+                    if model_ref.is_infinishell_launch_modal_open() {
+                        me.focus_infinishell_launch_modal(ctx);
                     } else if model_ref.is_orchestration_launch_modal_open() {
                         me.focus_orchestration_launch_modal(ctx);
                     } else if model_ref.is_agent_cli_launch_modal_open() {
@@ -3249,7 +3255,7 @@ impl Workspace {
             #[cfg(target_family = "wasm")]
             transcript_details_panel,
             tab_fixed_width: None,
-            zap_launch_modal: zap_launch_view,
+            infinishell_launch_modal: infinishell_launch_view,
             orchestration_launch_modal: orchestration_launch_view,
             agent_cli_launch_modal: agent_cli_launch_view,
             feature_intro_modal: feature_intro_view,
@@ -3903,7 +3909,7 @@ impl Workspace {
                 LeftPanelDisplayedTab::GlobalSearch => ToolPanelView::GlobalSearch {
                     entry_focus: GlobalSearchEntryFocus::Results,
                 },
-                LeftPanelDisplayedTab::ZapDrive => ToolPanelView::ZapDrive,
+                LeftPanelDisplayedTab::InfiniShellDrive => ToolPanelView::InfiniShellDrive,
                 LeftPanelDisplayedTab::ConversationListView => ToolPanelView::ConversationListView,
                 LeftPanelDisplayedTab::SshManager => ToolPanelView::SshManager,
                 LeftPanelDisplayedTab::ServerFileBrowser => ToolPanelView::ServerFileBrowser,
@@ -3973,13 +3979,13 @@ impl Workspace {
             self.add_tab_from_existing_pane(home_pane, 0, None, ctx);
 
             // If we can't start a terminal session to run the onboarding flow, show the Zap Home
-            // placeholder along with Zap Drive.
+            // placeholder along with InfiniShell Drive.
             true
         };
         let initial_tab = self.active_tab_pane_group().clone();
 
         if open_warp_drive {
-            // We open Zap Drive automatically in two cases:
+            // We open InfiniShell Drive automatically in two cases:
             // * The user is new to Zap, and went through the overall onboarding flow
             // * The user is on the web, so we can't open a terminal session.
             let initial_load_complete =
@@ -3991,7 +3997,7 @@ impl Workspace {
                 if ObjectStoreModel::as_ref(ctx).has_non_welcome_objects() {
                     me.open_or_toggle_warp_drive(false, false, ctx);
 
-                    // After opening Zap Drive, if we rendered the Zap Home placeholder panel, replace it with one of
+                    // After opening InfiniShell Drive, if we rendered the Zap Home placeholder panel, replace it with one of
                     // the user's own objects.
                     if show_warp_home {
                         let object_store_model = ObjectStoreModel::as_ref(ctx);
@@ -4053,7 +4059,7 @@ impl Workspace {
 
         // If the conversation is open in a pane this session, grab its nav data so we can
         // navigate directly to it. Otherwise we'll restore from scratch into a new tab.
-        // Zap:`AgentConversationsModel::get_conversation` / `ConversationOrTask` 已被上游
+        // InfiniShell:`AgentConversationsModel::get_conversation` / `ConversationOrTask` 已被上游
         // 的 entry 体系取代,且 entry 不携带 nav data,这里直接查会话导航数据源。
         let nav_data = ConversationNavigationData::all_conversations(ctx)
             .into_iter()
@@ -4150,7 +4156,7 @@ impl Workspace {
             }
         }
 
-        // Check if focused pane is a Zap Drive object
+        // Check if focused pane is an InfiniShell Drive object
         let focused_pane_id = pane_group.focused_pane_id(ctx);
         if focused_pane_id.is_warp_drive_object_pane() {
             return Some(SimplifiedWasmTabBarContent::WarpDriveObject);
@@ -4272,9 +4278,9 @@ impl Workspace {
         });
 
         // The panel is already open and no models are open, so just refocus the panel.
-        // If there is a modal open, it would sit above the Zap AI panel and we would end up
-        // focusing the Zap AI panel _behind_ the floating modal. Instead, we opt for the normal
-        // toggle behavior which will close the current modal view and then toggle Zap AI.
+        // If there is a modal open, it would sit above the InfiniShell AI panel and we would end up
+        // focusing the InfiniShell AI panel _behind_ the floating modal. Instead, we opt for the normal
+        // toggle behavior which will close the current modal view and then toggle InfiniShell AI.
         if self.current_workspace_state.is_ai_assistant_panel_open
             && !self.ai_assistant_panel.is_self_or_child_focused(ctx)
             && !self.current_workspace_state.is_any_modal_open(ctx)
@@ -4287,7 +4293,7 @@ impl Workspace {
         self.current_workspace_state.is_ai_assistant_panel_open =
             !self.current_workspace_state.is_ai_assistant_panel_open;
 
-        // Close any other modals that could be floating on top of the Zap AI panel.
+        // Close any other modals that could be floating on top of the InfiniShell AI panel.
         self.current_workspace_state.close_all_modals();
 
         if self.current_workspace_state.is_ai_assistant_panel_open {
@@ -4324,8 +4330,8 @@ impl Workspace {
             .has_warp_drive_initialized_sections(app)
     }
 
-    /// Check if Zap Drive view is focused within.
-    /// Routes to the appropriate Zap Drive panel.
+    /// Check if InfiniShell Drive view is focused within.
+    /// Routes to the appropriate InfiniShell Drive panel.
     fn is_warp_drive_view_focused(&self, ctx: &mut ViewContext<Self>) -> bool {
         let app = ctx;
         self.left_panel_view.is_self_or_child_focused(app)
@@ -4527,7 +4533,7 @@ impl Workspace {
     }
 
     /// This function shifts focus to the panel on the left.
-    /// The current focusable panels are: Zap Drive, theme chooser, AI, and resource center (keyboard shortcuts page only)
+    /// The current focusable panels are: InfiniShell Drive, theme chooser, AI, and resource center (keyboard shortcuts page only)
     fn focus_left_panel(&mut self, ctx: &mut ViewContext<Self>) {
         // Starts from terminal
         if self.active_tab_pane_group().is_self_or_child_focused(ctx) {
@@ -4547,7 +4553,7 @@ impl Workspace {
         {
             self.focus_active_tab(ctx);
         }
-        // Starts from a left panel: Zap Drive
+        // Starts from a left panel: InfiniShell Drive
         else if self.is_warp_drive_view_focused(ctx) {
             if self.current_workspace_state.is_right_panel_open() {
                 self.set_selected_object(None, ctx);
@@ -4592,7 +4598,7 @@ impl Workspace {
                 ctx.focus(&self.theme_chooser_view);
             }
         }
-        // Starts from a left panel: Zap Drive, theme chooser
+        // Starts from a left panel: InfiniShell Drive, theme chooser
         else if self.is_warp_drive_view_focused(ctx)
             || self.theme_chooser_view.is_self_or_child_focused(ctx)
         {
@@ -5548,7 +5554,7 @@ impl Workspace {
         menu
     }
 
-    /// Zap:team 切换属于账号/云端能力,`WorkspaceAction` 里没有
+    /// InfiniShell:team 切换属于账号/云端能力,`WorkspaceAction` 里没有
     /// `OpenNewWindowForTeam` / `ShowTeamSwitcherMenu` 两个 variant(见
     /// `workspace/action.rs`),因此本下拉菜单没有触发入口,菜单项也不再挂动作。
     #[allow(dead_code)]
@@ -5570,7 +5576,7 @@ impl Workspace {
         ];
         items.extend(workspace.teams.iter().map(|team| {
             let uid = team.uid;
-            // Zap:没有 `WorkspaceAction::OpenNewWindowForTeam`,菜单项仅作展示。
+            // InfiniShell:没有 `WorkspaceAction::OpenNewWindowForTeam`,菜单项仅作展示。
             let mut fields = MenuItemFields::new(team.name.clone());
             fields = if Some(uid) == current_team_uid {
                 fields.with_icon(icons::Icon::Check)
@@ -5656,7 +5662,7 @@ impl Workspace {
         })
         .with_cursor(Cursor::PointingHand)
         .on_click(|_ctx, _, _| {
-            // Zap:没有 `WorkspaceAction::ShowTeamSwitcherMenu`,team 切换入口不可用。
+            // InfiniShell:没有 `WorkspaceAction::ShowTeamSwitcherMenu`,team 切换入口不可用。
         })
         .finish();
 
@@ -5910,7 +5916,7 @@ impl Workspace {
                 let pane_group = self.active_tab_pane_group().clone();
                 self.handle_file_tree_event(pane_group, pane_group_event, ctx);
             }
-            LeftPanelEvent::ZapDrive(drive_event) => {
+            LeftPanelEvent::InfiniShellDrive(drive_event) => {
                 self.handle_warp_drive_event(drive_event, ctx);
             }
             LeftPanelEvent::ServerFileBrowser(event) => match event {
@@ -6046,7 +6052,7 @@ impl Workspace {
             LeftPanelEvent::StartProjectConversation { project_id } => {
                 self.start_project_conversation(project_id.clone(), ctx);
             }
-            // Zap:云端登录链路已删除,`LeftPanelEvent` 没有 `SignInRequested`,
+            // InfiniShell:云端登录链路已删除,`LeftPanelEvent` 没有 `SignInRequested`,
             // `AuthView` 也没有 `start_sign_in`,对应分支一并移除。
         }
     }
@@ -6377,11 +6383,8 @@ impl Workspace {
     /// 进入 Agent 视图,并把 (project_id, node_id) 绑定暂存到终端,待新会话
     /// 创建时写入会话数据(仅入口 UX,上下文注入走会话推断)。
     pub fn start_project_conversation(&mut self, project_id: String, ctx: &mut ViewContext<Self>) {
-        let node_ids = match zap_projects::with_conn(|conn| {
-            Ok(zap_projects::ProjectRepository::servers_for_project(
-                conn,
-                &project_id,
-            )?)
+        let node_ids = match infinishell_projects::with_conn(|conn| {
+            Ok(infinishell_projects::ProjectRepository::servers_for_project(conn, &project_id)?)
         }) {
             Ok(node_ids) => node_ids,
             Err(err) => {
@@ -8366,7 +8369,7 @@ impl Workspace {
             return false;
         }
 
-        // Zap: 去掉首次打开的 agentic suggestions 欢迎块教程。仍把用户标记为
+        // InfiniShell: 去掉首次打开的 agentic suggestions 欢迎块教程。仍把用户标记为
         // onboarded,避免下游(如 telemetry banner)把已用户当新用户处理。
         if !self.auth_state.is_onboarded().unwrap_or_default() {
             AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
@@ -8421,7 +8424,7 @@ impl Workspace {
         ctx.notify();
     }
 
-    /// Opens the Zap Drive object identified by `uid` in a new pane
+    /// Opens the InfiniShell Drive object identified by `uid` in a new pane
     /// if it has a pane representation.
     fn open_warp_drive_object_in_new_pane(&mut self, uid: &ObjectUid, ctx: &mut ViewContext<Self>) {
         let Some(object) = ObjectStoreModel::as_ref(ctx).get_by_uid(uid) else {
@@ -8433,7 +8436,7 @@ impl Workspace {
             ObjectType::Notebook => {
                 self.open_notebook(
                     &NotebookSource::Existing(sync_id),
-                    &ZapDriveObjectSettings::default(),
+                    &InfiniShellDriveObjectSettings::default(),
                     ctx,
                     true,
                 );
@@ -8441,7 +8444,7 @@ impl Workspace {
             ObjectType::Workflow => {
                 self.open_workflow_in_pane(
                     &WorkflowOpenSource::Existing(sync_id),
-                    &ZapDriveObjectSettings::default(),
+                    &InfiniShellDriveObjectSettings::default(),
                     WorkflowViewMode::View,
                     ctx,
                 );
@@ -8470,7 +8473,7 @@ impl Workspace {
     pub fn open_notebook(
         &mut self,
         source: &NotebookSource,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
         default_to_new_pane: bool,
     ) {
@@ -8492,7 +8495,7 @@ impl Workspace {
                 );
             }
             // TODO(zap-cloud-removal Phase 5): invitee_email/source 这条
-            // notebook 邀请链路已无 UI 出口,但 `ZapDriveObjectSettings.invitee_email`
+            // notebook 邀请链路已无 UI 出口,但 `InfiniShellDriveObjectSettings.invitee_email`
             // 仍由 URL handler / drag-drop 链路传入。Phase 5 退役 invitee 概念时
             // 把字段从 settings 结构里也删掉。
             let _ = settings;
@@ -8543,11 +8546,11 @@ impl Workspace {
         }
     }
 
-    /// Open a Zap Drive workflow in response to an intent URL.
+    /// Open an InfiniShell Drive workflow in response to an intent URL.
     pub fn open_workflow_from_intent(
         &mut self,
         workflow_id: SyncId,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
     ) {
         // If running workflows is supported, do so. Otherwise, or if the workflow isn't in memory,
@@ -8590,7 +8593,7 @@ impl Workspace {
     pub fn open_workflow_in_pane(
         &mut self,
         source: &WorkflowOpenSource,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         mode: WorkflowViewMode,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -9242,7 +9245,7 @@ impl Workspace {
         });
     }
 
-    // Zap Wave 7-3:`open_environment_management_pane` 随 ambient-agent UI 子系统
+    // InfiniShell Wave 7-3:`open_environment_management_pane` 随 ambient-agent UI 子系统
     // 物理删。
 
     /// Opens a custom model router editor pane in a right-split.
@@ -9513,21 +9516,21 @@ impl Workspace {
         self.current_workspace_state.is_warp_drive_open =
             if toggle { !was_warp_drive_open } else { true };
 
-        // Set selected object to None upon toggle close of Zap Drive
+        // Set selected object to None upon toggle close of InfiniShell Drive
         if !self.current_workspace_state.is_warp_drive_open {
             self.set_selected_object(None, ctx);
             self.focus_active_tab(ctx);
         }
 
-        // Reset focused index when opening/toggling Zap Drive open
+        // Reset focused index when opening/toggling InfiniShell Drive open
         if self.current_workspace_state.is_warp_drive_open {
             self.reset_focused_index_in_warp_drive(true, ctx);
         }
 
         ctx.notify();
 
-        // Telemetry and welcome tip logic is only for when the user explicitly opens Zap Drive
-        // AND zap drive wasn't open before. There are other scenarios where we open Zap Drive like:
+        // Telemetry and welcome tip logic is only for when the user explicitly opens InfiniShell Drive
+        // AND zap drive wasn't open before. There are other scenarios where we open InfiniShell Drive like:
         // new user onboarding, user joins a team, etc so we want to avoid counting those.
         if explicit_user_action
             && !was_warp_drive_open
@@ -9542,7 +9545,7 @@ impl Workspace {
             );
             self.tips_completed.update(ctx, |tips_completed, ctx| {
                 mark_feature_used_and_write_to_user_defaults(
-                    Tip::Action(TipAction::ZapDrive),
+                    Tip::Action(TipAction::InfiniShellDrive),
                     tips_completed,
                     ctx,
                 );
@@ -11410,7 +11413,7 @@ impl Workspace {
                     // Proc same behavior as DrivePanelEvent::RunWorkflow
                     self.run_cloud_workflow_in_active_input(
                         workflow.clone(),
-                        WorkflowSelectionSource::ZapDrive,
+                        WorkflowSelectionSource::InfiniShellDrive,
                         TerminalSessionFallbackBehavior::default(),
                         ctx,
                     );
@@ -11846,7 +11849,7 @@ impl Workspace {
         let warp_drive_index_width = modal_sizes.map(|ms| {
             ms.warp_drive_index_width
                 .lock()
-                .expect("should be able to lock zap drive resizable state handle")
+                .expect("should be able to lock InfiniShell Drive resizable state handle")
                 .size()
         });
 
@@ -12617,7 +12620,7 @@ impl Workspace {
         ctx.notify();
     }
 
-    /// Zap:上游删除了 Welcome pane(只留 GetStarted),但 Zap 保留 Welcome 作为
+    /// InfiniShell:上游删除了 Welcome pane(只留 GetStarted),但 Zap 保留 Welcome 作为
     /// `FeatureFlag::WelcomeTab` 打开时新建 tab 的入口视图,故一并保留该构造函数。
     fn add_welcome_tab(&mut self, ctx: &mut ViewContext<Self>) {
         let startup_directory = self.get_new_tab_startup_directory(
@@ -13020,7 +13023,7 @@ impl Workspace {
     pub fn add_tab_for_cloud_notebook(
         &mut self,
         notebook_id: SyncId,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
     ) {
         // TODO: We should validate that this notebook exists and fallback if it doesn't
@@ -13038,7 +13041,7 @@ impl Workspace {
     fn add_tab_for_cloud_workflow(
         &mut self,
         workflow_id: SyncId,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
     ) {
         let panes_layout = PanesLayout::Snapshot(Box::new(PaneNodeSnapshot::Leaf(LeafSnapshot {
@@ -13717,7 +13720,7 @@ impl Workspace {
                 return;
             };
 
-            // Zap:没有云端 fork 通路,始终走本地 fork。
+            // InfiniShell:没有云端 fork 通路,始终走本地 fork。
             workspace.create_local_fork(
                 source_conversation,
                 conversation_id,
@@ -14658,7 +14661,7 @@ impl Workspace {
                 _ => self.open_navigation_palette(ctx),
             },
             PaletteMode::LaunchConfig => self.open_launch_config_palette(ctx),
-            PaletteMode::ZapDrive => self.open_warp_drive_palette(ctx),
+            PaletteMode::InfiniShellDrive => self.open_warp_drive_palette(ctx),
             PaletteMode::Files => self.open_files_palette(ctx),
             PaletteMode::Conversations => self.open_conversations_palette(ctx),
         }
@@ -14751,7 +14754,7 @@ impl Workspace {
             }
             CommandPaletteEvent::OpenNotebook { id } => self.open_notebook(
                 &NotebookSource::Existing(*id),
-                &ZapDriveObjectSettings::default(),
+                &InfiniShellDriveObjectSettings::default(),
                 ctx,
                 true,
             ),
@@ -14818,11 +14821,11 @@ impl Workspace {
     }
 
     /// This function is used when we set a selected object, which is an object open in an active pane.
-    /// We do not want to focus Zap Drive, instead we want to focus the editor of the open object.
+    /// We do not want to focus InfiniShell Drive, instead we want to focus the editor of the open object.
     fn view_in_warp_drive(&mut self, item_id: WarpDriveItemId, ctx: &mut ViewContext<Self>) {
         self.open_left_panel(ctx);
         self.left_panel_view.update(ctx, |left_panel, ctx| {
-            left_panel.handle_action(&LeftPanelAction::ZapDrive, ctx);
+            left_panel.handle_action(&LeftPanelAction::InfiniShellDrive, ctx);
         });
 
         if let WarpDriveItemId::Object(object_id) = item_id {
@@ -14837,7 +14840,7 @@ impl Workspace {
         });
     }
 
-    /// This function is used when we want to view an item in Zap Drive AND focus Zap Drive.
+    /// This function is used when we want to view an item in InfiniShell Drive AND focus InfiniShell Drive.
     pub fn view_in_and_focus_warp_drive(
         &mut self,
         item_id: WarpDriveItemId,
@@ -14938,10 +14941,10 @@ impl Workspace {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            // Zap 去中心化分支:`CheckForUpdate` / `ZapDrive` 事件 arm 随
+            // Zap 去中心化分支:`CheckForUpdate` / `InfiniShellDrive` 事件 arm 随
             // `SettingsViewEvent` 中同名 variant 一同物理删。手动检查更新仍可
             // 由 `WorkspaceAction::CheckForUpdate`(`workspace:check_for_updates` binding)
-            // 触发;Zap Drive 仍可由 `WorkspaceAction::ZapDrive` 触发。
+            // 触发;InfiniShell Drive 仍可由 `WorkspaceAction::InfiniShellDrive` 触发。
             SettingsViewEvent::Pane(_) | SettingsViewEvent::StartResize => {}
             SettingsViewEvent::ShowToast { message, flavor } => {
                 self.toast_stack.update(ctx, |toast_stack, ctx| {
@@ -15195,7 +15198,11 @@ impl Workspace {
                 self.open_workflow_with_command(command.clone(), ctx)
             }
             pane_group::Event::OpenCloudWorkflowForEdit(workflow_id) => self
-                .open_workflow_with_existing(*workflow_id, &ZapDriveObjectSettings::default(), ctx),
+                .open_workflow_with_existing(
+                    *workflow_id,
+                    &InfiniShellDriveObjectSettings::default(),
+                    ctx,
+                ),
             pane_group::Event::OpenWorkflowModalWithTemporary(workflow) => {
                 self.open_workflow_with_temporary(*workflow.clone(), ctx)
             }
@@ -15255,7 +15262,7 @@ impl Workspace {
             } => {
                 self.move_to_drive_space(*object_type_and_id, *space, ctx);
             }
-            pane_group::Event::ZapDriveLink {
+            pane_group::Event::InfiniShellDriveLink {
                 open_warp_drive_args,
             } => {
                 let object_found = ObjectStoreModel::as_ref(ctx)
@@ -15568,7 +15575,7 @@ impl Workspace {
                     remote_path.path.clone(),
                 );
                 let pane_group_id = pane_group.id();
-                // Zap:同步 SSH 服务器文件浏览器到新的远端目录。
+                // InfiniShell:同步 SSH 服务器文件浏览器到新的远端目录。
                 self.left_panel_view.update(ctx, |left_panel, ctx| {
                     left_panel.navigate_server_file_browser(
                         remote_path.host_id.clone(),
@@ -15879,7 +15886,7 @@ impl Workspace {
                 ctx.notify();
             }
             pane_group::Event::ClearHoveredTabIndex => self.hovered_tab_index = None,
-            pane_group::Event::ZapDriveObjectInPane(uid) => {
+            pane_group::Event::InfiniShellDriveObjectInPane(uid) => {
                 self.open_warp_drive_object_in_new_pane(uid, ctx);
             }
             pane_group::Event::OpenSuggestedAgentModeWorkflowModal { workflow_and_id } => {
@@ -16082,7 +16089,9 @@ impl Workspace {
                     self.left_panel_view
                         .read(ctx, |left_panel, _| match target_view {
                             LeftPanelTargetView::FileTree => left_panel.is_file_tree_active(),
-                            LeftPanelTargetView::ZapDrive => left_panel.is_warp_drive_active(),
+                            LeftPanelTargetView::InfiniShellDrive => {
+                                left_panel.is_warp_drive_active()
+                            }
                         });
 
                 if self.active_tab_pane_group().as_ref(ctx).left_panel_open && is_target_active {
@@ -16097,7 +16106,9 @@ impl Workspace {
                     self.left_panel_view.update(ctx, |left_panel, ctx| {
                         let action = match target_view {
                             LeftPanelTargetView::FileTree => LeftPanelAction::ProjectExplorer,
-                            LeftPanelTargetView::ZapDrive => LeftPanelAction::ZapDrive,
+                            LeftPanelTargetView::InfiniShellDrive => {
+                                LeftPanelAction::InfiniShellDrive
+                            }
                         };
                         left_panel.handle_action_with_force_open(&action, *force_open, ctx);
                     });
@@ -16125,7 +16136,7 @@ impl Workspace {
                     ctx,
                 );
             }
-            // Zap:终端里 Ctrl/Cmd+点击远端 SSH 文件路径,走 buffer-sync 协议打开。
+            // InfiniShell:终端里 Ctrl/Cmd+点击远端 SSH 文件路径,走 buffer-sync 协议打开。
             #[cfg(all(feature = "local_tty", feature = "local_fs"))]
             pane_group::Event::OpenRemoteFileFromTerminal {
                 remote_path,
@@ -16144,7 +16155,7 @@ impl Workspace {
             pane_group::Event::OpenAgentProfileEditor { profile_id } => {
                 self.open_execution_profile_editor_pane(None, profile_id.clone(), ctx);
             }
-            // Zap Wave 7-3:`pane_group::Event::OpenEnvironmentManagementPane` handler 随
+            // InfiniShell Wave 7-3:`pane_group::Event::OpenEnvironmentManagementPane` handler 随
             // ambient-agent UI 子系统物理删。
             pane_group::Event::LeftPanelToggled { is_open } => {
                 // Only handle visibility changes from the active pane group.
@@ -16235,7 +16246,7 @@ impl Workspace {
                         code_review_view.expand_comment_list(ctx);
                     });
                 }
-            } // Zap:云端 agent 容量弹窗随云端 agent 链路一并移除,`pane_group::Event`
+            } // InfiniShell:云端 agent 容量弹窗随云端 agent 链路一并移除,`pane_group::Event`
               // 没有 `ShowCloudAgentCapacityModal` variant。
         }
     }
@@ -16510,7 +16521,7 @@ impl Workspace {
                     );
                 });
 
-                // Zap:上游在此把活动会话的工作目录通知给代码库向量索引
+                // InfiniShell:上游在此把活动会话的工作目录通知给代码库向量索引
                 // (`CodebaseIndexManager`),该索引链路已整体下线。
 
                 let is_remote = matches!(is_local, Some(false));
@@ -16630,7 +16641,7 @@ impl Workspace {
             DrivePanelEvent::RunWorkflow(workflow) => {
                 self.run_cloud_workflow_in_active_input(
                     workflow.as_ref().clone(),
-                    WorkflowSelectionSource::ZapDrive,
+                    WorkflowSelectionSource::InfiniShellDrive,
                     TerminalSessionFallbackBehavior::default(),
                     ctx,
                 );
@@ -16658,27 +16669,38 @@ impl Workspace {
             DrivePanelEvent::OpenWorkflowModalWithWorkflowObject(workflow_id) => {
                 self.open_workflow_with_existing(
                     *workflow_id,
-                    &ZapDriveObjectSettings::default(),
+                    &InfiniShellDriveObjectSettings::default(),
                     ctx,
                 );
             }
             DrivePanelEvent::OpenSearch => {
-                self.open_palette_action(PaletteMode::ZapDrive, PaletteSource::ZapDrive, None, ctx);
+                self.open_palette_action(
+                    PaletteMode::InfiniShellDrive,
+                    PaletteSource::InfiniShellDrive,
+                    None,
+                    ctx,
+                );
             }
-            DrivePanelEvent::OpenNotebook(source) => {
-                self.open_notebook(source, &ZapDriveObjectSettings::default(), ctx, true)
-            }
+            DrivePanelEvent::OpenNotebook(source) => self.open_notebook(
+                source,
+                &InfiniShellDriveObjectSettings::default(),
+                ctx,
+                true,
+            ),
             DrivePanelEvent::OpenEnvVarCollection(source) => {
                 self.open_env_var_collection(source, false, ctx)
             }
-            DrivePanelEvent::OpenWorkflowInPane(source, mode) => {
-                self.open_workflow_in_pane(source, &ZapDriveObjectSettings::default(), *mode, ctx)
-            }
+            DrivePanelEvent::OpenWorkflowInPane(source, mode) => self.open_workflow_in_pane(
+                source,
+                &InfiniShellDriveObjectSettings::default(),
+                *mode,
+                ctx,
+            ),
             DrivePanelEvent::OpenAIFactCollection => {
                 self.open_ai_fact_collection_pane(None, None, ctx);
                 send_telemetry_from_ctx!(
                     TelemetryEvent::KnowledgePaneOpened {
-                        entrypoint: KnowledgePaneEntrypoint::ZapDrive,
+                        entrypoint: KnowledgePaneEntrypoint::InfiniShellDrive,
                     },
                     ctx
                 );
@@ -16688,7 +16710,7 @@ impl Workspace {
 
                 send_telemetry_from_ctx!(
                     TelemetryEvent::MCPServerCollectionPaneOpened {
-                        entrypoint: MCPServerCollectionPaneEntrypoint::ZapDrive,
+                        entrypoint: MCPServerCollectionPaneEntrypoint::InfiniShellDrive,
                     },
                     ctx
                 );
@@ -16697,7 +16719,7 @@ impl Workspace {
                 ctx.focus(&self.left_panel_view);
             }
             DrivePanelEvent::OpenSharedObjectsCreationDeniedModal(_, _) => {
-                // Zap:云端 Drive 配额拒绝弹窗已删除,事件直接忽略
+                // InfiniShell:云端 Drive 配额拒绝弹窗已删除,事件直接忽略
             }
             DrivePanelEvent::AttachPlanAsContext(id) => {
                 self.attach_plan_as_context(*id, ctx);
@@ -17110,7 +17132,7 @@ impl Workspace {
                     AcceptNotebook(sync_id) => {
                         self.open_notebook(
                             &NotebookSource::Existing(*sync_id),
-                            &ZapDriveObjectSettings::default(),
+                            &InfiniShellDriveObjectSettings::default(),
                             ctx,
                             true,
                         );
@@ -17122,7 +17144,7 @@ impl Workspace {
                             ctx,
                         );
                     }
-                    ZapAI => {
+                    InfiniShellAI => {
                         if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
                             return;
                         }
@@ -18013,15 +18035,15 @@ impl Workspace {
         }
     }
 
-    fn handle_zap_launch_modal_event(
+    fn handle_infinishell_launch_modal_event(
         &mut self,
-        event: &ZapLaunchModalEvent,
+        event: &InfiniShellLaunchModalEvent,
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            ZapLaunchModalEvent::Close => {
+            InfiniShellLaunchModalEvent::Close => {
                 OneTimeModalModel::handle(ctx).update(ctx, |model, ctx| {
-                    model.mark_zap_launch_modal_dismissed(ctx);
+                    model.mark_infinishell_launch_modal_dismissed(ctx);
                 });
                 self.focus_active_tab(ctx);
                 ctx.notify();
@@ -18472,7 +18494,7 @@ impl Workspace {
         ctx.notify();
     }
 
-    // Zap:删除 open_shared_objects_creation_denied_modal(云端 Drive 配额拒绝弹窗)
+    // InfiniShell:删除 open_shared_objects_creation_denied_modal(云端 Drive 配额拒绝弹窗)
 
     /// Opens the workflow modal in the provided space and folder with no existing content (i.e. a new workflow modal).
     fn open_workflow_modal(
@@ -18490,7 +18512,7 @@ impl Workspace {
         let owner = match space {
             Space::Team { team_uid } => {
                 if !UserWorkspaces::has_capacity_for_shared_workflows(team_uid, ctx, 1) {
-                    // Zap:云端配额拒绝弹窗已删除,直接 return
+                    // InfiniShell:云端配额拒绝弹窗已删除,直接 return
                     return;
                 }
 
@@ -18521,7 +18543,7 @@ impl Workspace {
     fn open_workflow_with_existing(
         &mut self,
         workflow_id: SyncId,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         ctx: &mut ViewContext<Self>,
     ) {
         let source = WorkflowOpenSource::Existing(workflow_id);
@@ -18541,7 +18563,7 @@ impl Workspace {
         };
         self.open_workflow_in_pane(
             &source,
-            &ZapDriveObjectSettings::default(),
+            &InfiniShellDriveObjectSettings::default(),
             WorkflowViewMode::Create,
             ctx,
         );
@@ -18562,7 +18584,7 @@ impl Workspace {
         };
         self.open_workflow_in_pane(
             &source,
-            &ZapDriveObjectSettings::default(),
+            &InfiniShellDriveObjectSettings::default(),
             WorkflowViewMode::Create,
             ctx,
         );
@@ -19274,7 +19296,7 @@ impl Workspace {
                         .left_panel_views
                         .first()
                         .copied()
-                        .unwrap_or(ToolPanelView::ZapDrive)
+                        .unwrap_or(ToolPanelView::InfiniShellDrive)
                     {
                         ToolPanelView::ProjectExplorer => {
                             crate::t!("workspace-left-panel-project-explorer")
@@ -19282,7 +19304,9 @@ impl Workspace {
                         ToolPanelView::GlobalSearch { .. } => {
                             crate::t!("workspace-left-panel-global-search")
                         }
-                        ToolPanelView::ZapDrive => crate::t!("workspace-left-panel-warp-drive"),
+                        ToolPanelView::InfiniShellDrive => {
+                            crate::t!("workspace-left-panel-warp-drive")
+                        }
                         ToolPanelView::ConversationListView => {
                             crate::t!("workspace-left-panel-agent-conversations")
                         }
@@ -19346,7 +19370,7 @@ impl Workspace {
                 .left_panel_views
                 .first()
                 .copied()
-                .unwrap_or(ToolPanelView::ZapDrive)
+                .unwrap_or(ToolPanelView::InfiniShellDrive)
             {
                 ToolPanelView::ProjectExplorer => {
                     crate::t!("workspace-left-panel-project-explorer")
@@ -19354,7 +19378,7 @@ impl Workspace {
                 ToolPanelView::GlobalSearch { .. } => {
                     crate::t!("workspace-left-panel-global-search")
                 }
-                ToolPanelView::ZapDrive => crate::t!("workspace-left-panel-warp-drive"),
+                ToolPanelView::InfiniShellDrive => crate::t!("workspace-left-panel-warp-drive"),
                 ToolPanelView::ConversationListView => {
                     crate::t!("workspace-left-panel-agent-conversations")
                 }
@@ -19675,7 +19699,7 @@ impl Workspace {
             .is_user_web_anonymous_user()
             .unwrap_or_default();
 
-        // Simplified mode for viewing Zap Drive objects, shared sessions, or conversation transcripts on WASM
+        // Simplified mode for viewing InfiniShell Drive objects, shared sessions, or conversation transcripts on WASM
         #[cfg(target_family = "wasm")]
         if let Some(content_type) = self.get_simplified_wasm_tab_bar_content(ctx) {
             // Use MainAxisAlignment::SpaceBetween and expand to fill width
@@ -21892,7 +21916,7 @@ impl Workspace {
                 .set
                 .insert(flags::CLOUD_CONVERSATION_STORAGE_EDITABLE_FLAG);
         }
-        // Zap:云端对话存储链路已物理切断,`PrivacySettings` 没有
+        // InfiniShell:云端对话存储链路已物理切断,`PrivacySettings` 没有
         // `is_cloud_conversation_storage_enabled` 字段,该 context flag 不再置位。
 
         if privacy_settings.is_crash_reporting_enabled {
@@ -22102,7 +22126,7 @@ impl Workspace {
                 .insert(flags::NATURAL_LANGUAGE_AUTOSUGGESTIONS_FLAG);
         }
 
-        // Zap:分享 block 时的标题自动生成属于云端分享链路,
+        // InfiniShell:分享 block 时的标题自动生成属于云端分享链路,
         // `AISettings` 没有 `shared_block_title_generation_enabled_internal` 设置项,
         // 该 context flag 不再置位。
 
@@ -22347,8 +22371,8 @@ impl Workspace {
         self.tab_views().map(|tab| tab.id())
     }
 
-    fn focus_zap_launch_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        ctx.focus(&self.zap_launch_modal);
+    fn focus_infinishell_launch_modal(&mut self, ctx: &mut ViewContext<Self>) {
+        ctx.focus(&self.infinishell_launch_modal);
     }
 
     fn redirect_to_sign_in(&mut self) {
@@ -22477,13 +22501,13 @@ impl Workspace {
             });
         }
         if WarpDriveSettings::is_warp_drive_enabled(ctx) {
-            views.push(ToolPanelView::ZapDrive);
+            views.push(ToolPanelView::InfiniShellDrive);
         }
         // openWarp 独有:SSH 管理器,无 feature flag,默认始终显示。
         views.push(ToolPanelView::SshManager);
-        // openWarp 独有:项目管理器,由 ZapProjects flag 门控
+        // openWarp 独有:项目管理器,由 InfiniShellProjects flag 门控
         // (默认 feature `project_manager` 打开)。
-        if FeatureFlag::ZapProjects.is_enabled() {
+        if FeatureFlag::InfiniShellProjects.is_enabled() {
             views.push(ToolPanelView::Projects);
         }
         if FeatureFlag::ServerFileBrowser.is_enabled() && FeatureFlag::SshRemoteServer.is_enabled()
@@ -22928,9 +22952,9 @@ impl TypedActionView for Workspace {
                 let path = crate::settings::user_preferences_toml_file_path();
                 self.add_tab_for_code_file(path, None, ctx);
             }
-            // Zap:云端 handoff / 网络日志面板子系统未引入。这些 action 仍保留在
+            // InfiniShell:云端 handoff / 网络日志面板子系统未引入。这些 action 仍保留在
             // `WorkspaceAction` 中(TUI / CLI 侧复用),但在 GUI 工作区里是 no-op。
-            // Zap:`OpenLocalToCloudHandoffPane` 未引入 `WorkspaceAction`(见 action.rs)。
+            // InfiniShell:`OpenLocalToCloudHandoffPane` 未引入 `WorkspaceAction`(见 action.rs)。
             AutoHandoffActiveAgentToCloud { .. }
             | ShowHandoffEnvironmentCreationModal
             | ShowCloudModeV2EnvironmentCreationModal
@@ -23093,7 +23117,7 @@ impl TypedActionView for Workspace {
                             owner: personal_drive,
                             initial_folder_id: None,
                         },
-                        &ZapDriveObjectSettings::default(),
+                        &InfiniShellDriveObjectSettings::default(),
                         ctx,
                         true,
                     );
@@ -23123,7 +23147,7 @@ impl TypedActionView for Workspace {
                     };
                     self.open_workflow_in_pane(
                         &source,
-                        &ZapDriveObjectSettings::default(),
+                        &InfiniShellDriveObjectSettings::default(),
                         WorkflowViewMode::Create,
                         ctx,
                     );
@@ -23166,9 +23190,9 @@ impl TypedActionView for Workspace {
                 send_telemetry_from_ctx!(TelemetryEvent::DragAndDropTabGroup, ctx);
                 ctx.notify();
             }
-            ZapDrive => {
+            InfiniShellDrive => {
                 if WarpDriveSettings::is_warp_drive_enabled(ctx) {
-                    self.open_left_panel_view(&LeftPanelAction::ZapDrive, ctx);
+                    self.open_left_panel_view(&LeftPanelAction::InfiniShellDrive, ctx);
                 }
             }
             ToggleLeftPanel => {
@@ -23206,7 +23230,7 @@ impl TypedActionView for Workspace {
                             ctx
                         );
                     } else if warp_drive_active {
-                        // Tools panel opened with Zap Drive as the active view
+                        // Tools panel opened with InfiniShell Drive as the active view
                         send_telemetry_from_ctx!(
                             TelemetryEvent::WarpDriveOpened {
                                 source: WarpDriveSource::LeftPanelToolbelt,
@@ -23676,7 +23700,7 @@ impl TypedActionView for Workspace {
                 });
                 self.open_workflow_with_existing(
                     *workflow_id,
-                    &ZapDriveObjectSettings::default(),
+                    &InfiniShellDriveObjectSettings::default(),
                     ctx,
                 );
             }
@@ -23820,7 +23844,7 @@ impl TypedActionView for Workspace {
                     ctx
                 );
             }
-            // Zap Wave 7-3:`OpenEnvironmentManagementPane` WorkspaceAction handler 随
+            // InfiniShell Wave 7-3:`OpenEnvironmentManagementPane` WorkspaceAction handler 随
             // ambient-agent UI 子系统物理删。
             ToggleAIDocumentPane {
                 document_id,
@@ -23958,7 +23982,7 @@ impl TypedActionView for Workspace {
             }
             OpenNotebook { id } => self.open_notebook(
                 &NotebookSource::Existing(*id),
-                &ZapDriveObjectSettings::default(),
+                &InfiniShellDriveObjectSettings::default(),
                 ctx,
                 true,
             ),
@@ -24001,7 +24025,7 @@ impl TypedActionView for Workspace {
                     model.mark_task_as_manually_opened(*task_id, ctx);
                 });
 
-                // Zap:没有云端 shared-session 附着通路,只能聚焦已经打开的 pane。
+                // InfiniShell:没有云端 shared-session 附着通路,只能聚焦已经打开的 pane。
                 if let Some((tab_index, _)) =
                     self.find_pane_with_ambient_agent_conversation(*task_id, ctx)
                 {
@@ -24055,7 +24079,7 @@ impl TypedActionView for Workspace {
                     ctx,
                 );
             }
-            // Zap:第三方 agent 转录的本地续跑依赖云端 run transcript 下载,
+            // InfiniShell:第三方 agent 转录的本地续跑依赖云端 run transcript 下载,
             // 该链路未引入,这里保持 no-op。
             #[cfg(not(target_family = "wasm"))]
             ContinueThirdPartyConversationLocally { .. } => {}
@@ -24066,7 +24090,7 @@ impl TypedActionView for Workspace {
                 self.summarize_active_ai_conversation(prompt.clone(), initial_prompt.clone(), ctx);
             }
             QueuePromptForConversation { prompt } => {
-                // Zap:`/queue` 把 prompt 排到当前会话结束后再发,合并时该 handler 丢失,
+                // InfiniShell:`/queue` 把 prompt 排到当前会话结束后再发,合并时该 handler 丢失,
                 // 从 HEAD 取回。派发点在 terminal/input/slash_commands/mod.rs。
                 let Some(terminal_view) = self
                     .active_tab_pane_group()
@@ -24128,7 +24152,7 @@ impl TypedActionView for Workspace {
                     };
                     self.open_workflow_in_pane(
                         &source,
-                        &ZapDriveObjectSettings::default(),
+                        &InfiniShellDriveObjectSettings::default(),
                         WorkflowViewMode::Create,
                         ctx,
                     );
@@ -24158,22 +24182,22 @@ impl TypedActionView for Workspace {
                 log::info!("AWS Bedrock login banner dismissed state has been reset");
             }
             #[cfg(debug_assertions)]
-            OpenZapLaunchModal => {
-                // Force open the Zap launch modal for debugging
+            OpenInfiniShellLaunchModal => {
+                // Force open the InfiniShell launch modal for debugging
                 OneTimeModalModel::handle(ctx).update(ctx, |model, ctx| {
-                    model.force_open_zap_launch_modal(ctx);
+                    model.force_open_infinishell_launch_modal(ctx);
                 });
                 ctx.notify();
             }
             #[cfg(debug_assertions)]
-            ResetZapLaunchModalState => {
-                // Reset the Zap launch modal dismissed state for debugging
+            ResetInfiniShellLaunchModalState => {
+                // Reset the InfiniShell launch modal dismissed state for debugging
                 let old_value = *GeneralSettings::as_ref(ctx)
-                    .did_check_to_trigger_zap_launch_modal
+                    .did_check_to_trigger_infinishell_launch_modal
                     .value();
                 GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
                     if let Err(e) = settings
-                        .did_check_to_trigger_zap_launch_modal
+                        .did_check_to_trigger_infinishell_launch_modal
                         .set_value(false, ctx)
                     {
                         log::warn!(
@@ -24182,13 +24206,13 @@ impl TypedActionView for Workspace {
                     }
                 });
                 let new_value = *GeneralSettings::as_ref(ctx)
-                    .did_check_to_trigger_zap_launch_modal
+                    .did_check_to_trigger_infinishell_launch_modal
                     .value();
                 log::info!(
                     "InfiniShell launch modal state: old={}, new={}, feature_flag_enabled={}",
                     old_value,
                     new_value,
-                    FeatureFlag::ZapLaunchModal.is_enabled()
+                    FeatureFlag::InfiniShellLaunchModal.is_enabled()
                 );
             }
             #[cfg(debug_assertions)]
@@ -24442,9 +24466,13 @@ impl TypedActionView for Workspace {
             }
             ToggleWarpDrive => {
                 if WarpDriveSettings::is_warp_drive_enabled(ctx) {
-                    let is_showing =
-                        self.left_panel_view.as_ref(ctx).active_view() == ToolPanelView::ZapDrive;
-                    self.toggle_left_panel_view(&LeftPanelAction::ZapDrive, is_showing, ctx);
+                    let is_showing = self.left_panel_view.as_ref(ctx).active_view()
+                        == ToolPanelView::InfiniShellDrive;
+                    self.toggle_left_panel_view(
+                        &LeftPanelAction::InfiniShellDrive,
+                        is_showing,
+                        ctx,
+                    );
                 }
             }
             ToggleSshManager => {
@@ -24458,7 +24486,7 @@ impl TypedActionView for Workspace {
                 self.toggle_left_panel_view(&LeftPanelAction::SkillManager, is_showing, ctx);
             }
             ToggleProjectsPanel => {
-                if FeatureFlag::ZapProjects.is_enabled() {
+                if FeatureFlag::InfiniShellProjects.is_enabled() {
                     let is_showing =
                         self.left_panel_view.as_ref(ctx).active_view() == ToolPanelView::Projects;
                     self.toggle_left_panel_view(&LeftPanelAction::Projects, is_showing, ctx);
@@ -24648,7 +24676,7 @@ impl TypedActionView for Workspace {
             }
             SyncTrafficLights => {
                 self.sync_window_button_visibility(ctx);
-            } // Zap:`OpenNewWindowForTeam` / `ShowTeamSwitcherMenu`(team/账号功能)
+            } // InfiniShell:`OpenNewWindowForTeam` / `ShowTeamSwitcherMenu`(team/账号功能)
               // 未引入 `WorkspaceAction`,对应分支一并移除。
         };
         if action.should_save_app_state_on_action() {
@@ -24893,7 +24921,7 @@ impl View for Workspace {
 
         let tab_bar_mode = self.tab_bar_mode(app);
 
-        // For WASM simplified tab bar views (Zap Drive objects, shared sessions, conversation transcripts),
+        // For WASM simplified tab bar views (InfiniShell Drive objects, shared sessions, conversation transcripts),
         // we render the tab bar outside of panels so that the details panel only affects content below the tab bar.
         cfg_if::cfg_if! {
             if #[cfg(target_family = "wasm")] {
@@ -25633,8 +25661,8 @@ impl View for Workspace {
         let one_time_modal_model = OneTimeModalModel::as_ref(app);
         let should_show_modal = one_time_modal_model.target_window_id() == Some(self.window_id);
 
-        if should_show_modal && one_time_modal_model.is_zap_launch_modal_open() {
-            stack.add_child(ChildView::new(&self.zap_launch_modal).finish());
+        if should_show_modal && one_time_modal_model.is_infinishell_launch_modal_open() {
+            stack.add_child(ChildView::new(&self.infinishell_launch_modal).finish());
         }
 
         if should_show_modal && one_time_modal_model.is_orchestration_launch_modal_open() {

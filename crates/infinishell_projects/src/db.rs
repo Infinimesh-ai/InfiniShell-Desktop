@@ -26,7 +26,7 @@ pub fn set_database_path(path: PathBuf) {
 fn open() -> Result<SqliteConnection> {
     let path = DB_PATH
         .get()
-        .ok_or_else(|| anyhow!("zap_projects::db: database path not initialized"))?;
+        .ok_or_else(|| anyhow!("infinishell_projects::db: database path not initialized"))?;
     let url = path.to_string_lossy();
     let mut conn = SqliteConnection::establish(&url)?;
     conn.batch_execute(
@@ -42,12 +42,12 @@ pub fn with_conn<R>(f: impl FnOnce(&mut SqliteConnection) -> Result<R>) -> Resul
     let mtx = CONN.get_or_init(|| Mutex::new(None));
     let mut guard = mtx
         .lock()
-        .map_err(|_| anyhow!("zap_projects db mutex poisoned"))?;
+        .map_err(|_| anyhow!("infinishell_projects db mutex poisoned"))?;
     if guard.is_none() {
         *guard = Some(open()?);
     }
     let conn = guard
         .as_mut()
-        .ok_or_else(|| anyhow!("zap_projects db connection unavailable"))?;
+        .ok_or_else(|| anyhow!("infinishell_projects db connection unavailable"))?;
     f(conn)
 }

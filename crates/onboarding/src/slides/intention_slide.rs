@@ -437,7 +437,7 @@ impl IntentionSlide {
             },
         );
 
-        let new_settings_modes = FeatureFlag::ZapNewSettingsModes.is_enabled();
+        let new_settings_modes = FeatureFlag::InfiniShellNewSettingsModes.is_enabled();
         let next_text = if !new_settings_modes && selected_index == 1 {
             localized("common-get-warping", "Get started")
         } else {
@@ -483,7 +483,7 @@ impl IntentionSlide {
     fn render_visual(&self, appearance: &Appearance, selected_index: usize) -> Box<dyn Element> {
         let theme = appearance.theme();
 
-        if FeatureFlag::ZapNewSettingsModes.is_enabled() {
+        if FeatureFlag::InfiniShellNewSettingsModes.is_enabled() {
             let path = if selected_index == 1 {
                 Self::VISUAL_IMAGE_PATHS[1]
             } else {
@@ -556,7 +556,7 @@ impl IntentionSlide {
 
     fn next(&mut self, ctx: &mut ViewContext<Self>) {
         self.onboarding_state.update(ctx, |model, ctx| {
-            if FeatureFlag::ZapNewSettingsModes.is_enabled() {
+            if FeatureFlag::InfiniShellNewSettingsModes.is_enabled() {
                 match model.intention() {
                     // "Just use the terminal" confirms leaving AI behind before advancing.
                     OnboardingIntention::Terminal => {

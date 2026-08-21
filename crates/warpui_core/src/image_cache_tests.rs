@@ -443,7 +443,7 @@ fn test_preview_and_full_animation_requests_do_not_collide_in_rendered_image_cac
 fn test_svg_text_rasterizes_with_loaded_system_fonts() {
     let image_type = ImageType::try_from_bytes(
         br##"<svg width="160" height="40" viewBox="0 0 160 40" xmlns="http://www.w3.org/2000/svg">
-  <text x="10" y="24" font-size="20" fill="#000000">Zap</text>
+  <text x="10" y="24" font-size="20" fill="#000000">InfiniShell</text>
 </svg>
 "##,
     )
@@ -477,7 +477,7 @@ fn test_svg_text_rasterizes_with_loaded_system_fonts() {
 
     let svg = format!(
         "<svg width=\"160\" height=\"40\" viewBox=\"0 0 160 40\" xmlns=\"http://www.w3.org/2000/svg\">\
-  <text x=\"10\" y=\"24\" font-family=\"{font_family}\" font-size=\"20\" fill=\"#000000\">Zap</text>\
+  <text x=\"10\" y=\"24\" font-family=\"{font_family}\" font-size=\"20\" fill=\"#000000\">InfiniShell</text>\
 </svg>"
     );
 

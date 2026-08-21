@@ -1,4 +1,4 @@
-# Zap Desktop i18n 翻译进度看板
+# InfiniShell Desktop i18n 翻译进度看板
 
 > **本文档是多 agent 并行翻译的协调中心。** 每个 agent 启动前先读这里认领 surface,完成后更新对应行。
 > Source-of-truth locale 是 `en`(必须 100% 完整);其它 locale 缺 key 自动 fallback 到英文,可以分批补译。
@@ -73,7 +73,7 @@
 |---|---|---|
 | Agent | 智能体 | warp 自家 + BYOP 通用 |
 | Block | 命令块 | warp 核心概念 |
-| Drive | 云盘 | zap drive 文件协作产品 |
+| Drive | 云盘 | InfiniShell Drive 文件协作产品 |
 | Workflow | 工作流 | |
 | Notebook | 笔记本 | |
 | Profile | 配置 | execution profile / agent profile |

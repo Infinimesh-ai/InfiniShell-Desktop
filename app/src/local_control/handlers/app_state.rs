@@ -82,13 +82,13 @@ pub(crate) fn handle(
             target,
             ctx,
         ),
-        // Zap:上游的 `WorkspaceAction::OpenWarpDrive` 在我方叫 `ZapDrive`
-        //(语义相同:无条件打开 Zap Drive)。
+        // Zap:上游的 `WorkspaceAction::OpenWarpDrive` 在我方叫 `InfiniShellDrive`
+        //(语义相同:无条件打开 InfiniShell Drive)。
         ActionKind::SurfaceWarpDriveOpen => surface_workspace_action(
             instance_id,
             action,
             SurfaceDestination::WarpDrive,
-            WorkspaceAction::ZapDrive,
+            WorkspaceAction::InfiniShellDrive,
             target,
             ctx,
         ),
@@ -687,8 +687,8 @@ fn settings_section(page: String) -> Result<SettingsSection, ControlError> {
             format!("surface.settings.open cannot resolve settings page {page:?}"),
         )
     })?;
-    // Zap:上游 `SettingsSection::WarpDrive` 在我方叫 `ZapDrive`。
-    if section == SettingsSection::ZapDrive {
+    // Zap:上游 `SettingsSection::WarpDrive` 在我方叫 `InfiniShellDrive`。
+    if section == SettingsSection::InfiniShellDrive {
         return Err(ControlError::new(
             ErrorCode::UnsupportedAction,
             "surface.settings.open does not open Warp Drive settings",

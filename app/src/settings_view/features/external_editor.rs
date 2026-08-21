@@ -154,7 +154,7 @@ impl ExternalEditorView {
 
         items.push(DropdownItem::new(
             "InfiniShell",
-            make_action(EditorChoice::Zap),
+            make_action(EditorChoice::InfiniShell),
         ));
         if FeatureFlag::AllowOpeningFileLinksUsingEditorEnv.is_enabled() {
             items.push(DropdownItem::new(
@@ -177,7 +177,7 @@ impl ExternalEditorView {
             EditorChoice::ExternalEditor(editor) => {
                 dropdown.set_selected_by_name(format!("{editor}"), ctx)
             }
-            EditorChoice::Zap => dropdown.set_selected_by_name("InfiniShell", ctx),
+            EditorChoice::InfiniShell => dropdown.set_selected_by_name("InfiniShell", ctx),
             EditorChoice::EnvEditor => dropdown.set_selected_by_name("$EDITOR", ctx),
             EditorChoice::SystemDefault => dropdown.set_selected_by_name(default_option_text, ctx),
         };

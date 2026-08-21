@@ -1101,7 +1101,7 @@ where
             WARP_IN_BAND_GENERATOR_OSC_MARKER => match params.get(1) {
                 Some(&WARP_IN_BAND_GENERATOR_START_BYTE) => {
                     log::info!(
-                        "Received a InfiniShell OSC marker for starting in-band command output."
+                        "Received an InfiniShell OSC marker for starting in-band command output."
                     );
                     self.handler.start_in_band_command_output();
                 }
@@ -1109,7 +1109,7 @@ where
                     self.handler.end_in_band_command_output(true);
                 }
                 _ => {
-                    log::warn!("Received a InfiniShell OSC marker missing required param.");
+                    log::warn!("Received an InfiniShell OSC marker missing required param.");
                 }
             },
 
@@ -1247,7 +1247,7 @@ where
                 }
                 _ => {
                     log::warn!(
-                        "Received a InfiniShell OSC completions marker missing required param."
+                        "Received an InfiniShell OSC completions marker missing required param."
                     );
                 }
             },

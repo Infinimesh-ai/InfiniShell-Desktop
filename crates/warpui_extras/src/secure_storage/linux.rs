@@ -32,6 +32,9 @@ pub struct SecureStorage {
 
     /// The encryption fallback key.
     encryption_key: OnceCell<Option<aead::LessSafeKey>>,
+
+    /// Zap 时期 fallback 文件使用的旧密钥，仅用于升级读取。
+    legacy_encryption_key: OnceCell<Option<aead::LessSafeKey>>,
 }
 
 impl SecureStorage {
@@ -45,6 +48,7 @@ impl SecureStorage {
             collection: OnceCell::new(),
             fallback_dir: None,
             encryption_key: OnceCell::new(),
+            legacy_encryption_key: OnceCell::new(),
         }
     }
 
@@ -58,6 +62,7 @@ impl SecureStorage {
             collection: OnceCell::new(),
             fallback_dir: Some(fallback_dir),
             encryption_key: OnceCell::new(),
+            legacy_encryption_key: OnceCell::new(),
         }
     }
 
@@ -106,18 +111,31 @@ impl SecureStorage {
                 // We can use whatever super duper foolproof secure key we want here.
                 // Here we are specifically choosing a value that will look inconspicuous
                 // in case someone chooses to scan our binary for strings.
-                let mut key_bytes = Vec::from("zap-local-secure-storage-fallback-key");
-                key_bytes.resize(aead::AES_256_GCM.key_len(), 0);
-                match aead::UnboundKey::new(&aead::AES_256_GCM, key_bytes.as_slice()) {
-                    Ok(key) => Some(aead::LessSafeKey::new(key)),
-                    Err(_) => {
-                        report_error!("Failed to initialize fallback encryption key");
-                        None
-                    }
-                }
+                Self::encryption_key_from_seed(b"infinishell-local-secure-storage-fallback-key")
             })
             .as_ref()
             .ok_or_else(|| Error::Unknown(anyhow!("Invalid encryption key")))
+    }
+
+    fn legacy_encryption_key(&self) -> Result<&aead::LessSafeKey, Error> {
+        self.legacy_encryption_key
+            .get_or_init(|| {
+                Self::encryption_key_from_seed(b"zap-local-secure-storage-fallback-key")
+            })
+            .as_ref()
+            .ok_or_else(|| Error::Unknown(anyhow!("Invalid legacy encryption key")))
+    }
+
+    fn encryption_key_from_seed(seed: &[u8]) -> Option<aead::LessSafeKey> {
+        let mut key_bytes = Vec::from(seed);
+        key_bytes.resize(aead::AES_256_GCM.key_len(), 0);
+        match aead::UnboundKey::new(&aead::AES_256_GCM, key_bytes.as_slice()) {
+            Ok(key) => Some(aead::LessSafeKey::new(key)),
+            Err(_) => {
+                report_error!("Failed to initialize fallback encryption key");
+                None
+            }
+        }
     }
 
     /// Returns the set of attributes which should be used when interacting
@@ -165,7 +183,13 @@ impl SecureStorage {
 
     fn fallback_encrypt(&self, value: &str) -> Result<Vec<u8>, Error> {
         let encryption_key = self.encryption_key()?;
+        Self::fallback_encrypt_with_key(value, encryption_key)
+    }
 
+    fn fallback_encrypt_with_key(
+        value: &str,
+        encryption_key: &aead::LessSafeKey,
+    ) -> Result<Vec<u8>, Error> {
         // Generates nonce by randomly generating numbers
         // This is not the official best way to do this, but it should
         // be fine for our purposes.
@@ -188,15 +212,31 @@ impl SecureStorage {
         Ok(output)
     }
 
+    #[cfg(test)]
     fn fallback_decrypt(&self, value: &[u8]) -> Result<String, Error> {
+        self.fallback_decrypt_with_legacy_status(value)
+            .map(|(value, _)| value)
+    }
+
+    fn fallback_decrypt_with_legacy_status(&self, value: &[u8]) -> Result<(String, bool), Error> {
         if value.len() < aead::NONCE_LEN + 1 {
             return Err(Error::Unknown(anyhow!(
                 "Attempting to decrypt too small value for fallback decryption"
             )));
         }
 
-        let encryption_key = self.encryption_key()?;
+        Self::fallback_decrypt_with_key(value, self.encryption_key()?)
+            .map(|value| (value, false))
+            .or_else(|_| {
+                Self::fallback_decrypt_with_key(value, self.legacy_encryption_key()?)
+                    .map(|value| (value, true))
+            })
+    }
 
+    fn fallback_decrypt_with_key(
+        value: &[u8],
+        encryption_key: &aead::LessSafeKey,
+    ) -> Result<String, Error> {
         // The first 12 bytes of the message are the nonce.
         let nonce_bytes = &value[0..aead::NONCE_LEN];
         let nonce = aead::Nonce::try_assume_unique_for_key(nonce_bytes)
@@ -276,7 +316,11 @@ impl SecureStorage {
         let fallback_file = self.fallback_file(key)?;
 
         let data = std::fs::read(fallback_file).map_err(|_| Error::NotFound)?;
-        self.fallback_decrypt(&data)
+        let (value, used_legacy_key) = self.fallback_decrypt_with_legacy_status(&data)?;
+        if used_legacy_key {
+            let _ = self.write_fallback_value(key, &value);
+        }
+        Ok(value)
     }
 
     fn delete_fallback_value(&self, key: &str) -> Result<(), Error> {

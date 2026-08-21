@@ -21,7 +21,7 @@ fn test_open_code_panels_file_editor_default_is_warp() {
 
     assert_eq!(
         OpenCodePanelsFileEditor::default_value(),
-        EditorChoice::Warp
+        EditorChoice::InfiniShell
     );
 }
 
@@ -44,7 +44,7 @@ fn test_resolve_file_target_markdown_viewer_precedence() {
 fn test_resolve_file_target_warp_uses_default_layout() {
     let target = resolve_file_target_with_editor_choice(
         Path::new("data.txt"),
-        EditorChoice::Warp,
+        EditorChoice::InfiniShell,
         true, /* prefer_markdown_viewer */
         EditorLayout::NewTab,
         None,
@@ -90,7 +90,7 @@ fn test_resolve_file_target_to_open_in_warp_never_leaves_warp() {
 fn test_resolve_file_target_binary_is_system_generic() {
     let target = resolve_file_target_with_editor_choice(
         Path::new("image.png"),
-        EditorChoice::Warp,
+        EditorChoice::InfiniShell,
         true, /* prefer_markdown_viewer */
         EditorLayout::SplitPane,
         None,
@@ -138,7 +138,7 @@ fn test_resolve_file_target_jupyter_notebook_flag_on() {
     // a Jupyter notebook routes to the notebook viewer (not the JSON editor).
     let target = resolve_file_target_with_editor_choice(
         Path::new("analysis.ipynb"),
-        EditorChoice::Warp,
+        EditorChoice::InfiniShell,
         false, /* prefer_markdown_viewer */
         EditorLayout::SplitPane,
         None,
@@ -154,7 +154,7 @@ fn test_resolve_file_target_jupyter_notebook_flag_off() {
     // exactly as it does today.
     let target = resolve_file_target_with_editor_choice(
         Path::new("analysis.ipynb"),
-        EditorChoice::Warp,
+        EditorChoice::InfiniShell,
         true, /* prefer_markdown_viewer */
         EditorLayout::SplitPane,
         None,

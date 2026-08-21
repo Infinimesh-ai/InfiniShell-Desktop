@@ -13,6 +13,7 @@ fn detects_interactive_session_commands_across_platforms() {
         r#"& "C:\Program Files\OpenSSH\ssh.exe" host"#,
         "warp_run_generator_command 42 'ssh host'",
         " warp_run_generator_command 42 'ssh host'",
+        "InfiniShell-Run-GeneratorCommand 42 'ssh host' -ErrorAction Ignore",
         "Zap-Run-GeneratorCommand 42 'ssh host' -ErrorAction Ignore",
         r#"warp_run_generator_command 42 '"C:\Windows\System32\OpenSSH\ssh.exe" host'"#,
         "gcloud compute ssh --zone us-west1-a my-instance",
@@ -44,6 +45,7 @@ fn does_not_detect_unrelated_or_non_interactive_ssh_commands() {
         r#""C:\Windows\System32\OpenSSH\ssh.exe" user@host ls"#,
         r#"& "C:\Program Files\OpenSSH\ssh.exe" user@host ls"#,
         "warp_run_generator_command 42 'ssh user@host ls'",
+        "InfiniShell-Run-GeneratorCommand 42 'git status' -ErrorAction Ignore",
         "Zap-Run-GeneratorCommand 42 'git status' -ErrorAction Ignore",
         "rsync myfile.txt ssh://user@server.com",
         // 右引号后还粘着字符,故意拒绝 tokenize,避免被错切成 `ssh`

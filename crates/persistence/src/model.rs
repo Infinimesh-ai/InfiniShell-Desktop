@@ -12,13 +12,13 @@ use super::schema::{
     active_mcp_servers, agent_conversations, agent_tasks, ai_document_panes, ai_memory_panes,
     ambient_agent_panes, app, blocks, cloud_objects_refreshes, code_pane_tabs, code_panes,
     code_review_panes, commands, current_user_information, env_var_collection_panes, folders,
-    generic_string_objects, ignored_suggestions, mcp_environment_variables,
-    mcp_server_installations, mcp_server_panes, notebook_panes, notebooks, object_actions,
-    object_metadata, object_permissions, pane_branches, pane_leaves, pane_nodes, panels,
-    project_rules, projects, server_experiments, settings_panes, ssh_machine_memories, ssh_nodes,
-    ssh_onekey_credentials, ssh_route_hops, ssh_routes, ssh_servers, sync_meta, tab_groups, tabs,
-    team_members, team_settings, teams, terminal_panes, user_profiles, windows, workflow_panes,
-    workflows, workspace_teams, workspaces, zap_project_servers, zap_projects,
+    generic_string_objects, ignored_suggestions, infinishell_project_servers, infinishell_projects,
+    mcp_environment_variables, mcp_server_installations, mcp_server_panes, notebook_panes,
+    notebooks, object_actions, object_metadata, object_permissions, pane_branches, pane_leaves,
+    pane_nodes, panels, project_rules, projects, server_experiments, settings_panes,
+    ssh_machine_memories, ssh_nodes, ssh_onekey_credentials, ssh_route_hops, ssh_routes,
+    ssh_servers, sync_meta, tab_groups, tabs, team_members, team_settings, teams, terminal_panes,
+    user_profiles, windows, workflow_panes, workflows, workspace_teams, workspaces,
 };
 
 #[derive(Insertable)]
@@ -1964,13 +1964,13 @@ pub struct NewSshMachineMemory<'a> {
 }
 
 // --- Zap Projects ------------------------------------------------------
-// 项目实体(聚合 SSH 服务器 / Git 地址 / 项目规则),由 crates/zap_projects
+// 项目实体(聚合 SSH 服务器 / Git 地址 / 项目规则),由 crates/infinishell_projects
 // 的独立连接读写,行结构放在这里以复用生成的 schema。
 
 #[derive(Identifiable, Queryable, Selectable, Clone, Debug)]
-#[diesel(table_name = zap_projects)]
+#[diesel(table_name = infinishell_projects)]
 #[diesel(primary_key(id))]
-pub struct ZapProjectRow {
+pub struct InfiniShellProjectRow {
     pub id: String,
     pub name: String,
     pub git_url: Option<String>,
@@ -1985,8 +1985,8 @@ pub struct ZapProjectRow {
 }
 
 #[derive(Insertable, AsChangeset, Clone, Debug)]
-#[diesel(table_name = zap_projects)]
-pub struct NewZapProject<'a> {
+#[diesel(table_name = infinishell_projects)]
+pub struct NewInfiniShellProject<'a> {
     pub id: &'a str,
     pub name: &'a str,
     pub git_url: Option<&'a str>,
@@ -1998,18 +1998,18 @@ pub struct NewZapProject<'a> {
 }
 
 #[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug)]
-#[diesel(table_name = zap_project_servers)]
+#[diesel(table_name = infinishell_project_servers)]
 #[diesel(primary_key(project_id, node_id))]
-#[diesel(belongs_to(ZapProjectRow, foreign_key = project_id))]
-pub struct ZapProjectServerRow {
+#[diesel(belongs_to(InfiniShellProjectRow, foreign_key = project_id))]
+pub struct InfiniShellProjectServerRow {
     pub project_id: String,
     pub node_id: String,
     pub sort_order: i32,
 }
 
 #[derive(Insertable, Clone, Debug)]
-#[diesel(table_name = zap_project_servers)]
-pub struct NewZapProjectServer<'a> {
+#[diesel(table_name = infinishell_project_servers)]
+pub struct NewInfiniShellProjectServer<'a> {
     pub project_id: &'a str,
     pub node_id: &'a str,
     pub sort_order: i32,

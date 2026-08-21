@@ -16,7 +16,7 @@ use crate::uri::browser_url_handler::parse_current_url;
 use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme, PrimaryTheme};
 use crate::wasm_nux_dialog::{WasmNUXDialog, WasmNUXDialogEvent};
 use crate::workspace::action::WorkspaceAction;
-use crate::workspace::view::{NotebookSource, Workspace, ZapDriveObjectSettings};
+use crate::workspace::view::{InfiniShellDriveObjectSettings, NotebookSource, Workspace};
 
 const TRANSCRIPT_PANEL_WIDTH: f32 = 280.0;
 
@@ -82,7 +82,7 @@ impl Workspace {
             ConversationDetailsPanelEvent::OpenPlanNotebook { notebook_uid } => {
                 me.open_notebook(
                     &NotebookSource::Existing((*notebook_uid).into()),
-                    &ZapDriveObjectSettings::default(),
+                    &InfiniShellDriveObjectSettings::default(),
                     ctx,
                     true,
                 );

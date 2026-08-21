@@ -57,7 +57,7 @@ use crate::cloud_object::model::persistence::ObjectStoreModel;
 use crate::cloud_object::{GenericStringObjectFormat, JsonObjectType, ObjectType};
 use crate::drive::export::ExportManager;
 use crate::drive::items::WarpDriveItemId;
-use crate::drive::{ObjectTypeAndId, ZapDriveObjectArgs, ZapDriveObjectSettings};
+use crate::drive::{InfiniShellDriveObjectArgs, InfiniShellDriveObjectSettings, ObjectTypeAndId};
 use crate::experiments::{BlockOnboarding, Experiment};
 use crate::features::FeatureFlag;
 use crate::interval_timer::IntervalTimer;
@@ -964,7 +964,7 @@ fn open_linear_issue_work_in_new_window(args: &LinearIssueWork, ctx: &mut AppCon
     });
 }
 
-fn open_warp_drive_object(arg: &ZapDriveObjectArgs, ctx: &mut AppContext) {
+fn open_warp_drive_object(arg: &InfiniShellDriveObjectArgs, ctx: &mut AppContext) {
     match arg.object_type {
         ObjectType::Notebook => open_new_workspace_with_notebook_open(
             SyncId::ServerId(arg.server_id),
@@ -990,7 +990,7 @@ fn display_object_missing_error_in_window(window_id: WindowId, ctx: &mut AppCont
 
 fn open_new_workspace_with_notebook_open(
     notebook_id: SyncId,
-    settings: ZapDriveObjectSettings,
+    settings: InfiniShellDriveObjectSettings,
     ctx: &mut AppContext,
 ) {
     open_new_with_workspace_source(
@@ -1004,7 +1004,7 @@ fn open_new_workspace_with_notebook_open(
 
 fn open_new_workspace_with_workflow_open(
     workflow_id: SyncId,
-    settings: ZapDriveObjectSettings,
+    settings: InfiniShellDriveObjectSettings,
     ctx: &mut AppContext,
 ) {
     open_new_with_workspace_source(
@@ -1412,11 +1412,11 @@ pub enum NewWorkspaceSource {
     },
     NotebookById {
         id: SyncId,
-        settings: ZapDriveObjectSettings,
+        settings: InfiniShellDriveObjectSettings,
     },
     WorkflowById {
         id: SyncId,
-        settings: ZapDriveObjectSettings,
+        settings: InfiniShellDriveObjectSettings,
     },
     AgentSession {
         options: Box<NewTerminalOptions>,
@@ -1623,9 +1623,9 @@ impl RootView {
                 if #[cfg(target_family = "wasm")] {
                     AuthOnboardingState::WebImport(AuthOnboardingTarget::Workspace(workspace_args.into()))
                 } else {
-                    // When ZapNewSettingsModes is enabled, show onboarding before login for
+                    // When InfiniShellNewSettingsModes is enabled, show onboarding before login for
                     // users who haven't completed it yet (tracked via a local UserPreferences key).
-                    let pre_login_onboarding_enabled = FeatureFlag::ZapNewSettingsModes.is_enabled();
+                    let pre_login_onboarding_enabled = FeatureFlag::InfiniShellNewSettingsModes.is_enabled();
                     let has_completed_local_onboarding = pre_login_onboarding_enabled
                         && has_completed_local_onboarding(ctx);
                     let should_show_pre_login_onboarding = pre_login_onboarding_enabled
@@ -2180,7 +2180,7 @@ impl RootView {
 
     pub fn open_warp_drive_object_in_existing_window(
         &mut self,
-        arg: &ZapDriveObjectArgs,
+        arg: &InfiniShellDriveObjectArgs,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
         if let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state {
@@ -2271,7 +2271,7 @@ impl RootView {
             ctx.windows().show_window_and_focus_app(window_id);
             ctx.notify();
         } else {
-            log::warn!("Auth not complete before trying to open zap drive object");
+            log::warn!("Auth not complete before trying to open InfiniShell Drive object");
         }
         true
     }
@@ -2685,7 +2685,9 @@ impl RootView {
             return;
         };
 
-        if FeatureFlag::ZapNewSettingsModes.is_enabled() && FeatureFlag::TabConfigs.is_enabled() {
+        if FeatureFlag::InfiniShellNewSettingsModes.is_enabled()
+            && FeatureFlag::TabConfigs.is_enabled()
+        {
             let intention = tutorial.intention();
             if matches!(intention, OnboardingIntention::AgentDrivenDevelopment) {
                 workspace.update(ctx, |view, ctx| {

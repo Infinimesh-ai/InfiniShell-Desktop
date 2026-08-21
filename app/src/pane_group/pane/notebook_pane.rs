@@ -13,7 +13,7 @@ use super::{
 use crate::app_state::{LeafContents, NotebookPaneSnapshot};
 use crate::cloud_object::Space;
 use crate::drive::items::WarpDriveItemId;
-use crate::drive::{ObjectTypeAndId, ZapDriveObjectSettings};
+use crate::drive::{InfiniShellDriveObjectSettings, ObjectTypeAndId};
 use crate::notebooks::link::{LinkEvent, NotebookLinks};
 use crate::notebooks::manager::{NotebookManager, NotebookSource};
 use crate::notebooks::notebook::{NotebookEvent, NotebookView};
@@ -43,7 +43,7 @@ impl NotebookPane {
     /// Restore a notebook pane given its cloud notebook ID.
     pub fn restore(
         notebook_id: Option<SyncId>,
-        settings: &ZapDriveObjectSettings,
+        settings: &InfiniShellDriveObjectSettings,
         ctx: &mut ViewContext<PaneGroup>,
     ) -> anyhow::Result<Self> {
         let window_id = ctx.window_id();
@@ -77,7 +77,7 @@ impl PaneContent for NotebookPane {
         let notebook_id = self.notebook_view(app).as_ref(app).notebook_id(app);
         LeafContents::Notebook(NotebookPaneSnapshot::NotebookObject {
             notebook_id,
-            settings: ZapDriveObjectSettings::default(),
+            settings: InfiniShellDriveObjectSettings::default(),
         })
     }
 
@@ -179,9 +179,9 @@ pub(super) fn subscribe_to_link_model(
                 session: session.clone(),
             })
         }
-        LinkEvent::ZapDriveLink {
+        LinkEvent::InfiniShellDriveLink {
             open_warp_drive_args,
-        } => ctx.emit(crate::pane_group::Event::ZapDriveLink {
+        } => ctx.emit(crate::pane_group::Event::InfiniShellDriveLink {
             open_warp_drive_args: open_warp_drive_args.clone(),
         }),
         LinkEvent::StartLocalSession { path } => {

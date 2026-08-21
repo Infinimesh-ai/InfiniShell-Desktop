@@ -2834,7 +2834,7 @@ fn is_plan_mode_turn(input: &[AIAgentInput]) -> bool {
 /// 工具不在 tool list 里就调用不到(provider 协议层会直接拒绝 unknown function)。
 ///
 /// **没被 BLOCK 的写类工具**:`create_documents` / `edit_documents`。它们只动
-/// Zap Drive 本地文档存储(AIDocumentModel),不碰文件系统、不跑命令,语义上
+/// InfiniShell Drive 本地文档存储(AIDocumentModel),不碰文件系统、不跑命令,语义上
 /// 恰好是 Plan Mode 的产出归档动作 —— 模型把最终 plan 沉淀为 Drive 文档,
 /// 用户后续可在 Drive UI 中查看 / 编辑 / 拖入自建的 PLAN 文件夹复用。
 ///

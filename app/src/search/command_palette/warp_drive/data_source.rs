@@ -26,7 +26,7 @@ use crate::settings::AISettings;
 use crate::workflows::WorkflowObject;
 use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 
-/// The Zap Drive spaces a window can see: its team, plus the user's personal and
+/// The InfiniShell Drive spaces a window can see: its team, plus the user's personal and
 /// shared-with-me objects.
 struct WindowScope {
     window_id: WindowId,
@@ -60,7 +60,7 @@ impl WindowScope {
     }
 }
 
-/// Datasource that searches the Zap Drive objects visible in a single window.
+/// Datasource that searches the InfiniShell Drive objects visible in a single window.
 pub struct DataSource {
     searcher: Box<dyn WarpDriveSearcher>,
     scope: WindowScope,
@@ -677,7 +677,7 @@ mod full_text_searcher {
     /// Zap could potentially have a lot of objects, so we increase it from the default of 50MB to 100MB
     const MEMORY_BUDGET: usize = 100_000_000; // TODO: is 100MB really necessary?
 
-    // All Zap Drive objects are boosted due to multiple fields being a part of the same total score,
+    // All InfiniShell Drive objects are boosted due to multiple fields being a part of the same total score,
     // putting them at an inherent disadvantage, as each field would only have a fractional weight.
     define_search_schema!(
         schema_name: NOTEBOOK_SEARCH_SCHEMA,

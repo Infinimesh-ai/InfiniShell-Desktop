@@ -80,7 +80,7 @@ use crate::cloud_object::{
     StoredObjectPermissions, StoredObjectStatuses, StoredObjectSyncStatus,
 };
 use crate::code::editor_management::CodeSource;
-use crate::drive::ZapDriveObjectSettings;
+use crate::drive::InfiniShellDriveObjectSettings;
 use crate::drive::folders::{FolderId, FolderObject, FolderObjectModel};
 use crate::env_vars::{EnvVarCollectionObject, EnvVarCollectionObjectModel};
 use crate::notebooks::{NotebookId, NotebookObject, NotebookObjectModel};
@@ -130,7 +130,8 @@ const WELCOME_PANE_KIND: &str = "welcome";
 use crate::persistence::cloud_objects::{StoredObjectId, upsert_stored_object};
 
 const WARP_SQLITE_FILE_NAME: &str = "warp.sqlite";
-const ZAP_APP_GROUP_SQLITE_MIGRATION_MARKER: &str = ".zap-app-group-sqlite-migrated";
+const APP_GROUP_SQLITE_MIGRATION_MARKER: &str = ".infinishell-app-group-sqlite-migrated";
+const LEGACY_APP_GROUP_SQLITE_MIGRATION_MARKER: &str = ".zap-app-group-sqlite-migrated";
 #[cfg(target_os = "macos")]
 const WARP_APP_GROUP_ID: &str = "2BBY89MBSN.dev.warp";
 
@@ -495,8 +496,8 @@ pub(super) fn init_db(scope: &PersistenceScope) -> Result<SqliteConnection> {
     if matches!(scope, PersistenceScope::App)
         && warp_core::channel::ChannelState::channel() == warp_core::channel::Channel::Oss
     {
-        if let Some(legacy_dir) = zap_legacy_app_group_sqlite_dir() {
-            if let Err(err) = migrate_zap_app_group_sqlite_if_needed(&db_path, &legacy_dir)
+        if let Some(legacy_dir) = legacy_app_group_sqlite_dir() {
+            if let Err(err) = migrate_legacy_app_group_sqlite_if_needed(&db_path, &legacy_dir)
                 .context("Failed to migrate InfiniShell SQLite database out of legacy App Group")
             {
                 report_error!(err);
@@ -567,7 +568,7 @@ fn migrate_old_sqlite_into_secure_container_if_needed(db_path: &Path) {
 }
 
 #[cfg(target_os = "macos")]
-fn zap_legacy_app_group_sqlite_dir() -> Option<PathBuf> {
+fn legacy_app_group_sqlite_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|home_dir| {
         home_dir
             .join("Library/Group Containers")
@@ -578,24 +579,25 @@ fn zap_legacy_app_group_sqlite_dir() -> Option<PathBuf> {
 }
 
 #[cfg(target_os = "macos")]
-fn migrate_zap_app_group_sqlite_if_needed(target_db: &Path, legacy_dir: &Path) -> Result<()> {
+fn migrate_legacy_app_group_sqlite_if_needed(target_db: &Path, legacy_dir: &Path) -> Result<()> {
     let Some(target_dir) = target_db.parent() else {
         return Ok(());
     };
 
-    let marker = target_dir.join(ZAP_APP_GROUP_SQLITE_MIGRATION_MARKER);
-    if marker.exists() {
+    let marker = target_dir.join(APP_GROUP_SQLITE_MIGRATION_MARKER);
+    let legacy_marker = target_dir.join(LEGACY_APP_GROUP_SQLITE_MIGRATION_MARKER);
+    if marker.exists() || legacy_marker.exists() {
         return Ok(());
     }
 
     let legacy_db = legacy_dir.join(WARP_SQLITE_FILE_NAME);
     if !legacy_db.exists() {
-        write_zap_app_group_sqlite_migration_marker(&marker)?;
+        write_legacy_app_group_sqlite_migration_marker(&marker)?;
         return Ok(());
     }
 
-    if !should_copy_legacy_zap_sqlite(&legacy_db, target_db)? {
-        write_zap_app_group_sqlite_migration_marker(&marker)?;
+    if !should_copy_legacy_app_group_sqlite(&legacy_db, target_db)? {
+        write_legacy_app_group_sqlite_migration_marker(&marker)?;
         return Ok(());
     }
 
@@ -608,7 +610,7 @@ fn migrate_zap_app_group_sqlite_if_needed(target_db: &Path, legacy_dir: &Path) -
     copy_sqlite_file(&legacy_db, target_db)?;
     copy_sqlite_sidecar(&legacy_db, target_db, "sqlite-wal")?;
     copy_sqlite_sidecar(&legacy_db, target_db, "sqlite-shm")?;
-    write_zap_app_group_sqlite_migration_marker(&marker)?;
+    write_legacy_app_group_sqlite_migration_marker(&marker)?;
 
     safe_info!(
         safe: ("Migrated InfiniShell SQLite database out of legacy App Group"),
@@ -619,7 +621,7 @@ fn migrate_zap_app_group_sqlite_if_needed(target_db: &Path, legacy_dir: &Path) -
 }
 
 #[cfg(target_os = "macos")]
-fn should_copy_legacy_zap_sqlite(legacy_db: &Path, target_db: &Path) -> Result<bool> {
+fn should_copy_legacy_app_group_sqlite(legacy_db: &Path, target_db: &Path) -> Result<bool> {
     if !target_db.exists() {
         return Ok(true);
     }
@@ -678,7 +680,7 @@ fn copy_sqlite_file(source: &Path, target: &Path) -> Result<()> {
 }
 
 #[cfg(target_os = "macos")]
-fn write_zap_app_group_sqlite_migration_marker(marker: &Path) -> Result<()> {
+fn write_legacy_app_group_sqlite_migration_marker(marker: &Path) -> Result<()> {
     std::fs::write(marker, b"migrated\n")
         .with_context(|| format!("Failed to write migration marker `{}`", marker.display()))
 }
@@ -2693,7 +2695,7 @@ fn read_node(conn: &mut SqliteConnection, node: model::PaneNode) -> Result<PaneN
                         Some(path) => NotebookPaneSnapshot::LocalFileNotebook { path: Some(path) },
                         None => NotebookPaneSnapshot::NotebookObject {
                             notebook_id,
-                            settings: ZapDriveObjectSettings::default(),
+                            settings: InfiniShellDriveObjectSettings::default(),
                         },
                     })
                 }
@@ -2711,7 +2713,7 @@ fn read_node(conn: &mut SqliteConnection, node: model::PaneNode) -> Result<PaneN
 
                     LeafContents::Workflow(WorkflowPaneSnapshot::WorkflowObject {
                         workflow_id,
-                        settings: ZapDriveObjectSettings::default(),
+                        settings: InfiniShellDriveObjectSettings::default(),
                     })
                 }
                 CODE_PANE_KIND => {

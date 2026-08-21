@@ -16,32 +16,32 @@ app/assets/bundled/bootstrap/*_subshell_bootstrap_block_output.txt -text
 crates/input_classifier/models/** filter=lfs diff=lfs merge=lfs -text
 crates/input_classifier/models/**/*tokenizer.json -filter -diff -merge text linguist-generated=true
 
-# openWarp 特化路径:合并上游时永远保留 openWarp 版本
-# 用法:本地需先注册驱动 `git config merge.openwarp-ours.driver true`
+# InfiniShell 特化路径:合并上游时永远保留 InfiniShell 版本
+# 用法:本地需先注册驱动 `git config merge.infinishell-ours.driver true`
 # CI / 新克隆者执行 `script/setup-merge-drivers.sh` 自动配置
-.github/workflows/openwarp_release.yml merge=openwarp-ours
-app/channels/oss/dev.openwarp.OpenWarp.desktop merge=openwarp-ours
-lib/rust-genai/** merge=openwarp-ours
+.github/workflows/infinishell_release.yml merge=infinishell-ours
+app/channels/oss/dev.infinishell.InfiniShell.desktop merge=infinishell-ours
+lib/rust-genai/** merge=infinishell-ours
 
-# openWarp 自治区(BYOP / cloud 清理 / i18n / footer 删改 等已永久分叉)
-# 上游对这些路径的所有改动一律自动保留 openWarp 版本
-app/src/ai/agent_sdk/** merge=openwarp-ours
-app/src/ai/blocklist/action_model/** merge=openwarp-ours
-app/src/ai/blocklist/agent_view/** merge=openwarp-ours
-app/src/ai/blocklist/controller.rs merge=openwarp-ours
-app/src/ai/blocklist/controller/** merge=openwarp-ours
-app/src/ai/blocklist/history_model/conversation_loader.rs merge=openwarp-ours
-app/src/ai/blocklist/orchestration_event_poller*.rs merge=openwarp-ours
-app/src/ai/execution_profiles/editor/** merge=openwarp-ours
-app/src/terminal/input/slash_commands/** merge=openwarp-ours
-app/src/terminal/view/ambient_agent/** merge=openwarp-ours
-app/src/search/slash_command_menu/** merge=openwarp-ours
+# InfiniShell 自治区(BYOP / cloud 清理 / i18n / footer 删改 等已永久分叉)
+# 上游对这些路径的所有改动一律自动保留 InfiniShell 版本
+app/src/ai/agent_sdk/** merge=infinishell-ours
+app/src/ai/blocklist/action_model/** merge=infinishell-ours
+app/src/ai/blocklist/agent_view/** merge=infinishell-ours
+app/src/ai/blocklist/controller.rs merge=infinishell-ours
+app/src/ai/blocklist/controller/** merge=infinishell-ours
+app/src/ai/blocklist/history_model/conversation_loader.rs merge=infinishell-ours
+app/src/ai/blocklist/orchestration_event_poller*.rs merge=infinishell-ours
+app/src/ai/execution_profiles/editor/** merge=infinishell-ours
+app/src/terminal/input/slash_commands/** merge=infinishell-ours
+app/src/terminal/view/ambient_agent/** merge=infinishell-ours
+app/src/search/slash_command_menu/** merge=infinishell-ours
 
-# openWarp 独有特性:SSH 管理器(2026-05-04 新增)
-# 上游不会有这些路径,标记 merge=openwarp-ours 是为了将来万一上游加同名
+# InfiniShell 独有特性:SSH 管理器(2026-05-04 新增)
+# 上游不会有这些路径,标记 merge=infinishell-ours 是为了将来万一上游加同名
 # 文件时不产生意外冲突。
-crates/warp_ssh_manager/** merge=openwarp-ours
-app/src/ssh_manager/** merge=openwarp-ours
-app/src/pane_group/pane/ssh_server_pane.rs merge=openwarp-ours
-crates/persistence/migrations/2026-05-04-120000_add_ssh_manager_tables/** merge=openwarp-ours
-crates/persistence/migrations/2026-05-04-130000_add_ssh_nodes_is_collapsed/** merge=openwarp-ours
+crates/warp_ssh_manager/** merge=infinishell-ours
+app/src/ssh_manager/** merge=infinishell-ours
+app/src/pane_group/pane/ssh_server_pane.rs merge=infinishell-ours
+crates/persistence/migrations/2026-05-04-120000_add_ssh_manager_tables/** merge=infinishell-ours
+crates/persistence/migrations/2026-05-04-130000_add_ssh_nodes_is_collapsed/** merge=infinishell-ours

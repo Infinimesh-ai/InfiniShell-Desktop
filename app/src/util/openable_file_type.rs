@@ -243,7 +243,7 @@ pub fn resolve_file_target_with_editor_choice(
     }
 
     // 2. Zap Code Editor (Explicit user preference)
-    if is_openable_in_warp && matches!(editor_choice, EditorChoice::Zap) {
+    if is_openable_in_warp && matches!(editor_choice, EditorChoice::InfiniShell) {
         return FileTarget::CodeEditor(layout);
     }
 
@@ -266,7 +266,9 @@ pub fn resolve_file_target_with_editor_choice(
     match editor_choice {
         EditorChoice::ExternalEditor(editor) => FileTarget::ExternalEditor(editor),
         EditorChoice::SystemDefault => FileTarget::SystemDefault,
-        EditorChoice::Zap | EditorChoice::EnvEditor => unreachable!("Already matched above"),
+        EditorChoice::InfiniShell | EditorChoice::EnvEditor => {
+            unreachable!("Already matched above")
+        }
     }
 }
 
@@ -292,7 +294,10 @@ mod tests {
     fn test_open_code_panels_file_editor_default_is_warp() {
         use crate::util::file::external_editor::settings::OpenCodePanelsFileEditor;
 
-        assert_eq!(OpenCodePanelsFileEditor::default_value(), EditorChoice::Zap);
+        assert_eq!(
+            OpenCodePanelsFileEditor::default_value(),
+            EditorChoice::InfiniShell
+        );
     }
 
     #[test]
@@ -314,7 +319,7 @@ mod tests {
     fn test_resolve_file_target_warp_uses_default_layout() {
         let target = resolve_file_target_with_editor_choice(
             Path::new("data.txt"),
-            EditorChoice::Zap,
+            EditorChoice::InfiniShell,
             true, /* prefer_markdown_viewer */
             EditorLayout::NewTab,
             None,
@@ -328,7 +333,7 @@ mod tests {
     fn test_resolve_file_target_binary_is_system_generic() {
         let target = resolve_file_target_with_editor_choice(
             Path::new("video.mp4"),
-            EditorChoice::Zap,
+            EditorChoice::InfiniShell,
             true, /* prefer_markdown_viewer */
             EditorLayout::SplitPane,
             None,
@@ -342,7 +347,7 @@ mod tests {
     fn test_resolve_file_target_image_uses_image_viewer() {
         let target = resolve_file_target_with_editor_choice(
             Path::new("photo.png"),
-            EditorChoice::Zap,
+            EditorChoice::InfiniShell,
             true, /* prefer_markdown_viewer */
             EditorLayout::NewTab,
             None,

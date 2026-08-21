@@ -293,7 +293,7 @@ pub fn secure_state_dir() -> Option<PathBuf> {
 
     #[cfg(target_os = "macos")]
     if let Some(app_group_root) = app_group_container_path() {
-        // The macOS project_path is the bundle ID (i.e. `dev.warp.Zap-Stable`).
+        // The macOS project_path is the bundle ID (i.e. `dev.infinishell.InfiniShell`).
         let project_dirs = project_dirs()?;
         return Some(
             app_group_root

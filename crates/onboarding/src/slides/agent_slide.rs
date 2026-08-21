@@ -866,7 +866,7 @@ impl AgentSlide {
     fn render_visual(&self, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
         let theme = appearance.theme();
 
-        if FeatureFlag::ZapNewSettingsModes.is_enabled() {
+        if FeatureFlag::InfiniShellNewSettingsModes.is_enabled() {
             let use_vertical = self
                 .onboarding_state
                 .as_ref(app)

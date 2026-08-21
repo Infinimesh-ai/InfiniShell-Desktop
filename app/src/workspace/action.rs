@@ -271,7 +271,7 @@ pub enum WorkspaceAction {
     /// 打开/关闭左侧 panel 的 Skill 管理器视图(openWarp 独有)。
     ToggleSkillManager,
     /// 打开/关闭左侧 panel 的项目管理器视图(openWarp 独有,
-    /// `FeatureFlag::ZapProjects` 门控)。
+    /// `FeatureFlag::InfiniShellProjects` 门控)。
     ToggleProjectsPanel,
     AddTabWithShell {
         shell: AvailableShell,
@@ -392,15 +392,15 @@ pub enum WorkspaceAction {
         cursor_position: Vector2F,
     },
     DropGroup,
-    /// Toggles the left panel. In Code Mode V1 this toggles Zap Drive.
+    /// Toggles the left panel. In Code Mode V1 this toggles InfiniShell Drive.
     /// In Code Mode V2 this toggles the left panel which contains both the project explorer and
-    /// Zap Drive. This happens as explicit action from the user.
+    /// InfiniShell Drive. This happens as explicit action from the user.
     ToggleLeftPanel,
-    /// Toggles directly to the Zap Drive tab of the left panel in Code Mode V2
+    /// Toggles directly to the InfiniShell Drive tab of the left panel in Code Mode V2
     ToggleWarpDrive,
-    /// Unconditionally opens Zap Drive. This is used in the case of user lifecycle
+    /// Unconditionally opens InfiniShell Drive. This is used in the case of user lifecycle
     /// events like new user onboarding or when the user joins a team.
-    ZapDrive,
+    InfiniShellDrive,
     /// Toggles the right panel. This happens as an explicit action from the user.
     ToggleRightPanel,
     /// Opens the code review panel (right panel) without toggling. If already open,
@@ -706,12 +706,12 @@ pub enum WorkspaceAction {
     /// Reset the AWS Bedrock login banner dismissed state (for debugging).
     #[cfg(debug_assertions)]
     DebugResetAwsBedrockLoginBannerDismissed,
-    /// Open the Zap Launch Modal (for debugging)
+    /// Open the InfiniShell Launch Modal (for debugging)
     #[cfg(debug_assertions)]
-    OpenZapLaunchModal,
-    /// Reset the Zap launch modal dismissed state (for debugging)
+    OpenInfiniShellLaunchModal,
+    /// Reset the InfiniShell launch modal dismissed state (for debugging)
     #[cfg(debug_assertions)]
-    ResetZapLaunchModalState,
+    ResetInfiniShellLaunchModalState,
     /// Open the Orchestration Launch Modal (for debugging)
     #[cfg(debug_assertions)]
     OpenOrchestrationLaunchModal,
@@ -1023,7 +1023,7 @@ impl WorkspaceAction {
             | StartGroupDrag(_)
             | ToggleLeftPanel
             | ToggleWarpDrive
-            | ZapDrive
+            | InfiniShellDrive
             | ClosePanel
             | ToggleRightPanel
             | OpenCodeReviewPanel(..)
@@ -1139,8 +1139,8 @@ impl WorkspaceAction {
             ToggleConversationTranscriptDetailsPanel => false,
             #[cfg(debug_assertions)]
             DebugResetAwsBedrockLoginBannerDismissed
-            | OpenZapLaunchModal
-            | ResetZapLaunchModalState
+            | OpenInfiniShellLaunchModal
+            | ResetInfiniShellLaunchModalState
             | OpenOrchestrationLaunchModal
             | ResetOrchestrationLaunchModalState
             | OpenAgentCliLaunchModal
