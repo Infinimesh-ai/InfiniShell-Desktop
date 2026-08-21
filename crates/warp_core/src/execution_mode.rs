@@ -30,6 +30,22 @@ impl ExecutionMode {
             ExecutionMode::RemoteServerDaemon => "warp-remote-server-daemon",
         }
     }
+
+    /// Whether a CLI-based MCP server can fall back to inheriting this process's PATH when
+    /// no explicit `mcp_execution_path` setting is available.
+    ///
+    /// The desktop app keeps requiring a shell-derived path, so a failed MCP spawn surfaces
+    /// as an actionable toast instead of silently launching with the wrong PATH. The SDK CLI
+    /// and the TUI receive an authoritative PATH from their own launcher before Zap starts.
+    /// The remote server daemon is headless and has no window where it could surface the
+    /// alternative failure, so it also inherits the process PATH when no configured path exists.
+    pub fn can_inherit_process_path_for_mcp(&self) -> bool {
+        match self {
+            ExecutionMode::App => false,
+            ExecutionMode::Tui | ExecutionMode::Sdk | ExecutionMode::RemoteServerDaemon => true,
+        }
+    }
+
 }
 
 /// Model tracking the mode that Zap is running in.
@@ -120,6 +136,12 @@ impl AppExecutionMode {
     /// Returns the client ID to report to the server.
     pub fn client_id(&self) -> &'static str {
         self.mode.client_id()
+    }
+
+    /// Whether a CLI-based MCP server can fall back to inheriting this process's PATH when
+    /// no explicit `mcp_execution_path` setting is available.
+    pub fn can_inherit_process_path_for_mcp(&self) -> bool {
+        self.mode.can_inherit_process_path_for_mcp()
     }
 
     /// If true, Zap is running in a sandbox like a Docker container or VM, rather than directly
