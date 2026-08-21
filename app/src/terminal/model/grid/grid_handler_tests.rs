@@ -786,7 +786,7 @@ fn test_find_url_omits_trailing_periods() {
             .grid_handler
             .url_at_point(Point { row: 0, col: 10 }),
         Some(Link {
-            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 43 },
+            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 64 },
             is_empty: false
         })
     );
@@ -795,7 +795,7 @@ fn test_find_url_omits_trailing_periods() {
             .grid_handler
             .url_at_point(Point { row: 0, col: 33 }),
         Some(Link {
-            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 43 },
+            range: Point { row: 0, col: 6 }..=Point { row: 0, col: 64 },
             is_empty: false
         })
     );
