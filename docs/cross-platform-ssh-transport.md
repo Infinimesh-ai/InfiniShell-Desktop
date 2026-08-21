@@ -1,6 +1,6 @@
 # Cross-platform SSH transport
 
-Status: implemented with staged rollout; recursive paths remain in testing<br>
+Status: implemented; recursive paths are enabled by default in stable builds<br>
 Implementation baseline: `2082841bb`, `1e6fdfaa4`, `363914f1d`, `beeaeb85b`<br>
 Last updated: 2026-08-21<br>
 Chinese version: [cross-platform-ssh-transport.zh-CN.md](cross-platform-ssh-transport.zh-CN.md)
@@ -34,7 +34,7 @@ applicable. A fallback can mean that the terminal connection works normally
 while InfiniShell shell integration or remote-server features are unavailable
 for that session.
 
-## Recursive and multi-hop SSH preview
+## Recursive and multi-hop SSH
 
 An enhanced remote shell can intercept another compatible interactive `ssh`
 command and extend the new target through its parent remote-server. Each hop is
@@ -50,15 +50,14 @@ fallback. Repeating the same protocol supports `local -> A -> B -> C` rather
 than treating the second hop as a special case. A failed install or extension
 must leave the ordinary interactive shell usable.
 
-This capability is not stable yet. Debug builds enable it automatically;
-release builds require
-`INFINISHELL_UNSTABLE_FEATURES=recursive_ssh_extension` when InfiniShell starts.
-Focused POSIX multi-hop, protocol, flow-control and fallback checks are in
-place. Native Windows automation builds the real SSH worker and verifies that
-PowerShell preserves bootstrap argument boundaries, but it does not replace
-manual end-to-end coverage of Windows-origin, Windows-remote and mixed-OS
-multi-hop topologies. Those Windows paths remain the highest-risk part of the
-preview and must not be described as production-mature.
+This capability is enabled by default in stable builds; ordinary users do not
+need to set an environment variable. Focused POSIX multi-hop, protocol,
+flow-control and fallback checks are in place. Native Windows automation builds
+the real SSH worker and verifies that PowerShell preserves bootstrap argument
+boundaries, but it does not replace manual end-to-end coverage of
+Windows-origin, Windows-remote and mixed-OS multi-hop topologies. Those Windows
+paths remain the highest-risk release area and must pass the matrix below before
+the stable tag is pushed.
 
 ## Selection and connection flow
 
@@ -216,11 +215,11 @@ the byte window, upload compatibility and failure paths that previously caused
 an extension-install attempt to report a false failure.
 
 This is automated build and protocol evidence, not a claim that the Windows
-runtime matrix is complete. Before stable rollout, manually verify Windows as
-the client, an intermediate hop and the final remote, including mixed
+runtime matrix is complete. Before the stable release, manually verify Windows
+as the client, an intermediate hop and the final remote, including mixed
 POSIX/Windows chains, cold installation, nested `exit`, parent disconnect and
-native fallback. Until that matrix is recorded, Windows recursive SSH remains
-explicitly experimental.
+native fallback. Do not publish a stable candidate with recursive SSH enabled
+by default until that matrix passes.
 
 ## Post-merge observation log
 

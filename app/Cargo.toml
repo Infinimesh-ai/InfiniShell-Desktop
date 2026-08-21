@@ -640,6 +640,7 @@ default = [
     "settings_file",
     "ssh_tmux_wrapper",
     "onekey_prompt",
+    "recursive_ssh_extension",
     "directory_tab_colors",
     "pending_user_query_indicator",
     "queue_slash_command",

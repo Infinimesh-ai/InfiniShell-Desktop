@@ -1,6 +1,6 @@
 # 跨平台 SSH transport
 
-状态:已实现,分阶段放量;递归链路仍在测试<br>
+状态:已实现;递归链路随正式版默认启用<br>
 实现基线:`2082841bb`、`1e6fdfaa4`、`363914f1d`、`beeaeb85b`<br>
 最后更新:2026-08-21<br>
 英文版:[cross-platform-ssh-transport.md](cross-platform-ssh-transport.md)
@@ -33,7 +33,7 @@ Windows 远端扩展的原生构建、协议 E2E、fast-dev `.app`、版本化�
 仍保留原生 SSH。发生回退可能表示终端连接仍然正常,但当前会话无法使用
 InfiniShell shell 集成或 remote-server。
 
-## 递归与多级 SSH 预览
+## 递归与多级 SSH
 
 已增强的远端 shell 可以拦截下一条兼容的交互式 `ssh` 命令,并通过父
 remote-server 继续增强新目标。每一跳仍由用户输入命令所在主机的 OpenSSH
@@ -45,12 +45,11 @@ InfiniShell 只通过父 daemon 传递受作用域和 capability 保护的控制
 跳数保护和安全回退。重复同一协议即可支持 `local -> A -> B -> C`,而不是
 为第二跳维护一套特例。安装或增强失败时,普通交互式 shell 必须仍然可用。
 
-该能力尚未达到稳定状态。Debug 构建自动开启;release 构建需要在 InfiniShell
-启动时设置 `INFINISHELL_UNSTABLE_FEATURES=recursive_ssh_extension`。已有聚焦的
-POSIX 多级、协议、流控和回退检查。Windows 原生自动化会构建真实 SSH worker,
-并检查 PowerShell 是否保留 bootstrap 参数边界,但它不能取代 Windows 发起、
-Windows 远端和混合系统多级拓扑的人工端到端覆盖。这些 Windows 链路仍是预览
-阶段风险最高的部分,不得宣称为生产成熟。
+该能力在正式版中默认启用,普通用户无需设置环境变量。已有聚焦的 POSIX 多级、
+协议、流控和回退检查。Windows 原生自动化会构建真实 SSH worker,并检查
+PowerShell 是否保留 bootstrap 参数边界,但它不能取代 Windows 发起、Windows
+远端和混合系统多级拓扑的人工端到端覆盖。这些 Windows 链路仍是正式发布前
+风险最高的部分,必须通过下文矩阵后才能推送正式 Tag。
 
 ## 选路与连接流程
 
@@ -182,10 +181,10 @@ Windows 任务构建了真实 SSH worker,并在共享检查之外通过 PowerShe
 测试。递归隧道测试覆盖字节窗口、上传兼容与失败路径,包括曾经导致安装
 已实际成功却显示失败的流控问题。
 
-这是自动化构建与协议证据,不代表 Windows 运行时矩阵已完整。稳定放量前,
+这是自动化构建与协议证据,不代表 Windows 运行时矩阵已完整。正式发布前,
 必须人工验证 Windows 作为客户端、中间跳点与最终远端的情况,包括 POSIX/Windows
-混合链、冷安装、嵌套 `exit`、父连接中断和原生回退。在该矩阵有记录前,
-Windows 递归 SSH 仍明确属于实验功能。
+混合链、冷安装、嵌套 `exit`、父连接中断和原生回退。该矩阵未通过时,不得发布
+默认启用递归 SSH 的正式候选。
 
 ## 合并后观察记录
 

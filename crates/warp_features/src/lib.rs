@@ -982,7 +982,6 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::DragTabsToWindows,
     FeatureFlag::ServerFileBrowser,
     FeatureFlag::SshRemoteServer,
-    FeatureFlag::RecursiveSshExtension,
     FeatureFlag::RemoteCodebaseIndexing,
     FeatureFlag::GPTConfigurableContextWindow,
     FeatureFlag::RestorePromptOnInlineModelSelectorSearch,
