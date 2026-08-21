@@ -381,6 +381,29 @@ $encodedWindowsRecursive = ($windowsRecursiveCommand -split ' ')[-1]
 $decodedWindowsRecursive = [Text.Encoding]::Unicode.GetString(
     [Convert]::FromBase64String($encodedWindowsRecursive)
 )
+$windowsCommand = Warp-New-WindowsBootstrapCommand -RemoteSessionId 42 -SshHookHex '7B7D'
+$workerArgs = @(Warp-New-RustSshWorkerArguments `
+    -SessionId 99 `
+    -RemoteSessionId 42 `
+    -ControlScope 'remote' `
+    -HopDepth 3 `
+    -SshExecutable 'C:\Program Files\OpenSSH\ssh.exe' `
+    -PosixCommand $bootstrapCommand `
+    -WindowsCommand $windowsCommand `
+    -SshArgs @('-p', '2222', 'user@host'))
+$posixCommandIndex = [Array]::IndexOf($workerArgs, '--posix-command')
+$windowsCommandIndex = [Array]::IndexOf($workerArgs, '--windows-command')
+$controlScopeIndex = [Array]::IndexOf($workerArgs, '--control-scope')
+$hopDepthIndex = [Array]::IndexOf($workerArgs, '--hop-depth')
+$separatorIndex = [Array]::IndexOf($workerArgs, '--')
+$encodedPosixCommand = $workerArgs[$posixCommandIndex + 1]
+$encodedWindowsCommand = $workerArgs[$windowsCommandIndex + 1]
+$decodedWorkerPosixCommand = [Text.Encoding]::UTF8.GetString(
+    [Convert]::FromBase64String($encodedPosixCommand)
+)
+$decodedWorkerWindowsCommand = [Text.Encoding]::UTF8.GetString(
+    [Convert]::FromBase64String($encodedWindowsCommand)
+)
 $capabilityProbeCommand = Warp-New-PowerShellCapabilityProbeCommand
 $encodedCapabilityProbe = ($capabilityProbeCommand -split ' ')[-1]
 $decodedCapabilityProbe = [Text.Encoding]::Unicode.GetString(
@@ -435,6 +458,15 @@ ConvertTo-Json -Compress -Depth 4 -InputObject @{
         [bool][String]::IsNullOrEmpty((Warp-Get-SafeRemoteRelativePath '/absolute.exe'))
         [bool][String]::IsNullOrEmpty((Warp-Get-SafeRemoteRelativePath 'folder//worker.exe'))
     )
+    rust_worker_arguments = @{
+        uses_base64 = $workerArgs -contains '--commands-base64'
+        control_scope = $workerArgs[$controlScopeIndex + 1]
+        hop_depth = $workerArgs[$hopDepthIndex + 1]
+        posix_round_trip = $decodedWorkerPosixCommand -ceq $bootstrapCommand
+        windows_round_trip = $decodedWorkerWindowsCommand -ceq $windowsCommand
+        native_safe = $encodedPosixCommand -cmatch '^[A-Za-z0-9+/]*={0,2}$' -and $encodedWindowsCommand -cmatch '^[A-Za-z0-9+/]*={0,2}$'
+        ssh_args = @($workerArgs[($separatorIndex + 1)..($workerArgs.Count - 1)])
+    }
     remote_bootstrap_syntax = $remoteBootstrapSyntax
     posix_recursive_bootstrap = [bool]($bootstrapCommand.Contains("WARP_RECURSIVE_SSH_EXTENSION='1'") -and $bootstrapCommand.Contains("WARP_SSH_HOP_DEPTH='3'"))
     windows_recursive_bootstrap = [bool]($decodedWindowsRecursive.Contains("WARP_RECURSIVE_SSH_EXTENSION = '1'") -and $decodedWindowsRecursive.Contains("WARP_SSH_HOP_DEPTH = '3'") -and $decodedWindowsRecursive.Contains("WARP_RUST_SSH_EXECUTABLE = Join-Path"))
@@ -555,6 +587,18 @@ ConvertTo-Json -Compress -Depth 4 -InputObject @{
             true,
             true
         ])
+    );
+    assert_eq!(
+        result["rust_worker_arguments"],
+        json!({
+            "uses_base64": true,
+            "control_scope": "remote",
+            "hop_depth": "3",
+            "posix_round_trip": true,
+            "windows_round_trip": true,
+            "native_safe": true,
+            "ssh_args": ["-p", "2222", "user@host"]
+        })
     );
     let remote_bootstrap_syntax = result["remote_bootstrap_syntax"]
         .as_array()

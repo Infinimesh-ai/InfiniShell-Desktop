@@ -81,6 +81,52 @@ fn rust_ssh_worker_rejects_multiple_transports() {
 }
 
 #[test]
+fn rust_ssh_session_accepts_base64_bootstrap_commands() {
+    let args = Args::try_parse_from([
+        "infinishell-ssh",
+        "rust-ssh-session",
+        "--session-id",
+        "1",
+        "--remote-session-id",
+        "2",
+        "--control-scope",
+        "remote",
+        "--hop-depth",
+        "3",
+        "--ssh-executable",
+        "ssh.exe",
+        "--commands-base64",
+        "--posix-command",
+        "cHJpbnRmICclc1xuJyAiJDEiIHwgY29tbWFuZCAtcCB4eGQgLXAgLXI=",
+        "--windows-command",
+        "cG93ZXJzaGVsbC5leGUgLU5vTG9nbyAtTm9FeGl0",
+        "--",
+        "-p",
+        "2222",
+        "chiiz@192.168.20.204",
+    ])
+    .unwrap();
+    let Some(Command::Worker(WorkerCommand::RustSshSession(worker))) = args.command() else {
+        panic!("期望 Rust SSH session worker");
+    };
+
+    assert!(worker.commands_base64);
+    assert_eq!(worker.control_scope, "remote");
+    assert_eq!(worker.hop_depth, 3);
+    assert_eq!(
+        worker.posix_command,
+        "cHJpbnRmICclc1xuJyAiJDEiIHwgY29tbWFuZCAtcCB4eGQgLXAgLXI="
+    );
+    assert_eq!(
+        worker.ssh_args,
+        ["-p", "2222", "chiiz@192.168.20.204"]
+            .into_iter()
+            .map(OsString::from)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 #[serial_test::serial]
 fn help_hides_api_key_env_value() {
     const API_KEY: &str = "warp-cli-test-api-key-NOT-REAL";

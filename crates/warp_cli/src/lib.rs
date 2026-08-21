@@ -95,6 +95,9 @@ pub struct RustSshSessionArgs {
     /// 新会话在递归 SSH 路径中的深度。
     #[arg(long, default_value_t = 1, hide = true)]
     pub hop_depth: u32,
+    /// bootstrap 命令是否使用 UTF-8 Base64 编码，以安全穿过 PowerShell native argv。
+    #[arg(long, hide = true)]
+    pub commands_base64: bool,
     /// wrapper 已解析出的真实 OpenSSH 可执行文件，仅用于读取 `ssh -G` 配置。
     #[arg(long, hide = true)]
     pub ssh_executable: std::path::PathBuf,
