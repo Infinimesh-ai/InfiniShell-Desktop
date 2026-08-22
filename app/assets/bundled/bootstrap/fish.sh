@@ -797,7 +797,7 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1" -a "$
                 end
 
                 if test "$remote_powershell" = powershell
-                    set -l windows_ssh_hook (printf '{"hook": "SSH", "value": {"socket_path": "%s", "transport": {"version": 1, "type": "control_master", "socket_path": "%s", "ownership": "%s"}, "remote_shell": "pwsh", "session_id": %s, "remote_session_id": %s, "external_control_master": %s}}' "$control_path" "$control_path" "$control_master_ownership" "$WARP_SESSION_ID" "$remote_session_id" "$external_control_master" | command od -An -v -tx1 | command tr -d ' \n')
+                    set -l windows_ssh_hook (printf '{"hook": "SSH", "value": {"socket_path": "%s", "transport": {"version": 1, "type": "control_master", "socket_path": "%s", "ownership": "%s"}, "remote_shell": "pwsh", "session_id": %s, "remote_session_id": %s, "control_scope": "%s", "hop_depth": %s, "external_control_master": %s}}' "$control_path" "$control_path" "$control_master_ownership" "$WARP_SESSION_ID" "$remote_session_id" "$control_scope" "$next_hop_depth" "$external_control_master" | command od -An -v -tx1 | command tr -d ' \n')
                     set -l windows_bootstrap_command (warp_windows_powershell_bootstrap_command \
                         "$remote_session_id" "$windows_ssh_hook" "$WARP_CLIENT_VERSION" \
                         "$WARP_CLI_AGENT_PROTOCOL_VERSION")

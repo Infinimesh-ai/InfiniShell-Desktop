@@ -84,6 +84,43 @@ fn motd_is_scoped_to_ssh_bootstrap() {
 }
 
 #[test]
+fn posix_windows_ssh_hooks_preserve_recursive_transport_scope() {
+    let scripts = [
+        (
+            "bash",
+            include_str!("../../assets/bundled/bootstrap/bash_body.sh"),
+        ),
+        (
+            "zsh",
+            include_str!("../../assets/bundled/bootstrap/zsh_body.sh"),
+        ),
+        (
+            "fish",
+            include_str!("../../assets/bundled/bootstrap/fish.sh"),
+        ),
+    ];
+
+    for (shell, script) in scripts {
+        let hook = script
+            .lines()
+            .find(|line| line.contains("windows_ssh_hook"))
+            .unwrap_or_else(|| panic!("{shell} 应生成 Windows SSH hook"));
+        assert!(
+            hook.contains(r#""control_scope": "%s""#),
+            "{shell} Windows SSH hook 应携带 control_scope"
+        );
+        assert!(
+            hook.contains(r#""hop_depth": %s"#),
+            "{shell} Windows SSH hook 应携带 hop_depth"
+        );
+        assert!(
+            hook.contains(r#""$control_scope" "$next_hop_depth""#),
+            "{shell} Windows SSH hook 应传入当前 scope 和下一跳深度"
+        );
+    }
+}
+
+#[test]
 fn embeds_the_windows_remote_init_shell_as_bom_free_gzip_base64() {
     let script = embed_windows_remote_init_shell(
         format!("before {WINDOWS_REMOTE_INIT_SHELL_GZIP_BASE64_PLACEHOLDER} after"),
