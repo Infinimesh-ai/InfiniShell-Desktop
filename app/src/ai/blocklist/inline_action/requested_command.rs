@@ -772,11 +772,10 @@ impl RequestedCommandView {
             let mut items = vec![accept_item, auto_item];
             if FeatureFlag::AgentApprovalModes.is_enabled() {
                 items.push(
-                    MenuItemFields::new_with_label(
+                    MenuItemFields::new_with_stacked_label(
                         crate::t!("ai-block-full-access-this-conversation"),
-                        String::new(),
+                        crate::t!("ai-block-full-access-description"),
                     )
-                    .with_tooltip(crate::t!("ai-block-full-access-tooltip"))
                     .with_on_select_action(RequestedCommandViewAction::AcceptAndFullAccess)
                     .into_item(),
                 );

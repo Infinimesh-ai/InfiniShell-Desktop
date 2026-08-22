@@ -599,10 +599,12 @@ impl CLISubagentView {
             ];
             if FeatureFlag::AgentApprovalModes.is_enabled() {
                 items.push(
-                    MenuItemFields::new(crate::t!("ai-block-full-access-this-conversation"))
-                        .with_tooltip(crate::t!("ai-block-full-access-tooltip"))
-                        .with_on_select_action(CLISubagentAction::ExecuteAndFullAccess)
-                        .into_item(),
+                    MenuItemFields::new_with_stacked_label(
+                        crate::t!("ai-block-full-access-this-conversation"),
+                        crate::t!("ai-block-full-access-description"),
+                    )
+                    .with_on_select_action(CLISubagentAction::ExecuteAndFullAccess)
+                    .into_item(),
                 );
             }
             menu.set_items(items, ctx);
