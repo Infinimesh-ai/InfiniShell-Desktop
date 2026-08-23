@@ -22,6 +22,7 @@ use remote_server::proto::{
 use remote_server::protocol::{
     INITIAL_TUNNEL_WINDOW, MAX_TUNNEL_CHUNK_SIZE, MAX_TUNNELS_PER_CONNECTION,
 };
+#[cfg(unix)]
 use warpui::r#async::FutureExt as _;
 use warpui::r#async::executor;
 
@@ -153,29 +154,31 @@ impl TunnelBroker {
                     .remove(&release.control_id);
                 if let Some(control) = control {
                     match (&control.transport, control.ownership) {
+                        #[cfg(unix)]
                         (
                             RegisteredTransport::ControlMaster { path },
                             SshControlOwnership::WarpManaged,
                         ) => {
                             if release.stop_control_master {
-                                #[cfg(unix)]
-                                {
-                                    let args = remote_server::ssh::ssh_args(path);
-                                    let stopped = Command::new("ssh")
-                                        .arg("-O")
-                                        .arg("exit")
-                                        .args(args)
-                                        .kill_on_drop(true)
-                                        .output()
-                                        .with_timeout(CONTROL_CHECK_TIMEOUT)
-                                        .await;
-                                    if !matches!(stopped, Ok(Ok(output)) if output.status.success())
-                                    {
-                                        log::warn!("停止远端 SSH ControlMaster 失败");
-                                    }
+                                let args = remote_server::ssh::ssh_args(path);
+                                let stopped = Command::new("ssh")
+                                    .arg("-O")
+                                    .arg("exit")
+                                    .args(args)
+                                    .kill_on_drop(true)
+                                    .output()
+                                    .with_timeout(CONTROL_CHECK_TIMEOUT)
+                                    .await;
+                                if !matches!(stopped, Ok(Ok(output)) if output.status.success()) {
+                                    log::warn!("停止远端 SSH ControlMaster 失败");
                                 }
                             }
                         }
+                        #[cfg(not(unix))]
+                        (
+                            RegisteredTransport::ControlMaster { .. },
+                            SshControlOwnership::WarpManaged,
+                        ) => {}
                         (
                             RegisteredTransport::ControlMaster { .. },
                             SshControlOwnership::UserOwned,
@@ -314,6 +317,7 @@ impl TunnelBroker {
                             .await;
                         return;
                     }
+                    RegisteredTransport::ControlMaster { path }
                 }
                 #[cfg(not(unix))]
                 {
@@ -322,7 +326,6 @@ impl TunnelBroker {
                         .await;
                     return;
                 }
-                RegisteredTransport::ControlMaster { path }
             }
             register_ssh_transport::Transport::RustBroker(broker) => {
                 let valid_endpoint = broker

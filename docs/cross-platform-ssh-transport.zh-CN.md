@@ -109,7 +109,8 @@ Windows remote-server 产物与客户端分开打包,使用 PowerShell 感知的
 wrapper 把非交互操作、转发/隧道模式、多目标和显式远端命令留给原生
 OpenSSH。worker 遇到无法保留语义的配置时,也会在认证前回退。例如:
 
-- GSSAPI、host-based authentication、SSH certificate 与 security-key provider 策略;
+- GSSAPI、host-based authentication、SSH certificate 与自定义 security-key provider
+  策略,或实际配置了本地 SK/FIDO identity 的 `SecurityKeyProvider=internal`;
 - agent/X11/端口转发以及依赖 shell 的 `ProxyCommand` 表达式;
 - `known_hosts` 中的 `@cert-authority` 或 `@revoked` 条目;
 - `UpdateHostKeys=yes`、`ObscureKeystrokeTiming=yes`、
@@ -124,12 +125,38 @@ bootstrap 不可用,同一目标 session 可以继续作为普通交互 shell。
 `UpdateHostKeys` 证明请求和 OpenSSH 按键混淆 chaff 需要当前 `russh` 公开 API
 尚未暴露的协议钩子。它们作为兼容性缺口跟踪,不会用更弱的语义近似实现。
 
+Windows OpenSSH 9.5 默认报告 `SecurityKeyProvider=internal`;当目标没有实际可用的
+本地 SK/FIDO identity 时,该默认值不影响认证语义,不会再单独触发回退。如果目标
+确实使用本地安全密钥,worker 仍会在认证前安全回退到原生 OpenSSH。
+
+在上述两个协议钩子补齐前,Windows worker 会在回退前显示
+`Enable enhanced SSH for <host>`。用户点击一次后,桌面端会把带边界标记的精确
+`Host` 配置块写到用户 `~/.ssh/config` 顶部,通知当前 worker 重新执行 `ssh -G`,
+然后继续本次增强连接。请求使用短期、随机、单次有效的本机握手,终端输出不能仅凭
+构造同名 URI 修改任意主机配置。用户也可以按 Enter 跳过修改并立即进入原生
+OpenSSH,不会无提示等待。
+
+希望手动管理配置的用户可以只为已知目标显式选择增强 transport:
+
+```sshconfig
+Host 192.168.20.204
+    UpdateHostKeys no
+    ObscureKeystrokeTiming no
+```
+
+无论一键还是手动操作,这都是按主机 opt-in,不应写到全局 `Host *`。它会关闭 OpenSSH 的自动主机密钥更新
+和按键时序混淆保护;不能接受这一安全取舍时应保留默认值,该会话将使用原生
+OpenSSH,普通 SSH 仍可用,但 InfiniShell SSH 扩展能力不可用。回退消息会显示具体
+的不兼容阶段或选项,Windows worker 会把控制台交还给原生 OpenSSH,确保提示、输入
+和 `exit` 正常工作。
+
 ## 回归契约
 
 以下行为一旦回归,应视为发布阻断项:
 
 - 过去可通过原生 SSH 连接的命令必须仍然能连接;
 - 回退时必须保留原始 SSH 参数和用户解析后的 OpenSSH 配置;
+- 回退消息必须说明具体原因和当前会话不具备 InfiniShell SSH 扩展能力;
 - `ProxyJump` 和进程形式的 `ProxyCommand` 必须继续工作;
 - 增强的目标 session 不能产生意外的第二次认证提示或第二个目标连接;
 - 主机密钥不匹配或被拒绝时绝不允许绕过;

@@ -132,8 +132,9 @@ multiple destinations and explicit remote commands with native OpenSSH.
 The worker also falls back before authentication when it encounters a setting
 whose semantics it cannot preserve. Examples include:
 
-- GSSAPI, host-based authentication, SSH certificates and security-key
-  provider policies;
+- GSSAPI, host-based authentication, SSH certificates, custom security-key
+  provider policies, or `SecurityKeyProvider=internal` with an actual local
+  SK/FIDO identity;
 - agent/X11/port forwarding and shell-dependent `ProxyCommand` expressions;
 - `@cert-authority` or `@revoked` entries in `known_hosts`;
 - `UpdateHostKeys=yes`, `ObscureKeystrokeTiming=yes`,
@@ -152,6 +153,39 @@ continue as a plain interactive shell.
 protocol hooks that the current public `russh` API does not expose. These are
 tracked as compatibility gaps, not approximated with weaker behavior.
 
+Windows OpenSSH 9.5 reports `SecurityKeyProvider=internal` by default. When the
+target has no usable local SK/FIDO identity, that default does not affect
+authentication semantics and no longer triggers fallback by itself. A target
+that actually uses a local security key still falls back safely before
+authentication.
+
+Until the two protocol hooks above are available, the Windows worker displays
+`Enable enhanced SSH for <host>` before fallback. One click makes the desktop
+app prepend a bounded exact-`Host` block to the user's `~/.ssh/config`, notify
+the current worker to run `ssh -G` again, and continue the same enhanced
+connection. The request uses a short-lived random single-use local handshake,
+so terminal output cannot modify arbitrary host configuration merely by
+constructing a URI with the same action name. Pressing Enter skips the change
+and immediately continues with native OpenSSH without an unexplained wait.
+
+Users who prefer to manage the file manually can opt a known host into the
+enhanced transport:
+
+```sshconfig
+Host 192.168.20.204
+    UpdateHostKeys no
+    ObscureKeystrokeTiming no
+```
+
+Both the one-click and manual forms are per-host opt-ins and should not be
+placed under a global `Host *`. They
+disables OpenSSH's automatic host-key updates and keystroke-timing obfuscation.
+Users who cannot accept that security tradeoff should retain the defaults: the
+session will use native OpenSSH, so plain SSH remains available but InfiniShell
+SSH extension features do not. The fallback message identifies the incompatible
+stage or option, and the Windows worker returns control of the console to native
+OpenSSH so prompts, input and `exit` continue to work.
+
 ## Regression contract
 
 The following behaviors are release blockers if they regress:
@@ -159,6 +193,8 @@ The following behaviors are release blockers if they regress:
 - a connection that previously worked through native SSH must still connect;
 - original SSH arguments and the user's resolved OpenSSH configuration must be
   preserved on fallback;
+- the fallback message must identify the reason and state that InfiniShell SSH
+  extension features are unavailable for the session;
 - `ProxyJump` and process-style `ProxyCommand` must keep working;
 - enhanced target sessions must not cause a surprise second authentication
   prompt or second target connection;

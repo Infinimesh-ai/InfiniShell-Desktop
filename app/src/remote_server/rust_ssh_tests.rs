@@ -102,6 +102,137 @@ fn rejects_keystroke_timing_obfuscation_until_the_transport_can_preserve_it() {
 }
 
 #[test]
+fn reports_all_default_security_options_needed_for_enhanced_ssh_opt_in() {
+    let config = format!(
+        "{BASIC_CONFIG}\nupdatehostkeys true\nobscurekeystroketiming yes\nsecuritykeyprovider internal\n"
+    );
+
+    let error = parse_openssh_config(&config).unwrap_err();
+    let opt_in = error
+        .downcast_ref::<EnhancedSshOptInRequired>()
+        .expect("应返回可由用户确认的一键配置请求");
+
+    assert_eq!(opt_in.host, "test");
+    assert_eq!(opt_in.options, ["updatehostkeys", "obscurekeystroketiming"]);
+    let message = error.to_string();
+    assert!(message.contains("updatehostkeys, obscurekeystroketiming"));
+    assert!(message.contains("UpdateHostKeys=no and ObscureKeystrokeTiming=no"));
+}
+
+#[test]
+fn accepts_windows_internal_security_key_provider_without_a_local_sk_identity() {
+    let config = format!(
+        "{BASIC_CONFIG}\nsecuritykeyprovider internal\nupdatehostkeys no\nobscurekeystroketiming no\n"
+    );
+
+    assert!(parse_openssh_config(&config).is_ok());
+}
+
+#[test]
+fn rejects_windows_internal_security_key_provider_with_a_local_sk_identity() {
+    let directory = tempfile::tempdir().unwrap();
+    let identity = directory.path().join("hardware-key");
+    let public_identity = directory.path().join("hardware-key.pub");
+    std::fs::write(
+        public_identity,
+        "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29t test\n",
+    )
+    .unwrap();
+    let config = format!(
+        "{BASIC_CONFIG}\nidentityfile {}\nsecuritykeyprovider internal\nupdatehostkeys no\nobscurekeystroketiming no\n",
+        identity.display()
+    );
+
+    let error = parse_openssh_config(&config).unwrap_err().to_string();
+
+    assert!(error.contains("securitykeyprovider"));
+}
+
+#[test]
+fn one_click_opt_in_prepends_an_exact_host_block_and_preserves_crlf_and_bom() {
+    let directory = tempfile::tempdir().unwrap();
+    let config_path = directory.path().join(".ssh").join("config");
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &config_path,
+        "\u{feff}Host *\r\n    ServerAliveInterval 30\r\n",
+    )
+    .unwrap();
+
+    upsert_enhanced_ssh_host_config(&config_path, "example-host").unwrap();
+    upsert_enhanced_ssh_host_config(&config_path, "example-host").unwrap();
+
+    let updated = std::fs::read_to_string(config_path).unwrap();
+    assert!(updated.starts_with(
+        "\u{feff}# >>> InfiniShell enhanced SSH for example-host\r\nHost example-host\r\n    UpdateHostKeys no\r\n    ObscureKeystrokeTiming no\r\nHost *\r\n# <<< InfiniShell enhanced SSH for example-host\r\n\r\n"
+    ));
+    assert_eq!(
+        updated
+            .matches("# >>> InfiniShell enhanced SSH for example-host")
+            .count(),
+        1
+    );
+    assert!(updated.ends_with("Host *\r\n    ServerAliveInterval 30\r\n"));
+    assert!(!updated.contains("\nHost *\n"));
+}
+
+#[test]
+fn one_click_opt_in_rejects_a_host_pattern_without_touching_the_config() {
+    let directory = tempfile::tempdir().unwrap();
+    let config_path = directory.path().join("config");
+    std::fs::write(&config_path, "Host existing\n").unwrap();
+
+    assert!(upsert_enhanced_ssh_host_config(&config_path, "*.example.com").is_err());
+
+    assert_eq!(
+        std::fs::read_to_string(config_path).unwrap(),
+        "Host existing\n"
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn one_click_opt_in_request_updates_the_config_and_signals_the_worker() {
+    let token = format!("{:032x}", rand::random::<u128>());
+    let event_name = HSTRING::from(enhanced_ssh_opt_in_event_name(&token));
+    let event =
+        WindowsEventHandle(unsafe { CreateEventW(None, true, false, &event_name) }.unwrap());
+    let request_path = enhanced_ssh_opt_in_request_path(&token);
+    let result_path = enhanced_ssh_opt_in_result_path(&token);
+    std::fs::create_dir_all(request_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &request_path,
+        serde_json::to_vec(&EnhancedSshOptInRequest {
+            host: "one-click-test".to_string(),
+            created_at_unix_seconds: current_unix_seconds().unwrap(),
+        })
+        .unwrap(),
+    )
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let config_path = directory.path().join(".ssh").join("config");
+
+    let host = approve_enhanced_ssh_opt_in_at_path(&token, &config_path).unwrap();
+
+    assert_eq!(host, "one-click-test");
+    assert!(
+        std::fs::read_to_string(config_path)
+            .unwrap()
+            .contains("Host one-click-test\n    UpdateHostKeys no")
+    );
+    assert_eq!(
+        unsafe { WaitForMultipleObjects(&[event.0], false, 0) },
+        WAIT_OBJECT_0
+    );
+    let result: EnhancedSshOptInResult =
+        serde_json::from_slice(&std::fs::read(&result_path).unwrap()).unwrap();
+    assert!(result.applied);
+
+    let _ = std::fs::remove_file(request_path);
+    let _ = std::fs::remove_file(result_path);
+}
+
+#[test]
 fn rejects_an_invalid_ip_qos_value_before_connecting() {
     let config = format!("{BASIC_CONFIG}\nipqos invalid\n");
 
@@ -183,7 +314,7 @@ fn ssh_escape_filter_flushes_a_pending_literal_at_eof() {
 #[test]
 fn accepts_audited_neutral_values_for_modern_openssh_fields() {
     let config = format!(
-        "{BASIC_CONFIG}\ncanonicalizehostname false\ncontrolpath none\ncontrolpersist no\nobscurekeystroketiming no\nupdatehostkeys no\nwarnweakcrypto no\nipqos none\n"
+        "{BASIC_CONFIG}\ncanonicalizehostname false\ncontrolpath none\ncontrolpersist no\nobscurekeystroketiming no\nupdatehostkeys no\nwarnweakcrypto no\nipqos none\nsecuritykeyprovider internal\n"
     );
 
     assert!(parse_openssh_config(&config).is_ok());

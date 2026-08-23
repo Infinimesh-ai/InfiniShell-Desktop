@@ -108,6 +108,17 @@ impl Command {
         self
     }
 
+    /// 让控制台子进程继承当前进程已经附着的控制台。
+    ///
+    /// 仅适用于专门承载交互式命令的控制台 worker；GUI 进程仍应保留默认的
+    /// `CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB`，避免启动子进程时闪现窗口。
+    #[cfg(windows)]
+    pub fn inherit_console(&mut self) -> &mut Self {
+        use std::os::windows::process::CommandExt;
+        self.inner.creation_flags(0);
+        self
+    }
+
     /// Adds an argument to pass to the program.
     ///
     /// Only one argument can be passed per use. So instead of:

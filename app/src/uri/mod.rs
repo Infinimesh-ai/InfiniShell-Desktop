@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+#[cfg(windows)]
+use anyhow::Context as _;
 use anyhow::{Result, anyhow, ensure};
 use url::Url;
 #[cfg(not(target_family = "wasm"))]
@@ -112,6 +114,8 @@ pub enum UriHost {
     TabConfig,
     /// Focuses a specific terminal pane by its persistent session UUID.
     Session,
+    /// 处理一次性的本机 SSH 配置操作。
+    Ssh,
 }
 
 impl FromStr for UriHost {
@@ -131,6 +135,7 @@ impl FromStr for UriHost {
             "linear" => Ok(Self::Linear),
             "tab_config" if FeatureFlag::TabConfigs.is_enabled() => Ok(Self::TabConfig),
             "session" => Ok(Self::Session),
+            "ssh" => Ok(Self::Ssh),
             _ => Err(anyhow!("Received url with unexpected host: {}", s)),
         }
     }
@@ -470,6 +475,12 @@ impl UriHost {
                     log::warn!("session deep link could not find pane with given UUID");
                 }
             }
+            UriHost::Ssh => {
+                #[cfg(windows)]
+                handle_ssh_uri(primary_window_id, url, ctx);
+                #[cfg(not(windows))]
+                log::warn!("Ignored an enhanced SSH setup URI on an unsupported platform");
+            }
         }
     }
 
@@ -495,7 +506,38 @@ impl UriHost {
             // Handler picks the window itself based on `?new_window=true`.
             Self::TabConfig => W::Nothing,
             Self::Session => W::Nothing,
+            Self::Ssh => W::default(),
         }
+    }
+}
+
+#[cfg(windows)]
+fn handle_ssh_uri(primary_window_id: Option<WindowId>, url: &Url, ctx: &mut AppContext) {
+    let result = (|| {
+        ensure!(
+            url.path() == "/enable-enhanced",
+            "unrecognized enhanced SSH action"
+        );
+        let token = url
+            .query_pairs()
+            .find_map(|(key, value)| (key == "request").then(|| value.into_owned()))
+            .context("enhanced SSH setup request identifier is missing")?;
+        crate::remote_server::rust_ssh::approve_enhanced_ssh_opt_in(&token)
+    })();
+
+    let toast = match result {
+        Ok(host) => DismissibleToast::success(format!(
+            "Enhanced SSH enabled for {host}. The current connection will continue automatically."
+        )),
+        Err(error) => {
+            log::warn!("Failed to apply a one-time enhanced SSH setup request");
+            DismissibleToast::error(format!("Could not enable enhanced SSH: {error}"))
+        }
+    };
+    if let Some(window_id) = primary_window_id {
+        ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
+            toast_stack.add_ephemeral_toast(toast, window_id, ctx);
+        });
     }
 }
 
@@ -1426,7 +1468,8 @@ fn validate_custom_uri(url: &Url) -> Result<UriHost> {
         | UriHost::Codex
         | UriHost::Linear
         | UriHost::TabConfig
-        | UriHost::Session => true,
+        | UriHost::Session
+        | UriHost::Ssh => true,
         // Auth and Home only allow the desktop redirect path
         UriHost::Auth | UriHost::Home => false,
     };

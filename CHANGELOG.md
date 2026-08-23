@@ -4,7 +4,7 @@
 
 ## [Unreleased]
 
-- **跨平台 SSH**:新增 Windows PowerShell 远端探测/bootstrap 与 Windows remote-server 打包、daemon/proxy;新增 Windows 客户端 Rust SSH worker,在单个已认证目标 session 内复用交互终端和 remote-server channel;保留 macOS/Linux、ProxyJump/ProxyCommand 与原生 OpenSSH 安全回退,并引入分阶段 `russh` 后端。能力边界与观察清单见 [技术文档](docs/cross-platform-ssh-transport.zh-CN.md)
+- **跨平台 SSH**:新增 Windows PowerShell 远端探测/bootstrap 与 Windows remote-server 打包、daemon/proxy;新增 Windows 客户端 Rust SSH worker,在单个已认证目标 session 内复用交互终端和 remote-server channel;保留 macOS/Linux、ProxyJump/ProxyCommand 与原生 OpenSSH 安全回退,并引入分阶段 `russh` 后端;修复 Windows OpenSSH 9.5 默认 `SecurityKeyProvider=internal` 误触发回退,为两个可选保护项提供按主机一键启用并让当前连接重新尝试,同时让原生回退继承控制台、显示具体原因与扩展能力边界。能力边界与观察清单见 [技术文档](docs/cross-platform-ssh-transport.zh-CN.md)
 - **AI / BYOP**:port opencode `applyCaching`,启用 prompt caching;`write_to_long_running_shell_command` 在 line 模式下拒绝嵌入 LF;BYOP LRC monitor fallback 改走 silent subtask;`cancel_execution` 50ms 窗口内 sender 泄漏修复(#134 follow-up,#137)
 - **云端剥离 Phase 1–2**:增加 `cloud-disabled` channel 谓词;清理 billing/pricing、referral/reward、cloud sharing dialog UI;退订 RTC UpdateManager;退役 notebook/folder sync queue
 - **平台**:修复 Spotlight/Finder/Launchpad 启动 macOS 时的 panic;`run_shell_command` stdout 兜底回退至 command grid
