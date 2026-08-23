@@ -256,6 +256,8 @@ function Warp-New-RemoteBootstrapCommand {
     $zshInitShellHex = Warp-Encode-HexString $zshInitShell
     $clientVersion = Warp-Get-SafeRemoteEnvironmentValue $env:WARP_CLIENT_VERSION
     $protocolVersion = Warp-Get-SafeRemoteEnvironmentValue $env:WARP_CLI_AGENT_PROTOCOL_VERSION
+    $useSshWrapper = if ($env:WARP_USE_SSH_WRAPPER -eq '1') { '1' } else { '0' }
+    $reuseControlMaster = if ($env:WARP_SSH_REUSE_CONTROL_MASTER -eq '1') { '1' } else { '0' }
     $recursiveSsh = if ($env:WARP_RECURSIVE_SSH_EXTENSION -eq '1') { '1' } else { '0' }
     $nextHopDepth = Warp-Get-NextSshHopDepth
 
@@ -268,10 +270,15 @@ function Warp-New-RemoteBootstrapCommand {
     $remoteCommand = @'
 export TERM_PROGRAM='WarpTerminal'
 export WARP_IS_SSH='1'
+export WARP_USE_SSH_WRAPPER='__WARP_USE_SSH_WRAPPER__'
+export WARP_SSH_REUSE_CONTROL_MASTER='__WARP_SSH_REUSE_CONTROL_MASTER__'
 test -n '__WARP_CLIENT_VERSION__' && export WARP_CLIENT_VERSION='__WARP_CLIENT_VERSION__'
 test -n '__WARP_PROTOCOL_VERSION__' && export WARP_CLI_AGENT_PROTOCOL_VERSION='__WARP_PROTOCOL_VERSION__'
 export WARP_RECURSIVE_SSH_EXTENSION='__WARP_RECURSIVE_SSH__'
 export WARP_SSH_HOP_DEPTH='__WARP_SSH_HOP_DEPTH__'
+SSH_SOCKET_DIR="${XDG_RUNTIME_DIR:-$HOME/.cache}/infinishell-ssh"
+export SSH_SOCKET_DIR
+command -p mkdir -p "$SSH_SOCKET_DIR" && command -p chmod 700 "$SSH_SOCKET_DIR"
 __WARP_SSH_HOOK_COMMAND__
 
 warp_decode_hex() {
@@ -309,6 +316,8 @@ esac
 
     $remoteCommand = $remoteCommand.Replace('__WARP_CLIENT_VERSION__', $clientVersion)
     $remoteCommand = $remoteCommand.Replace('__WARP_PROTOCOL_VERSION__', $protocolVersion)
+    $remoteCommand = $remoteCommand.Replace('__WARP_USE_SSH_WRAPPER__', $useSshWrapper)
+    $remoteCommand = $remoteCommand.Replace('__WARP_SSH_REUSE_CONTROL_MASTER__', $reuseControlMaster)
     $remoteCommand = $remoteCommand.Replace('__WARP_RECURSIVE_SSH__', $recursiveSsh)
     $remoteCommand = $remoteCommand.Replace('__WARP_SSH_HOP_DEPTH__', [string]$nextHopDepth)
     $remoteCommand = $remoteCommand.Replace('__WARP_SSH_HOOK_COMMAND__', $sshHookCommand)

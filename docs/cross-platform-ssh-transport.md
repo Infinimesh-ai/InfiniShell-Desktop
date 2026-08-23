@@ -54,10 +54,17 @@ This capability is enabled by default in stable builds; ordinary users do not
 need to set an environment variable. Focused POSIX multi-hop, protocol,
 flow-control and fallback checks are in place. Native Windows automation builds
 the real SSH worker and verifies that PowerShell preserves bootstrap argument
-boundaries, but it does not replace manual end-to-end coverage of
-Windows-origin, Windows-remote and mixed-OS multi-hop topologies. Those Windows
-paths remain the highest-risk release area and must pass the matrix below before
-the stable tag is pushed.
+boundaries. When Windows enters a POSIX remote, the generated bootstrap also
+forwards `WARP_USE_SSH_WRAPPER` and `WARP_SSH_REUSE_CONTROL_MASTER` as normalized
+`0`/`1` values and creates
+`${XDG_RUNTIME_DIR:-$HOME/.cache}/infinishell-ssh` with mode `0700` for the next
+hop's ControlMaster. This lets the recursive `ssh()` wrapper installed on a
+Linux intermediate host establish an enhanced second hop without manual setup.
+
+Automation does not replace manual end-to-end coverage of Windows-origin,
+Windows-remote and mixed-OS multi-hop topologies. Those Windows paths remain the
+highest-risk release area and must pass the matrix below before the stable tag
+is pushed.
 
 ## Selection and connection flow
 

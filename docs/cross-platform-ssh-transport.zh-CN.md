@@ -47,9 +47,15 @@ InfiniShell 只通过父 daemon 传递受作用域和 capability 保护的控制
 
 该能力在正式版中默认启用,普通用户无需设置环境变量。已有聚焦的 POSIX 多级、
 协议、流控和回退检查。Windows 原生自动化会构建真实 SSH worker,并检查
-PowerShell 是否保留 bootstrap 参数边界,但它不能取代 Windows 发起、Windows
-远端和混合系统多级拓扑的人工端到端覆盖。这些 Windows 链路仍是正式发布前
-风险最高的部分,必须通过下文矩阵后才能推送正式 Tag。
+PowerShell 是否保留 bootstrap 参数边界。Windows 进入 POSIX 远端时,生成的
+bootstrap 还会按 `0/1` 传递 `WARP_USE_SSH_WRAPPER` 与
+`WARP_SSH_REUSE_CONTROL_MASTER`,并在远端创建权限为 `0700` 的
+`${XDG_RUNTIME_DIR:-$HOME/.cache}/infinishell-ssh`,供下一跳 ControlMaster 使用。
+这保证 Linux 中间跳点安装的递归 `ssh()` wrapper 能直接建立增强的第二跳。
+
+自动化不能取代 Windows 发起、Windows 远端和混合系统多级拓扑的人工端到端
+覆盖。这些 Windows 链路仍是正式发布前风险最高的部分,必须通过下文矩阵后
+才能推送正式 Tag。
 
 ## 选路与连接流程
 

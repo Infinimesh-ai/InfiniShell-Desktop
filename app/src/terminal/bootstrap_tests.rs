@@ -305,6 +305,74 @@ fn remote_windows_powershell_from_probe_output(probe_output: &str) -> String {
 }
 
 #[test]
+fn powershell_posix_bootstrap_preserves_recursive_ssh_environment() {
+    let Some(powershell) = powershell_executable() else {
+        eprintln!("当前环境没有 PowerShell,跳过 PowerShell SSH bootstrap 测试");
+        return;
+    };
+    let helper_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/assets/bundled/bootstrap/pwsh_ssh_wrapper.ps1"
+    );
+    let script = r#"
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+. $env:WARP_TEST_SSH_HELPER
+$script:WarpBashInitShell = 'echo bash'
+$script:WarpZshInitShell = 'echo zsh'
+function Warp-Encode-HexString([string]$str) {
+    [BitConverter]::ToString([Text.Encoding]::UTF8.GetBytes($str)).Replace('-', '')
+}
+$env:WARP_USE_SSH_WRAPPER = '1'
+$env:WARP_SSH_REUSE_CONTROL_MASTER = '1'
+$enabled = Warp-New-RemoteBootstrapCommand -RemoteSessionId 42 -SshHookHex '' -EmitSshHook $false
+$env:WARP_USE_SSH_WRAPPER = 'unexpected'
+$env:WARP_SSH_REUSE_CONTROL_MASTER = 'unexpected'
+$disabled = Warp-New-RemoteBootstrapCommand -RemoteSessionId 43 -SshHookHex '' -EmitSshHook $false
+ConvertTo-Json -Compress -InputObject @{
+    enabled = $enabled
+    disabled = $disabled
+}
+"#;
+
+    let output = powershell_test_command(powershell)
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            script,
+        ])
+        .env("WARP_TEST_SSH_HELPER", helper_path)
+        .output()
+        .expect("PowerShell 应能生成 POSIX SSH bootstrap");
+    assert!(
+        output.status.success(),
+        "PowerShell POSIX SSH bootstrap 测试失败: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("PowerShell 应输出有效 JSON");
+    let enabled = result["enabled"]
+        .as_str()
+        .expect("启用场景应生成 bootstrap 命令");
+    assert!(enabled.contains("export WARP_USE_SSH_WRAPPER='1'"));
+    assert!(enabled.contains("export WARP_SSH_REUSE_CONTROL_MASTER='1'"));
+    assert!(
+        enabled.contains("SSH_SOCKET_DIR=\"${XDG_RUNTIME_DIR:-$HOME/.cache}/infinishell-ssh\"")
+    );
+    assert!(enabled.contains("export SSH_SOCKET_DIR"));
+    assert!(enabled.contains(
+        "command -p mkdir -p \"$SSH_SOCKET_DIR\" && command -p chmod 700 \"$SSH_SOCKET_DIR\""
+    ));
+    let disabled = result["disabled"]
+        .as_str()
+        .expect("关闭场景应生成 bootstrap 命令");
+    assert!(disabled.contains("export WARP_USE_SSH_WRAPPER='0'"));
+    assert!(disabled.contains("export WARP_SSH_REUSE_CONTROL_MASTER='0'"));
+}
+
+#[test]
 fn powershell_ssh_wrapper_classifies_sessions_and_preserves_arguments() {
     let Some(powershell) = powershell_executable() else {
         eprintln!("当前环境没有 PowerShell,跳过 PowerShell SSH wrapper 测试");
@@ -510,7 +578,7 @@ ConvertTo-Json -Compress -Depth 4 -InputObject @{
 }
 "#;
 
-    let output = Command::new(powershell)
+    let output = powershell_test_command(powershell)
         .args([
             "-NoLogo",
             "-NoProfile",
@@ -657,7 +725,7 @@ fn powershell_executable() -> Option<&'static str> {
     let candidates = ["pwsh"];
 
     candidates.into_iter().find(|candidate| {
-        Command::new(candidate)
+        powershell_test_command(candidate)
             .args([
                 "-NoLogo",
                 "-NoProfile",
@@ -667,6 +735,15 @@ fn powershell_executable() -> Option<&'static str> {
             .output()
             .is_ok()
     })
+}
+
+fn powershell_test_command(powershell: &str) -> Command {
+    let command = Command::new(powershell);
+    #[cfg(windows)]
+    let mut command = command;
+    #[cfg(windows)]
+    command.creation_flags(0);
+    command
 }
 
 fn decode_script(bytes: &[u8]) -> &str {
