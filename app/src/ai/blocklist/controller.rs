@@ -31,7 +31,7 @@ use super::agent_view::{AgentViewController, AgentViewControllerEvent, AgentView
 use super::context_model::BlocklistAIContextModel;
 use super::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use super::input_model::InputConfig;
-use super::{BlocklistAIInputModel, InputType, ResponseStreamId};
+use super::{BlocklistAIInputModel, InputType, QueuedQueryModel, ResponseStreamId};
 use crate::ai::agent::api::{self, ServerConversationToken};
 use crate::ai::agent::conversation::{
     AIConversation, AIConversationId, ConversationStatus, ConversationTaskGraphDiagnostics,
@@ -584,6 +584,9 @@ impl BlocklistAIController {
                         );
                     });
                 }
+                QueuedQueryModel::handle(ctx).update(ctx, |model, ctx| {
+                    model.unlock_pending_lrc_rows(*conversation_id, ctx);
+                });
                 return;
             }
             let trigger = if has_manual_follow_up {
@@ -593,6 +596,9 @@ impl BlocklistAIController {
             };
             // 优先重发被 readiness 暂存的 BYOP 请求(其中含用户的原始 prompt);
             // 没有则走原 follow-up 路径(只发 finished_action_results)。
+            QueuedQueryModel::handle(ctx).update(ctx, |model, ctx| {
+                model.unlock_pending_lrc_rows(*conversation_id, ctx);
+            });
             if me.flush_pending_byop_request_after_finished_action(*conversation_id, ctx) {
                 return;
             }
@@ -3300,6 +3306,10 @@ impl BlocklistAIController {
         self.pending_passive_suggestion_results
             .remove(&conversation_id);
 
+        QueuedQueryModel::handle(ctx).update(ctx, |model, ctx| {
+            model.remove_pending_lrc_rows(conversation_id, ctx);
+        });
+
         if !self
             .in_flight_response_streams
             .try_cancel_streams_for_conversation(conversation_id, reason, ctx)
@@ -4312,3 +4322,7 @@ fn byop_get_running_command_for_lrc(terminal_model: &TerminalModel) -> Option<Ru
 #[cfg(test)]
 #[path = "controller_approval_mode_tests.rs"]
 mod approval_mode_tests;
+
+#[cfg(test)]
+#[path = "controller_queued_query_tests.rs"]
+mod queued_query_tests;
