@@ -1005,7 +1005,6 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::WellKnownMcpIds,
     FeatureFlag::TuiCostTransparency,
     FeatureFlag::ResponsesMultiAgentBeta,
-    FeatureFlag::CtrlCCancelsThirdPartyHarness,
 ];
 
 /// Features enabled for feature preview build users (e.g.: Friends of Zap).

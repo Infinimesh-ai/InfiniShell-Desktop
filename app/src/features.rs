@@ -441,6 +441,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::WindowsHighPerformanceGpuDefault,
         #[cfg(feature = "configurable_context_window")]
         FeatureFlag::ConfigurableContextWindow,
+        #[cfg(feature = "ctrl_c_cancels_third_party_harness")]
+        FeatureFlag::CtrlCCancelsThirdPartyHarness,
     ]);
 
     // 不稳定功能开关:统一通过 `INFINISHELL_UNSTABLE_FEATURES` 环境变量在 release 构建里
