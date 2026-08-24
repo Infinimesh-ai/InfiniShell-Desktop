@@ -21,7 +21,7 @@ use warp_core::settings::Setting as _;
 use warp_errors::report_error;
 use warpui::SingletonEntity as _;
 use warpui_core::platform::{TerminationMode, WindowStyle};
-use warpui_core::runtime::{TuiFocusPolicy, spawn_tui_driver};
+use warpui_core::runtime::{TuiDriverStartupError, TuiFocusPolicy, spawn_tui_driver};
 use warpui_core::{AddWindowOptions, AppContext, ModelHandle, ViewHandle};
 
 use crate::orchestration_model::TuiOrchestrationModel;
@@ -319,7 +319,17 @@ fn init(
             TuiSessions::wire_orchestration(&sessions, &orchestration, ctx);
             ensure_terminal_session(&sessions, &root, ctx);
         }
-        Err(error) => {
+        Err(error) => handle_tui_driver_startup_error(error, ctx),
+    }
+}
+
+fn handle_tui_driver_startup_error(error: TuiDriverStartupError, ctx: &mut AppContext) {
+    match error {
+        TuiDriverStartupError::TerminalDisconnected(error) => {
+            log::error!("failed to start the TUI driver: {error}");
+            ctx.terminate_app(TerminationMode::ForceTerminate, None);
+        }
+        TuiDriverStartupError::Unexpected(error) => {
             let error = anyhow::Error::new(error);
             report_error!(&error);
             ctx.terminate_app(TerminationMode::ForceTerminate, Some(Err(error)));
