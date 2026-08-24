@@ -862,7 +862,7 @@ fn make_new_help_menu() -> Menu {
             #[cfg(not(target_family = "wasm"))]
             MenuItem::Custom(CustomMenuItem::new(
                 &crate::t!("app-menu-cleanup-storage"),
-                |ctx| ctx.dispatch_global_action("workspace:cleanup_storage", &()),
+                custom_action_dispatcher(CustomAction::CleanupStorage),
                 no_updates,
                 None,
             )),

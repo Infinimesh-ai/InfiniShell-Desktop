@@ -1678,7 +1678,8 @@ fn add_overflow_menu_items_as_editable_binding(app: &mut AppContext) {
             crate::t!("keybinding-desc-workspace-cleanup-storage"),
             WorkspaceAction::CleanupStorage,
         )
-        .with_context_predicate(id!("Workspace")),
+        .with_context_predicate(id!("Workspace"))
+        .with_custom_action(CustomAction::CleanupStorage),
         #[cfg(not(target_family = "wasm"))]
         EditableBinding::new(
             "workspace:view_logs",
@@ -1722,3 +1723,7 @@ impl DropTargetData for VerticalTabsPaneDropTargetData {
         self
     }
 }
+
+#[cfg(test)]
+#[path = "mod_tests.rs"]
+mod tests;
