@@ -1,8 +1,7 @@
 //! 基于 russh 的异步单连接后端。
 //!
-//! 该模块只在 `russh_transport` 构建特性开启时编译，并继续复用父模块的
-//! OpenSSH 配置解析、ProxyCommand/ProxyJump 展开、PowerShell bootstrap 和
-//! loopback broker 协议。运行时 feature flag 关闭时不会进入这里。
+//! 该模块复用父模块的 OpenSSH 配置解析、ProxyCommand/ProxyJump 展开、
+//! PowerShell bootstrap 和 loopback broker 协议。
 
 use std::borrow::Cow;
 use std::io::{self, Read, Write};
@@ -39,8 +38,8 @@ use crate::remote_server::ssh_transport::{setup_command_line, upload_command};
 type RusshHandle = Handle<HostKeyHandler>;
 type SharedHandle = Arc<AsyncMutex<RusshHandle>>;
 
-/// feature flag 开启时建立 russh session；在交互提示或认证成功前失败，仍可安全
-/// 回到已经验证过的 ssh2/OpenSSH 链路。
+/// 建立 russh session；在交互提示或认证成功前失败，仍可安全回到已经验证过的
+/// ssh2/OpenSSH 链路。
 pub(super) fn run_session_worker(args: &RustSshSessionArgs) -> Result<i32> {
     let config = match resolve_openssh_config(&args.ssh_executable, &args.ssh_args) {
         Ok(config) => config,

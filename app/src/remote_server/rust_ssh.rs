@@ -34,8 +34,6 @@ use ssh2::{
 use warp_cli::{RustSshBrokerCommandArgs, RustSshSessionArgs};
 #[cfg(windows)]
 use warp_core::channel::ChannelState;
-#[cfg(feature = "russh_transport")]
-use warp_core::features::FeatureFlag;
 #[cfg(windows)]
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_FAILED, WAIT_OBJECT_0};
 #[cfg(windows)]
@@ -114,7 +112,6 @@ impl Drop for WindowsEventHandle {
     }
 }
 
-#[cfg(feature = "russh_transport")]
 mod russh_backend;
 
 /// Windows 的 console stdin 默认是按行、回显并把 Ctrl+C 当本地信号处理。
@@ -509,11 +506,7 @@ enum BrokerOperation {
 /// 建立单个 SSH session，启动本地 broker，并把交互 channel 映射到 stdio。
 pub fn run_session_worker(args: &RustSshSessionArgs) -> Result<i32> {
     let args = resolve_session_worker_args(args)?;
-    #[cfg(feature = "russh_transport")]
-    if FeatureFlag::RusshTransport.is_enabled() {
-        return russh_backend::run_session_worker(&args);
-    }
-    run_ssh2_session_worker(&args)
+    russh_backend::run_session_worker(&args)
 }
 
 fn resolve_session_worker_args(args: &RustSshSessionArgs) -> Result<RustSshSessionArgs> {

@@ -1,11 +1,10 @@
 # Recursive SSH Extension
 
-实现状态(2026-08-21):两个交付阶段已落地,但发布状态仍是测试 / preview,
-尚未承诺稳定兼容性。POSIX 多级链路、隧道协议、流控和失败回退已有
+实现状态(2026-08-25):两个交付阶段已落地,并已作为原生能力默认启用。
+POSIX 多级链路、隧道协议、流控和失败回退已有
 聚焦覆盖;Windows worker 构建与 PowerShell 参数边界已通过原生 Windows
 runner,但 Windows 客户端、Windows 中间跳点 / 远端和混合系统路径仍需要更完整的
-手工端到端矩阵。Release 构建需用
-`INFINISHELL_UNSTABLE_FEATURES=recursive_ssh_extension` 显式加入测试。
+手工端到端矩阵。
 
 ## 1. 问题
 
@@ -147,7 +146,7 @@ local -> bastion -> staging
 
 ### 阶段一：可用的远端再 SSH
 
-- 新增 `RecursiveSshExtension` Feature Flag；
+- 阶段性引入运行时 Feature Flag（稳定后移除）；
 - 支持带作用域的 SSH 控制引用；
 - remote-server 协议支持一个父连接承载一个子连接字节流；
 - bash、zsh、fish、PowerShell 远端 wrapper 支持再发起一个交互式 SSH；

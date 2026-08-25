@@ -371,14 +371,6 @@ fn build_host_shell_command(
         "WARP_SSH_REUSE_CONTROL_MASTER",
         if reuse_ssh_control_master { "1" } else { "0" },
     );
-    builder.env(
-        "WARP_RECURSIVE_SSH_EXTENSION",
-        if FeatureFlag::RecursiveSshExtension.is_enabled() {
-            "1"
-        } else {
-            "0"
-        },
-    );
     builder.env("WARP_SSH_HOP_DEPTH", "0");
     builder.env(
         "WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH",
@@ -903,14 +895,6 @@ fn build_docker_sandbox_command(
     builder.env(
         "WARP_SSH_REUSE_CONTROL_MASTER",
         if reuse_ssh_control_master { "1" } else { "0" },
-    );
-    builder.env(
-        "WARP_RECURSIVE_SSH_EXTENSION",
-        if FeatureFlag::RecursiveSshExtension.is_enabled() {
-            "1"
-        } else {
-            "0"
-        },
     );
     builder.env("WARP_SSH_HOP_DEPTH", "0");
     builder.env(

@@ -121,6 +121,34 @@ fn posix_windows_ssh_hooks_preserve_recursive_transport_scope() {
 }
 
 #[test]
+fn recursive_ssh_wrapper_is_native_for_managed_remote_shells() {
+    let bash = include_str!("../../assets/bundled/bootstrap/bash_body.sh");
+    let zsh = include_str!("../../assets/bundled/bootstrap/zsh_body.sh");
+    let fish = include_str!("../../assets/bundled/bootstrap/fish.sh");
+    let powershell = include_str!("../../assets/bundled/bootstrap/pwsh_ssh_wrapper.ps1");
+
+    assert!(
+        bash.contains(
+            r#"if [[ $WARP_IS_LOCAL_SHELL_SESSION == "1" || $WARP_IS_SSH == "1" ]]; then"#
+        )
+    );
+    assert!(
+        zsh.contains(
+            r#"if [[ $WARP_IS_LOCAL_SHELL_SESSION == "1" || $WARP_IS_SSH == "1" ]]; then"#
+        )
+    );
+    assert!(
+        fish.contains(
+            r#"if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1""#
+        )
+    );
+    assert!(
+        powershell
+            .contains("$env:WARP_IS_LOCAL_SHELL_SESSION -ne '1' -and $env:WARP_IS_SSH -ne '1'")
+    );
+}
+
+#[test]
 fn embeds_the_windows_remote_init_shell_as_bom_free_gzip_base64() {
     let script = embed_windows_remote_init_shell(
         format!("before {WINDOWS_REMOTE_INIT_SHELL_GZIP_BASE64_PLACEHOLDER} after"),
@@ -305,7 +333,7 @@ fn remote_windows_powershell_from_probe_output(probe_output: &str) -> String {
 }
 
 #[test]
-fn powershell_posix_bootstrap_preserves_recursive_ssh_environment() {
+fn powershell_posix_bootstrap_preserves_ssh_wrapper_environment() {
     let Some(powershell) = powershell_executable() else {
         eprintln!("当前环境没有 PowerShell,跳过 PowerShell SSH bootstrap 测试");
         return;
@@ -471,7 +499,6 @@ if ([String]::IsNullOrEmpty($env:SSH_SOCKET_DIR)) {
 $env:WARP_SSH_REUSE_CONTROL_MASTER = '0'
 Warp-Invoke-EnhancedSsh -SshArgs @('remote-host', 'two words') 6>$null
 $fallbackStatus = $global:LASTEXITCODE
-$env:WARP_RECURSIVE_SSH_EXTENSION = '1'
 $env:WARP_SSH_HOP_DEPTH = 'invalid'
 $invalidHopDepth = Warp-Get-NextSshHopDepth
 $env:WARP_SSH_HOP_DEPTH = '4294967296'
@@ -573,8 +600,8 @@ ConvertTo-Json -Compress -Depth 4 -InputObject @{
         ssh_args = @($workerArgs[($separatorIndex + 1)..($workerArgs.Count - 1)])
     }
     remote_bootstrap_syntax = $remoteBootstrapSyntax
-    posix_recursive_bootstrap = [bool]($bootstrapCommand.Contains("WARP_RECURSIVE_SSH_EXTENSION='1'") -and $bootstrapCommand.Contains("WARP_SSH_HOP_DEPTH='3'"))
-    windows_recursive_bootstrap = [bool]($decodedWindowsRecursive.Contains("WARP_RECURSIVE_SSH_EXTENSION = '1'") -and $decodedWindowsRecursive.Contains("WARP_SSH_HOP_DEPTH = '3'") -and $decodedWindowsRecursive.Contains("WARP_RUST_SSH_EXECUTABLE = Join-Path"))
+    posix_recursive_bootstrap = [bool]($bootstrapCommand.Contains("WARP_SSH_HOP_DEPTH='3'"))
+    windows_recursive_bootstrap = [bool]($decodedWindowsRecursive.Contains("WARP_SSH_HOP_DEPTH = '3'") -and $decodedWindowsRecursive.Contains("WARP_RUST_SSH_EXECUTABLE = Join-Path"))
 }
 "#;
 

@@ -16,7 +16,6 @@ use std::collections::HashMap;
 
 use pathfinder_geometry::vector::Vector2F;
 use settings::Setting;
-use warp_core::features::FeatureFlag;
 use warp_core::ui::theme::color::internal_colors;
 use warp_ssh_manager::{
     AuthType, KeychainSecretStore, NodeKind, SecretKind, SshNode, SshRepository, SshRoute,
@@ -2016,14 +2015,10 @@ impl View for SshManagerPanel {
             Empty::new().finish()
         };
 
-        let routes_section = if FeatureFlag::RecursiveSshExtension.is_enabled() {
-            Container::new(self.render_routes(appearance))
-                .with_padding_left(PANEL_HORIZONTAL_PADDING - ITEM_PADDING_HORIZONTAL)
-                .with_padding_right(PANEL_HORIZONTAL_PADDING - ITEM_PADDING_HORIZONTAL)
-                .finish()
-        } else {
-            Empty::new().finish()
-        };
+        let routes_section = Container::new(self.render_routes(appearance))
+            .with_padding_left(PANEL_HORIZONTAL_PADDING - ITEM_PADDING_HORIZONTAL)
+            .with_padding_right(PANEL_HORIZONTAL_PADDING - ITEM_PADDING_HORIZONTAL)
+            .finish();
 
         let tree = Container::new(self.render_tree(appearance))
             .with_padding_left(PANEL_HORIZONTAL_PADDING - ITEM_PADDING_HORIZONTAL)

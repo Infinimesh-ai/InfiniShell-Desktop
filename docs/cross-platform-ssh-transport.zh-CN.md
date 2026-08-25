@@ -91,11 +91,10 @@ worker 随后:
 Windows 安装包在同一 worker 协议后包含两个 Rust 后端:
 
 - 基于 `ssh2` 的兼容后端;
-- 新的异步 `russh` 后端,同时受编译期 `russh_transport` feature 与运行时
-  `RusshTransport` feature flag 控制。
+- 原生首选的异步 `russh` 后端。
 
-关闭 `RusshTransport` 时保留 `ssh2` 后端。截至本文档日期,该运行时开关尚未
-加入默认放量列表,因此可以在不删除既有链路的前提下分阶段开启。
+worker 默认进入 `russh` 后端;如果在提示或成功认证前无法安全建立连接,则回退到
+`ssh2` 或原生 OpenSSH。越过该边界后不会再启动第二个 SSH 连接。
 
 两个增强后端都覆盖 InfiniShell 需要的会话行为:
 
@@ -175,9 +174,9 @@ OpenSSH,普通 SSH 仍可用,但 InfiniShell SSH 扩展能力不可用。回退�
 ```bash
 cargo check -p warp --lib --locked
 cargo check -p warp --bin infinishell-ssh --locked \
-  --features rust_ssh_worker,russh_transport
+  --features rust_ssh_worker
 cargo nextest run -p warp --locked \
-  --features rust_ssh_worker,russh_transport \
+  --features rust_ssh_worker \
   -E 'test(remote_server::rust_ssh)'
 cargo fmt --all -- --check
 ```
@@ -256,9 +255,9 @@ InfiniShell 不为这个 transport 新增云遥测。在受控测试 fixture 中
   `app/assets/bundled/bootstrap/pwsh_ssh_wrapper.ps1`
 - POSIX 到 Windows 能力探测:
   `app/assets/bundled/bootstrap/ssh_remote_shell_probe.sh`
-- Rust worker 与配置门禁:
+- Rust worker 与配置解析:
   `app/src/remote_server/rust_ssh.rs`
-- 分阶段 `russh` 后端:
+- 原生 `russh` 后端:
   `app/src/remote_server/rust_ssh/russh_backend.rs`
 - 客户端 remote-server transport:
   `app/src/remote_server/ssh_transport.rs`

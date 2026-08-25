@@ -158,7 +158,6 @@ regex-automata = "0.4.6"
 regex.workspace = true
 reqwest.workspace = true
 rust-embed.workspace = true
-russh = { workspace = true, optional = true }
 i18n-embed.workspace = true
 i18n-embed-fl.workspace = true
 fluent.workspace = true
@@ -328,6 +327,7 @@ aws-types = "1"
 
 notify-debouncer-full.workspace = true
 rquickjs = { workspace = true, optional = true }
+russh.workspace = true
 rustls.workspace = true
 syntect = "5.0"
 sysinfo.workspace = true
@@ -640,7 +640,6 @@ default = [
     "settings_file",
     "ssh_tmux_wrapper",
     "onekey_prompt",
-    "recursive_ssh_extension",
     "directory_tab_colors",
     "pending_user_query_indicator",
     "queue_slash_command",
@@ -677,7 +676,6 @@ nld_heuristic_v2 = ["input_classifier/nld_heuristic_v2"]
 nld_prompt_history_match = []
 msys2_shells = []
 onekey_prompt = []
-recursive_ssh_extension = []
 # Zap 保留 TMUX warpify 流程(上游 #12478 已删除,我方继续使用)。
 ssh_tmux_wrapper = []
 less_horizontal_terminal_padding = []
@@ -768,7 +766,6 @@ rich_history = []
 richtext_multiselect = []
 runtime_feature_flags = []
 rust_ssh_worker = []
-russh_transport = ["dep:russh"]
 selectable_prompt = []
 settings_file = []
 sequential_storage = []

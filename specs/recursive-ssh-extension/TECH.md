@@ -3,7 +3,7 @@
 对应产品规格：`PRODUCT.md`。
 
 当前实现已包含两阶段的共享数据模型、隧道协议、多级路由和失败回退,
-但功能仍受 `RecursiveSshExtension` 运行时开关保护。稳定放量前需完成
+并已移除递归 SSH 的运行时开关,作为原生能力默认启用。仍需完成
 Windows 发起、Windows 中间跳点 / 远端和 POSIX/Windows 混合链的手工端到端矩阵;
 自动化 Windows worker 构建与 PowerShell 参数测试通过不等于该运行时矩阵已完成。
 
@@ -314,16 +314,15 @@ daemon 释放注册；用户拥有的 control 两边都不得执行 `-O exit`。
 
 ```text
 WARP_SSH_HOP_DEPTH
-WARP_RECURSIVE_SSH_EXTENSION=1
 WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH
 ```
 
 `InitializeResponse` 增加显式 `SSH_BYTE_STREAM_V1` 与 `SSH_TRANSPORT_V2` capability。
-只有父 daemon 宣告所需能力且运行时 Feature Flag 开启时才注入递归 wrapper 环境，
-不能仅按版本字符串推断。PowerShell wrapper 与 POSIX wrapper 使用相同的深度和父会话
-语义；Windows 下一跳通过 Rust worker 暴露 loopback broker。
+父 daemon 宣告所需能力后，InfiniShell 管理的远端 shell 原生安装递归 wrapper，
+不能仅按版本字符串推断传输能力。PowerShell wrapper 与 POSIX wrapper 使用相同的深度
+和父会话语义；Windows 下一跳通过 Rust worker 暴露 loopback broker。
 
-超过深度、父 daemon 不支持或 Feature Flag 关闭时调用 `command ssh`。
+超过深度、父 daemon 不支持或递归传输注册失败时调用 `command ssh`。
 
 ### 6.2 SSH hook
 
@@ -343,8 +342,8 @@ WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH
 }
 ```
 
-旧客户端缺少字段时仍按本地 scope 解析；新客户端只有在 Feature Flag 开启且父
-session 有已连接 daemon 时接受 `remote` scope。
+旧客户端缺少字段时仍按本地 scope 解析；新客户端只有在父 session 有已连接 daemon
+且携带有效作用域传输时接受 `remote` scope。
 
 bash、zsh、fish、PowerShell 必须保持等价语义，公共生成内容优先放在已有 bootstrap
 生成层，避免各脚本长期漂移。
@@ -452,7 +451,7 @@ A      -X-> C
 4. 父连接中断和有序恢复；
 5. B 不支持/安装失败时普通 SSH 可用；
 6. bash、zsh、fish、PowerShell wrapper；
-7. Feature Flag 关闭时行为完全等价于当前版本。
+7. 不支持递归 transport 时完整回退到原生 SSH。
 
 ## 11. 验证顺序
 

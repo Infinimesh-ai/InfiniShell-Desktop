@@ -23,7 +23,6 @@ use super::pty_controller::{EventLoopSender, PtyController};
 // 调用点随 AuthClient 一同物理删。auth context 在构造时基于
 // `AuthState` 构建一次并缓存(BYOP 路径下无云端 token 刷新)。
 use crate::auth::AuthStateProvider;
-use crate::features::FeatureFlag;
 use crate::remote_server::auth_context::server_api_auth_context;
 use crate::remote_server::manager::{RemoteServerManager, RemoteServerManagerEvent};
 use crate::remote_server::remote_ssh_transport::{
@@ -305,11 +304,6 @@ impl<T: EventLoopSender> RemoteServerController<T> {
                     info.spawning_session_id.unwrap_or(session_id),
                 )
             });
-        if !scoped_transport.is_local() && !FeatureFlag::RecursiveSshExtension.is_enabled() {
-            log::warn!("递归 SSH 功能未启用，嵌套 SSH 回退到带内执行");
-            self.flush_stashed_bootstrap(info, ctx);
-            return;
-        }
         let parent_session_id = if scoped_transport.is_local() {
             None
         } else {

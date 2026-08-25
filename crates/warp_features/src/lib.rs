@@ -778,13 +778,6 @@ pub enum FeatureFlag {
     /// for command execution.
     SshRemoteServer,
 
-    /// 使用 russh 承载 Windows SSH worker 的单连接 session。关闭时继续使用
-    /// 已有 ssh2 后端；该开关不改变原生 OpenSSH 回退路径。
-    RusshTransport,
-
-    /// 允许在远端 shell 中继续启动 SSH 扩展，并通过父级主机路由嵌套连接。
-    RecursiveSshExtension,
-
     /// 本地 PTY 输出密码提示时展示已保存的 SSH 凭据候选。
     OneKeyPrompt,
 

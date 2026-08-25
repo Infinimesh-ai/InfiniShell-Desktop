@@ -939,8 +939,8 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   # so we can reference this when we register it with a bindkey.
   zle -N warp_change_prompt_modes_to_warp_prompt
 
-  # 本地 shell 和已协商递归能力的远端 shell 都安装 SSH wrapper。
-  if [[ $WARP_IS_LOCAL_SHELL_SESSION == "1" || ( $WARP_IS_SSH == "1" && $WARP_RECURSIVE_SSH_EXTENSION == "1" ) ]]; then
+  # 本地 shell 和 InfiniShell 管理的远端 shell 都安装 SSH wrapper。
+  if [[ $WARP_IS_LOCAL_SHELL_SESSION == "1" || $WARP_IS_SSH == "1" ]]; then
       # This helper function determines whether the user's ssh arguments imply
       # creation of a non-interactive session or otherwise would conflict with
       # our SSH wrapper.  Returns 0 for an interactive session; >0 otherwise.
@@ -1120,7 +1120,6 @@ export TERM_PROGRAM='WarpTerminal'
 export WARP_IS_SSH='1'
 export WARP_USE_SSH_WRAPPER='$WARP_USE_SSH_WRAPPER'
 export WARP_SSH_REUSE_CONTROL_MASTER='$WARP_SSH_REUSE_CONTROL_MASTER'
-export WARP_RECURSIVE_SSH_EXTENSION='$WARP_RECURSIVE_SSH_EXTENSION'
 export WARP_SSH_HOP_DEPTH='$next_hop_depth'
 SSH_SOCKET_DIR="\${XDG_RUNTIME_DIR:-\$HOME/.cache}/infinishell-ssh"
 export SSH_SOCKET_DIR

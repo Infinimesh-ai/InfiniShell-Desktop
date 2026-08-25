@@ -32,8 +32,6 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
-  # 递归 SSH 已进入默认 feature；这里额外启用 russh 后端覆盖 Windows 传输。
-  SSH_TRANSPORT_FEATURES: russh_transport
 
 jobs:
   linux:
@@ -62,7 +60,7 @@ jobs:
 
       - name: Check InfiniShell-Desktop
         shell: bash
-        run: cargo check -p warp --lib --features "$SSH_TRANSPORT_FEATURES"
+        run: cargo check -p warp --lib
 
       - name: Test Responses integration
         shell: bash
@@ -137,11 +135,11 @@ jobs:
 
       - name: Check InfiniShell-Desktop
         shell: pwsh
-        run: cargo check -p warp --lib --features "$env:SSH_TRANSPORT_FEATURES"
+        run: cargo check -p warp --lib
 
       - name: Build InfiniShell SSH worker
         shell: pwsh
-        run: cargo build -p warp --bin infinishell-ssh --features "release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker,$env:SSH_TRANSPORT_FEATURES"
+        run: cargo build -p warp --bin infinishell-ssh --features "release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker"
 
       - name: Test Windows PowerShell SSH worker arguments
         shell: powershell

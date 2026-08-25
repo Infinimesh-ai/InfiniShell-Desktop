@@ -30,8 +30,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
     #[cfg(debug_assertions)]
     flags.insert(FeatureFlag::SshRemoteServer);
     #[cfg(debug_assertions)]
-    flags.insert(FeatureFlag::RecursiveSshExtension);
-    #[cfg(debug_assertions)]
     flags.insert(FeatureFlag::ServerFileBrowser);
 
     // Issue #72: HTTP 代理设置页面。不走 channel 判断,所有 channel 含 infinishell
@@ -71,8 +69,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::SettingsFile,
         #[cfg(feature = "rect_selection")]
         FeatureFlag::RectSelection,
-        #[cfg(feature = "russh_transport")]
-        FeatureFlag::RusshTransport,
         #[cfg(feature = "alacritty_settings_import")]
         FeatureFlag::AlacrittySettingsImport,
         #[cfg(feature = "dynamic_workflow_enums")]
@@ -427,8 +423,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::OscHyperlinks,
         #[cfg(feature = "onekey_prompt")]
         FeatureFlag::OneKeyPrompt,
-        #[cfg(feature = "recursive_ssh_extension")]
-        FeatureFlag::RecursiveSshExtension,
         #[cfg(feature = "block_toolbelt_save_as_workflow")]
         FeatureFlag::BlockToolbeltSaveAsWorkflow,
         #[cfg(feature = "remove_alt_screen_padding")]

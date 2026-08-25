@@ -258,7 +258,6 @@ function Warp-New-RemoteBootstrapCommand {
     $protocolVersion = Warp-Get-SafeRemoteEnvironmentValue $env:WARP_CLI_AGENT_PROTOCOL_VERSION
     $useSshWrapper = if ($env:WARP_USE_SSH_WRAPPER -eq '1') { '1' } else { '0' }
     $reuseControlMaster = if ($env:WARP_SSH_REUSE_CONTROL_MASTER -eq '1') { '1' } else { '0' }
-    $recursiveSsh = if ($env:WARP_RECURSIVE_SSH_EXTENSION -eq '1') { '1' } else { '0' }
     $nextHopDepth = Warp-Get-NextSshHopDepth
 
     $sshHookCommand = if ($EmitSshHook) {
@@ -274,7 +273,6 @@ export WARP_USE_SSH_WRAPPER='__WARP_USE_SSH_WRAPPER__'
 export WARP_SSH_REUSE_CONTROL_MASTER='__WARP_SSH_REUSE_CONTROL_MASTER__'
 test -n '__WARP_CLIENT_VERSION__' && export WARP_CLIENT_VERSION='__WARP_CLIENT_VERSION__'
 test -n '__WARP_PROTOCOL_VERSION__' && export WARP_CLI_AGENT_PROTOCOL_VERSION='__WARP_PROTOCOL_VERSION__'
-export WARP_RECURSIVE_SSH_EXTENSION='__WARP_RECURSIVE_SSH__'
 export WARP_SSH_HOP_DEPTH='__WARP_SSH_HOP_DEPTH__'
 SSH_SOCKET_DIR="${XDG_RUNTIME_DIR:-$HOME/.cache}/infinishell-ssh"
 export SSH_SOCKET_DIR
@@ -318,7 +316,6 @@ esac
     $remoteCommand = $remoteCommand.Replace('__WARP_PROTOCOL_VERSION__', $protocolVersion)
     $remoteCommand = $remoteCommand.Replace('__WARP_USE_SSH_WRAPPER__', $useSshWrapper)
     $remoteCommand = $remoteCommand.Replace('__WARP_SSH_REUSE_CONTROL_MASTER__', $reuseControlMaster)
-    $remoteCommand = $remoteCommand.Replace('__WARP_RECURSIVE_SSH__', $recursiveSsh)
     $remoteCommand = $remoteCommand.Replace('__WARP_SSH_HOP_DEPTH__', [string]$nextHopDepth)
     $remoteCommand = $remoteCommand.Replace('__WARP_SSH_HOOK_COMMAND__', $sshHookCommand)
     $remoteCommand = $remoteCommand.Replace('__WARP_BASH_INIT_SHELL_HEX__', $bashInitShellHex)
@@ -335,7 +332,6 @@ function Warp-New-WindowsBootstrapCommand {
 
     $clientVersion = Warp-Get-SafeRemoteEnvironmentValue $env:WARP_CLIENT_VERSION
     $protocolVersion = Warp-Get-SafeRemoteEnvironmentValue $env:WARP_CLI_AGENT_PROTOCOL_VERSION
-    $recursiveSsh = if ($env:WARP_RECURSIVE_SSH_EXTENSION -eq '1') { '1' } else { '0' }
     $nextHopDepth = Warp-Get-NextSshHopDepth
     $remoteWorkerRelativePath = Warp-Get-SafeRemoteRelativePath $env:WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH
     $initShell = $script:WarpPwshInitShell.Replace('@@WARP_SESSION_ID@@', [string]$RemoteSessionId)
@@ -350,7 +346,6 @@ function Warp-New-WindowsBootstrapCommand {
 `$env:WARP_IS_LOCAL_SHELL_SESSION = '0'
 `$env:WARP_CLIENT_VERSION = '$clientVersion'
 `$env:WARP_CLI_AGENT_PROTOCOL_VERSION = '$protocolVersion'
-`$env:WARP_RECURSIVE_SSH_EXTENSION = '$recursiveSsh'
 `$env:WARP_SSH_HOP_DEPTH = '$nextHopDepth'
 `$env:WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH = '$remoteWorkerRelativePath'
 if (-not [String]::IsNullOrEmpty('$remoteWorkerRelativePath')) {
@@ -586,8 +581,7 @@ function Warp-Ssh {
 }
 
 function Warp-Install-SshWrapper {
-    $isRecursiveRemote = $env:WARP_IS_SSH -eq '1' -and $env:WARP_RECURSIVE_SSH_EXTENSION -eq '1'
-    if ($env:WARP_IS_LOCAL_SHELL_SESSION -ne '1' -and -not $isRecursiveRemote) {
+    if ($env:WARP_IS_LOCAL_SHELL_SESSION -ne '1' -and $env:WARP_IS_SSH -ne '1') {
         return
     }
 

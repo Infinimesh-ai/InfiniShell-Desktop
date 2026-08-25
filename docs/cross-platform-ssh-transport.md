@@ -106,12 +106,12 @@ The Windows package includes two Rust backends behind the same worker
 protocol:
 
 - the compatibility backend based on `ssh2`;
-- the newer asynchronous `russh` backend, enabled by the compile-time
-  `russh_transport` feature and the runtime `RusshTransport` feature flag.
+- the native, preferred asynchronous `russh` backend.
 
-Disabling `RusshTransport` retains the `ssh2` backend. The runtime flag is not
-in a default rollout list as of this document, so it can be enabled in stages
-without removing the established path.
+The worker enters the `russh` backend by default. If it cannot safely establish
+the connection before prompting or successful authentication, it falls back to
+`ssh2` or native OpenSSH. It does not start a second SSH connection after that
+boundary.
 
 Both enhanced backends cover the session behaviors required by InfiniShell:
 
@@ -216,9 +216,9 @@ Run the local gate before cross-platform testing:
 ```bash
 cargo check -p warp --lib --locked
 cargo check -p warp --bin infinishell-ssh --locked \
-  --features rust_ssh_worker,russh_transport
+  --features rust_ssh_worker
 cargo nextest run -p warp --locked \
-  --features rust_ssh_worker,russh_transport \
+  --features rust_ssh_worker \
   -E 'test(remote_server::rust_ssh)'
 cargo fmt --all -- --check
 ```
@@ -304,9 +304,9 @@ Never attach private keys, passwords, capability tokens, a complete
   `app/assets/bundled/bootstrap/pwsh_ssh_wrapper.ps1`
 - POSIX-to-Windows capability probe:
   `app/assets/bundled/bootstrap/ssh_remote_shell_probe.sh`
-- Rust worker and configuration gate:
+- Rust worker and configuration parsing:
   `app/src/remote_server/rust_ssh.rs`
-- Staged `russh` backend:
+- Native `russh` backend:
   `app/src/remote_server/rust_ssh/russh_backend.rs`
 - Client remote-server transport:
   `app/src/remote_server/ssh_transport.rs`

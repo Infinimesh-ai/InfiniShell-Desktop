@@ -114,18 +114,6 @@ pub(super) fn get_shell_environment_variables(options: &PtyOptions) -> Vec<u16> 
         },
     );
     env.insert(
-        map_key("WARP_RECURSIVE_SSH_EXTENSION".into()),
-        EnvEntry {
-            preferred_key: "WARP_RECURSIVE_SSH_EXTENSION".into(),
-            value: if FeatureFlag::RecursiveSshExtension.is_enabled() {
-                "1"
-            } else {
-                "0"
-            }
-            .into(),
-        },
-    );
-    env.insert(
         map_key("WARP_SSH_HOP_DEPTH".into()),
         EnvEntry {
             preferred_key: "WARP_SSH_HOP_DEPTH".into(),

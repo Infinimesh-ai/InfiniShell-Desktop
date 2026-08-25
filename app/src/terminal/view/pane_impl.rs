@@ -222,17 +222,14 @@ impl TerminalView {
 
         let appearance = Appearance::as_ref(app);
         let pane_config = self.pane_configuration.as_ref(app);
-        let title = if FeatureFlag::RecursiveSshExtension.is_enabled() {
-            self.active_block_session_id()
-                .and_then(|session_id| {
-                    RemoteServerManager::handle(app)
-                        .as_ref(app)
-                        .ssh_route_display_path(session_id)
-                })
-                .unwrap_or_else(|| pane_config.title().to_owned())
-        } else {
-            pane_config.title().to_owned()
-        };
+        let title = self
+            .active_block_session_id()
+            .and_then(|session_id| {
+                RemoteServerManager::handle(app)
+                    .as_ref(app)
+                    .ssh_route_display_path(session_id)
+            })
+            .unwrap_or_else(|| pane_config.title().to_owned());
         let clip_config = if self.is_using_conversation_for_pane_header_title {
             ClipConfig::ellipsis()
         } else {
@@ -584,13 +581,12 @@ impl BackingView for TerminalView {
         // Zap:删除 Pane 头部 "Share session" / "Copy link" / "Open on Desktop" 入口
         //(云端 shared session 链路已剥离,shared_session::manager 不存在)
 
-        let has_ssh_route = FeatureFlag::RecursiveSshExtension.is_enabled()
-            && self.active_block_session_id().is_some_and(|session_id| {
-                RemoteServerManager::handle(ctx)
-                    .as_ref(ctx)
-                    .ssh_route_targets(session_id)
-                    .is_some()
-            });
+        let has_ssh_route = self.active_block_session_id().is_some_and(|session_id| {
+            RemoteServerManager::handle(ctx)
+                .as_ref(ctx)
+                .ssh_route_targets(session_id)
+                .is_some()
+        });
         if has_ssh_route {
             if !items.is_empty() {
                 items.push(MenuItem::Separator);
@@ -631,13 +627,12 @@ impl BackingView for TerminalView {
             .is_sharer_or_viewer();
         let is_fullscreen_agent_view = FeatureFlag::AgentView.is_enabled()
             && self.agent_view_controller.as_ref(app).is_fullscreen();
-        let has_ssh_route = FeatureFlag::RecursiveSshExtension.is_enabled()
-            && self.active_block_session_id().is_some_and(|session_id| {
-                RemoteServerManager::handle(app)
-                    .as_ref(app)
-                    .ssh_route_targets(session_id)
-                    .is_some()
-            });
+        let has_ssh_route = self.active_block_session_id().is_some_and(|session_id| {
+            RemoteServerManager::handle(app)
+                .as_ref(app)
+                .ssh_route_targets(session_id)
+                .is_some()
+        });
         is_shared
             || is_fullscreen_agent_view
             || has_ssh_route

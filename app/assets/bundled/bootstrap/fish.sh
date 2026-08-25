@@ -611,8 +611,8 @@ if not test -e $APT_SOURCESDIR$source_file_name.list; and not test -e $APT_SOURC
   end
 end
 
-# 本地 shell 和已协商递归能力的远端 shell 都安装 SSH wrapper。
-if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1" -a "$WARP_RECURSIVE_SSH_EXTENSION" = "1"
+# 本地 shell 和 InfiniShell 管理的远端 shell 都安装 SSH wrapper。
+if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1"
     function is_interactive_ssh_session
         # Parse through all ssh options, as defined in the ssh man pages.  Send
         # stderr to /dev/null to silence argparse output when an option is invalid.
@@ -830,7 +830,6 @@ export TERM_PROGRAM='WarpTerminal'
 export WARP_IS_SSH='1'
 export WARP_USE_SSH_WRAPPER='$WARP_USE_SSH_WRAPPER'
 export WARP_SSH_REUSE_CONTROL_MASTER='$WARP_SSH_REUSE_CONTROL_MASTER'
-export WARP_RECURSIVE_SSH_EXTENSION='$WARP_RECURSIVE_SSH_EXTENSION'
 export WARP_SSH_HOP_DEPTH='$next_hop_depth'
 SSH_SOCKET_DIR="\${XDG_RUNTIME_DIR:-\$HOME/.cache}/infinishell-ssh"
 export SSH_SOCKET_DIR
