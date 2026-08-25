@@ -1,6 +1,7 @@
+use diesel::connection::SimpleConnection;
+
 use super::*;
 use crate::types::Project;
-use diesel::connection::SimpleConnection;
 
 fn sample(conn: &mut diesel::SqliteConnection, name: &str) -> Project {
     ProjectRepository::create(conn, name).unwrap()
