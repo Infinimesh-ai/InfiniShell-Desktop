@@ -45,7 +45,6 @@ impl ExecutionMode {
             ExecutionMode::Tui | ExecutionMode::Sdk | ExecutionMode::RemoteServerDaemon => true,
         }
     }
-
 }
 
 /// Model tracking the mode that Zap is running in.
