@@ -644,6 +644,7 @@ default = [
     "pending_user_query_indicator",
     "queue_slash_command",
     "queued_prompts_v2",
+    "ctrl_c_cancels_third_party_harness",
 ]
 # Enable this feature to automatically perform heap profiling.  NOTE: This will
 # substantially slow down program execution.
@@ -933,6 +934,7 @@ codex_notifications = []
 configurable_context_window = []
 codex_plugin = []
 osc_hyperlinks = []
+ctrl_c_cancels_third_party_harness = []
 
 [package.metadata.bundle.bin.infinishell]
 category = "public.app-category.developer-tools"

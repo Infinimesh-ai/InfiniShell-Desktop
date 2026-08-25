@@ -45,6 +45,26 @@ fn detected_secret_texts_at(
 }
 
 #[test]
+fn dismiss_tooltip_reports_only_real_state_changes() {
+    let mut state = SecretRedactionState::default();
+    assert!(!state.dismiss_tooltip());
+
+    state.secret_location_open_tooltip = Some(SecretLocation {
+        secret_range: SecretRange {
+            char_range: 0..4,
+            byte_range: 0..4,
+        },
+        location: TextLocation::Output {
+            section_index: 0,
+            line_index: 0,
+        },
+    });
+
+    assert!(state.dismiss_tooltip());
+    assert!(!state.dismiss_tooltip());
+}
+
+#[test]
 fn test_merge_no_ranges() {
     let ranges: Vec<(SecretRange, SecretLevel)> = vec![];
     let result = merge_sorted_ranges_with_levels(ranges);

@@ -378,7 +378,10 @@ fn repo_failure_continues_and_global_still_executes() {
                 let mut calls = destructive_calls.borrow_mut();
                 *calls += 1;
                 if *calls == 1 {
-                    futures::future::ready(Err(CacheSetupError::NonzeroExit { exit_code: Some(1) }))
+                    futures::future::ready(Err(CacheSetupError::NonzeroExit {
+                        exit_code: Some(1),
+                        stderr: "repository mount failed".to_owned(),
+                    }))
                 } else {
                     futures::future::ready(Ok(response(&["cargo"], &[], &[])))
                 }
@@ -597,11 +600,12 @@ fn process_runner_classifies_spawn_nonzero_and_timeout() {
     assert_eq!(missing, Err(CacheSetupError::SpawnFailed));
 
     let mut nonzero = Command::new_with_process_group("sh");
-    nonzero.args(["-c", "exit 17"]);
+    nonzero.args(["-c", "printf 'mount failed' >&2; exit 17"]);
     assert_eq!(
         block_on(run_command_with_timeout(nonzero, Duration::from_secs(1))),
         Err(CacheSetupError::NonzeroExit {
-            exit_code: Some(17)
+            exit_code: Some(17),
+            stderr: "mount failed".to_owned(),
         })
     );
 
@@ -632,7 +636,13 @@ fn timeout_returns_bounded_when_descendant_keeps_stdout_open() {
 fn cache_setup_error_variants_have_expected_is_actionable_classification() {
     assert!(!CacheSetupError::RootCreationFailed.is_actionable());
     assert!(!CacheSetupError::SpawnFailed.is_actionable());
-    assert!(!CacheSetupError::NonzeroExit { exit_code: Some(1) }.is_actionable());
+    assert!(
+        !CacheSetupError::NonzeroExit {
+            exit_code: Some(1),
+            stderr: String::new(),
+        }
+        .is_actionable()
+    );
     assert!(!CacheSetupError::Timeout.is_actionable());
     assert!(CacheSetupError::JsonParseFailed.is_actionable());
     assert!(CacheSetupError::EnvExportFailed.is_actionable());
@@ -645,6 +655,7 @@ fn failure_categories_are_preserved() {
         CacheSetupError::SpawnFailed,
         CacheSetupError::NonzeroExit {
             exit_code: Some(17),
+            stderr: "mount failed".to_owned(),
         },
         CacheSetupError::Timeout,
     ] {

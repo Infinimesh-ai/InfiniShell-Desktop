@@ -1,10 +1,8 @@
 use std::collections::HashMap;
-use std::fmt;
-use std::io;
-use std::sync::Arc;
-use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use std::{fmt, io};
 
 use dashmap::DashMap;
 use futures::channel::{mpsc, oneshot};

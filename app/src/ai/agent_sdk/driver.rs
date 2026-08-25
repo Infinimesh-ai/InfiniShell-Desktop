@@ -1596,7 +1596,9 @@ impl AgentDriver {
 
                     // Drive idle-on-complete timer for the harness exit signal.
                     match status {
-                        CLIAgentSessionStatus::Success | CLIAgentSessionStatus::Blocked { .. } => {
+                        CLIAgentSessionStatus::Success
+                        | CLIAgentSessionStatus::Blocked { .. }
+                        | CLIAgentSessionStatus::Cancelled => {
                             if let Some(idle_timeout) = me.idle_on_complete {
                                 harness_exit.end_run_after(idle_timeout, ());
                             } else {
