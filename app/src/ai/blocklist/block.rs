@@ -4850,10 +4850,19 @@ impl AIBlock {
     }
 
     pub fn dismiss_ai_tooltips(&mut self, ctx: &mut ViewContext<Self>) {
-        self.detected_links_state.link_location_open_tooltip = None;
-        ctx.emit(AIBlockEvent::DismissLinkTooltip);
-        self.secret_redaction_state.dismiss_tooltip();
-        ctx.emit(AIBlockEvent::DismissSecretTooltip);
+        let dismissed_link_tooltip = self
+            .detected_links_state
+            .link_location_open_tooltip
+            .take()
+            .is_some();
+        if dismissed_link_tooltip {
+            ctx.emit(AIBlockEvent::DismissLinkTooltip);
+        }
+
+        let dismissed_secret_tooltip = self.secret_redaction_state.dismiss_tooltip();
+        if dismissed_secret_tooltip {
+            ctx.emit(AIBlockEvent::DismissSecretTooltip);
+        }
 
         // The hover state for the "open" button in linked code blocks should be reset on a focus change.
         for button_handles in self
@@ -4864,7 +4873,9 @@ impl AIBlock {
             button_handles.reset_hover_state_on_focus_change();
         }
 
-        ctx.notify();
+        if dismissed_link_tooltip || dismissed_secret_tooltip {
+            ctx.notify();
+        }
     }
 
     fn open_link(
