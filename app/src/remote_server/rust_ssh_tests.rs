@@ -687,6 +687,29 @@ fn control_master_upload_rejects_truncated_input() {
     assert!(stage_control_upload(&payload[..], 10).is_err());
 }
 
+#[test]
+fn windows_control_master_upload_uses_a_home_relative_path() {
+    let slash_path = "~/.infinishell/remote-server/infinishell-upload.zip";
+    assert_eq!(
+        control_master_upload_path(slash_path, true),
+        ".infinishell/remote-server/infinishell-upload.zip"
+    );
+    assert_eq!(
+        control_master_upload_path(
+            "~\\.infinishell\\remote-server\\infinishell-upload.zip",
+            true,
+        ),
+        ".infinishell\\remote-server\\infinishell-upload.zip"
+    );
+}
+
+#[test]
+fn posix_control_master_upload_preserves_tilde_paths() {
+    let remote_path = "~/.infinishell/remote-server/infinishell-upload.tar.gz";
+
+    assert_eq!(control_master_upload_path(remote_path, false), remote_path);
+}
+
 /// 真实验证当前 Rust SSH session 上的 SCP broker 上传。
 ///
 /// 运行前设置：

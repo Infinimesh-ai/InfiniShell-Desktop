@@ -316,10 +316,14 @@ impl SshTransport {
             archive_extension,
         );
         if let Some((socket_path, _)) = self.control_master() {
+            let scp_remote_path = crate::remote_server::rust_ssh::control_master_upload_path(
+                &remote_path,
+                platform.os == RemoteOs::Windows,
+            );
             remote_server::ssh::scp_upload(
                 socket_path,
                 local_archive,
-                &remote_path,
+                scp_remote_path,
                 remote_server::setup::SCP_INSTALL_TIMEOUT,
             )
             .await

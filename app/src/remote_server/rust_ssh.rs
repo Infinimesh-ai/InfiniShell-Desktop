@@ -1030,7 +1030,9 @@ pub fn run_broker_command(args: &RustSshBrokerCommandArgs) -> Result<i32> {
 
 fn run_control_master_upload(args: &RustSshBrokerCommandArgs, control_path: &Path) -> Result<i32> {
     let BrokerOperation::Upload {
-        remote_path, size, ..
+        remote_path,
+        size,
+        windows,
     } = broker_operation(args, None)?
     else {
         bail!("SSH ControlMaster worker only supports uploads");
@@ -1040,10 +1042,21 @@ fn run_control_master_upload(args: &RustSshBrokerCommandArgs, control_path: &Pat
     futures_lite::future::block_on(remote_server::ssh::scp_upload(
         control_path,
         archive.path(),
-        &remote_path,
+        control_master_upload_path(&remote_path, windows),
         remote_server::setup::SCP_INSTALL_TIMEOUT,
     ))?;
     Ok(0)
+}
+
+pub(crate) fn control_master_upload_path(remote_path: &str, windows: bool) -> &str {
+    if windows {
+        remote_path
+            .strip_prefix("~/")
+            .or_else(|| remote_path.strip_prefix("~\\"))
+            .unwrap_or(remote_path)
+    } else {
+        remote_path
+    }
 }
 
 fn stage_control_upload(mut reader: impl Read, size: u64) -> Result<tempfile::NamedTempFile> {
