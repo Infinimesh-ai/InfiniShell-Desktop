@@ -25,6 +25,19 @@ struct RoutedCommandOutput {
     exit_code: Option<i32>,
 }
 
+fn binary_check_result(remote_os: &RemoteOs, output: RoutedCommandOutput) -> Result<bool, Error> {
+    match output.exit_code {
+        Some(0) => Ok(true),
+        Some(1) if matches!(remote_os, RemoteOs::Windows) => Ok(false),
+        Some(126) | Some(127) => Ok(false),
+        Some(exit_code) => Err(Error::Other(anyhow!(
+            "binary check exited with {exit_code}: {}",
+            output.stderr
+        ))),
+        None => Err(Error::Other(anyhow!("binary check terminated by signal"))),
+    }
+}
+
 /// 通过父级 remote-server 上注册的 SSH transport 访问下一跳。
 #[derive(Clone)]
 pub struct RemoteSshTransport {
@@ -313,15 +326,7 @@ impl RemoteTransport for RemoteSshTransport {
                     remote_server::setup::CHECK_TIMEOUT,
                 )
                 .await?;
-            match output.exit_code {
-                Some(0) => Ok(true),
-                Some(126) | Some(127) => Ok(false),
-                Some(exit_code) => Err(Error::Other(anyhow!(
-                    "binary check exited with {exit_code}: {}",
-                    output.stderr
-                ))),
-                None => Err(Error::Other(anyhow!("binary check terminated by signal"))),
-            }
+            binary_check_result(&transport.remote_os, output)
         })
     }
 
@@ -450,3 +455,7 @@ impl RemoteTransport for RemoteSshTransport {
         !matches!(exit_status.and_then(|status| status.code), Some(255))
     }
 }
+
+#[cfg(test)]
+#[path = "remote_ssh_transport_tests.rs"]
+mod tests;
