@@ -6,6 +6,8 @@
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::ffi::OsString;
+#[cfg(any(windows, test))]
+use std::io::BufRead;
 use std::io::{self, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
 #[cfg(unix)]
@@ -20,8 +22,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
-#[cfg(windows)]
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context as _, Result, anyhow, bail};
 use rand::RngCore as _;
@@ -33,9 +33,7 @@ use ssh2::{
 };
 use warp_cli::{RustSshBrokerCommandArgs, RustSshSessionArgs};
 #[cfg(windows)]
-use warp_core::channel::ChannelState;
-#[cfg(windows)]
-use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_FAILED, WAIT_OBJECT_0};
+use windows::Win32::Foundation::HANDLE;
 #[cfg(windows)]
 use windows::Win32::Networking::WinSock::{
     IP_TOS, IPPROTO_IP, IPPROTO_IPV6, IPV6_TCLASS, SOCKET, SOCKET_ERROR, WSAGetLastError,
@@ -46,12 +44,6 @@ use windows::Win32::System::Console::{
     CONSOLE_MODE, ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT,
     ENABLE_VIRTUAL_TERMINAL_INPUT, GetConsoleMode, GetStdHandle, STD_INPUT_HANDLE, SetConsoleMode,
 };
-#[cfg(windows)]
-use windows::Win32::System::Threading::{
-    CreateEventW, EVENT_MODIFY_STATE, INFINITE, OpenEventW, SetEvent, WaitForMultipleObjects,
-};
-#[cfg(windows)]
-use windows::core::HSTRING;
 use zeroize::Zeroizing;
 
 pub const BROKER_CAPABILITY_ENV: &str = "WARP_SSH_BROKER_CAPABILITY";
@@ -63,8 +55,6 @@ const FRAME_EXIT: u8 = 3;
 const POLL_INTERVAL: Duration = Duration::from_millis(4);
 const RESIZE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
-#[cfg(windows)]
-const ENHANCED_SSH_OPT_IN_MAX_AGE: Duration = Duration::from_secs(10 * 60);
 
 type SessionGate = Arc<Mutex<()>>;
 
@@ -85,32 +75,6 @@ impl std::fmt::Display for EnhancedSshOptInRequired {
 }
 
 impl std::error::Error for EnhancedSshOptInRequired {}
-
-#[cfg(windows)]
-#[derive(Debug, Serialize, Deserialize)]
-struct EnhancedSshOptInRequest {
-    host: String,
-    created_at_unix_seconds: u64,
-}
-
-#[cfg(windows)]
-#[derive(Debug, Serialize, Deserialize)]
-struct EnhancedSshOptInResult {
-    applied: bool,
-    error: Option<String>,
-}
-
-#[cfg(windows)]
-struct WindowsEventHandle(HANDLE);
-
-#[cfg(windows)]
-impl Drop for WindowsEventHandle {
-    fn drop(&mut self) {
-        unsafe {
-            let _ = CloseHandle(self.0);
-        }
-    }
-}
 
 mod russh_backend;
 
@@ -556,7 +520,7 @@ fn run_ssh2_session_worker(args: &RustSshSessionArgs) -> Result<i32> {
                         }
                         Err(opt_in_error) => {
                             eprintln!(
-                                "InfiniShell could not offer one-click enhanced SSH setup: {opt_in_error:#}"
+                                "InfiniShell could not enable enhanced SSH for this host: {opt_in_error:#}"
                             );
                             return run_native_ssh_fallback(args, "OpenSSH configuration", &error);
                         }
@@ -753,187 +717,68 @@ fn run_native_ssh_fallback(
 
 #[cfg(windows)]
 fn request_enhanced_ssh_opt_in(opt_in: &EnhancedSshOptInRequired) -> Result<bool> {
+    let config_path = default_ssh_config_path()?;
+    let stdin = io::stdin();
+    let mut input = stdin.lock();
+    let stderr = io::stderr();
+    let mut output = stderr.lock();
+    request_enhanced_ssh_opt_in_with_io(opt_in, &config_path, &mut input, &mut output)
+}
+
+#[cfg(any(windows, test))]
+fn request_enhanced_ssh_opt_in_with_io(
+    opt_in: &EnhancedSshOptInRequired,
+    config_path: &Path,
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+) -> Result<bool> {
     validate_ssh_config_host(&opt_in.host)?;
-
-    let stdin_handle = unsafe { GetStdHandle(STD_INPUT_HANDLE) }
-        .context("failed to access console input for enhanced SSH setup")?;
-    let mut console_mode = CONSOLE_MODE::default();
-    if unsafe { GetConsoleMode(stdin_handle, &mut console_mode) }.is_err() {
-        return Ok(false);
-    }
-
-    let mut token_bytes = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut token_bytes);
-    let token = token_bytes
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    let event_name = enhanced_ssh_opt_in_event_name(&token);
-    let event_name_wide = HSTRING::from(&event_name);
-    let event = WindowsEventHandle(
-        unsafe { CreateEventW(None, true, false, &event_name_wide) }
-            .context("failed to create enhanced SSH setup event")?,
-    );
-    let request_path = enhanced_ssh_opt_in_request_path(&token);
-    let result_path = enhanced_ssh_opt_in_result_path(&token);
-    let request = EnhancedSshOptInRequest {
-        host: opt_in.host.clone(),
-        created_at_unix_seconds: current_unix_seconds()?,
-    };
-    let request_bytes = serde_json::to_vec(&request)?;
-    let request_directory = request_path
-        .parent()
-        .context("enhanced SSH setup request path has no parent")?;
-    std::fs::create_dir_all(request_directory)
-        .context("failed to create enhanced SSH setup directory")?;
-    let mut request_file = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&request_path)
-        .context("failed to create enhanced SSH setup request")?;
-    request_file
-        .write_all(&request_bytes)
-        .context("failed to write enhanced SSH setup request")?;
-    drop(request_file);
-
-    let uri = format!(
-        "{}://ssh/enable-enhanced?request={token}",
-        ChannelState::url_scheme()
-    );
-    let link = format!(
-        "\x1b]8;;{uri}\x1b\\Enable enhanced SSH for {}\x1b]8;;\x1b\\",
-        opt_in.host
-    );
-    eprintln!(
+    writeln!(
+        output,
         "InfiniShell enhanced SSH requires per-host OpenSSH settings because {} are enabled.",
         opt_in.options.join(", ")
-    );
-    eprintln!(
+    )?;
+    writeln!(
+        output,
         "This disables automatic host-key updates and keystroke-timing obfuscation for this host."
-    );
-    eprintln!(
-        "{link}, or press Enter to continue with native OpenSSH without SSH extension features."
-    );
+    )?;
 
-    let wait_result = unsafe { WaitForMultipleObjects(&[event.0, stdin_handle], false, INFINITE) };
-    let opted_in = if wait_result == WAIT_OBJECT_0 {
-        let result_bytes =
-            std::fs::read(&result_path).context("failed to read enhanced SSH setup result")?;
-        let result: EnhancedSshOptInResult = serde_json::from_slice(&result_bytes)
-            .context("failed to parse enhanced SSH setup result")?;
-        if result.applied {
-            eprintln!("InfiniShell enhanced SSH is enabled for this host; connecting now.");
-            true
-        } else {
-            eprintln!(
-                "InfiniShell could not update the OpenSSH configuration: {}",
-                result.error.as_deref().unwrap_or("unknown error")
-            );
-            false
+    loop {
+        write!(
+            output,
+            "Press Enter or type yes to update ~/.ssh/config and continue, or type no to use native OpenSSH [Y/n]: "
+        )?;
+        output.flush()?;
+
+        let mut choice = String::new();
+        if input.read_line(&mut choice)? == 0 {
+            writeln!(
+                output,
+                "Using native OpenSSH without InfiniShell SSH extension features."
+            )?;
+            return Ok(false);
         }
-    } else if wait_result.0 == WAIT_OBJECT_0.0 + 1 {
-        let mut input = String::new();
-        std::io::stdin()
-            .read_line(&mut input)
-            .context("failed to read enhanced SSH setup choice")?;
-        false
-    } else if wait_result == WAIT_FAILED {
-        bail!("failed to wait for enhanced SSH setup choice");
-    } else {
-        bail!("unexpected enhanced SSH setup wait result");
-    };
 
-    let _ = std::fs::remove_file(request_path);
-    let _ = std::fs::remove_file(result_path);
-    Ok(opted_in)
-}
-
-#[cfg(windows)]
-fn enhanced_ssh_opt_in_directory() -> PathBuf {
-    std::env::temp_dir()
-        .join("infinishell-ssh")
-        .join("enhanced-opt-in")
-}
-
-#[cfg(windows)]
-fn enhanced_ssh_opt_in_request_path(token: &str) -> PathBuf {
-    enhanced_ssh_opt_in_directory().join(format!("{token}.request.json"))
-}
-
-#[cfg(windows)]
-fn enhanced_ssh_opt_in_result_path(token: &str) -> PathBuf {
-    enhanced_ssh_opt_in_directory().join(format!("{token}.result.json"))
-}
-
-#[cfg(windows)]
-fn enhanced_ssh_opt_in_event_name(token: &str) -> String {
-    format!("Local\\InfiniShellSshOptIn-{token}")
-}
-
-#[cfg(windows)]
-fn current_unix_seconds() -> Result<u64> {
-    Ok(SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .context("system clock is before the Unix epoch")?
-        .as_secs())
-}
-
-/// 处理用户从终端点击的一次性增强 SSH 配置请求。
-#[cfg(windows)]
-pub fn approve_enhanced_ssh_opt_in(token: &str) -> Result<String> {
-    let config_path = default_ssh_config_path()?;
-    approve_enhanced_ssh_opt_in_at_path(token, &config_path)
-}
-
-#[cfg(windows)]
-fn approve_enhanced_ssh_opt_in_at_path(token: &str, config_path: &Path) -> Result<String> {
-    validate_enhanced_ssh_opt_in_token(token)?;
-    let request_path = enhanced_ssh_opt_in_request_path(token);
-    let request_bytes =
-        std::fs::read(&request_path).context("enhanced SSH setup request is missing or expired")?;
-    let request: EnhancedSshOptInRequest =
-        serde_json::from_slice(&request_bytes).context("enhanced SSH setup request is invalid")?;
-    validate_ssh_config_host(&request.host)?;
-    let now = current_unix_seconds()?;
-    if request.created_at_unix_seconds > now
-        || now - request.created_at_unix_seconds > ENHANCED_SSH_OPT_IN_MAX_AGE.as_secs()
-    {
-        bail!("enhanced SSH setup request is expired");
+        match choice.trim().to_ascii_lowercase().as_str() {
+            "" | "y" | "yes" => {
+                upsert_enhanced_ssh_host_config(config_path, &opt_in.host)?;
+                writeln!(
+                    output,
+                    "Enhanced SSH is enabled for {}; continuing this connection.",
+                    opt_in.host
+                )?;
+                return Ok(true);
+            }
+            "n" | "no" => {
+                writeln!(
+                    output,
+                    "Using native OpenSSH without InfiniShell SSH extension features."
+                )?;
+                return Ok(false);
+            }
+            _ => writeln!(output, "Please press Enter or type yes or no.")?,
+        }
     }
-
-    let apply_result = upsert_enhanced_ssh_host_config(config_path, &request.host);
-    let result = EnhancedSshOptInResult {
-        applied: apply_result.is_ok(),
-        error: apply_result.as_ref().err().map(ToString::to_string),
-    };
-    let result_bytes = serde_json::to_vec(&result)?;
-    let write_result = std::fs::write(enhanced_ssh_opt_in_result_path(token), result_bytes)
-        .context("failed to write enhanced SSH setup result");
-    let signal_result = signal_enhanced_ssh_opt_in(token);
-
-    write_result?;
-    signal_result?;
-    apply_result?;
-    Ok(request.host)
-}
-
-#[cfg(windows)]
-fn signal_enhanced_ssh_opt_in(token: &str) -> Result<()> {
-    let event_name = enhanced_ssh_opt_in_event_name(token);
-    let event_name_wide = HSTRING::from(&event_name);
-    let event = WindowsEventHandle(
-        unsafe { OpenEventW(EVENT_MODIFY_STATE, false, &event_name_wide) }
-            .context("enhanced SSH setup request is no longer active")?,
-    );
-    unsafe { SetEvent(event.0) }.context("failed to notify the SSH worker")
-}
-
-#[cfg(windows)]
-fn validate_enhanced_ssh_opt_in_token(token: &str) -> Result<()> {
-    if token.len() != 32 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        bail!("invalid enhanced SSH setup request identifier");
-    }
-    Ok(())
 }
 
 #[cfg(windows)]

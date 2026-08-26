@@ -166,14 +166,14 @@ authentication semantics and no longer triggers fallback by itself. A target
 that actually uses a local security key still falls back safely before
 authentication.
 
-Until the two protocol hooks above are available, the Windows worker displays
-`Enable enhanced SSH for <host>` before fallback. One click makes the desktop
-app prepend a bounded exact-`Host` block to the user's `~/.ssh/config`, notify
-the current worker to run `ssh -G` again, and continue the same enhanced
-connection. The request uses a short-lived random single-use local handshake,
-so terminal output cannot modify arbitrary host configuration merely by
-constructing a URI with the same action name. Pressing Enter skips the change
-and immediately continues with native OpenSSH without an unexplained wait.
+Until the two protocol hooks above are available, the Windows worker displays a
+terminal `[Y/n]` prompt before fallback. Pressing Enter, typing `y`, or typing
+`yes` prepends a bounded exact-`Host` block to the user's `~/.ssh/config`, makes
+the current worker run `ssh -G` again, and continues the same enhanced
+connection. Only an explicit `n` or `no` immediately falls back to native
+OpenSSH. Confirmation and configuration changes happen inside the current SSH
+worker, without a terminal hyperlink, desktop URI handler, or cross-process
+notification. The terminal explains the security tradeoff before prompting.
 
 Users who prefer to manage the file manually can opt a known host into the
 enhanced transport:
@@ -184,9 +184,9 @@ Host 192.168.20.204
     ObscureKeystrokeTiming no
 ```
 
-Both the one-click and manual forms are per-host opt-ins and should not be
-placed under a global `Host *`. They
-disables OpenSSH's automatic host-key updates and keystroke-timing obfuscation.
+Both the terminal-confirmation and manual forms are per-host opt-ins and should
+not be placed under a global `Host *`. They disable OpenSSH's automatic host-key
+updates and keystroke-timing obfuscation.
 Users who cannot accept that security tradeoff should retain the defaults: the
 session will use native OpenSSH, so plain SSH remains available but InfiniShell
 SSH extension features do not. The fallback message identifies the incompatible

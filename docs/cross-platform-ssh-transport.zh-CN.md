@@ -134,12 +134,11 @@ Windows OpenSSH 9.5 默认报告 `SecurityKeyProvider=internal`;当目标没有�
 本地 SK/FIDO identity 时,该默认值不影响认证语义,不会再单独触发回退。如果目标
 确实使用本地安全密钥,worker 仍会在认证前安全回退到原生 OpenSSH。
 
-在上述两个协议钩子补齐前,Windows worker 会在回退前显示
-`Enable enhanced SSH for <host>`。用户点击一次后,桌面端会把带边界标记的精确
-`Host` 配置块写到用户 `~/.ssh/config` 顶部,通知当前 worker 重新执行 `ssh -G`,
-然后继续本次增强连接。请求使用短期、随机、单次有效的本机握手,终端输出不能仅凭
-构造同名 URI 修改任意主机配置。用户也可以按 Enter 跳过修改并立即进入原生
-OpenSSH,不会无提示等待。
+在上述两个协议钩子补齐前,Windows worker 会在回退前直接在终端显示 `[Y/n]` 确认。
+直接按 Enter、输入 `y` 或输入 `yes` 会把带边界标记的精确 `Host` 配置块写到用户
+`~/.ssh/config` 顶部,由当前 worker 重新执行 `ssh -G`,然后继续本次增强连接。只有明确
+输入 `n` 或 `no` 才会立即回退原生 OpenSSH。确认和配置写入都在当前 SSH worker 内完成,
+不再依赖终端超链接、桌面 URI handler 或跨进程通知;终端会在提示前明确说明安全取舍。
 
 希望手动管理配置的用户可以只为已知目标显式选择增强 transport:
 
@@ -149,7 +148,7 @@ Host 192.168.20.204
     ObscureKeystrokeTiming no
 ```
 
-无论一键还是手动操作,这都是按主机 opt-in,不应写到全局 `Host *`。它会关闭 OpenSSH 的自动主机密钥更新
+无论终端确认还是手动操作,这都是按主机 opt-in,不应写到全局 `Host *`。它会关闭 OpenSSH 的自动主机密钥更新
 和按键时序混淆保护;不能接受这一安全取舍时应保留默认值,该会话将使用原生
 OpenSSH,普通 SSH 仍可用,但 InfiniShell SSH 扩展能力不可用。回退消息会显示具体
 的不兼容阶段或选项,Windows worker 会把控制台交还给原生 OpenSSH,确保提示、输入

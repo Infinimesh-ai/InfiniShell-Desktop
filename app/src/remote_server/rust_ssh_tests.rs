@@ -110,7 +110,7 @@ fn reports_all_default_security_options_needed_for_enhanced_ssh_opt_in() {
     let error = parse_openssh_config(&config).unwrap_err();
     let opt_in = error
         .downcast_ref::<EnhancedSshOptInRequired>()
-        .expect("应返回可由用户确认的一键配置请求");
+        .expect("应返回可由用户在终端确认的配置请求");
 
     assert_eq!(opt_in.host, "test");
     assert_eq!(opt_in.options, ["updatehostkeys", "obscurekeystroketiming"]);
@@ -149,7 +149,7 @@ fn rejects_windows_internal_security_key_provider_with_a_local_sk_identity() {
 }
 
 #[test]
-fn one_click_opt_in_prepends_an_exact_host_block_and_preserves_crlf_and_bom() {
+fn enhanced_ssh_opt_in_prepends_an_exact_host_block_and_preserves_crlf_and_bom() {
     let directory = tempfile::tempdir().unwrap();
     let config_path = directory.path().join(".ssh").join("config");
     std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
@@ -177,7 +177,7 @@ fn one_click_opt_in_prepends_an_exact_host_block_and_preserves_crlf_and_bom() {
 }
 
 #[test]
-fn one_click_opt_in_rejects_a_host_pattern_without_touching_the_config() {
+fn enhanced_ssh_opt_in_rejects_a_host_pattern_without_touching_the_config() {
     let directory = tempfile::tempdir().unwrap();
     let config_path = directory.path().join("config");
     std::fs::write(&config_path, "Host existing\n").unwrap();
@@ -190,46 +190,79 @@ fn one_click_opt_in_rejects_a_host_pattern_without_touching_the_config() {
     );
 }
 
-#[cfg(windows)]
 #[test]
-fn one_click_opt_in_request_updates_the_config_and_signals_the_worker() {
-    let token = format!("{:032x}", rand::random::<u128>());
-    let event_name = HSTRING::from(enhanced_ssh_opt_in_event_name(&token));
-    let event =
-        WindowsEventHandle(unsafe { CreateEventW(None, true, false, &event_name) }.unwrap());
-    let request_path = enhanced_ssh_opt_in_request_path(&token);
-    let result_path = enhanced_ssh_opt_in_result_path(&token);
-    std::fs::create_dir_all(request_path.parent().unwrap()).unwrap();
-    std::fs::write(
-        &request_path,
-        serde_json::to_vec(&EnhancedSshOptInRequest {
-            host: "one-click-test".to_string(),
-            created_at_unix_seconds: current_unix_seconds().unwrap(),
-        })
-        .unwrap(),
-    )
-    .unwrap();
+fn terminal_opt_in_enter_updates_the_config_and_continues() {
     let directory = tempfile::tempdir().unwrap();
     let config_path = directory.path().join(".ssh").join("config");
+    let opt_in = EnhancedSshOptInRequired {
+        host: "terminal-opt-in-test".to_string(),
+        options: vec!["updatehostkeys", "obscurekeystroketiming"],
+    };
+    let mut input = io::Cursor::new(b"\n");
+    let mut output = Vec::new();
 
-    let host = approve_enhanced_ssh_opt_in_at_path(&token, &config_path).unwrap();
+    let enabled =
+        request_enhanced_ssh_opt_in_with_io(&opt_in, &config_path, &mut input, &mut output)
+            .unwrap();
 
-    assert_eq!(host, "one-click-test");
+    assert!(enabled);
     assert!(
         std::fs::read_to_string(config_path)
             .unwrap()
-            .contains("Host one-click-test\n    UpdateHostKeys no")
+            .contains("Host terminal-opt-in-test\n    UpdateHostKeys no")
     );
-    assert_eq!(
-        unsafe { WaitForMultipleObjects(&[event.0], false, 0) },
-        WAIT_OBJECT_0
+    assert!(
+        String::from_utf8(output).unwrap().contains(
+            "Enhanced SSH is enabled for terminal-opt-in-test; continuing this connection."
+        )
     );
-    let result: EnhancedSshOptInResult =
-        serde_json::from_slice(&std::fs::read(&result_path).unwrap()).unwrap();
-    assert!(result.applied);
+}
 
-    let _ = std::fs::remove_file(request_path);
-    let _ = std::fs::remove_file(result_path);
+#[test]
+fn terminal_opt_in_yes_updates_the_config_and_continues() {
+    let directory = tempfile::tempdir().unwrap();
+    let config_path = directory.path().join(".ssh").join("config");
+    let opt_in = EnhancedSshOptInRequired {
+        host: "yes-test".to_string(),
+        options: vec!["updatehostkeys"],
+    };
+    let mut input = io::Cursor::new(b"yes\n");
+    let mut output = Vec::new();
+
+    let enabled =
+        request_enhanced_ssh_opt_in_with_io(&opt_in, &config_path, &mut input, &mut output)
+            .unwrap();
+
+    assert!(enabled);
+    assert!(
+        std::fs::read_to_string(config_path)
+            .unwrap()
+            .contains("Host yes-test\n    UpdateHostKeys no")
+    );
+}
+
+#[test]
+fn terminal_opt_in_no_preserves_the_config_and_falls_back() {
+    let directory = tempfile::tempdir().unwrap();
+    let config_path = directory.path().join(".ssh").join("config");
+    let opt_in = EnhancedSshOptInRequired {
+        host: "fallback-test".to_string(),
+        options: vec!["updatehostkeys"],
+    };
+    let mut input = io::Cursor::new(b"no\n");
+    let mut output = Vec::new();
+
+    let enabled =
+        request_enhanced_ssh_opt_in_with_io(&opt_in, &config_path, &mut input, &mut output)
+            .unwrap();
+
+    assert!(!enabled);
+    assert!(!config_path.exists());
+    assert!(
+        String::from_utf8(output)
+            .unwrap()
+            .contains("Using native OpenSSH without InfiniShell SSH extension features.")
+    );
 }
 
 #[test]
