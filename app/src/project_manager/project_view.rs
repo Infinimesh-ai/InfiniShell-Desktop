@@ -1,6 +1,6 @@
 //! 项目详情编辑器中央 pane 的 BackingView 实现(M2 part B)。
 //!
-//! 表单字段:名称 / Git 地址 / 本地目录 / 项目规则 / 备注 + 关联服务器
+//! 表单字段:名称 / Git 仓库列表 / 本地目录 / 项目规则 / 备注 + 关联服务器
 //! 勾选列表。「保存」写 `infinishell_projects` 数据层并广播
 //! [`ProjectsChangedNotifier`];「删除项目」走 confirmation → 软删 → 关 pane。
 //!
@@ -9,8 +9,9 @@
 
 use std::collections::HashSet;
 
-use infinishell_projects::{Project, ProjectRepository};
+use infinishell_projects::{Project, ProjectGitRepository, ProjectRepository};
 use pathfinder_geometry::vector::vec2f;
+use uuid::Uuid;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
 use warp_ssh_manager::{NodeKind, SshRepository};
@@ -18,10 +19,10 @@ use warpui::elements::{
     Align, Border, ChildAnchor, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, Dismiss, Element, Fill, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
-    ParentElement, ParentOffsetBounds, Radius, ScrollbarWidth, Stack, Text,
+    ParentElement, ParentOffsetBounds, Radius, ScrollbarWidth, Shrinkable, Stack, Text,
 };
 use warpui::fonts::Weight;
-use warpui::platform::Cursor;
+use warpui::platform::{Cursor, FilePickerConfiguration};
 use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{
@@ -47,9 +48,17 @@ const MULTILINE_FIELD_MIN_HEIGHT: f32 = 96.0;
 const SERVER_ROW_CHECK_SIZE: f32 = 16.0;
 const DELETE_DIALOG_WIDTH: f32 = 450.0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProjectViewAction {
     Save,
+    OpenRootPathPicker,
+    SetRootPath(String),
+    AddRepository,
+    RemoveRepository(usize),
+    ToggleRepositoryServer {
+        repository_index: usize,
+        server_index: usize,
+    },
     /// 切换第 index 台服务器(`self.servers[index]`)的关联状态。
     ToggleServer(usize),
     OpenDeleteConfirmation,
@@ -75,6 +84,15 @@ pub struct ProjectServerRow {
     pub port: u16,
 }
 
+/// 一条可编辑 Git 仓库及其服务器映射。
+struct ProjectRepositoryEditorRow {
+    id: String,
+    git_url_editor: ViewHandle<EditorView>,
+    mapped_node_ids: HashSet<String>,
+    remove_btn_state: MouseStateHandle,
+    server_row_states: Vec<MouseStateHandle>,
+}
+
 pub struct ProjectView {
     project_id: String,
     /// 缓存上次从 DB 读到的项目。已被删除/找不到时为 None,渲染占位提示。
@@ -83,10 +101,10 @@ pub struct ProjectView {
     focus_handle: Option<PaneFocusHandle>,
 
     name_editor: ViewHandle<EditorView>,
-    git_url_editor: ViewHandle<EditorView>,
     root_path_editor: ViewHandle<EditorView>,
     rules_editor: ViewHandle<EditorView>,
     notes_editor: ViewHandle<EditorView>,
+    repositories: Vec<ProjectRepositoryEditorRow>,
 
     /// 全部 SSH 服务器候选(树顺序),供勾选关联。
     servers: Vec<ProjectServerRow>,
@@ -95,6 +113,8 @@ pub struct ProjectView {
     linked_node_ids: HashSet<String>,
 
     save_btn_state: MouseStateHandle,
+    add_repository_btn_state: MouseStateHandle,
+    root_path_picker_btn_state: MouseStateHandle,
     delete_btn_state: MouseStateHandle,
     delete_confirm_btn_state: MouseStateHandle,
     delete_cancel_btn_state: MouseStateHandle,
@@ -108,7 +128,6 @@ pub struct ProjectView {
 impl ProjectView {
     pub fn new(project_id: String, ctx: &mut ViewContext<Self>) -> Self {
         let name_editor = make_single_line_editor(&crate::t!("common-name"), ctx);
-        let git_url_editor = make_single_line_editor("https://github.com/example/repo.git", ctx);
         let root_path_editor = make_single_line_editor("/home/user/projects/app", ctx);
         let rules_editor = make_multiline_editor(&crate::t!("project-view-rules-placeholder"), ctx);
         let notes_editor = make_multiline_editor(&crate::t!("project-view-notes-placeholder"), ctx);
@@ -121,13 +140,15 @@ impl ProjectView {
             pane_configuration,
             focus_handle: None,
             name_editor,
-            git_url_editor,
             root_path_editor,
             rules_editor,
             notes_editor,
+            repositories: Vec::new(),
             servers: Vec::new(),
             linked_node_ids: HashSet::new(),
             save_btn_state: MouseStateHandle::default(),
+            add_repository_btn_state: MouseStateHandle::default(),
+            root_path_picker_btn_state: MouseStateHandle::default(),
             delete_btn_state: MouseStateHandle::default(),
             delete_confirm_btn_state: MouseStateHandle::default(),
             delete_cancel_btn_state: MouseStateHandle::default(),
@@ -138,41 +159,32 @@ impl ProjectView {
         };
         me.reload(ctx);
 
-        // 监听每个 editor:编辑 → 清掉 status banner;失焦/切换字段时清
-        // selection,防止多个输入框同时保持高亮(套路同 SshServerView)。
-        for editor in me.all_editors() {
-            ctx.subscribe_to_view(&editor, |me, source, event, ctx| match event {
-                EditorEvent::Edited(_) | EditorEvent::Enter => {
-                    if me.status.is_some() {
-                        me.status = None;
-                        ctx.notify();
-                    }
-                }
-                EditorEvent::Blurred => {
-                    source.update(ctx, |e, ctx| e.clear_selections(ctx));
-                    if me.status.is_some() {
-                        me.status = None;
-                        ctx.notify();
-                    }
-                }
-                EditorEvent::Focused | EditorEvent::ClearParentSelections => {
-                    me.clear_other_editors_selections(&source, ctx);
-                }
-                _ => {}
-            });
+        // 动态仓库编辑器由 `reload` 创建时订阅；这里订阅固定字段。
+        for editor in [
+            me.name_editor.clone(),
+            me.root_path_editor.clone(),
+            me.rules_editor.clone(),
+            me.notes_editor.clone(),
+        ] {
+            subscribe_project_editor(&editor, ctx);
         }
 
         me
     }
 
-    fn all_editors(&self) -> [ViewHandle<EditorView>; 5] {
-        [
+    fn all_editors(&self) -> Vec<ViewHandle<EditorView>> {
+        let mut editors = vec![
             self.name_editor.clone(),
-            self.git_url_editor.clone(),
             self.root_path_editor.clone(),
             self.rules_editor.clone(),
             self.notes_editor.clone(),
-        ]
+        ];
+        editors.extend(
+            self.repositories
+                .iter()
+                .map(|repository| repository.git_url_editor.clone()),
+        );
+        editors
     }
 
     fn clear_other_editors_selections(
@@ -238,10 +250,10 @@ impl ProjectView {
         };
         // 悬挂引用(SSH 节点已删)在此静默过滤 — 与左侧面板的行为一致;
         // 下一次保存会把这些残留关联从关联表清掉。
-        let known_ids: HashSet<&str> = self.servers.iter().map(|s| s.node_id.as_str()).collect();
+        let known_ids: HashSet<String> = self.servers.iter().map(|s| s.node_id.clone()).collect();
         self.linked_node_ids = linked_ids
             .into_iter()
-            .filter(|id| known_ids.contains(id.as_str()))
+            .filter(|id| known_ids.contains(id))
             .collect();
         self.server_row_states
             .resize_with(self.servers.len(), MouseStateHandle::default);
@@ -251,11 +263,6 @@ impl ProjectView {
             .project
             .as_ref()
             .map(|p| p.name.clone())
-            .unwrap_or_default();
-        let git_url = self
-            .project
-            .as_ref()
-            .and_then(|p| p.git_url.clone())
             .unwrap_or_default();
         let root_path = self
             .project
@@ -274,14 +281,43 @@ impl ProjectView {
             .unwrap_or_default();
         self.name_editor
             .update(ctx, |e, ctx| e.set_buffer_text(&name, ctx));
-        self.git_url_editor
-            .update(ctx, |e, ctx| e.set_buffer_text(&git_url, ctx));
         self.root_path_editor
             .update(ctx, |e, ctx| e.set_buffer_text(&root_path, ctx));
         self.rules_editor
             .update(ctx, |e, ctx| e.set_buffer_text(&rules, ctx));
         self.notes_editor
             .update(ctx, |e, ctx| e.set_buffer_text(&notes, ctx));
+
+        self.repositories.clear();
+        let repositories = self
+            .project
+            .as_ref()
+            .map(|project| project.repositories.clone())
+            .unwrap_or_default();
+        for repository in repositories {
+            let editor = make_single_line_editor("https://github.com/example/repo.git", ctx);
+            editor.update(ctx, |editor, ctx| {
+                editor.set_buffer_text(&repository.git_url, ctx);
+                editor.clear_selections(ctx);
+            });
+            subscribe_project_editor(&editor, ctx);
+            let mapped_node_ids = repository
+                .server_node_ids
+                .into_iter()
+                .filter(|node_id| {
+                    known_ids.contains(node_id) && self.linked_node_ids.contains(node_id)
+                })
+                .collect();
+            self.repositories.push(ProjectRepositoryEditorRow {
+                id: repository.id,
+                git_url_editor: editor,
+                mapped_node_ids,
+                remove_btn_state: MouseStateHandle::default(),
+                server_row_states: (0..self.servers.len())
+                    .map(|_| MouseStateHandle::default())
+                    .collect(),
+            });
+        }
 
         // `set_buffer_text` 默认全选,首次渲染会看到多个输入框同时高亮,逐个清掉。
         for editor in self.all_editors() {
@@ -309,7 +345,6 @@ impl ProjectView {
         };
 
         let name = self.current_text(&self.name_editor.clone(), ctx);
-        let git_url = self.current_text(&self.git_url_editor.clone(), ctx);
         let root_path = self.current_text(&self.root_path_editor.clone(), ctx);
         let rules = self.current_text(&self.rules_editor.clone(), ctx);
         let notes = self.current_text(&self.notes_editor.clone(), ctx);
@@ -323,11 +358,34 @@ impl ProjectView {
             return;
         }
 
+        let mut repositories = Vec::new();
+        let mut seen_git_urls = HashSet::new();
+        for row in &self.repositories {
+            let git_url = self.current_text(&row.git_url_editor, ctx);
+            let git_url = git_url.trim();
+            // 新增后未填写的空行不落库，避免用户必须显式删除才能保存。
+            if git_url.is_empty() {
+                continue;
+            }
+            if !seen_git_urls.insert(git_url.to_owned()) {
+                self.status = Some(StatusBanner::Error(crate::t!(
+                    "project-view-error-duplicate-git-url"
+                )));
+                ctx.notify();
+                return;
+            }
+            repositories.push(ProjectGitRepository {
+                id: row.id.clone(),
+                git_url: git_url.to_owned(),
+                server_node_ids: linked_ids_in_tree_order(&self.servers, &row.mapped_node_ids),
+            });
+        }
+
         // default_profile_id / sort_order 保持已加载值不动(profile 下拉在 M3)。
         let project = Project {
             id: loaded.id.clone(),
             name,
-            git_url: normalize_optional_field(&git_url),
+            repositories,
             root_path: normalize_optional_field(&root_path),
             rules: rules.trim().to_string(),
             notes: notes.trim().to_string(),
@@ -363,12 +421,91 @@ impl ProjectView {
         let Some(row) = self.servers.get(index) else {
             return;
         };
-        if !self.linked_node_ids.remove(&row.node_id) {
-            self.linked_node_ids.insert(row.node_id.clone());
+        let node_id = row.node_id.clone();
+        if !self.linked_node_ids.remove(&node_id) {
+            self.linked_node_ids.insert(node_id);
+        } else {
+            // 仓库映射只能指向项目已关联的服务器。
+            for repository in &mut self.repositories {
+                repository.mapped_node_ids.remove(&node_id);
+            }
         }
         if self.status.is_some() {
             self.status = None;
         }
+        ctx.notify();
+    }
+
+    fn add_repository(&mut self, ctx: &mut ViewContext<Self>) {
+        let editor = make_single_line_editor("https://github.com/example/repo.git", ctx);
+        subscribe_project_editor(&editor, ctx);
+        self.repositories.push(ProjectRepositoryEditorRow {
+            id: Uuid::new_v4().to_string(),
+            git_url_editor: editor.clone(),
+            mapped_node_ids: HashSet::new(),
+            remove_btn_state: MouseStateHandle::default(),
+            server_row_states: (0..self.servers.len())
+                .map(|_| MouseStateHandle::default())
+                .collect(),
+        });
+        self.status = None;
+        ctx.focus(&editor);
+        ctx.notify();
+    }
+
+    fn remove_repository(&mut self, index: usize, ctx: &mut ViewContext<Self>) {
+        if index >= self.repositories.len() {
+            return;
+        }
+        self.repositories.remove(index);
+        self.status = None;
+        ctx.notify();
+    }
+
+    fn toggle_repository_server(
+        &mut self,
+        repository_index: usize,
+        server_index: usize,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let Some(server) = self.servers.get(server_index) else {
+            return;
+        };
+        if !self.linked_node_ids.contains(&server.node_id) {
+            return;
+        }
+        let Some(repository) = self.repositories.get_mut(repository_index) else {
+            return;
+        };
+        if !repository.mapped_node_ids.remove(&server.node_id) {
+            repository.mapped_node_ids.insert(server.node_id.clone());
+        }
+        self.status = None;
+        ctx.notify();
+    }
+
+    fn open_root_path_picker(&mut self, ctx: &mut ViewContext<Self>) {
+        ctx.open_file_picker(
+            |result, ctx| match result {
+                Ok(paths) => {
+                    if let Some(path) = paths.into_iter().next() {
+                        ctx.dispatch_typed_action(&ProjectViewAction::SetRootPath(path));
+                    }
+                }
+                Err(error) => {
+                    log::warn!("project_view: folder picker failed: {error}");
+                }
+            },
+            FilePickerConfiguration::new().folders_only(),
+        );
+    }
+
+    fn set_root_path(&mut self, path: &str, ctx: &mut ViewContext<Self>) {
+        self.root_path_editor.update(ctx, |editor, ctx| {
+            editor.set_buffer_text(path, ctx);
+            editor.clear_selections(ctx);
+        });
+        self.status = None;
         ctx.notify();
     }
 
@@ -443,6 +580,263 @@ impl ProjectView {
                 .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
                 .with_child(self.render_label(label, appearance))
                 .with_child(text_input)
+                .finish(),
+        )
+        .with_margin_bottom(FIELD_BLOCK_MARGIN_BOTTOM)
+        .finish()
+    }
+
+    fn render_repositories_section(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let add_button = appearance
+            .ui_builder()
+            .button(
+                ButtonVariant::Secondary,
+                self.add_repository_btn_state.clone(),
+            )
+            .with_style(UiComponentStyles {
+                height: Some(28.0),
+                font_size: Some(13.0),
+                ..Default::default()
+            })
+            .with_text_label(crate::t!("project-view-add-repository"))
+            .build()
+            .on_click(|ctx, _, _| ctx.dispatch_typed_action(ProjectViewAction::AddRepository))
+            .finish();
+        let heading = Flex::row()
+            .with_main_axis_size(MainAxisSize::Max)
+            .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(self.render_label(
+                &crate::t!("project-view-git-repositories-label"),
+                appearance,
+            ))
+            .with_child(add_button)
+            .finish();
+
+        let mut section = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+        section.add_child(heading);
+        if self.repositories.is_empty() {
+            section.add_child(
+                Container::new(
+                    Text::new_inline(
+                        crate::t!("project-view-no-repositories"),
+                        appearance.ui_font_family(),
+                        appearance.ui_font_size(),
+                    )
+                    .with_color(theme.sub_text_color(theme.background()).into())
+                    .finish(),
+                )
+                .with_uniform_padding(8.0)
+                .finish(),
+            );
+        } else {
+            for (index, repository) in self.repositories.iter().enumerate() {
+                section.add_child(self.render_repository_card(index, repository, appearance));
+            }
+        }
+
+        Container::new(section.finish())
+            .with_margin_bottom(FIELD_BLOCK_MARGIN_BOTTOM)
+            .finish()
+    }
+
+    fn render_repository_card(
+        &self,
+        repository_index: usize,
+        repository: &ProjectRepositoryEditorRow,
+        appearance: &Appearance,
+    ) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let text_input = appearance
+            .ui_builder()
+            .text_input(repository.git_url_editor.clone())
+            .with_style(self.field_input_styles(appearance))
+            .build()
+            .finish();
+        let remove_button = appearance
+            .ui_builder()
+            .button(
+                ButtonVariant::Secondary,
+                repository.remove_btn_state.clone(),
+            )
+            .with_style(UiComponentStyles {
+                height: Some(32.0),
+                font_size: Some(13.0),
+                ..Default::default()
+            })
+            .with_text_label(crate::t!("project-view-remove-repository"))
+            .build()
+            .on_click(move |ctx, _, _| {
+                ctx.dispatch_typed_action(ProjectViewAction::RemoveRepository(repository_index))
+            })
+            .finish();
+        let url_row = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_spacing(6.0)
+            .with_child(Shrinkable::new(1.0, text_input).finish())
+            .with_child(remove_button)
+            .finish();
+
+        let mut card = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+        card.add_child(self.render_label(&crate::t!("project-view-git-url-label"), appearance));
+        card.add_child(url_row);
+        card.add_child(
+            Container::new(
+                self.render_label(&crate::t!("project-view-repository-servers"), appearance),
+            )
+            .with_margin_top(6.0)
+            .finish(),
+        );
+
+        let mut has_linked_server = false;
+        for (server_index, server) in self.servers.iter().enumerate() {
+            if !self.linked_node_ids.contains(&server.node_id) {
+                continue;
+            }
+            has_linked_server = true;
+            card.add_child(self.render_repository_server_row(
+                repository_index,
+                server_index,
+                server,
+                repository,
+                appearance,
+            ));
+        }
+        if !has_linked_server {
+            card.add_child(
+                Container::new(
+                    Text::new_inline(
+                        crate::t!("project-view-repository-no-linked-servers"),
+                        appearance.ui_font_family(),
+                        12.0,
+                    )
+                    .with_color(theme.sub_text_color(theme.surface_2()).into())
+                    .finish(),
+                )
+                .with_uniform_padding(6.0)
+                .finish(),
+            );
+        }
+
+        Container::new(
+            Container::new(card.finish())
+                .with_uniform_padding(10.0)
+                .with_background(theme.surface_2())
+                .with_border(Border::all(1.0).with_border_fill(internal_colors::neutral_3(theme)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.0)))
+                .finish(),
+        )
+        .with_margin_bottom(8.0)
+        .finish()
+    }
+
+    fn render_repository_server_row(
+        &self,
+        repository_index: usize,
+        server_index: usize,
+        server: &ProjectServerRow,
+        repository: &ProjectRepositoryEditorRow,
+        appearance: &Appearance,
+    ) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let is_mapped = repository.mapped_node_ids.contains(&server.node_id);
+        let check_el: Box<dyn Element> = if is_mapped {
+            ConstrainedBox::new(
+                crate::ui_components::icons::Icon::Check
+                    .to_warpui_icon(theme.accent())
+                    .finish(),
+            )
+            .with_width(SERVER_ROW_CHECK_SIZE)
+            .with_height(SERVER_ROW_CHECK_SIZE)
+            .finish()
+        } else {
+            ConstrainedBox::new(warpui::elements::Empty::new().finish())
+                .with_width(SERVER_ROW_CHECK_SIZE)
+                .with_height(SERVER_ROW_CHECK_SIZE)
+                .finish()
+        };
+        let name = Text::new_inline(
+            server.name.clone(),
+            appearance.ui_font_family(),
+            appearance.ui_font_size(),
+        )
+        .with_color(theme.main_text_color(theme.background()).into())
+        .finish();
+        let subtitle = Text::new_inline(
+            server_row_subtitle(&server.username, &server.host, server.port),
+            appearance.ui_font_family(),
+            12.0,
+        )
+        .with_color(theme.sub_text_color(theme.background()).into())
+        .finish();
+        let content = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_spacing(8.0)
+            .with_child(check_el)
+            .with_child(name)
+            .with_child(subtitle)
+            .finish();
+        let state = repository
+            .server_row_states
+            .get(server_index)
+            .cloned()
+            .unwrap_or_default();
+        Hoverable::new(state, move |mouse| {
+            let mut container = Container::new(content)
+                .with_uniform_padding(6.0)
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.0)));
+            if mouse.is_hovered() {
+                container = container.with_background(internal_colors::fg_overlay_2(theme));
+            }
+            container.finish()
+        })
+        .with_cursor(Cursor::PointingHand)
+        .on_click(move |ctx, _, _| {
+            ctx.dispatch_typed_action(ProjectViewAction::ToggleRepositoryServer {
+                repository_index,
+                server_index,
+            });
+        })
+        .finish()
+    }
+
+    fn render_root_path_field(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let text_input = appearance
+            .ui_builder()
+            .text_input(self.root_path_editor.clone())
+            .with_style(self.field_input_styles(appearance))
+            .build()
+            .finish();
+        let picker_button = appearance
+            .ui_builder()
+            .button(
+                ButtonVariant::Secondary,
+                self.root_path_picker_btn_state.clone(),
+            )
+            .with_style(UiComponentStyles {
+                height: Some(32.0),
+                font_size: Some(13.0),
+                ..Default::default()
+            })
+            .with_text_label(crate::t!("project-view-choose-folder"))
+            .build()
+            .on_click(|ctx, _, _| ctx.dispatch_typed_action(ProjectViewAction::OpenRootPathPicker))
+            .finish();
+        let row = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_spacing(6.0)
+            .with_child(Shrinkable::new(1.0, text_input).finish())
+            .with_child(picker_button)
+            .finish();
+
+        Container::new(
+            Flex::column()
+                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+                .with_child(
+                    self.render_label(&crate::t!("project-view-root-path-label"), appearance),
+                )
+                .with_child(row)
                 .finish(),
         )
         .with_margin_bottom(FIELD_BLOCK_MARGIN_BOTTOM)
@@ -697,6 +1091,29 @@ impl ProjectView {
     }
 }
 
+/// 统一处理固定字段和动态仓库 URL 编辑器的状态/selection 联动。
+fn subscribe_project_editor(editor: &ViewHandle<EditorView>, ctx: &mut ViewContext<ProjectView>) {
+    ctx.subscribe_to_view(editor, |me, source, event, ctx| match event {
+        EditorEvent::Edited(_) | EditorEvent::Enter => {
+            if me.status.is_some() {
+                me.status = None;
+                ctx.notify();
+            }
+        }
+        EditorEvent::Blurred => {
+            source.update(ctx, |editor, ctx| editor.clear_selections(ctx));
+            if me.status.is_some() {
+                me.status = None;
+                ctx.notify();
+            }
+        }
+        EditorEvent::Focused | EditorEvent::ClearParentSelections => {
+            me.clear_other_editors_selections(&source, ctx);
+        }
+        _ => {}
+    });
+}
+
 fn make_single_line_editor(
     placeholder: &str,
     ctx: &mut ViewContext<ProjectView>,
@@ -800,6 +1217,14 @@ impl TypedActionView for ProjectView {
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
             ProjectViewAction::Save => self.on_save(ctx),
+            ProjectViewAction::OpenRootPathPicker => self.open_root_path_picker(ctx),
+            ProjectViewAction::SetRootPath(path) => self.set_root_path(path, ctx),
+            ProjectViewAction::AddRepository => self.add_repository(ctx),
+            ProjectViewAction::RemoveRepository(index) => self.remove_repository(*index, ctx),
+            ProjectViewAction::ToggleRepositoryServer {
+                repository_index,
+                server_index,
+            } => self.toggle_repository_server(*repository_index, *server_index, ctx),
             ProjectViewAction::ToggleServer(index) => self.on_toggle_server(*index, ctx),
             ProjectViewAction::OpenDeleteConfirmation => {
                 self.show_delete_confirmation = true;
@@ -881,16 +1306,8 @@ impl View for ProjectView {
             &self.name_editor,
             appearance,
         ));
-        col.add_child(self.render_text_field(
-            &crate::t!("project-view-git-url-label"),
-            &self.git_url_editor,
-            appearance,
-        ));
-        col.add_child(self.render_text_field(
-            &crate::t!("project-view-root-path-label"),
-            &self.root_path_editor,
-            appearance,
-        ));
+        col.add_child(self.render_repositories_section(appearance));
+        col.add_child(self.render_root_path_field(appearance));
         col.add_child(self.render_multiline_field(
             &crate::t!("project-view-rules-label"),
             &self.rules_editor,

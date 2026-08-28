@@ -262,7 +262,6 @@ fn empty_agent_conversation_data_for_test() -> AgentConversationData {
         byop_repair_state_json: None,
         cli_subagent_block_snapshots_json: None,
         project_id: None,
-        project_host_node_id: None,
     }
 }
 
@@ -9573,4 +9572,19 @@ fn saved_ssh_route_command_detection_only_matches_ssh_executable() {
     assert!(super::is_ssh_route_command("  ssh -p 2222 host"));
     assert!(!super::is_ssh_route_command("sshpass ssh host"));
     assert!(!super::is_ssh_route_command("echo ssh host"));
+}
+
+#[test]
+fn deferred_ssh_agent_entry_waits_for_remote_bootstrap_and_preserves_origin() {
+    let mut pending = Some(AgentViewEntryOrigin::DefaultSessionMode);
+    assert_eq!(
+        take_deferred_ssh_agent_entry_origin(&mut pending, false),
+        None
+    );
+    assert_eq!(pending, Some(AgentViewEntryOrigin::DefaultSessionMode));
+    assert_eq!(
+        take_deferred_ssh_agent_entry_origin(&mut pending, true),
+        Some(AgentViewEntryOrigin::DefaultSessionMode)
+    );
+    assert_eq!(pending, None);
 }

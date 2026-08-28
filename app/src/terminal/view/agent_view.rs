@@ -248,14 +248,14 @@ impl TerminalView {
             controller.try_enter_agent_view(conversation_id, origin.clone(), ctx)
         })?;
 
-        // Zap:「从项目发起 Agent 对话」入口暂存的绑定,在新会话创建成功后
-        // 写入会话数据(仅入口 UX / 历史过滤;上下文注入走会话推断链路)。
+        // 「从项目发起 Agent 对话」入口暂存的绑定,在新会话创建成功后
+        // 写入会话数据；后续请求据此加载完整项目上下文。
         // 复用已有会话时不消费,避免把绑定误写到旧会话上。
         if is_new_conversation {
-            if let Some((project_id, project_host_node_id)) = self.pending_project_binding.take() {
+            if let Some(project_id) = self.pending_project_binding.take() {
                 BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, _| {
                     if let Some(conversation) = history.conversation_mut(&conversation_id) {
-                        conversation.set_project_binding(project_id, project_host_node_id);
+                        conversation.set_project_binding(project_id);
                     }
                 });
             }

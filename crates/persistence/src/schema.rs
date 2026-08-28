@@ -197,6 +197,23 @@ diesel::table! {
 }
 
 diesel::table! {
+    infinishell_project_repositories (id) {
+        id -> Text,
+        project_id -> Text,
+        git_url -> Text,
+        sort_order -> Integer,
+    }
+}
+
+diesel::table! {
+    infinishell_project_repository_servers (repository_id, node_id) {
+        repository_id -> Text,
+        node_id -> Text,
+        sort_order -> Integer,
+    }
+}
+
+diesel::table! {
     infinishell_project_servers (project_id, node_id) {
         project_id -> Text,
         node_id -> Text,
@@ -599,6 +616,8 @@ diesel::table! {
 diesel::joinable!(ambient_agent_panes -> pane_nodes (id));
 diesel::joinable!(app -> windows (active_window_id));
 diesel::joinable!(code_pane_tabs -> code_panes (code_pane_id));
+diesel::joinable!(infinishell_project_repositories -> infinishell_projects (project_id));
+diesel::joinable!(infinishell_project_repository_servers -> infinishell_project_repositories (repository_id));
 diesel::joinable!(infinishell_project_servers -> infinishell_projects (project_id));
 diesel::joinable!(object_permissions -> object_metadata (object_metadata_id));
 diesel::joinable!(pane_branches -> pane_nodes (pane_node_id));
@@ -628,7 +647,12 @@ diesel::allow_tables_to_appear_in_same_query!(
     windows,
 );
 diesel::allow_tables_to_appear_in_same_query!(code_pane_tabs, code_panes,);
-diesel::allow_tables_to_appear_in_same_query!(infinishell_project_servers, infinishell_projects,);
+diesel::allow_tables_to_appear_in_same_query!(
+    infinishell_project_repositories,
+    infinishell_project_repository_servers,
+    infinishell_project_servers,
+    infinishell_projects,
+);
 diesel::allow_tables_to_appear_in_same_query!(object_metadata, object_permissions,);
 diesel::allow_tables_to_appear_in_same_query!(
     ssh_nodes,

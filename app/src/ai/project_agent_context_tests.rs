@@ -1,20 +1,12 @@
-use anyhow::anyhow;
 use chrono::NaiveDateTime;
 
 use super::*;
-
-fn ssh_info() -> InteractiveSshCommand {
-    InteractiveSshCommand {
-        host: Some("root@Web-01".to_owned()),
-        port: None,
-    }
-}
 
 fn project(id: &str, name: &str) -> Project {
     Project {
         id: id.to_owned(),
         name: name.to_owned(),
-        git_url: None,
+        repositories: Vec::new(),
         root_path: None,
         rules: String::new(),
         notes: String::new(),
@@ -43,169 +35,24 @@ fn record(id: &str, host_node_ids: &[&str]) -> ProjectRecord {
 }
 
 #[test]
-fn disabled_or_non_legacy_session_skips_loading() {
-    let info = ssh_info();
-    for (enabled, is_legacy_ssh) in [(false, true), (true, false)] {
-        assert_eq!(
-            load_with(
-                enabled,
-                is_legacy_ssh,
-                Some(&info),
-                |_host, _port| -> anyhow::Result<Option<String>> {
-                    panic!("gated sessions must not access the database")
-                },
-                |_node_id| -> anyhow::Result<Vec<ProjectRecord>> {
-                    panic!("gated sessions must not access the database")
-                },
-                |_node_ids| panic!("gated sessions must not access the database"),
-            ),
-            None
-        );
-    }
+fn conversation_without_explicit_project_binding_returns_none() {
+    assert_eq!(load_for_conversation(None), None);
 }
 
 #[test]
-fn missing_connection_info_or_unmatched_node_returns_none() {
-    assert_eq!(
-        load_with(
-            true,
-            true,
-            None,
-            |_host, _port| -> anyhow::Result<Option<String>> {
-                panic!("missing connection info must not access the database")
-            },
-            |_node_id| -> anyhow::Result<Vec<ProjectRecord>> {
-                panic!("missing connection info must not access the database")
-            },
-            |_node_ids| Vec::new(),
-        ),
-        None
-    );
+fn project_context_keeps_all_hosts() {
+    let context = context_from_record(record("p1", &["node-1", "node-2"]), |node_ids| {
+        hosts_from_lookup(node_ids, |node_id| Some(host_info(node_id)))
+    });
 
-    let info = ssh_info();
     assert_eq!(
-        load_with(
-            true,
-            true,
-            Some(&info),
-            |_host, _port| Ok::<_, anyhow::Error>(None),
-            |_node_id| -> anyhow::Result<Vec<ProjectRecord>> {
-                panic!("unmatched host must not load projects")
-            },
-            |_node_ids| Vec::new(),
-        ),
-        None
-    );
-}
-
-#[test]
-fn node_lookup_normalizes_host_and_defaults_port() {
-    let info = ssh_info();
-    let mut seen = None;
-    load_with(
-        true,
-        true,
-        Some(&info),
-        |host, port| {
-            seen = Some((host.to_owned(), port));
-            Ok::<_, anyhow::Error>(None)
-        },
-        |_node_id| Ok::<_, anyhow::Error>(Vec::new()),
-        |_node_ids| Vec::new(),
-    );
-    assert_eq!(seen, Some(("web-01".to_owned(), 22)));
-}
-
-#[test]
-fn database_errors_degrade_to_none() {
-    let info = ssh_info();
-    assert_eq!(
-        load_with(
-            true,
-            true,
-            Some(&info),
-            |_host, _port| Err::<Option<String>, _>(anyhow!("no such table: ssh_servers")),
-            |_node_id| Ok::<_, anyhow::Error>(Vec::new()),
-            |_node_ids| Vec::new(),
-        ),
-        None
-    );
-    assert_eq!(
-        load_with(
-            true,
-            true,
-            Some(&info),
-            |_host, _port| Ok::<_, anyhow::Error>(Some("node-1".to_owned())),
-            |_node_id| Err::<Vec<ProjectRecord>, _>(anyhow!("no such table: infinishell_projects")),
-            |_node_ids| Vec::new(),
-        ),
-        None
-    );
-}
-
-#[test]
-fn no_projects_for_node_returns_none() {
-    let info = ssh_info();
-    assert_eq!(
-        load_with(
-            true,
-            true,
-            Some(&info),
-            |_host, _port| Ok::<_, anyhow::Error>(Some("node-1".to_owned())),
-            |_node_id| Ok::<_, anyhow::Error>(Vec::new()),
-            |_node_ids| Vec::new(),
-        ),
-        None
-    );
-}
-
-#[test]
-fn loads_projects_with_current_host_node_id() {
-    let info = ssh_info();
-    let context = load_with(
-        true,
-        true,
-        Some(&info),
-        |_host, _port| Ok::<_, anyhow::Error>(Some("node-1".to_owned())),
-        |node_id| {
-            assert_eq!(node_id, "node-1");
-            Ok::<_, anyhow::Error>(vec![record("p1", &["node-1", "node-2"])])
-        },
-        |node_ids| hosts_from_lookup(node_ids, |node_id| Some(host_info(node_id))),
-    )
-    .unwrap();
-
-    assert_eq!(context.current_host_node_id, "node-1");
-    assert_eq!(context.projects.len(), 1);
-    let entry = &context.projects[0];
-    assert_eq!(entry.project_id, "p1");
-    assert_eq!(
-        entry
+        context.projects[0]
             .hosts
             .iter()
             .map(|host| host.node_id.as_str())
             .collect::<Vec<_>>(),
         vec!["node-1", "node-2"]
     );
-}
-
-#[test]
-fn projects_are_capped() {
-    let info = ssh_info();
-    let records = (0..PROJECTS_MAX + 2)
-        .map(|index| record(&format!("p{index}"), &[]))
-        .collect::<Vec<_>>();
-    let context = load_with(
-        true,
-        true,
-        Some(&info),
-        |_host, _port| Ok::<_, anyhow::Error>(Some("node-1".to_owned())),
-        |_node_id| Ok::<_, anyhow::Error>(records),
-        |_node_ids| Vec::new(),
-    )
-    .unwrap();
-    assert_eq!(context.projects.len(), PROJECTS_MAX);
-    assert_eq!(context.projects[0].project_id, "p0");
 }
 
 #[test]
@@ -224,6 +71,25 @@ fn dangling_host_references_are_filtered() {
             .map(|host| host.node_id.as_str())
             .collect::<Vec<_>>(),
         vec!["live", "live-2"]
+    );
+}
+
+#[test]
+fn repository_mappings_are_filtered_to_resolved_project_hosts() {
+    let mut project = project("p1", "demo");
+    project.repositories = vec![infinishell_projects::ProjectGitRepository {
+        id: "repo-1".to_owned(),
+        git_url: "git@example.com:demo.git".to_owned(),
+        server_node_ids: vec!["node-1".to_owned(), "dangling".to_owned()],
+    }];
+
+    let entry = build_entry(project, vec![host_info("node-1")]);
+    assert_eq!(
+        entry.repositories,
+        vec![ProjectRepositoryInfo {
+            git_url: "git@example.com:demo.git".to_owned(),
+            server_node_ids: vec!["node-1".to_owned()],
+        }]
     );
 }
 
@@ -260,26 +126,4 @@ fn hosts_are_capped_per_project() {
     let entry = build_entry(project("p1", "p1"), hosts);
     assert_eq!(entry.hosts.len(), HOSTS_MAX_PER_PROJECT);
     assert_eq!(entry.hosts[0].node_id, "node-0");
-}
-
-#[test]
-fn normalize_host_port_parses_port_and_defaults_to_22() {
-    assert_eq!(
-        normalize_host_port(&InteractiveSshCommand {
-            host: Some("root@Web-01".to_owned()),
-            port: Some("2222".to_owned()),
-        }),
-        Some(("web-01".to_owned(), 2222))
-    );
-    assert_eq!(
-        normalize_host_port(&ssh_info()),
-        Some(("web-01".to_owned(), 22))
-    );
-    assert_eq!(
-        normalize_host_port(&InteractiveSshCommand {
-            host: None,
-            port: Some("2222".to_owned()),
-        }),
-        None
-    );
 }

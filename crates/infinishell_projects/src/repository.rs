@@ -1,21 +1,28 @@
-//! Diesel CRUD over `infinishell_projects` + `infinishell_project_servers`。返回的全部是
+//! Diesel CRUD over `infinishell_projects`、项目仓库及服务器关联表。返回的全部是
 //! `crate::types` 里的 plain 数据结构,把 ORM 细节挡在 crate 边界内。
 //!
 //! 与 `warp_ssh_manager::SshRepository` 同款约定:每个方法接受
 //! `&mut SqliteConnection`,事务边界由调用方决定。
+
+use std::collections::HashSet;
 
 use chrono::Utc;
 use diesel::prelude::*;
 use diesel::result::Error as DieselError;
 use diesel::sqlite::SqliteConnection;
 use persistence::model::{
-    InfiniShellProjectRow, NewInfiniShellProject, NewInfiniShellProjectServer,
+    InfiniShellProjectRepositoryRow, InfiniShellProjectRow, NewInfiniShellProject,
+    NewInfiniShellProjectRepository, NewInfiniShellProjectRepositoryServer,
+    NewInfiniShellProjectServer,
 };
-use persistence::schema::{infinishell_project_servers, infinishell_projects};
+use persistence::schema::{
+    infinishell_project_repositories, infinishell_project_repository_servers,
+    infinishell_project_servers, infinishell_projects,
+};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::types::Project;
+use crate::types::{Project, ProjectGitRepository};
 
 #[derive(Debug, Error)]
 pub enum ProjectRepositoryError {
@@ -38,7 +45,12 @@ impl ProjectRepository {
                 infinishell_projects::created_at.asc(),
             ))
             .load(conn)?;
-        Ok(rows.into_iter().map(project_from_row).collect())
+        let mut projects = Vec::with_capacity(rows.len());
+        for row in rows {
+            let repositories = Self::repositories_for_project(conn, &row.id)?;
+            projects.push(project_from_row(row, repositories));
+        }
+        Ok(projects)
     }
 
     pub fn get(
@@ -50,7 +62,11 @@ impl ProjectRepository {
             .filter(infinishell_projects::deleted_at.is_null())
             .first(conn)
             .optional()?;
-        Ok(row.map(project_from_row))
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let repositories = Self::repositories_for_project(conn, &row.id)?;
+        Ok(Some(project_from_row(row, repositories)))
     }
 
     /// 新建项目,sort_order 追加到当前最大 +1。
@@ -75,35 +91,41 @@ impl ProjectRepository {
         Self::get(conn, &id)?.ok_or_else(|| ProjectRepositoryError::NotFound(id))
     }
 
-    /// 整体更新项目字段(不含 sort_order 之外的排序语义),updated_at 取当前时间。
+    /// 整体更新项目字段与 Git 仓库映射,updated_at 取当前时间。
     pub fn update(
         conn: &mut SqliteConnection,
         project: &Project,
     ) -> Result<(), ProjectRepositoryError> {
-        let now = Utc::now().naive_utc();
-        let affected = diesel::update(
-            infinishell_projects::table
-                .find(&project.id)
-                .filter(infinishell_projects::deleted_at.is_null()),
-        )
-        .set((
-            infinishell_projects::name.eq(&project.name),
-            infinishell_projects::git_url.eq(project.git_url.as_deref()),
-            infinishell_projects::root_path.eq(project.root_path.as_deref()),
-            infinishell_projects::rules.eq(&project.rules),
-            infinishell_projects::notes.eq(&project.notes),
-            infinishell_projects::default_profile_id.eq(project.default_profile_id.as_deref()),
-            infinishell_projects::sort_order.eq(project.sort_order),
-            infinishell_projects::updated_at.eq(now),
-        ))
-        .execute(conn)?;
-        if affected == 0 {
-            return Err(ProjectRepositoryError::NotFound(project.id.clone()));
-        }
-        Ok(())
+        conn.transaction::<_, ProjectRepositoryError, _>(|conn| {
+            let now = Utc::now().naive_utc();
+            let legacy_git_url = project
+                .repositories
+                .first()
+                .map(|repository| repository.git_url.as_str());
+            let affected = diesel::update(
+                infinishell_projects::table
+                    .find(&project.id)
+                    .filter(infinishell_projects::deleted_at.is_null()),
+            )
+            .set((
+                infinishell_projects::name.eq(&project.name),
+                infinishell_projects::git_url.eq(legacy_git_url),
+                infinishell_projects::root_path.eq(project.root_path.as_deref()),
+                infinishell_projects::rules.eq(&project.rules),
+                infinishell_projects::notes.eq(&project.notes),
+                infinishell_projects::default_profile_id.eq(project.default_profile_id.as_deref()),
+                infinishell_projects::sort_order.eq(project.sort_order),
+                infinishell_projects::updated_at.eq(now),
+            ))
+            .execute(conn)?;
+            if affected == 0 {
+                return Err(ProjectRepositoryError::NotFound(project.id.clone()));
+            }
+            replace_repositories(conn, &project.id, &project.repositories)
+        })
     }
 
-    /// 软删项目并清空其服务器关联(关联无 tombstone 需求,直接硬删)。
+    /// 软删项目并清空其服务器/仓库关联(关联无 tombstone 需求,直接硬删)。
     pub fn soft_delete(
         conn: &mut SqliteConnection,
         project_id: &str,
@@ -119,12 +141,59 @@ impl ProjectRepository {
         if affected == 0 {
             return Err(ProjectRepositoryError::NotFound(project_id.to_string()));
         }
+        delete_repositories(conn, project_id)?;
         diesel::delete(
             infinishell_project_servers::table
                 .filter(infinishell_project_servers::project_id.eq(project_id)),
         )
         .execute(conn)?;
         Ok(())
+    }
+
+    /// 覆盖式设置项目仓库及其服务器映射。仓库和映射顺序均按切片顺序保存。
+    pub fn set_repositories(
+        conn: &mut SqliteConnection,
+        project_id: &str,
+        repositories: &[ProjectGitRepository],
+    ) -> Result<(), ProjectRepositoryError> {
+        conn.transaction::<_, ProjectRepositoryError, _>(|conn| {
+            if !project_exists(conn, project_id)? {
+                return Err(ProjectRepositoryError::NotFound(project_id.to_string()));
+            }
+            replace_repositories(conn, project_id, repositories)?;
+            let legacy_git_url = repositories
+                .first()
+                .map(|repository| repository.git_url.as_str());
+            diesel::update(infinishell_projects::table.find(project_id))
+                .set(infinishell_projects::git_url.eq(legacy_git_url))
+                .execute(conn)?;
+            Ok(())
+        })
+    }
+
+    /// 项目的 Git 仓库列表及每个仓库的服务器映射。
+    pub fn repositories_for_project(
+        conn: &mut SqliteConnection,
+        project_id: &str,
+    ) -> Result<Vec<ProjectGitRepository>, ProjectRepositoryError> {
+        let rows: Vec<InfiniShellProjectRepositoryRow> = infinishell_project_repositories::table
+            .filter(infinishell_project_repositories::project_id.eq(project_id))
+            .order(infinishell_project_repositories::sort_order.asc())
+            .load(conn)?;
+        let mut repositories = Vec::with_capacity(rows.len());
+        for row in rows {
+            let server_node_ids = infinishell_project_repository_servers::table
+                .filter(infinishell_project_repository_servers::repository_id.eq(&row.id))
+                .order(infinishell_project_repository_servers::sort_order.asc())
+                .select(infinishell_project_repository_servers::node_id)
+                .load(conn)?;
+            repositories.push(ProjectGitRepository {
+                id: row.id,
+                git_url: row.git_url,
+                server_node_ids,
+            });
+        }
+        Ok(repositories)
     }
 
     /// 覆盖式设置项目的服务器关联,顺序即 node_ids 的顺序。
@@ -186,11 +255,14 @@ impl ProjectRepository {
     }
 }
 
-fn project_from_row(row: InfiniShellProjectRow) -> Project {
+fn project_from_row(
+    row: InfiniShellProjectRow,
+    repositories: Vec<ProjectGitRepository>,
+) -> Project {
     Project {
         id: row.id,
         name: row.name,
-        git_url: row.git_url,
+        repositories,
         root_path: row.root_path,
         rules: row.rules,
         notes: row.notes,
@@ -199,6 +271,83 @@ fn project_from_row(row: InfiniShellProjectRow) -> Project {
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
+}
+
+fn project_exists(
+    conn: &mut SqliteConnection,
+    project_id: &str,
+) -> Result<bool, ProjectRepositoryError> {
+    Ok(infinishell_projects::table
+        .find(project_id)
+        .filter(infinishell_projects::deleted_at.is_null())
+        .select(infinishell_projects::id)
+        .first::<String>(conn)
+        .optional()?
+        .is_some())
+}
+
+fn replace_repositories(
+    conn: &mut SqliteConnection,
+    project_id: &str,
+    repositories: &[ProjectGitRepository],
+) -> Result<(), ProjectRepositoryError> {
+    delete_repositories(conn, project_id)?;
+
+    let repository_values = repositories
+        .iter()
+        .enumerate()
+        .map(|(index, repository)| NewInfiniShellProjectRepository {
+            id: &repository.id,
+            project_id,
+            git_url: &repository.git_url,
+            sort_order: index as i32,
+        })
+        .collect::<Vec<_>>();
+    diesel::insert_into(infinishell_project_repositories::table)
+        .values(&repository_values)
+        .execute(conn)?;
+
+    let mut mapping_values = Vec::new();
+    for repository in repositories {
+        let mut seen = HashSet::new();
+        for node_id in &repository.server_node_ids {
+            if seen.insert(node_id) {
+                mapping_values.push(NewInfiniShellProjectRepositoryServer {
+                    repository_id: &repository.id,
+                    node_id,
+                    sort_order: (seen.len() - 1) as i32,
+                });
+            }
+        }
+    }
+    diesel::insert_into(infinishell_project_repository_servers::table)
+        .values(&mapping_values)
+        .execute(conn)?;
+    Ok(())
+}
+
+fn delete_repositories(
+    conn: &mut SqliteConnection,
+    project_id: &str,
+) -> Result<(), ProjectRepositoryError> {
+    let repository_ids = infinishell_project_repositories::table
+        .filter(infinishell_project_repositories::project_id.eq(project_id))
+        .select(infinishell_project_repositories::id)
+        .load::<String>(conn)?;
+    if !repository_ids.is_empty() {
+        diesel::delete(
+            infinishell_project_repository_servers::table.filter(
+                infinishell_project_repository_servers::repository_id.eq_any(&repository_ids),
+            ),
+        )
+        .execute(conn)?;
+    }
+    diesel::delete(
+        infinishell_project_repositories::table
+            .filter(infinishell_project_repositories::project_id.eq(project_id)),
+    )
+    .execute(conn)?;
+    Ok(())
 }
 
 fn next_sort_order(conn: &mut SqliteConnection) -> Result<i32, ProjectRepositoryError> {
@@ -220,6 +369,10 @@ pub(crate) fn setup_in_memory() -> SqliteConnection {
     .unwrap();
     conn.batch_execute(include_str!(
         "../../persistence/migrations/2026-08-20-000000_rename_zap_projects_to_infinishell/up.sql"
+    ))
+    .unwrap();
+    conn.batch_execute(include_str!(
+        "../../persistence/migrations/2026-08-26-000000_add_infinishell_project_repositories/up.sql"
     ))
     .unwrap();
     conn

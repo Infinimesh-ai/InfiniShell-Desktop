@@ -1,20 +1,13 @@
-//! 项目级 Agent 上下文加载 — 会话推断(session inference)链路。
+//! 项目级 Agent 上下文加载。
 //!
-//! 与 `machine_memory` 同款决策:legacy SSH 会话解析出 host+port 后反查 SSH
-//! 管理器节点,再经项目↔服务器关联拿到该主机所属项目,把项目规则/备注/主机
-//! 清单注入 system prompt(渲染见 `chat_stream::render_project_context_block`)。
-//! 显式会话绑定(会话落库的 `project_id`)只服务历史过滤/入口 UX,不参与
-//! 这里的上下文加载。
+//! 只有从项目入口创建、显式绑定 `project_id` 的会话才会加载项目规则、
+//! 仓库映射和主机清单。普通 SSH 会话不会反向推断所属项目。
 
 use std::collections::HashMap;
-use std::fmt::Display;
 
 use infinishell_projects::{Project, ProjectRepository};
 use warp_core::features::FeatureFlag;
 use warp_ssh_manager::SshRepository;
-
-use crate::ai::blocklist::SessionContext;
-use crate::terminal::ssh::util::InteractiveSshCommand;
 
 /// 项目规则注入上限(Unicode 字符),超出截断并追加 [`TRUNCATION_MARKER`]。
 pub const RULES_MAX_CHARS: usize = 8_000;
@@ -22,8 +15,8 @@ pub const RULES_MAX_CHARS: usize = 8_000;
 pub const NOTES_MAX_CHARS: usize = 2_000;
 /// 单项目主机清单条数上限,防止巨型项目撑爆 prompt。
 pub const HOSTS_MAX_PER_PROJECT: usize = 50;
-/// 注入项目数上限:一台主机同属多项目时只取排序靠前的若干个。
-pub const PROJECTS_MAX: usize = 5;
+/// 单项目仓库清单条数上限。
+pub const REPOSITORIES_MAX_PER_PROJECT: usize = 50;
 /// 截断标记,追加在被截断的规则/备注末尾。
 const TRUNCATION_MARKER: &str = "…(截断)";
 
@@ -38,12 +31,19 @@ pub struct ProjectHostInfo {
     pub username: String,
 }
 
+/// Git 仓库及其有效服务器映射。
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProjectRepositoryInfo {
+    pub git_url: String,
+    pub server_node_ids: Vec<String>,
+}
+
 /// 单个项目注入 prompt 的内容,rules/notes 已按上限截断。
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProjectContextEntry {
     pub project_id: String,
     pub name: String,
-    pub git_url: Option<String>,
+    pub repositories: Vec<ProjectRepositoryInfo>,
     pub rules: String,
     pub notes: String,
     pub hosts: Vec<ProjectHostInfo>,
@@ -53,8 +53,6 @@ pub struct ProjectContextEntry {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProjectAgentContext {
     pub projects: Vec<ProjectContextEntry>,
-    /// 会话所在主机对应的 SSH 节点 id(host+port 反查所得)。
-    pub current_host_node_id: String,
 }
 
 /// 数据库层取出的单项目原始记录,主机引用尚未解析/过滤。
@@ -63,37 +61,35 @@ struct ProjectRecord {
     host_node_ids: Vec<String>,
 }
 
-/// 仅为可定位主机的 legacy SSH 会话加载项目上下文。
-pub fn load_for_session(session_context: &SessionContext) -> Option<ProjectAgentContext> {
-    load_with(
-        FeatureFlag::InfiniShellProjects.is_enabled(),
-        session_context.is_legacy_ssh(),
-        session_context.ssh_connection_info(),
-        |host, port| {
-            warp_ssh_manager::with_conn(|conn| {
-                Ok(SshRepository::find_server_node_by_host_port(
-                    conn, host, port,
-                )?)
-            })
-        },
-        |node_id| {
-            infinishell_projects::with_conn(|conn| {
-                let mut records = Vec::new();
-                for project_id in ProjectRepository::projects_for_node(conn, node_id)? {
-                    let Some(project) = ProjectRepository::get(conn, &project_id)? else {
-                        continue;
-                    };
-                    let host_node_ids = ProjectRepository::servers_for_project(conn, &project_id)?;
-                    records.push(ProjectRecord {
-                        project,
-                        host_node_ids,
-                    });
-                }
-                Ok(records)
-            })
-        },
-        resolve_hosts_from_ssh_manager,
-    )
+/// 仅使用会话显式绑定的项目，不从终端/SSH 会话推断。
+pub fn load_for_conversation(explicit_project_id: Option<&str>) -> Option<ProjectAgentContext> {
+    let project_id = explicit_project_id?;
+    if !FeatureFlag::InfiniShellProjects.is_enabled() {
+        return None;
+    }
+    load_explicit_project(project_id)
+}
+
+fn load_explicit_project(project_id: &str) -> Option<ProjectAgentContext> {
+    let record = match infinishell_projects::with_conn(|conn| {
+        let Some(project) = ProjectRepository::get(conn, project_id)? else {
+            return Ok(None);
+        };
+        let host_node_ids = ProjectRepository::servers_for_project(conn, project_id)?;
+        Ok(Some(ProjectRecord {
+            project,
+            host_node_ids,
+        }))
+    }) {
+        Ok(Some(record)) => record,
+        Ok(None) => return None,
+        Err(err) => {
+            log::warn!("explicit project context load failed for project {project_id}: {err}");
+            return None;
+        }
+    };
+
+    Some(context_from_record(record, resolve_hosts_from_ssh_manager))
 }
 
 /// 从 SSH 管理器解析主机清单;节点/服务器详情缺失(悬挂引用)直接跳过,
@@ -134,63 +130,16 @@ fn resolve_hosts_from_ssh_manager(node_ids: &[String]) -> Vec<ProjectHostInfo> {
     }
 }
 
-/// 可测试的纯核心:gating + 主机定位 + 项目装配。
-fn load_with<E>(
-    enabled: bool,
-    is_legacy_ssh: bool,
-    ssh_connection_info: Option<&InteractiveSshCommand>,
-    find_node: impl FnOnce(&str, u16) -> Result<Option<String>, E>,
-    load_projects: impl FnOnce(&str) -> Result<Vec<ProjectRecord>, E>,
+fn context_from_record(
+    record: ProjectRecord,
     resolve_hosts: impl Fn(&[String]) -> Vec<ProjectHostInfo>,
-) -> Option<ProjectAgentContext>
-where
-    E: Display,
-{
-    if !enabled || !is_legacy_ssh {
-        return None;
+) -> ProjectAgentContext {
+    ProjectAgentContext {
+        projects: vec![build_entry(
+            record.project,
+            resolve_hosts(&record.host_node_ids),
+        )],
     }
-
-    let info = ssh_connection_info?;
-    let (host, port) = normalize_host_port(info)?;
-    let node_id = match find_node(&host, port) {
-        Ok(Some(node_id)) => node_id,
-        Ok(None) => return None,
-        Err(err) => {
-            log::warn!("project context node lookup failed for {host}:{port}: {err}");
-            return None;
-        }
-    };
-    let records = match load_projects(&node_id) {
-        Ok(records) => records,
-        Err(err) => {
-            log::warn!("project context load failed for node {node_id}: {err}");
-            return None;
-        }
-    };
-
-    let projects = records
-        .into_iter()
-        .take(PROJECTS_MAX)
-        .map(|record| build_entry(record.project, resolve_hosts(&record.host_node_ids)))
-        .collect::<Vec<_>>();
-    if projects.is_empty() {
-        return None;
-    }
-
-    Some(ProjectAgentContext {
-        projects,
-        current_host_node_id: node_id,
-    })
-}
-
-/// 复用 `resolve_machine_key` 的归一化(去 `user@` 前缀、小写、缺省端口 22),
-/// 拆回 (host, port) 供节点反查。
-fn normalize_host_port(info: &InteractiveSshCommand) -> Option<(String, u16)> {
-    let machine_key =
-        warp_ssh_manager::resolve_machine_key(info.host.as_deref(), info.port.as_deref())?;
-    let (host, port) = machine_key.rsplit_once(':')?;
-    let port = port.parse::<u16>().ok()?;
-    Some((host.to_owned(), port))
 }
 
 /// 按 node_ids 原顺序解析主机,查不到(悬挂引用)的直接过滤掉。
@@ -207,10 +156,27 @@ fn hosts_from_lookup(
 /// 装配单项目条目:rules/notes 截断、主机清单封顶。
 fn build_entry(project: Project, mut hosts: Vec<ProjectHostInfo>) -> ProjectContextEntry {
     hosts.truncate(HOSTS_MAX_PER_PROJECT);
+    let known_host_ids = hosts
+        .iter()
+        .map(|host| host.node_id.as_str())
+        .collect::<std::collections::HashSet<_>>();
+    let repositories = project
+        .repositories
+        .into_iter()
+        .take(REPOSITORIES_MAX_PER_PROJECT)
+        .map(|repository| ProjectRepositoryInfo {
+            git_url: repository.git_url,
+            server_node_ids: repository
+                .server_node_ids
+                .into_iter()
+                .filter(|node_id| known_host_ids.contains(node_id.as_str()))
+                .collect(),
+        })
+        .collect();
     ProjectContextEntry {
         project_id: project.id,
         name: project.name,
-        git_url: project.git_url,
+        repositories,
         rules: truncate_with_marker(&project.rules, RULES_MAX_CHARS),
         notes: truncate_with_marker(&project.notes, NOTES_MAX_CHARS),
         hosts,

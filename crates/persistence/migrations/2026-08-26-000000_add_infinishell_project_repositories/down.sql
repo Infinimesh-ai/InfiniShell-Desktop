@@ -1,0 +1,5 @@
+DROP INDEX IF EXISTS idx_infinishell_project_repository_servers_node;
+DROP TABLE IF EXISTS infinishell_project_repository_servers;
+
+DROP INDEX IF EXISTS idx_infinishell_project_repositories_project;
+DROP TABLE IF EXISTS infinishell_project_repositories;

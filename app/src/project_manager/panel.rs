@@ -14,13 +14,16 @@
 use std::collections::{HashMap, HashSet};
 
 use infinishell_projects::{Project, ProjectRepository};
+use pathfinder_geometry::vector::Vector2F;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
 use warp_ssh_manager::{NodeKind, SshRepository, SshServerInfo};
 use warpui::elements::{
-    Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, CornerRadius,
-    CrossAxisAlignment, Element, Empty, Fill as ElementFill, Flex, Hoverable, MainAxisSize,
-    MouseStateHandle, ParentElement, Radius, ScrollbarWidth, Shrinkable, Text,
+    Border, ChildAnchor, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
+    Container, CornerRadius, CrossAxisAlignment, Dismiss, Element, Empty, Fill as ElementFill,
+    Flex, Hoverable, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    ParentElement, ParentOffsetBounds, Radius, SavePosition, ScrollbarWidth, Shrinkable, Stack,
+    Text,
 };
 use warpui::platform::Cursor;
 use warpui::text_layout::ClipConfig;
@@ -37,6 +40,11 @@ const ITEM_PADDING_HORIZONTAL: f32 = 8.0;
 const ITEM_ICON_TEXT_SPACING: f32 = 8.0;
 const ITEM_ICON_SIZE: f32 = 14.0;
 const HOST_ROW_INDENT: f32 = 16.0;
+const CONTEXT_MENU_WIDTH: f32 = 200.0;
+const CONTEXT_MENU_ITEM_PADDING_VERTICAL: f32 = 7.0;
+const CONTEXT_MENU_ITEM_PADDING_HORIZONTAL: f32 = 12.0;
+const CONTEXT_MENU_ITEM_COUNT: usize = 2;
+const PROJECT_PANEL_POSITION_ID: &str = "project_manager_panel_root";
 
 #[derive(Clone, Debug)]
 pub enum ProjectManagerPanelAction {
@@ -47,9 +55,17 @@ pub enum ProjectManagerPanelAction {
     /// 单击项目行:选中 + 打开详情。
     OpenProject(String),
     /// 单击主机行:请求按 SSH 链路连接该主机。
-    OpenHost { project_id: String, node_id: String },
+    OpenHost {
+        project_id: String,
+        node_id: String,
+    },
     /// 行尾按钮「从项目发起 Agent 对话」。
     StartConversation(String),
+    OpenContextMenu {
+        project_id: String,
+        position: Vector2F,
+    },
+    DismissContextMenu,
 }
 
 #[derive(Clone, Debug)]
@@ -96,6 +112,10 @@ pub struct ProjectManagerPanel {
     /// key = `"{project_id}/{node_id}"`(主机可被多个项目关联,须带项目前缀)。
     host_row_states: HashMap<String, MouseStateHandle>,
 
+    context_menu_position: Option<Vector2F>,
+    context_menu_project_id: Option<String>,
+    context_menu_item_states: Vec<MouseStateHandle>,
+
     list_scroll_state: ClippedScrollStateHandle,
 }
 
@@ -111,6 +131,11 @@ impl ProjectManagerPanel {
             chevron_states: HashMap::new(),
             conversation_btn_states: HashMap::new(),
             host_row_states: HashMap::new(),
+            context_menu_position: None,
+            context_menu_project_id: None,
+            context_menu_item_states: (0..CONTEXT_MENU_ITEM_COUNT)
+                .map(|_| MouseStateHandle::default())
+                .collect(),
             list_scroll_state: ClippedScrollStateHandle::default(),
         };
         me.reload(ctx);
@@ -184,6 +209,15 @@ impl ProjectManagerPanel {
         for key in host_keys {
             self.host_row_states.entry(key).or_default();
         }
+
+        if self
+            .context_menu_project_id
+            .as_ref()
+            .is_some_and(|id| !project_ids.contains(id.as_str()))
+        {
+            self.context_menu_project_id = None;
+            self.context_menu_position = None;
+        }
     }
 
     fn on_create_project(&mut self, ctx: &mut ViewContext<Self>) {
@@ -231,6 +265,24 @@ impl ProjectManagerPanel {
                 server: host.server.clone(),
             });
         }
+    }
+
+    fn on_open_context_menu(
+        &mut self,
+        project_id: String,
+        position: Vector2F,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.selected_id = Some(project_id.clone());
+        self.context_menu_project_id = Some(project_id);
+        self.context_menu_position = Some(position);
+        ctx.notify();
+    }
+
+    fn on_dismiss_context_menu(&mut self, ctx: &mut ViewContext<Self>) {
+        self.context_menu_position = None;
+        self.context_menu_project_id = None;
+        ctx.notify();
     }
 
     // ---- 渲染 --------------------------------------------------------------
@@ -373,6 +425,7 @@ impl ProjectManagerPanel {
             .cloned()
             .unwrap_or_default();
         let project_id_for_open = project.id.clone();
+        let project_id_for_context_menu = project.id.clone();
         Hoverable::new(row_state, move |mouse| {
             let background = if is_selected && mouse.is_hovered() {
                 Some(internal_colors::fg_overlay_4(theme))
@@ -402,11 +455,22 @@ impl ProjectManagerPanel {
             }
             row.finish()
         })
+        .with_defer_events_to_children()
         .with_cursor(Cursor::PointingHand)
         .on_click(move |ctx, _, _| {
             ctx.dispatch_typed_action(ProjectManagerPanelAction::OpenProject(
                 project_id_for_open.clone(),
             ));
+        })
+        .on_right_click(move |ctx, _, position| {
+            let offset = match ctx.element_position_by_id(PROJECT_PANEL_POSITION_ID) {
+                Some(bounds) => position - bounds.origin(),
+                None => position,
+            };
+            ctx.dispatch_typed_action(ProjectManagerPanelAction::OpenContextMenu {
+                project_id: project_id_for_context_menu.clone(),
+                position: offset,
+            });
         })
         .finish()
     }
@@ -549,6 +613,78 @@ impl ProjectManagerPanel {
         .with_overlayed_scrollbar()
         .finish()
     }
+
+    fn context_menu_items(&self) -> Vec<(String, ProjectManagerPanelAction)> {
+        let Some(project_id) = self.context_menu_project_id.as_ref() else {
+            return Vec::new();
+        };
+        vec![
+            (
+                crate::t!("project-manager-menu-edit"),
+                ProjectManagerPanelAction::OpenProject(project_id.clone()),
+            ),
+            (
+                crate::t!("project-manager-start-conversation"),
+                ProjectManagerPanelAction::StartConversation(project_id.clone()),
+            ),
+        ]
+    }
+
+    fn render_context_menu(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let mut items = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+        for (index, (label, action)) in self.context_menu_items().into_iter().enumerate() {
+            let state = self
+                .context_menu_item_states
+                .get(index)
+                .cloned()
+                .unwrap_or_default();
+            let label = Self::render_label(
+                label,
+                appearance,
+                appearance.ui_font_subheading(),
+                theme.main_text_color(theme.background()),
+            );
+            let item_action = action.clone();
+            items.add_child(
+                Hoverable::new(state, move |mouse| {
+                    let mut item = Container::new(label)
+                        .with_padding_top(CONTEXT_MENU_ITEM_PADDING_VERTICAL)
+                        .with_padding_bottom(CONTEXT_MENU_ITEM_PADDING_VERTICAL)
+                        .with_padding_left(CONTEXT_MENU_ITEM_PADDING_HORIZONTAL)
+                        .with_padding_right(CONTEXT_MENU_ITEM_PADDING_HORIZONTAL)
+                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.0)));
+                    if mouse.is_hovered() {
+                        item = item.with_background(internal_colors::fg_overlay_3(theme));
+                    }
+                    item.finish()
+                })
+                .with_cursor(Cursor::PointingHand)
+                .on_click(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(item_action.clone());
+                    ctx.dispatch_typed_action(ProjectManagerPanelAction::DismissContextMenu);
+                })
+                .finish(),
+            );
+        }
+
+        let menu = ConstrainedBox::new(
+            Container::new(items.with_main_axis_size(MainAxisSize::Min).finish())
+                .with_background(theme.surface_2())
+                .with_border(Border::all(1.0).with_border_color(theme.surface_3().into()))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(6.0)))
+                .with_uniform_padding(4.0)
+                .finish(),
+        )
+        .with_width(CONTEXT_MENU_WIDTH)
+        .finish();
+
+        Dismiss::new(menu)
+            .on_dismiss(|ctx, _| {
+                ctx.dispatch_typed_action(ProjectManagerPanelAction::DismissContextMenu);
+            })
+            .finish()
+    }
 }
 
 impl TypedActionView for ProjectManagerPanel {
@@ -574,6 +710,11 @@ impl TypedActionView for ProjectManagerPanel {
                     project_id: project_id.clone(),
                 });
             }
+            ProjectManagerPanelAction::OpenContextMenu {
+                project_id,
+                position,
+            } => self.on_open_context_menu(project_id.clone(), *position, ctx),
+            ProjectManagerPanelAction::DismissContextMenu => self.on_dismiss_context_menu(ctx),
         }
     }
 }
@@ -586,7 +727,7 @@ impl View for ProjectManagerPanel {
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
 
-        Container::new(
+        let panel = Container::new(
             Flex::column()
                 .with_main_axis_size(MainAxisSize::Max)
                 .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
@@ -596,7 +737,20 @@ impl View for ProjectManagerPanel {
                 .finish(),
         )
         .with_uniform_padding(PANEL_PADDING)
-        .finish()
+        .finish();
+        let positioned_panel = SavePosition::new(panel, PROJECT_PANEL_POSITION_ID).finish();
+        let Some(position) = self.context_menu_position else {
+            return positioned_panel;
+        };
+        let positioning = OffsetPositioning::offset_from_parent(
+            position,
+            ParentOffsetBounds::ParentByPosition,
+            ParentAnchor::TopLeft,
+            ChildAnchor::TopLeft,
+        );
+        let mut stack = Stack::new().with_child(positioned_panel);
+        stack.add_positioned_overlay_child(self.render_context_menu(appearance), positioning);
+        stack.finish()
     }
 }
 

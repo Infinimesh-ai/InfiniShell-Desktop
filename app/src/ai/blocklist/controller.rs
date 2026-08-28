@@ -1767,6 +1767,7 @@ impl BlocklistAIController {
             let task_id = conversation.get_root_task_id().clone();
             let conversation_data = api::ConversationData {
                 id: conversation_id,
+                project_id: conversation.project_id().map(ToOwned::to_owned),
                 tasks: conversation.compute_active_tasks(),
                 server_conversation_token: conversation.server_conversation_token().cloned(),
                 forked_from_conversation_token: conversation
@@ -1785,6 +1786,7 @@ impl BlocklistAIController {
             let task_id = TaskId::new(uuid::Uuid::new_v4().to_string());
             let conversation_data = api::ConversationData {
                 id: conversation_id,
+                project_id: None,
                 tasks: vec![],
                 server_conversation_token: None,
                 forked_from_conversation_token: None,
@@ -1958,6 +1960,7 @@ impl BlocklistAIController {
         let conversation_id = conversation.id();
         let conversation_data = api::ConversationData {
             id: conversation_id,
+            project_id: conversation.project_id().map(ToOwned::to_owned),
             tasks: active_tasks,
             server_conversation_token: conversation.server_conversation_token().cloned(),
             forked_from_conversation_token: conversation

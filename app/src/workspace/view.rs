@@ -6228,7 +6228,9 @@ impl Workspace {
 
         if AISettings::as_ref(ctx).default_session_mode(ctx) == DefaultSessionMode::Agent {
             terminal_view.update(ctx, |view, _| {
-                view.set_enter_agent_view_after_ssh_bootstrap();
+                view.set_enter_agent_view_after_ssh_bootstrap(
+                    AgentViewEntryOrigin::DefaultSessionMode,
+                );
             });
         }
 
@@ -6378,43 +6380,51 @@ impl Workspace {
         self.open_ssh_terminal(node_id.clone(), server, ctx);
     }
 
-    /// 「从项目发起 Agent 对话」:取项目关联主机中第一台未悬挂的,复用
-    /// [`Self::open_ssh_terminal`] 连接链路开新 tab;远端 bootstrap 完成后自动
-    /// 进入 Agent 视图,并把 (project_id, node_id) 绑定暂存到终端,待新会话
-    /// 创建时写入会话数据(仅入口 UX,上下文注入走会话推断)。
+    /// 「从项目发起 Agent 对话」:创建不预选 SSH 主机的项目级 Agent 会话。
+    /// 会话显式绑定 project_id,请求上下文会包含项目的全部仓库映射和关联主机；
+    /// 后续需要操作远端时再由项目工具按 node_id 打开对应 SSH 会话。
     pub fn start_project_conversation(&mut self, project_id: String, ctx: &mut ViewContext<Self>) {
-        let node_ids = match infinishell_projects::with_conn(|conn| {
-            Ok(infinishell_projects::ProjectRepository::servers_for_project(conn, &project_id)?)
+        match infinishell_projects::with_conn(|conn| {
+            Ok(infinishell_projects::ProjectRepository::get(
+                conn,
+                &project_id,
+            )?)
         }) {
-            Ok(node_ids) => node_ids,
-            Err(err) => {
-                log::warn!("start_project_conversation: host list load failed: {err}");
+            Ok(Some(_)) => {}
+            Ok(None) => {
+                log::warn!("start_project_conversation: project {project_id} not found");
                 return;
             }
-        };
+            Err(err) => {
+                log::warn!("start_project_conversation: project load failed: {err}");
+                return;
+            }
+        }
 
-        // 第一台能解析出服务器详情的主机;悬挂引用(节点已删)跳过。
-        let first_host = node_ids.into_iter().find_map(|node_id| {
-            warp_ssh_manager::with_conn(|conn| {
-                Ok(warp_ssh_manager::SshRepository::get_server(conn, &node_id)?)
-            })
-            .unwrap_or_else(|err| {
-                log::warn!("start_project_conversation: server lookup failed for {node_id}: {err}");
-                None
-            })
-            .map(|server| (node_id, server))
-        });
-        let Some((node_id, server)) = first_host else {
-            log::warn!("start_project_conversation: project {project_id} has no usable host");
+        self.add_new_session_tab_internal_with_default_session_mode_behavior(
+            NewSessionSource::Tab,
+            Some(ctx.window_id()),
+            None,
+            None,
+            false,
+            DefaultSessionModeBehavior::Ignore,
+            ctx,
+        );
+        let Some(terminal_view) = self
+            .active_tab_pane_group()
+            .as_ref(ctx)
+            .active_session_view(ctx)
+        else {
+            log::warn!("start_project_conversation: no terminal in newly added tab");
             return;
         };
-
-        let Some(terminal_view) = self.open_ssh_terminal(node_id.clone(), server, ctx) else {
-            return;
-        };
-        terminal_view.update(ctx, |view, _| {
-            view.set_enter_agent_view_after_ssh_bootstrap();
-            view.set_pending_project_binding(project_id, node_id);
+        terminal_view.update(ctx, |view, ctx| {
+            view.set_pending_project_binding(project_id);
+            view.enter_agent_view_for_new_conversation(
+                None,
+                AgentViewEntryOrigin::ProjectEntry,
+                ctx,
+            );
         });
     }
 

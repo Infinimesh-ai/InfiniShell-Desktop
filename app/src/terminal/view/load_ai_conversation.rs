@@ -993,7 +993,6 @@ impl TerminalView {
             byop_repair_state_json: None,
             cli_subagent_block_snapshots_json: None,
             project_id: None,
-            project_host_node_id: None,
         };
 
         // We already early-return for empty `tasks` above, so the strict

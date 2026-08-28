@@ -2554,15 +2554,14 @@ pub struct TerminalView {
     /// commands and `PaneMode::Agent`.
     enter_agent_view_after_pending_commands: bool,
     /// SSH 管理器创建的 tab 会先启动本地 shell，再执行 ssh 并等待远端 shell
-    /// bootstrap；默认 Agent 模式必须延后到远端会话可用后再进入。
-    enter_agent_view_after_ssh_bootstrap: bool,
+    /// bootstrap；记录真实入口来源，远端会话可用后再进入 Agent。
+    enter_agent_view_after_ssh_bootstrap: Option<AgentViewEntryOrigin>,
     /// SSH Manager 保存路径的逐跳启动状态；每个目标都等上一跳完成 bootstrap
     /// 后才写入 PTY，确保命令由正确的父主机 OpenSSH 执行。
     pending_ssh_route_launch: Option<PendingSshRouteLaunch>,
-    /// Zap:「从项目发起 Agent 对话」入口暂存的 (project_id, node_id) 绑定,
-    /// 在本终端下一次新建 Agent 会话时消费并写入会话数据(仅入口 UX,不参与
-    /// 上下文注入)。
-    pending_project_binding: Option<(String, String)>,
+    /// 「从项目发起 Agent 对话」入口暂存的 project_id，在本终端下一次
+    /// 新建 Agent 会话时消费并写入会话数据。
+    pending_project_binding: Option<String>,
     slow_bootstrap_banner: ViewHandle<Banner<TerminalAction>>,
     is_slow_bootstrap_banner_open: bool,
     /// Timer that auto-dismisses the slow-bootstrap banner after
@@ -4251,7 +4250,7 @@ impl TerminalView {
             awaiting_pending_command_completion: false,
             pending_command_queue: Default::default(),
             enter_agent_view_after_pending_commands: false,
-            enter_agent_view_after_ssh_bootstrap: false,
+            enter_agent_view_after_ssh_bootstrap: None,
             pending_ssh_route_launch: None,
             pending_project_binding: None,
             slow_bootstrap_banner,
@@ -13339,8 +13338,6 @@ impl TerminalView {
         }
 
         let is_subshell_or_ssh = session.is_subshell_or_ssh();
-        let is_ssh_session = matches!(session.session_type(), SessionType::WarpifiedRemote { .. })
-            || session.is_ssh_wrapper_session();
 
         // Make sure we decorate any text that is already in the input.  We
         // need to make sure external commands have finished loading before
@@ -13377,7 +13374,8 @@ impl TerminalView {
             bootstrap_event.session_type,
             BootstrapSessionType::WarpifiedRemote
         );
-        if bootstrap_event.subshell_info.is_some() {
+        let has_subshell_info = bootstrap_event.subshell_info.is_some();
+        if has_subshell_info {
             self.add_bootstrap_success_block(bootstrap_event, ctx);
         }
 
@@ -13393,13 +13391,19 @@ impl TerminalView {
         self.any_session_contains_remote_blocks |= self.active_block_is_considered_remote(ctx);
         self.update_focused_terminal_info(ctx);
 
-        if self.enter_agent_view_after_ssh_bootstrap && is_ssh_session {
-            self.enter_agent_view_after_ssh_bootstrap = false;
-            self.enter_agent_view_for_new_conversation(
-                None,
-                AgentViewEntryOrigin::DefaultSessionMode,
-                ctx,
-            );
+        if is_warpified_remote {
+            // 部分远端 bootstrap 事件没有 subshell_info，因此不会经过
+            // `add_bootstrap_success_block` 清理 SSH 长运行占位块。先显式清理，
+            // 否则 Agent 会把该占位块误判为仍在监控的用户命令。
+            if !has_subshell_info {
+                self.clear_ssh_blocks(ctx);
+            }
+        }
+        if let Some(origin) = take_deferred_ssh_agent_entry_origin(
+            &mut self.enter_agent_view_after_ssh_bootstrap,
+            is_warpified_remote,
+        ) {
+            self.enter_agent_view_for_new_conversation(None, origin, ctx);
         }
 
         // At the end of bootstrapping, set the title to the title of
@@ -15381,14 +15385,14 @@ impl TerminalView {
         self.enter_agent_view_after_pending_commands = false;
     }
 
-    pub fn set_enter_agent_view_after_ssh_bootstrap(&mut self) {
-        self.enter_agent_view_after_ssh_bootstrap = true;
+    pub fn set_enter_agent_view_after_ssh_bootstrap(&mut self, origin: AgentViewEntryOrigin) {
+        self.enter_agent_view_after_ssh_bootstrap = Some(origin);
     }
 
-    /// Zap:暂存项目绑定,等本终端新建 Agent 会话时消费(见
+    /// 暂存项目绑定,等本终端新建 Agent 会话时消费(见
     /// [`Self::try_enter_agent_view`])。
-    pub fn set_pending_project_binding(&mut self, project_id: String, node_id: String) {
-        self.pending_project_binding = Some((project_id, node_id));
+    pub fn set_pending_project_binding(&mut self, project_id: String) {
+        self.pending_project_binding = Some(project_id);
     }
 
     /// Zap M4:项目批量工具(`run_command_on_hosts`)在本终端执行一条命令。
@@ -28586,6 +28590,17 @@ fn agent_view_back_button_label(
     {
         Some(name) => Cow::Owned(format!("for {name}")),
         None => Cow::Borrowed("for parent agent"),
+    }
+}
+
+fn take_deferred_ssh_agent_entry_origin(
+    pending: &mut Option<AgentViewEntryOrigin>,
+    is_warpified_remote: bool,
+) -> Option<AgentViewEntryOrigin> {
+    if is_warpified_remote {
+        pending.take()
+    } else {
+        None
     }
 }
 

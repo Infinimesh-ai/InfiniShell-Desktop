@@ -1608,11 +1608,8 @@ impl BlocklistAIHistoryModel {
             artifacts_json: None,
             // Forked conversation loses its parentage
             parent_agent_id: None,
-            // Zap:项目绑定随分叉保留 — 分叉仍发生在同一项目主机会话里。
+            // 项目绑定随分叉保留。
             project_id: source_conversation.project_id().map(ToString::to_string),
-            project_host_node_id: source_conversation
-                .project_host_node_id()
-                .map(ToString::to_string),
             agent_name: None,
             orchestration_harness_type: None,
             parent_conversation_id: None,
@@ -1806,9 +1803,8 @@ impl BlocklistAIHistoryModel {
             artifacts_json: None,
             // Forked conversation loses its parentage.
             parent_agent_id: None,
-            // Zap:项目绑定随分叉保留 — 分叉仍发生在同一项目主机会话里。
+            // 项目绑定随分叉保留。
             project_id: conversation.project_id().map(ToString::to_string),
-            project_host_node_id: conversation.project_host_node_id().map(ToString::to_string),
             agent_name: None,
             orchestration_harness_type: None,
             parent_conversation_id: None,
@@ -2822,9 +2818,8 @@ fn merged_remote_child_placeholder_conversation_data(
         byop_repair_state_json: None,
         cli_subagent_block_snapshots_json: None,
 
-        // Zap:项目绑定是纯本地数据,以 placeholder 为准(云端会话不携带)。
+        // 项目绑定是纯本地数据,以 placeholder 为准(云端会话不携带)。
         project_id: placeholder.project_id().map(ToString::to_string),
-        project_host_node_id: placeholder.project_host_node_id().map(ToString::to_string),
     }
 }
 

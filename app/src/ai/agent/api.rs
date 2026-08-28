@@ -122,7 +122,7 @@ pub struct RequestParams {
     pub computer_use_model: LLMId,
     pub is_memory_enabled: bool,
     pub machine_memory: Option<MachineMemoryContext>,
-    /// 会话推断出的项目上下文(legacy SSH host+port → SSH 节点 → 所属项目),
+    /// 会话显式绑定的项目上下文,
     /// 由 `chat_stream::render_project_context_block` 渲染进 system prompt。
     pub project_context: Option<ProjectAgentContext>,
     pub machine_index: Option<String>,
@@ -227,6 +227,7 @@ pub type ResponseStream = Pin<Box<dyn Stream<Item = Event>>>;
 #[derive(Debug, Clone)]
 pub struct ConversationData {
     pub id: AIConversationId,
+    pub project_id: Option<String>,
     pub tasks: Vec<warp_multi_agent_api::Task>,
     pub server_conversation_token: Option<ServerConversationToken>,
     pub forked_from_conversation_token: Option<ServerConversationToken>,
@@ -298,7 +299,8 @@ impl RequestParams {
         let ai_settings = AISettings::as_ref(app);
         let is_memory_enabled = ai_settings.is_memory_enabled(app);
         let machine_memory = machine_memory::load_for_session(&session_context, app);
-        let project_context = project_agent_context::load_for_session(&session_context);
+        let project_context =
+            project_agent_context::load_for_conversation(conversation.project_id.as_deref());
         let machine_index = machine_memory::load_index_for_session(&session_context, app);
         let warp_drive_context_enabled = ai_settings.is_warp_drive_context_enabled(app);
 

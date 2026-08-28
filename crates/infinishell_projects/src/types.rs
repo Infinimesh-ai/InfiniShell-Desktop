@@ -3,13 +3,22 @@
 
 use chrono::NaiveDateTime;
 
-/// 一个项目:聚合 SSH 服务器、Git 地址、项目规则/习惯。
+/// 一个 Git 仓库及其对应的 SSH 服务器。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectGitRepository {
+    pub id: String,
+    pub git_url: String,
+    /// `ssh_nodes.id` 列表；顺序与项目详情中的服务器顺序一致。
+    pub server_node_ids: Vec<String>,
+}
+
+/// 一个项目:聚合 SSH 服务器、Git 仓库、项目规则/习惯。
 #[derive(Debug, Clone, PartialEq)]
 pub struct Project {
     pub id: String,
     pub name: String,
-    /// 仓库地址,仅展示 + 注入 Agent 上下文,不做 clone/fetch。
-    pub git_url: Option<String>,
+    /// 仓库仅展示 + 注入 Agent 上下文,不做 clone/fetch。
+    pub repositories: Vec<ProjectGitRepository>,
     /// 可选本地目录;存在则该目录下的 WARP.md/AGENTS.md 文件规则自动生效。
     pub root_path: Option<String>,
     /// 项目级规则/配置习惯,直接注入 Agent system prompt(注入时截断)。

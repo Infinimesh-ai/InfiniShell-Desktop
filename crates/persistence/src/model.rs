@@ -12,7 +12,8 @@ use super::schema::{
     active_mcp_servers, agent_conversations, agent_tasks, ai_document_panes, ai_memory_panes,
     ambient_agent_panes, app, blocks, cloud_objects_refreshes, code_pane_tabs, code_panes,
     code_review_panes, commands, current_user_information, env_var_collection_panes, folders,
-    generic_string_objects, ignored_suggestions, infinishell_project_servers, infinishell_projects,
+    generic_string_objects, ignored_suggestions, infinishell_project_repositories,
+    infinishell_project_repository_servers, infinishell_project_servers, infinishell_projects,
     mcp_environment_variables, mcp_server_installations, mcp_server_panes, notebook_panes,
     notebooks, object_actions, object_metadata, object_permissions, pane_branches, pane_leaves,
     pane_nodes, panels, project_rules, projects, server_experiments, settings_panes,
@@ -1199,13 +1200,9 @@ pub struct AgentConversationData {
     /// CLI subagent 终端 block 快照 sidecar。具体 JSON schema 由 app 层负责。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cli_subagent_block_snapshots_json: Option<String>,
-    /// Zap:会话创建时显式绑定的项目 id(「从项目发起 Agent 对话」入口写入)。
-    /// 仅服务历史过滤/入口 UX;上下文注入走会话推断链路,不读这里。
+    /// 会话创建时显式绑定的项目 id(「从项目发起 Agent 对话」入口写入)。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
-    /// Zap:绑定项目时所连主机的 SSH 节点 id,与 `project_id` 同时写入。
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project_host_node_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -1662,7 +1659,6 @@ mod tests {
             byop_repair_state_json: None,
             cli_subagent_block_snapshots_json: None,
             project_id: None,
-            project_host_node_id: None,
         };
         let json = serde_json::to_string(&data).expect("serialize");
         let roundtripped: AgentConversationData = serde_json::from_str(&json).expect("deserialize");
@@ -1703,7 +1699,6 @@ mod tests {
             byop_repair_state_json: None,
             cli_subagent_block_snapshots_json: None,
             project_id: None,
-            project_host_node_id: None,
         };
         let json = serde_json::to_string(&data).expect("serialize");
         assert!(
@@ -1738,7 +1733,6 @@ mod tests {
             byop_repair_state_json: Some(r#"{"version":1,"records":[]}"#.to_string()),
             cli_subagent_block_snapshots_json: None,
             project_id: None,
-            project_host_node_id: None,
         };
 
         let json = serde_json::to_string(&data).expect("serialize");
@@ -1774,7 +1768,6 @@ mod tests {
                 r#"[{"task_id":"cli-task","block_id":"cli-block","block":{}}]"#.to_string(),
             ),
             project_id: None,
-            project_host_node_id: None,
         };
 
         let json = serde_json::to_string(&data).expect("serialize");
@@ -1994,6 +1987,44 @@ pub struct NewInfiniShellProject<'a> {
     pub rules: &'a str,
     pub notes: &'a str,
     pub default_profile_id: Option<&'a str>,
+    pub sort_order: i32,
+}
+
+#[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug)]
+#[diesel(table_name = infinishell_project_repositories)]
+#[diesel(primary_key(id))]
+#[diesel(belongs_to(InfiniShellProjectRow, foreign_key = project_id))]
+pub struct InfiniShellProjectRepositoryRow {
+    pub id: String,
+    pub project_id: String,
+    pub git_url: String,
+    pub sort_order: i32,
+}
+
+#[derive(Insertable, Clone, Debug)]
+#[diesel(table_name = infinishell_project_repositories)]
+pub struct NewInfiniShellProjectRepository<'a> {
+    pub id: &'a str,
+    pub project_id: &'a str,
+    pub git_url: &'a str,
+    pub sort_order: i32,
+}
+
+#[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug)]
+#[diesel(table_name = infinishell_project_repository_servers)]
+#[diesel(primary_key(repository_id, node_id))]
+#[diesel(belongs_to(InfiniShellProjectRepositoryRow, foreign_key = repository_id))]
+pub struct InfiniShellProjectRepositoryServerRow {
+    pub repository_id: String,
+    pub node_id: String,
+    pub sort_order: i32,
+}
+
+#[derive(Insertable, Clone, Debug)]
+#[diesel(table_name = infinishell_project_repository_servers)]
+pub struct NewInfiniShellProjectRepositoryServer<'a> {
+    pub repository_id: &'a str,
+    pub node_id: &'a str,
     pub sort_order: i32,
 }
 

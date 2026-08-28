@@ -475,11 +475,9 @@ pub struct AIConversation {
     /// For current orchestration, this holds the parent's `run_id`. Persisted as
     /// `parent_agent_id` for serde compatibility with older conversation data.
     parent_agent_id: Option<String>,
-    /// Zap:会话创建时显式绑定的项目 id(「从项目发起 Agent 对话」入口写入)。
-    /// 仅服务历史过滤/入口 UX;上下文注入走会话推断,不读这里。
+    /// 会话创建时显式绑定的项目 id(「从项目发起 Agent 对话」入口写入)。
+    /// 项目级请求据此加载上下文。
     project_id: Option<String>,
-    /// Zap:绑定项目时所连主机的 SSH 节点 id,与 `project_id` 同时写入。
-    project_host_node_id: Option<String>,
     /// The display name for this agent (e.g. "Agent 1"), assigned by the orchestrator.
     agent_name: Option<String>,
     /// Harness metadata associated with this child agent in orchestration flows.
@@ -566,7 +564,6 @@ impl AIConversation {
             artifacts: Vec::new(),
             parent_agent_id: None,
             project_id: None,
-            project_host_node_id: None,
             agent_name: None,
             orchestration_harness_type: None,
             parent_conversation_id: None,
@@ -750,7 +747,6 @@ impl AIConversation {
             artifacts,
             parent_agent_id,
             project_id,
-            project_host_node_id,
             agent_name,
             orchestration_harness_type,
             parent_conversation_id,
@@ -831,7 +827,6 @@ impl AIConversation {
                 artifacts,
                 data.parent_agent_id,
                 data.project_id,
-                data.project_host_node_id,
                 data.agent_name,
                 data.orchestration_harness_type,
                 parent_conversation_id,
@@ -852,7 +847,6 @@ impl AIConversation {
                 ConversationUsageMetadata::default(),
                 HashSet::new(),
                 Vec::new(),
-                None,
                 None,
                 None,
                 None,
@@ -902,7 +896,6 @@ impl AIConversation {
             artifacts,
             parent_agent_id,
             project_id,
-            project_host_node_id,
             agent_name,
             orchestration_harness_type,
             parent_conversation_id,
@@ -1413,20 +1406,14 @@ impl AIConversation {
         self.parent_agent_id = Some(id);
     }
 
-    /// Zap:会话创建时绑定的项目 id(入口 UX 用,详见字段注释)。
+    /// 会话创建时绑定的项目 id。
     pub fn project_id(&self) -> Option<&str> {
         self.project_id.as_deref()
     }
 
-    /// Zap:绑定项目时所连主机的 SSH 节点 id。
-    pub fn project_host_node_id(&self) -> Option<&str> {
-        self.project_host_node_id.as_deref()
-    }
-
-    /// Zap:写入项目绑定,「从项目发起 Agent 对话」创建新会话时调用一次。
-    pub fn set_project_binding(&mut self, project_id: String, project_host_node_id: String) {
+    /// 写入项目绑定,「从项目发起 Agent 对话」创建新会话时调用一次。
+    pub fn set_project_binding(&mut self, project_id: String) {
         self.project_id = Some(project_id);
-        self.project_host_node_id = Some(project_host_node_id);
     }
 
     pub fn agent_name(&self) -> Option<&str> {
@@ -3908,7 +3895,6 @@ impl AIConversation {
                 artifacts_json,
                 parent_agent_id: self.parent_agent_id.clone(),
                 project_id: self.project_id.clone(),
-                project_host_node_id: self.project_host_node_id.clone(),
                 agent_name: self.agent_name.clone(),
                 orchestration_harness_type: self.orchestration_harness_type.clone(),
                 parent_conversation_id: self.parent_conversation_id.map(|id| id.to_string()),
