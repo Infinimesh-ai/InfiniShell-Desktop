@@ -7617,16 +7617,32 @@ impl TerminalView {
                 // user's ctrl-c was directed to the AIBlock instead of the command's shell block.
                 self.ctrl_c(ctx);
             }
-            ShellCommandExecutorEvent::TransferControlToUser { reason, .. } => {
+            ShellCommandExecutorEvent::TransferControlToUser {
+                block_id,
+                reason,
+                is_ssh_session,
+                ..
+            } => {
                 // Transfer control of the long-running command to the user.
                 self.cli_subagent_controller.update(ctx, |controller, ctx| {
-                    controller.switch_control_to_user(
+                    controller.switch_control_to_user_for_block(
+                        block_id,
                         UserTakeOverReason::TransferFromAgent {
                             reason: reason.clone(),
                         },
                         ctx,
                     );
                 });
+
+                if *is_ssh_session {
+                    self.agent_view_controller.update(ctx, |controller, ctx| {
+                        controller.exit_agent_view_without_confirmation(ctx);
+                    });
+                    self.input.update(ctx, |input, ctx| {
+                        input.set_input_mode_terminal(false, ctx);
+                    });
+                    self.redetermine_terminal_focus(ctx);
+                }
             }
         }
     }

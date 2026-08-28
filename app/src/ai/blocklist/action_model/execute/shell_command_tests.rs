@@ -1,6 +1,75 @@
 use std::time::Duration;
 
 use super::*;
+use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::blocklist::block::cli_controller::LongRunningCommandControlState;
+use crate::terminal::model::ansi::{ExitShellValue, Handler, InitShellValue, SSHValue};
+use crate::terminal::model::block::AgentInteractionMetadata;
+use crate::terminal::model::session::SessionId;
+
+#[test]
+fn treats_bootstrapped_ssh_command_as_running_until_remote_shell_exits() {
+    let mut model = TerminalModel::mock(None, None);
+    model.simulate_long_running_block("ssh root@example.com", "");
+    model
+        .block_list_mut()
+        .active_block_mut()
+        .set_agent_interaction_mode(AgentInteractionMetadata::new(
+            None,
+            AIConversationId::new(),
+            None,
+            Some(LongRunningCommandControlState::Agent {
+                is_blocked: false,
+                should_hide_responses: false,
+            }),
+            false,
+            false,
+        ));
+    let ssh_command_block_id = model.active_block_id().clone();
+    let remote_session_id = SessionId::from(42);
+
+    model.ssh(SSHValue {
+        remote_shell: "zsh".to_owned(),
+        remote_session_id: Some(remote_session_id.as_u64()),
+        ..Default::default()
+    });
+    model.init_shell(InitShellValue {
+        session_id: remote_session_id,
+        shell: "zsh".to_owned(),
+        user: "root".to_owned(),
+        hostname: "example.com".to_owned(),
+        ..Default::default()
+    });
+
+    assert_eq!(
+        transfer_control_target(&model),
+        Some(TransferControlTarget {
+            block_id: ssh_command_block_id.clone(),
+            is_ssh_session: true,
+        })
+    );
+    let ssh_command_block = model
+        .block_list()
+        .block_with_id(&ssh_command_block_id)
+        .expect("SSH command block should remain in the block list");
+    assert!(matches!(
+        action_result_for_block(&model, ssh_command_block, false),
+        ActionResult::LongRunningCommandSnapshot { .. }
+    ));
+
+    model.exit_shell(ExitShellValue {
+        session_id: remote_session_id,
+    });
+
+    let ssh_command_block = model
+        .block_list()
+        .block_with_id(&ssh_command_block_id)
+        .expect("SSH command block should remain in the block list");
+    assert!(matches!(
+        action_result_for_block(&model, ssh_command_block, false),
+        ActionResult::CommandFinished { .. }
+    ));
+}
 
 #[test]
 fn detects_interactive_session_commands_across_platforms() {

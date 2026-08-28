@@ -583,14 +583,33 @@ impl CLISubagentController {
     }
 
     pub fn switch_control_to_user(&self, reason: UserTakeOverReason, ctx: &mut ModelContext<Self>) {
+        let block_id = self
+            .terminal_model
+            .lock()
+            .block_list()
+            .active_block()
+            .id()
+            .clone();
+        self.switch_control_to_user_for_block(&block_id, reason, ctx);
+    }
+
+    pub fn switch_control_to_user_for_block(
+        &self,
+        block_id: &BlockId,
+        reason: UserTakeOverReason,
+        ctx: &mut ModelContext<Self>,
+    ) {
         let should_cancel_conversation = !reason.is_transfer_from_agent();
         let mut terminal_model = self.terminal_model.lock();
 
-        let active_block = terminal_model.block_list_mut().active_block_mut();
-        let block_id = active_block.id().clone();
-        let interaction_mode_debug = format!("{:?}", active_block.interaction_mode());
-        let lrc_state_debug = format!("{:?}", active_block.long_running_control_state());
-        if let Err(e) = active_block.take_over_control_for_user(reason.clone()) {
+        let Some(block) = terminal_model.block_list_mut().mut_block_from_id(block_id) else {
+            log::warn!("Failed to take control for user: block {block_id:?} was not found");
+            return;
+        };
+        let block_id = block.id().clone();
+        let interaction_mode_debug = format!("{:?}", block.interaction_mode());
+        let lrc_state_debug = format!("{:?}", block.long_running_control_state());
+        if let Err(e) = block.take_over_control_for_user(reason.clone()) {
             report_error!(
                 anyhow::Error::new(e).context("Failed to take control for user"),
                 extra: {
@@ -603,9 +622,9 @@ impl CLISubagentController {
             return;
         }
 
-        let action_id = active_block.requested_command_action_id().cloned();
-        let conversation_id = active_block.ai_conversation_id();
-        let agent_has_control = active_block.is_agent_in_control();
+        let action_id = block.requested_command_action_id().cloned();
+        let conversation_id = block.ai_conversation_id();
+        let agent_has_control = block.is_agent_in_control();
         // Conversation cancellation potentially takes a lock on terminal model if the
         // cancelled action is a shell command action, so we have to drop the terminal
         // model lock before actually cancelling the conversation.

@@ -473,6 +473,50 @@ fn ssh_bootstraps_if_blocklist_empty_and_reconciles_parent_return() {
 }
 
 #[test]
+fn tracks_ssh_command_block_until_remote_shell_exits() {
+    let mut terminal = TerminalModel::mock(None, None);
+    terminal.simulate_long_running_block("ssh root@example.com", "");
+    let ssh_command_block_id = terminal.active_block_id().clone();
+    let remote_session_id = SessionId::from(42);
+
+    terminal.ssh(SSHValue {
+        remote_shell: "zsh".to_owned(),
+        remote_session_id: Some(remote_session_id.as_u64()),
+        ..Default::default()
+    });
+
+    assert_eq!(
+        terminal.active_ssh_command_block_id(),
+        Some(&ssh_command_block_id)
+    );
+
+    terminal.init_shell(InitShellValue {
+        session_id: remote_session_id,
+        shell: "zsh".to_owned(),
+        user: "root".to_owned(),
+        hostname: "example.com".to_owned(),
+        ..Default::default()
+    });
+
+    assert_ne!(terminal.active_block_id(), &ssh_command_block_id);
+    assert!(
+        terminal
+            .block_list()
+            .block_with_id(&ssh_command_block_id)
+            .expect("SSH command block should remain in the block list")
+            .finished()
+    );
+    assert!(terminal.is_active_ssh_command_block(&ssh_command_block_id));
+
+    terminal.exit_shell(ExitShellValue {
+        session_id: remote_session_id,
+    });
+
+    assert_eq!(terminal.active_ssh_command_block_id(), None);
+    assert!(!terminal.is_active_ssh_command_block(&ssh_command_block_id));
+}
+
+#[test]
 // An empty block that is restored should have a nonzero height and it should not get deleted.
 pub fn test_restored_empty_command_block() {
     let restored_blocks = [create_default_serialized_block().into()];

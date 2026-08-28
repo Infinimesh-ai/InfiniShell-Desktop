@@ -488,6 +488,10 @@ pub struct TerminalModel {
     /// machine) and when the remote shell sends the `InitShell` DCS.
     pending_ssh_wrapper_session: Option<SSHValue>,
 
+    /// 远端 shell 仍存活的 SSH 命令块。`InitShell` 会先结束原命令块，让远端提示符成为
+    /// 活跃块；但 SSH 进程要等到收到匹配的 `ExitShell` hook 后才算真正结束。
+    active_ssh_command_blocks: Vec<(SessionId, BlockId)>,
+
     /// The path of the shell binary used for the pending shell session, if any. This is
     /// temporarily stored between the spawning of the child shell process and bootstrap completion.
     /// After bootstrapping, this is set to None.
@@ -1148,6 +1152,7 @@ impl TerminalModel {
             override_colors: color::OverrideList::empty(),
             event_proxy,
             pending_ssh_wrapper_session: None,
+            active_ssh_command_blocks: Vec::new(),
             pending_shell_launch_data: None,
             active_shell_launch_data: None,
             pending_session_info: None,
@@ -1672,6 +1677,24 @@ impl TerminalModel {
 
     pub fn has_pending_ssh_session(&self) -> bool {
         self.pending_ssh_wrapper_session.is_some()
+    }
+
+    pub(crate) fn active_ssh_command_block_ids(&self) -> impl Iterator<Item = &BlockId> {
+        self.active_ssh_command_blocks
+            .iter()
+            .rev()
+            .map(|(_, block_id)| block_id)
+            .filter(|block_id| self.block_list.block_with_id(block_id).is_some())
+    }
+
+    pub(crate) fn active_ssh_command_block_id(&self) -> Option<&BlockId> {
+        self.active_ssh_command_block_ids().next()
+    }
+
+    pub(crate) fn is_active_ssh_command_block(&self, block_id: &BlockId) -> bool {
+        self.active_ssh_command_blocks
+            .iter()
+            .any(|(_, active_block_id)| active_block_id == block_id)
     }
 
     pub fn pending_shell_type(&self) -> Option<ShellType> {
@@ -3155,6 +3178,11 @@ impl ansi::Handler for TerminalModel {
                 return;
             }
             self.register_session_id(remote_session_id);
+            let ssh_command_block_id = self.block_list.active_block_id().clone();
+            self.active_ssh_command_blocks
+                .retain(|(session_id, _)| *session_id != remote_session_id);
+            self.active_ssh_command_blocks
+                .push((remote_session_id, ssh_command_block_id));
             if value.external_control_master
                 && let Some(socket_path) = &value.socket_path
             {
@@ -3175,6 +3203,8 @@ impl ansi::Handler for TerminalModel {
             "Received ExitShell hook from shell for session_id: {:?}",
             data.session_id
         );
+        self.active_ssh_command_blocks
+            .retain(|(session_id, _)| *session_id != data.session_id);
         self.event_proxy.send_terminal_event(Event::ExitShell {
             session_id: data.session_id,
         });

@@ -128,7 +128,8 @@ impl ShellCommandExecutor {
             let block_finished_senders = self.block_finished_senders.drain().collect_vec();
             for (block_selector, block_finished_tx) in block_finished_senders.into_iter() {
                 if let Some(block) = block_selector.get_block(&model) {
-                    if block.is_command_finished() {
+                    if block.is_command_finished() && !model.is_active_ssh_command_block(block.id())
+                    {
                         if let Err(e) = block_finished_tx.send(()) {
                             log::warn!(
                                 "Failed to notify block completion for running requested command: {e:?}"
@@ -398,7 +399,7 @@ impl ShellCommandExecutor {
                         ReadShellCommandOutputResult::Error(ShellCommandError::BlockNotFound),
                     ));
                 };
-                if block.finished() {
+                if block.finished() && !model.is_active_ssh_command_block(block_id) {
                     let command = block.command_with_secrets_unobfuscated(false);
                     let output: String = block.output_with_secrets_unobfuscated();
                     let exit_code = block.exit_code();
@@ -440,8 +441,7 @@ impl ShellCommandExecutor {
                 )
             }
             AIAgentActionType::TransferShellCommandControlToUser { reason } => {
-                let active_block = model.block_list().active_block();
-                if !active_block.is_active_and_long_running() {
+                let Some(transfer_target) = transfer_control_target(&model) else {
                     return ActionExecution::Sync(
                         AIAgentActionResultType::TransferShellCommandControlToUser(
                             TransferShellCommandControlToUserResult::Error(
@@ -449,15 +449,17 @@ impl ShellCommandExecutor {
                             ),
                         ),
                     );
-                }
+                };
 
-                let block_id = active_block.id().clone();
+                let block_id = transfer_target.block_id;
                 drop(model);
 
                 // Emit event to transfer control to user.
                 ctx.emit(ShellCommandExecutorEvent::TransferControlToUser {
                     action_id: action_id.clone(),
+                    block_id: block_id.clone(),
                     reason: reason.clone(),
+                    is_ssh_session: transfer_target.is_ssh_session,
                 });
 
                 // Create a channel to wait for control handback.
@@ -497,38 +499,7 @@ impl ShellCommandExecutor {
                             TransferControlResult::ControlHandedBack
                             | TransferControlResult::BlockFinished => {
                                 match model.block_list().block_with_id(&block_id) {
-                                    Some(block) => {
-                                        if block.finished() {
-                                            ActionResult::CommandFinished {
-                                                block_id: block.id().clone(),
-                                                output: agent_shell_command_block_output(block),
-                                                exit_code: block.exit_code(),
-                                                start_ts: block.start_ts().copied(),
-                                                completed_ts: block.completed_ts().copied(),
-                                            }
-                                        } else {
-                                            let grid_contents = if model.is_alt_screen_active() {
-                                                formatted_terminal_contents_for_input(
-                                                    model.alt_screen().grid_handler(),
-                                                    None,
-                                                    CURSOR_MARKER,
-                                                )
-                                            } else {
-                                                formatted_terminal_contents_for_input(
-                                                    block.output_grid().grid_handler(),
-                                                    Some(1000),
-                                                    CURSOR_MARKER,
-                                                )
-                                            };
-                                            ActionResult::LongRunningCommandSnapshot {
-                                                block_id: block.id().clone(),
-                                                grid_contents,
-                                                cursor: CURSOR_MARKER,
-                                                is_alt_screen_active: model.is_alt_screen_active(),
-                                                is_preempted: false,
-                                            }
-                                        }
-                                    }
+                                    Some(block) => action_result_for_block(&model, block, false),
                                     None => ActionResult::BlockNotFound,
                                 }
                             }
@@ -651,39 +622,7 @@ impl ShellCommandExecutor {
             // Check the current state of the block and produce a result accordingly.
             let model = terminal_model.lock();
             let result = match block_selector.get_block(&model) {
-                Some(block) => {
-                    if block.finished() {
-                        ActionResult::CommandFinished {
-                            block_id: block.id().clone(),
-                            output: agent_shell_command_block_output(block),
-                            exit_code: block.exit_code(),
-                            start_ts: block.start_ts().copied(),
-                            completed_ts: block.completed_ts().copied(),
-                        }
-                    } else {
-                        let grid_contents = if model.is_alt_screen_active() {
-                            formatted_terminal_contents_for_input(
-                                model.alt_screen().grid_handler(),
-                                None,
-                                CURSOR_MARKER,
-                            )
-                        } else {
-                            formatted_terminal_contents_for_input(
-                                block.output_grid().grid_handler(),
-                                // TODO(vorporeal): This is probably too large.
-                                Some(1000),
-                                CURSOR_MARKER,
-                            )
-                        };
-                        ActionResult::LongRunningCommandSnapshot {
-                            block_id: block.id().clone(),
-                            grid_contents,
-                            cursor: CURSOR_MARKER,
-                            is_alt_screen_active: model.is_alt_screen_active(),
-                            is_preempted,
-                        }
-                    }
-                }
+                Some(block) => action_result_for_block(&model, block, is_preempted),
                 None => ActionResult::BlockNotFound,
             };
 
@@ -1038,6 +977,75 @@ fn command_basename(command_token: &str) -> &str {
         .unwrap_or(command_token)
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TransferControlTarget {
+    block_id: BlockId,
+    is_ssh_session: bool,
+}
+
+fn transfer_control_target(model: &TerminalModel) -> Option<TransferControlTarget> {
+    let active_block = model.block_list().active_block();
+    if active_block.is_active_and_long_running() {
+        return Some(TransferControlTarget {
+            block_id: active_block.id().clone(),
+            is_ssh_session: false,
+        });
+    }
+
+    model.active_ssh_command_block_ids().find_map(|block_id| {
+        model
+            .block_list()
+            .block_with_id(block_id)
+            .and_then(|block| {
+                block
+                    .agent_interaction_metadata()
+                    .is_some_and(|metadata| metadata.is_agent_in_control())
+                    .then(|| TransferControlTarget {
+                        block_id: block_id.clone(),
+                        is_ssh_session: true,
+                    })
+            })
+    })
+}
+
+fn action_result_for_block(
+    model: &TerminalModel,
+    block: &Block,
+    is_preempted: bool,
+) -> ActionResult {
+    if block.finished() && !model.is_active_ssh_command_block(block.id()) {
+        return ActionResult::CommandFinished {
+            block_id: block.id().clone(),
+            output: agent_shell_command_block_output(block),
+            exit_code: block.exit_code(),
+            start_ts: block.start_ts().copied(),
+            completed_ts: block.completed_ts().copied(),
+        };
+    }
+
+    let grid_contents = if model.is_alt_screen_active() {
+        formatted_terminal_contents_for_input(
+            model.alt_screen().grid_handler(),
+            None,
+            CURSOR_MARKER,
+        )
+    } else {
+        formatted_terminal_contents_for_input(
+            block.output_grid().grid_handler(),
+            // TODO(vorporeal): This is probably too large.
+            Some(1000),
+            CURSOR_MARKER,
+        )
+    };
+    ActionResult::LongRunningCommandSnapshot {
+        block_id: block.id().clone(),
+        grid_contents,
+        cursor: CURSOR_MARKER,
+        is_alt_screen_active: model.is_alt_screen_active(),
+        is_preempted,
+    }
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 enum BlockSelector {
     Id(BlockId),
@@ -1247,7 +1255,9 @@ pub enum ShellCommandExecutorEvent {
     /// Emitted when the agent requests to transfer control of a long-running command to the user.
     TransferControlToUser {
         action_id: AIAgentActionId,
+        block_id: BlockId,
         reason: String,
+        is_ssh_session: bool,
     },
 }
 
