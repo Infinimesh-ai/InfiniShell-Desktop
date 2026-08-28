@@ -215,7 +215,9 @@ impl TypedActionView for AcceptAutosuggestionKeybinding {
             }
             AcceptAutosuggestionKeybindingAction::OpenSettingsForCustomKeybinding => ctx
                 .dispatch_typed_action(&WorkspaceAction::ConfigureKeybindingSettings {
-                    keybinding_name: Some("Accept Autosuggestion".to_owned()),
+                    keybinding_name: Some(crate::t!(
+                        "keybinding-desc-editor-accept-autosuggestion"
+                    )),
                 }),
             AcceptAutosuggestionKeybindingAction::OpenMenu => {
                 self.is_menu_open = true;

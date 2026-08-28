@@ -8,15 +8,6 @@ use warpui::ViewContext;
 use super::view::Workspace;
 use crate::pane_group::{AnyPaneContent, FilePane};
 
-const WARP_HOME_TITLE: &str = "Welcome to InfiniShell";
-const WARP_HOME_CONTENT: &str = r#"
-Welcome to InfiniShell.
-
-Use this local workspace to:
-* Create, view, and edit InfiniShell Drive objects
-* Manage local settings
-* Work with local agent sessions, notebooks, and workflows"#;
-
 /// Create a static "home page" pane.
 pub fn create_home_pane(ctx: &mut ViewContext<Workspace>) -> Box<dyn AnyPaneContent> {
     let pane = FilePane::new(
@@ -27,7 +18,8 @@ pub fn create_home_pane(ctx: &mut ViewContext<Workspace>) -> Box<dyn AnyPaneCont
         ctx,
     );
     pane.file_view(ctx).update(ctx, |pane, ctx| {
-        pane.open_static(WARP_HOME_TITLE, WARP_HOME_CONTENT, ctx);
+        let content = crate::t!("workspace-home-content");
+        pane.open_static(crate::t!("workspace-home-title"), &content, ctx);
     });
     Box::new(pane)
 }

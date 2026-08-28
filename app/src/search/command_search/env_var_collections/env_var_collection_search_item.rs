@@ -34,7 +34,7 @@ impl EnvVarCollectionSearchItem {
                 env_var_collection
                     .title
                     .clone()
-                    .unwrap_or("Untitled".to_owned()),
+                    .unwrap_or_else(|| crate::t!("common-untitled")),
                 true,
             )
             .with_style(UiComponentStyles {
@@ -92,7 +92,7 @@ impl SearchItem for EnvVarCollectionSearchItem {
             env_var_collection
                 .title
                 .clone()
-                .unwrap_or("Untitled".to_owned()),
+                .unwrap_or_else(|| crate::t!("common-untitled")),
             appearance.ui_font_family(),
             appearance.monospace_font_size(),
         )
@@ -220,7 +220,7 @@ impl SearchItem for EnvVarCollectionSearchItem {
             env_var_collection
                 .title
                 .clone()
-                .unwrap_or("Untitled".to_owned())
+                .unwrap_or_else(|| crate::t!("common-untitled"))
         )
     }
 }

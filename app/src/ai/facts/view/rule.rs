@@ -43,9 +43,6 @@ use crate::view_components::action_button::{ActionButton, NakedTheme};
 use crate::workspace::ToastStack;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
-// 顶部标题保留英文 "Rules"(用户偏好,不译为知识库)。
-pub const HEADER_TEXT: &str = "Rules";
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuleScope {
     Global,
@@ -451,7 +448,7 @@ impl RuleView {
             .with_child(
                 appearance
                     .ui_builder()
-                    .wrappable_text(HEADER_TEXT, true)
+                    .wrappable_text(crate::t!("rules-collection-name"), true)
                     .with_style(style::header_text())
                     .build()
                     .finish(),
@@ -710,12 +707,12 @@ impl RuleView {
         let formatted_name = match name {
             Some(name) => {
                 if name.is_empty() {
-                    "Untitled".to_string()
+                    crate::t!("common-untitled")
                 } else {
                     name
                 }
             }
-            None => "Untitled".to_string(),
+            None => crate::t!("common-untitled"),
         };
         // Truncate content to 3 lines
         let formatted_content = if content.split("\n").count() > 3 {
@@ -946,7 +943,10 @@ impl TypedActionView for RuleView {
                         Err(err) => {
                             ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                                 toast_stack.add_ephemeral_toast(
-                                    DismissibleToast::error(format!("{err}")),
+                                    DismissibleToast::error(crate::t!(
+                                        "file-picker-select-folder-error",
+                                        error = err.to_string()
+                                    )),
                                     window_id,
                                     ctx,
                                 );

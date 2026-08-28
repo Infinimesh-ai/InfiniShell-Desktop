@@ -84,7 +84,7 @@ fn entry_text(mode: TuiUsageDisplayMode, totals: ConversationUsageTotals) -> Str
         TuiUsageDisplayMode::Cost => totals
             .cost_in_cents
             .map(format_cost)
-            .unwrap_or_else(|| "Cost unavailable".to_owned()),
+            .unwrap_or_else(|| warp::t!("tui-cost-unavailable")),
     }
 }
 

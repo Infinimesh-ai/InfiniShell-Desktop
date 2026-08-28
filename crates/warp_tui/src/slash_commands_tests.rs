@@ -329,7 +329,12 @@ fn argument_hint_uses_shared_static_command_placeholder() {
 
     assert_eq!(
         argument_hint_text_for_parsed_input(&command, "/export-to-file "),
-        Some("<optional filename>")
+        Some(
+            slash_commands::EXPORT_TO_FILE
+                .argument_hint()
+                .expect("export command has an argument hint")
+                .text
+        )
     );
     assert_eq!(
         argument_hint_text_for_parsed_input(&command, "/export-to-file notes.md"),
@@ -346,7 +351,12 @@ fn argument_hint_uses_shared_static_command_placeholder() {
     });
     assert_eq!(
         argument_hint_text_for_parsed_input(&theme, "/theme "),
-        Some("<auto|light|dark>")
+        Some(
+            slash_commands::THEME
+                .argument_hint()
+                .expect("theme command has an argument hint")
+                .text
+        )
     );
 }
 

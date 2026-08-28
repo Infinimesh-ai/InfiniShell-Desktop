@@ -649,7 +649,7 @@ fn render_standard_top_section(
     };
     if !bullets.is_empty() {
         column = column.child(blank_row()).child(
-            TuiText::new("What's new")
+            TuiText::new(warp::t!("tui-whats-new"))
                 .with_style(header_style)
                 .truncate()
                 .finish(),
@@ -766,7 +766,7 @@ impl McpStatusCounts {
 
 fn mcp_status_label(snapshot: &warp::tui_export::TuiMcpSnapshot) -> (String, bool) {
     if snapshot.servers.is_empty() && snapshot.diagnostics.is_empty() {
-        return ("No servers available · run /mcp".to_owned(), false);
+        return (warp::t!("tui-mcp-no-servers"), false);
     }
     let mut counts = McpStatusCounts::default();
     for server in &snapshot.servers {
@@ -783,28 +783,31 @@ fn mcp_status_label(snapshot: &warp::tui_export::TuiMcpSnapshot) -> (String, boo
     } = counts;
     let mut parts = Vec::new();
     if running > 0 {
-        parts.push(format!("{running} connected"));
+        parts.push(warp::t!("tui-mcp-connected", count = running));
     }
     if starting > 0 {
-        parts.push(format!("{starting} starting"));
+        parts.push(warp::t!("tui-mcp-starting", count = starting));
     }
     if authenticating > 0 {
-        parts.push(format!("{authenticating} needs auth"));
+        parts.push(warp::t!("tui-mcp-needs-auth", count = authenticating));
     }
     if stopping > 0 {
-        parts.push(format!("{stopping} stopping"));
+        parts.push(warp::t!("tui-mcp-stopping", count = stopping));
     }
     if failed > 0 {
-        parts.push(format!("{failed} failed"));
+        parts.push(warp::t!("tui-mcp-failed", count = failed));
     }
     if offline > 0 {
-        parts.push(format!("{offline} offline"));
+        parts.push(warp::t!("tui-mcp-offline", count = offline));
     }
     if available > 0 {
-        parts.push(format!("{available} available"));
+        parts.push(warp::t!("tui-mcp-available", count = available));
     }
     if !snapshot.diagnostics.is_empty() {
-        parts.push(format!("{} config errors", snapshot.diagnostics.len()));
+        parts.push(warp::t!(
+            "tui-mcp-config-errors",
+            count = snapshot.diagnostics.len()
+        ));
     }
     (
         format!("{} · /mcp", parts.join(" · ")),
@@ -813,14 +816,14 @@ fn mcp_status_label(snapshot: &warp::tui_export::TuiMcpSnapshot) -> (String, boo
 }
 
 /// User-facing copy for each visible background updater status.
-fn autoupdate_status_label(status: TuiAutoupdateStatus) -> Option<&'static str> {
+fn autoupdate_status_label(status: TuiAutoupdateStatus) -> Option<String> {
     match status {
         TuiAutoupdateStatus::Idle => None,
-        TuiAutoupdateStatus::Checking => Some("checking for updates…"),
-        TuiAutoupdateStatus::Updating => Some("updating…"),
-        TuiAutoupdateStatus::UpToDate => Some("up to date"),
-        TuiAutoupdateStatus::Failed => Some("automatic update failed"),
-        TuiAutoupdateStatus::PendingRestart => Some("update installed, restart to apply"),
+        TuiAutoupdateStatus::Checking => Some(warp::t!("tui-autoupdate-checking")),
+        TuiAutoupdateStatus::Updating => Some(warp::t!("tui-autoupdate-updating")),
+        TuiAutoupdateStatus::UpToDate => Some(warp::t!("tui-autoupdate-up-to-date")),
+        TuiAutoupdateStatus::Failed => Some(warp::t!("tui-autoupdate-failed")),
+        TuiAutoupdateStatus::PendingRestart => Some(warp::t!("tui-autoupdate-restart-required")),
     }
 }
 
@@ -832,7 +835,7 @@ fn autoupdate_status_label(status: TuiAutoupdateStatus) -> Option<&'static str> 
 fn render_version_line(builder: &TuiUiBuilder, app: &AppContext) -> Box<dyn TuiElement> {
     let muted = builder.muted_text_style();
     let Some(version) = ChannelState::app_version() else {
-        return TuiText::new("dev build")
+        return TuiText::new(warp::t!("tui-dev-build"))
             .with_style(muted)
             .truncate()
             .finish();
@@ -910,7 +913,7 @@ fn render_project_context_body(
         // nothing may be known yet; this also covers projects with no
         // context at all.
         return column.child(
-            TuiText::new("Discovering project context…")
+            TuiText::new(warp::t!("tui-project-context-discovering"))
                 .with_style(builder.dim_text_style())
                 .truncate()
                 .finish(),
@@ -926,13 +929,12 @@ fn render_project_context_body(
         )
     };
     for file in rule_files {
-        column = status_row(column, format!("{file} loaded"));
+        column = status_row(column, warp::t!("tui-project-rule-loaded", file = file));
     }
     if project_skill_count > 0 {
-        let plural = if project_skill_count == 1 { "" } else { "s" };
         column = status_row(
             column,
-            format!("{project_skill_count} skill{plural} discovered"),
+            warp::t!("tui-project-skills-discovered", count = project_skill_count),
         );
     }
     column

@@ -61,11 +61,6 @@ const ESC_BADGE_HEIGHT: f32 = 14.;
 const ESC_BADGE_CORNER_RADIUS: Radius = Radius::Pixels(3.);
 /// Size of the close (X) icon in the header.
 const CLOSE_ICON_SIZE: f32 = 14.;
-/// Font size for inline validation error messages.
-/// Error shown when the user-entered worktree branch name contains invalid characters.
-const INVALID_BRANCH_NAME_ERROR: &str =
-    "Name can only contain letters, numbers, hyphens, and underscores";
-
 /// Returns `true` if `name` is a valid worktree branch name.
 ///
 /// Valid names contain only ASCII letters, digits, hyphens, and underscores.
@@ -176,7 +171,7 @@ impl NewWorktreeModal {
         let editor = ctx.add_typed_action_view(|ctx| {
             let options = SingleLineEditorOptions::default();
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text("my-feature-branch", ctx);
+            editor.set_placeholder_text(crate::t!("tab-config-worktree-name-placeholder"), ctx);
             editor
         });
         ctx.subscribe_to_view(&editor, |me, _, event, ctx| match event {
@@ -314,7 +309,7 @@ impl View for NewWorktreeModal {
         // ── Header (custom — Modal wrapper has no title) ────────────────
         let header = {
             let title = Text::new_inline(
-                "New worktree".to_string(),
+                crate::t!("tab-config-new-worktree-title"),
                 appearance.ui_font_family(),
                 appearance.ui_font_heading_3(),
             )
@@ -453,7 +448,7 @@ impl View for NewWorktreeModal {
             .with_child(checkbox_element)
             .with_child(
                 Text::new_inline(
-                    "Autogenerate worktree branch name".to_string(),
+                    crate::t!("tab-config-autogenerate-worktree-branch-name"),
                     appearance.ui_font_family(),
                     appearance.ui_font_size(),
                 )
@@ -484,7 +479,7 @@ impl View for NewWorktreeModal {
                 body.add_child(
                     Container::new(
                         Text::new_inline(
-                            INVALID_BRANCH_NAME_ERROR.to_string(),
+                            crate::t!("tab-config-invalid-worktree-branch-name"),
                             appearance.ui_font_family(),
                             appearance.ui_font_body(),
                         )

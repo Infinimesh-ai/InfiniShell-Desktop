@@ -320,19 +320,20 @@ impl TuiAttachmentModel {
 
     fn validate_new_images(&self, count: usize, ctx: &AppContext) -> Result<(), String> {
         if !FeatureFlag::ImageAsContext.is_enabled() {
-            return Err("Image attachments are unavailable.".to_owned());
+            return Err(warp::t!("tui-image-attachments-unavailable"));
         }
         if self.is_processing() {
-            return Err("Wait for the current image attachment to finish.".to_owned());
+            return Err(warp::t!("tui-image-attachment-wait"));
         }
         let attached_images = self.context_model.as_ref(ctx).pending_images().len();
         if attached_images + count > MAX_IMAGE_COUNT_FOR_QUERY {
-            return Err(format!(
-                "Image attachment limit is {MAX_IMAGE_COUNT_FOR_QUERY} per query."
+            return Err(warp::t!(
+                "tui-image-attachment-limit",
+                count = MAX_IMAGE_COUNT_FOR_QUERY
             ));
         }
         if !LLMPreferences::as_ref(ctx).vision_supported(ctx, Some(self.terminal_surface_id)) {
-            return Err("The selected model does not support image attachments.".to_owned());
+            return Err(warp::t!("tui-model-no-image-attachments"));
         }
         Ok(())
     }

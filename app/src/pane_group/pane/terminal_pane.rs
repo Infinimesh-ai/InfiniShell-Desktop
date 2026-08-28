@@ -1434,8 +1434,7 @@ fn dispatch_start_agent_conversation(
                     parent_conversation_id: request.parent_conversation_id,
                     request_id: Some(request.id),
                     orchestration_harness: None,
-                    error_message: "Local child agents are not supported in WASM builds."
-                        .to_string(),
+                    error_message: crate::t!("agent-local-child-wasm-unsupported"),
                 },
                 ctx,
             );
@@ -1594,9 +1593,7 @@ fn launch_local_no_harness_child(
                             parent_conversation_id,
                             request_id: Some(request_id),
                             orchestration_harness: Some(Harness::Oz),
-                            error_message:
-                                "Failed to create a hidden pane for the local child agent."
-                                    .to_string(),
+                            error_message: crate::t!("ambient-agent-create-hidden-pane-failed"),
                         },
                         ctx,
                     );
@@ -1604,6 +1601,7 @@ fn launch_local_no_harness_child(
             }
         }
         Err(error) => {
+            let error = error.to_string();
             let _ = create_error_child_agent_conversation(
                 group,
                 ErrorChildAgentConversationRequest {
@@ -1612,7 +1610,10 @@ fn launch_local_no_harness_child(
                     parent_conversation_id,
                     request_id: Some(request_id),
                     orchestration_harness: Some(Harness::Oz),
-                    error_message: format!("Failed to create local child task: {error}"),
+                    error_message: crate::t!(
+                        "ambient-agent-create-local-child-failed",
+                        error = error.as_str()
+                    ),
                 },
                 ctx,
             );

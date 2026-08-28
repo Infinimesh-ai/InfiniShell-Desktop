@@ -1032,7 +1032,7 @@ impl AgentProvidersWidget {
         // ---- Modalities 区 ----
         let modalities_label = Container::new(
             Text::new(
-                "Modalities".to_string(),
+                crate::t!("settings-agent-providers-model-modalities"),
                 appearance.ui_font_family(),
                 appearance.ui_font_size(),
             )
@@ -1074,19 +1074,19 @@ impl AgentProvidersWidget {
             .with_run_spacing(4.)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(modality_chip(
-                "Image",
+                &crate::t!("settings-agent-providers-model-modality-image"),
                 model.image,
                 row.image_chip_state.clone(),
                 ModelCapabilityKind::Image,
             ))
             .with_child(modality_chip(
-                "PDF",
+                &crate::t!("settings-agent-providers-model-modality-pdf"),
                 model.pdf,
                 row.pdf_chip_state.clone(),
                 ModelCapabilityKind::Pdf,
             ))
             .with_child(modality_chip(
-                "Audio",
+                &crate::t!("settings-agent-providers-model-modality-audio"),
                 model.audio,
                 row.audio_chip_state.clone(),
                 ModelCapabilityKind::Audio,
@@ -1096,7 +1096,7 @@ impl AgentProvidersWidget {
         // ---- Capabilities 区(reasoning / tool_call) ----
         let capabilities_label = Container::new(
             Text::new(
-                "Capabilities".to_string(),
+                crate::t!("settings-agent-providers-model-capabilities"),
                 appearance.ui_font_family(),
                 appearance.ui_font_size(),
             )
@@ -1131,7 +1131,7 @@ impl AgentProvidersWidget {
             .with_run_spacing(4.)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(bool_chip(
-                "Reasoning",
+                &crate::t!("settings-agent-providers-model-capability-reasoning"),
                 model.reasoning,
                 row.reasoning_chip_state.clone(),
                 AISettingsPageAction::ToggleAgentProviderModelReasoning {
@@ -1140,7 +1140,7 @@ impl AgentProvidersWidget {
                 },
             ))
             .with_child(bool_chip(
-                "Tool Calling",
+                &crate::t!("settings-agent-providers-model-capability-tool-calling"),
                 model.tool_call,
                 row.tool_call_chip_state.clone(),
                 AISettingsPageAction::ToggleAgentProviderModelToolCall {
@@ -1152,7 +1152,7 @@ impl AgentProvidersWidget {
 
         // ---- Remove 按钮(展开后才出现,避免折叠态误删)----
         let remove_button = Self::render_card_button_preserving_draft(
-            "Remove model",
+            crate::t!("settings-agent-providers-remove-model"),
             row.remove_button_state.clone(),
             draft_editors,
             AISettingsPageAction::RemoveAgentProviderModel {
@@ -1266,7 +1266,7 @@ impl AgentProvidersWidget {
 
         let headers_label = Container::new(
             Text::new(
-                "Extra Headers".to_string(),
+                crate::t!("settings-agent-providers-extra-headers"),
                 appearance.ui_font_family(),
                 appearance.ui_font_size(),
             )
@@ -1321,7 +1321,7 @@ impl AgentProvidersWidget {
         }
 
         let add_header_button = Self::render_card_button_preserving_draft(
-            "+ Add Header",
+            crate::t!("settings-agent-providers-add-header"),
             row.add_header_button_state.clone(),
             draft_editors.clone(),
             AISettingsPageAction::AddAgentProviderHeader {

@@ -48,9 +48,9 @@ use crate::ai::agent::{
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::api_error::AIApiError;
 use crate::ai::byop_readiness::{
-    BLOCKED_BYOP_REQUEST_MESSAGE, BlockedByopReadinessError, PendingByopToolResultsError,
-    ReadinessCategory, ReadinessDiagnosticCoalescer, ReadinessDiagnosticContext,
-    ReadinessDiagnosticLevel, ReadinessTriggerLayer,
+    BlockedByopReadinessError, PendingByopToolResultsError, ReadinessCategory,
+    ReadinessDiagnosticCoalescer, ReadinessDiagnosticContext, ReadinessDiagnosticLevel,
+    ReadinessTriggerLayer,
 };
 use crate::ai::document::ai_document_model::{
     AIDocumentId, AIDocumentModel, AIDocumentUserEditStatus,
@@ -3059,7 +3059,7 @@ impl BlocklistAIController {
                     conversation_data.id,
                     request_params.model.clone(),
                     is_queued_prompt,
-                    BLOCKED_BYOP_REQUEST_MESSAGE.to_owned(),
+                    crate::t!("ai-byop-history-corrupted"),
                     ctx,
                 );
             }

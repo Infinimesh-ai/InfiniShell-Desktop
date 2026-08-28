@@ -204,22 +204,29 @@ impl TuiPlanView {
         if self.presentation.documents.len() == 1 {
             self.presentation.documents[0].title.clone()
         } else {
-            format!("{} documents", self.presentation.documents.len())
+            warp::t!(
+                "tui-count-documents",
+                count = self.presentation.documents.len()
+            )
         }
     }
 
-    fn header_label(&self, state: ToolCallDisplayState) -> (&'static str, Option<String>) {
+    fn header_label(&self, state: ToolCallDisplayState) -> (String, Option<String>) {
         if matches!(&self.action.action, AIAgentActionType::CreateDocuments(_)) {
             match state {
                 ToolCallDisplayState::Constructing | ToolCallDisplayState::Running => {
-                    ("Creating ", Some(self.document_subject()))
+                    (warp::t!("tui-creating"), Some(self.document_subject()))
                 }
                 ToolCallDisplayState::Pending | ToolCallDisplayState::Blocked => {
-                    ("Create plan", None)
+                    (warp::t!("tui-tool-plan-create"), None)
                 }
-                ToolCallDisplayState::Succeeded => ("Created ", Some(self.document_subject())),
-                ToolCallDisplayState::Failed => ("Failed to create plan", None),
-                ToolCallDisplayState::Cancelled => ("Create plan cancelled", None),
+                ToolCallDisplayState::Succeeded => {
+                    (warp::t!("tui-created"), Some(self.document_subject()))
+                }
+                ToolCallDisplayState::Failed => (warp::t!("tui-tool-plan-create-failed"), None),
+                ToolCallDisplayState::Cancelled => {
+                    (warp::t!("tui-tool-plan-create-cancelled"), None)
+                }
             }
         } else {
             debug_assert!(matches!(
@@ -228,14 +235,16 @@ impl TuiPlanView {
             ));
             match state {
                 ToolCallDisplayState::Constructing | ToolCallDisplayState::Running => {
-                    ("Updating plan", None)
+                    (warp::t!("tui-plan-updating"), None)
                 }
                 ToolCallDisplayState::Pending | ToolCallDisplayState::Blocked => {
-                    ("Update plan", None)
+                    (warp::t!("tui-tool-plan-update"), None)
                 }
-                ToolCallDisplayState::Succeeded => ("Updated plan", None),
-                ToolCallDisplayState::Failed => ("Failed to update plan", None),
-                ToolCallDisplayState::Cancelled => ("Update plan cancelled", None),
+                ToolCallDisplayState::Succeeded => (warp::t!("tui-plan-updated"), None),
+                ToolCallDisplayState::Failed => (warp::t!("tui-tool-plan-update-failed"), None),
+                ToolCallDisplayState::Cancelled => {
+                    (warp::t!("tui-tool-plan-update-cancelled"), None)
+                }
             }
         }
     }
@@ -314,9 +323,10 @@ impl TuiView for TuiPlanView {
         let (label, subject) = self.header_label(state);
         let mut header = vec![
             (format!("{} ", state.glyph()), state.glyph_style(&builder)),
-            (label.to_owned(), header_style),
+            (label, header_style),
         ];
         if let Some(subject) = subject {
+            header.push((" ".to_owned(), header_style));
             header.push((
                 subject,
                 builder.link_text_style().add_modifier(Modifier::BOLD),
@@ -339,7 +349,7 @@ impl TuiView for TuiPlanView {
         let mut content = TuiFlex::column().child(collapsible);
         if let Some(binding) = plan_toggle_hint(app) {
             content = content.child(
-                TuiText::new(format!("{binding} to collapse plan"))
+                TuiText::new(warp::t!("tui-hint-collapse-plan", binding = binding))
                     .with_style(builder.muted_text_style())
                     .finish(),
             );

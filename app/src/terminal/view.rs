@@ -266,7 +266,7 @@ use crate::ai::predict::prompt_suggestions::{
     is_accept_prompt_suggestion_bound_to_cmd_enter,
     is_accept_prompt_suggestion_bound_to_ctrl_enter,
 };
-use crate::ai_assistant::{ASK_AI_ASSISTANT_TEXT, AskAIType};
+use crate::ai_assistant::{AskAIType, ask_ai_assistant_text};
 use crate::antivirus::AntivirusInfo;
 use crate::appearance::{Appearance, AppearanceEvent};
 use crate::auth::{AuthManager, AuthState, AuthStateProvider, AuthViewVariant};
@@ -698,8 +698,6 @@ const MOVE_LINE_END_BINDING_NAME: &str = "editor_view:move_to_line_end";
 
 const DEFAULT_AI_BLOCK_HEIGHT: f32 = 96.;
 
-pub const DEFAULT_ASK_AI_AUTOSUGGESTION_TEXT: &str = "What happened here?";
-
 const WARP_MD_PATH: &str = "WARP.md";
 
 pub const LONG_RUNNING_AGENT_REQUESTED_COMMAND_CONTEXT_KEY: &str = "LongRunningRequestedCommand";
@@ -768,6 +766,19 @@ pub struct NotificationsErrorBanner {
     pub banner_type: NotificationsErrorBannerType,
 }
 
+fn notification_error_banner_title(error: Option<&NotificationSendError>) -> String {
+    match error {
+        Some(
+            NotificationSendError::PermissionsDenied
+            | NotificationSendError::PermissionsNotYetGranted,
+        ) => crate::t!("terminal-notification-permission-error"),
+        Some(NotificationSendError::Other { .. }) => {
+            crate::t!("terminal-notification-send-error")
+        }
+        None => crate::t!("terminal-notification-send-error-short"),
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct BlockNotification {
     pub title: String,
@@ -785,19 +796,19 @@ pub enum NotificationsTrigger {
 }
 
 impl NotificationsTrigger {
-    pub fn discovery_banner_copy(&self) -> &'static str {
+    pub fn discovery_banner_copy(&self) -> String {
         match self {
             NotificationsTrigger::LongRunningCommand(..) => {
-                "InfiniShell can notify you when long-running commands finish."
+                crate::t!("terminal-notification-discovery-long-command")
             }
             NotificationsTrigger::AgentTaskCompleted(..) => {
-                "InfiniShell can notify you when an agent finishes responding."
+                crate::t!("terminal-notification-discovery-agent")
             }
             NotificationsTrigger::NeedsAttention => {
-                "InfiniShell can notify you when a command or agent needs your attention."
+                crate::t!("terminal-notification-discovery-attention")
             }
             NotificationsTrigger::PasswordPrompt => {
-                "InfiniShell can notify you when you're prompted to enter a password."
+                crate::t!("terminal-notification-discovery-password")
             }
         }
     }
@@ -824,35 +835,48 @@ impl NotificationsTrigger {
 
         let (title_suffix, body_prefix) = match self {
             LongRunningCommand(command_succeeded, block_duration) => {
-                let status = if *command_succeeded {
-                    "finished"
-                } else {
-                    "failed"
-                };
-
                 let duration_seconds = block_duration.as_secs_f32();
                 let duration_seconds = if duration_seconds >= 1. {
                     format!("{}", duration_seconds.round() as usize)
                 } else {
                     format!("{duration_seconds:.1}")
                 };
-
+                let title_suffix = if *command_succeeded {
+                    crate::t!(
+                        "terminal-notification-command-finished-after",
+                        duration = duration_seconds.as_str()
+                    )
+                } else {
+                    crate::t!(
+                        "terminal-notification-command-failed-after",
+                        duration = duration_seconds.as_str()
+                    )
+                };
                 (
-                    format!(" {status} after {duration_seconds}s"),
-                    "Latest output: ".to_string(),
+                    title_suffix,
+                    crate::t!("terminal-notification-latest-output-prefix"),
                 )
             }
             AgentTaskCompleted(command_succeeded) => {
                 if *command_succeeded {
-                    (" finished".to_string(), "Latest output: ".to_string())
+                    (
+                        crate::t!("terminal-notification-agent-finished-suffix"),
+                        crate::t!("terminal-notification-latest-output-prefix"),
+                    )
                 } else {
-                    (" failed".to_string(), "Error: ".to_string())
+                    (
+                        crate::t!("terminal-notification-agent-failed-suffix"),
+                        crate::t!("terminal-notification-error-prefix"),
+                    )
                 }
             }
-            NotificationsTrigger::NeedsAttention => (" blocked".to_string(), "".to_string()),
+            NotificationsTrigger::NeedsAttention => (
+                crate::t!("terminal-notification-blocked-suffix"),
+                String::new(),
+            ),
             PasswordPrompt => (
-                " is waiting for a password".to_string(),
-                "Latest output: ".to_string(),
+                crate::t!("terminal-notification-waiting-password-suffix"),
+                crate::t!("terminal-notification-latest-output-prefix"),
             ),
         };
 
@@ -3932,7 +3956,7 @@ impl TerminalView {
                 // TODO(Linear PLAT-512): update Banner to support generic event type.
                 vec![
                     BannerTextButton::new(
-                        String::from("Yes, use Emacs-style bindings"),
+                        crate::t!("terminal-banner-use-emacs-bindings"),
                         Rc::new(|event_ctx, _app_ctx, _| {
                             event_ctx.dispatch_typed_action(
                                 BannerAction::<TerminalAction>::Dismiss(DismissalType::Temporary),
@@ -3940,7 +3964,7 @@ impl TerminalView {
                         }),
                     ),
                     BannerTextButton::new(
-                        String::from("No, keep IDE bindings"),
+                        crate::t!("terminal-banner-keep-ide-bindings"),
                         Rc::new(|event_ctx, _app_ctx, _| {
                             event_ctx.dispatch_typed_action(
                                 BannerAction::<TerminalAction>::Dismiss(DismissalType::Permanent),
@@ -3961,20 +3985,20 @@ impl TerminalView {
 
         let osc52_clipboard_blocked_banner = ctx.add_typed_action_view(|_| {
             Banner::<TerminalAction>::new_with_buttons(
-                BannerTextContent::plain_text(
-                    "A terminal program tried to access your clipboard. This is disabled by default for security reasons.",
-                ),
+                BannerTextContent::plain_text(crate::t!("terminal-clipboard-access-blocked")),
                 vec![
                     BannerTextButton::new(
-                        "Allow".to_string(),
+                        crate::t!("common-allow"),
                         Rc::new(|event_ctx, _ctx, _position| {
-                            event_ctx.dispatch_typed_action(BannerAction::<TerminalAction>::Action(
-                                TerminalAction::Osc52AllowBlockedClipboardOperation,
-                            ));
+                            event_ctx.dispatch_typed_action(
+                                BannerAction::<TerminalAction>::Action(
+                                    TerminalAction::Osc52AllowBlockedClipboardOperation,
+                                ),
+                            );
                         }),
                     ),
                     BannerTextButton::new(
-                        "Don't show again".to_string(),
+                        crate::t!("common-dont-show-again"),
                         Rc::new(|event_ctx, _ctx, _position| {
                             event_ctx.dispatch_typed_action(
                                 BannerAction::<TerminalAction>::Dismiss(DismissalType::Permanent),
@@ -4473,11 +4497,17 @@ impl TerminalView {
                             me.show_ssh_remote_server_failed_banner(
                                 *session_id,
                                 remote_server::transport::UserFacingError {
-                                    body: "Failed to start SSH extension".into(),
+                                    body: remote_server::transport::UserFacingErrorBody::Custom(
+                                        crate::t!("terminal-ssh-extension-start-failed"),
+                                    ),
                                     detail: if error.is_empty() {
                                         None
                                     } else {
-                                        Some(error.clone())
+                                        Some(
+                                            remote_server::transport::UserFacingErrorDetail::Custom(
+                                                error.clone(),
+                                            ),
+                                        )
                                     },
                                 },
                                 ctx,
@@ -5318,8 +5348,8 @@ impl TerminalView {
                 let block_id = BlockId::from(block.id().to_string());
                 let suggestion = AgentModePromptSuggestion::Success(PromptSuggestion {
                     id: Uuid::new_v4().to_string(),
-                    label: Some("Execute this plan".to_string()),
-                    prompt: "Execute this plan".to_string(),
+                    label: Some(crate::t!("terminal-execute-this-plan")),
+                    prompt: crate::t!("terminal-execute-this-plan"),
                     coding_query_context: None,
                     static_prompt_suggestion_name: Some("EXECUTE_CREATED_PLAN".to_string()),
                     should_start_new_conversation: false,
@@ -7660,21 +7690,18 @@ impl TerminalView {
                 .get_pending_action(app)
                 .map(|action| match &action.action {
                     AIAgentActionType::RequestCommandOutput { command, .. } => {
-                        format!("InfiniShell Agent needs your permission to run `{command}`")
+                        crate::t!("terminal-agent-permission-run", command = command.as_str())
                     }
-                    AIAgentActionType::ReadFiles(..) => {
-                        "InfiniShell Agent needs your permission to read files".to_string()
-                    }
+                    AIAgentActionType::ReadFiles(..) => crate::t!("terminal-agent-permission-read"),
                     AIAgentActionType::RequestFileEdits { .. } => {
-                        "InfiniShell Agent needs your permission to edit a file".to_string()
+                        crate::t!("terminal-agent-permission-edit")
                     }
                     AIAgentActionType::WriteToLongRunningShellCommand { .. } => {
-                        "InfiniShell Agent needs your permission to interact with a running shell command"
-                            .to_string()
+                        crate::t!("terminal-agent-permission-running-shell")
                     }
-                    _ => "InfiniShell Agent needs your confirmation to continue".to_string(),
+                    _ => crate::t!("terminal-agent-confirmation"),
                 })
-                .unwrap_or("InfiniShell Agent needs your confirmation to continue".to_string());
+                .unwrap_or_else(|| crate::t!("terminal-agent-confirmation"));
             return Some(AIBlockNotificationSummary {
                 success: false,
                 title,
@@ -7731,7 +7758,7 @@ impl TerminalView {
                     _ => Some(AIBlockNotificationSummary {
                         success: false,
                         title,
-                        description: "An unknown error occurred".to_string(),
+                        description: crate::t!("common-unknown-error"),
                     }),
                 }
             }
@@ -9856,8 +9883,8 @@ impl TerminalView {
     fn show_warpify_banner(
         &mut self,
         command: String,
-        title: &str,
-        lowercase_title: &str,
+        title: String,
+        subject: String,
         warpify_keybinding: Option<Keystroke>,
         telemetry_event: TelemetryEvent,
         ctx: &mut ViewContext<Self>,
@@ -9877,14 +9904,12 @@ impl TerminalView {
         }
 
         let a11y_message = match &warpify_keybinding {
-            Some(keystroke) => format!(
-                "You can press {} to Warpify this {} for more InfiniShell features.",
-                keystroke.displayed(),
-                lowercase_title
+            Some(keystroke) => crate::t!(
+                "terminal-warpify-a11y-with-keybinding",
+                keybinding = keystroke.displayed(),
+                subject = subject.as_str()
             ),
-            None => {
-                format!("You can Warpify this {lowercase_title} for more InfiniShell features.")
-            }
+            None => crate::t!("terminal-warpify-a11y", subject = subject.as_str()),
         };
 
         model
@@ -9894,7 +9919,7 @@ impl TerminalView {
             )));
 
         let a11y_content = AccessibilityContent::new(
-            format!("{title} recognized."),
+            crate::t!("terminal-warpify-recognized", subject = title.as_str()),
             a11y_message,
             WarpA11yRole::TextRole,
         );
@@ -9998,7 +10023,7 @@ impl TerminalView {
 
         let a11y_content = AccessibilityContent::new(
             trigger.discovery_banner_copy(),
-            "You can enable notifications through the command palette.",
+            crate::t!("terminal-notification-enable-command-palette"),
             WarpA11yRole::TextRole,
         );
         ctx.emit_a11y_content(a11y_content);
@@ -10027,17 +10052,16 @@ impl TerminalView {
                 InlineBannerType::NotificationsError,
             ));
 
-        let banner_title = self
-            .inline_banners_state
-            .notifications_error_banner
-            .error
-            .as_ref()
-            .map(|e| e.notifications_error_banner_title())
-            .unwrap_or("Error sending notification");
+        let banner_title = notification_error_banner_title(
+            self.inline_banners_state
+                .notifications_error_banner
+                .error
+                .as_ref(),
+        );
 
         let a11y_content = AccessibilityContent::new(
             banner_title,
-            "Make sure you have enabled access for InfiniShell notifications in System Preferences.",
+            crate::t!("terminal-notification-check-system-settings"),
             WarpA11yRole::TextRole,
         );
         ctx.emit_a11y_content(a11y_content);
@@ -14300,8 +14324,11 @@ impl TerminalView {
             });
 
             let a11y_content = AccessibilityContent::new(
-                format!("Suggested corrected command: {}", correction.command),
-                "Press right arrow to insert or keep editing to ignore",
+                crate::t!(
+                    "terminal-correction-suggested-command",
+                    command = correction.command.as_str()
+                ),
+                crate::t!("terminal-correction-a11y-help"),
                 WarpA11yRole::HelpRole,
             );
             ctx.emit_a11y_content(a11y_content);
@@ -16166,12 +16193,12 @@ impl TerminalView {
                         // URI verbatim; "Open link" dispatches through
                         // `OpenGridLink`.
                         vec![
-                            MenuItemFields::new("Open link")
+                            MenuItemFields::new(crate::t!("common-open-link"))
                                 .with_on_select_action(TerminalAction::OpenGridLink(
                                     highlighted_link.clone(),
                                 ))
                                 .into_item(),
-                            MenuItemFields::new("Copy link")
+                            MenuItemFields::new(crate::t!("common-copy-link"))
                                 .with_on_select_action(TerminalAction::ContextMenu(
                                     ContextMenuAction::CopyUrl {
                                         url_content: uri.clone(),
@@ -16208,9 +16235,9 @@ impl TerminalView {
                     fields.extend([
                         MenuItem::Separator,
                         MenuItemFields::new(if FeatureFlag::AgentMode.is_enabled() {
-                            *ATTACH_AS_AGENT_MODE_CONTEXT_TEXT
+                            ATTACH_AS_AGENT_MODE_CONTEXT_TEXT.to_string()
                         } else {
-                            ASK_AI_ASSISTANT_TEXT
+                            ask_ai_assistant_text()
                         })
                         .with_on_select_action(TerminalAction::ContextMenu(
                             ContextMenuAction::AskAI(if FeatureFlag::AgentMode.is_enabled() {
@@ -16656,7 +16683,7 @@ impl TerminalView {
             return None;
         }
         Some(
-            MenuItemFields::new("Clear Blocks")
+            MenuItemFields::new(crate::t!("menu-block-clear-blocks"))
                 .with_on_select_action(TerminalAction::ClearBuffer)
                 .with_key_shortcut_label(keybinding_name_to_display_string(
                     "terminal:clear_blocks",
@@ -17176,9 +17203,9 @@ impl TerminalView {
                 menu_items.extend([
                     MenuItem::Separator,
                     MenuItemFields::new(if FeatureFlag::AgentMode.is_enabled() {
-                        *ATTACH_AS_AGENT_MODE_CONTEXT_TEXT
+                        ATTACH_AS_AGENT_MODE_CONTEXT_TEXT.to_string()
                     } else {
-                        ASK_AI_ASSISTANT_TEXT
+                        ask_ai_assistant_text()
                     })
                     .with_on_select_action(TerminalAction::ContextMenu(ContextMenuAction::AskAI(
                         AskAISource::SelectedTerminalText,
@@ -19452,9 +19479,11 @@ impl TerminalView {
                 populate_input_box,
             } => {
                 if *populate_input_box {
-                    let query_prefix = "Explain the following:\n";
                     let formatted_selection = { format!("```\n{}\n```", text.trim()) };
-                    let combined_query = Some(format!("{query_prefix}{formatted_selection}"));
+                    let combined_query = Some(crate::t!(
+                        "terminal-explain-following",
+                        selection = formatted_selection.as_str()
+                    ));
                     (combined_query, None)
                 } else {
                     (None, None)
@@ -19463,17 +19492,20 @@ impl TerminalView {
 
             AskAIType::FromBlock { block_index, .. } => {
                 context_block_indices.insert(*block_index);
-                (None, Some(DEFAULT_ASK_AI_AUTOSUGGESTION_TEXT))
+                (None, Some(crate::t!("terminal-what-happened-here")))
             }
             AskAIType::FromBlocks { block_indices } => {
                 context_block_indices.extend(block_indices);
-                (None, Some(DEFAULT_ASK_AI_AUTOSUGGESTION_TEXT))
+                (None, Some(crate::t!("terminal-what-happened-here")))
             }
 
-            AskAIType::FromAICommandSearch { query } => {
-                let query_prefix = "What is the command to: ";
-                (Some(format!("{}{}", query_prefix, query.trim())), None)
-            }
+            AskAIType::FromAICommandSearch { query } => (
+                Some(crate::t!(
+                    "terminal-command-for-query",
+                    query = query.trim()
+                )),
+                None,
+            ),
         };
 
         // We don't support attaching blocks as context in new panes.
@@ -19514,7 +19546,7 @@ impl TerminalView {
                 && let Some(autosuggestion) = auto_suggestion
             {
                 input.set_autosuggestion(
-                    autosuggestion,
+                    autosuggestion.as_str(),
                     AutosuggestionType::AgentModeQuery {
                         context_block_ids: selected_block_ids,
                         was_intelligent_autosuggestion: false,
@@ -21290,7 +21322,7 @@ impl TerminalView {
                     let password_trigger = NotificationsTrigger::NeedsAttention;
                     let notification_content = password_trigger.create_notification_content(
                         active_block.command_to_string(),
-                        "Command is waiting for a password".to_string(),
+                        crate::t!("terminal-command-waiting-password"),
                     );
                     ctx.emit(Event::SendNotification(notification_content));
                     send_telemetry_from_ctx!(
@@ -21371,13 +21403,13 @@ impl TerminalView {
 
         let Some(ambient_agent_view_model) = self.ambient_agent_view_model.clone() else {
             self.restore_followup_prompt_after_failed_submission(&prompt, ctx);
-            self.show_error_toast("Couldn't continue this cloud task.".to_string(), ctx);
+            self.show_error_toast(crate::t!("terminal-cloud-task-continue-failed"), ctx);
             return true;
         };
 
         if ambient_agent_view_model.as_ref(ctx).task_id() != Some(task_id) {
             self.restore_followup_prompt_after_failed_submission(&prompt, ctx);
-            self.show_error_toast("Couldn't continue this cloud task.".to_string(), ctx);
+            self.show_error_toast(crate::t!("terminal-cloud-task-continue-failed"), ctx);
             return true;
         }
 
@@ -21387,7 +21419,7 @@ impl TerminalView {
         // 默认关闭,函数开头就 return false,正常走不到这里)。为了不把用户输入静默吞掉,
         // 这里回退到与上面两处相同的失败路径:把 prompt 还给输入框并提示。
         self.restore_followup_prompt_after_failed_submission(&prompt, ctx);
-        self.show_error_toast("Couldn't continue this cloud task.".to_string(), ctx);
+        self.show_error_toast(crate::t!("terminal-cloud-task-continue-failed"), ctx);
         true
     }
 
@@ -21449,7 +21481,7 @@ impl TerminalView {
                 {
                     return;
                 }
-                self.show_error_toast("Couldn't continue this cloud task.".to_string(), ctx);
+                self.show_error_toast(crate::t!("terminal-cloud-task-continue-failed"), ctx);
             }
             // 同上:取消共享会话会话的云端中继链路在 Zap 中不存在。
             InputEvent::CancelSharedSessionConversation { .. } => {}
@@ -22174,21 +22206,17 @@ impl TerminalView {
             return;
         }
         let text = match blocked_type {
-            Osc52ClipboardBlockedType::Write => {
-                "A terminal program tried to write to your clipboard. This is disabled by default for security reasons, to protect against malicious software."
-            }
-            Osc52ClipboardBlockedType::Read => {
-                "A terminal program tried to read your clipboard. This is disabled by default for security reasons, to protect against malicious software."
-            }
+            Osc52ClipboardBlockedType::Write => crate::t!("terminal-clipboard-write-blocked"),
+            Osc52ClipboardBlockedType::Read => crate::t!("terminal-clipboard-read-blocked"),
         };
         let button_label = match blocked_type {
-            Osc52ClipboardBlockedType::Write => "Allow clipboard writes",
-            Osc52ClipboardBlockedType::Read => "Allow clipboard reads and writes",
+            Osc52ClipboardBlockedType::Write => crate::t!("terminal-clipboard-allow-writes"),
+            Osc52ClipboardBlockedType::Read => crate::t!("terminal-clipboard-allow-read-write"),
         };
         self.osc52_clipboard_blocked_banner
             .update(ctx, |banner, ctx| {
                 banner.set_content(BannerTextContent::plain_text(text), ctx);
-                banner.set_action_button_label(0, button_label, ctx);
+                banner.set_action_button_label(0, button_label.as_str(), ctx);
             });
         self.osc52_clipboard_blocked_type = Some(blocked_type);
         ctx.notify();
@@ -23241,11 +23269,27 @@ impl TerminalView {
             Some(block) => block,
         };
 
-        let start = block.start_ts().map_or_else(String::new, |b| {
-            format!("Started at: {}", b.format("%a %b %-d at %-I:%M:%S %p"))
+        let uses_chinese_date_format = crate::i18n::current_languages()
+            .first()
+            .is_some_and(|language| language.to_string().starts_with("zh"));
+        let start = block.start_ts().map_or_else(String::new, |timestamp| {
+            let date = if uses_chinese_date_format {
+                timestamp.format("%Y-%m-%d %H:%M:%S").to_string()
+            } else {
+                timestamp.format("%a, %b %-d at %-I:%M:%S %p").to_string()
+            };
+            crate::t!("terminal-block-started-at", date = date.as_str())
         });
-        let end = block.completed_ts().map_or_else(String::new, |b| {
-            format!("\nCompleted at: {}", b.format("%a %b %-d at %-I:%M:%S %p"))
+        let end = block.completed_ts().map_or_else(String::new, |timestamp| {
+            let date = if uses_chinese_date_format {
+                timestamp.format("%Y-%m-%d %H:%M:%S").to_string()
+            } else {
+                timestamp.format("%a, %b %-d at %-I:%M:%S %p").to_string()
+            };
+            format!(
+                "\n{}",
+                crate::t!("terminal-block-completed-at", date = date.as_str())
+            )
         });
         format!("{start}{end}")
     }
@@ -23467,7 +23511,7 @@ impl TerminalView {
         render_hoverable_block_button(
             icon,
             Some(ToolbeltButtonTooltip {
-                label: "Bookmark this block to quickly scroll to it".to_string(),
+                label: crate::t!("terminal-bookmark-block-tooltip"),
                 tool_tip_below_button,
             }),
             false,
@@ -23527,9 +23571,9 @@ impl TerminalView {
                         && input_mode.is_inverted_blocklist()
                         && is_long_running_command
                     {
-                        "Lock scrolling at bottom of block".to_string()
+                        crate::t!("terminal-lock-scrolling-at-block-bottom")
                     } else {
-                        "Jump to the bottom of this block".to_string()
+                        crate::t!("terminal-jump-to-block-bottom")
                     };
 
                     let tool_tip = appearance
@@ -23723,18 +23767,17 @@ impl TerminalView {
             .notifications_error_banner
             .banner_type
         {
-            let banner_title = self
-                .inline_banners_state
-                .notifications_error_banner
-                .error
-                .as_ref()
-                .map(|e| e.notifications_error_banner_title())
-                .unwrap_or("Error sending notification");
+            let banner_title = notification_error_banner_title(
+                self.inline_banners_state
+                    .notifications_error_banner
+                    .error
+                    .as_ref(),
+            );
 
             inline_banners.insert(
                 state.banner_id,
                 render_inline_notifications_error_banner(
-                    banner_title,
+                    banner_title.as_str(),
                     state,
                     &self.inline_banners_state.notifications_error_banner.error,
                     appearance,
@@ -25034,19 +25077,27 @@ impl TerminalView {
         let model = self.model.lock();
         model.block_list().block_at(index).map(|block| {
             let status = if block.has_failed() {
-                format!("failed, status code {}", block.exit_code().value())
+                crate::t!(
+                    "terminal-block-a11y-failed-status",
+                    code = block.exit_code().value()
+                )
             } else if block.is_background() {
-                "background".to_string()
+                crate::t!("terminal-block-a11y-background")
             } else if block.is_done() {
-                "succeeded".to_string()
+                crate::t!("terminal-block-a11y-succeeded")
             } else {
-                "in progress".to_string()
+                crate::t!("terminal-block-a11y-in-progress")
             };
             AccessibilityContent::new(
-                format!("Block {index}: {}, {}.\n", block.command_to_string(), status),
+                crate::t!(
+                    "terminal-block-a11y-summary",
+                    index = index.to_string(),
+                    command = block.command_to_string(),
+                    status = status.as_str()
+                ),
                 // TODO (a11y) Keybindings should be taken from the actual user's
                 // configuration
-                "Press cmd-C to read and copy both command and output, and cmd-option-shift-C to read and copy output only. Press cmd-B to bookmark the block: you could navigate between bookmarked blocks quickly using option-up and option-down.",
+                crate::t!("terminal-block-a11y-help"),
                 WarpA11yRole::TextRole,
             )
         })
@@ -25382,10 +25433,7 @@ impl TerminalView {
     ) {
         ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
             toast_stack.add_ephemeral_toast(
-                DismissibleToast::error(
-                    "Can not invoke environment variable subshell in a non-local session"
-                        .to_owned(),
-                ),
+                DismissibleToast::error(crate::t!("terminal-env-subshell-local-only")),
                 window_id,
                 ctx,
             );
@@ -26061,7 +26109,10 @@ impl TypedActionView for TerminalView {
                     .and_then(|index| self.selected_block_accessibility_content(index))
                 {
                     let num_selected_text =
-                        format!("Selected {} blocks.", self.num_non_hidden_selected_blocks());
+                        crate::t!(
+                            "terminal-selected-blocks-a11y",
+                            count = self.num_non_hidden_selected_blocks()
+                        );
                     content.value = format!("{}\n{}", num_selected_text, content.value);
                     Custom(content)
                 } else {
@@ -26122,7 +26173,11 @@ impl TypedActionView for TerminalView {
                     },
                     ctx,
                 );
-                let text = format!("Copied {} blocks.\n{}", blocks.len(), blocks.join("\n"));
+                let text = crate::t!(
+                    "terminal-copied-blocks-a11y",
+                    count = blocks.len(),
+                    content = blocks.join("\n")
+                );
                 Custom(AccessibilityContent::new_without_help(
                     text,
                     WarpA11yRole::TextRole,
@@ -26148,7 +26203,10 @@ impl TypedActionView for TerminalView {
                 ))
             }
             OpenBlockFilterEditor(block_index) => Custom(AccessibilityContent::new_without_help(
-                format!("Open block filter editor for block {block_index}"),
+                crate::t!(
+                    "terminal-open-block-filter-a11y",
+                    index = block_index.to_string()
+                ),
                 WarpA11yRole::TextRole,
             )),
             ShowInitializationBlock => Custom(AccessibilityContent::new_without_help(
@@ -26685,8 +26743,8 @@ impl TypedActionView for TerminalView {
                     keybinding_name_to_keystroke("terminal:warpify_subshell", ctx);
                 self.show_warpify_banner(
                     command.to_owned(),
-                    "Subshell",
-                    "subshell",
+                    crate::t!("terminal-subshell-title"),
+                    crate::t!("terminal-subshell-subject"),
                     warpify_keybinding,
                     TelemetryEvent::ShowSubshellBanner,
                     ctx,
@@ -27205,9 +27263,9 @@ impl TypedActionView for TerminalView {
                             let window_id = ctx.window_id();
                             ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                                 toast_stack.add_ephemeral_toast(
-                                    DismissibleToast::error(
-                                        "Bundled skills cannot be edited".to_string(),
-                                    ),
+                                    DismissibleToast::error(crate::t!(
+                                        "terminal-bundled-skills-cannot-edit"
+                                    )),
                                     window_id,
                                     ctx,
                                 );
@@ -27222,9 +27280,9 @@ impl TypedActionView for TerminalView {
                     let window_id = ctx.window_id();
                     ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                         toast_stack.add_ephemeral_toast(
-                            DismissibleToast::error(
-                                "Editing skills is not supported in this build".to_string(),
-                            ),
+                            DismissibleToast::error(crate::t!(
+                                "terminal-skill-editing-unsupported"
+                            )),
                             window_id,
                             ctx,
                         );

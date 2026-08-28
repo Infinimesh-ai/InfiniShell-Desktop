@@ -25,11 +25,11 @@ pub enum OrchestrationParticipantKind {
 }
 
 impl OrchestrationParticipantKind {
-    pub(super) fn display_name(&self) -> &str {
+    pub(super) fn display_name(&self) -> String {
         match self {
-            Self::Orchestrator => "Orchestrator",
-            Self::Agent { name } => name,
-            Self::Unknown => "Unknown agent",
+            Self::Orchestrator => crate::t!("ai-orchestration-participant-orchestrator"),
+            Self::Agent { name } => name.clone(),
+            Self::Unknown => crate::t!("ai-orchestration-participant-unknown"),
         }
     }
 }
@@ -93,8 +93,8 @@ pub fn resolve_orchestration_participant(
     let name = conversation
         .agent_name()
         .filter(|name| !name.is_empty())
-        .unwrap_or("Agent")
-        .to_string();
+        .map(str::to_owned)
+        .unwrap_or_else(|| crate::t!("ai-orchestration-participant-agent"));
     ResolvedOrchestrationParticipant {
         kind: OrchestrationParticipantKind::Agent { name },
         conversation_id: Some(conversation_id),

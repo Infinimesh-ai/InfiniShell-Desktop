@@ -35,10 +35,11 @@ pub enum LoadAwsCredentialsError {
 impl std::fmt::Display for LoadAwsCredentialsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotConfigured => write!(f, "No AWS credentials configured"),
-            Self::CredentialsLoadFailed(msg) => {
-                write!(f, "Failed to load AWS credentials: {msg}")
-            }
+            Self::NotConfigured => f.write_str(&crate::t!("ai-aws-not-configured")),
+            Self::CredentialsLoadFailed(message) => f.write_str(&crate::t!(
+                "ai-aws-load-failed-with-message",
+                message = message.as_str()
+            )),
         }
     }
 }
@@ -47,39 +48,31 @@ fn aws_profile_reference_for_message(profile: &str, capitalize_first_word: bool)
     let profile = profile.trim();
     if profile.is_empty() {
         if capitalize_first_word {
-            "The default AWS profile".to_string()
+            crate::t!("ai-aws-default-profile-capitalized")
         } else {
-            "the default AWS profile".to_string()
+            crate::t!("ai-aws-default-profile")
         }
+    } else if capitalize_first_word {
+        crate::t!("ai-aws-named-profile-capitalized", profile = profile)
     } else {
-        let article = if capitalize_first_word { "The" } else { "the" };
-        format!("{article} AWS profile `{profile}`")
+        crate::t!("ai-aws-named-profile", profile = profile)
     }
 }
 
 fn user_facing_aws_credentials_error_message(err: &CredentialsError, profile: &str) -> String {
     match err {
-        CredentialsError::CredentialsNotLoaded(_) => format!(
-            "AWS credentials were not found for {}. Log in with the AWS CLI or update your AWS credentials configuration, then refresh.",
-            aws_profile_reference_for_message(profile, false)
+        CredentialsError::CredentialsNotLoaded(_) => crate::t!(
+            "ai-aws-credentials-not-found",
+            profile = aws_profile_reference_for_message(profile, false)
         ),
-        CredentialsError::ProviderTimedOut(_) => {
-            "Timed out while loading AWS credentials. Refresh and try again.".to_string()
-        }
-        CredentialsError::InvalidConfiguration(_) => format!(
-            "{} is invalid or incomplete in your local AWS configuration. Update your AWS profile settings and credentials, then refresh.",
-            aws_profile_reference_for_message(profile, true)
+        CredentialsError::ProviderTimedOut(_) => crate::t!("ai-aws-credentials-timeout"),
+        CredentialsError::InvalidConfiguration(_) => crate::t!(
+            "ai-aws-credentials-invalid",
+            profile = aws_profile_reference_for_message(profile, true)
         ),
-        CredentialsError::ProviderError(_) => {
-            "Unable to load AWS credentials from your configured provider. Refresh your AWS login and try again."
-                .to_string()
-        }
-        CredentialsError::Unhandled(_) => {
-            "Unexpected error while loading AWS credentials. Refresh your AWS login and try again."
-                .to_string()
-        }
-        _ => "Unable to load AWS credentials. Refresh your AWS login and try again."
-            .to_string(),
+        CredentialsError::ProviderError(_) => crate::t!("ai-aws-credentials-provider-error"),
+        CredentialsError::Unhandled(_) => crate::t!("ai-aws-credentials-unexpected-error"),
+        _ => crate::t!("ai-aws-credentials-load-error"),
     }
 }
 

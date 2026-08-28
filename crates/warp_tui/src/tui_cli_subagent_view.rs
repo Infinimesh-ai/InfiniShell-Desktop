@@ -34,35 +34,37 @@ fn terminal_use_status_text(
     output_streaming: bool,
 ) -> String {
     if command_finished {
-        return "Command finished".to_owned();
+        return warp::t!("tui-command-finished");
     }
     let (status, key_binding, action) = match control_state {
         LongRunningCommandControlState::Agent {
             is_blocked: true, ..
-        } => return "Agent needs your input".to_owned(),
+        } => return warp::t!("tui-agent-needs-input"),
         LongRunningCommandControlState::Agent { .. } if output_streaming => (
-            "Agent is monitoring command",
+            warp::t!("tui-agent-monitoring-command"),
             TAKE_CONTROL_KEY_BINDING,
-            "to take control",
+            warp::t!("tui-hint-take-control"),
         ),
         LongRunningCommandControlState::Agent { .. } => (
-            "Agent waiting for instructions",
+            warp::t!("tui-agent-waiting-instructions"),
             TAKE_CONTROL_KEY_BINDING,
-            "to take control",
+            warp::t!("tui-hint-take-control"),
         ),
         LongRunningCommandControlState::User { reason } => match reason {
-            UserTakeOverReason::Manual => {
-                ("User is in control", HAND_BACK_KEY_BINDING, "to hand back")
-            }
-            UserTakeOverReason::Stop { .. } => (
-                "Agent paused · user is in control",
+            UserTakeOverReason::Manual => (
+                warp::t!("tui-user-in-control"),
                 HAND_BACK_KEY_BINDING,
-                "to hand back",
+                warp::t!("tui-hint-hand-back"),
+            ),
+            UserTakeOverReason::Stop { .. } => (
+                warp::t!("tui-agent-paused-user-control"),
+                HAND_BACK_KEY_BINDING,
+                warp::t!("tui-hint-hand-back"),
             ),
             UserTakeOverReason::TransferFromAgent { .. } => (
-                "Agent handed control to you",
+                warp::t!("tui-agent-handed-control"),
                 HAND_BACK_KEY_BINDING,
-                "to hand back",
+                warp::t!("tui-hint-hand-back"),
             ),
         },
     };
@@ -94,21 +96,21 @@ fn blocked_action_presentation(action: &AIAgentActionType) -> BlockedActionPrese
     let (summary, detail) = match action {
         AIAgentActionType::WriteToLongRunningShellCommand { input, mode, .. } => {
             let input_kind = match mode {
-                AIAgentPtyWriteMode::Raw => "Input",
-                AIAgentPtyWriteMode::Line => "Line input",
-                AIAgentPtyWriteMode::Block => "Pasted input",
+                AIAgentPtyWriteMode::Raw => warp::t!("tui-input-kind-raw"),
+                AIAgentPtyWriteMode::Line => warp::t!("tui-input-kind-line"),
+                AIAgentPtyWriteMode::Block => warp::t!("tui-input-kind-pasted"),
             };
             (
-                "Agent wants to write to the running command".to_owned(),
+                warp::t!("tui-agent-wants-write-command"),
                 Some(format!("{input_kind}:\n{}", display_pty_input(input))),
             )
         }
         AIAgentActionType::TransferShellCommandControlToUser { reason } => (
-            "Agent wants to hand command control to you".to_owned(),
-            Some(format!("Reason: {reason}")),
+            warp::t!("tui-agent-wants-transfer-control"),
+            Some(warp::t!("tui-reason-detail", reason = reason.clone())),
         ),
         AIAgentActionType::ReadFiles(request) => (
-            "Agent wants to read files".to_owned(),
+            warp::t!("tui-agent-wants-read-files"),
             Some(
                 request
                     .locations
@@ -119,26 +121,30 @@ fn blocked_action_presentation(action: &AIAgentActionType) -> BlockedActionPrese
             ),
         ),
         AIAgentActionType::Grep { queries, path } => (
-            "Agent wants to search file contents".to_owned(),
-            Some(format!("Patterns: {}\nPath: {path}", queries.join(", "))),
+            warp::t!("tui-agent-wants-search-files"),
+            Some(warp::t!(
+                "tui-patterns-path-detail",
+                patterns = queries.join(", "),
+                path = path
+            )),
         ),
         AIAgentActionType::FileGlob { patterns, path } => (
-            "Agent wants to find files".to_owned(),
-            Some(format!(
-                "Patterns: {}\nPath: {}",
-                patterns.join(", "),
-                path.as_deref().unwrap_or(".")
+            warp::t!("tui-agent-wants-find-files"),
+            Some(warp::t!(
+                "tui-patterns-path-detail",
+                patterns = patterns.join(", "),
+                path = path.as_deref().unwrap_or(".")
             )),
         ),
         AIAgentActionType::FileGlobV2 {
             patterns,
             search_dir,
         } => (
-            "Agent wants to find files".to_owned(),
-            Some(format!(
-                "Patterns: {}\nPath: {}",
-                patterns.join(", "),
-                search_dir.as_deref().unwrap_or(".")
+            warp::t!("tui-agent-wants-find-files"),
+            Some(warp::t!(
+                "tui-patterns-path-detail",
+                patterns = patterns.join(", "),
+                path = search_dir.as_deref().unwrap_or(".")
             )),
         ),
         _ => (action.user_friendly_name(), None),
@@ -185,9 +191,10 @@ fn remaining_for_fixed_delay(delay: Duration, elapsed: Duration) -> Option<Durat
 fn format_next_check_remaining(remaining: Duration) -> String {
     let seconds = remaining.as_secs();
     if seconds < 60 {
-        format!(" · Check in {seconds}s")
+        warp::t!("tui-check-in-seconds", seconds = seconds)
     } else {
-        format!(" · Check in {}m", seconds / 60)
+        let minutes = seconds / 60;
+        warp::t!("tui-check-in-minutes", minutes = minutes)
     }
 }
 
@@ -437,7 +444,7 @@ impl TuiCLISubagentView {
         );
         if let Some(instruction) = self.latest_instruction(target, app) {
             content.add_child(
-                TuiText::new(format!("Last instruction: {instruction}"))
+                TuiText::new(warp::t!("tui-last-instruction", instruction = instruction))
                     .with_style(builder.muted_text_style())
                     .truncate()
                     .finish(),
@@ -467,14 +474,14 @@ impl TuiCLISubagentView {
                 TuiContainer::new(
                     TuiFlex::row()
                         .child(Self::render_action(
-                            "Allow · Ctrl+Enter",
+                            warp::t_static!("tui-allow-ctrl-enter"),
                             &self.allow_mouse_state,
                             TuiTerminalSessionAction::AcceptBlockedTerminalUseAction,
                             app,
                         ))
                         .child(TuiText::new("  ").finish())
                         .child(Self::render_action(
-                            "Reject · Ctrl+C",
+                            warp::t_static!("tui-reject-ctrl-c"),
                             &self.reject_mouse_state,
                             TuiTerminalSessionAction::RejectBlockedTerminalUseAction,
                             app,

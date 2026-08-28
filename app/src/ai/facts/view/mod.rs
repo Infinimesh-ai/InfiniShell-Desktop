@@ -36,10 +36,11 @@ pub enum AIFactPage {
 
 impl std::fmt::Display for AIFactPage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AIFactPage::Rules => write!(f, "Rules"),
-            AIFactPage::RuleEditor { .. } => write!(f, "Rule Editor"),
-        }
+        let label = match self {
+            AIFactPage::Rules => crate::t!("rules-collection-name"),
+            AIFactPage::RuleEditor { .. } => crate::t!("rules-editor-title"),
+        };
+        f.write_str(&label)
     }
 }
 
@@ -68,7 +69,8 @@ pub struct AIFactView {
 
 impl AIFactView {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
-        let pane_configuration = ctx.add_model(|_ctx| PaneConfiguration::new(HEADER_TEXT));
+        let pane_configuration =
+            ctx.add_model(|_ctx| PaneConfiguration::new(crate::t!("rules-collection-name")));
 
         let rule_view = ctx.add_typed_action_view(RuleView::new);
         ctx.subscribe_to_view(&rule_view, |me, _, event, ctx| {
@@ -271,7 +273,7 @@ impl BackingView for AIFactView {
         _ctx: &view::HeaderRenderContext<'_>,
         _app: &AppContext,
     ) -> view::HeaderContent {
-        view::HeaderContent::simple(HEADER_TEXT)
+        view::HeaderContent::simple(crate::t!("rules-collection-name"))
     }
 
     fn set_focus_handle(&mut self, focus_handle: PaneFocusHandle, _ctx: &mut ViewContext<Self>) {

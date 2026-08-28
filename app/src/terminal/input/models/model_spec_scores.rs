@@ -15,15 +15,12 @@ use crate::terminal::input::inline_menu::styles as inline_styles;
 const CORNER_RADIUS: f32 = 4.0;
 const ROW_SPACING: f32 = 12.0;
 
-pub const CUSTOM_MODEL_ROUTER_TITLE: &str = "Custom Model Router";
-pub const CUSTOM_MODEL_ROUTER_DESCRIPTION: &str = "Routes each request to a concrete model based on your routing rules, rather than using a single fixed model.";
-
 pub enum CostRow {
     Bar {
         value: Option<f32>,
     },
     BilledToProvider {
-        label: &'static str,
+        label: String,
         manage_button: Box<dyn Element>,
     },
 }
@@ -51,7 +48,7 @@ pub fn render_byop_spec_scores(
 ) -> Box<dyn Element> {
     let rows = vec![
         render_score_row(
-            "Context",
+            &crate::t!("model-spec-context"),
             ScoreRowKind::Bar {
                 value: context_window.map(normalize_context_window),
             },
@@ -59,7 +56,7 @@ pub fn render_byop_spec_scores(
             app,
         ),
         render_score_row(
-            "Output",
+            &crate::t!("model-spec-output"),
             ScoreRowKind::Bar {
                 value: max_output_tokens.map(normalize_max_output),
             },
@@ -67,11 +64,11 @@ pub fn render_byop_spec_scores(
             app,
         ),
         render_score_row(
-            "Cost",
+            &crate::t!("model-spec-cost"),
             // 上游把 `BilledToApi` 换成带 label 的 `BilledToProvider`;
             // BYOP 走用户自己的 API key,沿用 "Inference via API key" 文案。
             ScoreRowKind::BilledToProvider {
-                label: "Inference via API key",
+                label: crate::t!("model-spec-inference-via-api-key"),
                 manage_button,
             },
             layout.bg_bar_color,
@@ -167,7 +164,7 @@ enum ScoreRowKind {
         value: Option<f32>,
     },
     BilledToProvider {
-        label: &'static str,
+        label: String,
         manage_button: Box<dyn Element>,
     },
 }
@@ -298,9 +295,9 @@ fn render_row_label(label: &str, appearance: &Appearance, app: &AppContext) -> B
     .finish()
 }
 
-fn render_provider_label(label: &'static str, appearance: &Appearance) -> Box<dyn Element> {
+fn render_provider_label(label: String, appearance: &Appearance) -> Box<dyn Element> {
     Container::new(
-        Text::new(label.to_string(), appearance.ui_font_family(), 14.)
+        Text::new(label, appearance.ui_font_family(), 14.)
             .with_color(appearance.theme().disabled_ui_text_color().into())
             .finish(),
     )

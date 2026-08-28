@@ -64,11 +64,6 @@ fn host_presence(execution_mode: &RunAgentsExecutionMode) -> bool {
     )
 }
 
-const CONFIG_BLOCK_HEADER: &str = "Use orchestration";
-const CONFIG_BLOCK_DESCRIPTION: &str =
-    "Break this work into coordinated streams with multiple agents.";
-const BASE_MODEL_HELPER: &str = "The primary model all agents will use.";
-
 // ── Action type ─────────────────────────────────────────────────────
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -766,7 +761,7 @@ impl View for OrchestrationConfigBlockView {
 
         // Header row: "Use orchestration" + pill toggle switch
         let header_label = Text::new(
-            CONFIG_BLOCK_HEADER.to_string(),
+            crate::t!("ai-orchestration-use-orchestration"),
             appearance.ui_font_family(),
             16.,
         )
@@ -795,7 +790,7 @@ impl View for OrchestrationConfigBlockView {
 
         // Description
         let description = Text::new(
-            CONFIG_BLOCK_DESCRIPTION.to_string(),
+            crate::t!("ai-orchestration-use-description"),
             appearance.ui_font_family(),
             appearance.monospace_font_size(),
         )
@@ -823,7 +818,7 @@ impl View for OrchestrationConfigBlockView {
             };
             let disabled_text_color = blended_colors::text_disabled(theme, theme.background());
             let details_text = Text::new(
-                "View details".to_string(),
+                crate::t!("common-view-details"),
                 appearance.ui_font_family(),
                 appearance.monospace_font_size() + 1.,
             )
@@ -887,7 +882,7 @@ impl View for OrchestrationConfigBlockView {
 
                 // Helper text
                 let helper = Text::new(
-                    BASE_MODEL_HELPER.to_string(),
+                    crate::t!("ai-orchestration-base-model-helper"),
                     appearance.ui_font_family(),
                     appearance.monospace_font_size() - 1.,
                 )

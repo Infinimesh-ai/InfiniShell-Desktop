@@ -48,10 +48,8 @@ const MENU_WIDTH: f32 = 208.;
 const ITEM_ICON_SIZE: f32 = 16.;
 
 /// Tooltip string for the closed-state button.
-const BUTTON_TOOLTIP: &str = "Agent harness";
 
 /// Label rendered at the top of the dropdown.
-const MENU_HEADER_LABEL: &str = "Agent harness";
 
 /// Actions dispatched by the [`HarnessSelector`].
 #[derive(Clone, Debug, PartialEq)]
@@ -88,7 +86,7 @@ impl HarnessSelector {
             ActionButton::new("", AgentInputButtonTheme)
                 .with_size(ButtonSize::AgentInputButton)
                 .with_menu(true)
-                .with_tooltip(BUTTON_TOOLTIP)
+                .with_tooltip(crate::t!("ai-orchestration-agent-harness"))
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(HarnessSelectorAction::ToggleMenu);
                 })
@@ -211,7 +209,7 @@ fn build_menu_items(
     header_text_color: pathfinder_color::ColorU,
 ) -> Vec<MenuItem<HarnessSelectorAction>> {
     let header = MenuItem::Header {
-        fields: MenuItemFields::new(MENU_HEADER_LABEL)
+        fields: MenuItemFields::new(crate::t!("ai-orchestration-agent-harness"))
             .with_font_size_override(HEADER_FONT_SIZE)
             .with_override_text_color(header_text_color)
             .with_padding_override(HEADER_VERTICAL_PADDING, MENU_HORIZONTAL_PADDING)

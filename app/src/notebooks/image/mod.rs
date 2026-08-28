@@ -155,7 +155,7 @@ impl ImageViewerView {
             .as_deref()
             .map(Self::title_for)
             .or_else(|| self.remote_name.clone())
-            .unwrap_or_else(|| "Untitled".to_string())
+            .unwrap_or_else(|| crate::t!("common-untitled"))
     }
 
     fn title_for(path: &Path) -> String {
@@ -176,7 +176,7 @@ impl View for ImageViewerView {
 
     fn accessibility_contents(&self, _ctx: &AppContext) -> Option<AccessibilityContent> {
         Some(AccessibilityContent::new_without_help(
-            format!("{} image", self.title()),
+            crate::t!("notebook-a11y-image-title", title = self.title()),
             WarpA11yRole::TextRole,
         ))
     }

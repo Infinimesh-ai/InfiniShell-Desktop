@@ -12,11 +12,39 @@ pub struct AuthSecretTypeField {
     pub sensitive: bool,
 }
 
+impl AuthSecretTypeField {
+    pub fn localized_placeholder(&self) -> String {
+        match self.placeholder {
+            Some("Bearer token") => crate::t!("auth-secret-placeholder-bearer-token"),
+            Some("Secret access key") => {
+                crate::t!("auth-secret-placeholder-secret-access-key")
+            }
+            Some("Session token (temporary credentials only)") => {
+                crate::t!("auth-secret-placeholder-session-token")
+            }
+            Some(placeholder) => placeholder.to_string(),
+            None => self.label.to_string(),
+        }
+    }
+}
+
 pub struct AuthSecretTypeInfo {
     pub display_name: &'static str,
     pub secret_type: ManagedSecretType,
     pub fields: &'static [AuthSecretTypeField],
     pub learn_more_url: &'static str,
+}
+
+impl AuthSecretTypeInfo {
+    pub fn localized_display_name(&self) -> String {
+        match self.display_name {
+            "OpenAI API Key" => crate::t!("auth-secret-openai-api-key"),
+            "Anthropic API Key" => crate::t!("auth-secret-anthropic-api-key"),
+            "Bedrock API Key" => crate::t!("auth-secret-bedrock-api-key"),
+            "Bedrock Access Key" => crate::t!("auth-secret-bedrock-access-key"),
+            display_name => display_name.to_string(),
+        }
+    }
 }
 
 pub fn auth_secret_types_for_harness(harness: Harness) -> &'static [AuthSecretTypeInfo] {

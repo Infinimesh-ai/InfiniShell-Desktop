@@ -415,7 +415,10 @@ impl SshManagerPanel {
                 .map(|p| p.to_string_lossy().into_owned()),
             credential_id: None,
             startup_command: None,
-            notes: Some(format!("Imported from {path_display}")),
+            notes: Some(crate::t!(
+                "ssh-manager-imported-from",
+                path = path_display.as_str()
+            )),
             last_connected_at: None,
         };
 

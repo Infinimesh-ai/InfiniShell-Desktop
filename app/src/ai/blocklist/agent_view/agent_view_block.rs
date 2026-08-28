@@ -381,9 +381,9 @@ impl TypedActionView for AgentViewEntryBlock {
                         let window_id = ctx.window_id();
                         ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                             toast_stack.add_ephemeral_toast(
-                                DismissibleToast::error(
-                                    "Couldn't navigate to conversation.".to_string(),
-                                ),
+                                DismissibleToast::error(crate::t!(
+                                    "terminal-conversation-navigation-failed"
+                                )),
                                 window_id,
                                 ctx,
                             );

@@ -66,8 +66,8 @@ use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::action_model::AIActionStatus;
 use crate::ai::blocklist::block::model::{AIBlockModel, AIBlockModelHelper, AIBlockOutputStatus};
 use crate::ai::blocklist::block::view_impl::common::{
-    BLOCKED_ACTION_MESSAGE_FOR_GREP_OR_FILE_GLOB, BLOCKED_ACTION_MESSAGE_FOR_READING_FILES,
-    MaybeShimmeringText,
+    MaybeShimmeringText, blocked_action_message_for_grep_or_file_glob,
+    blocked_action_message_for_reading_files,
 };
 use crate::ai::blocklist::block::{
     AIBlock, AIBlockAction, AIBlockStateHandles, ActionButtons, AutonomySettingSpeedbump,
@@ -97,9 +97,7 @@ use crate::ai::blocklist::inline_action::web_search::WebSearchView;
 use crate::ai::blocklist::keyboard_navigable_buttons::KeyboardNavigableButtons;
 use crate::ai::blocklist::secret_redaction::SecretRedactionState;
 use crate::ai::blocklist::usage::rollup::compute_orchestration_rollup;
-use crate::ai::blocklist::view_util::{
-    FAILED_OUTPUT_USAGE_NOTICE_TEXT, format_credits, should_show_failed_output_usage_notice,
-};
+use crate::ai::blocklist::view_util::{format_credits, should_show_failed_output_usage_notice};
 use crate::ai::blocklist::{BlocklistAIActionModel, SuggestionChipView};
 use crate::ai::paths::shell_native_absolute_path;
 use crate::ai::skills::{
@@ -378,7 +376,10 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                             && props.thinking_display_mode.should_render() =>
                         {
                             let header_text = if let Some(dur) = finished_duration {
-                                format!("Thought for {}", format_elapsed_seconds(*dur))
+                                crate::t!(
+                                    "ai-thought-for-duration",
+                                    duration = format_elapsed_seconds(*dur)
+                                )
                             } else {
                                 "Thinking".to_string()
                             };
@@ -957,7 +958,7 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                                         .and_then(|c| c.title())
                                         .map(|q| truncate_from_end(&q, 40));
                                     Some((
-                                        "conversation",
+                                        crate::t!("ai-search-target-conversation"),
                                         title.unwrap_or_else(|| target_id.clone()),
                                     ))
                                 })
@@ -972,13 +973,17 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                                         })
                                         .map(|task| truncate_from_end(&task.title, 40));
                                     Some((
-                                        "agent run",
+                                        crate::t!("ai-search-target-agent-run"),
                                         title.unwrap_or_else(|| truncate_from_end(target_id, 40)),
                                     ))
                                 });
 
                             let done = is_finished || is_cancelled;
-                            let verb = if done { "Searched" } else { "Searching" };
+                            let verb = if done {
+                                crate::t!("ai-search-status-searched")
+                            } else {
+                                crate::t!("ai-search-status-searching")
+                            };
 
                             let mut fragments: Vec<FormattedTextFragment> =
                                 vec![FormattedTextFragment::plain_text(format!("{verb} "))];
@@ -993,15 +998,17 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                                     ));
                                 }
                                 None => {
-                                    fragments.push(FormattedTextFragment::plain_text(
-                                        "this conversation",
-                                    ));
+                                    fragments.push(FormattedTextFragment::plain_text(crate::t!(
+                                        "ai-search-target-this-conversation"
+                                    )));
                                 }
                             };
                             match query {
                                 Some(q) => {
-                                    fragments
-                                        .push(FormattedTextFragment::plain_text(format!(": {q}")));
+                                    fragments.push(FormattedTextFragment::plain_text(crate::t!(
+                                        "ai-search-query-suffix",
+                                        query = q
+                                    )));
                                 }
                                 None if !done => {
                                     fragments.push(FormattedTextFragment::plain_text("..."));
@@ -1177,7 +1184,7 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                 props.model.is_restored(),
             ) {
                 output_items.add_child(
-                    render_informational_footer(app, FAILED_OUTPUT_USAGE_NOTICE_TEXT.to_string())
+                    render_informational_footer(app, crate::t!("ai-error-usage-notice"))
                         .with_agent_output_item_spacing(app)
                         .finish(),
                 );
@@ -1643,7 +1650,7 @@ fn render_read_files(
         renderable_action = renderable_action
             .with_header(blocked_action_header(
                 id.clone(),
-                BLOCKED_ACTION_MESSAGE_FOR_READING_FILES,
+                &blocked_action_message_for_reading_files(),
                 buttons.run_button.clone(),
                 buttons.cancel_button.clone(),
                 props.action_model,
@@ -1798,7 +1805,7 @@ fn render_stopped_output(props: Props, app: &AppContext) -> Box<dyn Element> {
 
             conversation
                 .initial_query()
-                .map(|task_name| format!("Stopped task: \"{task_name}\""))
+                .map(|task_name| crate::t!("ai-stopped-task", name = task_name.as_str()))
         })
         .unwrap_or_else(|| "Stopped task".to_string());
 
@@ -1948,8 +1955,9 @@ fn render_requested_edits_output_message(
             .view
             .as_ref(app)
             .title()
-            .unwrap_or("Could not apply changes to file.");
-        RenderableAction::new(title, app)
+            .map(str::to_owned)
+            .unwrap_or_else(|| crate::t!("ai-code-diff-apply-failed"));
+        RenderableAction::new(&title, app)
             .with_icon(inline_action_icons::cancelled_icon(appearance).finish())
             .render(app)
             .finish()
@@ -1957,7 +1965,7 @@ fn render_requested_edits_output_message(
         match requested_edit.view.as_ref(app).display_mode() {
             DisplayMode::FullPane => Align::new(
                 Text::new_inline(
-                    "This suggestion is being edited in another tab.",
+                    crate::t!("ai-code-diff-edited-in-another-tab"),
                     appearance.ui_font_family(),
                     appearance.monospace_font_size(),
                 )
@@ -2067,11 +2075,11 @@ fn render_suggest_new_conversation(
         };
         let (label, status_icon) = match result {
             SuggestNewConversationResult::Accepted { .. } => (
-                "New conversation started",
+                crate::t!("ai-suggest-conversation-started"),
                 inline_action_icons::green_check_icon(appearance).finish(),
             ),
             SuggestNewConversationResult::Rejected => (
-                "Continuing current conversation",
+                crate::t!("ai-suggest-conversation-continuing"),
                 warpui::elements::Icon::new(
                     Icon::FlipForward.into(),
                     internal_colors::neutral_6(theme),
@@ -2079,7 +2087,7 @@ fn render_suggest_new_conversation(
                 .finish(),
             ),
             SuggestNewConversationResult::Cancelled => (
-                "New conversation suggestion cancelled",
+                crate::t!("ai-suggest-conversation-cancelled"),
                 inline_action_icons::cancelled_icon(appearance).finish(),
             ),
         };
@@ -2390,7 +2398,7 @@ fn render_file_retrieval_tool(
         config = config
             .with_header(blocked_action_header(
                 action_id.clone(),
-                BLOCKED_ACTION_MESSAGE_FOR_GREP_OR_FILE_GLOB,
+                &blocked_action_message_for_grep_or_file_glob(),
                 buttons.run_button.clone(),
                 buttons.cancel_button.clone(),
                 props.action_model,
@@ -2461,7 +2469,7 @@ fn render_comment_addressed_header(comment: &ReviewComment, app: &AppContext) ->
         Shrinkable::new(
             1.,
             Text::new_inline(
-                format!("Comment addressed: \"{content}\""),
+                crate::t!("ai-comment-addressed", content = content.as_str()),
                 appearance.ui_font_family(),
                 appearance.monospace_font_size(),
             )
@@ -2553,7 +2561,7 @@ fn render_references_footer(
     )?;
 
     let title = Text::new_inline(
-        "References",
+        crate::t!("ai-references-title"),
         appearance.ui_font_family(),
         appearance.monospace_font_size(),
     )
@@ -2638,7 +2646,7 @@ fn render_suggested_rules_and_prompts_footer(
     let theme = appearance.theme();
     let title_row_color = theme.sub_text_color(theme.background());
     let title_text = Text::new_inline(
-        "Suggestions:",
+        crate::t!("ai-suggestions-title"),
         appearance.ui_font_family(),
         appearance.monospace_font_size(),
     )
@@ -3275,7 +3283,7 @@ fn render_collapsible_debug_output(
         // "Debug output" label
         row.add_child(
             Text::new(
-                "Debug output".to_string(),
+                crate::t!("ai-debug-output"),
                 appearance.ai_font_family(),
                 appearance.monospace_font_size(),
             )

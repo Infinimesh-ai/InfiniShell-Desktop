@@ -193,37 +193,44 @@ impl TuiGenericToolCallView {
     /// its server. `None` for non-MCP actions or unknown/legacy servers.
     fn permission_question(&self, server_name: Option<&str>) -> String {
         match &self.action.action {
-            AIAgentActionType::ReadFiles(_) => "Is it OK if I read these files?".to_owned(),
-            AIAgentActionType::Grep { .. } => "Is it OK if I search these files?".to_owned(),
+            AIAgentActionType::ReadFiles(_) => warp::t!("tui-permission-read-files"),
+            AIAgentActionType::Grep { .. } => warp::t!("tui-permission-search-files"),
             AIAgentActionType::FileGlob { .. } | AIAgentActionType::FileGlobV2 { .. } => {
-                "Is it OK if I find files matching these patterns?".to_owned()
+                warp::t!("tui-permission-find-files")
             }
             AIAgentActionType::CallMCPTool { name, .. } => {
                 if name.is_empty() {
                     match server_name {
-                        Some(server) => format!("Is it OK if I call an MCP tool on {server}?"),
-                        None => "Is it OK if I call this MCP tool?".to_owned(),
+                        Some(server) => warp::t!("tui-permission-call-mcp-server", server = server),
+                        None => warp::t!("tui-permission-call-mcp"),
                     }
                 } else {
                     match server_name {
-                        Some(server) => format!("Is it OK if I call MCP tool {name} on {server}?"),
-                        None => format!("Is it OK if I call MCP tool {name}?"),
+                        Some(server) => warp::t!(
+                            "tui-permission-call-mcp-name-server",
+                            name = name.clone(),
+                            server = server
+                        ),
+                        None => warp::t!("tui-permission-call-mcp-name", name = name.clone()),
                     }
                 }
             }
             AIAgentActionType::ReadMCPResource { .. } => {
-                "Is it OK if I read this MCP resource?".to_owned()
+                warp::t!("tui-permission-read-mcp-resource")
             }
             AIAgentActionType::WriteToLongRunningShellCommand { .. } => {
-                "Is it OK if I write this input to the running command?".to_owned()
+                warp::t!("tui-permission-write-command-input")
             }
             AIAgentActionType::SuggestNewConversation { .. } => {
-                "Should I start a new conversation?".to_owned()
+                warp::t!("tui-permission-new-conversation")
             }
             AIAgentActionType::TransferShellCommandControlToUser { .. } => {
-                "Is it OK if I hand control of the running command to you?".to_owned()
+                warp::t!("tui-permission-transfer-control")
             }
-            action => format!("Is it OK if I {}?", action.user_friendly_name()),
+            action => warp::t!(
+                "tui-permission-generic-action",
+                action = action.user_friendly_name()
+            ),
         }
     }
 
@@ -241,24 +248,40 @@ impl TuiGenericToolCallView {
                 .collect::<Vec<_>>()
                 .join("\n"),
             AIAgentActionType::Grep { queries, path } => {
-                format!("{}\n  in {path}", queries.join("\n"))
+                warp::t!(
+                    "tui-tool-details-in-path",
+                    content = queries.join("\n"),
+                    path = path
+                )
             }
             AIAgentActionType::FileGlob { patterns, path } => {
                 let path = path.as_deref().unwrap_or(".");
-                format!("{}\n  in {path}", patterns.join("\n"))
+                warp::t!(
+                    "tui-tool-details-in-path",
+                    content = patterns.join("\n"),
+                    path = path
+                )
             }
             AIAgentActionType::FileGlobV2 {
                 patterns,
                 search_dir,
             } => {
                 let path = search_dir.as_deref().unwrap_or(".");
-                format!("{}\n  in {path}", patterns.join("\n"))
+                warp::t!(
+                    "tui-tool-details-in-path",
+                    content = patterns.join("\n"),
+                    path = path
+                )
             }
             AIAgentActionType::CallMCPTool { name, input, .. } => {
                 let input =
                     serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
                 let header = match server_name {
-                    Some(server) => format!("{name} on {server}"),
+                    Some(server) => warp::t!(
+                        "tui-tool-details-mcp-server",
+                        name = name.clone(),
+                        server = server
+                    ),
                     None => name.clone(),
                 };
                 if input == "{}" || input == "null" {
@@ -274,7 +297,7 @@ impl TuiGenericToolCallView {
                 String::from_utf8_lossy(input).into_owned()
             }
             AIAgentActionType::SuggestNewConversation { .. } => {
-                "Continue the agent's next step in a fresh conversation.".to_owned()
+                warp::t!("tui-new-conversation-detail")
             }
             AIAgentActionType::TransferShellCommandControlToUser { reason } => reason.clone(),
             action => action.user_friendly_name(),

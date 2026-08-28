@@ -344,14 +344,20 @@ impl ConversationUsageView {
                 appearance,
             ));
 
-            labels.push(render_label_text("Credits spent (total)", appearance));
+            labels.push(render_label_text(
+                &crate::t!("ai-usage-credits-spent-total"),
+                appearance,
+            ));
             values.push(self.render_total_credits_value_row(
                 total_credits_value,
                 rollup.as_ref(),
                 appearance,
             ));
         } else {
-            labels.push(render_label_text("Credits spent", appearance));
+            labels.push(render_label_text(
+                &crate::t!("ai-usage-credits-spent"),
+                appearance,
+            ));
             values.push(self.render_total_credits_value_row(
                 total_credits_value,
                 rollup.as_ref(),
@@ -367,7 +373,10 @@ impl ConversationUsageView {
         // existing flex spacing handles indentation.
         self.append_per_agent_rows(&mut labels, &mut values, rollup.as_ref(), appearance);
 
-        labels.push(render_label_text("Tool calls", appearance));
+        labels.push(render_label_text(
+            &crate::t!("ai-usage-tool-calls"),
+            appearance,
+        ));
         values.push(render_value_text(
             format_value_text(self.usage_info.tool_calls, "call"),
             appearance,
@@ -391,7 +400,10 @@ impl ConversationUsageView {
             {
                 "Models".to_string()
             } else {
-                format!("Models ({})", token_usage_category_display_name(&category))
+                crate::t!(
+                    "ai-usage-models-category",
+                    category = token_usage_category_display_name(&category)
+                )
             };
 
             // For FULL_TERMINAL_USE_CATEGORY, add an info icon with tooltip
@@ -465,7 +477,10 @@ impl ConversationUsageView {
             );
         }
 
-        labels.push(render_label_text("Context window used", appearance));
+        labels.push(render_label_text(
+            &crate::t!("ai-usage-context-window-used"),
+            appearance,
+        ));
         let context_usage_pct = self.usage_info.context_window_usage * 100.;
         let context_usage_str = if context_window_breakdown_enabled && self.context_window_expanded
         {
@@ -533,13 +548,19 @@ impl ConversationUsageView {
         ));
         values.push(render_section_header("".to_string(), appearance));
 
-        labels.push(render_label_text("Files changed", appearance));
+        labels.push(render_label_text(
+            &crate::t!("ai-usage-files-changed"),
+            appearance,
+        ));
         values.push(render_value_text(
             format_value_text(self.usage_info.files_changed, "file"),
             appearance,
         ));
 
-        labels.push(render_label_text("Diffs applied", appearance));
+        labels.push(render_label_text(
+            &crate::t!("ai-usage-diffs-applied"),
+            appearance,
+        ));
         let diffs_element = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
@@ -576,7 +597,10 @@ impl ConversationUsageView {
             .finish();
         values.push(diffs_element);
 
-        labels.push(render_label_text("Commands executed", appearance));
+        labels.push(render_label_text(
+            &crate::t!("ai-usage-commands-executed"),
+            appearance,
+        ));
         values.push(render_value_text(
             format_value_text(self.usage_info.commands_executed, "command"),
             appearance,
@@ -608,7 +632,10 @@ impl ConversationUsageView {
             ));
             values.push(render_section_header("".to_string(), appearance));
 
-            labels.push(render_label_text("Time to first token", appearance));
+            labels.push(render_label_text(
+                &crate::t!("ai-usage-time-to-first-token"),
+                appearance,
+            ));
             values.push(render_value_text(
                 format!(
                     "{:.1} seconds",
@@ -617,7 +644,10 @@ impl ConversationUsageView {
                 appearance,
             ));
 
-            labels.push(render_label_text("Total agent response time", appearance));
+            labels.push(render_label_text(
+                &crate::t!("ai-usage-total-response-time"),
+                appearance,
+            ));
             values.push(render_value_text(
                 format!(
                     "{:.1} seconds",
@@ -861,7 +891,7 @@ impl ConversationUsageView {
         let theme = appearance.theme();
         let font_size = appearance.ui_font_size() + 2.;
         let link_color = theme.ansi_fg_blue();
-        let label = format!("Show {hidden_count} more");
+        let label = crate::t!("common-show-count-more", count = hidden_count);
         Hoverable::new(self.show_more_mouse_state.clone(), move |_hover_state| {
             Text::new(label.clone(), appearance.ui_font_family(), font_size)
                 .with_color(link_color)
@@ -1125,7 +1155,7 @@ fn render_context_window_other_tooltip(appearance: &Appearance) -> Box<dyn Eleme
     let background = theme.tooltip_background();
     let text = ConstrainedBox::new(
         Text::new(
-            "Includes other request context and temporary instructions added to help the agent better respond.".to_string(),
+            crate::t!("ai-usage-other-context-description"),
             appearance.ui_font_family(),
             appearance.ui_font_size() - 2.,
         )

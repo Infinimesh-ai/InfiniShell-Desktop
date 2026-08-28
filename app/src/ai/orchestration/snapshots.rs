@@ -11,8 +11,8 @@ use warpui::{AppContext, SingletonEntity};
 
 use super::config_state::{AuthSecretSelection, OrchestrationConfigState};
 use super::providers::{
-    ORCHESTRATION_ENV_NONE_LABEL, ORCHESTRATION_RUNNER_NONE_LABEL, ORCHESTRATION_WARP_WORKER_HOST,
-    get_base_model_choices, resolve_default_host_slug, resolve_recent_host_slug,
+    ORCHESTRATION_WARP_WORKER_HOST, get_base_model_choices, resolve_default_host_slug,
+    resolve_recent_host_slug,
 };
 use crate::LLMPreferences;
 use crate::ai::auth_secret_types::auth_secret_types_for_harness;
@@ -22,13 +22,6 @@ use crate::ai::harness_display;
 use crate::ai::local_harness_setup::{
     LocalHarnessSetupState, local_harness_is_product_enabled, local_harness_setup_state,
 };
-
-const DEFAULT_MODEL_LABEL: &str = "Default model";
-/// Label shown in the auth secret picker when no secret is selected
-/// (the child agent will inherit credentials from its environment).
-pub(crate) const AUTH_SECRET_INHERIT_LABEL: &str = "Skip (advanced)";
-const CUSTOM_HOST_LABEL: &str = "Custom host…";
-const AUTH_SECRETS_LOAD_FAILED_MESSAGE: &str = "Unable to load secrets";
 
 /// Row id for the Cloud location option.
 #[cfg_attr(not(feature = "tui"), allow(dead_code))]
@@ -125,8 +118,14 @@ impl OptionSnapshot {
 #[cfg_attr(not(feature = "tui"), allow(dead_code))]
 pub fn location_snapshot(state: &OrchestrationConfigState, _ctx: &AppContext) -> OptionSnapshot {
     let rows = vec![
-        OptionRow::new(LOCATION_CLOUD_ID, "Cloud"),
-        OptionRow::new(LOCATION_LOCAL_ID, "Local"),
+        OptionRow::new(
+            LOCATION_CLOUD_ID,
+            crate::t!("ai-orchestration-location-cloud"),
+        ),
+        OptionRow::new(
+            LOCATION_LOCAL_ID,
+            crate::t!("ai-orchestration-location-local"),
+        ),
     ];
     let selected = if state.execution_mode.is_remote() {
         LOCATION_CLOUD_ID
@@ -226,14 +225,26 @@ fn build_harness_snapshot(
             } else {
                 None
             };
-            Some(
-                match local_setup_state {
-                    Some(LocalHarnessSetupState::MissingHarness { tooltip }) => tooltip,
-                    Some(LocalHarnessSetupState::ProductDisabled { message }) => message,
-                    Some(LocalHarnessSetupState::Ready) | None => "Disabled by your administrator",
+            Some(match local_setup_state {
+                Some(LocalHarnessSetupState::MissingHarness { tooltip }) => match harness {
+                    Harness::Claude => crate::t!("ai-orchestration-install-claude"),
+                    Harness::Codex => crate::t!("ai-orchestration-install-codex"),
+                    Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Unknown => {
+                        tooltip.to_string()
+                    }
+                },
+                Some(LocalHarnessSetupState::ProductDisabled { message }) => match harness {
+                    Harness::Codex => crate::t!("ai-orchestration-local-codex-disabled"),
+                    Harness::Oz
+                    | Harness::Claude
+                    | Harness::OpenCode
+                    | Harness::Gemini
+                    | Harness::Unknown => message.to_string(),
+                },
+                Some(LocalHarnessSetupState::Ready) | None => {
+                    crate::t!("ai-orchestration-disabled-by-admin")
                 }
-                .to_string(),
-            )
+            })
         };
         // Match by harness string first, then fall back to matching
         // the display_name against the client-side name for the target
@@ -264,7 +275,7 @@ fn build_harness_snapshot(
             rows,
             selected_id,
             status: OptionSourceStatus::Empty {
-                message: "No harnesses available".to_string(),
+                message: crate::t!("ai-orchestration-no-harnesses"),
             },
             footer: None,
         };
@@ -296,7 +307,10 @@ pub fn model_snapshot(state: &OrchestrationConfigState, ctx: &AppContext) -> Opt
         Some(Harness::Codex) if is_local => {
             // Local Codex: only "Default model" entry.
             OptionSnapshot::ready(
-                vec![OptionRow::new(String::new(), DEFAULT_MODEL_LABEL)],
+                vec![OptionRow::new(
+                    String::new(),
+                    crate::t!("ai-orchestration-default-model"),
+                )],
                 Some(String::new()),
             )
         }
@@ -372,7 +386,7 @@ fn build_oz_model_snapshot(
             rows,
             selected_id,
             status: OptionSourceStatus::Empty {
-                message: "No models available".to_string(),
+                message: crate::t!("ai-orchestration-no-models"),
             },
             footer: None,
         };
@@ -387,7 +401,10 @@ fn build_non_oz_model_snapshot(
     models: Option<Vec<ModelChoiceInput>>,
     initial_model_id: &str,
 ) -> OptionSnapshot {
-    let mut rows = vec![OptionRow::new(String::new(), DEFAULT_MODEL_LABEL)];
+    let mut rows = vec![OptionRow::new(
+        String::new(),
+        crate::t!("ai-orchestration-default-model"),
+    )];
     let mut found_initial = false;
     for model in models.into_iter().flatten() {
         if model.id == initial_model_id {
@@ -442,7 +459,10 @@ fn build_api_key_snapshot(
     selection: &AuthSecretSelection,
     supports_create_new: bool,
 ) -> OptionSnapshot {
-    let mut rows = vec![OptionRow::new(String::new(), AUTH_SECRET_INHERIT_LABEL)];
+    let mut rows = vec![OptionRow::new(
+        String::new(),
+        crate::t!("ai-orchestration-skip-api-key"),
+    )];
     let status = match names {
         AuthSecretNamesInput::Loaded(names) => {
             for name in names {
@@ -452,7 +472,7 @@ fn build_api_key_snapshot(
         }
         AuthSecretNamesInput::NotLoaded => OptionSourceStatus::Loading,
         AuthSecretNamesInput::Failed => OptionSourceStatus::Failed {
-            message: AUTH_SECRETS_LOAD_FAILED_MESSAGE.to_string(),
+            message: crate::t!("ai-orchestration-secrets-load-failed"),
         },
     };
     // The selection derives directly from the edit state. `Named` is kept
@@ -547,7 +567,7 @@ fn build_host_snapshot(
         selected_id: Some(current.to_string()),
         status: OptionSourceStatus::Ready,
         footer: Some(OptionFooter::CustomText {
-            label: CUSTOM_HOST_LABEL.to_string(),
+            label: crate::t!("ai-orchestration-custom-host"),
         }),
     }
 }
@@ -571,7 +591,10 @@ pub fn environment_snapshot(state: &OrchestrationConfigState, _ctx: &AppContext)
 /// Pure core of [`environment_snapshot`]; `envs` must already be sorted
 /// by display name.
 fn build_environment_snapshot(envs: Vec<(String, String)>, current: &str) -> OptionSnapshot {
-    let mut rows = vec![OptionRow::new(String::new(), ORCHESTRATION_ENV_NONE_LABEL)];
+    let mut rows = vec![OptionRow::new(
+        String::new(),
+        crate::t!("ai-orchestration-empty-environment"),
+    )];
     let mut selected_id = current.is_empty().then(String::new);
     for (env_id, env_name) in envs {
         if env_id == current {
@@ -597,7 +620,7 @@ pub fn build_runner_snapshot(
 ) -> OptionSnapshot {
     let mut rows = vec![OptionRow::new(
         String::new(),
-        ORCHESTRATION_RUNNER_NONE_LABEL,
+        crate::t!("ai-orchestration-use-default"),
     )];
     let mut selected_id = current.is_empty().then(String::new);
     for (runner_id, runner_name) in runners {

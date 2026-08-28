@@ -1,12 +1,12 @@
 # InfiniShell — English (source-of-truth locale)
-# 本文件由多 agent 并行编辑,各自维护自己的 SECTION,key 以 surface 前缀隔离避免冲突。
-# 加 key 时 ctrl-F 找到对应 SECTION 头追加;新 surface 在文件末尾加新 SECTION。
+# Add each new key to the matching surface section and add the same key to zh-CN/warp.ftl.
+# Keep Fluent variables aligned across locales; app/src/i18n_tests.rs enforces key and variable parity.
 #
 # 命名规范:kebab-case,前缀按 surface,例 settings-ai-title / drive-folder-rename-title
 # 变量插值用 Fluent { $name } 语法,不要拼接
 
 # =============================================================================
-# SECTION: common (Owner: foundation)
+# SECTION: common
 # =============================================================================
 
 app-name = InfiniShell
@@ -84,6 +84,8 @@ common-copied-to-clipboard = Copied to clipboard
 common-new = New
 common-no-results = No results
 common-learn-more = Learn more
+common-user = User
+common-show-in-file-explorer = Show in file explorer
 common-skip = Skip
 common-get-warping = Get started
 common-try-again = Try again
@@ -96,7 +98,7 @@ common-list-prefix = {" - "}
 common-current-directory = the current directory
 
 # =============================================================================
-# SECTION: agent-management (Owner: agent-i18n-remaining)
+# SECTION: agent-management
 # Files: app/src/ai/agent_management/**
 # =============================================================================
 
@@ -124,7 +126,7 @@ agent-management-artifact-screenshot = Screenshot
 agent-management-artifact-file = File
 agent-management-source-scheduled = Scheduled
 agent-management-source-local-agent = InfiniShell (local agent)
-agent-management-source-cloud-agent = InfiniShell agent
+agent-management-source-cloud-agent = InfiniShell Agent
 agent-management-source-oz-web = InfiniShell Agent
 agent-management-source-github-action = GitHub Action
 agent-management-no-session-available = No session available
@@ -138,7 +140,7 @@ agent-management-environment-selected = Environment: { $environment }
 agent-management-loading-cloud-runs = Loading agent runs
 
 # =============================================================================
-# SECTION: workspace-runtime (Owner: agent-i18n-remaining)
+# SECTION: workspace-runtime
 # Files: app/src/workspace/view.rs
 # =============================================================================
 
@@ -162,10 +164,10 @@ workspace-toast-upgrade-more-credits = Upgrade for more credits.
 workspace-toast-disabled-synchronized-inputs = Disabled all synchronized inputs.
 workspace-toast-conversation-deleted = Conversation deleted
 workspace-search-repos-placeholder = Search repos
-workspace-search-tabs-placeholder = Search tabs...
-terminal-onekey-search-placeholder = Search saved SSH credentials...
+workspace-search-tabs-placeholder = Search tabs…
+terminal-onekey-search-placeholder = Search saved SSH credentials…
 terminal-onekey-search-no-results = No matching SSH credentials
-workspace-rearrange-toolbar-items = Re-arrange toolbar items
+workspace-rearrange-toolbar-items = Rearrange toolbar items
 workspace-new-session-agent = Agent
 workspace-new-session-terminal = Terminal
 workspace-new-session-cloud-oz = Agent tab
@@ -173,12 +175,73 @@ workspace-new-session-local-docker-sandbox = Local Docker Sandbox
 workspace-new-worktree-config = New worktree config
 workspace-new-tab-config = New tab config
 workspace-reopen-closed-session = Reopen closed session
+workspace-session-config-tab-config-chip = Access your tab configs here.
+workspace-toast-failed-remove-tab-config = Failed to remove tab config: { $error }
+workspace-toast-failed-load-tab-config = Failed to load tab config { $path }: { $error }
+workspace-toast-failed-load-model-config = Failed to load model config { $path }: { $error }
+workspace-heap-profile-written = Wrote heap profile to { $path }
+workspace-heap-profile-write-failed = Failed to write heap profile: { $error }
+workspace-local-conversation-unavailable = Conversation is not available in local InfiniShell history.
+workspace-untitled-pane = Untitled pane
+workspace-switch-team = Switch team
+workspace-new-tab-group = New tab group
+workspace-open-tab-config-title = Open: { $name }
+workspace-new-group = New Group
+workspace-rename-pane = Rename pane
+workspace-reset-pane-name = Reset pane name
+workspace-rename-active-pane = Rename active pane
+workspace-reset-active-pane-name = Reset active pane name
+workspace-current-version = Current version is { $version }
+workspace-install-update = Install update ({ $version })
+workspace-cli-agent-installed = Installed the InfiniShell Agent CLI globally. You can now run '{ $command }' from any terminal outside InfiniShell.
+workspace-cli-agent-removed = Removed the global InfiniShell Agent CLI installation—it still works inside InfiniShell.
+workspace-cli-agent-install-failed = Failed to install the InfiniShell Agent CLI command
+workspace-cli-agent-uninstall-failed = Failed to uninstall the InfiniShell Agent CLI command
+workspace-auto-handoff-success = Handed session off to the cloud
+workspace-toast-forked-conversation = Forked “{ $title }”
+workspace-toast-mouse-reporting-enabled = You enabled mouse reporting.
+workspace-toast-mouse-reporting-disabled = You disabled mouse reporting.
+workspace-toast-sync-all-enabled = You enabled synchronized inputs in all tabs.
+workspace-toast-sync-all-disabled = You disabled synchronized inputs in all tabs.
+workspace-toast-sync-tab-enabled = You enabled synchronized inputs in this tab.
+workspace-toast-sync-tab-disabled = You disabled synchronized inputs in this tab.
+workspace-toast-press-to-undo = {" "}Press { $key } to undo.
+workspace-process-sample-saved = Process sample saved to { $path }
+workspace-process-sample-failed = Failed to sample process (check logs)
+ai-conversation-renamed = Conversation renamed to { $title }
+ai-recording-open-failed = Failed to open recording.
+ai-code-diff-revert-failed = Failed to revert changes to { $file }
+ai-requested-command-request = Request
+ai-requested-command-response = Response
+ai-requested-command-no-arguments = (no arguments)
+ai-requested-command-cancelled = Cancelled
+ai-requested-command-error = Error: { $error }
+ai-requested-command-copy-json = Copy JSON
+ai-orchestration-new-environment = New environment
+ai-usage-credits-spent-total = Credits spent (total)
+ai-usage-credits-spent = Credits spent
+ai-usage-tool-calls = Tool calls
+ai-usage-context-window-used = Context window used
+ai-usage-files-changed = Files changed
+ai-usage-diffs-applied = Diffs applied
+ai-usage-commands-executed = Commands executed
+ai-usage-time-to-first-token = Time to first token
+ai-usage-total-response-time = Total agent response time
+terminal-custom-models = Custom models
+terminal-custom-model-router-title = Custom Model Router
+terminal-custom-model-router-description = Routes each request to a specific model according to your routing rules instead of using one fixed model.
+terminal-save-ssh-access-path = Save SSH access path
+terminal-secrets-search-or-create = Search secrets or create a new one
+terminal-secrets-new = New { $name }
+terminal-secrets-none-found = No secrets found
+terminal-secrets-load-failed = Unable to load secrets
+terminal-queued-to-send = to send
 app-menu-new-window = New Window
-app-menu-save-new = Save New...
+app-menu-save-new = Save New…
 app-menu-launch-configurations = Launch Configurations
 app-menu-warp = InfiniShell
 app-menu-preferences = Preferences
-app-menu-privacy-policy = Privacy Policy...
+app-menu-privacy-policy = Privacy Policy…
 app-menu-debug = Debug
 app-menu-set-default-terminal = Set InfiniShell as Default Terminal
 app-menu-file = File
@@ -211,12 +274,12 @@ app-menu-disable-in-band-generators = Disable in-band generators for new session
 app-menu-manually-toggle-network-status = Manually Toggle Network Status
 app-menu-export-default-settings-csv = Export Default Settings as CSV to home dir
 app-menu-create-anonymous-user = Create anonymous user
-app-menu-send-feedback = Send Feedback...
+app-menu-send-feedback = Send Feedback…
 app-menu-help = Help
-app-menu-warp-documentation = InfiniShell Documentation...
-app-menu-github-issues = GitHub Issues...
-app-menu-warp-slack-community = InfiniShell Slack Community...
-app-menu-cleanup-storage = Clean Up Storage...
+app-menu-warp-documentation = InfiniShell Documentation…
+app-menu-github-issues = GitHub Issues…
+app-menu-warp-slack-community = InfiniShell Slack Community…
+app-menu-cleanup-storage = Clean Up Storage…
 storage-cleanup-title = Clean Up Storage
 storage-cleanup-no-remote = Open and focus a connected SSH session to scan its installed InfiniShell extension versions.
 storage-cleanup-unsupported-shell = Remote storage cleanup currently supports POSIX SSH hosts only.
@@ -235,17 +298,17 @@ pane-get-started-title = Get started
 pane-new-tab-title = New tab
 
 # =============================================================================
-# SECTION: terminal-runtime (Owner: agent-i18n-remaining)
+# SECTION: terminal-runtime
 # Files: app/src/terminal/view.rs
 # =============================================================================
 
 terminal-banner-completions-not-working-prefix = Seems like your completions are not working (
 terminal-banner-more-info-lower = more info
 terminal-banner-more-info = More info
-terminal-banner-completions-not-working-middle = ). Enabling tmux warpification in {" "}
+terminal-banner-completions-not-working-middle = ). Enabling tmux Warpify in {" "}
 terminal-banner-settings = settings
 terminal-banner-completions-not-working-suffix =  may resolve this issue.
-terminal-banner-shell-config-incompatible = Your shell configuration is incompatible with InfiniShell...{"  "}
+terminal-banner-shell-config-incompatible = Your shell configuration is incompatible with InfiniShell…{"  "}
 terminal-banner-did-you-intend = Did you intend {" "}
 terminal-banner-move-cursor =  to move the cursor?
 terminal-toast-powershell-subshells-not-supported = PowerShell subshells not supported
@@ -257,7 +320,7 @@ terminal-cloud-agent-run = Agent run
 terminal-agent-header-for-terminal = for terminal
 ssh-remote-choice-title = Choose your experience for this remote session:
 ssh-remote-choice-install-extension = Install InfiniShell's SSH extension
-ssh-remote-choice-install-extension-desc = Install InfiniShell's extension to enable agent features like file browsing, code review, and intelligent command completions in this session.
+ssh-remote-choice-install-extension-desc = Install the InfiniShell SSH extension to enable agent features such as file browsing, code review, and intelligent command completions in this session.
 ssh-remote-choice-continue-without-installing = Continue without installing
 ssh-remote-choice-continue-without-installing-desc = You'll still get a Warpified experience just without the agent features.
 ssh-remote-choice-manage-warpify-settings = Manage Warpify settings
@@ -265,10 +328,12 @@ ai-document-show-version-history = Show version history
 ai-document-update-agent = Update Agent
 ai-document-save-and-sync-tooltip = Save and auto-sync this plan to your InfiniShell Drive
 ai-document-show-in-warp-drive = Show in InfiniShell Drive
-ai-document-save-as-markdown-file = Save as markdown file
+ai-document-save-as-markdown-file = Save as Markdown file
 ai-document-attach-to-active-session = Attach to active session
 ai-document-copy-plan-id = Copy plan ID
 ai-document-plan-id-copied = Plan ID copied to clipboard
+ai-document-copy-as-markdown = Copy as Markdown
+ai-document-copied-as-markdown = Copied to clipboard as Markdown
 ai-conversation-view-in-oz = View run
 ai-conversation-view-in-oz-tooltip = View this agent run
 ai-block-open-in-github = Open in GitHub
@@ -351,12 +416,12 @@ notebook-refresh-notebook = Refresh notebook
 notebook-refresh-file = Refresh file
 notebook-open-in-editor = Open in editor
 notebook-sign-in-to-edit = Sign in to edit
-editor-custom-keybinding = Custom...
+editor-custom-keybinding = Custom…
 editor-change-keybinding = Change keybinding
 autosuggestion-ignore-this-suggestion = Ignore this suggestion
 codex-use-latest-model = Use latest codex model
 infinishell-launch-visit-repo = Visit the repo
-infinishell-launch-title = InfiniShell is now open-source
+infinishell-launch-title = InfiniShell is now open source
 infinishell-launch-description = You, our community, can participate in building InfiniShell using an agent-first workflow.
 infinishell-launch-contribute-title = Contribute
 infinishell-launch-contribute-description = InfiniShell's client code is now open source. Get started by using the /feedback skill to open an issue, and follow the contribution guidelines here.
@@ -392,9 +457,9 @@ drive-sharing-teammates-with-link = Local access with link
 terminal-warpify-subshell = Warpify subshell
 terminal-warpify-subshell-tooltip = Enable InfiniShell shell integration in this session
 terminal-use-agent = Use agent
-terminal-use-agent-tooltip = Ask the InfiniShell agent to assist
+terminal-use-agent-tooltip = Ask InfiniShell Agent to assist
 terminal-give-control-back-to-agent = Give control back to agent
-terminal-resume-agent-tooltip = Ask the InfiniShell agent to resume
+terminal-resume-agent-tooltip = Ask InfiniShell Agent to resume
 terminal-voice-input-tooltip = Voice input
 terminal-attach-file-tooltip = Attach file
 terminal-slash-commands-tooltip = Slash commands
@@ -412,8 +477,8 @@ terminal-shared-session-make-viewer = Make viewer
 terminal-shared-session-change-role = Change role
 terminal-choose-execution-profile-tooltip = Choose an AI execution profile
 terminal-choose-agent-model-tooltip = Choose an agent model
-terminal-input-cli-agent-rich-input-hint = Tell the agent what to build...
-terminal-input-enter-prompt-for-agent = Enter prompt for { $agent }...
+terminal-input-cli-agent-rich-input-hint = Tell the agent what to build…
+terminal-input-enter-prompt-for-agent = Enter a prompt for { $agent }…
 terminal-input-cloud-agent-hint = Kick off an agent
 terminal-input-a11y-label = Command Input.
 terminal-input-a11y-helper = Input your shell command, press enter to execute. Press cmd-up to navigate to output of previously executed commands. Press cmd-l to re-focus command input.
@@ -443,6 +508,23 @@ terminal-input-steer-agent-hint = Steer the running agent
 terminal-input-steer-agent-backspace-hint = Steer the running agent, or backspace to exit
 terminal-input-follow-up-hint = Ask a follow up
 terminal-input-follow-up-backspace-hint = Ask a follow up, or backspace to exit
+terminal-input-queue-follow-up-hint = Queue a follow up for the running agent
+terminal-input-queue-follow-up-backspace-hint = Queue a follow up for the running agent, or backspace to exit
+terminal-input-child-queue-follow-up = Queue a follow up for the { $agent } agent
+terminal-input-child-steer = Steer the { $agent } agent
+terminal-input-child-follow-up = Ask the { $agent } agent a follow up
+terminal-input-handoff-cloud = Hand off to the cloud
+terminal-banner-use-emacs-bindings = Yes, use Emacs-style bindings
+terminal-banner-keep-ide-bindings = No, keep IDE bindings
+terminal-agent-permission-run = InfiniShell Agent needs your permission to run `{ $command }`
+terminal-agent-permission-read = InfiniShell Agent needs your permission to read files
+terminal-agent-permission-edit = InfiniShell Agent needs your permission to edit a file
+terminal-agent-permission-running-shell = InfiniShell Agent needs your permission to interact with a running shell command
+terminal-agent-confirmation = InfiniShell Agent needs your confirmation to continue
+terminal-block-started-at = Started at: { $date }
+terminal-block-completed-at = Completed at: { $date }
+terminal-recording-started = PTY recording started: { $path }
+terminal-recording-stopped = PTY recording stopped: { $path }
 terminal-input-search-queries = Search queries
 terminal-input-search-queries-rewind = Search queries to rewind to
 terminal-input-search-conversations = Search conversations
@@ -471,7 +553,7 @@ terminal-message-to-cycle-tabs = {" "}to cycle tabs
 terminal-message-to-select = {" "}to select
 terminal-message-select-save-profile = {" "}select and save to profile
 terminal-message-open-plan = {" "}open plan
-terminal-starting-shell = Starting shell...
+terminal-starting-shell = Starting shell…
 terminal-input-no-skills-found = No skills found
 terminal-model-specs-title = Model Specs
 terminal-model-specs-description = InfiniShell's benchmarks for how well a model performs in our harness, the rate at which it consumes credits, and task speed.
@@ -484,7 +566,7 @@ terminal-model-banner-full-terminal-agent = You're using the full terminal use a
 terminal-filter-block-output-placeholder = Filter block output
 
 # =============================================================================
-# SECTION: object-surfaces (Owner: agent-i18n-remaining)
+# SECTION: object-surfaces
 # Files: app/src/code_review/**, app/src/notebooks/**, app/src/workflows/**, app/src/drive/**
 # =============================================================================
 
@@ -521,7 +603,7 @@ object-toast-link-copied = Link copied to clipboard
 drive-toast-finished-exporting = Finished exporting objects
 
 # =============================================================================
-# SECTION: remaining-settings-tabs-env (Owner: agent-i18n-remaining)
+# SECTION: remaining-settings-tabs-env
 # Files: app/src/settings_view/**, app/src/tab_configs/**, app/src/env_vars/**
 # =============================================================================
 
@@ -536,7 +618,7 @@ env-vars-restore-tooltip = Restore environment variables from trash
 env-vars-variables-label = Variables
 
 # =============================================================================
-# SECTION: onboarding-callout (Owner: agent-i18n-remaining)
+# SECTION: onboarding-callout
 # Files: crates/onboarding/src/callout/view.rs
 # =============================================================================
 
@@ -567,7 +649,7 @@ onboarding-callout-updated-agent-input-text = Your agent input will detect natur
 onboarding-callout-back-terminal = Back to terminal
 
 # =============================================================================
-# SECTION: language (Owner: foundation)
+# SECTION: language
 # Files: app/src/settings_view/appearance_page.rs (Language widget + restart modal)
 # =============================================================================
 
@@ -577,7 +659,7 @@ language-restart-required-title = Language changed
 language-restart-required-body = InfiniShell's UI language has been updated. Some text will switch immediately, but a full restart is required for the change to take effect everywhere.
 
 # =============================================================================
-# SECTION: settings (Owner: agent-settings)
+# SECTION: settings
 # Files: app/src/settings_view/**
 # =============================================================================
 
@@ -604,7 +686,7 @@ settings-section-agent-profiles = Profiles
 settings-section-agent-mcp-servers = MCP servers
 settings-section-agent-providers = Providers
 settings-section-knowledge = Knowledge
-settings-section-third-party-cli-agents = Third party CLI agents
+settings-section-third-party-cli-agents = Third-party CLI agents
 settings-section-code = Code
 settings-section-editor-and-code-review = Editor and Code Review
 settings-section-cloud-environments = Environments
@@ -731,9 +813,9 @@ settings-mcp-card-button-set-up = Set up
 settings-mcp-card-tools-none = No tools available
 settings-mcp-card-tools-available = { $count } tools available
 settings-mcp-card-status-offline = Offline
-settings-mcp-card-status-starting = Starting server...
-settings-mcp-card-status-authenticating = Authenticating...
-settings-mcp-card-status-shutting-down = Shutting down...
+settings-mcp-card-status-starting = Starting server…
+settings-mcp-card-status-authenticating = Authenticating…
+settings-mcp-card-status-shutting-down = Shutting down…
 
 # ---- update_modal.rs ----
 settings-mcp-update-modal-default-name = Server
@@ -808,10 +890,10 @@ settings-referrals-sign-up = Unavailable locally
 settings-referrals-link-label = Link
 settings-referrals-email-label = Email
 settings-referrals-link-error = Failed to load referral code.
-settings-referrals-loading = Loading...
+settings-referrals-loading = Loading…
 settings-referrals-copy-link-button = Copy link
 settings-referrals-email-send-button = Send
-settings-referrals-email-sending-button = Sending...
+settings-referrals-email-sending-button = Sending…
 settings-referrals-link-copied-toast = Link copied.
 settings-referrals-email-success-toast = Successfully sent emails.
 settings-referrals-email-failure-toast = Failed to send emails. Please try again.
@@ -847,9 +929,9 @@ settings-warpify-host-placeholder = host (supports regex)
 settings-warpify-enable-ssh = Warpify SSH Sessions
 settings-warpify-install-ssh-extension = Install SSH extension
 settings-warpify-install-ssh-extension-description = Controls the installation behavior for InfiniShell's SSH extension when a remote host doesn't have it installed.
-settings-warpify-use-tmux = Use Tmux Warpification
-settings-warpify-tmux-description = The tmux ssh wrapper works in many situations where the default one does not, but may require you to hit a button to warpify. Takes effect in new tabs.
-settings-warpify-ssh-tmux-toggle-binding-label = SSH session detection for Warpification
+settings-warpify-use-tmux = Use tmux Warpify
+settings-warpify-tmux-description = The tmux SSH wrapper works in many situations where the default wrapper does not, but you may need to click a button to run Warpify. This setting takes effect in new tabs.
+settings-warpify-ssh-tmux-toggle-binding-label = SSH session detection for Warpify
 
 # --- ANCHOR-SUB-NETWORK (network-settings) ---
 # Global HTTP proxy settings page (see Issue #72).
@@ -892,7 +974,7 @@ settings-cloud-sync-platform-label = Sync Platform
 settings-cloud-sync-platform-description = Select the cloud service for synchronization
 settings-cloud-sync-token-label = Access Token
 settings-cloud-sync-token-description = Personal access token with gist scope
-settings-cloud-sync-token-placeholder = Enter access token...
+settings-cloud-sync-token-placeholder = Enter access token…
 settings-cloud-sync-operations-header = Sync Operations
 settings-cloud-sync-upload-label = Upload
 settings-cloud-sync-download-label = Download
@@ -905,8 +987,8 @@ settings-cloud-sync-last-time = Last sync time: {$time}
 settings-cloud-sync-last-platform = Last sync platform: {$platform}
 settings-cloud-sync-na = N/A
 settings-cloud-sync-never = Never
-settings-cloud-sync-syncing-upload = Uploading to {$platform}...
-settings-cloud-sync-syncing-download = Downloading from {$platform}...
+settings-cloud-sync-syncing-upload = Uploading to {$platform}…
+settings-cloud-sync-syncing-download = Downloading from {$platform}…
 settings-cloud-sync-success-upload = Upload to {$platform} successful (version v{$version})
 settings-cloud-sync-success-download = Download from {$platform} successful (version v{$version})
 settings-cloud-sync-already-up-to-date = Already up to date (v{$version}), no sync needed
@@ -925,7 +1007,7 @@ settings-cloud-sync-upload-confirm-title = Confirm Upload
 settings-cloud-sync-upload-confirm-description = Uploading will overwrite all remote SSH server configurations with the local version. Gists do not keep history, so this action cannot be undone.
 settings-cloud-sync-upload-confirm-button = Confirm Upload
 settings-cloud-sync-clear = Clear
-settings-cloud-sync-validating = Validating token...
+settings-cloud-sync-validating = Validating token…
 settings-cloud-sync-token-valid = Token valid ({$username})
 settings-cloud-sync-token-invalid = Invalid token: {$error}
 settings-cloud-sync-auto-sync-label = Auto Sync
@@ -940,7 +1022,7 @@ settings-ai-mcp-servers-section = MCP Servers
 settings-ai-knowledge-section = Knowledge
 settings-ai-voice-section = Voice
 settings-ai-other-section = Other
-settings-ai-third-party-cli-section = Third party CLI agents
+settings-ai-third-party-cli-section = Third-party CLI agents
 settings-ai-experimental-section = Experimental
 settings-ai-aws-bedrock-section = AWS Bedrock
 settings-ai-agents-header = Agents
@@ -948,6 +1030,14 @@ settings-ai-profiles-header = Profiles
 settings-ai-models-subheader = Models
 settings-ai-permissions-subheader = Permissions
 settings-ai-usage-header = Usage
+settings-ai-usage-resets = Resets { $date }
+settings-ai-grok-code-placeholder = Paste sign-in code
+settings-ai-grok-start-failed = Couldn't start Grok login: { $error }
+settings-ai-grok-opening-browser = Opening your browser to connect your SuperGrok subscription…
+settings-ai-grok-copy-url = Copy URL
+settings-ai-grok-connected = SuperGrok subscription connected
+settings-ai-grok-connect-failed = Couldn't connect SuperGrok: { $error }
+settings-ai-router-description-placeholder = Describe when to use this model…
 settings-ai-credits-label = Credits
 
 # Active AI toggle labels
@@ -1018,7 +1108,8 @@ settings-ai-learn-more = Learn more
 settings-ai-add-server = Add a server
 settings-ai-manage-mcp-servers = Manage MCP servers
 settings-ai-file-based-mcp-toggle = Auto-spawn servers from third-party agents
-settings-ai-file-based-mcp-supported-providers = See supported providers.
+settings-ai-drive-context-label = InfiniShell Drive as agent context
+settings-ai-drive-context-description = InfiniShell Agent can use your InfiniShell Drive content to tailor responses to your personal and team workflows and environments, including workflows, notebooks, and environment variables.
 settings-ai-mcp-dropdown-header = Select MCP servers
 
 # Knowledge / Rules
@@ -1053,7 +1144,7 @@ settings-ai-auto-dismiss-rich-input = Auto dismiss Rich Input after prompt submi
 settings-ai-toolbar-commands-label = Commands that enable the toolbar
 settings-ai-toolbar-commands-description = Add regex patterns to show the coding agent toolbar for matching commands.
 settings-ai-per-agent-section = Installed agents
-settings-ai-per-agent-scanning = Looking for installed agents...
+settings-ai-per-agent-scanning = Looking for installed agents…
 settings-ai-per-agent-empty = No installed CLI agents found.
 settings-ai-per-agent-agent-col = Agent
 settings-ai-per-agent-toolbar-col = Toolbar
@@ -1098,7 +1189,7 @@ settings-features-show-quit-warning = Show warning before quitting/logging out
 settings-features-quit-on-last-window-closed = Quit when all windows are closed
 settings-features-show-changelog-after-update = Show changelog toast after updates
 settings-features-mouse-scroll-multiplier = Lines scrolled by mouse wheel interval
-settings-features-auto-open-code-review = Auto open code review panel
+settings-features-auto-open-code-review = Automatically open code review panel
 settings-features-max-rows-per-block = Maximum rows in a block
 settings-features-ssh-wrapper = InfiniShell SSH Wrapper
 settings-features-ssh-auto-discovery = Auto-discover SSH hosts
@@ -1152,6 +1243,10 @@ settings-features-graphics-backend-current = Current backend: { $backend }
 settings-features-working-dir-home = Home directory
 settings-features-working-dir-previous = Previous session's directory
 settings-features-working-dir-custom = Custom directory
+settings-features-working-dir-advanced = Advanced
+settings-features-working-dir-new-window = New window
+settings-features-working-dir-new-tab = New tab
+settings-features-working-dir-split-pane = Split pane
 settings-features-undo-close-enable = Enable reopening of closed sessions
 settings-features-undo-close-grace-period = Grace period (seconds)
 settings-features-configure-global-hotkey = Configure Global Hotkey
@@ -1182,7 +1277,7 @@ settings-features-wayland-window-restore-warning = Window positions won't be res
 settings-features-see-docs = See docs.
 settings-features-allowed-values-1-20 = Allowed Values: 1-20
 settings-features-supports-floating-1-20 = Supports floating point values between 1 and 20.
-settings-features-auto-open-code-review-description = When this setting is on, the code review panel will open on the first accepted diff of a conversation
+settings-features-auto-open-code-review-description = Open the code review panel when the first diff in a conversation is accepted.
 settings-features-default-terminal-current = InfiniShell is the default terminal
 settings-features-takes-effect-new-sessions = This change will take effect in new sessions
 settings-features-seconds = seconds
@@ -1226,8 +1321,8 @@ settings-footer-alert-open-file = Open file
 settings-footer-alert-fix-with-oz = Fix with InfiniShell Agent
 
 # --- ANCHOR-SUB-CODE (agent-settings-code) ---
-settings-code-auto-open-review-panel = Auto open code review panel
-settings-code-auto-open-review-panel-desc = When this setting is on, the code review panel will open on the first accepted diff of a conversation
+settings-code-auto-open-review-panel = Automatically open code review panel
+settings-code-auto-open-review-panel-desc = Open the code review panel when the first diff in a conversation is accepted.
 settings-code-show-code-review-button = Show code review button
 settings-code-show-code-review-button-desc = Show a button in the top right of the window to toggle the code review panel.
 settings-code-show-diff-stats = Show diff stats on code review button
@@ -1317,6 +1412,7 @@ settings-exec-profile-editor-mcp-denylist-desc = MCP servers that InfiniShell Ag
 settings-env-modal-add-repo = Add repo
 settings-env-modal-cancel = Cancel
 settings-env-modal-create-environment = Create environment
+settings-env-modal-cloud-unavailable = Creating a cloud environment is not available in this build.
 settings-env-modal-selected-repos = Selected repos
 settings-env-modal-no-repos-selected = No repos selected yet
 settings-env-modal-available-repos = Available indexed repos
@@ -1335,10 +1431,10 @@ settings-env-modal-dialog-description-default = Select repos to provide context 
 settings-show-blocks-page-title = Shared blocks
 settings-show-blocks-unshare-menu-item = Unshare
 settings-show-blocks-copy-link = Copy link
-settings-show-blocks-deleting = Deleting...
+settings-show-blocks-deleting = Deleting…
 settings-show-blocks-executed-on = Executed on: { $time }
 settings-show-blocks-empty = You don't have any shared blocks yet.
-settings-show-blocks-loading = Getting blocks...
+settings-show-blocks-loading = Loading blocks…
 settings-show-blocks-load-failed = Failed to load blocks. Please try again.
 settings-show-blocks-link-copied = Link copied.
 settings-show-blocks-unshare-success = Block was successfully unshared.
@@ -1402,6 +1498,17 @@ settings-appearance-input-position-label = Input position
 settings-appearance-input-mode-pinned-bottom = Pin to the bottom (InfiniShell mode)
 settings-appearance-input-mode-pinned-top = Pin to the top (Reverse mode)
 settings-appearance-input-mode-waterfall = Start at the top (Classic mode)
+settings-appearance-command-input-waterfall = Start input at the top
+settings-appearance-command-input-pinned-top = Pin input to the top
+settings-appearance-command-input-pinned-bottom = Pin input to the bottom
+settings-appearance-command-toggle-input-mode = Toggle input mode (InfiniShell/Classic)
+settings-appearance-command-tab-bar-always = Always show tab bar
+settings-appearance-command-tab-bar-windowed = Hide tab bar in full screen
+settings-appearance-command-tab-bar-hover = Show tab bar only on hover
+settings-appearance-tools-panel-project-explorer-description = Show the project explorer/file tree tab in the tools panel.
+settings-appearance-tools-panel-agent-conversations-description = Show the agent conversation history tab in the tools panel.
+settings-appearance-tools-panel-global-search-description = Show the global file search tab in the tools panel.
+settings-appearance-tools-panel-drive-description = Show the InfiniShell Drive tab in the tools panel.
 
 # Panes
 settings-appearance-pane-dim-inactive-label = Dim inactive panes
@@ -1462,7 +1569,7 @@ settings-appearance-tab-show-vertical-panel-in-restored-windows-label = Show ver
 settings-appearance-tab-show-vertical-panel-in-restored-windows-description = When enabled, reopening or restoring a window opens the vertical tabs panel even if it was closed when the window was last saved.
 settings-appearance-tab-show-title-bar-search-bar-label = Show search bar in title bar
 settings-appearance-tab-show-title-bar-search-bar-description = Show the "Search sessions, agents, files…" search bar in the middle of the title bar; click to open the command palette. Disable to leave the slot empty. Only applies to vertical tabs layout.
-workspace-title-bar-search-placeholder = Search sessions, agents, files...
+workspace-title-bar-search-placeholder = Search sessions, agents, files…
 settings-appearance-tab-use-prompt-as-title-label = Use latest user prompt as conversation title in tab names
 settings-appearance-tab-use-prompt-as-title-description = Show the latest user prompt instead of the generated conversation title for built-in AI and third-party agent sessions in vertical tabs.
 settings-appearance-tab-toolbar-layout-label = Header toolbar layout
@@ -1485,7 +1592,7 @@ settings-appearance-zoom-secondary = Adjusts the default zoom level across all w
 # --- ANCHOR-SUB-ENVIRONMENTS (agent-settings-environments) ---
 settings-environments-page-title = Environments
 settings-environments-page-description = Environments define where your ambient agents run. Set one up in minutes via GitHub (recommended), InfiniShell-assisted setup, or manual configuration.
-settings-environments-search-placeholder = Search environments...
+settings-environments-search-placeholder = Search environments…
 settings-environments-no-matches = No environments match your search.
 settings-environments-section-personal = Personal
 settings-environments-section-team-default = Provided by InfiniShell and this device
@@ -1507,7 +1614,7 @@ settings-environments-empty-suggested-badge = Suggested
 settings-environments-empty-quick-setup-subtitle = Select the GitHub repositories you’d like to work with and we’ll suggest a base image and config
 settings-environments-empty-use-agent-title = Use the agent
 settings-environments-empty-use-agent-subtitle = Choose a locally set up project and we’ll help you set up an environment based on it
-settings-environments-button-loading = Loading...
+settings-environments-button-loading = Loading…
 settings-environments-button-retry = Retry
 settings-environments-button-authorize = Authorize
 settings-environments-button-get-started = Get started
@@ -1532,7 +1639,7 @@ settings-update-environment-description-placeholder = e.g., this environment is 
 # 此锚点下放 settings_view/agent_providers_widget.rs 字符串
 # 命名前缀:settings-agent-providers-*
 settings-agent-providers-title = Agent providers
-settings-agent-providers-description = Configure custom Agent providers across multiple protocols — OpenAI-compatible (DeepSeek, Zhipu GLM, Moonshot, DashScope, SiliconFlow, OpenRouter, etc.), Anthropic, Gemini, and local Ollama. You can add models manually (display name + model ID mapping) or fetch them automatically from the API. Provider metadata is stored in the local settings.toml; API keys are stored securely in the system keychain.
+settings-agent-providers-description = Configure custom agent providers across multiple protocols: OpenAI-compatible services (DeepSeek, Zhipu GLM, Moonshot, DashScope, SiliconFlow, OpenRouter, and others), Anthropic, Gemini, and local Ollama. You can add models manually by mapping display names to model IDs, or fetch them automatically from the API. Provider metadata is stored in the local settings.toml file; API keys are stored securely in the system keychain.
 settings-agent-providers-empty = No providers configured yet. Click [+ Add provider] in the top-right to add one.
 settings-agent-providers-placeholder-display-name = No custom provider configured — add one in Settings → AI
 settings-agent-providers-placeholder-base-model-name = Not configured
@@ -1568,7 +1675,7 @@ settings-agent-providers-responses-ptc = Programmatic tool calling
 settings-agent-providers-responses-multi-agent = Multi-agent Beta (3)
 settings-agent-providers-responses-privacy-hint = Local / ZDR does not store the conversation at the provider. Cloud state, background tasks, and third-party tools change the data-retention boundary.
 settings-agent-providers-name-placeholder = Custom provider name (e.g. DeepSeek, local Ollama)
-settings-agent-providers-api-key-placeholder = sk-... (optional, leave empty for local providers like ollama)
+settings-agent-providers-api-key-placeholder = sk-... (optional; leave empty for local providers such as Ollama)
 settings-agent-providers-models-label = Models ({ $count })
 settings-agent-providers-models-empty-hint = No models configured yet. Click [+ Add model] to add manually, or [Fetch from API] to fetch automatically.
 settings-agent-providers-models-header-name = Display name
@@ -1580,11 +1687,51 @@ settings-agent-providers-model-id-placeholder = Model ID (the `model` field sent
 settings-agent-providers-model-context-placeholder = Context (tokens)
 settings-agent-providers-model-output-placeholder = Output (tokens)
 settings-agent-providers-add-model = + Add model
+settings-agent-providers-model-modalities = Modalities
+settings-agent-providers-model-modality-image = Image
+settings-agent-providers-model-modality-pdf = PDF
+settings-agent-providers-model-modality-audio = Audio
+settings-agent-providers-model-capabilities = Capabilities
+settings-agent-providers-model-capability-reasoning = Reasoning
+settings-agent-providers-model-capability-tool-calling = Tool calling
+settings-agent-providers-remove-model = Remove model
+settings-agent-providers-extra-headers = Extra headers
+settings-agent-providers-add-header = + Add header
 settings-agent-providers-fetch-from-api = Fetch from API
 settings-agent-providers-sync-models-dev = Sync from models.dev
 settings-agent-providers-remove = Remove
 settings-agent-providers-save = Save
 settings-agent-providers-saved-toast = Saved
+settings-agent-providers-add-custom-endpoint = + Add custom endpoint
+settings-agent-providers-add-custom-endpoint-title = Add custom endpoint
+settings-agent-providers-edit-custom-endpoint-title = Edit custom endpoint
+settings-agent-providers-custom-endpoint-description = Enter the endpoint details below. You can add multiple models and give them aliases for the model picker.
+settings-agent-providers-custom-endpoint-api-schema = API schema
+settings-agent-providers-custom-endpoint-name = Endpoint name
+settings-agent-providers-custom-endpoint-name-placeholder = e.g., My external models
+settings-agent-providers-custom-endpoint-url = Endpoint URL
+settings-agent-providers-custom-endpoint-url-placeholder = Include https://
+settings-agent-providers-custom-endpoint-api-key = API key
+settings-agent-providers-custom-endpoint-api-key-placeholder = e.g., sk-...
+settings-agent-providers-custom-endpoint-model-name = Model name
+settings-agent-providers-custom-endpoint-model-name-placeholder = e.g., GLM-5-FP8
+settings-agent-providers-custom-endpoint-model-alias = Model alias (optional)
+settings-agent-providers-custom-endpoint-model-alias-placeholder = e.g., GLM-5
+settings-agent-providers-custom-endpoint-add-action = Add endpoint
+settings-agent-providers-remove-endpoint-action = Remove endpoint
+settings-agent-providers-remove-endpoint-title = Remove endpoint?
+settings-agent-providers-remove-endpoint-description = Are you sure you want to remove this endpoint? Its models will no longer be available in agent sessions.
+settings-agent-providers-change-default-title = Change your default model?
+settings-agent-providers-change-default-not-now = Not now
+settings-agent-providers-change-default-action = Change default model
+settings-agent-providers-change-default-provider-description = You added your own { $provider } API key, but your default model is currently set to { $model }, which won't work without InfiniShell credits. Would you like to change your default model?
+settings-agent-providers-change-default-endpoint-description = You added the “{ $endpoint }” custom endpoint, but your default model is currently set to { $model }, which won't work without InfiniShell credits. Would you like to change your default model?
+settings-agent-providers-default-model-updated = Default model updated
+settings-agent-providers-endpoint-added = Endpoint added
+settings-agent-providers-endpoint-saved = Endpoint saved
+settings-agent-providers-endpoint-removed = Endpoint removed
+settings-ai-add-router = + Add router
+settings-ai-context-window-label = Context window (tokens)
 
 # ---- AI page (settings_view/ai_page.rs) ----
 settings-ai-title = AI
@@ -1598,56 +1745,14 @@ settings-ai-natural-language-autosuggestions = Let AI suggest natural language a
 settings-ai-git-operations-autogen-description = Let AI generate commit messages and pull request titles and descriptions.
 
 # =============================================================================
-# SECTION: ai (Owner: agent-ai)
-# Files: app/src/ai/**, app/src/ai_assistant/**
-# =============================================================================
-
-# (placeholder — to be filled by agent-ai)
-
-# =============================================================================
-# SECTION: command-palette (Owner: agent-cmdpal)
-# Files: app/src/command_palette.rs, app/src/palette/**
-# =============================================================================
-
-# (placeholder)
-
-# =============================================================================
-# SECTION: drive (Owner: agent-drive)
-# Files: app/src/drive/**
-# =============================================================================
-
-# (placeholder)
-
-# =============================================================================
-# SECTION: workspace (Owner: agent-workspace)
-# Files: app/src/workspace/**, app/src/workspaces/**
-# =============================================================================
-
-# (placeholder)
-
-# =============================================================================
-# SECTION: modal (Owner: agent-modal)
-# Files: app/src/modal/**, app/src/prompt/**, app/src/quit_warning/**
-# =============================================================================
-
-# (placeholder)
-
-# =============================================================================
-# SECTION: auth (Owner: agent-auth)
-# Files: app/src/auth/**
-# =============================================================================
-
-# (placeholder)
-
-# =============================================================================
-# SECTION: banner (Owner: agent-banner)
+# SECTION: banner
 # Files: app/src/banner/**
 # =============================================================================
 
 banner-dont-show-again = Don't show me again
 
 # =============================================================================
-# SECTION: quit-warning (Owner: agent-quit-warning)
+# SECTION: quit-warning
 # Files: app/src/quit_warning/mod.rs
 # =============================================================================
 
@@ -1865,16 +1970,16 @@ keybinding-desc-workspace-show-settings-menu = Settings
 # InfiniShell: keybinding-desc-workspace-show-settings-account removed alongside the
 # Account settings page.
 keybinding-desc-workspace-show-settings-appearance = Open Settings: Appearance
-keybinding-desc-workspace-show-settings-appearance-menu = Appearance...
+keybinding-desc-workspace-show-settings-appearance-menu = Appearance…
 keybinding-desc-workspace-show-settings-features = Open Settings: Features
 keybinding-desc-workspace-show-settings-shared-blocks = Open Settings: Shared Blocks
-keybinding-desc-workspace-show-settings-shared-blocks-menu = View Shared Blocks...
+keybinding-desc-workspace-show-settings-shared-blocks-menu = View Shared Blocks…
 keybinding-desc-workspace-show-settings-keyboard-shortcuts = Open Settings: Keyboard Shortcuts
-keybinding-desc-workspace-show-settings-keyboard-shortcuts-menu = Configure Keyboard Shortcuts...
+keybinding-desc-workspace-show-settings-keyboard-shortcuts-menu = Configure Keyboard Shortcuts…
 keybinding-desc-workspace-show-settings-about = Open Settings: About
 keybinding-desc-workspace-show-settings-about-menu = About InfiniShell
 keybinding-desc-workspace-show-settings-warpify = Open Settings: Warpify
-keybinding-desc-workspace-show-settings-warpify-menu = Configure Warpify...
+keybinding-desc-workspace-show-settings-warpify-menu = Configure Warpify…
 keybinding-desc-workspace-show-settings-ai = Open Settings: AI
 keybinding-desc-workspace-show-settings-code = Open Settings: Code
 keybinding-desc-workspace-show-settings-referrals = Open Settings: Referrals
@@ -1935,7 +2040,7 @@ keybinding-desc-input-clear-and-reset-ai-context-menu-query = Clear and reset AI
 keybinding-desc-terminal-alternate-paste = Alternate terminal paste
 keybinding-desc-terminal-toggle-cli-agent-rich-input = Toggle CLI Agent Rich Input
 keybinding-desc-terminal-warpify-subshell = Warpify subshell
-keybinding-desc-terminal-warpify-ssh-session = Warpify ssh session
+keybinding-desc-terminal-warpify-ssh-session = Warpify SSH session
 keybinding-desc-terminal-accept-prompt-suggestion = Accept Prompt Suggestion
 keybinding-desc-terminal-cancel-process-windows = Copy text or cancel active process
 keybinding-desc-terminal-cancel-process = Cancel active process
@@ -2218,7 +2323,7 @@ rules-add-button = Add
 rules-init-project-button = Initialize Project
 
 # --- Agent view zero-state + message bar ---
-agent-zero-state-title = New InfiniShell agent conversation
+agent-zero-state-title = New InfiniShell Agent conversation
 agent-zero-state-description = Send a prompt below to start a new conversation
 agent-zero-state-description-with-location = Send a prompt below to start a new conversation in `{ $location }`
 agent-zero-state-recent-activity = RECENT ACTIVITY
@@ -2235,7 +2340,7 @@ agent-toolbar-edit-cli-agent-toolbelt = Edit CLI agent toolbelt
 agent-toolbar-available-chips = Available chips
 agent-message-bar-get-figma-mcp = Get Figma MCP
 agent-message-bar-enable-figma-mcp = Enable Figma MCP
-agent-message-bar-enabling = Enabling...
+agent-message-bar-enabling = Enabling…
 child-agent-default-name = Agent
 agent-zero-state-switch-model = switch model
 agent-zero-state-go-back-to-terminal = go back to terminal
@@ -2268,8 +2373,8 @@ agent-shortcuts-search-continue-conversations = search and continue conversation
 agent-shortcuts-start-new-conversation = start a new conversation
 agent-shortcuts-toggle-auto-accept = toggle auto-accept
 agent-shortcuts-pause-agent = pause agent
-agent-error-will-resume-when-network-restored = Will resume conversation when network connectivity is restored...
-agent-error-attempting-resume-conversation = Attempting to resume conversation...
+agent-error-will-resume-when-network-restored = The conversation will resume when network connectivity is restored…
+agent-error-attempting-resume-conversation = Attempting to resume the conversation…
 
 # --- ANCHOR-SUB-TOGGLE-PAIR (settings-toggle-pair) ---
 toggle-setting-enable = Enable { $suffix }
@@ -2355,7 +2460,7 @@ settings-external-editor-layout-new-tab = New Tab
 settings-external-editor-default-app = Default App
 
 # =============================================================================
-# SECTION: context-menu (Owner: agent-context-menu)
+# SECTION: context-menu
 # 鼠标右键弹出菜单。surface 前缀:menu-{block,input,ai-block,tab,pane,filetree,codeeditor}-*
 # =============================================================================
 
@@ -2394,6 +2499,7 @@ menu-block-split-pane-left = Split pane left
 menu-block-split-pane-down = Split pane down
 menu-block-split-pane-up = Split pane up
 menu-block-close-pane = Close pane
+menu-block-clear-blocks = Clear Blocks
 
 # --- input 右键菜单(terminal/view.rs) ---
 menu-input-cut = Cut
@@ -2417,6 +2523,7 @@ menu-ai-block-copy-command = Copy command
 menu-ai-block-copy-git-branch = Copy git branch
 menu-ai-block-save-as-prompt = Save as prompt
 menu-ai-block-copy-conversation-text = Copy conversation text
+menu-ai-block-fork = Fork
 menu-ai-block-fork-from-here = Fork from here
 menu-ai-block-rewind-to-before-here = Rewind to before here
 menu-ai-block-fork-from-last-query = Fork from last query
@@ -2438,6 +2545,31 @@ menu-tab-close-below = Close Tabs Below
 menu-tab-close-right = Close Tabs to the Right
 menu-tab-save-as-new-config = Save as new config
 menu-tab-default-no-color = Default (no color)
+menu-tab-copy-title = Copy tab title
+menu-tab-copy-pane-title = Copy pane title
+menu-tab-copy-branch = Copy branch
+menu-tab-copy-working-directory = Copy working directory
+menu-tab-copy-pull-request-link = Copy pull request link
+menu-tab-new-group-with-tab = New group with tab
+menu-tab-move-to-group = Move to group
+menu-tab-remove-from-group = Remove from group
+menu-tab-group-create-from-tabs = Create group from tabs
+menu-tab-group-move-up = Move group up
+menu-tab-group-move-left = Move group left
+menu-tab-group-move-down = Move group down
+menu-tab-group-move-right = Move group right
+menu-tab-group-close-all = Close all tabs in group
+menu-tab-group-close-above = Close tabs above
+menu-tab-group-close-left = Close tabs to the left
+menu-tab-group-close-below = Close tabs below
+menu-tab-group-close-right = Close tabs to the right
+menu-tab-group-pin = Pin group
+menu-tab-group-unpin = Unpin group
+menu-tab-group-ungroup = Ungroup tabs
+menu-tab-group-new-tab = New tab in group
+menu-tab-pin = Pin tab
+menu-tab-unpin = Unpin tab
+menu-tab-untitled-group = Untitled group
 
 # --- pane header 溢出菜单(terminal/view/pane_impl.rs) ---
 menu-pane-copy-link = Copy link
@@ -2470,37 +2602,64 @@ menu-attach-as-agent-context = Attach as agent context
 # Slash command palette descriptions and argument hints
 # (app/src/search/slash_command_menu/static_commands/commands.rs)
 slash-cmd-agent-desc = Start a new conversation
+slash-cmd-cloud-agent-desc = Start a new cloud agent conversation
 slash-cmd-add-mcp-desc = Add new MCP server
+slash-cmd-reset-statusline-desc = Restore the default status line items and order
+slash-cmd-statusline-desc = Configure the status line
+slash-cmd-auto-approve-desc = Toggle automatic approval
+slash-cmd-mcp-desc = View and manage MCP servers
+slash-cmd-view-logs-desc = Bundle your logs into a ZIP archive
+slash-cmd-voice-desc = Start voice input (Ctrl-S)
+slash-cmd-natural-language-detection-desc = Toggle natural-language detection
+slash-cmd-api-keys-desc = View and manage API keys
+slash-cmd-connect-grok-desc = Connect your Grok (X Premium / SuperGrok) account
+slash-cmd-upgrade-desc = Open the InfiniShell upgrade page in your browser
+slash-cmd-theme-desc = Set the color theme
+slash-cmd-theme-hint = <auto|light|dark>
+slash-cmd-exit-desc = Exit InfiniShell
+slash-cmd-status-desc = Show local session status
 slash-cmd-pr-comments-desc = Pull GitHub PR review comments
 slash-cmd-create-environment-desc = Create an InfiniShell Agent environment (Docker image + repos) via guided setup
 slash-cmd-create-environment-hint = <optional repo paths or GitHub URLs>
-slash-cmd-docker-sandbox-desc = Create a new docker sandbox terminal session
+slash-cmd-docker-sandbox-desc = Create a new Docker sandbox terminal session
 slash-cmd-create-new-project-desc = Have InfiniShell Agent walk you through creating a new coding project
 slash-cmd-create-new-project-hint = <describe what you want to build>
-slash-cmd-open-skill-desc = Open a skill's markdown file in InfiniShell's built-in editor
+slash-cmd-open-skill-desc = Open a skill's Markdown file in InfiniShell's built-in editor
 slash-cmd-skills-desc = Invoke a skill
-slash-cmd-add-prompt-desc = Add new Agent prompt
+slash-cmd-add-prompt-desc = Add a new agent prompt
 slash-cmd-add-rule-desc = Add a new global rule for the agent
 slash-cmd-open-file-desc = Open a file in InfiniShell's code editor
 slash-cmd-open-file-hint = <path/to/file[:line[:col]]> or "@" to search
 slash-cmd-rename-tab-desc = Rename the current tab
 slash-cmd-rename-tab-hint = <tab name>
+slash-cmd-rename-conversation-desc = Rename the current conversation
+slash-cmd-rename-conversation-hint = <new title>
+slash-cmd-set-tab-color-desc = Set the color of the current tab
 slash-cmd-fork-desc = Fork the current conversation in a new pane or a new tab
 slash-cmd-fork-hint = <optional prompt to send in forked conversation>
+slash-cmd-handoff-desc = Hand off this conversation to a cloud agent
+slash-cmd-handoff-hint = <optional follow-up prompt>
 slash-cmd-open-code-review-desc = Open code review
+slash-cmd-index-desc = Index this codebase
 slash-cmd-init-desc = Generate or update an AGENTS.md file
 slash-cmd-open-project-rules-desc = Open the project rules file (AGENTS.md)
 slash-cmd-open-mcp-servers-desc = Open MCP servers
 slash-cmd-open-settings-file-desc = Open settings file (TOML)
 slash-cmd-changelog-desc = Open the latest changelog
+slash-cmd-feedback-desc = Send feedback
 slash-cmd-open-repo-desc = Switch to another indexed repository
 slash-cmd-open-rules-desc = View all of your global and project rules
 slash-cmd-new-desc = Start a new conversation (alias for /agent)
+slash-cmd-clear-desc = Clear the transcript and start a new conversation (alias for /agent)
 slash-cmd-model-desc = Switch the base agent model
+slash-cmd-host-desc = Switch the cloud agent execution host
+slash-cmd-harness-desc = Switch the cloud agent harness
+slash-cmd-environment-desc = Switch the cloud agent environment
 slash-cmd-profile-desc = Switch the active execution profile
 slash-cmd-plan-desc = Prompt the agent to do some research and create a plan for a task
 slash-cmd-plan-hint = <describe your task>
-slash-cmd-compact-desc = Free up context by summarizing convo history
+slash-cmd-orchestrate-desc = Split a task into subtasks and run them in parallel with multiple agents
+slash-cmd-compact-desc = Free up context by summarizing conversation history
 slash-cmd-compact-hint = <optional custom summarization instructions>
 slash-cmd-compact-and-desc = Compact conversation and then send a follow-up prompt
 slash-cmd-compact-and-hint = <prompt to send after compaction>
@@ -2509,13 +2668,19 @@ slash-cmd-queue-hint = <prompt to send when agent is done>
 slash-cmd-fork-and-compact-desc = Fork current conversation and compact it in the forked copy
 slash-cmd-fork-and-compact-hint = <optional prompt to send after compaction>
 slash-cmd-fork-from-desc = Fork conversation from a specific query
+slash-cmd-continue-locally-desc = Continue this cloud conversation locally
+slash-cmd-continue-locally-hint = <optional prompt to send in the local conversation>
+slash-cmd-usage-desc = Open billing and usage settings
 slash-cmd-remote-control-desc = Start remote control for this session
+slash-cmd-cost-desc = Toggle credit usage details
 slash-cmd-conversations-desc = Open conversation history
 slash-cmd-prompts-desc = Search saved prompts
 slash-cmd-rewind-desc = Rewind to a previous point in the conversation
-slash-cmd-export-to-clipboard-desc = Export current conversation to clipboard in markdown format
-slash-cmd-export-to-file-desc = Export current conversation to a markdown file
+slash-cmd-export-to-clipboard-desc = Export the current conversation to the clipboard in Markdown format
+slash-cmd-export-to-file-desc = Export the current conversation to a Markdown file
 slash-cmd-export-to-file-hint = <optional filename>
+slash-cmd-vim-mode-desc = Toggle Vim mode
+slash-cmd-copy-debugging-id-desc = Copy debugging information for this conversation
 
 # --- ANCHOR-SUB-PROMPT-TIPS ---
 # Prompt editor modal (app/src/prompt/editor_modal.rs)
@@ -2561,7 +2726,7 @@ command-palette-toast-cannot-switch-conversations = Cannot switch conversations 
 command-palette-toast-cannot-start-new-conversation = Cannot start a new conversation while agent is monitoring a command.
 command-palette-zero-state-recent = Recent
 command-palette-zero-state-suggested = Suggested
-welcome-palette-search-placeholder = Code, build, or search for anything...
+welcome-palette-search-placeholder = Code, build, or search for anything…
 welcome-palette-no-results = No results found
 search-filter-placeholder-history = Search history
 search-filter-placeholder-workflows = Search workflows
@@ -2655,14 +2820,14 @@ drive-naming-rename = Rename
 drive-import-title = Import
 drive-import-close = Close
 drive-import-cancel = Cancel
-drive-import-preparing = Preparing...
-drive-import-choose-files = Choose files...
+drive-import-preparing = Preparing…
+drive-import-choose-files = Choose files…
 drive-import-learn-file-support = Learn about file support and formatting
 drive-import-file-upload-error = Failed to upload file to server
 drive-import-folder-upload-error = Failed to upload folder to server
 
 # Drive main panel and workflow editor (app/src/drive/index.rs, app/src/drive/workflows/*)
-drive-title = Drive
+drive-title = InfiniShell Drive
 drive-environment-variables = Environment variables
 drive-folder = Folder
 drive-notebook = Notebook
@@ -2741,7 +2906,7 @@ workflow-arguments-label = Arguments
 workflow-argument-description-placeholder = Description
 workflow-argument-value-placeholder = Value (optional)
 workflow-default-value-placeholder = Default value (optional)
-workflow-agent-mode-query-placeholder = Enter your prompt here... (e.g., 'Create a function to sort an array of objects by date' or 'Help me debug this React component').
+workflow-agent-mode-query-placeholder = Enter your prompt here… (for example, “Create a function to sort an array of objects by date” or “Help me debug this React component”).
 workflow-save = Save workflow
 workflow-unsaved-changes = You have unsaved changes.
 workflow-keep-editing = Keep editing
@@ -2886,11 +3051,11 @@ workspace-left-panel-ssh-manager-error-port-invalid = Port must be a number betw
 workspace-left-panel-ssh-manager-error-host-required = Host cannot be empty.
 workspace-left-panel-ssh-manager-connect = Connect
 workspace-left-panel-ssh-manager-test = Test
-workspace-left-panel-ssh-manager-testing = Testing...
+workspace-left-panel-ssh-manager-testing = Testing…
 workspace-left-panel-ssh-manager-status-online = Online
 workspace-left-panel-ssh-manager-status-offline = Offline
 workspace-left-panel-ssh-manager-status-unknown = Unknown
-search-filter-placeholder-ssh-servers = Search SSH servers...
+search-filter-placeholder-ssh-servers = Search SSH servers…
 search-filter-display-ssh-servers = SSH Servers
 workspace-left-panel-ssh-manager-menu-rename = Rename
 workspace-left-panel-ssh-manager-tree-empty = No SSH servers yet. Click 📁 to add a folder, + to add a server.
@@ -3196,15 +3361,15 @@ cli-agent-plugin-opencode-restart-update-note = Restart OpenCode to load the upd
 # Remaining visible UI strings
 ai-ask-user-questions-unavailable = Questions unavailable
 ai-ask-user-questions-skipped-auto-approve = Questions skipped due to auto-approve
-terminal-bootstrapping-checking = Checking...
-terminal-bootstrapping-installing-progress = Installing... ({ $p }%)
-terminal-bootstrapping-installing = Installing...
-terminal-bootstrapping-updating = Updating...
-terminal-bootstrapping-initializing = Initializing...
-terminal-bootstrapping-installing-warp-ssh-extension-progress = Installing InfiniShell SSH Extension... ({ $p }%)
-terminal-bootstrapping-installing-warp-ssh-extension = Installing InfiniShell SSH Extension...
-terminal-bootstrapping-updating-warp-ssh-extension = Updating InfiniShell SSH Extension...
-terminal-bootstrapping-starting-shell-name = Starting { $shell }...
+terminal-bootstrapping-checking = Checking…
+terminal-bootstrapping-installing-progress = Installing… ({ $p }%)
+terminal-bootstrapping-installing = Installing…
+terminal-bootstrapping-updating = Updating…
+terminal-bootstrapping-initializing = Initializing…
+terminal-bootstrapping-installing-warp-ssh-extension-progress = Installing InfiniShell SSH extension… ({ $p }%)
+terminal-bootstrapping-installing-warp-ssh-extension = Installing InfiniShell SSH extension…
+terminal-bootstrapping-updating-warp-ssh-extension = Updating InfiniShell SSH extension…
+terminal-bootstrapping-starting-shell-name = Starting { $shell }…
 agent-tip-prefix = Tip:
 agent-tip-slash-menu = `/` to open the slash-command menu and access quick agent actions.
 agent-tip-toggle-input-mode = <keybinding> to toggle natural language detection and switch between agent and terminal input.
@@ -3255,25 +3420,25 @@ hoa-feature-native-code-review-title = Native code review
 hoa-feature-native-code-review-description = Send inline comments from InfiniShell's code review directly to Claude Code, Codex, or OpenCode
 resource-center-whats-new-section = What's New?
 resource-center-getting-started-section = Getting Started
-resource-center-maximize-warp-section = Maximize InfiniShell
+resource-center-maximize-warp-section = Get the most from InfiniShell
 resource-center-advanced-setup-section = Advanced Setup
 resource-center-create-first-block-title = Create your first block
 resource-center-create-first-block-description = Run a command to see your command and output grouped.
 resource-center-navigate-blocks-title = Navigate blocks
 resource-center-navigate-blocks-description = Click to select a block and navigate with arrow keys.
-resource-center-block-action-title = Take an action on block
-resource-center-block-action-description = Right click on a block to copy/paste, share, more.
+resource-center-block-action-title = Take action on a block
+resource-center-block-action-description = Right-click a block to copy, paste, share, or access more actions.
 resource-center-command-palette-title = Open command palette
 resource-center-command-palette-description = Access all of InfiniShell via the keyboard.
 resource-center-set-theme-title = Set your theme
 resource-center-set-theme-description = Make InfiniShell your own by choosing a theme.
 resource-center-custom-prompt-title = Use your custom prompt
-resource-center-custom-prompt-description = Set up InfiniShell to honor your PS1 setting
+resource-center-custom-prompt-description = Set up InfiniShell to honor your PS1 setting.
 resource-center-view-documentation = View documentation
 resource-center-integrate-ide-title = Integrate InfiniShell with your IDE
-resource-center-integrate-ide-description = Configure InfiniShell to launch from your most used development tools
-resource-center-how-warp-uses-warp-title = How InfiniShell uses InfiniShell
-resource-center-how-warp-uses-warp-description = Learn how InfiniShell's engineering team uses their favorite features
+resource-center-integrate-ide-description = Configure InfiniShell to launch from your most-used development tools.
+resource-center-how-warp-uses-warp-title = How we use InfiniShell
+resource-center-how-warp-uses-warp-description = Learn how the InfiniShell engineering team uses its favorite features.
 resource-center-read-article = Read article
 resource-center-command-search-title = Command search
 resource-center-command-search-description = Find and run previously executed commands, workflows, and more.
@@ -3293,7 +3458,7 @@ sharing-inherited-from-prefix = Inherited from {" "}
 sharing-inherited-permission-label = Inherited permission
 sharing-inherited-permissions-edit-parent-tooltip = Edit inherited permissions on the parent folder
 sharing-inherited-permissions-cannot-edit-tooltip = Cannot edit inherited permissions
-command-palette-navigation-running = Running...
+command-palette-navigation-running = Running…
 command-palette-navigation-completed-over-hour = Completed over 1 hour ago
 command-palette-navigation-completed-minute-ago = Completed { $mins } minute ago
 command-palette-navigation-completed-minutes-ago = Completed { $mins } minutes ago
@@ -3310,7 +3475,7 @@ terminal-message-new-conversation = {" "}new conversation
 agent-message-bar-again-send-to-agent = again to send to agent
 
 # =============================================================================
-# SECTION: remaining-ui-surfaces (Owner: codex-i18n-remaining-ui-surfaces)
+# SECTION: additional-ui-surfaces
 # Files: onboarding slides, auth modal, voice, launch configs, notebook file state,
 #        resource center, theme picker, terminal banners, AI footer/tool output
 # =============================================================================
@@ -3424,7 +3589,7 @@ theme-creator-theme-name = Theme name
 theme-creator-background-color = Background color
 theme-creator-image-subheader = Automatically generate a theme based on extracted colors from an image (.png, .jpg).
 theme-creator-select-image = Select an image
-theme-creator-selecting-image = Selecting image...
+theme-creator-selecting-image = Selecting image…
 theme-creator-select-new-image = Select a new image
 theme-creator-create-theme = Create theme
 theme-creator-process-image-failed = Failed to process selected image. Please try again with a different image.
@@ -3452,16 +3617,16 @@ launch-config-save-description-no-keybinding = This will save your current confi
 launch-config-save-description-with-keybinding = This will save your current configuration of windows, tabs and panes to a file so you can easily open it again with { $keybinding }.
 launch-config-yaml-saved-to-prefix = \nThe YAML file is saved to{" "}
 notebook-file-could-not-read = Could not read { $name }
-notebook-file-loading = Loading { $name }...
+notebook-file-loading = Loading { $name }…
 notebook-file-missing-source = Missing source file
 
-terminal-shared-session-reconnecting = Offline, trying to reconnect...
+terminal-shared-session-reconnecting = Offline; attempting to reconnect…
 terminal-banner-p10k-supported = Powerlevel10k now supports InfiniShell!{"  "}
 terminal-banner-p10k-older-version-prefix = You seem to be running an older (unsupported) version, please follow{" "}
 terminal-banner-these-instructions = these instructions
 terminal-banner-update-latest-suffix = {" "}to update to the latest version.
 terminal-banner-pure-unsupported = Pure is not yet supported in InfiniShell. You might consider one of the supported prompts as an alternative.{"  "}
-terminal-loading-session = Loading session...
+terminal-loading-session = Loading session…
 
 ai-footer-hide-rich-input = Hide Rich Input
 ai-footer-choose-environment = Choose an environment
@@ -3482,10 +3647,10 @@ ai-footer-start-remote-control = Start remote control
 ai-footer-login-required-remote-control = Log in to use /remote-control
 ai-footer-see-logs-for-details = See logs for details
 ai-footer-plugin-installed-restart-session = Warp plugin installed. Please restart the session to activate.
-ai-footer-installing-warp-plugin = Installing Warp plugin...
+ai-footer-installing-warp-plugin = Installing Warp plugin…
 ai-footer-failed-install-warp-plugin = Failed to install Warp plugin
 ai-footer-plugin-updated-restart-session = Warp plugin updated. Please restart the session to activate.
-ai-footer-updating-warp-plugin = Updating Warp plugin...
+ai-footer-updating-warp-plugin = Updating Warp plugin…
 ai-footer-failed-update-warp-plugin = Failed to update Warp plugin
 voice-input-limit-reached = Voice input limit reached
 voice-input-transcription-failed = Failed to transcribe voice input
@@ -3627,7 +3792,7 @@ passive-suggestion-find-search-query = Help me search code across files with {1}
 passive-suggestion-ssh-keygen-query = Walk me through generating an SSH key.
 
 # =============================================================================
-# SECTION: remaining-ui-surfaces (Owner: agent-i18n-remaining)
+# SECTION: late-added-ui-surfaces
 # Files: app/src/workspace, app/src/terminal, app/src/code, app/src/notebooks,
 #        app/src/ai, app/src/settings_view, app/src/workflows, app/src/view_components
 # =============================================================================
@@ -3646,7 +3811,123 @@ common-do-not-show-again = Do not show again
 common-dont-show-again-with-period = Don't show again.
 common-refresh = Refresh
 common-resource-not-found-or-access-denied = Resource not found or access denied
+settings-search-empty-title = No settings match your search.
+settings-search-empty-description = Try different keywords or check for typos.
+settings-billing-monthly-spending-limit = Monthly spending limit
+settings-billing-load-more = Load more
+settings-billing-buy-more = Buy more
+settings-billing-plan = Plan
+settings-billing-manage-billing = Manage billing
+settings-billing-open-admin-panel = Open admin panel
+settings-billing-compare-plans = Compare plans
+settings-billing-balance = Balance
+settings-billing-base-credits = Base credits
+settings-billing-personal-credits = Personal credits
+settings-billing-team-credits = Team credits
+settings-billing-workspace-credits = Workspace credits
+settings-billing-cloud-agent-trial = Cloud agent trial
+settings-billing-credit-remaining-one = 1 credit remaining
+settings-billing-credit-remaining-many = { $credits } credits remaining
+settings-billing-update-workspace-failed = Failed to update workspace settings
+settings-billing-purchase-success = Successfully purchased add-on credits
+settings-billing-addon-description = Add-on credits are purchased in prepaid packages that roll over each billing cycle and expire after one year. Larger purchases have a lower per-credit rate. Add-on credits are used after your base-plan credits run out.
+settings-billing-addon-team-description = {" "}Purchased add-on credits are added to your personal balance.
+settings-billing-auto-reload-enabled = Auto-reload is enabled
+settings-billing-addon-restricted-admin = Restricted because of a billing issue. Update your payment method to purchase add-on credits.
+settings-billing-addon-restricted-member = Restricted because of a billing issue. Ask a team admin to update the payment method.
+settings-billing-auto-reload-failed-admin = Auto-reload is disabled after a failed reload. Update your payment method and try again.
+settings-billing-auto-reload-failed-member = Auto-reload is disabled after a failed reload. Ask a team admin to update the payment method.
+settings-billing-upgrade-build = Upgrade to Build
+settings-billing-credit-price = { $credits } credits / { $price }
+settings-billing-credit-count-one = 1 credit
+settings-billing-credit-count-many = { $credits } credits
+settings-billing-selected-credit-amount = selected credit amount
+settings-billing-auto-reload-tooltip = When any team member's balance reaches 100 credits, automatically purchase { $amount }.
+settings-billing-auto-reload-limit-admin = Auto-reload is paused because the next reload would exceed your monthly spending limit. Increase the limit to continue using auto-reload.
+settings-billing-auto-reload-limit-member = Auto-reload is paused because the next reload would exceed your team's monthly spending limit. Ask a team admin to increase it.
+settings-billing-purchase-limit-admin = This purchase would exceed your monthly spending limit. Increase the limit to continue.
+settings-billing-purchase-limit-member = This purchase would exceed your team's monthly spending limit. Ask a team admin to increase it.
+settings-billing-admin-auto-reload = Your admin enabled auto-reload for add-on credits. When your personal balance runs low, InfiniShell will purchase { $credits } credits for { $price } and add them to your balance.
+settings-billing-admin-auto-reload-generic = Your admin enabled auto-reload for add-on credits. When your personal balance runs low, InfiniShell will purchase add-on credits and add them to your balance.
+settings-billing-upgrade-purchase-suffix = {" "}to purchase add-on credits.
+settings-billing-contact-account-executive = Contact your account executive for more add-on credits.
+settings-billing-contact-team-admin = Ask a team admin to enable add-on credits.
+settings-billing-buy-credits = Buy credits
+settings-billing-monthly-limit-tooltip = Sets the monthly spending limit for add-on credits
+settings-billing-monthly-limit = Monthly spending limit
+settings-billing-purchased-this-month = Purchased this month
+settings-billing-buying = Buying…
+settings-billing-one-time-purchase = One-time purchase
+settings-billing-auto-reload = Auto-reload
+settings-billing-last-30-days = Last 30 days
+settings-billing-no-usage-history = No usage history
+settings-billing-no-usage-history-description = Start an agent task to see its usage history here.
+settings-billing-auto-reload-pricing-unavailable = Auto-reload can't be enabled until pricing options finish loading.
+settings-billing-auto-reload-toast-enabled = Auto-reload enabled. We'll add { $credits } credits when your balance runs low.
+settings-billing-auto-reload-toast-disabled = Auto-reload disabled.
+settings-billing-expires = Expires { $date }
+settings-billing-resets = Resets { $date }
+settings-billing-remaining-with-limit = / { $limit } remaining
+settings-billing-remaining = remaining
+settings-billing-usage = Usage
+settings-billing-cost-base = Base
+settings-billing-cost-addons = Add-ons
+settings-billing-cost-payg = Pay-as-you-go
+settings-billing-cost-cloud-only = Cloud-only
+settings-billing-cost-combined = Combined
+settings-billing-cost-other = Other
+settings-billing-bucket-ai = AI
+settings-billing-bucket-compute = Compute
+settings-billing-bucket-platform = Platform
+settings-billing-bucket-suggested-code-diffs = Suggested code diffs
+settings-billing-bucket-voice = Voice
+settings-billing-bucket-total = Total
+settings-billing-total-usage = Total usage
+settings-billing-source-all = All
+settings-billing-source-local = Local
+settings-billing-source-cloud = Cloud
+settings-billing-your-usage = Your usage
+settings-billing-other-members = Other members
+settings-billing-automated-agent-description = This is an automated agent on your team.
+settings-billing-former-member = Former member
+settings-billing-members = Members
+settings-billing-team = Team
+settings-billing-overall-usage = Overall usage
+settings-billing-local-agent-usage = Local agent usage
+settings-billing-cloud-agent-usage = Cloud agent usage
+settings-billing-credits-parenthetical = ({ $credits } credits)
+settings-billing-limit-label = Limit: { $limit }
+settings-billing-cta-open-admin = Open the admin panel
+settings-billing-cta-manage-workspace-suffix = {" "}to manage workspace settings and spend limits.
+settings-billing-cta-upgrade-build = Upgrade to Build
+settings-billing-cta-team-usage-suffix = {" "}to see team-level credit usage.
+settings-billing-cta-upgrade-business = Upgrade to Business
+settings-billing-cta-user-attribution-suffix = {" "}to see per-user credit attribution.
+settings-billing-cta-upgrade-enterprise = Upgrade to Enterprise
+settings-billing-cta-fine-grained-suffix = {" "}to see fine-grained credit attribution and set per-user spend limits.
+settings-billing-cta-spend-limits-suffix = {" "}to set per-user spend limits.
+settings-billing-combined-tooltip = Other team members' usage across add-on, pay-as-you-go, and cloud-only credits.
 workspace-close-session = Close session
+workspace-close-session-title = Close session?
+workspace-no-tabs-match-search = No tabs match your search.
+workspace-orchestration-intro-title = Orchestrate any agent, anywhere
+workspace-orchestration-intro-description = We've made major improvements to InfiniShell's agent orchestration platform.
+workspace-orchestration-intro-cloud-title = Run any agent harness in the cloud
+workspace-orchestration-intro-cloud-description = Use InfiniShell Agent to start Claude Code or Codex agents in the cloud, then track or steer their work.
+workspace-orchestration-intro-multi-agent-title = Multi-agent orchestration
+workspace-orchestration-intro-multi-agent-description = InfiniShell Agent can orchestrate groups of child agents so you can run tasks in parallel.
+workspace-orchestration-intro-memory-title = Agent memory
+workspace-orchestration-intro-memory-description = Agents can store and retrieve long-term memories, allowing them to improve over time.
+workspace-orchestration-intro-research-preview = Research preview
+workspace-auto-handoff-badge = Run connection lost
+workspace-auto-handoff-title = Enable automatic handoff?
+workspace-auto-handoff-description = Allow InfiniShell to move active local agents to the cloud automatically when your computer sleeps.
+workspace-auto-handoff-enable = Enable
+workspace-agent-cli-intro-title = Introducing InfiniShell TUI: your coding agent in any terminal
+workspace-agent-cli-intro-anywhere-title = What's new: Use InfiniShell TUI anywhere
+workspace-agent-cli-intro-anywhere-description = InfiniShell's coding agent is available in any terminal through its standalone TUI.
+workspace-agent-cli-intro-multiplexer-title = What's special: Built-in terminal multiplexer
+workspace-agent-cli-intro-multiplexer-description = Each InfiniShell TUI session creates its own PTY for REPLs, SSH, directory switching, and more.
 workspace-auto-reload = Auto-reload
 workspace-add-new-repo = {" "}+ Add new repo
 workspace-notification-permission-denied-toast = InfiniShell doesn't have permission to send desktop notifications.
@@ -3657,7 +3938,7 @@ workspace-update-now = Update now
 workspace-update-warp = Update InfiniShell
 workspace-app-out-of-date-needs-update = Your app is out of date and needs to update.
 workspace-restart-app-and-update-now = Restart app and update now
-workspace-sampling-process-toast = Sampling process for 3 seconds...
+workspace-sampling-process-toast = Sampling process for 3 seconds…
 workspace-version-deprecation-banner = Your app is out of date and some features may not work as expected. Please update immediately.
 workspace-version-deprecation-without-permissions-banner = Some InfiniShell features may not work as expected without updating immediately, but InfiniShell is unable to perform the update.
 workspace-new-version-unable-to-update-banner = A new version is available but InfiniShell is unable to perform the update.
@@ -3666,12 +3947,12 @@ tab-config-session-type = Session type
 terminal-copy-error = Copy error
 terminal-authenticate-with-github = Authenticate with GitHub
 terminal-create-environment = Create an environment
-terminal-regenerate-agents-file = Re-generate AGENTS.md file
+terminal-regenerate-agents-file = Regenerate AGENTS.md file
 terminal-view-index-status = View index status
 terminal-shared-session-request-edit-access = Request edit access
 terminal-create-team = Create team
 terminal-warpify-without-tmux = Warpify without TMUX
-terminal-continue-without-warpification = Continue without Warpification
+terminal-continue-without-warpification = Continue without Warpify
 terminal-always-install = Always install
 terminal-never-install = Never install
 terminal-ssh-report-issue-prefix = We are actively working on improving the stability of SSH in InfiniShell. Please consider{" "}
@@ -3684,13 +3965,13 @@ terminal-ssh-view-upload-session = View upload session
 terminal-reveal-secret = Reveal secret
 terminal-hide-secret = Hide secret
 terminal-copy-secret = Copy secret
-terminal-tag-agent-for-assistance = Tag agent for assistance
+terminal-tag-agent-for-assistance = Ask the agent for assistance
 terminal-save-as-workflow-secrets-tooltip = Blocks containing secrets cannot be saved.
 terminal-agent-mode-setup-title = Optimize InfiniShell for this codebase?
-terminal-agent-mode-setup-description = Unlock smarter, more consistent responses by letting the Agent understand your codebase and generate rules for it. You can also do this at any point by running /init
+terminal-agent-mode-setup-description = Get smarter, more consistent responses by letting the agent understand your codebase and generate rules for it. You can also do this at any time by running /init.
 terminal-agent-mode-setup-optimize = Optimize
 terminal-no-active-conversation-to-export = No active conversation to export
-terminal-slow-shell-startup-banner-prefix = Seems like your shell is taking a while to start...{"  "}
+terminal-slow-shell-startup-banner-prefix = Your shell seems to be taking a while to start…{"  "}
 terminal-more-info = More info
 terminal-show-initialization-block = Show initialization block
 terminal-shell-process-exited = Shell process exited
@@ -3758,3 +4039,1435 @@ workflow-enum-variants = Variants
 quit-warning-dont-save = Don't Save
 quit-warning-show-running-processes = Show running processes
 quit-warning-save-changes-title = Save changes?
+
+# Third-pass localization: import, environment variables, workflows, notebooks, and legacy objects
+settings-import-select-profile = Select a settings profile to import:
+settings-import-looking-for-settings = Looking for settings to import…
+settings-import-new-session-note = Some settings will take effect when you open a new session.
+workspace-home-title = Welcome to InfiniShell
+workspace-home-content = Welcome to InfiniShell.{"\u000A\u000A"}Use this local workspace to:{"\u000A"}* Create, view, and edit InfiniShell Drive objects{"\u000A"}* Manage local settings{"\u000A"}* Work with local agent sessions, notebooks, and workflows
+
+env-vars-title-placeholder = Add a title
+env-vars-description-placeholder = Add a description
+env-vars-variable-placeholder = Variable
+env-vars-value-placeholder = Value
+env-vars-variable-description-placeholder = Description
+env-vars-title-label = Title
+env-vars-description-label = Description
+env-vars-add-secret-or-command-tooltip = Add a secret or command. InfiniShell never stores external secrets.
+env-vars-enterprise-secret-conflict = This environment variable cannot be created because it conflicts with your enterprise's secret redaction settings. Contact a team admin for details.
+env-vars-user-secret-conflict = This environment variable cannot be created because it conflicts with your secret redaction settings. Save the secret as an environment variable in your shell configuration or a .env file, or update secret redaction in Settings → Privacy.
+env-vars-invoke-error = An error occurred while trying to invoke the environment variables.
+env-vars-unsaved-changes = You have unsaved changes.
+env-vars-keep-editing = Keep editing
+env-vars-discard-changes = Discard changes
+env-vars-command-placeholder = Command
+env-vars-secret-command = Secret command
+env-vars-run = Run
+env-vars-run-command-confirmation = Is it okay to run this command and read its output?
+
+workflow-command-placeholder = echo "Hello {{your_name}}" # insert arguments with curly braces{"\u000A"}# enter a single-line command or an entire shell script
+workflow-error-saving-aliases = Error saving aliases
+workflow-error-contains-secrets = This workflow cannot be saved because it contains secrets.
+workflow-error-create = Could not create workflow
+workflow-prompt-copied = Prompt copied.
+workflow-command-copied = Command copied.
+workflow-alias-help = Aliases let you create short strings that run workflows. Each alias can use different argument values and environment variables, and aliases are personal to you.
+workflow-aliases = Aliases
+workflow-run-in-infinishell = Run in InfiniShell
+workflow-no-longer-accessible = You no longer have access to this workflow
+workflow-moved-to-trash = Workflow moved to trash
+workflow-edit-prompt = Edit prompt
+workflow-edit-workflow = Edit workflow
+workflow-command-edited = Command edited.
+workflow-cycle-parameters = to cycle parameters
+workflow-save-as-workflow = Save as workflow
+workflow-view-context = View context
+workflow-add-alias = Add alias
+
+notebook-block-text = Text
+notebook-block-command = Command
+notebook-block-bulleted-list = Bulleted list
+notebook-block-numbered-list = Numbered list
+notebook-block-code = Code
+notebook-block-todo-list = To-do list
+notebook-mermaid-raw = Raw
+notebook-mermaid-rendered = Rendered
+notebook-open-full-screen = Open full screen
+notebook-run-in-terminal = Run in terminal
+notebook-a11y-pasting = Pasting: { $text }
+notebook-a11y-shift-tab = Shift+Tab
+notebook-a11y-edit-link = Edit link
+notebook-a11y-open-link = Open link: { $link }
+notebook-a11y-secondary-click-link = Secondary click on { $link }
+notebook-a11y-delete-line-left = Delete line to the left
+notebook-a11y-delete-line-right = Delete line to the right
+notebook-a11y-delete-word-left = Delete word to the left
+notebook-a11y-delete-word-right = Delete word to the right
+notebook-a11y-cut-line-left = Cut line to the left
+notebook-a11y-cut-line-right = Cut line to the right
+notebook-a11y-cut-word-left = Cut word to the left
+notebook-a11y-cut-word-right = Cut word to the right
+notebook-a11y-show-character-palette = Show character palette
+notebook-a11y-show-find-bar = Show find bar
+notebook-a11y-open-block-insertion-menu = Open block insertion menu
+notebook-a11y-open-embedded-object-search = Open embedded object search menu
+notebook-a11y-insert-block = Insert { $block } block
+notebook-a11y-deselect-command = Deselect command
+notebook-a11y-deselect-command-help = Switch from selecting commands to selecting text
+notebook-a11y-change-code-block-language = Change code block language to { $language }
+notebook-a11y-copy-code-block = Copy code block
+notebook-a11y-toggle-task-list = Toggle task list
+notebook-a11y-convert-to-block = Convert to { $block }
+notebook-a11y-remove-link = Remove link
+
+object-edit-access-title = This notebook is currently being edited
+object-edit-access-description = If you take editing control, the current editor will be switched to view mode.
+object-edit-access-confirm = Edit anyway
+object-sync-failed = Failed to save
+object-edited-time = Edited { $time }
+object-edited-by-time = { $name } edited { $time }
+object-last-edited-by = Last edited by { $name }
+object-days-until-permanent-deletion = { $count ->
+        [one] 1 day until permanent deletion
+       *[other] { $count } days until permanent deletion
+    }
+object-space-personal = Personal
+object-space-team = Team
+object-space-shared-with-me = Shared with me
+
+time-approx-years-ago = { $count ->
+        [one] 1 year ago
+       *[other] { $count } years ago
+    }
+time-approx-months-ago = { $count ->
+        [one] 1 month ago
+       *[other] { $count } months ago
+    }
+time-approx-weeks-ago = { $count ->
+        [one] 1 week ago
+       *[other] { $count } weeks ago
+    }
+time-approx-days-ago = { $count ->
+        [one] 1 day ago
+       *[other] { $count } days ago
+    }
+time-approx-hours-ago = { $count ->
+        [one] 1 hour ago
+       *[other] { $count } hours ago
+    }
+time-approx-minutes-ago = { $count } min ago
+time-approx-minutes-ago-long = { $count ->
+        [one] 1 minute ago
+       *[other] { $count } minutes ago
+    }
+time-approx-just-now = just now
+time-approx-just-now-sentence = Just now
+time-elapsed-seconds = { $count ->
+        [one] 1 second
+       *[other] { $count } seconds
+    }
+
+settings-import-alacritty-theme-name = Imported Alacritty Theme
+settings-import-iterm-theme-name = Imported iTerm Theme
+settings-import-iterm-light-theme-name = Imported iTerm Theme (Light)
+settings-import-iterm-dark-theme-name = Imported iTerm Theme (Dark)
+settings-import-iterm-theme-name-with-suffix = Imported iTerm Theme{ $suffix }
+settings-import-profile-name = Profile: { $name }
+workflow-category-all = All
+workflow-category-my-workflows = My Workflows
+workflow-category-repository-workflows = Repository Workflows
+workflow-a11y-showing-category = Showing workflows in the { $category } category
+workflow-a11y-showing-all = Showing all workflows
+workflow-a11y-showing-mine = Showing my workflows
+workflow-a11y-showing-project = Showing repository workflows
+workflow-a11y-selected = Selected { $name }: { $content }
+workflow-a11y-menu-title = Workflows
+workflow-a11y-menu-help = Search or use the up and down arrow keys to find a workflow. Press Enter to confirm or Escape to close.
+workflow-name-with-description = { $name }: { $description }
+notebook-a11y-selected-workflow = Selected workflow: { $command }
+notebook-a11y-style-on = Turn { $style } on
+notebook-a11y-style-off = Turn { $style } off
+notebook-a11y-enable-regex-search = Enable regular expression search
+notebook-a11y-disable-regex-search = Disable regular expression search
+notebook-a11y-enable-case-sensitive-search = Enable case-sensitive search
+notebook-a11y-disable-case-sensitive-search = Disable case-sensitive search
+notebook-a11y-focus-next-match = Focus next match
+notebook-a11y-focus-previous-match = Focus previous match
+notebook-a11y-close-find-bar = Close find bar
+notebook-a11y-notebook-title = { $title } notebook
+notebook-a11y-image-title = { $title } image
+notebook-editor-is-editing = { $editor } is editing
+notebook-modifier-click = [{ $modifier } Click]
+
+command-search-placeholder = Search your history, workflows, and more
+external-secrets-search-placeholder = Search for a secret
+notebook-reference-search-placeholder = Search for a reference
+command-search-ai-translate = Translate into a shell command with InfiniShell AI
+command-search-ai-ask = Ask InfiniShell AI for command suggestions
+command-search-ai-accessibility-label = InfiniShell AI: { $action }
+welcome-palette-add-repository = Add repository
+welcome-palette-add-repository-with-shortcut = Add repository { $shortcut }
+welcome-palette-terminal-session = Terminal session
+welcome-palette-terminal-session-with-shortcut = Terminal session { $shortcut }
+ai-context-category-files-and-folders = Files and folders
+ai-context-category-commands = Commands
+ai-context-category-blocks = Blocks
+ai-context-category-workflows = Workflows
+ai-context-category-notebooks = Notebooks
+ai-context-category-plans = Plans
+ai-context-category-diffs = Diffs
+ai-context-category-docs = Docs
+ai-context-category-past-tasks = Past tasks
+ai-context-category-rules = Rules
+ai-context-category-servers-and-integrations = Servers and integrations
+ai-context-category-terminal = Terminal
+ai-context-category-web = Web
+ai-context-category-recent-diff = Most recent diff
+ai-context-category-recent-block = Most recent block
+ai-context-category-code = Code
+ai-context-category-diff-sets = Diff sets
+ai-context-category-conversations = Conversations
+ai-context-category-skills = Skills
+
+# =============================================================================
+# SECTION: legacy Drive, cloud-object toasts, and workflow dialogs
+# Files: app/src/drive/**, app/src/cloud_object/toast_message.rs
+# =============================================================================
+
+drive-sharing-access-can-view = Can view
+drive-sharing-access-can-edit = Can edit
+drive-sharing-access-full = Full access
+
+drive-sort-last-updated = Last updated
+drive-sort-last-trashed = Last trashed
+drive-sort-a-to-z = A to Z
+drive-sort-z-to-a = Z to A
+drive-sort-type = Type
+
+drive-item-unknown-user = unknown user
+drive-item-unknown-team = unknown team
+drive-item-from-owner = From { $owner }
+
+drive-export-location-error = Could not choose an export location: { $error }
+drive-export-open-in-finder = Open in Finder
+drive-export-open-in-folder = Open in folder
+drive-export-failed-named = Failed to export { $name }
+drive-export-failed = Export failed
+drive-export-completed-named = Exported { $name }
+drive-export-completed-object = Exported object
+
+workflow-enum-dynamic-placeholder = # Enter a shell command that generates variants, delimited by newlines.{"\u000A"}{"\u000A"}git branch -a
+
+cloud-object-type-plan = Plan
+cloud-object-type-rule = Rule
+cloud-object-type-ai-execution-profile = AI execution profile
+cloud-object-type-preference = Preference
+cloud-object-type-workflow-enum = Workflow enum
+
+cloud-object-toast-saved-to = { $object } saved to { $container }
+cloud-object-toast-updated = { $object } updated
+cloud-object-toast-moved-to = { $object } moved to { $container }
+cloud-object-toast-trashed = { $object } trashed
+cloud-object-toast-restored = { $object } restored
+cloud-object-toast-left = Left { $object }
+cloud-object-toast-create-failed = Failed to create { $object }
+cloud-object-toast-update-failed = Failed to update { $object }
+cloud-object-toast-move-failed = Failed to move { $object }
+cloud-object-toast-trash-failed = Failed to trash { $object }
+cloud-object-toast-restore-failed = Failed to restore { $object }
+cloud-object-toast-delete-failed = Failed to delete { $object }
+cloud-object-toast-leave-failed = Failed to leave { $object }
+cloud-object-toast-workflow-conflict = This workflow could not be saved because changes were made while you were editing.
+cloud-object-toast-env-vars-conflict = Environment variables could not be saved because changes were made while you were editing.
+cloud-object-toast-rule-conflict = Rule could not be saved because changes were made while you were editing.
+cloud-object-toast-start-editing-failed = Failed to start editing { $object }
+cloud-object-toast-deleted-forever = { $count } { $count ->
+        [one] object
+       *[other] objects
+    } deleted forever
+cloud-object-toast-trash-emptied = Trash emptied: { $count } { $count ->
+        [one] object
+       *[other] objects
+    } deleted forever
+cloud-object-toast-empty-trash-failed = Failed to empty trash
+cloud-object-toast-trash-already-empty = No objects in trash to empty
+
+drive-import-file-picker-error = Could not select files to import: { $error }
+drive-import-parse-file-error = Failed to parse file: { $error }
+
+cloud-object-action-runs-last-day = { $count } { $count ->
+        [one] run
+       *[other] runs
+    } in the last day
+cloud-object-action-runs-last-week = { $count } { $count ->
+        [one] run
+       *[other] runs
+    } in the last week
+cloud-object-action-runs-last-month = { $count } { $count ->
+        [one] run
+       *[other] runs
+    } in the last month
+cloud-object-action-runs-last-year = { $count } { $count ->
+        [one] run
+       *[other] runs
+    } in the last year
+
+# =============================================================================
+# SECTION: resource center, URI notifications, file pickers, and image attachments
+# Files: app/src/resource_center/**, app/src/uri/mod.rs, app/src/editor/view/mod.rs
+# =============================================================================
+
+common-unknown-error = An unknown error occurred.
+
+resource-center-footer-docs = Docs
+resource-center-footer-slack = Join our Slack community
+resource-center-footer-feedback = Feedback
+resource-center-essentials-title = InfiniShell Essentials
+resource-center-invite-friend = Invite a friend to InfiniShell
+resource-center-mark-all-read = Mark all as read
+resource-center-keybinding-new-window = Open New Window
+resource-center-keybinding-hide-app = Hide InfiniShell
+resource-center-keybinding-hide-others = Hide Others
+resource-center-keybinding-quit-app = Quit InfiniShell
+resource-center-keybinding-minimize = Minimize
+resource-center-keybindings-toggle-panel = Toggle this panel
+resource-center-keybindings-settings-description = Configure custom keybindings in Settings > Keyboard Shortcuts.
+resource-center-keybindings-open-settings = Open settings
+resource-center-changelog-fetch-error = Unable to fetch the latest changelog.
+resource-center-read-all-changelogs = Read all changelogs
+resource-center-changelog-new-features = New features
+resource-center-changelog-improvements = Improvements
+resource-center-changelog-bug-fixes = Bug fixes
+
+uri-new-tab-created-title = New tab created
+uri-new-tab-created-description = Open InfiniShell to view your new tab.
+
+file-picker-select-files-error = Could not select files: { $error }
+file-picker-select-file-error = Could not select a file: { $error }
+file-picker-select-folder-error = Could not select a folder: { $error }
+file-picker-select-image-error = Could not select an image: { $error }
+
+editor-images-model-unsupported-tooltip = This model does not support image attachments
+editor-images-disabled-query-limit = Image attachment is disabled—the limit is { $limit } per query
+editor-images-disabled-conversation-limit = Image attachment is disabled—the limit is { $limit } per conversation
+editor-images-attach = Attach images
+editor-images-selected-model-unsupported = The selected model does not support images as context.
+editor-images-not-attached-query-limit = { $count } { $count ->
+        [one] image wasn't
+       *[other] images weren't
+    } attached—the limit is { $limit } per query.
+editor-images-not-attached-conversation-limit = { $count } { $count ->
+        [one] image wasn't
+       *[other] images weren't
+    } attached—the limit is { $limit } per conversation.
+editor-image-unsupported-type = The image could not be attached. Supported types: PNG, JPG, GIF, and WEBP.
+editor-images-unsupported-type = { $count } { $count ->
+        [one] image wasn't
+       *[other] images weren't
+    } attached. Supported types: PNG, JPG, GIF, and WEBP.
+editor-image-read-failed = The image could not be attached because the file could not be read.
+editor-images-read-failed = { $count } { $count ->
+        [one] image wasn't
+       *[other] images weren't
+    } attached because the { $count ->
+        [one] file could not
+       *[other] files could not
+    } be read.
+editor-image-too-large = The image could not be attached because the file is too large.
+editor-images-too-large = { $count } { $count ->
+        [one] image wasn't
+       *[other] images weren't
+    } attached because the { $count ->
+        [one] file is
+       *[other] files are
+    } too large.
+editor-image-processing-failed = The image could not be attached because processing failed.
+editor-images-processing-failed = { $count } { $count ->
+        [one] image wasn't
+       *[other] images weren't
+    } attached because processing failed.
+editor-images-removed-model-unsupported = Attached images were removed because the selected model does not support images.
+editor-images-removed-conversation-limit = { $count } { $count ->
+        [one] image was
+       *[other] images were
+    } removed—the limit is { $limit } per conversation.
+
+theme-creator-modal-title = Create a new theme from an image
+theme-creator-process-image-failed-with-error = Failed to process the selected image: { $error }. Try a different image.
+theme-deletion-modal-title = Delete this theme?
+theme-deletion-modal-description = This will permanently delete the theme.
+theme-deletion-confirm = Delete theme
+
+# =============================================================================
+# SECTION: localization-final-pass
+# User-facing text discovered during the final GUI/TUI residual audit.
+# =============================================================================
+
+external-secrets-cli-not-installed = { $manager } CLI is not installed
+external-secrets-view-installation-docs = View { $manager } CLI installation documentation
+external-secrets-integrate-one-password = Integrate the 1Password app with its CLI
+external-secrets-fetch-failed = { $manager } didn't return any secrets. It may not be configured or authenticated.
+external-secrets-platform-unsupported = This platform is not supported.
+
+terminal-execute-this-plan = Execute this plan
+terminal-queued-initial-cloud-locked = The first cloud-mode prompt cannot be changed.
+terminal-queued-wait-environment = Prompts cannot be sent until environment setup is complete.
+terminal-queued-wait-full-terminal-agent = Prompts cannot be sent until the full terminal-use agent is initialized.
+terminal-queued-send-full-terminal-agent = Send to the full terminal-use agent
+terminal-queued-read-only = Read-only viewers cannot send prompts.
+terminal-queued-until-command-finishes = (queued until the command finishes)
+terminal-queued-count = { $count } queued
+
+terminal-cloud-agent-start-failed = Cloud agent failed to start
+terminal-continue-cloud = Continue
+terminal-continue-cloud-tooltip = Continue this cloud conversation
+terminal-viewing-snapshot = You're viewing a snapshot
+terminal-agent-task = Agent task
+terminal-snapshot-description = This shared conversation shows its state when you opened it. If the agent is still running, refresh to see the latest progress.
+terminal-metadata-directory = Directory: { $directory }
+terminal-metadata-skill = Skill: { $skill }
+terminal-context-none-available = No objects are available in the current context.
+terminal-context-ssh-unsupported = Context is not supported in SSH sessions without a remote server.
+terminal-context-subshell-unsupported = Context is not supported in subshells.
+terminal-context-filesystem-required = A filesystem is required.
+terminal-context-disabled-terminal-mode = Context is disabled in terminal mode. Re-enable it in Settings.
+terminal-attach-context = Attach context
+terminal-input-mode-edit-access = Request edit access to change the input mode.
+terminal-input-mode-agent-monitoring = The input mode is locked while the agent is monitoring a command.
+terminal-input-mode-terminal = Terminal
+terminal-input-mode-agent = Agent Mode
+terminal-input-mode-shortcuts = { $keybinding } or { $prefix }
+
+settings-scripting-title = Scripting
+settings-scripting-install-success = The InfiniShell Control CLI was installed successfully. You can now run “{ $command }” from the command line.
+settings-scripting-install-failed = Failed to install the InfiniShell Control command: { $error }
+settings-scripting-installing = Installing…
+settings-scripting-installed = Installed
+settings-scripting-install = Install
+settings-scripting-command-label = InfiniShell Control CLI command
+settings-scripting-command-description = Install the warpctrl command to script InfiniShell from your terminal.
+settings-scripting-cli-label = warpctrl CLI
+settings-scripting-cli-description = warpctrl can script InfiniShell's UI. Use it with care.
+settings-ai-incorrect-detection = Encountered an incorrect detection?{ " " }
+settings-ai-natural-language-detection-description = Natural language detection recognizes natural-language text entered in the terminal and automatically switches to Agent Mode for AI queries.
+settings-ai-incorrect-input-detection = { " " }Encountered an incorrect input detection?{ " " }
+settings-ai-report-detection = Let us know
+
+ai-summarization-cancel-title = Cancel summarization?
+ai-summarization-cancel-description = Summarization is already running. If you cancel now, the request may still incur a cost, all progress will be lost, and restarting will take longer. Are you sure you want to cancel?
+ai-rule-suggested-title = Suggested rule
+ai-rule-offline-edit-disabled = Editing is disabled while offline.
+keybinding-desc-code-review-toggle-file-navigation = Toggle file navigation in code review
+keybinding-desc-code-review-send-comments = Send code review comments to the agent
+ai-error-apology = I'm sorry, I couldn't complete that request.
+ai-error-credit-limit = You've reached your credit limit. Your credit limit resets on { $date }.
+ai-error-server-overloaded = InfiniShell is currently overloaded. Please try again later.
+ai-error-internal = Internal InfiniShell error.
+ai-error-invalid-api-key-title = The provided API key is not valid
+ai-error-invalid-api-key-detail = Authentication with { $provider } failed while using { $model }. Double-check that your API key is correct.
+ai-error-aws-credentials = AWS credentials for { $model } have expired or are missing. Refresh your AWS credentials.
+ai-error-gemini-credentials = Gemini Enterprise credentials have expired or are invalid. InfiniShell couldn't authenticate with Google Cloud. Refresh your Gemini Enterprise credentials, then retry the request.
+ai-error-usage-notice = This response won't count toward your usage.
+ai-error-subscribe = Subscribe
+ai-orchestration-parent-run-required = Remote child agents require the parent run ID to be available.
+ai-orchestration-skill-resolution-failed = Failed to resolve child-agent skills: { $references }
+ai-orchestration-cloud-environment-failed = Failed to start environment
+ai-orchestration-github-auth-required = GitHub authentication required
+ai-orchestration-github-auth-continue = Authenticate with GitHub to continue.
+ai-orchestration-github-auth-rerun = Authenticate with GitHub, then run the orchestration request again.
+ai-orchestration-authenticate-github = Authenticate with GitHub
+workspace-free-ai-notice-title = InfiniShell no longer provides inference on the free plan.
+workspace-free-ai-notice-body = To keep using InfiniShell's AI features, upgrade to a paid plan, bring your own API key or endpoint, or sign in with your Grok subscription.
+workspace-free-ai-notice-bonus = If you have unused bonus credits, AI will keep working until they run out.
+workspace-free-ai-suggestions-title = How to use AI features in InfiniShell
+workspace-free-ai-suggestions-body = To use AI features in InfiniShell, subscribe to a paid plan, add an API key (OpenAI, Anthropic, or Google), add a custom inference endpoint (OpenRouter or LiteLLM), or sign in with your SuperGrok subscription.
+workspace-free-ai-byok = Bring your own AI
+workspace-free-ai-view-pricing = View pricing
+
+feature-intro-new = NEW
+feature-intro-custom-router-title = Build a custom model router for InfiniShell Agent.
+feature-intro-custom-router-description = Custom routers can route tasks by their complexity or by a set of natural-language rules.
+feature-intro-get-started = Get started
+
+auth-secret-delete-title = Delete secret
+auth-secret-delete-description = Are you sure you want to delete { $name }? This action cannot be undone. Any agents or environments that reference this secret will lose access to it.
+
+ai-gemini-refresh-credentials = Refresh credentials
+ai-gemini-refreshing = Refreshing…
+ai-gemini-credentials-refreshed-button = Credentials refreshed
+ai-gemini-try-again = Try again
+ai-gemini-refreshed-title = Gemini Enterprise credentials refreshed
+ai-gemini-refreshing-title = Refreshing Gemini Enterprise credentials…
+ai-gemini-invalid-title = Gemini Enterprise credentials have expired or are invalid
+ai-gemini-refreshed-detail = Your credentials are ready. Retry the request to continue.
+ai-gemini-refreshing-detail = InfiniShell is refreshing your Google Cloud credentials.
+ai-gemini-invalid-detail = InfiniShell couldn't authenticate with Google Cloud. Refresh your Gemini Enterprise credentials, then retry the request.
+
+ai-orchestration-select-api-key = Select an API key for this harness to continue.
+ai-orchestration-opencode-cloud-unsupported = OpenCode is not supported in the cloud yet. Switch to Local or choose a different harness.
+ai-orchestration-parent-conversation = Parent conversation
+ai-orchestration-back-to-parent = Back to parent conversation
+ai-code-review-address-comments = Address these comments
+ai-suggest-conversation-started = New conversation started
+ai-suggest-conversation-continuing = Continuing current conversation
+ai-suggest-conversation-cancelled = New conversation suggestion cancelled
+ai-mcp-required-variables = Every required MCP variable must have a value.
+
+ai-orchestration-agent-location = Agent location
+ai-orchestration-location-local = Local
+ai-orchestration-location-cloud = Cloud
+ai-orchestration-agent-harness = Agent harness
+ai-orchestration-api-key = API key
+ai-orchestration-new-api-key = New API key…
+ai-orchestration-host = Host
+ai-orchestration-environment = Environment
+ai-orchestration-runner = Runner
+ai-orchestration-base-model = Base model
+ai-orchestration-default-model = Default model
+ai-orchestration-skip-api-key = Skip (advanced)
+ai-orchestration-custom-host = Custom host…
+ai-orchestration-secrets-load-failed = Unable to load secrets
+ai-orchestration-disabled-by-admin = Disabled by your administrator
+ai-orchestration-no-harnesses = No harnesses available
+ai-orchestration-no-models = No models available
+ai-orchestration-empty-environment = Empty environment
+ai-orchestration-use-default = Use default
+ai-orchestration-install-claude = Install Claude Code to use this local harness.
+ai-orchestration-install-codex = Install Codex to use this local harness.
+ai-orchestration-local-codex-disabled = Local Codex child agents are temporarily disabled.
+ai-orchestration-badge-default = Default
+ai-orchestration-badge-connected = Connected
+ai-orchestration-badge-disconnected = Disconnected
+
+run-agents-title = Can I start additional agents for this task?
+run-agents-accept-without-orchestration = Accept without orchestration
+run-agents-cancelled = Spawning agents cancelled
+run-agents-configuring = Configuring agents…
+run-agents-summary = Spawn { $count } { $count ->
+        [one] agent
+       *[other] agents
+    } to address this task.
+run-agents-child-agents-notice = These agents may start their own child agents
+run-agents-section-label = Agents ({ $count })
+run-agents-spawned = Spawned { $count } { $count ->
+        [one] agent
+       *[other] agents
+    }
+run-agents-failed = Failed to spawn { $count } { $count ->
+        [one] agent
+       *[other] agents
+    }
+run-agents-partially-spawned = Spawned { $launched } of { $total } agents
+run-agents-disabled = Orchestration is currently disabled. Re-enable it on the plan card to launch agents.
+run-agents-disabled-with-reason = Orchestration is currently disabled. Re-enable it on the plan card to launch agents. ({ $reason })
+run-agents-start-failed = Failed to start orchestration
+run-agents-start-failed-with-error = Failed to start orchestration: { $error }
+run-agents-spawning = Spawning { $count } { $count ->
+        [one] agent
+       *[other] agents
+    }…
+
+custom-router-editor-title = Router Editor
+custom-router-new = New Router
+custom-router-name-placeholder-personal = { $name }'s custom router
+custom-router-name-placeholder-generic = My custom router
+custom-router-type-complexity = Complexity
+custom-router-type-rules = Rules
+custom-router-add-rule = + Add rule
+custom-router-name-required = Router name is required.
+custom-router-model-required = A model is required for { $field }.
+custom-router-field-default = Default
+custom-router-field-easy = Easy
+custom-router-field-medium = Medium
+custom-router-field-hard = Hard
+custom-router-default-model-required = A default model is required.
+custom-router-rule-required = At least one rule with a description and model is required.
+custom-router-validation-error = Validation: { $error }
+custom-router-serialization-error = Serialization: { $error }
+custom-router-write-error = Write error: { $error }
+custom-router-models = Models
+custom-router-default-required = Default (required)
+custom-router-easy-required = Easy (required)
+custom-router-medium-required = Medium (required)
+custom-router-hard-required = Hard (required)
+custom-router-default-model = Default model
+custom-router-rules-description = Rules are custom prompts that describe when to use a specific model. InfiniShell intelligently matches your tasks against these rules.
+custom-router-rules-order = Rules are matched from top to bottom. Rules higher in the list take precedence.
+custom-router-name = Router name
+custom-router-complexity-based = Complexity-based
+custom-router-complexity-description = { " " }routing chooses a model based on InfiniShell's classification of the task's difficulty.
+custom-router-rule-based = Rule-based
+custom-router-rule-description = { " " }routing chooses a model based on custom prompts.
+custom-router-type = Router type
+custom-router-rule = Rule
+custom-router-model = Model
+
+# Final cross-surface residual audit
+common-enable = Enable
+common-dont-show-again = Don't show again
+common-cancelled = Cancelled
+terminal-message-rewind = rewind
+terminal-restore-original-directory-missing = couldn't find the original conversation directory{ " " }
+terminal-restore-directory-changed = changed directory to continue the conversation{ " " }
+terminal-restore-change-repositories = { " " }change repositories
+terminal-history-title = History
+terminal-fork-conversation = Fork conversation
+terminal-current-directory = Current directory
+terminal-model-base = Base
+terminal-model-full-terminal-use = Full terminal use
+terminal-banner-shell-exited-prematurely = Shell process exited prematurely!
+terminal-banner-shell-exited-debug-description = The output from InfiniShell's initialization script is visible above to help with debugging.
+terminal-banner-shell-exited = Shell process exited
+terminal-banner-enable-alias-expansion = Enable alias expansion
+terminal-banner-alias-expansion-title = InfiniShell can expand aliases automatically.
+terminal-banner-enable-vim-keybindings = Enable InfiniShell's Vim keybindings?
+terminal-banner-aws-cli-required-description = The AWS CLI is required to authenticate with your organization's AWS Bedrock. Install it to continue.
+terminal-banner-aws-cli-not-installed = AWS CLI not installed
+terminal-banner-log-into-aws = Log in to AWS
+terminal-banner-aws-bedrock-enabled-description = AWS Bedrock support is enabled for this local workspace.
+terminal-banner-use-aws-bedrock = Use AWS Bedrock?
+terminal-ssh-extension-start-failed = Failed to start the SSH extension
+terminal-bookmark-block-tooltip = Bookmark this block to return to it quickly
+terminal-env-subshell-local-only = Environment-variable subshells are only available in local sessions.
+terminal-bundled-skills-cannot-edit = Bundled skills can't be edited.
+terminal-skill-editing-unsupported = Skill editing isn't supported in this build.
+terminal-custom-model-cloud-unsupported = Custom models can't run in the cloud. Switch to an InfiniShell model before handing off.
+terminal-conversation-navigation-failed = Couldn't navigate to the conversation.
+terminal-export-file-overwritten = { $path } already exists and will be overwritten.
+terminal-conversation-exported-to = Conversation exported to { $path }
+terminal-command-already-running = Can't run `{ $command }` because another command is already running.
+terminal-no-agent-harnesses = No agent harnesses are available. Contact your team admin.
+terminal-new-conversation-monitoring-command = You can't start a new conversation while the agent is monitoring a command.
+terminal-open-file-local-only = The /open-file command is only available in local sessions.
+terminal-conversation-exported-clipboard = Conversation exported to the clipboard.
+coding-project-create = Create new project
+coding-project-create-tooltip = Create and initialize a brand-new project
+coding-project-open-repository = Open repository
+coding-project-open-repository-tooltip = Open an existing local folder or repository
+coding-project-clone-repository = Clone repository
+coding-project-clone-repository-tooltip = Clone a repository from GitHub or another source
+notifications-title = Notifications
+notifications-empty = No notifications
+notifications-open-conversation = Open conversation
+settings-billing-title = Billing and usage
+settings-ai-mcp-empty-description = You haven't added any MCP servers yet. Once you do, you can control how much autonomy InfiniShell Agent has when interacting with them.{ " " }
+settings-ai-mcp-empty-or = { " " }or{ " " }
+settings-ai-mcp-empty-learn-more = learn more about MCP servers.
+settings-ai-mcp-description = Add MCP servers to extend InfiniShell Agent's capabilities. MCP servers expose data sources or tools to agents through a standardized interface, much like plugins.{ " " }
+settings-ai-file-based-mcp-description = Automatically detect and start MCP servers from globally scoped third-party AI-agent configuration files, such as files in your home directory. Servers detected inside a repository are never started automatically and must be enabled individually from the MCP settings page.{ " " }
+settings-ai-file-based-mcp-supported-providers = See supported providers.
+settings-ai-voice-description-prefix = Voice input lets you control InfiniShell by speaking directly to your terminal (powered by{ " " }
+settings-ai-voice-description-suffix = ).
+settings-ai-speech-language = Speech language
+settings-ai-speech-language-description = Language used when transcribing voice input.
+settings-ai-cli-toolbar-description-prefix = Show a toolbar with quick actions when running coding agents such as{ " " }
+settings-ai-cli-toolbar-description-separator = ,{ " " }
+settings-ai-cli-toolbar-description-last-separator = , or{ " " }
+settings-ai-cli-toolbar-description-suffix = .
+settings-ai-orchestration-message-display = Orchestration message display
+settings-ai-orchestration-message-display-description = Controls whether orchestration messages remain expanded.
+code-gutter-add-diff-context = Add diff hunk as context
+code-gutter-save-to-attach-context = Save changes before attaching them as context.
+code-gutter-revert-diff-hunk = Revert diff hunk
+code-gutter-save-to-revert = Save changes before reverting.
+code-gutter-add-line-comment = Add a comment on this line
+code-gutter-save-to-add-comment = Save changes before adding a comment.
+code-gutter-show-saved-comment = Show saved comment
+code-review-push-tooltip = Push commits to the remote
+code-review-create-pr-tooltip = Create a pull request
+code-review-refreshing-pr-info = Refreshing pull request information
+code-review-view-pr-github = View pull request on GitHub
+code-review-publish-tooltip = Publish branch to the remote
+code-review-enter-commit-message = Enter a commit message
+code-review-diff-removed = Diff removed
+code-review-cannot-attach-terminal-running = Context can't be attached while the terminal is running.
+code-review-cannot-attach-input-unavailable = The diff can't be attached while input is unavailable.
+code-cannot-save-remote-session-disconnected = Can't save because the remote session disconnected.
+notebook-content-contains-secrets = This notebook can't be saved because its content contains secrets.
+notebook-title-contains-secrets = This notebook can't be saved because its title contains secrets.
+ambient-agent-starting-environment = Starting environment…
+ambient-agent-working = Agent is working on the task
+ambient-agent-failed = Agent failed
+ambient-agent-authentication-required = Authentication required
+ambient-agent-setting-up-environment = Setting up environment
+ambient-agent-execution-host = Execution host
+model-spec-context = Context
+model-spec-output = Output
+model-spec-cost = Cost
+model-spec-intelligence = Intelligence
+model-spec-speed = Speed
+model-spec-inference-via-api-key = Inference via API key
+toolbar-editor-title = Edit toolbar
+toolbar-editor-available-items = Available items
+toolbar-item-tabs-panel = Tabs panel
+toolbar-item-tools-panel = Tools panel
+toolbar-item-agent-management = Agent management
+toolbar-item-code-review = Code review
+toolbar-item-notifications = Notifications
+mcp-path-required = A PATH is required to start an MCP server. Open a new terminal session to populate PATH automatically.
+mcp-authentication-success = Successfully authenticated the { $server } MCP server.
+ai-code-diff-save-file-failed = Failed to save { $path }
+ai-voice-enabled-toast = Voice input is enabled. You can also press and hold `{ $key }` to activate it. Configure this in Settings > AI > Voice.
+workspace-crash-recovery-xwayland-description = We detected a crash during startup and changed your windowing setting to Xwayland. This may result in blurry text when using fractional scaling.
+workspace-fix-with-agent = Fix with InfiniShell Agent
+workspace-log-bundle-create-failed = Failed to create the log bundle: { $error }
+workspace-warp-control-installed = Installed the Warp Control CLI globally. You can now run `{ $command }` from any terminal outside InfiniShell.
+workspace-warp-control-install-failed = Failed to install the Warp Control command
+workspace-warp-control-removed = Removed the global Warp Control CLI installation. It still works inside InfiniShell.
+workspace-warp-control-uninstall-failed = Failed to uninstall the Warp Control command
+workspace-workflow-unavailable = This workflow is no longer available.
+workspace-check-latest-version = Check out the latest version and try again.
+workspace-ai-warm-welcome-description = Ask InfiniShell AI to explain errors, suggest commands, or write scripts.
+conversation-rename-empty-conversation = You can't rename an empty conversation.
+conversation-rename-not-synced = Your conversation hasn't synced to the cloud yet. Send another message, then try renaming it again.
+conversation-rename-in-progress = A rename is already in progress for this conversation.
+conversation-rename-not-found = Conversation not found.
+conversation-rename-not-ready = Your conversation is still syncing. Try renaming it again in a moment.
+conversation-rename-empty-title = Enter a conversation title.
+conversation-rename-too-long = Conversation titles must be { $max } characters or fewer.
+cli-agent-plugin-update-not-effective = The plugin update didn't take effect.
+cli-agent-platform-plugin-install-not-effective = The platform plugin installation didn't take effect.
+cli-agent-platform-plugin-update-not-effective = The platform plugin update didn't take effect.
+cli-agent-plugin-codex-warp-installed = Warp plugin installed. Restart Codex to activate it.
+cli-agent-plugin-codex-warp-updated = Warp plugin updated. Restart Codex to activate it.
+cli-agent-plugin-codex-warp-install-title = Install the Warp plugin for Codex
+cli-agent-plugin-codex-run-commands-restart = Run the following commands, then restart Codex.
+cli-agent-plugin-add-marketplace-step = Add the Warp plugin marketplace repository
+cli-agent-plugin-codex-activate-note = Restart Codex to activate the plugin.
+cli-agent-plugin-codex-warp-update-title = Update the Warp plugin for Codex
+cli-agent-plugin-upgrade-marketplace-step = Upgrade the marketplace
+cli-agent-plugin-reinstall-warp-plugin-step = Reinstall the Warp plugin
+cli-agent-plugin-codex-activate-update-note = Restart Codex to activate the update.
+cli-agent-plugin-codex-marketplace-recovery-note = If this fails because codex-warp isn't configured as a Git marketplace, remove and re-add the marketplace.
+cli-agent-plugin-claude-installed = InfiniShell plugin installed. Run /reload-plugins to activate it.
+cli-agent-plugin-claude-updated = InfiniShell plugin updated. Run /reload-plugins to activate it.
+cli-agent-plugin-gemini-installed = InfiniShell plugin installed. Restart Gemini CLI to activate it.
+cli-agent-plugin-gemini-updated = InfiniShell plugin updated. Restart Gemini CLI to activate it.
+cli-agent-plugin-auto-install-unsupported = Automatic installation isn't supported for this agent.
+cli-agent-plugin-auto-update-unsupported = Automatic updates aren't supported for this agent.
+cli-agent-plugin-installed-restart-session = InfiniShell plugin installed. Restart the session to activate it.
+cli-agent-plugin-updated-restart-session = InfiniShell plugin updated. Restart the session to activate it.
+cli-agent-plugin-manager-unavailable = No plugin manager is available.
+model-disabled-by-admin = This model has been disabled by your team admin.
+model-upgrade-for-requests = Upgrade your plan to make more requests.
+model-provider-outage = This model is temporarily unavailable because of a provider outage.
+model-upgrade-to-access = Upgrade your plan to access this model.
+model-unavailable = This model is unavailable.
+cli-agent-generic-name = CLI agent
+settings-key-side-left = { $key } (left)
+settings-key-side-right = { $key } (right)
+default-session-terminal = Terminal
+default-session-agent = Agent
+default-session-ambient-agent = Ambient agent
+default-session-tab-config = Tab config
+default-session-local-docker-sandbox = Local Docker sandbox
+thinking-display-show-collapse-label = Show and collapse
+thinking-display-always-show-label = Always show
+thinking-display-never-show-label = Never show
+orchestration-display-show-collapse-label = Show and collapse
+orchestration-display-always-show-label = Always show
+orchestration-display-always-collapse-label = Always collapse
+orchestration-display-show-collapse-command = Set child-agent message display to show and collapse
+orchestration-display-always-show-command = Set child-agent message display to always show
+orchestration-display-always-collapse-command = Set child-agent message display to always collapse
+prompt-submission-interrupt-label = Interrupt response
+prompt-submission-queue-label = Queue until the response finishes
+prompt-submission-interrupt-command = Set the default prompt submission mode to interrupt the response
+prompt-submission-queue-command = Set the default prompt submission mode to queue until the response finishes
+lrc-submission-send-immediately-label = Send immediately
+lrc-submission-queue-label = Queue until the command finishes
+lrc-submission-send-immediately-command = Set long-running command submission to send immediately
+lrc-submission-queue-command = Set long-running command submission to queue until the command finishes
+reasoning-effort-auto = Auto
+reasoning-effort-off = Off
+reasoning-effort-minimal = Minimal
+reasoning-effort-low = Low
+reasoning-effort-medium = Medium
+reasoning-effort-high = High
+reasoning-effort-xhigh = Extra high
+reasoning-effort-max = Max
+agent-task-cancelled-by-user = Cancelled by the user
+agent-task-waiting-confirmation = The agent is waiting for confirmation of this action: { $action }
+ai-read-file-not-found = File not found or couldn't be read
+ai-read-files-failed = Failed to read files: { $files }
+ai-no-output-received = No output was received.
+
+# =============================================================================
+# SECTION: final user-visible residual audit
+# =============================================================================
+
+common-show-more = Show more
+common-show-less = Show less
+common-allow = Allow
+common-new-feature = NEW
+common-view-details = View details
+common-tasks = Tasks
+
+tooltip-secret-not-included = This wasn't included in the AI conversation.
+tooltip-secret-will-not-be-included = This won't be included in any AI conversations or shared blocks.
+tooltip-secret-matched-organization-pattern = Pattern matched your organization's secret redaction regex list.
+tooltip-secret-matched-user-pattern = Pattern matched your secret redaction regex list.
+tooltip-secret-matched-pattern = Pattern matched the secret redaction regex list.
+
+editor-search-files-and-directories = Search files and directories
+editor-cycle-suggestions = Cycle suggestions
+
+notifications-agent-completed-title = { $agent } completed
+notifications-from-agent = Notification from { $agent }
+notifications-task-completed = Task completed.
+notifications-agent-failed-title = { $agent } failed
+notifications-agent-error = The agent encountered an error.
+notifications-agent-needs-attention-title = { $agent } needs attention
+notifications-waiting-for-input = Waiting for input.
+notifications-agent-cancelled-title = { $agent } cancelled
+notifications-cancelled-by-user = Cancelled by user.
+notifications-task-cancelled = Task was cancelled.
+notifications-something-went-wrong = Something went wrong.
+
+tui-mcp-no-longer-available = This MCP server is no longer available to enable.
+tui-mcp-synced-template-unavailable = The synced MCP template is no longer available.
+tui-mcp-gallery-template-unavailable = The gallery MCP template is no longer available.
+tui-mcp-already-installed = This MCP server is already installed.
+tui-mcp-install-failed = Unable to install this MCP server.
+tui-mcp-select-allowed-value = Select one of the allowed values for this MCP variable.
+tui-mcp-variable-once = Each MCP variable may only be provided once.
+tui-mcp-start-failed = Failed to start
+
+coding-project-build-placeholder = What do you want to build?
+coding-project-suggestion-minesweeper = Build a Minesweeper clone in React
+coding-project-suggestion-node-quotes = Code a Node.js server that returns random quotes from a JSON file
+coding-project-suggestion-csv-json = Write a CSV-to-JSON converter CLI
+coding-project-suggestion-resume = Create a starter template for a résumé web page
+coding-project-suggestion-game-of-life = Make a Conway's Game of Life simulation
+
+code-close-saved = Close saved files
+code-reveal-in-finder = Reveal in Finder
+code-reveal-in-explorer = Reveal in Explorer
+code-reveal-in-file-manager = Reveal in file manager
+code-comment-imported-from-github = Comment imported from GitHub
+code-saved-changes-not-reflected = This file has saved changes that are not reflected here.
+code-remote-host-disconnected = The remote host disconnected. You won't be able to see updates or save changes.
+
+context-node-install-nvm-title = Install nvm to enable version switching
+context-node-install-nvm-description = This menu helps you switch between Node.js versions, but it requires nvm to be installed.
+context-node-no-versions = No Node.js versions installed
+context-node-try-installing-versions = Try installing versions with nvm
+
+code-review-error-loading-diffs = Error loading diffs
+code-review-cannot-detect-diffs = Can't detect diffs for this folder
+code-review-no-changes-description = As you or the Agent make changes, you'll be able to track them here.
+code-review-repo-initialized-with-file = Repository initialized with a { $file } file.
+code-review-binary-no-diff = Binary file — no diff available
+code-review-file-renamed-without-changes = File renamed without changes
+code-review-new-empty-file = New empty file
+code-review-file-content-unavailable = Unable to load file content
+code-review-no-file-selected = No file selected
+code-review-no-files-to-discard = No files to discard
+code-review-outdated-count = { $count ->
+    [one] 1 outdated
+   *[other] { $count } outdated
+}
+code-review-outdated = Outdated
+code-review-from-github = From GitHub
+code-review-branch = Branch
+code-review-default-branch = default branch
+code-review-changes = Changes
+code-review-included-commits = Included commits
+code-review-include-unstaged = Include unstaged changes
+
+tab-config-auto-create-worktree = Automatically create a worktree when opening a new tab
+tab-config-auto-generate-worktree-branch = Automatically generate the worktree branch name
+
+ai-block-queued = Queued
+ai-block-refine = Refine
+ai-block-take-over = Take over
+ai-block-take-control = Take control
+ai-debug-information = Debug information: { $info }
+ai-debug-output = Debug output
+ai-question-skip-all = Skip all
+ai-command-profile-always-asks-permission = Your profile is set to always ask for permission to execute commands.
+ai-usage-other-context-description = Includes other request context and temporary instructions added to help the agent respond better.
+ai-full-terminal-agent-default-model = Now using Full Terminal Agent's default model.
+ai-aws-running-login-command = Running `{ $command }`…
+ai-aws-credentials-expired-title = AWS credentials expired or missing
+ai-aws-authentication-failed-description = Authentication with AWS Bedrock failed while using { $model }. Run `{ $command }` to refresh your credentials.
+ai-aws-always-run-automatically = Always run automatically
+
+ambient-agent-environment-start-failed = Failed to start environment
+ambient-agent-github-auth-required = GitHub authentication required
+ambient-agent-github-auth-description = Authenticate with GitHub to continue
+ambient-agent-run-cancelled = Agent run cancelled
+ambient-agent-no-environment-started = No environment was started
+
+terminal-secrets-skip-advanced = Skip (advanced)
+terminal-secrets-skip-advanced-description = Only if your key is already set in the environment (for example, injected as a Kubernetes secret)
+terminal-secrets-none-found-helper = No secrets found. Save to use this value directly, or select the key to add a secret.
+
+hoa-switch-horizontal-tabs = Switch back to horizontal tabs
+hoa-vertical-tabs-callout-title = Introducing vertical tabs — the new default
+hoa-vertical-tabs-callout-description = Vertical tabs show all open agent and terminal panes, grouped by tab. Customize the information shown to support your workflow.
+hoa-agent-inbox-callout-title = Meet your new agent inbox
+hoa-agent-inbox-callout-description = InfiniShell routes notifications from every CLI coding agent into one notification center that works across agents and harnesses.{ " " }
+hoa-create-first-tab-config = Create your first tab config
+hoa-create-first-tab-config-description = Set up a reusable starting point for your tabs. Pick a repository, choose a session type, and optionally attach a worktree. Reuse it whenever you open a tab with this setup.
+
+terminal-clipboard-access-blocked = A terminal program tried to access your clipboard. This is disabled by default for security.
+terminal-notification-discovery-long-command = InfiniShell can notify you when long-running commands finish.
+terminal-notification-discovery-agent = InfiniShell can notify you when an agent finishes responding.
+terminal-notification-discovery-attention = InfiniShell can notify you when a command or agent needs your attention.
+terminal-notification-discovery-password = InfiniShell can notify you when you're prompted to enter a password.
+terminal-notification-command-finished-after = { " " }finished after { $duration }s
+terminal-notification-command-failed-after = { " " }failed after { $duration }s
+terminal-notification-agent-finished-suffix = { " " }finished
+terminal-notification-agent-failed-suffix = { " " }failed
+terminal-notification-blocked-suffix = { " " }blocked
+terminal-notification-waiting-password-suffix = { " " }is waiting for a password
+terminal-notification-latest-output-prefix = Latest output:{ " " }
+terminal-notification-error-prefix = Error:{ " " }
+terminal-warpify-a11y-with-keybinding = Press { $keybinding } to Warpify this { $subject } and enable more InfiniShell features.
+terminal-warpify-a11y = Warpify this { $subject } to enable more InfiniShell features.
+terminal-warpify-recognized = { $subject } recognized.
+terminal-notification-enable-command-palette = You can enable notifications from the command palette.
+terminal-notification-permission-error = InfiniShell tried to send a notification for the last block but doesn't have permission.
+terminal-notification-send-error = InfiniShell tried to send a notification for the last block, but something went wrong.
+terminal-notification-send-error-short = Error sending notification
+terminal-notification-check-system-settings = Make sure InfiniShell is allowed to send notifications in System Settings.
+terminal-correction-suggested-command = Suggested corrected command: { $command }
+terminal-correction-a11y-help = Press Right Arrow to insert it, or keep editing to ignore it.
+terminal-command-waiting-password = Command is waiting for a password
+terminal-cloud-task-continue-failed = Couldn't continue this cloud task.
+terminal-clipboard-write-blocked = A terminal program tried to write to your clipboard. This is disabled by default to protect you from malicious software.
+terminal-clipboard-read-blocked = A terminal program tried to read your clipboard. This is disabled by default to protect you from malicious software.
+terminal-clipboard-allow-writes = Allow clipboard writes
+terminal-clipboard-allow-read-write = Allow clipboard reads and writes
+terminal-lock-scrolling-at-block-bottom = Lock scrolling at the bottom of the block
+terminal-jump-to-block-bottom = Jump to the bottom of this block
+terminal-block-a11y-failed-status = failed, status code { $code }
+terminal-block-a11y-background = running in the background
+terminal-block-a11y-succeeded = succeeded
+terminal-block-a11y-in-progress = in progress
+terminal-block-a11y-summary = Block { $index }: { $command }, { $status }.
+terminal-block-a11y-help = Press Command-C to read and copy the command and output, or Command-Option-Shift-C to read and copy only the output. Press Command-B to bookmark the block; use Option-Up and Option-Down to move between bookmarks.
+terminal-subshell-title = Subshell
+terminal-subshell-subject = subshell
+terminal-explain-following = Explain the following:
+    { $selection }
+terminal-what-happened-here = What happened here?
+terminal-command-for-query = What is the command to: { $query }
+
+time-precise-over-one-week = >1 week
+time-precise-days = { $value } days
+time-precise-hours = { $value } hours
+time-precise-minutes = { $value } min
+time-precise-seconds = { $value } sec
+time-precise-milliseconds = { $value } ms
+terminal-history-exit-code = Exit code { $code }
+terminal-history-finished-in = Finished in { $duration }
+terminal-history-last-ran = Last ran { $time }
+terminal-history-ran = Ran { $time }
+code-requested-edit = Requested edit
+code-review-file-count = { $count ->
+    [one] 1 file
+   *[other] { $count } files
+}
+
+# Final settings, context, and terminal surface labels
+settings-voice-input-hold-key = Voice input (hold the { $key } key)
+settings-language-simplified-chinese = Simplified Chinese
+settings-ctrl-tab-previous-next = Activate previous/next tab
+settings-ctrl-tab-recent-session = Cycle most recent session
+settings-ctrl-tab-recent-tab = Cycle most recent tab
+settings-hotkey-dedicated-window = Dedicated hotkey window
+settings-hotkey-toggle-all-windows = Show/hide all windows
+settings-cursor-bar = Bar
+settings-cursor-block = Block
+settings-cursor-underline = Underline
+settings-line-numbers-absolute = Absolute
+settings-line-numbers-relative = Relative
+settings-clipboard-write-only = Write only
+settings-clipboard-read-write = Read and write
+settings-secrets-asterisks = Asterisks
+settings-secrets-strikethrough = Strikethrough
+settings-secrets-always-show = Always show secrets
+notifications-filter-all-tabs = All tabs
+notifications-filter-unread = Unread
+notifications-filter-errors = Errors
+tab-config-built-in-agent = Built-in agent
+code-review-commit-your-changes = Commit your changes
+code-review-publish-branch = Publish branch
+code-review-push-changes = Push changes
+code-review-create-pull-request = Create pull request
+context-search-directories = Search directories…
+context-search-branches = Search branches…
+context-search-environments = Search environments…
+code-find-a11y-description = Find bar for searching text in the editor.
+code-find-a11y-match-description = Find bar with { $count } matches. Currently on match { $current } of { $count }.
+code-find-a11y-replace-help = Replace field focused. Type replacement text, press Enter to replace the current match, or Tab to return to the find field. Use the up and down arrows to navigate matches, or Escape to close.
+code-find-a11y-find-help = Find field focused. Type to search. Use Enter and Shift-Enter or the up and down arrows to navigate matches. Press Escape to close the find bar.
+terminal-section-commands = Commands
+terminal-section-skills = Skills
+terminal-section-prompts = Prompts
+terminal-section-workflows = Workflows
+terminal-menu-commands = /Commands
+terminal-menu-model = /Models
+terminal-menu-conversations = /Conversations
+terminal-menu-profiles = /Profiles
+terminal-menu-prompts = /Prompts
+terminal-menu-skills = /Skills
+terminal-menu-fork = /Fork
+terminal-menu-rewind = /Rewind
+terminal-menu-history = History
+terminal-menu-repositories = /Repositories
+terminal-menu-plans = /Plans
+terminal-file-uploading = Uploading…
+terminal-file-uploaded = Uploaded
+terminal-file-upload-failed = Upload failed
+terminal-open-file-banner-markdown-description = Did you know that InfiniShell can display Markdown files directly?
+terminal-open-file-banner-language-description = Did you know that InfiniShell can edit { $language } files directly?
+terminal-open-file-banner-code-description = Did you know that InfiniShell can edit code directly?
+terminal-open-file-banner-view = View in InfiniShell
+terminal-open-file-banner-edit = Edit in InfiniShell
+terminal-prompt-suggestion-explain = Explain this to me.
+terminal-prompt-suggestion-fix = Help me fix this.
+terminal-prompt-suggestion-install = Help me install a binary or dependency. What information do you need from me?
+terminal-prompt-suggestion-code = Help me write some code. What information do you need from me?
+terminal-prompt-suggestion-deploy = Help me deploy my project. What information do you need from me?
+terminal-prompt-suggestion-other = Something else?
+custom-router-complexity-routing = Complexity routing
+custom-router-prompt-routing = Prompt routing
+model-inference-user-api-key = Your API key
+model-inference-team-api-key = Team API key
+context-requires-local-session = Requires a local session
+context-requires-github-cli = Requires the GitHub CLI
+context-requires-command = Requires the `{ $command }` command
+context-git-tracking-rebased = Tracking { $upstream } • branch was rebased
+context-git-tracking-counts = Tracking { $upstream } • ahead { $ahead }, behind { $behind }
+context-git-tracking-counts-unavailable = Tracking { $upstream }; ahead/behind counts are unavailable
+context-git-rebased-no-upstream = Branch was rebased; upstream name is unavailable
+context-git-counts-no-upstream = Ahead { $ahead }, behind { $behind }; upstream name is unavailable
+context-git-no-upstream = No upstream configured
+terminal-shell-system-default = System default shell
+terminal-shell-wsl = Windows Subsystem for Linux
+terminal-shell-custom-path = Custom: { $path }
+terminal-shell-docker-sandbox = Docker Sandbox
+terminal-shell-custom-command = Custom ({ $command })
+voltron-ai-command-search = AI command search
+voltron-history-search = History search
+tui-mcp-source-cli-local = Local CLI
+tui-mcp-source-another-device = Synced from another device
+tui-mcp-source-shared-by = Shared by { $creator }
+tui-mcp-source-shared-template = Shared template
+tui-mcp-source-shared-by-warp = Shared by InfiniShell
+tui-mcp-source-provider-global = { $provider } global configuration
+tui-mcp-source-project = Project
+tui-mcp-source-provider-project = { $provider } project configuration ({ $project })
+tui-mcp-source-file-config = File-based configuration
+settings-tui-statusline-auto-approve = Auto-approve indicator
+settings-tui-statusline-vim-mode = Vim mode indicator
+settings-tui-statusline-model = Model
+settings-tui-statusline-working-directory = Working directory
+settings-tui-statusline-git-branch = Git branch
+settings-tui-statusline-git-branch-status = Git branch status
+settings-tui-statusline-git-diff-status = Git diff status
+settings-tui-statusline-github-pull-request = GitHub pull request
+settings-tui-statusline-credit-usage = Credit usage
+settings-tui-statusline-context-window-usage = Context window usage
+settings-tui-statusline-date = Date
+settings-tui-statusline-time-12-hour = Time (12-hour)
+settings-tui-statusline-time-24-hour = Time (24-hour)
+settings-tui-statusline-agent-todo-list = Agent to-do list
+settings-tui-statusline-voice-input = Voice input
+model-spec-inference-via-bedrock = Inference via Bedrock
+model-spec-inference-via-gemini-enterprise = Inference via Gemini Enterprise Agent Platform
+model-spec-inference-may-use-hosted = Inference may use your hosted provider
+settings-responses-state-local-zdr = Local / ZDR
+settings-responses-state-provider-chain = Provider chain
+settings-responses-state-cloud-conversation = Cloud conversation
+workspace-home-directory-unavailable = Failed to determine home directory
+code-new-file-suffix = { " " }(new)
+notebook-other-user = Other user
+ai-aws-default-profile-capitalized = The default AWS profile
+ai-aws-default-profile = the default AWS profile
+ai-aws-named-profile-capitalized = The AWS profile `{ $profile }`
+ai-aws-named-profile = the AWS profile `{ $profile }`
+ai-aws-credentials-not-found = AWS credentials were not found for { $profile }. Log in with the AWS CLI or update your AWS credentials configuration, then refresh.
+ai-aws-credentials-timeout = Timed out while loading AWS credentials. Refresh and try again.
+ai-aws-credentials-invalid = { $profile } is invalid or incomplete in your local AWS configuration. Update your AWS profile settings and credentials, then refresh.
+ai-aws-credentials-provider-error = Unable to load AWS credentials from your configured provider. Refresh your AWS login and try again.
+ai-aws-credentials-unexpected-error = Unexpected error while loading AWS credentials. Refresh your AWS login and try again.
+ai-aws-credentials-load-error = Unable to load AWS credentials. Refresh your AWS login and try again.
+ai-aws-not-configured = No AWS credentials are configured
+ai-aws-load-failed-with-message = Failed to load AWS credentials: { $message }
+ambient-agent-source-scheduled = Scheduled
+ambient-agent-source-local = InfiniShell (local agent)
+ai-mcp-other-agents = Other agents
+custom-router-routes-by-complexity = Routes by task complexity
+custom-router-routes-by-prompt = Routes by prompt content
+ai-fallback-primary-failed-named = The primary model ({ $primary }) failed. Retrying with the fallback model.
+ai-fallback-primary-failed = The primary model failed. Retrying with the fallback model.
+ai-fallback-warping-with-model = Warping with { $model }.
+ai-fallback-warping-with-another-model = Warping with another model.
+terminal-remote-host = Remote host
+ai-orchestration-participant-orchestrator = Orchestrator
+ai-orchestration-participant-unknown = Unknown agent
+ai-orchestration-participant-agent = Agent
+code-find-replaced-match-a11y = Successfully replaced the match. The selected match is { $current } of { $count }.
+code-find-replaced-match-help = Continue pressing Enter to replace more matches, or use the up and down arrows to navigate.
+code-find-replaced-last-match-a11y = Successfully replaced the last match.
+ai-document-untitled-filename = Untitled.md
+settings-mcp-debug-template-sync-id = Template sync ID: { $id }
+settings-mcp-debug-gallery-id = Gallery ID: { $id }
+settings-mcp-debug-gallery-id-none = Gallery ID: None
+settings-mcp-debug-template-not-found = Could not find the template object
+context-branch-worktree-path-unavailable = The branch is already checked out in another worktree, but InfiniShell couldn't find its path.
+tab-config-new-worktree-branch-name = New worktree branch name
+auth-secret-placeholder-bearer-token = Bearer token
+auth-secret-placeholder-secret-access-key = Secret access key
+auth-secret-placeholder-session-token = Session token (temporary credentials only)
+auth-secret-openai-api-key = OpenAI API key
+auth-secret-anthropic-api-key = Anthropic API key
+auth-secret-bedrock-api-key = Bedrock API key
+auth-secret-bedrock-access-key = Bedrock access key
+editor-a11y-selected = selected
+editor-a11y-unselected = unselected
+editor-a11y-selection-state = , { $state }
+find-result-a11y = Result { $current } of { $count }.
+find-result-help-a11y = Use Enter and Shift-Enter to navigate between matches. Press Escape to quit.
+ai-status-waiting-for-instructions = Agent waiting for instructions…
+ai-status-warping = Warping…
+ai-status-adjusting-tasks = Adjusting tasks…
+ai-status-generating-fix = Generating fix…
+ai-status-creating-diff = Creating diff…
+ai-status-preparing-question = Preparing question…
+ai-status-generating-plan = Generating plan…
+ai-status-updating-plan = Updating plan…
+ai-status-summarizing-conversation = Summarizing conversation…
+ai-status-summarizing-command-output = Summarizing command output…
+ai-status-reading-files = Reading files…
+ai-status-grepping = Grepping…
+ai-status-finding-files = Finding files…
+ai-status-executing-command = Executing command…
+ai-status-writing-command-input = Writing command input…
+ai-status-waiting-for-command-exit = Waiting for command to exit…
+ai-status-searching-web = Searching the web…
+ai-status-searching-web-for-query = Searching the web for “{ $query }”
+ai-status-calling-mcp-tool-on-server = Calling “{ $name }” MCP tool on { $server }…
+ai-status-calling-mcp-tool = Calling “{ $name }” MCP tool…
+ai-status-reading-mcp-resource = Reading “{ $name }” MCP resource…
+ai-status-next-check-suffix = { " " }· Next check in { $duration }
+ai-permission-write-running-command = Can I write the following to this running command?
+ai-permission-read-files = Grant access to the following files?
+ai-permission-search-directory = OK if I search the files in this directory?
+ai-permission-agent-asks-user-control = Agent is asking you to take control.
+ai-requested-command-run = Run
+ai-requested-command-done = Done
+ai-requested-command-generating = Generating command…
+ai-requested-command-permission = OK if I run this command and read the output?
+ai-requested-mcp-permission = OK if I call this MCP tool?
+ai-requested-command-monitoring = Agent is monitoring the command…
+ai-requested-command-needs-input = Agent needs your input to continue
+ai-requested-command-user-control = User is in control.
+ai-requested-command-agent-paused = Agent paused. User is in control.
+ai-requested-command-user-in-control = User in control
+ai-requested-command-agent-error = Agent ran into an issue. Take over control.
+ai-requested-command-viewing-detail = Viewing command details
+ai-requested-mcp-viewing-detail = Viewing MCP tool call details
+ai-requested-mcp-permission-on-server = OK if I call MCP tool { $tool } on server { $server }?
+ai-requested-mcp-permission-named = OK if I call MCP tool { $tool }?
+ai-requested-mcp-viewing-on-server = Viewing MCP tool { $tool } on { $server }
+ai-requested-mcp-viewing-named = Viewing MCP tool { $tool }
+ai-context-selected-text = Selected text
+ai-context-block-count = { $count ->
+    [one] 1 block
+   *[other] { $count } blocks
+}
+ai-footer-enable-agent-notifications = Enable { $agent } notifications
+common-find = Find
+common-replace = Replace
+common-out-of-credits = Out of credits
+tab-config-fetching-branches = Fetching branches…
+rules-editor-title = Rule editor
+ai-byop-history-corrupted = Can't continue this conversation: an earlier tool result is missing or corrupted in this conversation's history, so InfiniShell can't safely send the request to your provider. Start a new conversation or fork from an earlier point to continue.
+model-custom-endpoint = Custom endpoint
+ai-assistant-ask = Ask InfiniShell AI
+ai-assistant-restart = Restart
+ai-assistant-generating-answer = Generating answer…
+ai-assistant-accuracy-notice = AI responses can be inaccurate.
+find-regex-tooltip = Regex search
+find-case-sensitive-tooltip = Case-sensitive search
+find-selected-block-tooltip = Find in selected block
+find-preserve-case-tooltip = Preserve case
+find-invert-filter-tooltip = Invert filter
+find-context-lines-tooltip = Show context lines around matches
+terminal-dynamic-enum-command-pending = Command pending…
+terminal-dynamic-enum-command-failed = Command failed
+terminal-dynamic-enum-no-results = Command returned no results
+terminal-dynamic-enum-generate-message = Run the following command to generate variants:
+terminal-dynamic-enum-run-command = Run command
+terminal-local-skills-remote-error = Local skills cannot run on a remote machine. Try forking the conversation locally and running the skill.
+terminal-model-edit-access-tooltip = Request edit access to change the model
+ambient-agent-inherit-key-from-environment = Inherit key from environment
+ambient-agent-choose-key-type = Choose a type
+terminal-ssh-extension-connect-failed = Couldn't connect to the InfiniShell SSH extension
+terminal-ssh-extension-connect-failed-description = Advanced features such as file browsing and code review are currently unavailable, but the rest of your terminal session remains fully functional.
+terminal-ssh-tmux-deprecated = Tmux-based SSH integration has been deprecated
+terminal-ssh-tmux-deprecated-description = InfiniShell now connects to remote sessions through its more reliable SSH extension. The tmux-based option has been removed.
+settings-warpify-reuse-control-master-description = Attach to an active SSH ControlMaster already configured for the destination host instead of creating one managed by InfiniShell. This change applies to new tabs.
+ai-prompt-alert-no-connection = No internet connection
+ai-prompt-alert-at-limit = At limit —
+ai-prompt-alert-configure-local-provider = Configure a local AI provider
+ai-prompt-alert-use-own-api-keys = Use your own API keys
+onboarding-prompt-setup-description = Next, set up your prompt. Use InfiniShell's customizable prompt, or select PS1 to keep your existing prompt configuration.
+onboarding-prompt-custom-prompt-support = InfiniShell supports many custom prompts, including Oh My Zsh, Starship, and Powerlevel10k.{" "}
+onboarding-prompt-shell-prompt-title = Shell prompt (PS1)
+onboarding-prompt-no-existing-prompt = No existing prompt.
+onboarding-prompt-look-incorrect = Doesn't look right?{" "}
+onboarding-prompt-let-us-know = Let us know.
+onboarding-prompt-infinishell-prompt-title = InfiniShell prompt
+onboarding-prompt-customizable-description = Customize it in Appearance settings.
+ai-code-diff-accept-and-continue = Accept and continue with agent
+ai-code-diff-iterate-with-agent = Iterate with agent
+ai-code-diff-open-config = Open config
+ai-code-diff-manage-banner-settings = Manage suggested-code banner settings
+ai-code-diff-new-file-name = { $file } (new)
+ai-code-diff-deleted-file-name = { $file } (deleted)
+code-review-outdated-comments-omitted = { $count ->
+    [one] 1 comment will be omitted because it is outdated.
+   *[other] { $count } comments will be omitted because they are outdated.
+}
+code-review-outdated-comment-count = { $count ->
+    [one] 1 outdated comment
+   *[other] { $count } outdated comments
+}
+code-review-comment-count = { $count ->
+    [one] 1 comment
+   *[other] { $count } comments
+}
+tab-config-add-new-repository = + Add new repository…
+theme-scope-all-windows = All windows
+theme-scope-this-window = This window
+ai-orchestration-use-orchestration = Use orchestration
+ai-orchestration-use-description = Break this work into coordinated streams with multiple agents.
+ai-orchestration-base-model-helper = The primary model all agents will use.
+common-prompt = Prompt
+ai-assistant-question-placeholder = { " " }Ask a question…
+ai-assistant-follow-up-placeholder = { " " }Type a response or select one above…
+ai-assistant-explain-selection-prefix = Explain the following:
+ai-assistant-next-step-question = What should I do next?
+ai-assistant-fix-question = How do I fix this?
+ai-assistant-command-output-prefix = I ran the command: `
+ai-assistant-command-output-suffix = ` and got the following output:
+ai-assistant-transcript-heading = ## InfiniShell AI transcript ({ $time })
+ai-assistant-transcript-prompt = Prompt: { $prompt }
+ai-assistant-transcript-answer = InfiniShell AI: { $answer }
+ai-assistant-character-limit-exceeded = Character limit exceeded.
+ai-assistant-prepared-prompt-git = How do I undo the most recent Git commits?
+ai-assistant-prepared-prompt-files = How do I find all files containing specific text?
+ai-assistant-prepared-prompt-script = Write a script to connect to an AWS EC2 instance.
+ai-assistant-zero-state-help = Select a block or text, then press Shift+Ctrl+Space to ask InfiniShell AI.
+ai-assistant-copy-code-tooltip = Copy code to clipboard [Cmd+C]
+ai-assistant-insert-code-tooltip = Insert code into terminal input [Cmd+Enter]
+ai-assistant-save-workflow-tooltip = Save as workflow [Cmd+S]
+ai-assistant-copy-answer-tooltip = Copy answer to clipboard
+ai-assistant-prepared-prompt-next = What should I do next?
+ai-assistant-prepared-prompt-examples = Show examples.
+ai-assistant-prepared-prompt-fix = How do I fix this?
+ai-assistant-missing-context-notice = InfiniShell AI might forget earlier answers as conversations get long.
+ai-assistant-credits-used = Credits used: { $used } / { $limit }.
+ai-assistant-time-until-refresh = { $duration } until refresh.
+ai-assistant-cloud-disabled = InfiniShell AI Assistant cloud requests are disabled in InfiniShell. Use Agent Mode with a configured BYOP model instead.
+ai-assistant-duration-days = { $count ->
+    [one] 1 day
+   *[other] { $count } days
+}
+ai-assistant-duration-hours = { $count ->
+    [one] 1 hour
+   *[other] { $count } hours
+}
+ai-assistant-duration-minutes = { $count ->
+    [one] 1 minute
+   *[other] { $count } minutes
+}
+tab-config-invalid-worktree-branch-name = Name can contain only letters, numbers, hyphens, and underscores.
+settings-workspace-override-tooltip = This option is enforced by your organization's settings and cannot be customized.
+ambient-agent-usage-limit-reached = Agent usage limit reached. Try again later.
+ambient-agent-server-overloaded = InfiniShell is temporarily overloaded. Try again shortly.
+ai-error-request-failed = Request failed with error: { $error }
+ai-error-quota-limit-reached = Quota limit reached.
+ai-error-context-window-exceeded = Context window exceeded: { $message }
+ai-error-invalid-api-key = Invalid API key for { $provider }
+ai-error-bedrock-credentials-invalid = AWS Bedrock credentials for { $model } have expired or are invalid.
+ai-error-gemini-enterprise-credentials-invalid = Gemini Enterprise credentials have expired or are invalid.
+ai-error-transient-network = InfiniShell lost its connection while receiving the agent response. This is usually temporary.
+
+    Debug info: { $debug }
+ai-error-agent-exited-shell = The shell exited while the agent was running the command `{ $command }`, so the run could not continue. Make sure the agent is not asked to run commands or source scripts that can exit the shell.
+terminal-ssh-error-detect-platform = Failed to detect the remote platform
+terminal-ssh-error-preinstall-check = Failed to run the preinstallation check
+terminal-ssh-error-check-extension = Failed to verify the SSH extension
+terminal-ssh-error-install-extension = Failed to install the SSH extension
+terminal-ssh-error-launch-extension = Failed to start the SSH extension
+terminal-ssh-error-timeout = The operation timed out. Check your network connection.
+terminal-ssh-error-unsupported-os = Unsupported operating system: { $os }
+terminal-ssh-error-unsupported-architecture = Unsupported architecture: { $arch }
+terminal-ssh-error-script-failed = Script exited with code { $code }: { $stderr }
+terminal-ssh-error-with-detail = { $body }. { $detail }
+terminal-ssh-error-body-only = { $body }.
+code-review-creating-pull-request-loading = Creating pull request…
+code-review-publishing-loading = Publishing…
+code-review-pushing-loading = Pushing…
+terminal-default-shell-unsupported = InfiniShell doesn't currently support your default shell, so it is falling back to zsh.{"  "}
+editor-go-to-line = Go to line
+code-add-selection-as-context = Add as context
+tab-config-worktree-name-placeholder = my-feature-branch
+tab-config-new-worktree-title = New worktree
+tab-config-autogenerate-worktree-branch-name = Generate worktree branch name automatically
+tab-config-select-directory = Select directory
+tab-config-select-repository-for-worktree = Select a Git repository to enable worktree support
+sftp-folder-empty = This folder is empty
+terminal-loading-prompt = Loading prompt…
+terminal-project-skill-badge = Project skill
+terminal-rewind-no-code-to-restore = No code to restore
+terminal-sharing-inactivity-title = Are you still there?
+terminal-sharing-inactivity-countdown = Sharing will end in { $time } due to inactivity.
+ambient-agent-api-key-name-placeholder = e.g. My API key
+ambient-agent-api-key-save-failed = Failed to save API key: { $error }
+ambient-agent-api-key-saved = API key “{ $name }” saved.
+ambient-agent-enter-credentials = Enter your credentials below.
+ambient-agent-select-api-key-type-description = Select an API key type to use { $harness } in the cloud with InfiniShell Agent.
+ambient-agent-credentials-encrypted = Your credentials are end-to-end encrypted.{" "}
+ambient-agent-authentication-learn-more = Learn more about authentication for { $harness } in InfiniShell.
+ambient-agent-share-with-team = Share with team
+ambient-agent-optional-field = { $field } (optional)
+command-search-title = Command Search
+command-search-looking-for = I'm looking for…
+command-search-example-queries = Example queries
+ai-long-context-pricing-warning = OpenAI automatically applies long-context pricing when context exceeds 272,000 tokens.{" "}
+ai-web-fetch-no-urls = No URLs fetched
+ai-web-search-no-urls = No URLs found
+ai-toggle-selection-hint = to toggle selection
+ai-github-authentication-missing = GitHub authentication is missing.
+ai-authenticate-github = Authenticate with GitHub
+ai-cloud-agent-run-cancelled = Cloud agent run cancelled
+ai-search-target-conversation = conversation
+ai-search-target-agent-run = agent run
+ai-search-status-searched = Searched
+ai-search-status-searching = Searching
+ai-search-target-this-conversation = this conversation
+ai-search-query-suffix = : { $query }
+ai-code-diff-apply-failed = Could not apply changes to the file.
+ai-code-diff-edited-in-another-tab = This suggestion is being edited in another tab.
+ai-references-title = References
+ai-suggestions-title = Suggestions:
+common-beta = Beta
+common-beta-uppercase = BETA
+terminal-file-upload-to = { " " }to{" " }
+common-or-spaced = { " " }or{" " }
+common-custom = Custom
+input-suggestion-last-ran = Last ran { $time }
+input-suggestion-a11y = Suggestion: { $text }.
+input-suggestion-selected-a11y = Selected: { $text }
+editor-pasting-a11y = Pasting: { $content }
+session-last-run-command-a11y = Last run command: { $command }
+session-last-ai-interaction-a11y = Last AI interaction: { $prompt }
+session-running-command-a11y = Currently running: { $command }
+session-running-ai-interaction-a11y = Currently running AI interaction: { $prompt }
+code-review-unsaved-changes-tooltip = This file has unsaved changes. { $shortcut } to save
+tab-config-remove-title = Remove “{ $name }”?
+tab-config-remove-description = This tab config will be permanently deleted. This action cannot be undone.
+tab-config-enter-parameter = Enter { $name }
+tab-config-default-value = Default: { $value }
+search-directory-a11y = Directory: { $path }
+search-file-a11y = File: { $path }
+search-directory-help = Press Enter to navigate to this directory
+search-file-help = Press Enter to open this file
+search-create-file-label = Create a file named { $name }…
+search-create-file-a11y = Create file: { $name }
+search-create-file-help = Press Enter to create { $name } in the current directory
+context-chip-create-branch = Create new branch “{ $name }”
+search-selected-a11y = Selected: { $item }
+search-selected-tab-a11y = Selected tab: { $title }.
+search-section-a11y = Section: { $title }
+search-notebook-a11y = Notebook: { $name }
+search-notebook-with-description-a11y = Notebook: { $name } — { $description }
+search-workflow-a11y = Workflow: { $name }
+search-workflow-with-description-a11y = Workflow: { $name } — { $description }
+search-secret-a11y = Secret: { $name }
+search-loading-suggestions-a11y = Loading { $filter } suggestions
+search-skill-a11y = Skill: { $name }
+search-command-a11y = Command: { $command }
+search-rule-a11y = Rule: { $rule }
+search-conversation-a11y = Conversation: { $title }
+search-ai-query-a11y = AI query: { $query }
+search-ai-prompt-a11y = AI prompt: { $prompt }
+search-history-item-a11y = History item: { $item }
+search-project-a11y = Project: { $name }
+search-query-a11y = Query: { $query }
+search-prompt-a11y = Prompt: { $name }
+search-plan-a11y = Plan: { $title }
+search-profile-a11y = Profile: { $name }
+search-indexed-repository-a11y = Indexed repository: { $name }
+terminal-rewind-no-code-a11y = Rewind to: { $query } (no code changes)
+common-show-count-more = Show { $count } more
+ai-mcp-server-default-name = MCP Server { $id }
+terminal-open-path-in-infinishell = Open { $path } in InfiniShell
+ambient-agent-running-harness = Running { $name }…
+ambient-agent-api-key-deleted = API key “{ $name }” deleted.
+ambient-agent-api-key-delete-failed = Failed to delete API key “{ $name }”: { $error }
+ambient-agent-delete-api-key-a11y = Delete API key { $name }
+terminal-file-not-found = File not found: { $path }
+ai-create-environment-failed = Failed to create environment: { $error }
+common-error-with-detail = Error: { $error }
+ai-load-conversation-failed = Failed to load conversation with ID: { $id }
+ai-plan-not-found = Plan document { $id } was not found in InfiniShell Drive.
+ai-web-search-searching = Searching the web for “{ $query }”…
+ai-web-search-searched = Searched the web for “{ $query }”
+ai-web-search-failed = Web search failed for “{ $query }”
+ai-web-fetch-fetching = Fetching { $count } web pages…
+ai-web-fetch-fetched = Fetched { $count } web pages
+ai-web-fetch-fetched-partial = Fetched { $successful } of { $total } web pages
+ai-add-rule = Add rule: { $rule }
+ai-suggested-prompt-a11y = Suggested prompt:
+    { $prompt }
+ai-mcp-tool-title = MCP Tool: { $name }
+ai-mcp-tool-title-with-input = MCP Tool: { $name } ({ $input })
+ai-navigate-to-open-comments = Navigate to { $path } to open these comments
+ai-thought-for-duration = Thought for { $duration }
+ai-stopped-task = Stopped task: “{ $name }”
+ai-comment-addressed = Comment addressed: “{ $content }”
+ai-completed-task = Completed { $title }
+ai-grep-one-pattern = Grep for `{ $query }` in { $path }
+ai-grep-multiple-patterns = Grep for the following patterns in { $path }:
+    { $patterns }
+ai-invalid-api-key-update-settings = Invalid API key for { $provider }. Update your API key in settings.
+terminal-selected-blocks-a11y = Selected { $count } blocks.
+terminal-copied-blocks-a11y = Copied { $count } blocks.
+    { $content }
+terminal-open-block-filter-a11y = Open block filter editor for block { $index }
+common-copy-item = Copy { $item }
+workspace-new-worktree-with-branch = New worktree: { $repo }, { $branch }
+workspace-new-worktree = New worktree: { $repo }
+workspace-worktree = Worktree: { $repo }
+search-ssh-server-a11y = SSH server: { $name } { $host }
+ai-delete-conversation-title = Delete “{ $title }”?
+terminal-workflow-command-inserted-a11y = Workflow command { $command } inserted.
+terminal-selected-workflow-argument-a11y = Selected workflow argument { $name }
+terminal-executed-command-a11y = Executed: { $command }
+search-model-a11y = Model: { $name }
+ai-export-file-already-exists = File { $path } already exists
+notebook-command-from = Command from { $source }
+ai-custom-model-description = Custom · { $name }
+ai-usage-models-category = Models ({ $category })
+ambient-agent-create-hidden-pane-failed = Failed to create a hidden pane for the local child agent.
+ambient-agent-create-local-child-failed = Failed to create local child task: { $error }
+ambient-agent-local-harness-missing = Local child harness type is missing.
+ambient-agent-local-harness-unsupported = Unsupported local child harness “{ $name }”.
+ssh-manager-imported-from = Imported from { $path }
+tab-config-auto-worktree-required-tooltip = Select automatic worktree creation before enabling this option.
+ai-export-permission-denied = Permission denied writing to { $path }. Check file permissions.
+ai-export-directory-not-found = Directory not found: { $path }
+ai-export-failed = Failed to export to { $path }: { $error }
+code-save-file-failed = Failed to save file: { $error }
+code-delete-file-failed = Failed to delete file: { $error }
+settings-mcp-parse-markdown-failed = Failed to parse Markdown: { $error }

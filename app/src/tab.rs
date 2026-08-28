@@ -58,7 +58,9 @@ pub const TAB_BAR_BORDER_HEIGHT: f32 = 1.0;
 pub(crate) const TAB_INDICATOR_HEIGHT: f32 = 14.0;
 
 /// Label for the tab right-click menu's "Move to group" submenu parent.
-pub const MOVE_TO_GROUP_LABEL: &str = "Move to group";
+pub fn move_to_group_label() -> String {
+    crate::t!("menu-tab-move-to-group")
+}
 
 /// Decides which tab-group context-menu entries apply to a tab, based on its
 /// group membership, whether it is the sole member of that group, and whether
@@ -155,11 +157,11 @@ pub enum NewSessionMenuItem {
     CreateNewTabGroup,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct PaneNameMenuTarget {
     pub locator: PaneViewLocator,
-    pub rename_label: &'static str,
-    pub reset_label: &'static str,
+    pub rename_label: String,
+    pub reset_label: String,
 }
 
 /// TabData struct holds the state of the given tab. It includes the pane group and mouse states
@@ -276,7 +278,7 @@ impl TabData {
             self.pin_menu_items(index),
             self.tab_group_menu_items(index, tab_groups, is_only_member_of_group),
             self.session_sharing_menu_items(index, ctx),
-            self.copy_metadata_menu_items(pane_name_target, ctx),
+            self.copy_metadata_menu_items(pane_name_target.clone(), ctx),
             self.modify_tab_menu_items(index, can_move_left, can_move_right, pane_name_target, ctx),
             self.close_tab_menu_items(index, tabs_len, ctx),
             Self::save_config_menu_items(index),
@@ -332,7 +334,11 @@ impl TabData {
         let mut menu_items = vec![];
         let tab_title = Self::copyable_metadata_value(Some(pane_group.display_title(ctx)));
         if !uses_vertical_tabs(ctx) {
-            Self::push_copy_metadata_menu_item(&mut menu_items, "Copy tab title", tab_title);
+            Self::push_copy_metadata_menu_item(
+                &mut menu_items,
+                crate::t!("menu-tab-copy-title"),
+                tab_title,
+            );
             return menu_items;
         }
 
@@ -344,6 +350,7 @@ impl TabData {
             VerticalTabsDisplayGranularity::Panes
         ) {
             let pane_id = pane_name_target
+                .as_ref()
                 .filter(|target| self.pane_group.id() == target.locator.pane_group_id)
                 .and_then(|target| {
                     pane_group
@@ -352,31 +359,32 @@ impl TabData {
                 })
                 .unwrap_or_else(|| pane_group.focused_pane_id(ctx));
             (
-                "Copy pane title",
+                crate::t!("menu-tab-copy-pane-title"),
                 Self::copyable_pane_title(pane_group, pane_id, ctx),
                 pane_group.terminal_view_from_pane_id(pane_id, ctx),
             )
         } else {
             let terminal_view = pane_name_target
+                .as_ref()
                 .filter(|target| self.pane_group.id() == target.locator.pane_group_id)
                 .and_then(|target| {
                     pane_group.terminal_view_from_pane_id(target.locator.pane_id, ctx)
                 })
                 .or_else(|| pane_group.focused_session_view(ctx));
-            ("Copy tab title", tab_title, terminal_view)
+            (crate::t!("menu-tab-copy-title"), tab_title, terminal_view)
         };
 
         if let Some(terminal_view) = terminal_view {
             let terminal_view = terminal_view.as_ref(ctx);
             Self::push_copy_metadata_menu_item(
                 &mut menu_items,
-                "Copy branch",
+                crate::t!("menu-tab-copy-branch"),
                 Self::copyable_metadata_value(terminal_view.current_git_branch(ctx)),
             );
             Self::push_copy_metadata_menu_item(&mut menu_items, title_label, title);
             Self::push_copy_metadata_menu_item(
                 &mut menu_items,
-                "Copy working directory",
+                crate::t!("menu-tab-copy-working-directory"),
                 Self::copyable_metadata_value(
                     terminal_view
                         .pwd()
@@ -385,7 +393,7 @@ impl TabData {
             );
             Self::push_copy_metadata_menu_item(
                 &mut menu_items,
-                "Copy pull request link",
+                crate::t!("menu-tab-copy-pull-request-link"),
                 Self::copyable_metadata_value(terminal_view.current_pull_request_url(ctx)),
             );
         } else {
@@ -397,7 +405,7 @@ impl TabData {
 
     fn push_copy_metadata_menu_item(
         menu_items: &mut Vec<MenuItem<WorkspaceAction>>,
-        label: &'static str,
+        label: String,
         value: Option<String>,
     ) {
         if let Some(value) = value {
@@ -482,11 +490,16 @@ impl TabData {
         target: PaneNameMenuTarget,
         ctx: &AppContext,
     ) -> Vec<MenuItem<WorkspaceAction>> {
+        let PaneNameMenuTarget {
+            locator,
+            rename_label,
+            reset_label,
+        } = target;
         let pane_group = self.pane_group.as_ref(ctx);
-        if self.pane_group.id() != target.locator.pane_group_id {
+        if self.pane_group.id() != locator.pane_group_id {
             return vec![];
         }
-        let Some(pane) = pane_group.pane_by_id(target.locator.pane_id) else {
+        let Some(pane) = pane_group.pane_by_id(locator.pane_id) else {
             return vec![];
         };
         let configuration = pane.pane_configuration();
@@ -496,14 +509,14 @@ impl TabData {
             .is_some();
 
         let mut menu_items = vec![
-            MenuItemFields::new(target.rename_label)
-                .with_on_select_action(WorkspaceAction::RenamePane(target.locator))
+            MenuItemFields::new(rename_label)
+                .with_on_select_action(WorkspaceAction::RenamePane(locator))
                 .into_item(),
         ];
         if has_custom_name {
             menu_items.push(
-                MenuItemFields::new(target.reset_label)
-                    .with_on_select_action(WorkspaceAction::ResetPaneName(target.locator))
+                MenuItemFields::new(reset_label)
+                    .with_on_select_action(WorkspaceAction::ResetPaneName(locator))
                     .into_item(),
             );
         }
@@ -566,9 +579,12 @@ impl TabData {
         }
 
         let (label, action) = if self.pinned {
-            ("Unpin tab", WorkspaceAction::UnpinTab(index))
+            (
+                crate::t!("menu-tab-unpin"),
+                WorkspaceAction::UnpinTab(index),
+            )
         } else {
-            ("Pin tab", WorkspaceAction::PinTab(index))
+            (crate::t!("menu-tab-pin"), WorkspaceAction::PinTab(index))
         };
         vec![
             MenuItemFields::new(label)
@@ -599,17 +615,17 @@ impl TabData {
         let mut menu_items = vec![];
         if show_new_group {
             menu_items.push(
-                MenuItemFields::new("New group with tab")
+                MenuItemFields::new(crate::t!("menu-tab-new-group-with-tab"))
                     .with_on_select_action(WorkspaceAction::NewTabGroupFromTab(index))
                     .into_item(),
             );
         }
         if show_move_to_group {
-            menu_items.push(MenuItemFields::new_submenu(MOVE_TO_GROUP_LABEL).into_item());
+            menu_items.push(MenuItemFields::new_submenu(move_to_group_label()).into_item());
         }
         if show_remove_from_group {
             menu_items.push(
-                MenuItemFields::new("Remove from group")
+                MenuItemFields::new(crate::t!("menu-tab-remove-from-group"))
                     .with_on_select_action(WorkspaceAction::RemoveTabFromGroup(index))
                     .into_item(),
             );

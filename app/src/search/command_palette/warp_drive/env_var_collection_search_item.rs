@@ -63,7 +63,7 @@ impl SearchItem for EnvVarCollectionSearchItem {
                 .string_model
                 .title
                 .clone()
-                .unwrap_or("Untitled".to_owned())
+                .unwrap_or_else(|| crate::t!("common-untitled"))
                 .to_owned(),
             appearance.ui_font_family(),
             appearance.monospace_font_size(),
@@ -170,7 +170,7 @@ impl SearchItem for EnvVarCollectionSearchItem {
                 .string_model
                 .title
                 .clone()
-                .unwrap_or("Untitled".to_owned())
+                .unwrap_or_else(|| crate::t!("common-untitled"))
         )
     }
 }

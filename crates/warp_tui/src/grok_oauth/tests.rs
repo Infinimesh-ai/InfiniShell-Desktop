@@ -1,9 +1,12 @@
 use uuid::Uuid;
 use warpui_core::App;
 
-use super::{
-    CALLBACK_FAILURE_MESSAGE, MANUAL_FAILURE_MESSAGE, TuiGrokOAuthController, TuiGrokOAuthPhase,
-};
+use super::{TuiGrokOAuthController, TuiGrokOAuthPhase};
+
+const CALLBACK_FAILURE_MESSAGE: &str =
+    "Couldn't complete Grok authorization. Press Esc, then select Grok to try again.";
+const MANUAL_FAILURE_MESSAGE: &str =
+    "Couldn't connect Grok with that code. Check the code and try again.";
 
 fn test_controller() -> TuiGrokOAuthController {
     TuiGrokOAuthController {

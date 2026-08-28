@@ -44,7 +44,11 @@ pub(super) fn active_todo_menu(
         })
         .collect();
     Some(TuiReadOnlyMenu::new(vec![TuiReadOnlyMenuSection::new(
-        format!("Tasks {completed}/{}", todo_list.len()),
+        warp::t!(
+            "tui-tasks-progress",
+            completed = completed,
+            total = todo_list.len()
+        ),
         rows,
     )]))
 }

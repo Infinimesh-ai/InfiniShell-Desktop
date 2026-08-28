@@ -9,11 +9,6 @@ use crate::appearance::Appearance;
 use crate::ui_components::buttons::close_button;
 use crate::ui_components::dialog::{Dialog, dialog_styles};
 
-const EDIT_ANYWAY_CTA_LABEL: &str = "Edit anyway";
-const EDIT_ANYWAY_TEXT: &str =
-    "If you take edit controls, the current editor will be forced into view mode";
-const CURRENTLY_EDITED_LABEL: &str = "This notebook is currently being edited";
-
 #[derive(Default)]
 struct MouseStateHandles {
     close_button: MouseStateHandle,
@@ -51,13 +46,17 @@ impl GrabEditAccessModal {
         let theme = appearance.theme();
         let ui_builder = appearance.ui_builder();
 
-        let description = Text::new(EDIT_ANYWAY_TEXT, appearance.ui_font_family(), 13.)
-            .with_style(Properties {
-                style: Style::Normal,
-                weight: Weight::Bold,
-            })
-            .with_color(theme.active_ui_text_color().into())
-            .finish();
+        let description = Text::new(
+            crate::t!("object-edit-access-description"),
+            appearance.ui_font_family(),
+            13.,
+        )
+        .with_style(Properties {
+            style: Style::Normal,
+            weight: Weight::Bold,
+        })
+        .with_color(theme.active_ui_text_color().into())
+        .finish();
 
         let close_button = close_button(appearance, self.mouse_state_handles.close_button.clone())
             .build()
@@ -66,7 +65,7 @@ impl GrabEditAccessModal {
             .finish();
 
         Dialog::new(
-            CURRENTLY_EDITED_LABEL.to_string(),
+            crate::t!("object-edit-access-title"),
             None,
             dialog_styles(appearance),
         )
@@ -96,7 +95,7 @@ impl GrabEditAccessModal {
                     ButtonVariant::Warn,
                     self.mouse_state_handles.edit_anyway_button.clone(),
                 )
-                .with_text_label(EDIT_ANYWAY_CTA_LABEL.to_string())
+                .with_text_label(crate::t!("object-edit-access-confirm"))
                 .build()
                 .on_click(|ctx, _, _| {
                     ctx.dispatch_typed_action(GrabEditAccessModalAction::GrabEditAccess)

@@ -64,10 +64,9 @@ impl TerminalView {
             let window_id = ctx.window_id();
             ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                 toast_stack.add_ephemeral_toast(
-                    DismissibleToast::error(
-                        "Cannot start a new conversation while agent is monitoring a command."
-                            .to_string(),
-                    ),
+                    DismissibleToast::error(crate::t!(
+                        "terminal-new-conversation-monitoring-command"
+                    )),
                     window_id,
                     ctx,
                 );
@@ -178,7 +177,10 @@ impl TerminalView {
             ctx.spawn(future, move |me, conversation, ctx| {
                 let Some(conversation) = conversation else {
                     me.show_error_toast(
-                        format!("Failed to load conversation with id: {conversation_id}"),
+                        crate::t!(
+                            "ai-load-conversation-failed",
+                            id = conversation_id.to_string()
+                        ),
                         ctx,
                     );
                     return;

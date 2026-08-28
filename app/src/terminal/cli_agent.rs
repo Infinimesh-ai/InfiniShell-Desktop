@@ -253,27 +253,27 @@ impl CLIAgent {
         }
     }
 
-    pub fn display_name(&self) -> &'static str {
+    pub fn display_name(&self) -> String {
         match self {
-            CLIAgent::Claude => "Claude Code",
-            CLIAgent::Gemini => "Gemini",
-            CLIAgent::Codex => "Codex",
-            CLIAgent::Amp => "Amp",
-            CLIAgent::Droid => "Droid",
-            CLIAgent::OpenCode => "OpenCode",
-            CLIAgent::Copilot => "Copilot",
-            CLIAgent::Pi => "Pi",
-            CLIAgent::OhMyPi => "oh-my-pi",
-            CLIAgent::Auggie => "Auggie",
-            CLIAgent::CursorCli => "Cursor",
-            CLIAgent::Goose => "Goose",
-            CLIAgent::DeepSeek => "DeepSeek",
-            CLIAgent::Hermes => "Hermes",
-            CLIAgent::Vibe => "Mistral Vibe",
-            CLIAgent::Antigravity => "Antigravity",
-            CLIAgent::Omp => "Omp",
-            CLIAgent::WarpTui => "InfiniShell TUI",
-            CLIAgent::Unknown => "CLI Agent",
+            CLIAgent::Claude => "Claude Code".to_string(),
+            CLIAgent::Gemini => "Gemini".to_string(),
+            CLIAgent::Codex => "Codex".to_string(),
+            CLIAgent::Amp => "Amp".to_string(),
+            CLIAgent::Droid => "Droid".to_string(),
+            CLIAgent::OpenCode => "OpenCode".to_string(),
+            CLIAgent::Copilot => "Copilot".to_string(),
+            CLIAgent::Pi => "Pi".to_string(),
+            CLIAgent::OhMyPi => "oh-my-pi".to_string(),
+            CLIAgent::Auggie => "Auggie".to_string(),
+            CLIAgent::CursorCli => "Cursor".to_string(),
+            CLIAgent::Goose => "Goose".to_string(),
+            CLIAgent::DeepSeek => "DeepSeek".to_string(),
+            CLIAgent::Hermes => "Hermes".to_string(),
+            CLIAgent::Vibe => "Mistral Vibe".to_string(),
+            CLIAgent::Antigravity => "Antigravity".to_string(),
+            CLIAgent::Omp => "Omp".to_string(),
+            CLIAgent::WarpTui => "InfiniShell TUI".to_string(),
+            CLIAgent::Unknown => crate::t!("cli-agent-generic-name"),
         }
     }
 

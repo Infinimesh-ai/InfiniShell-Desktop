@@ -867,9 +867,13 @@ fn render_run_agents_permission_line_with_icon(
     is_ai_enabled: bool,
 ) -> Box<dyn Element> {
     let permission_text = match permission {
-        RunAgentsPermission::NeverAllow | RunAgentsPermission::Unknown => "Never",
-        RunAgentsPermission::AlwaysAllow => "Always allow",
-        RunAgentsPermission::AlwaysAsk => "Always ask",
+        RunAgentsPermission::NeverAllow | RunAgentsPermission::Unknown => {
+            crate::t!("settings-exec-profile-perm-never")
+        }
+        RunAgentsPermission::AlwaysAllow => {
+            crate::t!("settings-exec-profile-perm-always-allow")
+        }
+        RunAgentsPermission::AlwaysAsk => crate::t!("settings-exec-profile-perm-always-ask"),
     };
     render_permission_line_with_icon(icon, label, permission_text, appearance, is_ai_enabled)
 }

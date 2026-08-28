@@ -677,7 +677,7 @@ impl RunnableCommandModel for NotebookCommand {
             .with_active_styles(active_highlight)
             .with_tooltip(move || {
                 tooltip_builder_raw
-                    .tool_tip("Raw".to_string())
+                    .tool_tip(crate::t!("notebook-mermaid-raw"))
                     .build()
                     .finish()
             })
@@ -702,7 +702,7 @@ impl RunnableCommandModel for NotebookCommand {
             .with_active_styles(active_highlight)
             .with_tooltip(move || {
                 tooltip_builder_rendered
-                    .tool_tip("Rendered".to_string())
+                    .tool_tip(crate::t!("notebook-mermaid-rendered"))
                     .build()
                     .finish()
             })
@@ -743,7 +743,7 @@ impl RunnableCommandModel for NotebookCommand {
                             self.mouse_state_handles
                                 .mermaid_fullscreen_button_state
                                 .clone(),
-                            "Open full screen",
+                            crate::t!("notebook-open-full-screen"),
                             None,
                         )
                         .on_click(move |ctx, app, _| {
@@ -776,7 +776,7 @@ impl RunnableCommandModel for NotebookCommand {
                     appearance,
                     Icon::Copy,
                     self.mouse_state_handles.copy_button_state.clone(),
-                    "Copy",
+                    crate::t!("common-copy"),
                     custom_action_to_display(CustomAction::Copy),
                 )
                 .on_click(move |ctx, app, _| {
@@ -803,7 +803,7 @@ impl RunnableCommandModel for NotebookCommand {
                         appearance,
                         Icon::TerminalInput,
                         self.mouse_state_handles.insert_button_state.clone(),
-                        "Run in terminal",
+                        crate::t!("notebook-run-in-terminal"),
                         NotebookKeybindings::as_ref(ctx).run_commands_keybinding(),
                     )
                     .on_click(move |ctx, app, _| {

@@ -260,7 +260,7 @@ fn cloud_startup_presentations_preserve_gui_copy_and_child_retry_semantics() {
     assert_eq!(
         CloudAgentStartupPresentation::failure("Server error"),
         CloudAgentStartupPresentation {
-            title: "Failed to start environment",
+            title: crate::t!("ai-orchestration-cloud-environment-failed"),
             detail: "Server error".to_string(),
             action_label: None,
             primary_url: None,
@@ -272,9 +272,9 @@ fn cloud_startup_presentations_preserve_gui_copy_and_child_retry_semantics() {
             CloudAgentStartupAuthFlow::RetryRetainedRequest,
         ),
         CloudAgentStartupPresentation {
-            title: "GitHub Authentication Required",
-            detail: "Please authenticate with GitHub to continue".to_string(),
-            action_label: Some("Authenticate with GitHub"),
+            title: crate::t!("ai-orchestration-github-auth-required"),
+            detail: crate::t!("ai-orchestration-github-auth-continue"),
+            action_label: Some(crate::t!("ai-orchestration-authenticate-github")),
             primary_url: Some("https://example.com/auth".to_string()),
         }
     );
@@ -284,7 +284,7 @@ fn cloud_startup_presentations_preserve_gui_copy_and_child_retry_semantics() {
             CloudAgentStartupAuthFlow::RerunOrchestrationRequest,
         )
         .detail,
-        "Authenticate with GitHub, then run the orchestration request again."
+        crate::t!("ai-orchestration-github-auth-rerun")
     );
 }
 
@@ -293,12 +293,12 @@ fn quota_and_fallback_errors_keep_their_semantics() {
     // Zap:`CloudAgentCapacityError` 随云端 `server_api` 删除,
     // `CloudAgentStartupFailure::Capacity` 已无来源,容量断言移除。
     // `AIApiError::QuotaLimit` 现在是无字段变体,文案来自
-    // `OUT_OF_CREDITS_TASK_FAILURE_MESSAGE`。
+    // `out_of_credits_task_failure_message()`。
     let quota = anyhow::Error::new(AIApiError::QuotaLimit);
     assert_eq!(
         classify_cloud_agent_startup_error(&quota),
         CloudAgentStartupIssue::Failed(CloudAgentStartupFailure::OutOfCredits {
-            message: crate::ai::ambient_agents::OUT_OF_CREDITS_TASK_FAILURE_MESSAGE.to_string(),
+            message: crate::ai::ambient_agents::out_of_credits_task_failure_message(),
         })
     );
 

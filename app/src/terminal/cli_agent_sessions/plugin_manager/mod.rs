@@ -186,7 +186,7 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
     /// Default returns an error — only agents with `can_auto_install() == true` should override.
     async fn install(&self) -> Result<(), PluginInstallError> {
         Err(PluginInstallError {
-            message: "Auto-install not supported for this agent".to_owned(),
+            message: crate::t!("cli-agent-plugin-auto-install-unsupported"),
             log: String::new(),
         })
     }
@@ -195,19 +195,19 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
     /// Default returns an error — only agents with `can_auto_install() == true` should override.
     async fn update(&self) -> Result<(), PluginInstallError> {
         Err(PluginInstallError {
-            message: "Auto-update not supported for this agent".to_owned(),
+            message: crate::t!("cli-agent-plugin-auto-update-unsupported"),
             log: String::new(),
         })
     }
 
     /// Toast message shown after a successful auto-install.
     fn install_success_message(&self) -> &'static str {
-        "InfiniShell plugin installed. Please restart the session to activate."
+        crate::t_static!("cli-agent-plugin-installed-restart-session")
     }
 
     /// Toast message shown after a successful auto-update.
     fn update_success_message(&self) -> &'static str {
-        "InfiniShell plugin updated. Please restart the session to activate."
+        crate::t_static!("cli-agent-plugin-updated-restart-session")
     }
 
     /// Manual installation instructions for the modal UI.

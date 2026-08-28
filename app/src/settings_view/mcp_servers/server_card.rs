@@ -606,7 +606,10 @@ impl ServerCardView {
             ServerCardItemId::TemplatableMCP(template_uuid) => {
                 let server_object = TemplatableMCPServerObject::get_by_uuid(&template_uuid, app);
                 if let Some(server_object) = server_object {
-                    lines.push(format!("Template sync id: {}", server_object.sync_id()));
+                    lines.push(crate::t!(
+                        "settings-mcp-debug-template-sync-id",
+                        id = server_object.sync_id().to_string()
+                    ));
                 }
             }
             ServerCardItemId::TemplatableMCPInstallation(installation_uuid) => {
@@ -616,16 +619,21 @@ impl ServerCardView {
                     let template_uuid = installation.template_uuid();
                     let gallery_uuid = installation.gallery_uuid();
                     let gallery_uuid_text = match gallery_uuid {
-                        Some(uuid) => format!("Gallery Id: {uuid}"),
-                        None => "Gallery Id: None".to_string(),
+                        Some(uuid) => {
+                            crate::t!("settings-mcp-debug-gallery-id", id = uuid.to_string())
+                        }
+                        None => crate::t!("settings-mcp-debug-gallery-id-none"),
                     };
                     let server_object =
                         TemplatableMCPServerObject::get_by_uuid(&template_uuid, app);
                     let template_sync_id_text = match server_object {
                         Some(server_object) => {
-                            format!("Template sync id: {}", server_object.sync_id())
+                            crate::t!(
+                                "settings-mcp-debug-template-sync-id",
+                                id = server_object.sync_id().to_string()
+                            )
                         }
-                        None => "Could not find template object".to_string(),
+                        None => crate::t!("settings-mcp-debug-template-not-found"),
                     };
                     lines.push(format!(
                         "{}",

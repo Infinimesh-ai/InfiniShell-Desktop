@@ -66,7 +66,7 @@ pub(crate) fn init(app: &mut AppContext) {
     app.register_editable_bindings([
         EditableBinding::new(
             "tui:attachments:next",
-            "Select the next attachment",
+            warp::t_static!("tui-keybinding-next-attachment"),
             TuiAttachmentBarAction::Next,
         )
         .with_context_predicate(context.clone())
@@ -74,7 +74,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("tab"),
         EditableBinding::new(
             "tui:attachments:next",
-            "Select the next attachment",
+            warp::t_static!("tui-keybinding-next-attachment"),
             TuiAttachmentBarAction::Next,
         )
         .with_context_predicate(context.clone())
@@ -82,7 +82,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("right"),
         EditableBinding::new(
             "tui:attachments:previous",
-            "Select the previous attachment",
+            warp::t_static!("tui-keybinding-previous-attachment"),
             TuiAttachmentBarAction::Previous,
         )
         .with_context_predicate(context.clone())
@@ -90,7 +90,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("shift-tab"),
         EditableBinding::new(
             "tui:attachments:previous",
-            "Select the previous attachment",
+            warp::t_static!("tui-keybinding-previous-attachment"),
             TuiAttachmentBarAction::Previous,
         )
         .with_context_predicate(context.clone())
@@ -98,7 +98,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("left"),
         EditableBinding::new(
             "tui:attachments:remove",
-            "Remove the selected attachment",
+            warp::t_static!("tui-keybinding-remove-attachment"),
             TuiAttachmentBarAction::RemoveSelected,
         )
         .with_context_predicate(context.clone())
@@ -106,7 +106,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("backspace"),
         EditableBinding::new(
             "tui:attachments:remove",
-            "Remove the selected attachment",
+            warp::t_static!("tui-keybinding-remove-attachment"),
             TuiAttachmentBarAction::RemoveSelected,
         )
         .with_context_predicate(context.clone())
@@ -114,7 +114,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("delete"),
         EditableBinding::new(
             "tui:attachments:return_focus",
-            "Return focus to the input",
+            warp::t_static!("tui-keybinding-return-input-focus"),
             TuiAttachmentBarAction::ReturnFocus,
         )
         .with_context_predicate(context.clone())
@@ -122,7 +122,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("escape"),
         EditableBinding::new(
             "tui:attachments:return_focus",
-            "Return focus to the input",
+            warp::t_static!("tui-keybinding-return-input-focus"),
             TuiAttachmentBarAction::ReturnFocus,
         )
         .with_context_predicate(context)
@@ -202,8 +202,8 @@ fn render_attachment_snapshot(
         return TuiFlex::row().finish();
     };
     let kind = match selected.attachment_type {
-        AttachmentType::Image => "[image]",
-        AttachmentType::File => "[file]",
+        AttachmentType::Image => warp::t!("tui-attachment-image"),
+        AttachmentType::File => warp::t!("tui-attachment-file"),
     };
     if snapshot.selected_is_processing {
         return TuiFlex::row()
@@ -220,7 +220,7 @@ fn render_attachment_snapshot(
                     .finish(),
             )
             .child(
-                TuiText::new(" · loading…")
+                TuiText::new(format!(" · {}", warp::t!("tui-loading-ellipsis")))
                     .with_style(builder.dim_text_style())
                     .truncate()
                     .finish(),
@@ -291,7 +291,7 @@ fn render_attachment_snapshot(
     }
     if snapshot.is_processing {
         row = row.child(
-            TuiText::new(" · loading…")
+            TuiText::new(format!(" · {}", warp::t!("tui-loading-ellipsis")))
                 .with_style(builder.dim_text_style())
                 .truncate()
                 .finish(),

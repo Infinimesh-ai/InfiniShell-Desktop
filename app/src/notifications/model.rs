@@ -136,19 +136,22 @@ impl NotificationsModel {
                     );
                 }
                 CLIAgentSessionStatus::Success => {
-                    let title = session_context
-                        .display_title()
-                        .unwrap_or_else(|| format!("{} completed", agent.display_name()));
+                    let title = session_context.display_title().unwrap_or_else(|| {
+                        crate::t!(
+                            "notifications-agent-completed-title",
+                            agent = agent.display_name()
+                        )
+                    });
                     let message = match agent {
-                        CLIAgent::Codex => "Notification from Codex",
-                        CLIAgent::DeepSeek => "Notification from DeepSeek",
-                        CLIAgent::Antigravity => "Notification from Antigravity",
-                        _ => "Task completed.",
+                        CLIAgent::Codex | CLIAgent::DeepSeek | CLIAgent::Antigravity => {
+                            crate::t!("notifications-from-agent", agent = agent.display_name())
+                        }
+                        _ => crate::t!("notifications-task-completed"),
                     };
                     let metadata = TerminalViewMetadata::lookup(*terminal_view_id, ctx);
                     self.add_notification(
                         title,
-                        message.to_owned(),
+                        message,
                         NotificationCategory::Complete,
                         NotificationSourceAgent::CLI {
                             agent: *agent,
@@ -165,14 +168,17 @@ impl NotificationsModel {
                     error_type,
                     message,
                 } => {
-                    let title = session_context
-                        .display_title()
-                        .unwrap_or_else(|| format!("{} failed", agent.display_name()));
+                    let title = session_context.display_title().unwrap_or_else(|| {
+                        crate::t!(
+                            "notifications-agent-failed-title",
+                            agent = agent.display_name()
+                        )
+                    });
                     let body = match (message.as_deref(), error_type.as_deref()) {
                         (Some(msg), Some(kind)) => format!("{kind}: {msg}"),
                         (Some(msg), None) => msg.to_owned(),
                         (None, Some(kind)) => kind.to_owned(),
-                        (None, None) => "The agent encountered an error.".to_owned(),
+                        (None, None) => crate::t!("notifications-agent-error"),
                     };
                     let metadata = TerminalViewMetadata::lookup(*terminal_view_id, ctx);
                     self.add_notification(
@@ -191,15 +197,18 @@ impl NotificationsModel {
                     );
                 }
                 CLIAgentSessionStatus::Blocked { message } => {
-                    let title = session_context
-                        .display_title()
-                        .unwrap_or_else(|| format!("{} needs attention", agent.display_name()));
+                    let title = session_context.display_title().unwrap_or_else(|| {
+                        crate::t!(
+                            "notifications-agent-needs-attention-title",
+                            agent = agent.display_name()
+                        )
+                    });
                     let metadata = TerminalViewMetadata::lookup(*terminal_view_id, ctx);
                     self.add_notification(
                         title,
                         message
                             .clone()
-                            .unwrap_or_else(|| "Waiting for input.".to_owned()),
+                            .unwrap_or_else(|| crate::t!("notifications-waiting-for-input")),
                         NotificationCategory::Request,
                         NotificationSourceAgent::CLI {
                             agent: *agent,
@@ -213,13 +222,16 @@ impl NotificationsModel {
                     );
                 }
                 CLIAgentSessionStatus::Cancelled => {
-                    let title = session_context
-                        .display_title()
-                        .unwrap_or_else(|| format!("{} cancelled", agent.display_name()));
+                    let title = session_context.display_title().unwrap_or_else(|| {
+                        crate::t!(
+                            "notifications-agent-cancelled-title",
+                            agent = agent.display_name()
+                        )
+                    });
                     let metadata = TerminalViewMetadata::lookup(*terminal_view_id, ctx);
                     self.add_notification(
                         title,
-                        "Cancelled by user.".to_owned(),
+                        crate::t!("notifications-cancelled-by-user"),
                         NotificationCategory::Complete,
                         NotificationSourceAgent::CLI {
                             agent: *agent,
@@ -331,7 +343,7 @@ impl NotificationsModel {
             return;
         }
 
-        let title = latest_query.unwrap_or_else(|| "Agent task".to_owned());
+        let title = latest_query.unwrap_or_else(|| crate::t!("terminal-agent-task"));
         let metadata = TerminalViewMetadata::lookup(terminal_view_id, ctx);
         let oz_agent = NotificationSourceAgent::Oz {
             is_ambient: metadata.is_ambient,
@@ -354,7 +366,7 @@ impl NotificationsModel {
                 let artifacts = self.flush_pending_artifacts(conversation_id);
                 self.add_notification(
                     title,
-                    "Task completed.".to_owned(),
+                    crate::t!("notifications-task-completed"),
                     NotificationCategory::Complete,
                     oz_agent,
                     origin,
@@ -368,7 +380,7 @@ impl NotificationsModel {
                 let artifacts = self.flush_pending_artifacts(conversation_id);
                 self.add_notification(
                     title,
-                    "Task was cancelled.".to_owned(),
+                    crate::t!("notifications-task-cancelled"),
                     NotificationCategory::Complete,
                     oz_agent,
                     origin,
@@ -395,7 +407,7 @@ impl NotificationsModel {
                 let artifacts = self.flush_pending_artifacts(conversation_id);
                 self.add_notification(
                     title,
-                    "Something went wrong.".to_owned(),
+                    crate::t!("notifications-something-went-wrong"),
                     NotificationCategory::Error,
                     oz_agent,
                     origin,

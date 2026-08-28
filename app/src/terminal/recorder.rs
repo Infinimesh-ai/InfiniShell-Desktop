@@ -111,8 +111,9 @@ impl PtyRecorder {
             if let Some(path) = self.start_recording(ctx) {
                 let display_path = warp_core::paths::home_relative_path(path);
                 let file_path = path.to_owned();
+                let display_path = display_path.to_string();
                 self.show_toast(
-                    format!("PTY recording started: {display_path}"),
+                    crate::t!("terminal-recording-started", path = display_path.as_str()),
                     Some(file_path),
                     ctx,
                 );
@@ -120,8 +121,9 @@ impl PtyRecorder {
         } else if !should_record && self.is_recording() {
             let display_path = warp_core::paths::home_relative_path(&self.path);
             self.stop_recording();
+            let display_path = display_path.to_string();
             self.show_toast(
-                format!("PTY recording stopped: {display_path}"),
+                crate::t!("terminal-recording-stopped", path = display_path.as_str()),
                 Some(self.path.clone()),
                 ctx,
             );

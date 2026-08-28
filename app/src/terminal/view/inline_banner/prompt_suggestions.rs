@@ -34,8 +34,6 @@ use crate::util::bindings::keybinding_name_to_keystroke;
 const INLINE_BANNER_SPACING: f32 = 8.;
 const INLINE_BANNER_BUTTON_PADDING: f32 = 8.;
 
-const OUT_OF_REQUESTS_TOOLTIP_MESSAGE: &str = "Out of credits";
-
 /// Types of zero-state prompt suggestions.
 #[derive(Debug, Copy, Clone, Serialize)]
 pub enum ZeroStatePromptSuggestionType {
@@ -60,20 +58,14 @@ impl ZeroStatePromptSuggestionType {
     /// Constant for the number of zero-state prompt suggestion types.
     pub const COUNT: usize = 5;
 
-    pub fn query(&self) -> &'static str {
+    pub fn query(&self) -> String {
         match self {
-            Self::Explain => "Explain this to me.",
-            Self::Fix => "Help me fix this.",
-            Self::Install => {
-                "Help me install a binary/dependency. What information do I need to provide to you to do this?"
-            }
-            Self::Code => {
-                "Help me write some code. What information do I need to provide to you to do this?"
-            }
-            Self::Deploy => {
-                "Help me deploy my project. What information do I need to provide to you to do this?"
-            }
-            Self::SomethingElse => "Something else?",
+            Self::Explain => crate::t!("terminal-prompt-suggestion-explain"),
+            Self::Fix => crate::t!("terminal-prompt-suggestion-fix"),
+            Self::Install => crate::t!("terminal-prompt-suggestion-install"),
+            Self::Code => crate::t!("terminal-prompt-suggestion-code"),
+            Self::Deploy => crate::t!("terminal-prompt-suggestion-deploy"),
+            Self::SomethingElse => crate::t!("terminal-prompt-suggestion-other"),
         }
     }
 
@@ -282,7 +274,7 @@ fn get_tooltip_text_for_alert_state(alert_state: &PromptAlertState) -> Option<St
         PromptAlertState::RequestLimitReached
         | PromptAlertState::AnonymousUserRequestLimitHardGate
         | PromptAlertState::AnonymousUserRequestLimitSoftGate => {
-            Some(OUT_OF_REQUESTS_TOOLTIP_MESSAGE.to_string())
+            Some(crate::t!("common-out-of-credits"))
         }
         _ => None,
     }

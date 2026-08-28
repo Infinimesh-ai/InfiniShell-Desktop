@@ -46,8 +46,8 @@ pub(super) fn confirm_icon_for() -> Icon {
     Icon::Github
 }
 
-fn loading_label_for() -> &'static str {
-    "Creating\u{2026}"
+fn loading_label_for() -> String {
+    crate::t!("code-review-creating-pull-request-loading")
 }
 
 /// PR mode has no prerequisites beyond a branch with commits; confirm is
@@ -181,7 +181,8 @@ pub(super) fn render_body(
     let base_branch = state
         .base_branch_name
         .as_deref()
-        .unwrap_or("default branch");
+        .map(str::to_owned)
+        .unwrap_or_else(|| crate::t!("code-review-default-branch"));
     let branch_name = format!("{branch_name} \u{2192} {base_branch}");
     Flex::column()
         .with_child(
@@ -198,7 +199,7 @@ fn render_changes_section(state: &PrState, appearance: &Appearance) -> Box<dyn E
     let main_color = theme.main_text_color(theme.surface_1()).into_solid();
 
     let label = Text::new(
-        "Changes",
+        crate::t!("code-review-changes"),
         appearance.ui_font_family(),
         appearance.ui_font_size(),
     )

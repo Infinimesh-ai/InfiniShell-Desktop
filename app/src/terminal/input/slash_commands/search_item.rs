@@ -98,7 +98,7 @@ impl SearchItem for InlineItem {
                 .with_child(name_text.finish())
                 .with_child(
                     Text::new(
-                        " or ",
+                        crate::t!("common-or-spaced"),
                         appearance.ui_font_family(),
                         inline_styles::font_size(appearance),
                     )

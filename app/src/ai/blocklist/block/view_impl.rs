@@ -654,7 +654,8 @@ pub fn render_citation(
                 .to_warp_drive_item(appearance)?;
             (
                 item.icon(appearance, Some(theme.active_ui_text_color())),
-                item.display_name().unwrap_or(String::from("Untitled")),
+                item.display_name()
+                    .unwrap_or_else(|| crate::t!("common-untitled")),
             )
         }
         AIAgentCitation::WarpDocumentation { .. } => {

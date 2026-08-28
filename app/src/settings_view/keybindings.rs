@@ -48,8 +48,6 @@ const EDIT_BUTTONS_BORDER_RADIUS: f32 = 4.0;
 
 // 保留给 `resource_center/keybindings_page.rs` 复用的占位文案;
 // 该文件单独 i18n 化时再迁移到 fluent。
-pub const SEARCH_PLACEHOLDER: &str = "Search by name or by keys (ex. \"cmd d\")";
-
 const KEYBINDINGS_PAGE_SHORTCUT: &str = "workspace:toggle_keybindings_page";
 
 // 其他面向用户的字符串通过 crate::t!() 在运行时取值,见 settings-keybindings-* fluent key。

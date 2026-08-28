@@ -191,6 +191,9 @@ impl SearchItem for RepoSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Indexed repository: {}", self.display_name)
+        crate::t!(
+            "search-indexed-repository-a11y",
+            name = self.display_name.as_str()
+        )
     }
 }

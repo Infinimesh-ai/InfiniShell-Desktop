@@ -171,7 +171,10 @@ impl SearchItem for NotebookSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Notebook: {}", self.notebook.model().title)
+        crate::t!(
+            "search-notebook-a11y",
+            name = self.notebook.model().title.as_str()
+        )
     }
 }
 

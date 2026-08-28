@@ -259,7 +259,7 @@ impl ReadFilesExecutor {
                     .into_iter()
                     .map(|path| ReadFilesFailedFile {
                         path,
-                        message: "File not found or could not be read".to_string(),
+                        message: crate::t!("ai-read-file-not-found"),
                     })
                     .collect::<Vec<_>>();
                 if failed_files.is_empty() {
@@ -269,8 +269,9 @@ impl ReadFilesExecutor {
                     })
                 } else if result.file_contexts.is_empty() {
                     let failed = describe_failed_files(&failed_files);
-                    Ok(ReadFilesResult::Error(format!(
-                        "Failed to read files: {failed}"
+                    Ok(ReadFilesResult::Error(crate::t!(
+                        "ai-read-files-failed",
+                        files = failed
                     )))
                 } else {
                     Ok(ReadFilesResult::Success {

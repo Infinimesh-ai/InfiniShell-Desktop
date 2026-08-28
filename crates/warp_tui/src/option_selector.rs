@@ -37,8 +37,6 @@ use crate::tui_builder::TuiUiBuilder;
 /// Maximum option rows visible at once; longer lists scroll.
 pub(crate) const MAX_VISIBLE_OPTION_ROWS: usize = 6;
 
-/// Validation copy shown when the custom-text editor is submitted empty.
-const CUSTOM_TEXT_EMPTY_ERROR: &str = "Enter a value to continue.";
 const SELECTOR_NAVIGATION_ACTIVE: &str = "TuiOptionSelectorNavigationActive";
 
 pub(crate) fn init(app: &mut AppContext) {
@@ -46,7 +44,7 @@ pub(crate) fn init(app: &mut AppContext) {
     app.register_editable_bindings([
         EditableBinding::new(
             "tui:option-selector:previous",
-            "Select the previous option",
+            warp::t_static!("tui-keybinding-select-previous-option"),
             TuiOptionSelectorAction::MoveUp,
         )
         .with_context_predicate(predicate.clone())
@@ -54,7 +52,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("up"),
         EditableBinding::new(
             "tui:option-selector:next",
-            "Select the next option",
+            warp::t_static!("tui-keybinding-select-next-option"),
             TuiOptionSelectorAction::MoveDown,
         )
         .with_context_predicate(predicate)
@@ -1094,7 +1092,10 @@ impl TuiOptionSelector {
         let position = TuiText::from_spans([
             ("←".to_string(), previous_style),
             (format!(" {current} "), builder.primary_text_style()),
-            (format!("of {total} "), builder.muted_text_style()),
+            (
+                warp::t!("tui-position-of-total", total = total),
+                builder.muted_text_style(),
+            ),
             ("→".to_string(), next_style),
         ])
         .truncate()
@@ -1166,10 +1167,10 @@ impl TuiOptionSelector {
         }
         spans.push((row.label.clone(), label_style));
         let badge = match row.badge {
-            Some(OptionBadge::Default) => Some("default"),
-            Some(OptionBadge::Recent) => Some("recent"),
-            Some(OptionBadge::Connected) => Some("connected"),
-            Some(OptionBadge::Recommended) => Some("recommended"),
+            Some(OptionBadge::Default) => Some(warp::t!("tui-badge-default")),
+            Some(OptionBadge::Recent) => Some(warp::t!("tui-badge-recent")),
+            Some(OptionBadge::Connected) => Some(warp::t!("tui-badge-connected")),
+            Some(OptionBadge::Recommended) => Some(warp::t!("tui-badge-recommended")),
             None => None,
         };
         if let Some(badge) = badge {
@@ -1287,7 +1288,7 @@ impl TuiOptionSelector {
                 .any(|item| matches!(item, SelectorItem::Row(_)))
         {
             column.add_child(
-                TuiText::new("No matches")
+                TuiText::new(warp::t!("tui-no-matches"))
                     .with_style(builder.dim_text_style())
                     .truncate()
                     .finish(),
@@ -1320,7 +1321,7 @@ impl TuiOptionSelector {
                     self.render_row(row, shortcut, is_selected, builder)
                 }
                 SelectorItem::Retry => self.render_virtual_row(
-                    "↻ Retry".to_string(),
+                    warp::t!("tui-retry-with-symbol"),
                     digit,
                     is_selected,
                     None,
@@ -1329,21 +1330,24 @@ impl TuiOptionSelector {
                 ),
                 SelectorItem::CustomText => {
                     match (&self.page.snapshot.footer, self.custom_text.is_editing()) {
-                        (Some(OptionFooter::CustomText { label }), true) => self
-                            .render_editor_field(
+                        (Some(OptionFooter::CustomText { label }), true) => {
+                            let empty_error = self
+                                .custom_text
+                                .error_is_visible()
+                                .then(|| warp::t!("tui-enter-value-to-continue"));
+                            self.render_editor_field(
                                 digit.map_or_else(
                                     || "    ".to_string(),
                                     |digit| format!("({digit}) "),
                                 ),
                                 label,
                                 &self.custom_text.editor,
-                                self.custom_text
-                                    .error_is_visible()
-                                    .then_some(CUSTOM_TEXT_EMPTY_ERROR),
+                                empty_error.as_deref(),
                                 self.show_selection_markers
                                     .then_some(self.custom_text.committed_value.is_some()),
                                 builder,
-                            ),
+                            )
+                        }
                         (Some(OptionFooter::CustomText { label }), false) => {
                             let custom_text_selected = self.custom_text.committed_value.is_some();
                             self.render_virtual_row(
@@ -1387,7 +1391,7 @@ impl TuiOptionSelector {
             OptionSourceStatus::Ready => {}
             OptionSourceStatus::Loading => {
                 column.add_child(
-                    TuiText::new("Loading…")
+                    TuiText::new(warp::t!("tui-loading"))
                         .with_style(builder.dim_text_style())
                         .truncate()
                         .finish(),
@@ -1461,7 +1465,7 @@ impl TuiView for TuiOptionSelector {
         {
             content.add_child(self.render_editor_field(
                 String::new(),
-                "Search",
+                &warp::t!("tui-search"),
                 search_field,
                 None,
                 None,

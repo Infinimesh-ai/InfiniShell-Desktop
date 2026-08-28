@@ -237,7 +237,7 @@ impl RichTextEditorView {
             let title = model
                 .get_notebook(id)
                 .map(|notebook| notebook.model().title.clone())
-                .unwrap_or_else(|| "Untitled".to_string());
+                .unwrap_or_else(|| crate::t!("common-untitled"));
             let link = model
                 .get_by_uid(&ObjectTypeAndId::Notebook(*id).uid())
                 .and_then(|object| object.object_link());

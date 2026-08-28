@@ -151,9 +151,9 @@ impl SearchItem for AIQuerySearchResultItem {
         details_column.add_child(
             Container::new(
                 ui_builder
-                    .paragraph(format!(
-                        "Ran {}",
-                        format_approx_duration_from_now(self.start_time)
+                    .paragraph(crate::t!(
+                        "terminal-history-ran",
+                        time = format_approx_duration_from_now(self.start_time)
                     ))
                     .build()
                     .finish(),
@@ -178,6 +178,6 @@ impl SearchItem for AIQuerySearchResultItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("AI query: {}", self.query_text)
+        crate::t!("search-ai-query-a11y", query = self.query_text.as_str())
     }
 }

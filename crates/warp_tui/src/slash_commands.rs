@@ -56,7 +56,7 @@ fn highlighted_prefix_len_for_parsed_input(
 fn argument_hint_text_for_parsed_input(
     parsed_input: &ParsedSlashCommandInput,
     input: &str,
-) -> Option<&'static str> {
+) -> Option<String> {
     let ParsedSlashCommandInput::SlashCommand(detected) = parsed_input else {
         return None;
     };
@@ -90,7 +90,7 @@ pub(crate) struct TuiSlashCommandModel {
     lifecycle: InputDrivenInlineMenuLifecycle,
     opened_telemetry_emitted: bool,
     highlighted_prefix_len: Option<usize>,
-    argument_hint_text: Option<&'static str>,
+    argument_hint_text: Option<String>,
     conversation_selection: ConversationSelectionHandle,
 }
 
@@ -172,8 +172,8 @@ impl TuiSlashCommandModel {
     }
 
     #[cfg(test)]
-    pub(crate) fn set_argument_hint_text_for_test(&mut self, text: Option<&'static str>) {
-        self.argument_hint_text = text;
+    pub(crate) fn set_argument_hint_text_for_test(&mut self, text: Option<&str>) {
+        self.argument_hint_text = text.map(str::to_owned);
     }
 
     fn has_open_state(&self) -> bool {
@@ -189,8 +189,8 @@ impl TuiSlashCommandModel {
             .map(|len| CharOffset::zero()..CharOffset::from(len))
     }
 
-    pub(crate) fn argument_hint_text(&self) -> Option<&'static str> {
-        self.argument_hint_text
+    pub(crate) fn argument_hint_text(&self) -> Option<String> {
+        self.argument_hint_text.clone()
     }
 
     pub(crate) fn selected_action(&self) -> Option<AcceptSlashCommandOrSavedPrompt> {
@@ -210,7 +210,7 @@ impl TuiSlashCommandModel {
 
     fn set_argument_hint_text(
         &mut self,
-        argument_hint_text: Option<&'static str>,
+        argument_hint_text: Option<String>,
         ctx: &mut ModelContext<Self>,
     ) {
         if self.argument_hint_text == argument_hint_text {
@@ -280,9 +280,9 @@ impl TuiSlashCommandModel {
         };
         let status = if list.rows().is_empty() {
             Some(if list.is_loading() {
-                TuiInlineMenuStatus::Loading("Loading slash commands…".to_owned())
+                TuiInlineMenuStatus::Loading(warp::t!("tui-slash-commands-loading"))
             } else {
-                TuiInlineMenuStatus::Empty("No slash commands found".to_owned())
+                TuiInlineMenuStatus::Empty(warp::t!("tui-slash-commands-empty"))
             })
         } else {
             None
@@ -321,13 +321,14 @@ impl TuiSlashCommandModel {
         if title == slash_commands::THEME.name {
             let selected_theme = TuiThemeSettings::as_ref(ctx).selected_theme();
             return Some(match selected_theme {
-                TuiTheme::Auto => format!(
-                    "(currently auto: {})",
-                    TuiTheme::from(Appearance::as_ref(ctx).theme()).display_name()
+                TuiTheme::Auto => warp::t!(
+                    "tui-slash-theme-auto-current",
+                    theme = tui_theme_name(TuiTheme::from(Appearance::as_ref(ctx).theme()))
                 ),
-                TuiTheme::Light | TuiTheme::Dark => {
-                    format!("(currently {})", selected_theme.display_name())
-                }
+                TuiTheme::Light | TuiTheme::Dark => warp::t!(
+                    "tui-slash-current-state",
+                    state = tui_theme_name(selected_theme)
+                ),
             });
         }
         let enabled = if title == slash_commands::AUTO_APPROVE.name {
@@ -342,10 +343,12 @@ impl TuiSlashCommandModel {
         } else {
             return None;
         };
-        Some(format!(
-            "(currently {})",
-            if enabled { "on" } else { "off" }
-        ))
+        let state = if enabled {
+            warp::t!("tui-state-on")
+        } else {
+            warp::t!("tui-state-off")
+        };
+        Some(warp::t!("tui-slash-current-state", state = state))
     }
 
     fn update_from_input(&mut self, force_query: bool, ctx: &mut ModelContext<Self>) {
@@ -491,6 +494,14 @@ impl TuiSlashCommandModel {
         self.suggestions_mode.update(ctx, |mode, ctx| {
             mode.close_if_active(TuiInputSuggestionsMode::SlashCommands, ctx);
         });
+    }
+}
+
+fn tui_theme_name(theme: TuiTheme) -> String {
+    match theme {
+        TuiTheme::Auto => warp::t!("tui-theme-auto"),
+        TuiTheme::Light => warp::t!("tui-theme-light"),
+        TuiTheme::Dark => warp::t!("tui-theme-dark"),
     }
 }
 

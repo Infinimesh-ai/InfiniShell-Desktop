@@ -43,9 +43,26 @@ const CARD_BAR_HEIGHT: f32 = 8.;
 const CARD_BAR_RADIUS: f32 = CARD_BAR_HEIGHT / 2.;
 
 /// Summary backing a single team-totals card (Overall / Local / Cloud).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TeamTotalCardKind {
+    Overall,
+    Local,
+    Cloud,
+}
+
+impl TeamTotalCardKind {
+    fn label(self) -> String {
+        match self {
+            Self::Overall => crate::t!("settings-billing-overall-usage"),
+            Self::Local => crate::t!("settings-billing-local-agent-usage"),
+            Self::Cloud => crate::t!("settings-billing-cloud-agent-usage"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct TeamTotalCardSummary {
-    pub title: &'static str,
+    pub kind: TeamTotalCardKind,
     pub card_key: &'static str,
     pub segments: Vec<BarSegment>,
     pub total_credits: i64,
@@ -59,7 +76,7 @@ pub fn build_team_total_card_summaries(
 ) -> Vec<TeamTotalCardSummary> {
     let (overall_segments, overall_credits, overall_cost) = aggregate_segments(entries.iter());
     let mut summaries = vec![TeamTotalCardSummary {
-        title: "Overall usage",
+        kind: TeamTotalCardKind::Overall,
         card_key: "__card_overall__",
         segments: overall_segments,
         total_credits: overall_credits,
@@ -83,7 +100,7 @@ pub fn build_team_total_card_summaries(
                 .filter(|e| e.usage_source == AiCreditsUsageSource::Cloud),
         );
         summaries.push(TeamTotalCardSummary {
-            title: "Local agent usage",
+            kind: TeamTotalCardKind::Local,
             card_key: "__card_local__",
             segments: local_segments,
             total_credits: local_credits,
@@ -91,7 +108,7 @@ pub fn build_team_total_card_summaries(
             limit_cents: None,
         });
         summaries.push(TeamTotalCardSummary {
-            title: "Cloud agent usage",
+            kind: TeamTotalCardKind::Cloud,
             card_key: "__card_cloud__",
             segments: cloud_segments,
             total_credits: cloud_credits,
@@ -206,7 +223,7 @@ fn build_team_total_card(
     let main = blended_colors::text_main(theme, card_bg);
     let sub = blended_colors::text_sub(theme, card_bg);
 
-    let title_text = Text::new_inline(summary.title.to_string(), appearance.ui_font_family(), 13.)
+    let title_text = Text::new_inline(summary.kind.label(), appearance.ui_font_family(), 13.)
         .with_color(sub)
         .with_style(Properties::default().weight(Weight::Medium))
         .finish();
@@ -220,8 +237,12 @@ fn build_team_total_card(
     .with_style(Properties::default().weight(Weight::Semibold))
     .finish();
 
+    let credits = format_credits(summary.total_credits);
     let credits_text = Text::new_inline(
-        format!("({} credits)", format_credits(summary.total_credits)),
+        crate::t!(
+            "settings-billing-credits-parenthetical",
+            credits = credits.as_str()
+        ),
         appearance.ui_font_family(),
         13.,
     )
@@ -236,8 +257,9 @@ fn build_team_total_card(
 
     let totals_row: Box<dyn Element> = match summary.limit_cents {
         Some(limit) => {
+            let limit = format_cost_cents(limit);
             let limit_text = Text::new_inline(
-                format!("Limit: {}", format_cost_cents(limit)),
+                crate::t!("settings-billing-limit-label", limit = limit.as_str()),
                 appearance.ui_font_family(),
                 12.,
             )
@@ -353,9 +375,12 @@ pub fn render_team_totals_block(
 ) -> Box<dyn Element> {
     let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
     column.add_child(
-        Container::new(render_section_subheader("Team", appearance))
-            .with_margin_bottom(8.)
-            .finish(),
+        Container::new(render_section_subheader(
+            &crate::t!("settings-billing-team"),
+            appearance,
+        ))
+        .with_margin_bottom(8.)
+        .finish(),
     );
     column.add_child(render_team_totals_section(
         entries,

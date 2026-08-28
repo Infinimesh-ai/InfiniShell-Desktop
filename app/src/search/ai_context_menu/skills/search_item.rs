@@ -129,6 +129,6 @@ impl SearchItem for SkillSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Skill: {}", self.name)
+        crate::t!("search-skill-a11y", name = self.name.as_str())
     }
 }

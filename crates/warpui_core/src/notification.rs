@@ -109,20 +109,6 @@ pub enum NotificationSendError {
     Other { error_message: String },
 }
 
-impl NotificationSendError {
-    pub fn notifications_error_banner_title(&self) -> &str {
-        match self {
-            NotificationSendError::PermissionsDenied
-            | NotificationSendError::PermissionsNotYetGranted => {
-                "InfiniShell tried to send you a notification for the last block but does not have permission."
-            }
-            NotificationSendError::Other { .. } => {
-                "InfiniShell tried to send you a notification for the last block, but something went wrong."
-            }
-        }
-    }
-}
-
 #[derive(Clone, Debug, Serialize)]
 pub enum RequestPermissionsOutcome {
     /// User accepted the request for permissions.

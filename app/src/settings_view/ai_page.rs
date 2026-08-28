@@ -527,7 +527,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
         vec![
             ToggleSettingActionPair::new(
-                "Rules",
+                &crate::t!("settings-ai-rules-label"),
                 builder(SettingsAction::AI(AISettingsPageAction::ToggleRules)),
                 &(context.clone() & id!(flags::IS_ANY_AI_ENABLED)),
                 flags::AI_RULES_FLAG,
@@ -535,7 +535,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             .with_group(bindings::BindingGroup::WarpAi)
             .with_enabled(|| FeatureFlag::AIRules.is_enabled()),
             ToggleSettingActionPair::new(
-                "Suggested Rules",
+                &crate::t!("settings-ai-suggested-rules-label"),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleRuleSuggestions,
                 )),
@@ -547,7 +547,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 FeatureFlag::AIRules.is_enabled() && FeatureFlag::SuggestedRules.is_enabled()
             }),
             ToggleSettingActionPair::new(
-                "Warp Drive as agent context",
+                &crate::t!("settings-ai-drive-context-label"),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleWarpDriveContext,
                 )),
@@ -557,7 +557,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             .with_group(bindings::BindingGroup::WarpAi)
             .with_enabled(|| FeatureFlag::AIRules.is_enabled()),
             ToggleSettingActionPair::new(
-                "Auto-spawn servers from third-party agents",
+                &crate::t!("settings-ai-file-based-mcp-toggle"),
                 builder(SettingsAction::AI(AISettingsPageAction::ToggleFileBasedMcp)),
                 &(context.clone() & id!(flags::IS_ANY_AI_ENABLED)),
                 flags::FILE_BASED_MCP_FLAG,
@@ -1743,7 +1743,7 @@ impl AISettingsPageView {
         let router_views = Self::create_router_views(ctx);
         #[cfg(feature = "local_fs")]
         let add_router_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("+ Add router", SecondaryTheme)
+            ActionButton::new(crate::t!("settings-ai-add-router"), SecondaryTheme)
                 .with_size(ButtonSize::Small)
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(AISettingsPageAction::OpenAddCustomRouter);
@@ -1776,11 +1776,14 @@ impl AISettingsPageView {
             && UserWorkspaces::as_ref(ctx).is_custom_inference_enabled(ctx)
             && UserWorkspaces::as_ref(ctx).are_member_byo_endpoints_allowed();
         let custom_inference_add_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("+ Add custom model", SecondaryTheme)
-                .with_size(ButtonSize::Small)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(AISettingsPageAction::OpenAddCustomEndpointModal);
-                })
+            ActionButton::new(
+                crate::t!("settings-agent-providers-add-custom-endpoint"),
+                SecondaryTheme,
+            )
+            .with_size(ButtonSize::Small)
+            .on_click(|ctx| {
+                ctx.dispatch_typed_action(AISettingsPageAction::OpenAddCustomEndpointModal);
+            })
         });
         custom_inference_add_button.update(ctx, |button, ctx| {
             button.set_disabled(!custom_inference_controls_enabled, ctx);
@@ -1794,7 +1797,9 @@ impl AISettingsPageView {
 
         let custom_endpoint_modal_view = ctx.add_typed_action_view(|ctx| {
             Modal::new(
-                Some("Add custom endpoint".to_string()),
+                Some(crate::t!(
+                    "settings-agent-providers-add-custom-endpoint-title"
+                )),
                 custom_endpoint_modal_body.clone(),
                 ctx,
             )
@@ -1840,7 +1845,7 @@ impl AISettingsPageView {
         });
         let set_default_model_modal_view = ctx.add_typed_action_view(|ctx| {
             Modal::new(
-                Some("Change your default model?".to_string()),
+                Some(crate::t!("settings-agent-providers-change-default-title")),
                 set_default_model_modal_body.clone(),
                 ctx,
             )
@@ -2084,9 +2089,9 @@ impl AISettingsPageView {
 
                 let window_id = ctx.window_id();
                 crate::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = crate::view_components::DismissibleToast::success(
-                        "Default model updated".to_string(),
-                    );
+                    let toast = crate::view_components::DismissibleToast::success(crate::t!(
+                        "settings-agent-providers-default-model-updated"
+                    ));
                     toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                 });
                 ctx.notify();
@@ -2214,10 +2219,10 @@ impl AISettingsPageView {
         }
         let provider_name = provider.display_name();
         let current_default = Self::active_base_model_display_name(ctx);
-        let description = format!(
-            "You added your own {provider_name} API key, but your default model is currently set \
-             to {current_default}, which won't work without Warp credits. Would you like to change \
-             your default model?"
+        let description = crate::t!(
+            "settings-agent-providers-change-default-provider-description",
+            provider = provider_name,
+            model = current_default.as_str()
         );
         self.show_set_default_model_modal(description, choices, ctx);
     }
@@ -2260,11 +2265,10 @@ impl AISettingsPageView {
             return;
         }
         let current_default = Self::active_base_model_display_name(ctx);
-        let description = format!(
-            "You added the \"{}\" custom endpoint, but your default model is currently set to \
-             {current_default}, which won't work without Warp credits. Would you like to change \
-             your default model?",
-            endpoint.name
+        let description = crate::t!(
+            "settings-agent-providers-change-default-endpoint-description",
+            endpoint = endpoint.name.as_str(),
+            model = current_default.as_str()
         );
         self.show_set_default_model_modal(description, choices, ctx);
     }
@@ -2297,7 +2301,7 @@ impl AISettingsPageView {
         (0..count)
             .map(|index| {
                 let button = ctx.add_typed_action_view(move |_| {
-                    ActionButton::new("Edit", SecondaryTheme)
+                    ActionButton::new(crate::t!("common-edit"), SecondaryTheme)
                         .with_icon(Icon::Pencil)
                         .with_size(ButtonSize::Small)
                         .on_click(move |ctx| {
@@ -2329,8 +2333,12 @@ impl AISettingsPageView {
             });
         self.pending_remove_custom_endpoint_index = None;
 
-        self.custom_endpoint_modal_state
-            .set_title(Some("Add custom endpoint".to_string()), ctx);
+        self.custom_endpoint_modal_state.set_title(
+            Some(crate::t!(
+                "settings-agent-providers-add-custom-endpoint-title"
+            )),
+            ctx,
+        );
         self.custom_endpoint_modal_state.prefill(None, None, ctx);
         self.custom_endpoint_modal_state.open(ctx);
         ctx.emit(AISettingsPageEvent::ShowModal);
@@ -2356,8 +2364,12 @@ impl AISettingsPageView {
             });
         self.pending_remove_custom_endpoint_index = None;
 
-        self.custom_endpoint_modal_state
-            .set_title(Some("Edit custom endpoint".to_string()), ctx);
+        self.custom_endpoint_modal_state.set_title(
+            Some(crate::t!(
+                "settings-agent-providers-edit-custom-endpoint-title"
+            )),
+            ctx,
+        );
         self.custom_endpoint_modal_state
             .prefill(endpoint.as_ref(), Some(index), ctx);
         self.custom_endpoint_modal_state.open(ctx);
@@ -2419,9 +2431,9 @@ impl AISettingsPageView {
 
                 let window_id = ctx.window_id();
                 crate::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = crate::view_components::DismissibleToast::success(
-                        "Endpoint added".to_string(),
-                    );
+                    let toast = crate::view_components::DismissibleToast::success(crate::t!(
+                        "settings-agent-providers-endpoint-added"
+                    ));
                     toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                 });
 
@@ -2463,9 +2475,9 @@ impl AISettingsPageView {
 
                 let window_id = ctx.window_id();
                 crate::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = crate::view_components::DismissibleToast::success(
-                        "Endpoint saved".to_string(),
-                    );
+                    let toast = crate::view_components::DismissibleToast::success(crate::t!(
+                        "settings-agent-providers-endpoint-saved"
+                    ));
                     toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                 });
                 self.maybe_prompt_set_default_model_for_custom_endpoint(*index, ctx);
@@ -2550,9 +2562,9 @@ impl AISettingsPageView {
 
                 let window_id = ctx.window_id();
                 crate::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = crate::view_components::DismissibleToast::success(
-                        "Endpoint removed".to_string(),
-                    );
+                    let toast = crate::view_components::DismissibleToast::success(crate::t!(
+                        "settings-agent-providers-endpoint-removed"
+                    ));
                     toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                 });
                 ctx.notify();
@@ -2574,7 +2586,7 @@ impl AISettingsPageView {
                 ..Default::default()
             };
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text("Paste sign-in code", ctx);
+            editor.set_placeholder_text(crate::t!("settings-ai-grok-code-placeholder"), ctx);
             editor
         })
     }
@@ -2624,8 +2636,11 @@ impl AISettingsPageView {
                 );
                 let window_id = ctx.window_id();
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast =
-                        DismissibleToast::error(format!("Couldn't start Grok login: {err}"));
+                    let error = err.to_string();
+                    let toast = DismissibleToast::error(crate::t!(
+                        "settings-ai-grok-start-failed",
+                        error = error.as_str()
+                    ));
                     toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                 });
                 return;
@@ -2650,14 +2665,12 @@ impl AISettingsPageView {
             // forever: the completion toast below replaces it (shared object
             // id), and the OAuth attempt itself times out when the callback
             // never arrives.
-            let toast = DismissibleToast::default(
-                "Opening your browser to connect your SuperGrok subscription…".to_string(),
-            )
-            .with_object_id(CONNECT_TOAST_OBJECT_ID.to_string())
-            .with_link(
-                ToastLink::new("Copy URL".to_string())
-                    .with_onclick_action(WorkspaceAction::CopyTextToClipboard(authorize_url)),
-            );
+            let toast = DismissibleToast::default(crate::t!("settings-ai-grok-opening-browser"))
+                .with_object_id(CONNECT_TOAST_OBJECT_ID.to_string())
+                .with_link(
+                    ToastLink::new(crate::t!("settings-ai-grok-copy-url"))
+                        .with_onclick_action(WorkspaceAction::CopyTextToClipboard(authorize_url)),
+                );
             toast_stack.add_persistent_toast(toast, window_id, ctx);
         });
 
@@ -2683,7 +2696,7 @@ impl AISettingsPageView {
                     ApiKeyManager::handle(ctx).update(ctx, move |manager, ctx| {
                         manager.store_grok_tokens(tokens, ctx);
                     });
-                    DismissibleToast::success("SuperGrok subscription connected".to_string())
+                    DismissibleToast::success(crate::t!("settings-ai-grok-connected"))
                 }
                 Err(err) => {
                     me.grok_oauth_attempt = None;
@@ -2700,7 +2713,11 @@ impl AISettingsPageView {
                         },
                         ctx
                     );
-                    DismissibleToast::error(format!("Couldn't connect SuperGrok: {err}"))
+                    let error = err.to_string();
+                    DismissibleToast::error(crate::t!(
+                        "settings-ai-grok-connect-failed",
+                        error = error.as_str()
+                    ))
                 }
             };
             ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
@@ -2752,7 +2769,7 @@ impl AISettingsPageView {
                         ApiKeyManager::handle(ctx).update(ctx, move |manager, ctx| {
                             manager.store_grok_tokens(tokens, ctx);
                         });
-                        DismissibleToast::success("SuperGrok subscription connected".to_string())
+                        DismissibleToast::success(crate::t!("settings-ai-grok-connected"))
                     }
                     Err(err) => {
                         // Keep the row open so the user can correct the code.
@@ -2766,7 +2783,11 @@ impl AISettingsPageView {
                             },
                             ctx
                         );
-                        DismissibleToast::error(format!("Couldn't connect SuperGrok: {err}"))
+                        let error = err.to_string();
+                        DismissibleToast::error(crate::t!(
+                            "settings-ai-grok-connect-failed",
+                            error = error.as_str()
+                        ))
                     }
                 };
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
@@ -2927,8 +2948,10 @@ impl AISettingsPageView {
         // Single-topic subpages follow the Account-page convention and render their title as
         // page chrome, so filtering their setting widgets never removes the title.
         let title = match subpage {
-            Some(AISubpage::Knowledge) => Some("Knowledge"),
-            Some(AISubpage::ThirdPartyCLIAgents) => Some("Third party CLI agents"),
+            Some(AISubpage::Knowledge) => Some(crate::t_static!("settings-ai-knowledge-section")),
+            Some(AISubpage::ThirdPartyCLIAgents) => {
+                Some(crate::t_static!("settings-ai-third-party-cli-section"))
+            }
             // Zap:BYOP 提供商子页由 `AgentProvidersWidget` 自己渲染 sub-header 标题,
             // 与 Warp Agent / Profiles 一样不需要页面级标题。
             None
@@ -5817,7 +5840,14 @@ impl SettingsWidget for UsageWidget {
     ) -> Box<dyn Element> {
         let ai_request_usage_model = AIRequestUsageModel::as_ref(app);
         let next_refresh_time = ai_request_usage_model.next_refresh_time();
-        let formatted_next_refresh_time = next_refresh_time.format("%b %d").to_string();
+        let uses_chinese_date_format = crate::i18n::current_languages()
+            .first()
+            .is_some_and(|language| language.to_string().starts_with("zh"));
+        let formatted_next_refresh_time = if uses_chinese_date_format {
+            next_refresh_time.format("%Y-%m-%d").to_string()
+        } else {
+            next_refresh_time.format("%b %d").to_string()
+        };
         let workspace_is_delinquent_due_to_payment_issue = UserWorkspaces::as_ref(app)
             .team_for_view_handle(&self.view_handle, app)
             .map(|team| team.billing_metadata.is_delinquent_due_to_payment_issue())
@@ -5839,7 +5869,10 @@ impl SettingsWidget for UsageWidget {
                 .with_child(
                     appearance
                         .ui_builder()
-                        .paragraph(format!("Resets {formatted_next_refresh_time}"))
+                        .paragraph(crate::t!(
+                            "settings-ai-usage-resets",
+                            date = formatted_next_refresh_time.as_str()
+                        ))
                         .with_style(UiComponentStyles {
                             font_color: Some(blended_colors::text_sub(
                                 appearance.theme(),
@@ -6342,7 +6375,7 @@ impl AgentsWidget {
         let max = cw.max;
 
         let label = Container::new(render_body_item_label::<AISettingsPageAction>(
-            "Context window (tokens)".to_string(),
+            crate::t!("settings-ai-context-window-label"),
             None,
             None,
             LocalOnlyIconState::Hidden,
@@ -6886,15 +6919,13 @@ impl AgentsWidget {
 
         let subtext = {
             let subtext_fragments = vec![
-                FormattedTextFragment::plain_text(
-                    "You haven't added any MCP servers yet. Once you do, you'll be able to control how much autonomy the InfiniShell Agent has when interacting with them. ",
-                ),
+                FormattedTextFragment::plain_text(crate::t!("settings-ai-mcp-empty-description")),
                 FormattedTextFragment::hyperlink_action(
                     crate::t!("settings-ai-add-server"),
                     AISettingsPageAction::OpenMCPServerCollection,
                 ),
-                FormattedTextFragment::plain_text(" or "),
-                FormattedTextFragment::hyperlink("learn more about MCPs.", ""),
+                FormattedTextFragment::plain_text(crate::t!("settings-ai-mcp-empty-or")),
+                FormattedTextFragment::hyperlink(crate::t!("settings-ai-mcp-empty-learn-more"), ""),
             ];
 
             Container::new(
@@ -7285,9 +7316,11 @@ impl AIInputWidget {
             static AUTODETECTION_DESCRIPTION_FRAGMENTS: LazyLock<Vec<FormattedTextFragment>> =
                 LazyLock::new(|| {
                     vec![
-                        FormattedTextFragment::plain_text("Encountered an incorrect detection? "),
+                        FormattedTextFragment::plain_text(crate::t!(
+                            "settings-ai-incorrect-detection"
+                        )),
                         FormattedTextFragment::hyperlink(
-                            "Let us know",
+                            crate::t!("settings-ai-report-detection"),
                             "https://warpdotdev.typeform.com/to/offrTIpq",
                         ),
                     ]
@@ -7342,14 +7375,14 @@ impl AIInputWidget {
                 Vec<FormattedTextFragment>,
             > = LazyLock::new(|| {
                 vec![
-                    FormattedTextFragment::plain_text(
-                        "Enabling natural language detection will detect when natural language is written in the terminal input, and then automatically switch to Agent Mode for AI queries.",
-                    ),
-                    FormattedTextFragment::plain_text(
-                        " Encountered an incorrect input detection? ",
-                    ),
+                    FormattedTextFragment::plain_text(crate::t!(
+                        "settings-ai-natural-language-detection-description"
+                    )),
+                    FormattedTextFragment::plain_text(crate::t!(
+                        "settings-ai-incorrect-input-detection"
+                    )),
                     FormattedTextFragment::hyperlink(
-                        "Let us know",
+                        crate::t!("settings-ai-report-detection"),
                         "https://warpdotdev.typeform.com/to/offrTIpq",
                     ),
                 ]
@@ -7456,10 +7489,7 @@ impl SettingsWidget for MCPServersWidget {
         .finish();
 
         let mcp_description = vec![
-            FormattedTextFragment::plain_text(
-                "Add MCP servers to extend the InfiniShell Agent's capabilities. \
-            MCP servers expose data sources or tools to agents through a standardized interface, essentially acting like plugins. ",
-            ),
+            FormattedTextFragment::plain_text(crate::t!("settings-ai-mcp-description")),
             FormattedTextFragment::hyperlink(crate::t!("common-learn-more"), ""),
         ];
 
@@ -7503,11 +7533,11 @@ impl SettingsWidget for MCPServersWidget {
                             Vec<FormattedTextFragment>,
                         > = LazyLock::new(|| {
                             vec![
-                                FormattedTextFragment::plain_text(
-                                    "Automatically detect and spawn MCP servers from globally-scoped third-party AI agent configuration files (e.g. in your home directory). Servers detected inside a repository are never spawned automatically and must be enabled individually from the MCP settings page. ",
-                                ),
+                                FormattedTextFragment::plain_text(crate::t!(
+                                    "settings-ai-file-based-mcp-description"
+                                )),
                                 FormattedTextFragment::hyperlink(
-                                    "See supported providers.",
+                                    crate::t!("settings-ai-file-based-mcp-supported-providers"),
                                     "",
                                 ),
                             ]
@@ -7523,10 +7553,14 @@ impl SettingsWidget for MCPServersWidget {
                                 styles::description_font_color(is_any_ai_enabled, app).into(),
                                 self.file_based_mcp_docs_link_index.clone(),
                             )
-                            .with_heading_to_font_size_multipliers(appearance.heading_font_size_multipliers().clone())
+                            .with_heading_to_font_size_multipliers(
+                                appearance.heading_font_size_multipliers().clone(),
+                            )
                             .with_hyperlink_font_color(appearance.theme().accent().into_solid())
                             .register_default_click_handlers(|url, ctx, _| {
-                                ctx.dispatch_typed_action(AISettingsPageAction::HyperlinkClick(url));
+                                ctx.dispatch_typed_action(AISettingsPageAction::HyperlinkClick(
+                                    url,
+                                ));
                             })
                             .finish(),
                         )
@@ -7736,7 +7770,7 @@ impl SettingsWidget for WarpDriveContextWidget {
     ) -> Box<dyn Element> {
         let ai_settings = AISettings::as_ref(app);
         let toggle = render_ai_setting_toggle::<WarpDriveContextEnabled>(
-            "Warp Drive as agent context",
+            &crate::t!("settings-ai-drive-context-label"),
             AISettingsPageAction::ToggleWarpDriveContext,
             *ai_settings.warp_drive_context_enabled,
             ai_settings.is_any_ai_enabled(app),
@@ -7746,7 +7780,7 @@ impl SettingsWidget for WarpDriveContextWidget {
         );
 
         let description = render_ai_setting_description(
-            "The Warp Agent can leverage your Warp Drive Contents to tailor responses to your personal and team developer workflows and environments. This includes any Workflows, Notebooks, and Environment Variables.",
+            crate::t!("settings-ai-drive-context-description"),
             ai_settings.is_any_ai_enabled(app),
             app,
         );
@@ -7784,11 +7818,9 @@ impl VoiceWidget {
         ));
 
         let voice_input_description_text_fragments = vec![
-            FormattedTextFragment::plain_text(
-                "Voice input allows you to control InfiniShell by speaking directly to your terminal (powered by ",
-            ),
+            FormattedTextFragment::plain_text(crate::t!("settings-ai-voice-description-prefix")),
             FormattedTextFragment::hyperlink("Wispr Flow", WISPR_FLOW_URL),
-            FormattedTextFragment::plain_text(")."),
+            FormattedTextFragment::plain_text(crate::t!("settings-ai-voice-description-suffix")),
         ];
 
         let voice_input_description = FormattedTextElement::new(
@@ -7832,8 +7864,8 @@ impl VoiceWidget {
             ));
             column.add_child(render_filterable_dropdown_item(
                 appearance,
-                "Speech Language",
-                Some("Language used when transcribing voice input."),
+                &crate::t!("settings-ai-speech-language"),
+                Some(&crate::t!("settings-ai-speech-language-description")),
                 None,
                 LocalOnlyIconState::for_setting(
                     VoiceInputLanguage::storage_key(),
@@ -8067,8 +8099,10 @@ impl SettingsWidget for OtherAIWidget {
 
         column.add_child(render_dropdown_item(
             appearance,
-            "Orchestration message display",
-            Some("Controls whether orchestration messages stay expanded."),
+            &crate::t!("settings-ai-orchestration-message-display"),
+            Some(&crate::t!(
+                "settings-ai-orchestration-message-display-description"
+            )),
             None,
             LocalOnlyIconState::for_setting(
                 OrchestrationMessageDisplayMode::storage_key(),
@@ -8177,15 +8211,21 @@ impl SettingsWidget for CLIAgentWidget {
         );
 
         let description_fragments = vec![
-            FormattedTextFragment::plain_text(
-                "Show a toolbar with quick actions when running coding agents like ",
-            ),
+            FormattedTextFragment::plain_text(crate::t!(
+                "settings-ai-cli-toolbar-description-prefix"
+            )),
             FormattedTextFragment::inline_code("claude"),
-            FormattedTextFragment::plain_text(", "),
+            FormattedTextFragment::plain_text(crate::t!(
+                "settings-ai-cli-toolbar-description-separator"
+            )),
             FormattedTextFragment::inline_code("codex"),
-            FormattedTextFragment::plain_text(", or "),
+            FormattedTextFragment::plain_text(crate::t!(
+                "settings-ai-cli-toolbar-description-last-separator"
+            )),
             FormattedTextFragment::inline_code("gemini"),
-            FormattedTextFragment::plain_text("."),
+            FormattedTextFragment::plain_text(crate::t!(
+                "settings-ai-cli-toolbar-description-suffix"
+            )),
         ];
 
         let description = FormattedTextElement::new(
@@ -8258,15 +8298,13 @@ impl SettingsWidget for CLIAgentAutoToggleRichInputWidget {
         }
 
         let label = render_body_item_label::<AISettingsPageAction>(
-            "Auto show/hide Rich Input based on agent status".into(),
+            crate::t!("settings-ai-auto-show-rich-input"),
             Some(styles::header_font_color(true, app)),
             Some(AdditionalInfo {
                 mouse_state: self.info_tooltip.clone(),
                 on_click_action: None,
                 secondary_text: None,
-                tooltip_override_text: Some(
-                    "Requires the Warp plugin for your coding agent".to_owned(),
-                ),
+                tooltip_override_text: Some(crate::t!("settings-ai-auto-show-rich-input-tooltip")),
             }),
             LocalOnlyIconState::for_setting(
                 AutoToggleRichInput::storage_key(),
@@ -8523,7 +8561,7 @@ impl SettingsWidget for CLIAgentCommandsWidget {
 
         let description = appearance
             .ui_builder()
-            .paragraph("Add regex patterns to show the coding agent toolbar for matching commands.")
+            .paragraph(crate::t!("settings-ai-toolbar-commands-description"))
             .with_style(UiComponentStyles {
                 font_size: Some(appearance.ui_font_size()),
                 font_color: Some(styles::description_font_color(true, app).into()),
@@ -9257,7 +9295,7 @@ impl GeminiEnterpriseWidget {
 
     fn new(ctx: &mut ViewContext<<Self as SettingsWidget>::View>) -> Self {
         let refresh_credentials_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Refresh", SecondaryTheme)
+            ActionButton::new(crate::t!("common-refresh"), SecondaryTheme)
                 .with_icon(Icon::RefreshCw04)
                 .with_size(ButtonSize::Small)
                 .on_click(|ctx| {

@@ -18,13 +18,6 @@ use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const ANONYMOUS_USER_REQUEST_LIMIT_SOFT_GATE_PERCENTAGE: f32 = 0.5;
 
-const NO_CONNECTION_PRIMARY_TEXT: &str = "No internet connection";
-const ANONYMOUS_USER_REQUEST_LIMIT_SOFT_GATE_PRIMARY_TEXT: &str = "";
-const ANONYMOUS_USER_REQUEST_LIMIT_HARD_GATE_PRIMARY_TEXT: &str = "At Limit -";
-const OUT_OF_REQUESTS_PRIMARY_TEXT: &str = "Out of credits";
-
-const ANONYMOUS_USER_REQUEST_LIMIT_ACTION_TEXT: &str = "Configure local AI provider";
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptAlertAction {}
 
@@ -143,24 +136,20 @@ impl PromptAlertView {
         text_fragments.push(FormattedTextFragment::plain_text("  "));
         match state {
             PromptAlertState::NoConnection => {
-                text_fragments.push(FormattedTextFragment::plain_text(
-                    NO_CONNECTION_PRIMARY_TEXT,
-                ));
+                text_fragments.push(FormattedTextFragment::plain_text(crate::t!(
+                    "ai-prompt-alert-no-connection"
+                )));
             }
-            PromptAlertState::AnonymousUserRequestLimitSoftGate => {
-                text_fragments.push(FormattedTextFragment::plain_text(
-                    ANONYMOUS_USER_REQUEST_LIMIT_SOFT_GATE_PRIMARY_TEXT,
-                ));
-            }
+            PromptAlertState::AnonymousUserRequestLimitSoftGate => {}
             PromptAlertState::AnonymousUserRequestLimitHardGate => {
-                text_fragments.push(FormattedTextFragment::plain_text(
-                    ANONYMOUS_USER_REQUEST_LIMIT_HARD_GATE_PRIMARY_TEXT,
-                ));
+                text_fragments.push(FormattedTextFragment::plain_text(crate::t!(
+                    "ai-prompt-alert-at-limit"
+                )));
             }
             PromptAlertState::RequestLimitReached => {
-                text_fragments.push(FormattedTextFragment::plain_text(
-                    OUT_OF_REQUESTS_PRIMARY_TEXT,
-                ));
+                text_fragments.push(FormattedTextFragment::plain_text(crate::t!(
+                    "common-out-of-credits"
+                )));
             }
             PromptAlertState::NoAlert => {}
         }
@@ -178,7 +167,7 @@ impl PromptAlertView {
             | PromptAlertState::AnonymousUserRequestLimitHardGate => {
                 text_fragments.push(FormattedTextFragment::plain_text("  "));
                 text_fragments.push(FormattedTextFragment::hyperlink_action(
-                    ANONYMOUS_USER_REQUEST_LIMIT_ACTION_TEXT,
+                    crate::t!("ai-prompt-alert-configure-local-provider"),
                     WorkspaceAction::ShowSettingsPageWithSearch {
                         search_query: "api".to_string(),
                         section: Some(SettingsSection::WarpAgent),
@@ -189,7 +178,7 @@ impl PromptAlertView {
                 text_fragments.push(FormattedTextFragment::plain_text("  "));
                 if UserWorkspaces::as_ref(app).is_byo_api_key_enabled(app) {
                     text_fragments.push(FormattedTextFragment::hyperlink_action(
-                        "use your own API keys",
+                        crate::t!("ai-prompt-alert-use-own-api-keys"),
                         WorkspaceAction::ShowSettingsPageWithSearch {
                             search_query: "api".to_string(),
                             section: Some(SettingsSection::WarpAgent),

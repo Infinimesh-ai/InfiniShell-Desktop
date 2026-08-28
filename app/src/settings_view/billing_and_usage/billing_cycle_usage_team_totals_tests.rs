@@ -1,4 +1,4 @@
-use super::{TeamTotalCardSummary, build_team_total_card_summaries};
+use super::{TeamTotalCardKind, TeamTotalCardSummary, build_team_total_card_summaries};
 use crate::workspaces::workspace::{
     AiCreditsUsageAndCostSubjectType, AiCreditsUsageAndCostType, AiCreditsUsageBucket,
     AiCreditsUsageSource, BillingCycleUsageEntry, UsageVisibility, UsageVisibilityGranularity,
@@ -36,8 +36,8 @@ fn entries_two_per_source() -> Vec<BillingCycleUsageEntry> {
     ]
 }
 
-fn titles(summaries: &[TeamTotalCardSummary]) -> Vec<&'static str> {
-    summaries.iter().map(|s| s.title).collect()
+fn kinds(summaries: &[TeamTotalCardSummary]) -> Vec<TeamTotalCardKind> {
+    summaries.iter().map(|s| s.kind).collect()
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn team_aggregate_visibility_yields_overall_card_only() {
         &entries_two_per_source(),
         &visibility(UsageVisibilityGranularity::TeamAggregate),
     );
-    assert_eq!(titles(&summaries), vec!["Overall usage"]);
+    assert_eq!(kinds(&summaries), vec![TeamTotalCardKind::Overall]);
 }
 
 #[test]
@@ -60,7 +60,7 @@ fn own_only_visibility_yields_overall_card_only() {
         &entries_two_per_source(),
         &visibility(UsageVisibilityGranularity::OwnOnly),
     );
-    assert_eq!(titles(&summaries), vec!["Overall usage"]);
+    assert_eq!(kinds(&summaries), vec![TeamTotalCardKind::Overall]);
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn per_user_totals_visibility_yields_overall_card_only() {
         &entries_two_per_source(),
         &visibility(UsageVisibilityGranularity::PerUserTotals),
     );
-    assert_eq!(titles(&summaries), vec!["Overall usage"]);
+    assert_eq!(kinds(&summaries), vec![TeamTotalCardKind::Overall]);
 }
 
 #[test]
@@ -80,8 +80,12 @@ fn full_breakdown_visibility_returns_three_cards_with_partitioned_sums() {
     );
 
     assert_eq!(
-        titles(&summaries),
-        vec!["Overall usage", "Local agent usage", "Cloud agent usage"]
+        kinds(&summaries),
+        vec![
+            TeamTotalCardKind::Overall,
+            TeamTotalCardKind::Local,
+            TeamTotalCardKind::Cloud,
+        ]
     );
 
     // Overall = Local + Cloud; Local card = only Local entries; Cloud card =

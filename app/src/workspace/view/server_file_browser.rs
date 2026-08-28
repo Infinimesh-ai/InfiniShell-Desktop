@@ -5056,7 +5056,7 @@ mod tests {
     fn clear_context_menu_state_removes_items_and_selection() {
         let mut position = Some(vec2f(10.0, 20.0));
         let mut menu_items = vec![
-            MenuItemFields::new("Refresh")
+            MenuItemFields::new(crate::t!("common-refresh"))
                 .with_on_select_action(ServerFileBrowserAction::Refresh)
                 .into_item(),
         ];

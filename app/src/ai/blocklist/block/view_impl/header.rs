@@ -84,9 +84,8 @@ pub(super) fn render(props: Props, app: &AppContext) -> Option<Box<dyn Element>>
             props.has_attached_context_selected_text,
             props.num_attached_context_blocks,
         ) {
-            (true, _) => "selected text".to_owned(),
-            (false, 1) => "1 block".to_owned(),
-            (false, n) => format!("{n} blocks"),
+            (true, _) => crate::t!("ai-context-selected-text"),
+            (false, count) => crate::t!("ai-context-block-count", count = count),
         };
 
         left_row.add_child(render_attached_context_chip(

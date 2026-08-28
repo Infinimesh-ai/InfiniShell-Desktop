@@ -27,10 +27,7 @@ use super::view::{EditorViewEvent, RichTextEditorView};
 use crate::appearance::Appearance;
 use crate::editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions, TextOptions};
 use crate::ui_components::icons::Icon;
-use crate::view_components::find::{
-    CASE_SENSITIVE_LABEL, CASE_SENSITIVE_TOOLTIP, FIND_BAR_WIDTH, REGEX_TOGGLE_LABEL,
-    REGEX_TOGGLE_TOOLTIP,
-};
+use crate::view_components::find::{CASE_SENSITIVE_LABEL, FIND_BAR_WIDTH, REGEX_TOGGLE_LABEL};
 
 /// View for the find bar within a notebook.
 pub struct FindBar {
@@ -411,7 +408,7 @@ impl View for FindBar {
                 ),
                 self.render_toggle_button(
                     REGEX_TOGGLE_LABEL,
-                    REGEX_TOGGLE_TOOLTIP,
+                    &crate::t!("find-regex-tooltip"),
                     FindBarAction::ToggleRegex,
                     searcher.is_regex(),
                     self.button_handles.regex_toggle.clone(),
@@ -420,7 +417,7 @@ impl View for FindBar {
                 ),
                 self.render_toggle_button(
                     CASE_SENSITIVE_LABEL,
-                    CASE_SENSITIVE_TOOLTIP,
+                    &crate::t!("find-case-sensitive-tooltip"),
                     FindBarAction::ToggleCaseSensitive,
                     searcher.is_case_sensitive(),
                     self.button_handles.case_sensitive_toggle.clone(),
@@ -535,21 +532,23 @@ impl TypedActionView for FindBar {
         let text = match action {
             FindBarAction::ToggleRegex => {
                 if self.searcher.as_ref(ctx).is_regex() {
-                    "Enable regex search"
+                    crate::t!("notebook-a11y-enable-regex-search")
                 } else {
-                    "Disable regex search"
+                    crate::t!("notebook-a11y-disable-regex-search")
                 }
             }
             FindBarAction::ToggleCaseSensitive => {
                 if self.searcher.as_ref(ctx).is_case_sensitive() {
-                    "Enable case-sensitive search"
+                    crate::t!("notebook-a11y-enable-case-sensitive-search")
                 } else {
-                    "Disable case-sensitive search"
+                    crate::t!("notebook-a11y-disable-case-sensitive-search")
                 }
             }
-            FindBarAction::FocusNextMatch => "Focus next match",
-            FindBarAction::FocusPreviousMatch => "Focus previous match",
-            FindBarAction::Close => "Close find bar",
+            FindBarAction::FocusNextMatch => crate::t!("notebook-a11y-focus-next-match"),
+            FindBarAction::FocusPreviousMatch => {
+                crate::t!("notebook-a11y-focus-previous-match")
+            }
+            FindBarAction::Close => crate::t!("notebook-a11y-close-find-bar"),
         };
         Some(AccessibilityContent::new_without_help(
             text,

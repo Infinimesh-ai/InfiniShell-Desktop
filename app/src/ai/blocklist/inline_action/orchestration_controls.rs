@@ -31,17 +31,17 @@ use crate::ai::blocklist::inline_action::host_picker::HostPicker;
 use crate::ai::execution_profiles::model_menu_items::available_model_menu_items;
 use crate::ai::harness_availability::HarnessAvailabilityModel;
 use crate::ai::harness_display;
-use crate::ai::orchestration::{
-    AUTH_SECRET_INHERIT_LABEL, OptionBadge, OptionFooter, OptionRow, OptionSnapshot,
-    OptionSourceStatus, api_key_snapshot, build_runner_snapshot, environment_snapshot,
-    harness_snapshot, host_snapshot, model_snapshot, persist_auth_secret_selection,
-};
 pub use crate::ai::orchestration::{
     AuthSecretSelection, ORCHESTRATION_WARP_WORKER_HOST, OrchestrationConfigState,
     OrchestrationEditState, accept_disabled_reason_with_auth, empty_env_recommendation_message,
     persist_environment_selection, persist_host_selection,
     resolve_auth_secret_selection_for_harness, resolve_default_environment_id,
     resolve_default_host_slug, should_show_auth_secret_picker,
+};
+use crate::ai::orchestration::{
+    OptionBadge, OptionFooter, OptionRow, OptionSnapshot, OptionSourceStatus, api_key_snapshot,
+    build_runner_snapshot, environment_snapshot, harness_snapshot, host_snapshot, model_snapshot,
+    persist_auth_secret_selection,
 };
 use crate::appearance::Appearance;
 use crate::menu::{MenuItem, MenuItemFields};
@@ -63,10 +63,6 @@ pub const ORCHESTRATION_PICKER_MAX_WIDTH: f32 = 205.;
 
 const ORCHESTRATION_SEGMENTED_CONTROL_PADDING: f32 = 4.;
 const ORCHESTRATION_SEGMENT_VERTICAL_PADDING: f32 = 4.;
-
-/// Label for the auth secret column.
-pub const AUTH_SECRET_COLUMN_LABEL: &str = "API key";
-const AUTH_SECRET_CREATE_NEW_LABEL: &str = "New API key…";
 
 /// Returns whether the client should expose the remote runner controls.
 ///
@@ -533,9 +529,13 @@ fn render_new_environment_footer<A: OrchestrationControlAction>(
                         .finish(),
                 )
                 .with_child(
-                    Text::new_inline("New environment", font_family, font_size)
-                        .with_color(text_color.into())
-                        .finish(),
+                    Text::new_inline(
+                        crate::t!("ai-orchestration-new-environment"),
+                        font_family,
+                        font_size,
+                    )
+                    .with_color(text_color.into())
+                    .finish(),
                 )
                 .finish(),
         )
@@ -599,12 +599,12 @@ pub fn populate_host_picker<V: View>(
 fn auth_secret_trigger_label(selection: &AuthSecretSelection, supports_create_new: bool) -> String {
     match selection {
         AuthSecretSelection::Named(name) => name.clone(),
-        AuthSecretSelection::Inherit => AUTH_SECRET_INHERIT_LABEL.to_string(),
-        AuthSecretSelection::CreatingNew => AUTH_SECRET_CREATE_NEW_LABEL.to_string(),
+        AuthSecretSelection::Inherit => crate::t!("ai-orchestration-skip-api-key"),
+        AuthSecretSelection::CreatingNew => crate::t!("ai-orchestration-new-api-key"),
         AuthSecretSelection::Unset if supports_create_new => {
-            AUTH_SECRET_CREATE_NEW_LABEL.to_string()
+            crate::t!("ai-orchestration-new-api-key")
         }
-        AuthSecretSelection::Unset => AUTH_SECRET_INHERIT_LABEL.to_string(),
+        AuthSecretSelection::Unset => crate::t!("ai-orchestration-skip-api-key"),
     }
 }
 
@@ -653,7 +653,7 @@ pub fn populate_auth_secret_picker_for_harness<A: OrchestrationControlAction, V:
             .collect();
         match snapshot.status {
             OptionSourceStatus::Loading => items.push(MenuItem::Item(
-                MenuItemFields::new("Loading…").with_disabled(true),
+                MenuItemFields::new(crate::t!("common-loading")).with_disabled(true),
             )),
             OptionSourceStatus::Failed { message } => items.push(MenuItem::Item(
                 MenuItemFields::new(&message).with_disabled(true),
@@ -663,9 +663,10 @@ pub fn populate_auth_secret_picker_for_harness<A: OrchestrationControlAction, V:
         if supports_create_new {
             items.push(MenuItem::Separator);
             items.push(MenuItem::Item(
-                MenuItemFields::new(AUTH_SECRET_CREATE_NEW_LABEL).with_on_select_action(
-                    DropdownAction::select_action_and_close(A::create_new_auth_secret_requested()),
-                ),
+                MenuItemFields::new(crate::t!("ai-orchestration-new-api-key"))
+                    .with_on_select_action(DropdownAction::select_action_and_close(
+                        A::create_new_auth_secret_requested(),
+                    )),
             ));
         }
         let final_selection =
@@ -1029,7 +1030,7 @@ pub fn render_mode_toggle<A: OrchestrationControlAction>(
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
     let label = Text::new(
-        "Agent location".to_string(),
+        crate::t!("ai-orchestration-agent-location"),
         appearance.ui_font_family(),
         appearance.monospace_font_size() - 1.,
     )
@@ -1037,7 +1038,7 @@ pub fn render_mode_toggle<A: OrchestrationControlAction>(
     .finish();
 
     let local_segment = render_segment_button::<A>(
-        "Local",
+        crate::t!("ai-orchestration-location-local"),
         !is_remote,
         A::execution_mode_toggled(false),
         handles.local_toggle.clone(),
@@ -1045,7 +1046,7 @@ pub fn render_mode_toggle<A: OrchestrationControlAction>(
         active_segment_bg,
     );
     let cloud_segment = render_segment_button::<A>(
-        "Cloud",
+        crate::t!("ai-orchestration-location-cloud"),
         is_remote,
         A::execution_mode_toggled(true),
         handles.cloud_toggle.clone(),
@@ -1092,7 +1093,7 @@ pub fn render_mode_toggle<A: OrchestrationControlAction>(
 }
 
 fn render_segment_button<A: OrchestrationControlAction>(
-    label: &str,
+    label: impl Into<String>,
     is_active: bool,
     on_click: A,
     mouse_state: MouseStateHandle,
@@ -1100,7 +1101,7 @@ fn render_segment_button<A: OrchestrationControlAction>(
     active_bg_override: Option<Fill>,
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
-    let label_owned = label.to_string();
+    let label_owned = label.into();
     let font_family = appearance.ui_font_family();
     let font_size = ORCHESTRATION_PICKER_FONT_SIZE;
     let active_text_color = blended_colors::text_main(theme, theme.surface_1());
@@ -1157,7 +1158,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
             .with_spacing(12.);
 
-        let add = |col: &mut Flex, label: &str, picker: Option<Box<dyn Element>>| {
+        let add = |col: &mut Flex, label: String, picker: Option<Box<dyn Element>>| {
             col.add_child(render_picker_column(label, picker, appearance));
         };
 
@@ -1167,7 +1168,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
         // from the "Primary model…" subtext that follows the picker row.
         add(
             &mut column,
-            "Agent harness",
+            crate::t!("ai-orchestration-agent-harness"),
             handles
                 .harness_picker
                 .as_ref()
@@ -1176,7 +1177,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
         if show_auth_picker {
             add(
                 &mut column,
-                AUTH_SECRET_COLUMN_LABEL,
+                crate::t!("ai-orchestration-api-key"),
                 handles
                     .auth_secret_picker
                     .as_ref()
@@ -1186,7 +1187,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
         if is_remote {
             add(
                 &mut column,
-                "Host",
+                crate::t!("ai-orchestration-host"),
                 handles
                     .host_picker
                     .as_ref()
@@ -1194,7 +1195,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
             );
             add(
                 &mut column,
-                "Environment",
+                crate::t!("ai-orchestration-environment"),
                 handles
                     .environment_picker
                     .as_ref()
@@ -1203,7 +1204,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
             if show_runner_controls {
                 add(
                     &mut column,
-                    "Runner",
+                    crate::t!("ai-orchestration-runner"),
                     handles
                         .runner_picker
                         .as_ref()
@@ -1213,7 +1214,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
         }
         add(
             &mut column,
-            "Base model",
+            crate::t!("ai-orchestration-base-model"),
             handles
                 .model_picker
                 .as_ref()
@@ -1227,14 +1228,14 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
         let mut row = AdaptivePickerRow::new(ORCHESTRATION_PICKER_MAX_WIDTH, 12.);
 
         let add_picker =
-            |row: &mut AdaptivePickerRow, label: &str, picker: Option<Box<dyn Element>>| {
+            |row: &mut AdaptivePickerRow, label: String, picker: Option<Box<dyn Element>>| {
                 let col = render_picker_column(label, picker, appearance);
                 row.add_child(col);
             };
 
         add_picker(
             &mut row,
-            "Agent harness",
+            crate::t!("ai-orchestration-agent-harness"),
             handles
                 .harness_picker
                 .as_ref()
@@ -1243,7 +1244,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
         if is_remote {
             add_picker(
                 &mut row,
-                "Host",
+                crate::t!("ai-orchestration-host"),
                 handles
                     .host_picker
                     .as_ref()
@@ -1251,7 +1252,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
             );
             add_picker(
                 &mut row,
-                "Environment",
+                crate::t!("ai-orchestration-environment"),
                 handles
                     .environment_picker
                     .as_ref()
@@ -1260,7 +1261,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
             if show_runner_controls {
                 add_picker(
                     &mut row,
-                    "Runner",
+                    crate::t!("ai-orchestration-runner"),
                     handles
                         .runner_picker
                         .as_ref()
@@ -1270,7 +1271,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
         }
         add_picker(
             &mut row,
-            "Base model",
+            crate::t!("ai-orchestration-base-model"),
             handles
                 .model_picker
                 .as_ref()
@@ -1279,7 +1280,7 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
         if show_auth_picker {
             add_picker(
                 &mut row,
-                AUTH_SECRET_COLUMN_LABEL,
+                crate::t!("ai-orchestration-api-key"),
                 handles
                     .auth_secret_picker
                     .as_ref()
@@ -1292,13 +1293,13 @@ pub fn render_picker_row_with_layout<A: OrchestrationControlAction>(
 }
 
 pub fn render_picker_column(
-    label: &str,
+    label: impl Into<String>,
     picker: Option<Box<dyn Element>>,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
     let label_el = Text::new(
-        label.to_string(),
+        label.into(),
         appearance.ui_font_family(),
         appearance.monospace_font_size() - 1.,
     )

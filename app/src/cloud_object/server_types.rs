@@ -33,8 +33,6 @@ pub enum StoredObjectSyncStatus {
 }
 
 const SYNC_ICON_DIMENSIONS: f32 = 16.;
-const SYNC_STATUS_TOOLTIP_ERROR: &str = "Failed to save";
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredObjectPermissions {
     pub owner: Owner,
@@ -165,7 +163,7 @@ impl StoredObjectStatuses {
         let icon_and_tooltip_text = if should_show_error_indicator {
             Some((
                 Icon::AlertTriangle.to_warpui_icon(Fill::Solid(theme.ui_error_color())),
-                SYNC_STATUS_TOOLTIP_ERROR,
+                crate::t!("object-sync-failed"),
             ))
         } else {
             None

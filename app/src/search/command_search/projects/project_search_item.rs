@@ -147,7 +147,7 @@ impl SearchItem for ProjectSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Project: {}", self.name)
+        crate::t!("search-project-a11y", name = self.name.as_str())
     }
 
     fn dedup_key(&self) -> Option<String> {

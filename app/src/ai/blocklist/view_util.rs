@@ -23,10 +23,6 @@ use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const PROVIDER_BUTTON_ICON_SIZE: f32 = 14.;
 const PROVIDER_BUTTON_ICON_TEXT_GAP: f32 = 8.;
-const ERROR_APOLOGY_TEXT: &str = "I'm sorry, I couldn't complete that request.";
-const INTERNAL_WARP_ERROR: &str = "Internal Warp error.";
-pub const FAILED_OUTPUT_USAGE_NOTICE_TEXT: &str = "This response won't count towards your usage.";
-pub const OUT_OF_CREDITS_SUBSCRIBE_LABEL: &str = "Subscribe";
 /// Text to use as a label throughout the app for user interactions that will attach selected
 /// block(s) or text selections to a new AI query.
 pub static ATTACH_AS_AGENT_MODE_CONTEXT_TEXT: LazyLock<&'static str> =
@@ -65,7 +61,7 @@ pub enum FailedOutputPresentation {
         can_use_own_api_keys: bool,
     },
     InvalidApiKey {
-        title: &'static str,
+        title: String,
         detail: String,
     },
     ContextWindowExceeded {
@@ -95,31 +91,38 @@ pub fn failed_output_presentation(
         RenderableAIError::QuotaLimit {
             user_display_message,
         } => {
+            let apology = crate::t!("ai-error-apology");
             if let Some(message) = user_display_message {
                 if should_show_subscribe_cta(app) {
                     FailedOutputPresentation::OutOfCredits {
-                        message: format!("{ERROR_APOLOGY_TEXT}\n\n{message}"),
+                        message: format!("{apology}\n\n{message}"),
                         can_use_own_api_keys: UserWorkspaces::as_ref(app)
                             .is_byo_api_key_enabled(app),
                     }
                 } else {
-                    FailedOutputPresentation::Message(format!("{ERROR_APOLOGY_TEXT}\n\n{message}"))
+                    FailedOutputPresentation::Message(format!("{apology}\n\n{message}"))
                 }
             } else {
-                let formatted_next_refresh_time = AIRequestUsageModel::as_ref(app)
-                    .next_refresh_time()
-                    .format("%B %d")
-                    .to_string();
-                FailedOutputPresentation::Message(format!(
-                    "{ERROR_APOLOGY_TEXT}\n\nYou've reached your credit limit. Your credit limit resets on {formatted_next_refresh_time}.",
-                ))
+                let next_refresh_time = AIRequestUsageModel::as_ref(app).next_refresh_time();
+                let uses_chinese_date_format = crate::i18n::current_languages()
+                    .first()
+                    .is_some_and(|language| language.to_string().starts_with("zh"));
+                let formatted_next_refresh_time = if uses_chinese_date_format {
+                    next_refresh_time.format("%Y-%m-%d").to_string()
+                } else {
+                    next_refresh_time.format("%B %d").to_string()
+                };
+                let limit = crate::t!("ai-error-credit-limit", date = formatted_next_refresh_time);
+                FailedOutputPresentation::Message(format!("{apology}\n\n{limit}"))
             }
         }
-        RenderableAIError::ServerOverloaded => FailedOutputPresentation::Message(
-            "Warp is currently overloaded. Please try again later.".to_string(),
-        ),
+        RenderableAIError::ServerOverloaded => {
+            FailedOutputPresentation::Message(crate::t!("ai-error-server-overloaded"))
+        }
         RenderableAIError::InternalWarpError => FailedOutputPresentation::Message(format!(
-            "{ERROR_APOLOGY_TEXT}\n\n{INTERNAL_WARP_ERROR}"
+            "{}\n\n{}",
+            crate::t!("ai-error-apology"),
+            crate::t!("ai-error-internal")
         )),
         RenderableAIError::ContextWindowExceeded(message) => {
             FailedOutputPresentation::ContextWindowExceeded {
@@ -130,37 +133,41 @@ pub fn failed_output_presentation(
             provider,
             model_name,
         } => FailedOutputPresentation::InvalidApiKey {
-            title: "Provided API key is not valid",
-            detail: format!(
-                "Failed to authenticate with {provider} when using {model_name}. \
-                 Double-check that your API key is correct."
+            title: crate::t!("ai-error-invalid-api-key-title"),
+            detail: crate::t!(
+                "ai-error-invalid-api-key-detail",
+                provider = provider,
+                model = model_name
             ),
         },
         RenderableAIError::AwsBedrockCredentialsExpiredOrInvalid { model_name } => {
             FailedOutputPresentation::AwsBedrockCredentialsExpiredOrInvalid {
                 fallback_message: format!(
-                    "{ERROR_APOLOGY_TEXT}\n\nAWS credentials expired or missing for {model_name}. \
-                     Please refresh your AWS credentials."
+                    "{}\n\n{}",
+                    crate::t!("ai-error-apology"),
+                    crate::t!("ai-error-aws-credentials", model = model_name)
                 ),
             }
         }
         RenderableAIError::GeminiEnterpriseCredentialsExpiredOrInvalid => {
             FailedOutputPresentation::GeminiEnterpriseCredentialsExpiredOrInvalid {
                 fallback_message: format!(
-                    "{ERROR_APOLOGY_TEXT}\n\nGemini Enterprise credentials expired or invalid.\n\n\
-                     Warp couldn't authenticate with Google Cloud. Refresh your Gemini Enterprise credentials, then retry the request."
+                    "{}\n\n{}",
+                    crate::t!("ai-error-apology"),
+                    crate::t!("ai-error-gemini-credentials")
                 ),
             }
         }
         RenderableAIError::TransientNetworkError { .. } => {
             FailedOutputPresentation::Message(error.to_string())
         }
-        RenderableAIError::Other { error_message, .. } => {
-            FailedOutputPresentation::Message(format!("{ERROR_APOLOGY_TEXT}\n\n{error_message}"))
-        }
-        RenderableAIError::AgentExitedShell { .. } => {
-            FailedOutputPresentation::Message(format!("{ERROR_APOLOGY_TEXT}\n\n{error}"))
-        }
+        RenderableAIError::Other { error_message, .. } => FailedOutputPresentation::Message(
+            format!("{}\n\n{error_message}", crate::t!("ai-error-apology")),
+        ),
+        RenderableAIError::AgentExitedShell { .. } => FailedOutputPresentation::Message(format!(
+            "{}\n\n{error}",
+            crate::t!("ai-error-apology")
+        )),
         // Cloud startup failures surface the raw server message directly, matching the
         // dedicated GUI error card which shows the message without an apology prefix.
         RenderableAIError::CloudStartupFailed(msg) => {

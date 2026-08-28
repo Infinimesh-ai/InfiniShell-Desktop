@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use warp::editor::{CodeEditorModel, CodeEditorModelEvent};
 use warp::tui_export::{
     TuiMcpAction, TuiMcpManager, TuiMcpManagerEvent, TuiMcpServerId, TuiMcpServerStatus,
@@ -13,6 +15,7 @@ use crate::inline_menu::{
 use crate::input_suggestions_mode::{TuiInputSuggestionsMode, TuiInputSuggestionsModeModel};
 
 const MAX_VISIBLE_ROWS: usize = result_row_capacity(MAX_INLINE_MENU_ROWS, true, false);
+static MCP_SEARCH_HINT: LazyLock<String> = LazyLock::new(|| warp::t!("tui-mcp-search-placeholder"));
 
 #[derive(Clone, Debug)]
 struct TuiMcpMenuRow {
@@ -176,7 +179,7 @@ impl TuiMcpMenuModel {
 
     pub(crate) fn input_hint_text(&self, ctx: &AppContext) -> Option<&'static str> {
         (self.is_open(ctx) && input_text(&self.input_editor, ctx).is_empty())
-            .then_some("Search MCP servers…")
+            .then_some(MCP_SEARCH_HINT.as_str())
     }
 
     pub(crate) fn snapshot(&self, app: &AppContext) -> Option<TuiInlineMenuSnapshot> {
@@ -189,15 +192,15 @@ impl TuiMcpMenuModel {
         let query = input_text(&self.input_editor, app);
         let status = list.rows().is_empty().then(|| {
             let label = if !query.trim().is_empty() {
-                "No matching MCP servers".to_owned()
+                warp::t!("tui-mcp-no-matches")
             } else {
-                "No MCP servers available".to_owned()
+                warp::t!("tui-mcp-no-servers-available")
             };
             TuiInlineMenuStatus::Empty(label)
         });
         Some(TuiInlineMenuSnapshot {
             header: Some(TuiInlineMenuHeader {
-                title: Some("MCP servers".to_owned()),
+                title: Some(warp::t!("tui-mcp-servers-title")),
                 tabs: Vec::new(),
             }),
             rows: list
@@ -255,7 +258,10 @@ fn menu_rows(snapshot: &TuiMcpSnapshot, query: &str) -> Vec<TuiMcpMenuRow> {
     for diagnostic in &snapshot.diagnostics {
         rows.push(TuiMcpMenuRow {
             server_id: None,
-            title: format!("{} config error", diagnostic.provider),
+            title: warp::t!(
+                "tui-mcp-provider-config-error",
+                provider = diagnostic.provider.clone()
+            ),
             description: Some(format!(
                 "{} · {}",
                 diagnostic.config_path.display(),
@@ -286,27 +292,28 @@ fn menu_rows(snapshot: &TuiMcpSnapshot, query: &str) -> Vec<TuiMcpMenuRow> {
                 });
                 let (status, primary_action) = match &server.status {
                     TuiMcpServerStatus::Available => (
-                        "available".to_owned(),
+                        warp::t!("tui-state-available"),
                         Some(TuiMcpAction::Enable(server.id)),
                     ),
-                    TuiMcpServerStatus::Offline => {
-                        ("offline".to_string(), Some(TuiMcpAction::Start(server.id)))
-                    }
-                    TuiMcpServerStatus::Starting => ("starting…".to_string(), None),
+                    TuiMcpServerStatus::Offline => (
+                        warp::t!("tui-state-offline"),
+                        Some(TuiMcpAction::Start(server.id)),
+                    ),
+                    TuiMcpServerStatus::Starting => (warp::t!("tui-state-starting"), None),
                     TuiMcpServerStatus::Authenticating => (
-                        "authentication required".to_string(),
+                        warp::t!("tui-state-authentication-required"),
                         server
                             .authorization_url
                             .as_ref()
                             .map(|_| TuiMcpAction::ReopenAuthorization(server.id)),
                     ),
                     TuiMcpServerStatus::Running => (
-                        format!("running · {} tools", server.tool_count),
+                        warp::t!("tui-mcp-running-tools", count = server.tool_count),
                         Some(TuiMcpAction::Stop(server.id)),
                     ),
-                    TuiMcpServerStatus::Stopping => ("stopping…".to_string(), None),
+                    TuiMcpServerStatus::Stopping => (warp::t!("tui-state-stopping"), None),
                     TuiMcpServerStatus::Failed { message } => (
-                        format!("failed · {message}"),
+                        warp::t!("tui-state-failed-with-message", message = message),
                         Some(TuiMcpAction::Retry(server.id)),
                     ),
                 };

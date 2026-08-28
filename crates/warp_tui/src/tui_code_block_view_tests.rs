@@ -7,10 +7,12 @@ use warpui_core::presenter::tui::TuiPresenter;
 use warpui_core::{TuiView, ViewHandle};
 
 use super::{
-    MAX_CODE_LINES, MAX_HIGHLIGHT_BYTES, TRUNCATION_NOTICE, TuiCodeBlockPayload, TuiCodeBlockView,
+    MAX_CODE_LINES, MAX_HIGHLIGHT_BYTES, TuiCodeBlockPayload, TuiCodeBlockView,
     TuiCodeBlockViewEvent, bounded_fallback_text,
 };
 use crate::test_fixtures::TestHostView;
+
+const TRUNCATION_NOTICE: &str = "… code block truncated …";
 
 #[test]
 fn renders_read_only_code_with_language_and_wrapping() {

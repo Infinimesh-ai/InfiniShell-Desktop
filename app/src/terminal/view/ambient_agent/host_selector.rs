@@ -32,10 +32,6 @@ const HEADER_VERTICAL_PADDING: f32 = 6.;
 
 const MENU_WIDTH: f32 = 208.;
 
-const BUTTON_TOOLTIP: &str = "Execution host";
-
-const MENU_HEADER_LABEL: &str = "Execution host";
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Host {
     InfiniShell,
@@ -82,7 +78,7 @@ impl HostSelector {
             ActionButton::new(selected.display_name(), NakedHeaderButtonTheme)
                 .with_size(ButtonSize::AgentInputButton)
                 .with_menu(true)
-                .with_tooltip(BUTTON_TOOLTIP)
+                .with_tooltip(crate::t!("ambient-agent-execution-host"))
                 .with_tooltip_alignment(TooltipAlignment::Left)
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(HostSelectorAction::ToggleMenu);
@@ -170,7 +166,7 @@ fn build_menu_items(
     header_text_color: ColorU,
 ) -> Vec<MenuItem<HostSelectorAction>> {
     let header = MenuItem::Header {
-        fields: MenuItemFields::new(MENU_HEADER_LABEL)
+        fields: MenuItemFields::new(crate::t!("ambient-agent-execution-host"))
             .with_font_size_override(HEADER_FONT_SIZE)
             .with_override_text_color(header_text_color)
             .with_padding_override(HEADER_VERTICAL_PADDING, MENU_HORIZONTAL_PADDING)

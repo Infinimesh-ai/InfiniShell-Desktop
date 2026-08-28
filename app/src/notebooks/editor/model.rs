@@ -1414,7 +1414,7 @@ impl NotebooksEditorModel {
 
         if let Some(command) = child_model.executable_command(ctx) {
             ctx.emit_a11y_content(AccessibilityContent::new_without_help(
-                format!("Selected workflow: {command}"),
+                crate::t!("notebook-a11y-selected-workflow", command = command),
                 WarpA11yRole::TextareaRole,
             ));
         }
@@ -1771,12 +1771,11 @@ impl NotebooksEditorModel {
 
     /// Accessibility content for toggling an inline style.
     pub fn style_toggle_a11y(&self, style: BufferTextStyle) -> ActionAccessibilityContent {
-        let action = if self.is_style_active(style) {
-            "off"
+        let text = if self.is_style_active(style) {
+            crate::t!("notebook-a11y-style-off", style = format!("{style:?}"))
         } else {
-            "on"
+            crate::t!("notebook-a11y-style-on", style = format!("{style:?}"))
         };
-        let text = format!("{style:?} {action}");
         ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
             text,
             WarpA11yRole::UserAction,

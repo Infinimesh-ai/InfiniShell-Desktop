@@ -25,29 +25,22 @@ use crate::input_suggestions_mode::{
 use crate::tui_builder::TuiUiBuilder;
 
 const MAX_VISIBLE_ROWS: usize = result_row_capacity(MAX_INLINE_MENU_ROWS, true, false);
-const FALLBACK_DESCRIPTION: &str = "in the event of an error, requests may be routed to use Warp \
-credits. Warp will prioritize using your API keys over Warp credits.";
 const PROVIDER_ROWS: [TuiApiKeysRow; 4] = [
     TuiApiKeysRow {
         kind: TuiApiKeysRowKind::Provider(LLMProvider::Anthropic),
-        title: "Anthropic API key",
     },
     TuiApiKeysRow {
         kind: TuiApiKeysRowKind::Provider(LLMProvider::Google),
-        title: "Google API key",
     },
     TuiApiKeysRow {
         kind: TuiApiKeysRowKind::Provider(LLMProvider::OpenAI),
-        title: "OpenAI API key",
     },
     TuiApiKeysRow {
         kind: TuiApiKeysRowKind::Provider(LLMProvider::Xai),
-        title: "X premium or SuperGrok subscription",
     },
 ];
 const FALLBACK_ROW: TuiApiKeysRow = TuiApiKeysRow {
     kind: TuiApiKeysRowKind::WarpCreditFallbackSetting,
-    title: "Warp credit fallback",
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,7 +52,24 @@ enum TuiApiKeysRowKind {
 #[derive(Debug, Clone, Copy)]
 struct TuiApiKeysRow {
     kind: TuiApiKeysRowKind,
-    title: &'static str,
+}
+
+fn api_key_row_title(kind: TuiApiKeysRowKind) -> String {
+    match kind {
+        TuiApiKeysRowKind::Provider(LLMProvider::Anthropic) => {
+            warp::t!("tui-api-key-anthropic")
+        }
+        TuiApiKeysRowKind::Provider(LLMProvider::Google) => warp::t!("tui-api-key-google"),
+        TuiApiKeysRowKind::Provider(LLMProvider::OpenAI) => warp::t!("tui-api-key-openai"),
+        TuiApiKeysRowKind::Provider(LLMProvider::Xai) => warp::t!("tui-api-key-grok"),
+        TuiApiKeysRowKind::Provider(provider @ LLMProvider::Unknown) => warp::t!(
+            "tui-api-key-provider-title",
+            provider = provider.display_name()
+        ),
+        TuiApiKeysRowKind::WarpCreditFallbackSetting => {
+            warp::t!("tui-api-key-warp-credit-fallback")
+        }
+    }
 }
 
 #[derive(Default)]
@@ -160,16 +170,16 @@ impl TuiApiKeysMenuModel {
     fn start_grok_oauth(&mut self, ctx: &mut ModelContext<Self>) {
         let workspaces = UserWorkspaces::as_ref(ctx);
         let policy_error = if !FeatureFlag::SuperGrok.is_enabled() {
-            Some("Grok subscriptions aren't available in this build.")
+            Some(warp::t!("tui-api-key-grok-build-unavailable"))
         } else if !workspaces.is_byo_api_key_enabled(ctx) {
-            Some("Grok subscriptions require BYOK access for this workspace.")
+            Some(warp::t!("tui-api-key-grok-byok-required"))
         } else if !workspaces.are_member_byo_keys_allowed() {
-            Some("Your organization doesn't allow member-provided credentials.")
+            Some(warp::t!("tui-api-key-member-credentials-disallowed"))
         } else {
             None
         };
         if let Some(error) = policy_error {
-            self.set_browsing_error(error.to_owned(), ctx);
+            self.set_browsing_error(error, ctx);
             return;
         }
         let attempt = match OauthAttempt::start() {
@@ -315,10 +325,7 @@ impl TuiApiKeysMenuModel {
         };
         match result {
             Ok(()) => self.refresh_rows(ctx),
-            Err(_) => self.set_browsing_error(
-                "Could not clear the selected API key. Try again.".to_owned(),
-                ctx,
-            ),
+            Err(_) => self.set_browsing_error(warp::t!("tui-api-key-clear-failed"), ctx),
         }
     }
 
@@ -396,7 +403,7 @@ impl TuiApiKeysMenuModel {
             TuiApiKeysMenuState::Closed => None,
             TuiApiKeysMenuState::Browsing { list, error } => Some(TuiInlineMenuSnapshot {
                 header: Some(TuiInlineMenuHeader {
-                    title: Some(error.clone().unwrap_or_else(|| "API keys".to_owned())),
+                    title: Some(error.clone().unwrap_or_else(|| warp::t!("tui-api-keys"))),
                     tabs: Vec::new(),
                 }),
                 rows: list
@@ -413,7 +420,10 @@ impl TuiApiKeysMenuModel {
             TuiApiKeysMenuState::EditingProvider { provider, error } => {
                 Some(TuiInlineMenuSnapshot {
                     header: Some(TuiInlineMenuHeader {
-                        title: Some(format!("{} API key", provider.display_name())),
+                        title: Some(warp::t!(
+                            "tui-api-key-provider-title",
+                            provider = provider.display_name()
+                        )),
                         tabs: Vec::new(),
                     }),
                     rows: Vec::new(),
@@ -433,7 +443,7 @@ impl TuiApiKeysMenuModel {
                     .collect();
                 Some(TuiInlineMenuSnapshot {
                     header: Some(TuiInlineMenuHeader {
-                        title: Some(error.unwrap_or_else(|| "API keys".to_owned())),
+                        title: Some(error.unwrap_or_else(|| warp::t!("tui-api-keys"))),
                         tabs: Vec::new(),
                     }),
                     rows,
@@ -457,28 +467,23 @@ impl TuiApiKeysMenuModel {
             TuiApiKeysRowKind::Provider(provider) => {
                 let connected = provider_connected(provider, ctx);
                 let suffix = if connecting_grok && provider == LLMProvider::Xai {
-                    "(Connecting...)"
+                    warp::t!("tui-api-key-connecting")
                 } else if connected {
-                    "(Connected)"
+                    warp::t!("tui-api-key-connected")
                 } else {
-                    "(Not connected)"
+                    warp::t!("tui-api-key-not-connected")
                 };
-                (
-                    Some(String::new()),
-                    Some(suffix.to_owned()),
-                    !connecting_grok,
-                )
+                (Some(String::new()), Some(suffix), !connecting_grok)
             }
             TuiApiKeysRowKind::WarpCreditFallbackSetting => (
-                Some(FALLBACK_DESCRIPTION.to_owned()),
-                Some(format!(
-                    "({})",
+                Some(warp::t!("tui-api-key-warp-credit-fallback-description")),
+                Some(
                     if *AISettings::as_ref(ctx).can_use_warp_credits_for_fallback {
-                        "on"
+                        warp::t!("tui-state-on-parenthesized")
                     } else {
-                        "off"
-                    }
-                )),
+                        warp::t!("tui-state-off-parenthesized")
+                    },
+                ),
                 !connecting_grok,
             ),
         };
@@ -488,7 +493,7 @@ impl TuiApiKeysMenuModel {
             TuiInlineMenuRowStyle::InlineMenuItem
         };
         TuiInlineMenuRow {
-            title: row.title.to_owned(),
+            title: api_key_row_title(row.kind),
             prefix: None,
             description,
             state_suffix,
@@ -501,10 +506,7 @@ impl TuiApiKeysMenuModel {
     fn edit_provider(&mut self, provider: LLMProvider, ctx: &mut ModelContext<Self>) {
         if provider == LLMProvider::Xai {
             if ApiKeyManager::as_ref(ctx).has_grok_subscription() {
-                self.set_browsing_error(
-                    "Grok is already connected. Press Ctrl-X to disconnect.".to_owned(),
-                    ctx,
-                );
+                self.set_browsing_error(warp::t!("tui-api-key-grok-already-connected"), ctx);
             } else {
                 self.start_grok_oauth(ctx);
             }
@@ -531,7 +533,7 @@ impl TuiApiKeysMenuModel {
             Ok(()) => self.transition_to_browsing(ctx),
             Err(_) => {
                 if let TuiApiKeysMenuState::EditingProvider { error, .. } = &mut self.state {
-                    *error = Some("Could not save this API key. Try again.".to_owned());
+                    *error = Some(warp::t!("tui-api-key-save-failed"));
                 }
                 ctx.emit(TuiApiKeysMenuEvent);
             }
@@ -546,10 +548,7 @@ impl TuiApiKeysMenuModel {
         });
         match result {
             Ok(_) => self.refresh_rows(ctx),
-            Err(_) => self.set_browsing_error(
-                "Could not save the Warp credit fallback setting.".to_owned(),
-                ctx,
-            ),
+            Err(_) => self.set_browsing_error(warp::t!("tui-api-key-fallback-save-failed"), ctx),
         }
     }
 
@@ -603,7 +602,11 @@ impl TuiApiKeysMenuModel {
         let query = input_text(&self.input_editor, ctx).to_ascii_lowercase();
         let rows = PROVIDER_ROWS
             .into_iter()
-            .filter(|row| row.title.to_ascii_lowercase().contains(&query))
+            .filter(|row| {
+                api_key_row_title(row.kind)
+                    .to_ascii_lowercase()
+                    .contains(&query)
+            })
             .chain(std::iter::once(FALLBACK_ROW))
             .collect();
         let previous_kind = list.selected_row().map(|row| row.kind);
@@ -671,44 +674,50 @@ pub(crate) fn render_api_keys_footer(
         TuiApiKeysFooter::ProviderList { can_clear } => {
             let mut spans = vec![
                 ("enter".to_owned(), key),
-                (" to set api key | ".to_owned(), muted),
+                (format!(" {} | ", warp::t!("tui-hint-set-api-key")), muted),
             ];
             if can_clear {
                 spans.extend([
                     ("ctrl + x".to_owned(), key),
-                    (" to clear api key | ".to_owned(), muted),
+                    (format!(" {} | ", warp::t!("tui-hint-clear-api-key")), muted),
                 ]);
             }
             spans.extend([
                 ("esc".to_owned(), key),
-                (" to close menu".to_owned(), muted),
+                (format!(" {}", warp::t!("tui-hint-close-menu")), muted),
             ]);
             spans
         }
         TuiApiKeysFooter::WarpCreditFallback => vec![
             ("enter".to_owned(), key),
-            (" to toggle warp credit fallback | ".to_owned(), muted),
+            (
+                format!(" {} | ", warp::t!("tui-hint-toggle-warp-credit-fallback")),
+                muted,
+            ),
             ("esc".to_owned(), key),
-            (" to close menu".to_owned(), muted),
+            (format!(" {}", warp::t!("tui-hint-close-menu")), muted),
         ],
         TuiApiKeysFooter::EditingProvider(provider) => vec![
             (
-                format!("Connect {} API key", provider.display_name()),
+                warp::t!(
+                    "tui-api-key-connect-provider",
+                    provider = provider.display_name()
+                ),
                 accent,
             ),
             (" | ".to_owned(), muted),
             ("enter".to_owned(), key),
-            (" to save key | ".to_owned(), muted),
+            (format!(" {} | ", warp::t!("tui-hint-save-key")), muted),
             ("esc".to_owned(), key),
-            (" to cancel".to_owned(), muted),
+            (format!(" {}", warp::t!("tui-hint-cancel")), muted),
         ],
         TuiApiKeysFooter::ConnectingGrok => vec![
-            ("Connect X premium/SuperGrok".to_owned(), accent),
+            (warp::t!("tui-api-key-connect-grok"), accent),
             (" | ".to_owned(), muted),
             ("enter".to_owned(), key),
-            (" to confirm | ".to_owned(), muted),
+            (format!(" {} | ", warp::t!("tui-hint-confirm")), muted),
             ("esc".to_owned(), key),
-            (" to cancel".to_owned(), muted),
+            (format!(" {}", warp::t!("tui-hint-cancel")), muted),
         ],
     };
     TuiText::from_spans(spans).truncate().finish()

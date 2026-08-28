@@ -186,7 +186,7 @@ pub(crate) fn tool_call_label_with_server(
         .map(|result| &result.result);
     let label = label_for_action(&action.action, state, result, block, server_name);
     match state {
-        State::Blocked => format!("{label} (awaiting approval)"),
+        State::Blocked => warp::t!("tui-tool-awaiting-approval", label = label),
         State::Constructing
         | State::Pending
         | State::Running
@@ -238,56 +238,66 @@ fn label_for_action(
             // the complete command instead of capping it at MAX_INLINE_LEN.
             let cmd = executed.unwrap_or(command).trim_end();
             match state {
-                State::Constructing => "Generating command…".to_owned(),
-                State::Pending | State::Blocked => format!("Run `{cmd}`"),
-                State::Running => format!("Running `{cmd}`"),
+                State::Constructing => warp::t!("tui-tool-command-generating"),
+                State::Pending | State::Blocked => warp::t!("tui-tool-command-run", command = cmd),
+                State::Running => warp::t!("tui-tool-command-running", command = cmd),
                 State::Succeeded => match block_state {
-                    Some(CommandBlockState::Finished { .. }) => format!("Ran `{cmd}`"),
+                    Some(CommandBlockState::Finished { .. }) => {
+                        warp::t!("tui-tool-command-ran", command = cmd)
+                    }
                     // No local block: fall back to the stored result. A
                     // snapshot result means the command was still running at
                     // the last point we could observe it.
                     Some(CommandBlockState::Running) | None => match result {
                         Some(AIAgentActionResultType::RequestCommandOutput(
                             RequestCommandOutputResult::LongRunningCommandSnapshot { .. },
-                        )) => format!("`{cmd}` is still running"),
-                        _ => format!("Ran `{cmd}`"),
+                        )) => warp::t!("tui-tool-command-still-running", command = cmd),
+                        _ => warp::t!("tui-tool-command-ran", command = cmd),
                     },
                 },
                 State::Failed => match block_state {
                     Some(CommandBlockState::Finished { exit_code }) => {
-                        format!("`{cmd}` exited with code {}", exit_code.value())
+                        warp::t!(
+                            "tui-tool-command-exited",
+                            command = cmd,
+                            code = exit_code.value()
+                        )
                     }
                     Some(CommandBlockState::Running) | None => match result {
                         Some(AIAgentActionResultType::RequestCommandOutput(
                             RequestCommandOutputResult::Completed { exit_code, .. },
-                        )) => format!("`{cmd}` exited with code {}", exit_code.value()),
+                        )) => warp::t!(
+                            "tui-tool-command-exited",
+                            command = cmd,
+                            code = exit_code.value()
+                        ),
                         Some(AIAgentActionResultType::RequestCommandOutput(
                             RequestCommandOutputResult::Denylisted { .. },
-                        )) => format!("`{cmd}` denied (denylisted)"),
-                        _ => format!("`{cmd}` failed"),
+                        )) => warp::t!("tui-tool-command-denied", command = cmd),
+                        _ => warp::t!("tui-tool-command-failed", command = cmd),
                     },
                 },
-                State::Cancelled => format!("Cancelled `{cmd}`"),
+                State::Cancelled => warp::t!("tui-tool-command-cancelled", command = cmd),
             }
         }
         AIAgentActionType::WriteToLongRunningShellCommand { .. } => match state {
-            State::Constructing => "Writing command input…".to_owned(),
-            State::Pending | State::Blocked => "Write input to running command".to_owned(),
-            State::Running => "Writing input to running command…".to_owned(),
-            State::Succeeded => "Wrote input to running command".to_owned(),
-            State::Failed => "Failed to write to running command".to_owned(),
-            State::Cancelled => "Write to running command cancelled".to_owned(),
+            State::Constructing => warp::t!("tui-tool-command-input-writing"),
+            State::Pending | State::Blocked => warp::t!("tui-tool-command-input-write"),
+            State::Running => warp::t!("tui-tool-command-input-writing-running"),
+            State::Succeeded => warp::t!("tui-tool-command-input-wrote"),
+            State::Failed => warp::t!("tui-tool-command-input-failed"),
+            State::Cancelled => warp::t!("tui-tool-command-input-cancelled"),
         },
         AIAgentActionType::ReadFiles(request) => {
             let files = files_summary(request.locations.iter().map(|location| &location.name));
             match state {
-                State::Constructing => "Reading files…".to_owned(),
+                State::Constructing => warp::t!("tui-tool-files-reading"),
                 State::Pending | State::Blocked | State::Succeeded => {
-                    format!("Read {files}")
+                    warp::t!("tui-tool-files-read", files = files)
                 }
-                State::Running => format!("Reading {files}"),
-                State::Failed => format!("Failed to read {files}"),
-                State::Cancelled => format!("Cancelled reading {files}"),
+                State::Running => warp::t!("tui-tool-files-reading-named", files = files),
+                State::Failed => warp::t!("tui-tool-files-failed", files = files),
+                State::Cancelled => warp::t!("tui-tool-files-cancelled", files = files),
             }
         }
         // Rendered by its own stateful child view (`TuiFileEditsView`); the
@@ -300,22 +310,24 @@ fn label_for_action(
             let queries = single_line(&queries.join(", "));
             let path = display_path(path);
             match state {
-                State::Constructing => "Grepping…".to_owned(),
+                State::Constructing => warp::t!("tui-tool-grep-starting"),
                 State::Pending | State::Blocked => {
-                    format!("Grep for {queries} in {path}")
+                    warp::t!("tui-tool-grep", queries = queries, path = path)
                 }
-                State::Running => format!("Grepping for {queries} in {path}"),
+                State::Running => warp::t!("tui-tool-grep-running", queries = queries, path = path),
                 State::Succeeded => match result {
                     Some(AIAgentActionResultType::Grep(GrepResult::Success { matched_files })) => {
-                        format!(
-                            "Grepped for {queries} in {path}, {}",
-                            count_label(matched_files.len(), "matching file", "matching files")
+                        warp::t!(
+                            "tui-tool-grep-succeeded-with-count",
+                            queries = queries,
+                            path = path,
+                            count = matched_files.len()
                         )
                     }
-                    _ => format!("Grepped for {queries} in {path}"),
+                    _ => warp::t!("tui-tool-grep-succeeded", queries = queries, path = path),
                 },
-                State::Failed => format!("Grep for {queries} failed"),
-                State::Cancelled => format!("Grep for {queries} cancelled"),
+                State::Failed => warp::t!("tui-tool-grep-failed", queries = queries),
+                State::Cancelled => warp::t!("tui-tool-grep-cancelled", queries = queries),
             }
         }
         AIAgentActionType::FileGlob { patterns, path } => {
@@ -340,14 +352,18 @@ fn label_for_action(
                 // The resource name arrives with the tool-call header (not
                 // the streamed args), so include it when present, like the
                 // GUI's "Reading \"{name}\" MCP resource..." loading text.
-                State::Constructing if name.is_empty() => "Reading MCP resource…".to_owned(),
-                State::Constructing => format!("Reading \"{name}\" MCP resource…"),
+                State::Constructing if name.is_empty() => warp::t!("tui-tool-mcp-resource-reading"),
+                State::Constructing => warp::t!("tui-tool-mcp-resource-reading-name", name = name),
                 State::Pending | State::Blocked | State::Succeeded => {
-                    format!("Read MCP resource {resource}")
+                    warp::t!("tui-tool-mcp-resource-read", resource = resource)
                 }
-                State::Running => format!("Reading MCP resource {resource}"),
-                State::Failed => format!("MCP resource {resource} failed"),
-                State::Cancelled => format!("MCP resource {resource} cancelled"),
+                State::Running => {
+                    warp::t!("tui-tool-mcp-resource-reading-uri", resource = resource)
+                }
+                State::Failed => warp::t!("tui-tool-mcp-resource-failed", resource = resource),
+                State::Cancelled => {
+                    warp::t!("tui-tool-mcp-resource-cancelled", resource = resource)
+                }
             }
         }
         AIAgentActionType::CallMCPTool { name, .. } => {
@@ -355,118 +371,137 @@ fn label_for_action(
             // Append the originating server when known so MCP tool calls
             // surface both identities, with a deterministic no-server fallback.
             let suffix = server_name
-                .map(|server| format!(" on {server}"))
+                .map(|server| warp::t!("tui-tool-mcp-server-suffix", server = server))
                 .unwrap_or_default();
             match state {
                 // Like the GUI's "Calling \"{name}\" MCP tool..." loading
                 // text; the tool name is available before its args finish.
                 State::Constructing if name.is_empty() => {
-                    format!("Calling MCP tool{suffix}…")
+                    warp::t!("tui-tool-mcp-calling", suffix = suffix)
                 }
-                State::Constructing => format!("Calling \"{name}\" MCP tool{suffix}…"),
-                State::Pending | State::Blocked => format!("Call MCP tool {name}{suffix}"),
-                State::Running => format!("Calling MCP tool {name}{suffix}"),
-                State::Succeeded => format!("Called MCP tool {name}{suffix}"),
-                State::Failed => format!("MCP tool {name}{suffix} failed"),
-                State::Cancelled => format!("MCP tool {name}{suffix} cancelled"),
+                State::Constructing => {
+                    warp::t!("tui-tool-mcp-calling-name", name = name, suffix = suffix)
+                }
+                State::Pending | State::Blocked => {
+                    warp::t!("tui-tool-mcp-call", name = name, suffix = suffix)
+                }
+                State::Running => warp::t!(
+                    "tui-tool-mcp-calling-name-plain",
+                    name = name,
+                    suffix = suffix
+                ),
+                State::Succeeded => warp::t!("tui-tool-mcp-called", name = name, suffix = suffix),
+                State::Failed => warp::t!("tui-tool-mcp-failed", name = name, suffix = suffix),
+                State::Cancelled => {
+                    warp::t!("tui-tool-mcp-cancelled", name = name, suffix = suffix)
+                }
             }
         }
         AIAgentActionType::SuggestNewConversation { .. } => match state {
-            State::Constructing => "Suggesting a new conversation…".to_owned(),
+            State::Constructing => warp::t!("tui-tool-new-conversation-suggesting"),
             State::Pending | State::Blocked | State::Running | State::Failed => {
-                "Suggested starting a new conversation".to_owned()
+                warp::t!("tui-tool-new-conversation-suggested")
             }
             State::Succeeded => match result {
                 Some(AIAgentActionResultType::SuggestNewConversation(
                     SuggestNewConversationResult::Rejected,
-                )) => "Continuing current conversation".to_owned(),
-                _ => "New conversation started".to_owned(),
+                )) => warp::t!("tui-tool-current-conversation-continuing"),
+                _ => warp::t!("tui-tool-new-conversation-started"),
             },
-            State::Cancelled => "New conversation suggestion cancelled".to_owned(),
+            State::Cancelled => warp::t!("tui-tool-new-conversation-cancelled"),
         },
         AIAgentActionType::SuggestPrompt(_) | AIAgentActionType::OpenCodeReview => {
             fallback_label(action, state)
         }
         AIAgentActionType::ReadDocuments(request) => {
-            let documents = count_label(request.document_ids.len(), "document", "documents");
+            let documents = count_documents(request.document_ids.len());
             match state {
-                State::Constructing => "Reading documents…".to_owned(),
+                State::Constructing => warp::t!("tui-tool-documents-reading"),
                 State::Pending | State::Blocked | State::Succeeded => {
-                    format!("Read {documents}")
+                    warp::t!("tui-tool-documents-read", documents = documents)
                 }
-                State::Running => format!("Reading {documents}"),
-                State::Failed => "Failed to read documents".to_owned(),
-                State::Cancelled => "Cancelled reading documents".to_owned(),
+                State::Running => {
+                    warp::t!("tui-tool-documents-reading-count", documents = documents)
+                }
+                State::Failed => warp::t!("tui-tool-documents-failed"),
+                State::Cancelled => warp::t!("tui-tool-documents-cancelled"),
             }
         }
         AIAgentActionType::EditDocuments(request) => match state {
-            State::Pending | State::Blocked => "Update plan".to_owned(),
-            State::Constructing | State::Running => "Updating plan…".to_owned(),
-            State::Succeeded => format!(
-                "Updated plan ({})",
-                count_label(request.diffs.len(), "edit", "edits")
-            ),
-            State::Failed => "Failed to update plan".to_owned(),
-            State::Cancelled => "Update plan cancelled".to_owned(),
+            State::Pending | State::Blocked => warp::t!("tui-tool-plan-update"),
+            State::Constructing | State::Running => warp::t!("tui-tool-plan-updating"),
+            State::Succeeded => warp::t!("tui-tool-plan-updated", count = request.diffs.len()),
+            State::Failed => warp::t!("tui-tool-plan-update-failed"),
+            State::Cancelled => warp::t!("tui-tool-plan-update-cancelled"),
         },
         AIAgentActionType::CreateDocuments(request) => match state {
-            State::Pending | State::Blocked => "Create plan".to_owned(),
-            State::Constructing | State::Running => "Generating plan…".to_owned(),
+            State::Pending | State::Blocked => warp::t!("tui-tool-plan-create"),
+            State::Constructing | State::Running => warp::t!("tui-tool-plan-generating"),
             State::Succeeded => {
                 let count = request.documents.len();
                 if count > 1 {
-                    format!("Created {count} documents")
+                    warp::t!("tui-tool-documents-created", count = count)
                 } else {
-                    "Created plan".to_owned()
+                    warp::t!("tui-tool-plan-created")
                 }
             }
-            State::Failed => "Failed to create plan".to_owned(),
-            State::Cancelled => "Create plan cancelled".to_owned(),
+            State::Failed => warp::t!("tui-tool-plan-create-failed"),
+            State::Cancelled => warp::t!("tui-tool-plan-create-cancelled"),
         },
         AIAgentActionType::ReadShellCommandOutput { .. } => match state {
-            State::Pending | State::Blocked | State::Succeeded => "Read command output".to_owned(),
-            State::Constructing | State::Running => "Reading command output…".to_owned(),
-            State::Failed => "Failed to read command output".to_owned(),
-            State::Cancelled => "Read command output cancelled".to_owned(),
+            State::Pending | State::Blocked | State::Succeeded => {
+                warp::t!("tui-tool-command-output-read")
+            }
+            State::Constructing | State::Running => warp::t!("tui-tool-command-output-reading"),
+            State::Failed => warp::t!("tui-tool-command-output-failed"),
+            State::Cancelled => warp::t!("tui-tool-command-output-cancelled"),
         },
         AIAgentActionType::InsertCodeReviewComments { comments, .. } => {
-            let comments = count_label(comments.len(), "review comment", "review comments");
+            let comments = count_review_comments(comments.len());
             match state {
-                State::Constructing => "Preparing review comments…".to_owned(),
-                State::Pending | State::Blocked => format!("Insert {comments}"),
-                State::Running => format!("Inserting {comments}…"),
-                State::Succeeded => format!("Inserted {comments}"),
-                State::Failed => "Failed to insert review comments".to_owned(),
-                State::Cancelled => "Insert review comments cancelled".to_owned(),
+                State::Constructing => warp::t!("tui-tool-review-comments-preparing"),
+                State::Pending | State::Blocked => {
+                    warp::t!("tui-tool-review-comments-insert", comments = comments)
+                }
+                State::Running => {
+                    warp::t!("tui-tool-review-comments-inserting", comments = comments)
+                }
+                State::Succeeded => {
+                    warp::t!("tui-tool-review-comments-inserted", comments = comments)
+                }
+                State::Failed => warp::t!("tui-tool-review-comments-failed"),
+                State::Cancelled => warp::t!("tui-tool-review-comments-cancelled"),
             }
         }
         AIAgentActionType::ReadSkill(request) => {
             let skill = single_line(&request.skill.display_label());
             match state {
-                State::Constructing => "Reading skill…".to_owned(),
+                State::Constructing => warp::t!("tui-tool-skill-reading"),
                 State::Pending | State::Blocked | State::Succeeded => {
-                    format!("Read skill {skill}")
+                    warp::t!("tui-tool-skill-read", skill = skill)
                 }
-                State::Running => format!("Reading skill {skill}"),
-                State::Failed => format!("Failed to read skill {skill}"),
-                State::Cancelled => format!("Cancelled reading skill {skill}"),
+                State::Running => warp::t!("tui-tool-skill-reading-name", skill = skill),
+                State::Failed => warp::t!("tui-tool-skill-failed", skill = skill),
+                State::Cancelled => warp::t!("tui-tool-skill-cancelled", skill = skill),
             }
         }
         AIAgentActionType::TransferShellCommandControlToUser { reason } => match state {
-            State::Constructing => "Handing control to you…".to_owned(),
+            State::Constructing => warp::t!("tui-tool-control-transferring"),
             State::Pending | State::Blocked | State::Running => {
-                format!("Handing control to you: {}", single_line(reason))
+                warp::t!(
+                    "tui-tool-control-transferring-reason",
+                    reason = single_line(reason)
+                )
             }
-            State::Succeeded => "You are in control".to_owned(),
-            State::Failed => "Control transfer failed".to_owned(),
-            State::Cancelled => "Control transfer cancelled".to_owned(),
+            State::Succeeded => warp::t!("tui-tool-control-transferred"),
+            State::Failed => warp::t!("tui-tool-control-transfer-failed"),
+            State::Cancelled => warp::t!("tui-tool-control-transfer-cancelled"),
         },
         AIAgentActionType::AskUserQuestion { questions } => match state {
-            State::Constructing => "Preparing question…".to_owned(),
-            State::Pending | State::Blocked | State::Running => format!(
-                "Asking {}",
-                count_label(questions.len(), "question", "questions")
-            ),
+            State::Constructing => warp::t!("tui-tool-question-preparing"),
+            State::Pending | State::Blocked | State::Running => {
+                warp::t!("tui-tool-questions-asking", count = questions.len())
+            }
             State::Succeeded => match result {
                 Some(AIAgentActionResultType::AskUserQuestion(
                     AskUserQuestionResult::Success { answers },
@@ -474,38 +509,42 @@ fn label_for_action(
                     let total = answers.len();
                     let answered = answers.iter().filter(|answer| !answer.is_skipped()).count();
                     if answered == 0 {
-                        "Questions skipped".to_owned()
+                        warp::t!("tui-questions-skipped")
                     } else if answered == total && total == 1 {
-                        "Answered question".to_owned()
+                        warp::t!("tui-answered-question")
                     } else if answered == total {
-                        format!("Answered all {total} questions")
+                        warp::t!("tui-answered-all-questions", total = total)
                     } else {
-                        format!("Answered {answered} of {total} questions")
+                        warp::t!(
+                            "tui-answered-some-questions",
+                            answered = answered,
+                            total = total
+                        )
                     }
                 }
                 Some(AIAgentActionResultType::AskUserQuestion(
                     AskUserQuestionResult::SkippedByAutoApprove { .. },
-                )) => "Questions skipped".to_owned(),
-                _ => "Answered questions".to_owned(),
+                )) => warp::t!("tui-questions-skipped"),
+                _ => warp::t!("tui-answered-questions"),
             },
-            State::Failed => "Questions failed".to_owned(),
-            State::Cancelled => "Questions cancelled".to_owned(),
+            State::Failed => warp::t!("tui-tool-questions-failed"),
+            State::Cancelled => warp::t!("tui-tool-questions-cancelled"),
         },
         AIAgentActionType::RunAgents(request) => {
             let total = request.agent_run_configs.len();
             match state {
                 State::Constructing | State::Pending | State::Blocked => {
-                    "Configuring agents…".to_owned()
+                    warp::t!("tui-tool-agents-configuring")
                 }
                 State::Running => {
-                    format!("Spawning {}…", count_label(total, "agent", "agents"))
+                    warp::t!("tui-tool-agents-spawning", count = total)
                 }
                 State::Succeeded => match result {
                     Some(AIAgentActionResultType::RunAgents(RunAgentsResult::Launched {
                         agents,
                         ..
                     })) => launched_agents_label(agents),
-                    _ => format!("Spawned {}", count_label(total, "agent", "agents")),
+                    _ => warp::t!("tui-tool-agents-spawned", count = total),
                 },
                 State::Failed => match result {
                     Some(AIAgentActionResultType::RunAgents(RunAgentsResult::Launched {
@@ -514,24 +553,27 @@ fn label_for_action(
                     })) => launched_agents_label(agents),
                     Some(AIAgentActionResultType::RunAgents(RunAgentsResult::Denied {
                         ..
-                    })) => "Orchestration disabled — agents not launched".to_owned(),
+                    })) => warp::t!("tui-tool-orchestration-disabled"),
                     Some(AIAgentActionResultType::RunAgents(RunAgentsResult::Failure {
                         error,
                     })) if !error.is_empty() => {
-                        format!("Failed to start orchestration: {}", single_line(error))
+                        warp::t!(
+                            "tui-tool-orchestration-failed-error",
+                            error = single_line(error)
+                        )
                     }
-                    _ => "Failed to start orchestration".to_owned(),
+                    _ => warp::t!("tui-tool-orchestration-failed"),
                 },
-                State::Cancelled => "Spawn agents cancelled".to_owned(),
+                State::Cancelled => warp::t!("tui-tool-agents-cancelled"),
             }
         }
         AIAgentActionType::WaitForEvents { .. } => match state {
             State::Constructing | State::Pending | State::Blocked | State::Running => {
-                "Waiting for agent events…".to_owned()
+                warp::t!("tui-tool-events-waiting")
             }
-            State::Succeeded => "Done waiting for agent events".to_owned(),
-            State::Failed => "Waiting for agent events failed".to_owned(),
-            State::Cancelled => "Wait for events cancelled".to_owned(),
+            State::Succeeded => warp::t!("tui-tool-events-done"),
+            State::Failed => warp::t!("tui-tool-events-failed"),
+            State::Cancelled => warp::t!("tui-tool-events-cancelled"),
         },
     }
 }
@@ -543,11 +585,15 @@ fn launched_agents_label(agents: &[RunAgentsAgentOutcome]) -> String {
         .count();
     let total = agents.len();
     if launched == total {
-        format!("Spawned {}", count_label(total, "agent", "agents"))
+        warp::t!("tui-tool-agents-spawned", count = total)
     } else if launched == 0 {
-        format!("Failed to spawn {}", count_label(total, "agent", "agents"))
+        warp::t!("tui-tool-agents-spawn-failed", count = total)
     } else {
-        format!("Spawned {launched} of {total} agents")
+        warp::t!(
+            "tui-tool-agents-spawned-some",
+            launched = launched,
+            total = total
+        )
     }
 }
 /// Shared label body for both file-glob action versions; only V2 results
@@ -561,20 +607,25 @@ fn file_glob_label(
     let patterns = single_line(&patterns.join(", "));
     let path = display_path(path.unwrap_or("."));
     match state {
-        State::Constructing => "Finding files…".to_owned(),
+        State::Constructing => warp::t!("tui-tool-files-finding"),
         State::Pending | State::Blocked => {
-            format!("Find files matching {patterns} in {path}")
+            warp::t!("tui-tool-files-find", patterns = patterns, path = path)
         }
-        State::Running => format!("Finding files matching {patterns} in {path}"),
+        State::Running => warp::t!(
+            "tui-tool-files-finding-pattern",
+            patterns = patterns,
+            path = path
+        ),
         State::Succeeded => match matched_count {
-            Some(count) => format!(
-                "Found {} matching {patterns}",
-                count_label(count, "file", "files")
+            Some(count) => warp::t!(
+                "tui-tool-files-found-count",
+                count = count,
+                patterns = patterns
             ),
-            None => format!("Found files matching {patterns}"),
+            None => warp::t!("tui-tool-files-found", patterns = patterns),
         },
-        State::Failed => format!("File search for {patterns} failed"),
-        State::Cancelled => format!("File search for {patterns} cancelled"),
+        State::Failed => warp::t!("tui-tool-files-search-failed", patterns = patterns),
+        State::Cancelled => warp::t!("tui-tool-files-search-cancelled", patterns = patterns),
     }
 }
 
@@ -584,10 +635,10 @@ fn fallback_label(action: &AIAgentActionType, state: State) -> String {
     let name = action.user_friendly_name();
     match state {
         State::Pending | State::Blocked => name,
-        State::Constructing | State::Running => format!("{name}…"),
-        State::Succeeded => format!("{name} — done"),
-        State::Failed => format!("{name} — failed"),
-        State::Cancelled => format!("{name} — cancelled"),
+        State::Constructing | State::Running => warp::t!("tui-tool-generic-running", name = name),
+        State::Succeeded => warp::t!("tui-tool-generic-done", name = name),
+        State::Failed => warp::t!("tui-tool-generic-failed", name = name),
+        State::Cancelled => warp::t!("tui-tool-generic-cancelled", name = name),
     }
 }
 
@@ -605,7 +656,7 @@ fn single_line(text: &str) -> String {
 /// Renders a search path for display, mirroring the GUI's treatment of `.`.
 fn display_path(path: &str) -> String {
     if path == "." {
-        "the current directory".to_owned()
+        warp::t!("tui-current-directory")
     } else {
         single_line(path)
     }
@@ -622,20 +673,26 @@ fn base_name(path: &str) -> String {
 /// Summarizes file paths as comma-joined base names for up to 3 files, else a count.
 fn files_summary<'a>(paths: impl ExactSizeIterator<Item = &'a String>) -> String {
     if paths.len() > 3 {
-        return count_label(paths.len(), "file", "files");
+        return count_files(paths.len());
     }
     let names: Vec<String> = paths.map(|path| base_name(path)).collect();
     if names.is_empty() {
-        "files".to_owned()
+        warp::t!("tui-files")
     } else {
         names.join(", ")
     }
 }
 
-/// Pluralizes a counted noun, e.g. `count_label(2, "file", "files")` → "2 files".
-fn count_label(count: usize, singular: &str, plural: &str) -> String {
-    let noun = if count == 1 { singular } else { plural };
-    format!("{count} {noun}")
+fn count_files(count: usize) -> String {
+    warp::t!("tui-count-files", count = count)
+}
+
+fn count_documents(count: usize) -> String {
+    warp::t!("tui-count-documents", count = count)
+}
+
+fn count_review_comments(count: usize) -> String {
+    warp::t!("tui-count-review-comments", count = count)
 }
 
 #[cfg(test)]

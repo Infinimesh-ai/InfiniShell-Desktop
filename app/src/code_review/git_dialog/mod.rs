@@ -196,7 +196,7 @@ fn render_branch_section(
     let sub_color = theme.sub_text_color(theme.surface_1()).into_solid();
 
     let label = Text::new(
-        "Branch",
+        crate::t!("code-review-branch"),
         appearance.ui_font_family(),
         appearance.ui_font_size(),
     )
@@ -281,10 +281,7 @@ fn render_file_changes_box(
     let total_deletions: usize = file_changes.iter().map(|f| f.deletions).sum();
 
     let files_text = Text::new(
-        format!(
-            "{total_files} {}",
-            if total_files == 1 { "file" } else { "files" }
-        ),
+        crate::t!("code-review-file-count", count = total_files),
         appearance.ui_font_family(),
         appearance.ui_font_size(),
     )
@@ -701,9 +698,9 @@ impl GitDialog {
 
     /// Disables cancel/confirm/close and swaps the confirm label while the
     /// async op is running.
-    fn set_loading(&mut self, loading_label: &'static str, ctx: &mut ViewContext<Self>) {
+    fn set_loading(&mut self, loading_label: String, ctx: &mut ViewContext<Self>) {
         self.loading = true;
-        self.confirm_button.update(ctx, |b, ctx| {
+        self.confirm_button.update(ctx, move |b, ctx| {
             b.set_label(loading_label, ctx);
             b.set_disabled(true, ctx);
         });
@@ -737,17 +734,17 @@ impl GitDialog {
         });
     }
 
-    fn title(&self) -> &'static str {
+    fn title(&self) -> String {
         match &self.mode {
-            GitDialogMode::Commit(_) => "Commit your changes",
+            GitDialogMode::Commit(_) => crate::t!("code-review-commit-your-changes"),
             GitDialogMode::Push(state) => {
                 if state.publish {
-                    "Publish branch"
+                    crate::t!("code-review-publish-branch")
                 } else {
-                    "Push changes"
+                    crate::t!("code-review-push-changes")
                 }
             }
-            GitDialogMode::CreatePr(_) => "Create pull request",
+            GitDialogMode::CreatePr(_) => crate::t!("code-review-create-pull-request"),
         }
     }
 
@@ -808,7 +805,7 @@ impl GitDialog {
         .finish();
 
         let dialog = Dialog::new(
-            self.title().to_string(),
+            self.title(),
             None,
             UiComponentStyles {
                 width: Some(460.),

@@ -50,6 +50,7 @@ fs4.workspace = true
 http_client.workspace = true
 instant.workspace = true
 inquire = "0.9.1"
+i18n-embed-fl.workspace = true
 itertools.workspace = true
 log.workspace = true
 markdown_parser.workspace = true
@@ -112,6 +113,7 @@ dunce.workspace = true
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
+ctor = "0.1.18"
 tempfile.workspace = true
 # `test-util` exposes `Appearance::mock()`, used to register the `Appearance`
 # singleton that the editor-backed TUI input view depends on in tests.

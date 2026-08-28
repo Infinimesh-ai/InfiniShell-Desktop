@@ -180,9 +180,13 @@ impl SearchItem for WorkflowSearchItem {
 
     fn accessibility_label(&self) -> String {
         if let Some(description) = &self.workflow_description {
-            format!("Workflow: {} - {}", self.workflow_name, description)
+            crate::t!(
+                "search-workflow-with-description-a11y",
+                name = self.workflow_name.as_str(),
+                description = description.as_str()
+            )
         } else {
-            format!("Workflow: {}", self.workflow_name)
+            crate::t!("search-workflow-a11y", name = self.workflow_name.as_str())
         }
     }
 

@@ -53,13 +53,27 @@ pub struct InstallOutcome {
 /// details.
 #[derive(Clone, Debug)]
 pub struct UserFacingError {
-    /// Always-visible explanation of what went wrong,
-    /// e.g. "Failed to install SSH extension".
-    pub body: String,
+    /// Always-visible explanation of what went wrong.
+    pub body: UserFacingErrorBody,
     /// Optional technical detail shown to the user (stderr,
     /// timeout duration, unsupported OS/arch). `None` when the
     /// underlying error doesn't carry anything useful for the user.
-    pub detail: Option<String>,
+    pub detail: Option<UserFacingErrorDetail>,
+}
+
+#[derive(Clone, Debug)]
+pub enum UserFacingErrorBody {
+    SetupStage(SetupStage),
+    Custom(String),
+}
+
+#[derive(Clone, Debug)]
+pub enum UserFacingErrorDetail {
+    TimedOut,
+    UnsupportedOs(String),
+    UnsupportedArch(String),
+    ScriptFailed { exit_code: i32, stderr: String },
+    Custom(String),
 }
 
 /// The setup stage that failed, used to generate context-appropriate
@@ -71,18 +85,6 @@ pub enum SetupStage {
     CheckBinary,
     InstallBinary,
     Launch,
-}
-
-impl SetupStage {
-    fn action_description(self) -> &'static str {
-        match self {
-            Self::DetectPlatform => "detect remote platform",
-            Self::PreinstallCheck => "run preinstall check",
-            Self::CheckBinary => "verify SSH extension",
-            Self::InstallBinary => "install SSH extension",
-            Self::Launch => "start SSH extension",
-        }
-    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -114,13 +116,13 @@ impl Error {
     /// SSH remote-server failed banner, using `stage` to provide
     /// context-appropriate copy.
     pub fn user_facing_error(&self, stage: SetupStage) -> UserFacingError {
-        let body = format!("Failed to {}", stage.action_description());
+        let body = UserFacingErrorBody::SetupStage(stage);
         let detail = match self {
-            Self::TimedOut => {
-                Some("The operation timed out — check your network connection".into())
+            Self::TimedOut => Some(UserFacingErrorDetail::TimedOut),
+            Self::UnsupportedOs { os } => Some(UserFacingErrorDetail::UnsupportedOs(os.clone())),
+            Self::UnsupportedArch { arch } => {
+                Some(UserFacingErrorDetail::UnsupportedArch(arch.clone()))
             }
-            Self::UnsupportedOs { os } => Some(format!("Unsupported OS: {os}")),
-            Self::UnsupportedArch { arch } => Some(format!("Unsupported architecture: {arch}")),
             Self::ScriptFailed { exit_code, stderr } => {
                 let truncated = if stderr.chars().count() > MAX_STDERR_DISPLAY_CHARS {
                     let end: usize = stderr
@@ -132,7 +134,10 @@ impl Error {
                 } else {
                     stderr.clone()
                 };
-                Some(format!("Script exited with code {exit_code}: {truncated}"))
+                Some(UserFacingErrorDetail::ScriptFailed {
+                    exit_code: *exit_code,
+                    stderr: truncated,
+                })
             }
             Self::Other(_) => None,
         };

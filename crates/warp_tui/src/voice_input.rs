@@ -128,9 +128,9 @@ impl TuiVoiceInputModel {
             && AISettings::as_ref(ctx).is_voice_input_enabled(ctx)
             && AIRequestUsageModel::as_ref(ctx).can_request_voice();
         if !available {
-            ctx.emit(TuiVoiceInputEvent::Failed(
-                "Voice input is unavailable".to_owned(),
-            ));
+            ctx.emit(TuiVoiceInputEvent::Failed(warp::t!(
+                "tui-voice-input-unavailable"
+            )));
             return false;
         }
 
@@ -141,12 +141,12 @@ impl TuiVoiceInputModel {
             Ok(session) => session,
             Err(error) => {
                 let hint = match error {
-                    StartListeningError::AccessDenied => "Microphone access denied",
+                    StartListeningError::AccessDenied => warp::t!("tui-microphone-access-denied"),
                     StartListeningError::AlreadyRunning | StartListeningError::Other(_) => {
-                        "Unable to start voice input"
+                        warp::t!("tui-voice-input-start-failed")
                     }
                 };
-                ctx.emit(TuiVoiceInputEvent::Failed(hint.to_owned()));
+                ctx.emit(TuiVoiceInputEvent::Failed(hint));
                 return false;
             }
         };
@@ -181,7 +181,7 @@ impl TuiVoiceInputModel {
             VoiceInput::handle(ctx).update(ctx, |voice_input, _| {
                 voice_input.abort_listening();
             });
-            self.fail("Failed to stop voice input", ctx);
+            self.fail(&warp::t!("tui-voice-input-stop-failed"), ctx);
             report_error!(error.context("Failed to stop TUI voice input"));
             return;
         }
@@ -304,12 +304,12 @@ impl TuiVoiceInputModel {
                     },
                     ctx
                 );
-                self.fail("Voice input stopped", ctx);
+                self.fail(&warp::t!("tui-voice-input-stopped"), ctx);
                 return;
             }
         };
         let Some(transcriber) = VoiceTranscriber::as_ref(ctx).transcriber().cloned() else {
-            self.fail("Voice transcription is unavailable", ctx);
+            self.fail(&warp::t!("tui-voice-transcription-unavailable"), ctx);
             return;
         };
         let language = AISettings::as_ref(ctx)
@@ -341,11 +341,13 @@ impl TuiVoiceInputModel {
             Ok(text) => ctx.emit(TuiVoiceInputEvent::Completed(text)),
             Err(error) => {
                 let hint = match error {
-                    TranscribeError::QuotaLimit => "Voice input limit reached",
-                    TranscribeError::ServerOverloaded => "Voice transcription is unavailable",
-                    _ => "Failed to transcribe voice input",
+                    TranscribeError::QuotaLimit => warp::t!("tui-voice-input-limit-reached"),
+                    TranscribeError::ServerOverloaded => {
+                        warp::t!("tui-voice-transcription-unavailable")
+                    }
+                    _ => warp::t!("tui-voice-transcription-failed"),
                 };
-                ctx.emit(TuiVoiceInputEvent::Failed(hint.to_owned()));
+                ctx.emit(TuiVoiceInputEvent::Failed(hint));
             }
         }
     }

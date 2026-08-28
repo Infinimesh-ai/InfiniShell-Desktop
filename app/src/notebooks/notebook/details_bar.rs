@@ -192,7 +192,10 @@ impl DetailsBar {
                 let editor = editor_display_name(editor.email.as_deref(), app);
                 appearance
                     .ui_builder()
-                    .span(format!("{editor} is editing"))
+                    .span(crate::t!(
+                        "notebook-editor-is-editing",
+                        editor = editor.clone()
+                    ))
                     .with_style(base_text_styles)
                     .with_highlights(
                         (0..editor.chars().count()).collect(),
@@ -213,7 +216,7 @@ fn editor_display_name(email: Option<&str>, app: &AppContext) -> String {
         Some(email) => UserProfiles::as_ref(app)
             .displayable_identifier_for_email(email)
             .unwrap_or_else(|| email.to_string()),
-        None => "Other user".to_string(),
+        None => crate::t!("notebook-other-user"),
     }
 }
 

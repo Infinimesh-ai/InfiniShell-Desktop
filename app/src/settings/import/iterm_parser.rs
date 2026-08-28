@@ -141,6 +141,18 @@ impl ITermTheme {
         };
 
         let accent = calculate_accent_color(background, foreground, cursor, bright);
+        let theme_name = if suffix.is_empty() {
+            crate::t!("settings-import-iterm-theme-name")
+        } else if suffix == " (Light)" {
+            crate::t!("settings-import-iterm-light-theme-name")
+        } else if suffix == " (Dark)" {
+            crate::t!("settings-import-iterm-dark-theme-name")
+        } else {
+            crate::t!(
+                "settings-import-iterm-theme-name-with-suffix",
+                suffix = suffix.to_string()
+            )
+        };
 
         Ok(WarpTheme::new(
             background.into(),
@@ -162,7 +174,7 @@ impl ITermTheme {
                 bright,
             },
             None,
-            Some(format!("Imported iTerm Theme{suffix}")),
+            Some(theme_name),
             None,
         ))
     }
@@ -755,7 +767,9 @@ impl ParseableConfig for ITermProfile {
                 SettingType::MouseAndScrollReporting,
             ),
             option_as_meta: ImportableSetting::new(option_as_meta, SettingType::OptionAsMeta),
-            description: self.profile_name.map(|name| format!("Profile: {name}")),
+            description: self
+                .profile_name
+                .map(|name| crate::t!("settings-import-profile-name", name = name)),
             font: ImportableSetting::new(font, SettingType::Font),
             default_shell: ImportableSetting::new(default_shell, SettingType::DefaultShell),
             working_directory: ImportableSetting::new(

@@ -20,11 +20,10 @@ use warp::tui_export::{
     AIAgentOutputMessageType, AIAgentText, AIAgentTextSection, AIAgentTodo, AIBlockModel,
     AIBlockModelHelper, AIBlockOutputStatus, AIConversationId, AuthStateProvider, BlockId,
     BlocklistAIActionEvent, BlocklistAIActionModel, BlocklistAIHistoryModel, CancellationReason,
-    FAILED_OUTPUT_USAGE_NOTICE_TEXT, FailedOutputPresentation, MessageId, ModelEvent,
-    ModelEventDispatcher, ReceivedMessageDisplay, RenderableAIError, SummarizationType,
-    TelemetryEvent, TerminalModel, TodoOperation, TodoStatus, TuiOnboardingMarker,
-    TuiOnboardingMarkers, TuiOnboardingMarkersEvent, UserWorkspaces, failed_output_presentation,
-    should_show_failed_output_usage_notice,
+    FailedOutputPresentation, MessageId, ModelEvent, ModelEventDispatcher, ReceivedMessageDisplay,
+    RenderableAIError, SummarizationType, TelemetryEvent, TerminalModel, TodoOperation, TodoStatus,
+    TuiOnboardingMarker, TuiOnboardingMarkers, TuiOnboardingMarkersEvent, UserWorkspaces,
+    failed_output_presentation, should_show_failed_output_usage_notice,
 };
 use warpui::SingletonEntity;
 use warpui_core::elements::MouseStateHandle;
@@ -58,13 +57,7 @@ use crate::tui_markdown::{
 };
 use crate::tui_plan_view::{TuiPlanView, TuiPlanViewEvent};
 use crate::tui_review_comments::render_review_comments_tool_call;
-const OUT_OF_CREDITS_TITLE: &str = "I’m sorry, I couldn’t complete that request.";
-const OUT_OF_CREDITS_DETAIL: &str =
-    "In order to use InfiniShell’s AI features, subscribe to a Warp plan or buy packs of credits.";
-const OUT_OF_CREDITS_ACTION_LABEL: &str = "Get started with AI";
 const OUT_OF_CREDITS_ACTION_HINT: &str = "(ctrl+o)";
-const FIRST_CREDIT_GATE_TITLE: &str = "You need AI credits in order to use InfiniShell TUI.";
-const FIRST_CREDIT_GATE_ACTION_LABEL: &str = "Start using AI";
 const FIRST_CREDIT_GATE_ACTION_HINT: &str = "(ctrl+o).";
 const FAILURE_WARNING_PREFIX: &str = "⚠ ";
 
@@ -100,7 +93,7 @@ fn render_first_credit_gate(
     let click_url = upgrade_url.clone();
     let action = TuiHoverable::new(
         out_of_credits_hover_state.clone(),
-        TuiText::new(FIRST_CREDIT_GATE_ACTION_LABEL)
+        TuiText::new(warp::t!("tui-first-credit-action"))
             .with_style(primary_style.add_modifier(Modifier::UNDERLINED))
             .finish(),
     )
@@ -108,7 +101,7 @@ fn render_first_credit_gate(
     .finish();
     TuiFlex::column()
         .child(
-            TuiText::new(FIRST_CREDIT_GATE_TITLE)
+            TuiText::new(warp::t!("tui-first-credit-title"))
                 .with_style(builder.attention_glyph_style())
                 .finish(),
         )
@@ -267,7 +260,7 @@ fn render_failure_section(
             let click_url = upgrade_url.clone();
             let action = TuiHoverable::new(
                 out_of_credits_hover_state.clone(),
-                TuiText::new(OUT_OF_CREDITS_ACTION_LABEL)
+                TuiText::new(warp::t!("tui-out-of-credits-action"))
                     .with_style(link_style)
                     .finish(),
             )
@@ -287,13 +280,13 @@ fn render_failure_section(
                 .child(
                     TuiText::from_spans([
                         (FAILURE_WARNING_PREFIX.to_owned(), error_style),
-                        (OUT_OF_CREDITS_TITLE.to_owned(), primary_style),
+                        (warp::t!("tui-out-of-credits-title"), primary_style),
                     ])
                     .finish(),
                 )
                 .child(
                     TuiContainer::new(
-                        TuiText::new(OUT_OF_CREDITS_DETAIL)
+                        TuiText::new(warp::t!("tui-out-of-credits-detail"))
                             .with_style(primary_style)
                             .finish(),
                     )
@@ -319,7 +312,7 @@ fn render_failure_section(
 }
 
 fn render_usage_notice(app: &AppContext) -> Box<dyn TuiElement> {
-    TuiText::new(FAILED_OUTPUT_USAGE_NOTICE_TEXT)
+    TuiText::new(warp::t!("tui-failed-output-usage-notice"))
         .with_style(TuiUiBuilder::from_app(app).muted_text_style())
         .finish()
 }
@@ -336,9 +329,11 @@ fn failure_text(presentation: &FailedOutputPresentation, app: &AppContext) -> St
         | FailedOutputPresentation::ContextWindowExceeded { message } => message.clone(),
         FailedOutputPresentation::OutOfCredits { .. } => {
             let upgrade_url = upgrade_url(app);
+            let title = warp::t!("tui-out-of-credits-title");
+            let detail = warp::t!("tui-out-of-credits-detail");
+            let action = warp::t!("tui-out-of-credits-action");
             format!(
-                "{OUT_OF_CREDITS_TITLE}\n  {OUT_OF_CREDITS_DETAIL}\n\n  \
-                 {OUT_OF_CREDITS_ACTION_LABEL} {OUT_OF_CREDITS_ACTION_HINT}\n\n  {upgrade_url}"
+                "{title}\n  {detail}\n\n  {action} {OUT_OF_CREDITS_ACTION_HINT}\n\n  {upgrade_url}"
             )
         }
         FailedOutputPresentation::InvalidApiKey { title, detail } => {
@@ -1664,7 +1659,7 @@ impl TuiAIBlock {
                 .get(key)
                 .map(|view| TuiChildView::new(view).finish())
                 .unwrap_or_else(|| {
-                    TuiText::new("[Code block unavailable]")
+                    TuiText::new(warp::t!("tui-code-block-unavailable"))
                         .with_style(palette.fallback)
                         .finish()
                 }),
@@ -1680,9 +1675,9 @@ impl TuiAIBlock {
                 .finish(),
             TuiRichTextSection::Image { alt_text, source } => {
                 let label = if alt_text.is_empty() {
-                    "Image".to_owned()
+                    warp::t!("tui-image-label")
                 } else {
-                    format!("Image: {alt_text}")
+                    warp::t!("tui-image-description", description = alt_text)
                 };
                 TuiText::from_spans([
                     (label, palette.fallback),
@@ -1908,12 +1903,13 @@ fn section_logical_text(section: &TuiAIBlockSection, app: &AppContext) -> Option
         TuiAIBlockSection::Failure(presentation) => Some(failure_text(presentation, app)),
         TuiAIBlockSection::FirstCreditGate => {
             let upgrade_url = upgrade_url(app);
+            let title = warp::t!("tui-first-credit-title");
+            let action = warp::t!("tui-first-credit-action");
             Some(format!(
-                "{FIRST_CREDIT_GATE_TITLE}\n{FIRST_CREDIT_GATE_ACTION_LABEL} \
-                 {FIRST_CREDIT_GATE_ACTION_HINT}\n\n{upgrade_url}"
+                "{title}\n{action} {FIRST_CREDIT_GATE_ACTION_HINT}\n\n{upgrade_url}"
             ))
         }
-        TuiAIBlockSection::UsageNotice => Some(FAILED_OUTPUT_USAGE_NOTICE_TEXT.to_owned()),
+        TuiAIBlockSection::UsageNotice => Some(warp::t!("tui-failed-output-usage-notice")),
     }
 }
 

@@ -63,7 +63,7 @@ impl View for HarnessSessionHeader {
             Icon::ChevronRight
         };
 
-        let label = format!("Running {}...", self.cli_name);
+        let label = crate::t!("ambient-agent-running-harness", name = self.cli_name.as_str());
 
         let row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)

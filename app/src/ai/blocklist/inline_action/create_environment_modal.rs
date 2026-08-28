@@ -36,7 +36,10 @@ impl CreateEnvironmentModal {
             HandoffEnvironmentCreationModalEvent::CreationFailed { error_message } => {
                 me.visible = false;
                 me.show_error_toast(
-                    format!("Failed to create environment: {error_message}"),
+                    crate::t!(
+                        "ai-create-environment-failed",
+                        error = error_message.as_str()
+                    ),
                     ctx,
                 );
                 ctx.notify();

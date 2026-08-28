@@ -41,7 +41,7 @@ pub fn render_rich_history(entry: &HistoryEntry, ctx: &AppContext) -> Box<dyn El
         flex_column.add_child(
             Container::new(render_row_with_icon_and_paragraph(
                 icon.into(),
-                format!("Exit code {}", exit_code.value()),
+                crate::t!("terminal-history-exit-code", code = exit_code.value()),
                 appearance,
             ))
             .with_margin_top(DETAILS_PARAGRAPH_SPACING)
@@ -77,9 +77,9 @@ pub fn render_rich_history(entry: &HistoryEntry, ctx: &AppContext) -> Box<dyn El
         flex_column.add_child(
             Container::new(
                 ui_builder
-                    .paragraph(format!(
-                        "Finished in {}",
-                        human_readable_precise_duration((completed_ts).sub(start_ts))
+                    .paragraph(crate::t!(
+                        "terminal-history-finished-in",
+                        duration = human_readable_precise_duration((completed_ts).sub(start_ts))
                     ))
                     .build()
                     .finish(),
@@ -93,9 +93,9 @@ pub fn render_rich_history(entry: &HistoryEntry, ctx: &AppContext) -> Box<dyn El
         flex_column.add_child(
             Container::new(
                 ui_builder
-                    .paragraph(format!(
-                        "Last ran {}",
-                        format_approx_duration_from_now(start_ts)
+                    .paragraph(crate::t!(
+                        "terminal-history-last-ran",
+                        time = format_approx_duration_from_now(start_ts)
                     ))
                     .build()
                     .finish(),
@@ -138,9 +138,9 @@ pub(crate) fn render_ai_query_rich_history(
         Container::new(
             appearance
                 .ui_builder()
-                .paragraph(format!(
-                    "Ran {}",
-                    format_approx_duration_from_now(entry.start_time)
+                .paragraph(crate::t!(
+                    "terminal-history-ran",
+                    time = format_approx_duration_from_now(entry.start_time)
                 ))
                 .build()
                 .finish(),

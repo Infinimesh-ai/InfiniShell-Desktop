@@ -329,7 +329,7 @@ impl DiffViewer for InlineDiffView {
                         file_model.delete(file_id, version, ctx)
                     })
                     .map(drop)
-                    .map_err(|e| format!("Failed to delete file: {e:?}"))?;
+                    .map_err(|e| crate::t!("code-delete-file-failed", error = format!("{e:?}")))?;
                 return Ok(());
             }
 
@@ -352,7 +352,7 @@ impl DiffViewer for InlineDiffView {
                     file_model.save(file_id, base_content, version, ctx)
                 })
                 .map(drop)
-                .map_err(|e| format!("Failed to save file: {e:?}"))?;
+                .map_err(|e| crate::t!("code-save-file-failed", error = format!("{e:?}")))?;
         }
 
         Ok(())

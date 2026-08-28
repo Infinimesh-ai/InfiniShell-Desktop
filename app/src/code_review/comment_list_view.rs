@@ -58,20 +58,12 @@ use crate::view_components::action_button::{
 };
 use crate::workspace::view::right_panel::ReviewDestination;
 
-/// Header text for the outdated section when there is exactly one outdated comment.
-const OUTDATED_SECTION_HEADER_SINGULAR: &str = "1 comment will be omitted because it is outdated.";
-/// Header text format for the outdated section when there are multiple outdated comments.
-/// Use with `format!` to insert the count.
-const OUTDATED_SECTION_HEADER_PLURAL_FMT: &str =
-    " comments will be omitted because they are outdated.";
-
 /// Returns the header text for the outdated section based on the number of outdated comments.
 fn outdated_section_header_text(count: usize) -> Cow<'static, str> {
-    if count == 1 {
-        Cow::Borrowed(OUTDATED_SECTION_HEADER_SINGULAR)
-    } else {
-        Cow::Owned(format!("{count}{OUTDATED_SECTION_HEADER_PLURAL_FMT}"))
-    }
+    Cow::Owned(crate::t!(
+        "code-review-outdated-comments-omitted",
+        count = count
+    ))
 }
 
 /// Convert markdown text to HTML using the editor's buffer serialization.
@@ -214,7 +206,7 @@ impl CommentListView {
         });
 
         let send_button = ctx.add_view(|ctx| {
-            ActionButton::new("Send to Agent", PrimaryTheme)
+            ActionButton::new(crate::t!("code-review-send-to-agent"), PrimaryTheme)
                 .with_size(ButtonSize::Small)
                 .with_keybinding(
                     KeystrokeSource::Fixed(
@@ -274,17 +266,9 @@ impl CommentListView {
             .count();
 
         let label_text = if non_outdated_count == 0 && total_count > 0 {
-            format!(
-                "{} outdated comment{}",
-                total_count,
-                if total_count == 1 { "" } else { "s" }
-            )
+            crate::t!("code-review-outdated-comment-count", count = total_count)
         } else {
-            format!(
-                "{} comment{}",
-                non_outdated_count,
-                if non_outdated_count == 1 { "" } else { "s" }
-            )
+            crate::t!("code-review-comment-count", count = non_outdated_count)
         };
 
         self.comments_button
@@ -823,7 +807,7 @@ impl CommentListView {
             .finish();
 
             let outdated_text = Text::new(
-                format!("{outdated_count} outdated"),
+                crate::t!("code-review-outdated-count", count = outdated_count),
                 appearance.ui_font_family(),
                 appearance.ui_font_size(),
             )

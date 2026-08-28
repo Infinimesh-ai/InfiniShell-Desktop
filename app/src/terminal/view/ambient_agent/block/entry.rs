@@ -121,14 +121,18 @@ impl AmbientAgentEntryBlock {
     }
 
     /// Gets the detail text to display based on the ambient agent status.
-    fn detail_text(&self, app: &AppContext) -> Option<&'static str> {
+    fn detail_text(&self, app: &AppContext) -> Option<String> {
         match self.ambient_agent_view_model(app)?.status() {
             Status::NotAmbientAgent | Status::Setup | Status::Composing => None,
-            Status::WaitingForSession { .. } => Some("Starting environment..."),
-            Status::AgentRunning => Some("Agent is working on task"),
-            Status::Failed { .. } => Some("Agent failed"),
-            Status::NeedsGithubAuth { .. } => Some("Authentication required"),
-            Status::Cancelled { .. } => Some("Cancelled"),
+            Status::WaitingForSession { .. } => {
+                Some(crate::t!("ambient-agent-starting-environment"))
+            }
+            Status::AgentRunning => Some(crate::t!("ambient-agent-working")),
+            Status::Failed { .. } => Some(crate::t!("ambient-agent-failed")),
+            Status::NeedsGithubAuth { .. } => {
+                Some(crate::t!("ambient-agent-authentication-required"))
+            }
+            Status::Cancelled { .. } => Some(crate::t!("common-cancelled")),
         }
     }
 

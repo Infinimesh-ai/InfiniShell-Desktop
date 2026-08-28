@@ -68,17 +68,19 @@ impl AgentSource {
         }
     }
 
-    pub fn display_name(&self) -> &str {
+    pub fn display_name(&self) -> String {
         match self {
-            AgentSource::Linear => "Linear",
-            AgentSource::AgentWebhook => "API",
-            AgentSource::Slack => "Slack",
-            AgentSource::Cli => "CLI",
-            AgentSource::ScheduledAgent => "Scheduled",
-            AgentSource::Interactive | AgentSource::CloudMode => "InfiniShell (local agent)",
-            AgentSource::WebApp => "InfiniShell Agent",
-            AgentSource::GitHubAction => "GitHub Action",
-            AgentSource::GitHubWebhook => "GitHub",
+            AgentSource::Linear => "Linear".to_string(),
+            AgentSource::AgentWebhook => "API".to_string(),
+            AgentSource::Slack => "Slack".to_string(),
+            AgentSource::Cli => "CLI".to_string(),
+            AgentSource::ScheduledAgent => crate::t!("ambient-agent-source-scheduled"),
+            AgentSource::Interactive | AgentSource::CloudMode => {
+                crate::t!("ambient-agent-source-local")
+            }
+            AgentSource::WebApp => "InfiniShell Agent".to_string(),
+            AgentSource::GitHubAction => "GitHub Action".to_string(),
+            AgentSource::GitHubWebhook => "GitHub".to_string(),
         }
     }
 

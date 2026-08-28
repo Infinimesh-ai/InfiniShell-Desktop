@@ -47,10 +47,10 @@ pub enum ByoKeySource {
 }
 
 impl ByoKeySource {
-    pub fn inference_label(self) -> &'static str {
+    pub fn inference_label(self) -> String {
         match self {
-            ByoKeySource::UserProvided => "Inference via User-provided API key",
-            ByoKeySource::TeamProvided => "Inference via Team-provided API key",
+            ByoKeySource::UserProvided => crate::t!("model-inference-user-api-key"),
+            ByoKeySource::TeamProvided => crate::t!("model-inference-team-api-key"),
         }
     }
 }
@@ -195,7 +195,6 @@ pub fn model_leading_icon(llm: &LLMInfo, flags: ModelIconFlags) -> Icon {
 /// Note: this key used to store a single [`AvailableLLMs`]
 /// but was migrated to store a full [`ModelsByFeature`].
 pub const MODELS_BY_FEATURE_CACHE_KEY: &str = "AvailableLLMs";
-const CUSTOM_ENDPOINT_USAGE_FALLBACK_LABEL: &str = "Custom endpoint";
 const CLOUD_FALLBACK_OZ_MODEL_ID: &str = "auto";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -215,15 +214,13 @@ pub enum DisableReason {
 
 impl DisableReason {
     /// Returns a user-facing tooltip explaining why the model is disabled.
-    pub fn tooltip_text(&self) -> &'static str {
+    pub fn tooltip_text(&self) -> String {
         match self {
-            DisableReason::AdminDisabled => "This model has been disabled by your team admin.",
-            DisableReason::OutOfRequests => "Please upgrade your plan to make more requests.",
-            DisableReason::ProviderOutage => {
-                "This model is temporarily unavailable due to a provider outage."
-            }
-            DisableReason::RequiresUpgrade => "Please upgrade your plan to access this model.",
-            DisableReason::Unavailable => "This model is unavailable.",
+            DisableReason::AdminDisabled => crate::t!("model-disabled-by-admin"),
+            DisableReason::OutOfRequests => crate::t!("model-upgrade-for-requests"),
+            DisableReason::ProviderOutage => crate::t!("model-provider-outage"),
+            DisableReason::RequiresUpgrade => crate::t!("model-upgrade-to-access"),
+            DisableReason::Unavailable => crate::t!("model-unavailable"),
         }
     }
 
@@ -1290,7 +1287,7 @@ impl LLMPreferences {
         self.custom_llm_info_for_id(&config_key)
             .map(|info| info.display_name.as_str())
             .map(str::to_string)
-            .unwrap_or_else(|| CUSTOM_ENDPOINT_USAGE_FALLBACK_LABEL.to_string())
+            .unwrap_or_else(|| crate::t!("model-custom-endpoint"))
     }
 
     fn custom_llm_info_for_id_if_enabled(&self, id: &LLMId, app: &AppContext) -> Option<&LLMInfo> {
@@ -2166,7 +2163,10 @@ fn custom_llm_info_from(endpoint: &CustomEndpoint, model: &CustomEndpointModel) 
             request_multiplier: 1,
             credit_multiplier: None,
         },
-        description: Some(format!("Custom · {}", endpoint.name)),
+        description: Some(crate::t!(
+            "ai-custom-model-description",
+            name = endpoint.name.as_str()
+        )),
         disable_reason: None,
         vision_supported: true,
         spec: None,

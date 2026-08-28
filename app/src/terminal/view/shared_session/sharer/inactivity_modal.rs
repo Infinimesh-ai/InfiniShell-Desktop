@@ -146,10 +146,13 @@ impl InactivityModalBody {
     }
 
     fn render_countdown(&self, appearance: &Appearance) -> Box<dyn Element> {
-        let text = format!(
-            "Sharing will end in {}:{:02} due to inactivity.",
-            self.duration.as_secs() / 60,
-            self.duration.as_secs() % 60,
+        let text = crate::t!(
+            "terminal-sharing-inactivity-countdown",
+            time = format!(
+                "{}:{:02}",
+                self.duration.as_secs() / 60,
+                self.duration.as_secs() % 60
+            )
         );
 
         Container::new(
@@ -234,7 +237,7 @@ impl View for InactivityModalBody {
 
         let header = Container::new(
             Text::new_inline(
-                "Are you still there?",
+                crate::t!("terminal-sharing-inactivity-title"),
                 appearance.ui_font_family(),
                 appearance.ui_font_heading_3(),
             )

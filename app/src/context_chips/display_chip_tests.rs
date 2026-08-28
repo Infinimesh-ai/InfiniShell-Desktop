@@ -1,7 +1,7 @@
 use super::{
     CreateGitBranch, GitBranch, GitBranchTrackingStatus, GitLineChanges, truncate_from_beginning,
 };
-use crate::context_chips::display_chip::PromptChipShellCommand;
+use crate::context_chips::display_chip::{PromptChipShellCommand, PromptChipShellMessage};
 use crate::context_chips::display_menu::GenericMenuItem;
 use crate::context_chips::git_branch_on_click::GitBranchOnClickValue;
 use crate::context_chips::{ContextChipKind, github_pr_display_text_from_url};
@@ -213,7 +213,7 @@ fn test_format_git_branch_command_reports_missing_linked_worktree_path() {
     assert_eq!(
         GitBranch(value).prompt_chip_command(),
         PromptChipShellCommand::Echo {
-            message: "The branch is already checked out in another worktree, but Warp couldn't find its path."
+            message: PromptChipShellMessage::BranchWorktreePathUnavailable
         }
     );
 }

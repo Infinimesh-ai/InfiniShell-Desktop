@@ -125,7 +125,6 @@ const WORKFLOW_PARAMETER_HIGHLIGHT_COLOR: u32 = 0x42C0FA4D;
 const MAX_ELEMENT_WIDTH: f32 = 800.;
 
 const SCROLLBAR_WIDTH: ScrollbarWidth = ScrollbarWidth::Auto;
-const COMMAND_PLACEHOLDER_TEXT: &str = "echo \"Hello {{your_name}}\" # insert arguments with curly braces\n# enter a single-line command or an entire shell script";
 const DESCRIPTION_MARGIN_TOP: f32 = 10.;
 
 const CORE_HORIZONATAL_MARGIN: f32 = 24.;
@@ -150,17 +149,8 @@ const BUTTON_BORDER_RADIUS: f32 = 4.;
 const BUTTON_HEIGHT: f32 = 32.;
 
 const AI_ASSIST_BUTTON_SIZE: f32 = 92.;
-const AI_ASSIST_BUTTON_TEXT: &str = "Autofill";
-const AI_ASSIST_LOADING_TEXT: &str = "Loading";
-
-const ALIAS_HELP_TEXT: &str = "Aliases allow you to create short strings to execute workflows. Each alias can have different argument values and environment variables, and aliases are personal to you.";
-
-const RUN_ON_DESKTOP_BUTTON_TEXT: &str = "Run in InfiniShell";
 const RUN_ON_DESKTOP_BUTTON_WIDTH: f32 = 108.;
 
-const UNSAVED_CHANGES_TEXT: &str = "You have unsaved changes.";
-const KEEP_EDITING_TEXT: &str = "Keep editing";
-const DISCARD_CHANGES_TEXT: &str = "Discard changes";
 const DIALOG_WIDTH: f32 = 460.;
 const MODAL_HORIZONTAL_MARGIN: f32 = 28.;
 
@@ -360,7 +350,7 @@ impl WorkflowView {
             ctx,
             Some(steps_font_size),
             Some(monospace_font_family),
-            Some(COMMAND_PLACEHOLDER_TEXT),
+            Some(crate::t!("workflow-command-placeholder")),
             true,
             false,
             true,
@@ -370,7 +360,7 @@ impl WorkflowView {
             ctx,
             Some(steps_font_size),
             Some(monospace_font_family),
-            Some(COMMAND_PLACEHOLDER_TEXT),
+            Some(crate::t!("workflow-command-placeholder")),
             true,
             false,
             true,
@@ -1558,7 +1548,7 @@ impl WorkflowView {
     fn save_aliases(&mut self, ctx: &mut ViewContext<Self>) {
         if let Err(e) = self.alias_bar.update(ctx, |bar, ctx| bar.save(ctx)) {
             report_error!(e.context("Error saving aliases"));
-            self.display_error_toast("Error saving aliases".to_string(), ctx);
+            self.display_error_toast(crate::t!("workflow-error-saving-aliases"), ctx);
         }
     }
 
@@ -1567,10 +1557,7 @@ impl WorkflowView {
 
         // Block saving if secrets are detected in the workflow when secret redaction is enabled.
         if self.workflow_contains_secrets(ctx) {
-            self.display_error_toast(
-                "This workflow cannot be saved because it contains secrets".to_string(),
-                ctx,
-            );
+            self.display_error_toast(crate::t!("workflow-error-contains-secrets"), ctx);
             return;
         }
 
@@ -1602,7 +1589,7 @@ impl WorkflowView {
                     id
                 } else {
                     report_error!("No client_id obtained for creating workflow");
-                    self.display_error_toast(String::from("Could not create workflow"), ctx);
+                    self.display_error_toast(crate::t!("workflow-error-create"), ctx);
                     return;
                 };
 
@@ -1713,9 +1700,9 @@ impl WorkflowView {
         crate::workspace::ToastStack::handle(ctx).update(ctx, |stack, ctx| {
             stack.add_ephemeral_toast(
                 DismissibleToast::success(if self.is_for_agent_mode {
-                    "Prompt copied.".to_string()
+                    crate::t!("workflow-prompt-copied")
                 } else {
-                    "Command copied.".to_string()
+                    crate::t!("workflow-command-copied")
                 }),
                 window_id,
                 ctx,
@@ -2214,7 +2201,7 @@ impl WorkflowView {
                 if state.is_hovered() {
                     let tooltip = ConstrainedBox::new(
                         ui_builder
-                            .tool_tip(ALIAS_HELP_TEXT.to_string())
+                            .tool_tip(crate::t!("workflow-alias-help"))
                             .build()
                             .finish(),
                     )
@@ -2240,7 +2227,7 @@ impl WorkflowView {
             .with_children([
                 Flex::row()
                     .with_children([
-                        self.render_section_header("Aliases", appearance),
+                        self.render_section_header(crate::t!("workflow-aliases"), appearance),
                         Container::new(help_icon).with_margin_left(4.).finish(),
                     ])
                     .with_cross_axis_alignment(CrossAxisAlignment::Center)
@@ -2267,7 +2254,7 @@ impl WorkflowView {
                 padding: Some(Coords::uniform(BUTTON_PADDING)),
                 ..Default::default()
             })
-            .with_text_label(KEEP_EDITING_TEXT.into())
+            .with_text_label(crate::t!("workflow-keep-editing"))
             .build()
             .with_cursor(Cursor::PointingHand)
             .on_click(move |ctx, _, _| {
@@ -2287,7 +2274,7 @@ impl WorkflowView {
                 padding: Some(Coords::uniform(BUTTON_PADDING)),
                 ..Default::default()
             })
-            .with_text_label(DISCARD_CHANGES_TEXT.into())
+            .with_text_label(crate::t!("workflow-discard-changes"))
             .build()
             .with_cursor(Cursor::PointingHand)
             .on_click(move |ctx, _, _| {
@@ -2297,7 +2284,7 @@ impl WorkflowView {
 
         Container::new(
             Dialog::new(
-                UNSAVED_CHANGES_TEXT.to_string(),
+                crate::t!("workflow-unsaved-changes"),
                 None,
                 dialog_styles(appearance),
             )
@@ -2410,8 +2397,12 @@ impl WorkflowView {
         let mut button_row = Flex::row();
 
         let label_and_icon = match self.ai_metadata_assist_state {
-            AiAssistState::PreRequest => Some((AI_ASSIST_BUTTON_TEXT, Icon::AiAssistant)),
-            AiAssistState::RequestInFlight => Some((AI_ASSIST_LOADING_TEXT, Icon::Refresh)),
+            AiAssistState::PreRequest => {
+                Some((crate::t!("workflow-ai-assist-autofill"), Icon::AiAssistant))
+            }
+            AiAssistState::RequestInFlight => {
+                Some((crate::t!("workflow-ai-assist-loading"), Icon::Refresh))
+            }
             AiAssistState::Generated => None,
         };
 
@@ -2424,7 +2415,7 @@ impl WorkflowView {
                 let mut button = self
                     .build_footer_button(
                         ButtonVariant::Secondary,
-                        label.to_string(),
+                        label,
                         Some((icon, TextAndIconAlignment::TextFirst)),
                         self.ui_state_handles.ai_assist_state.clone(),
                         appearance,
@@ -2445,7 +2436,7 @@ impl WorkflowView {
                     .finish();
 
                 let button_with_tool_tip = appearance.ui_builder().tool_tip_on_element(
-                    "Generate a title, descriptions, or parameters with InfiniShell AI".to_string(),
+                    crate::t!("workflow-ai-assist-tooltip"),
                     self.ui_state_handles.ai_assist_tool_tip.clone(),
                     rendered_button,
                     ParentAnchor::TopMiddle,
@@ -2486,7 +2477,7 @@ impl WorkflowView {
             let run_on_desktop_button = self
                 .build_footer_button(
                     ButtonVariant::Accent,
-                    RUN_ON_DESKTOP_BUTTON_TEXT.to_string(),
+                    crate::t!("workflow-run-in-infinishell"),
                     Some((Icon::Laptop, TextAndIconAlignment::IconFirst)),
                     // Reuse the execute button's handle since it's only shown if running workflows is
                     // supported.
@@ -2604,11 +2595,7 @@ impl WorkflowView {
                 command: raw_request,
             },
         ) else {
-            self.display_error_toast(
-                "Autofill 需要 BYOP 模型。请到 Settings → AI 中配置一个 provider 与模型。"
-                    .to_string(),
-                ctx,
-            );
+            self.display_error_toast(crate::t!("workflow-ai-assist-error-byop-required"), ctx);
             return;
         };
 
@@ -2761,9 +2748,9 @@ impl WorkflowView {
 
         let appearance = Appearance::as_ref(app);
         let text = if deleted {
-            "You no longer have access to this workflow"
+            crate::t!("workflow-no-longer-accessible")
         } else {
-            "Workflow moved to trash"
+            crate::t!("workflow-moved-to-trash")
         };
 
         let mut stack = Stack::new();

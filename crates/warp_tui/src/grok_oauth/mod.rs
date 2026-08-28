@@ -8,11 +8,6 @@ use uuid::Uuid;
 use warpui::SingletonEntity as _;
 use warpui_core::{Entity, ModelContext};
 
-const CALLBACK_FAILURE_MESSAGE: &str =
-    "Couldn't complete Grok authorization. Press Esc, then select Grok to try again.";
-const MANUAL_FAILURE_MESSAGE: &str =
-    "Couldn't connect Grok with that code. Check the code and try again.";
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum TuiGrokOAuthControllerEvent {
     Connected,
@@ -86,9 +81,7 @@ impl TuiGrokOAuthController {
         };
         if code.trim().is_empty() {
             self.phase = TuiGrokOAuthPhase::Waiting {
-                manual_error: Some(
-                    "Enter the code shown in your browser to finish connecting.".to_owned(),
-                ),
+                manual_error: Some(warp::t!("tui-grok-enter-browser-code")),
             };
             ctx.emit(TuiGrokOAuthControllerEvent::Updated);
             return;
@@ -135,10 +128,10 @@ impl TuiGrokOAuthController {
         match result {
             Ok(tokens) => self.finish_success(attempt_id, tokens, ctx),
             Err(_) if self.is_exchanging() => {
-                self.callback_error = Some(CALLBACK_FAILURE_MESSAGE.to_owned());
+                self.callback_error = Some(warp::t!("tui-grok-authorization-failed"));
             }
             Err(_) => {
-                self.phase = TuiGrokOAuthPhase::Fatal(CALLBACK_FAILURE_MESSAGE.to_owned());
+                self.phase = TuiGrokOAuthPhase::Fatal(warp::t!("tui-grok-authorization-failed"));
                 ctx.emit(TuiGrokOAuthControllerEvent::Updated);
             }
         }
@@ -159,7 +152,7 @@ impl TuiGrokOAuthController {
                 self.phase = match self.callback_error.take() {
                     Some(error) => TuiGrokOAuthPhase::Fatal(error),
                     None => TuiGrokOAuthPhase::Waiting {
-                        manual_error: Some(MANUAL_FAILURE_MESSAGE.to_owned()),
+                        manual_error: Some(warp::t!("tui-grok-code-failed")),
                     },
                 };
                 ctx.emit(TuiGrokOAuthControllerEvent::Updated);

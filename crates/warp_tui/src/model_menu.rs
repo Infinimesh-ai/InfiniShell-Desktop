@@ -218,7 +218,7 @@ impl TuiModelMenuModel {
         };
         Some(TuiInlineMenuSnapshot {
             header: Some(TuiInlineMenuHeader {
-                title: Some("Models".to_owned()),
+                title: Some(warp::t!("tui-models-title")),
                 tabs: Vec::new(),
             }),
             rows: list.rows().iter().map(snapshot_row).collect(),
@@ -229,7 +229,7 @@ impl TuiModelMenuModel {
             status: list
                 .rows()
                 .is_empty()
-                .then(|| TuiInlineMenuStatus::Empty("No models found".to_owned())),
+                .then(|| TuiInlineMenuStatus::Empty(warp::t!("tui-models-empty"))),
         })
     }
 
@@ -291,15 +291,15 @@ fn model_menu_row(
 
 fn snapshot_row(row: &TuiModelMenuRow) -> TuiInlineMenuRow {
     let state_suffix = match (row.is_profile_default, row.is_key_connected) {
-        (true, true) => Some("(default) (key connected)".to_owned()),
-        (true, false) => Some("(default)".to_owned()),
-        (false, true) => Some("(key connected)".to_owned()),
+        (true, true) => Some(warp::t!("tui-model-default-key-connected")),
+        (true, false) => Some(warp::t!("tui-model-default")),
+        (false, true) => Some(warp::t!("tui-model-key-connected")),
         (false, false) => None,
     };
     TuiInlineMenuRow {
         title: row.title.clone(),
         prefix: None,
-        description: (!row.is_selectable).then(|| "disabled".to_owned()),
+        description: (!row.is_selectable).then(|| warp::t!("tui-state-disabled")),
         state_suffix,
         promotional_suffix: discount_label(row.discount_percentage),
         is_selectable: row.is_selectable,
@@ -310,7 +310,12 @@ fn snapshot_row(row: &TuiModelMenuRow) -> TuiInlineMenuRow {
 fn discount_label(discount_percentage: Option<f32>) -> Option<String> {
     discount_percentage
         .filter(|percentage| *percentage > 0.)
-        .map(|percentage| format!("{}% off", percentage.round() as u32))
+        .map(|percentage| {
+            warp::t!(
+                "tui-model-discount",
+                percentage = (percentage.round() as u32)
+            )
+        })
 }
 
 fn preferred_selection_index(

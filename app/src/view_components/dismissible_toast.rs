@@ -293,16 +293,20 @@ impl<A: Action + Clone> TypedActionView for DismissibleToastStack<A> {
     ) -> ActionAccessibilityContent {
         match action {
             DismissibleToastAction::ToggleMessageExpanded(uuid) => {
-                let label = self.toasts.iter().find(|toast| toast.uuid == *uuid).map_or(
-                    "Show more",
-                    |toast| {
-                        if toast.message_expanded {
-                            "Show less"
-                        } else {
-                            "Show more"
-                        }
-                    },
-                );
+                let label = self
+                    .toasts
+                    .iter()
+                    .find(|toast| toast.uuid == *uuid)
+                    .map_or_else(
+                        || crate::t!("common-show-more"),
+                        |toast| {
+                            if toast.message_expanded {
+                                crate::t!("common-show-less")
+                            } else {
+                                crate::t!("common-show-more")
+                            }
+                        },
+                    );
                 Some(AccessibilityContent::new_without_help(
                     label,
                     WarpA11yRole::ButtonRole,
@@ -529,13 +533,13 @@ impl<A: Action + Clone> DismissibleToast<A> {
 
         if toast_message_is_truncated(&self.main_text) {
             let label = if message_expanded {
-                "Show less"
+                crate::t!("common-show-less")
             } else {
-                "Show more"
+                crate::t!("common-show-more")
             };
             let toggle_button = ui_builder
                 .button(ButtonVariant::Text, self.expand_button_mouse_state.clone())
-                .with_text_label(label.to_string())
+                .with_text_label(label)
                 .with_style(UiComponentStyles {
                     font_color: Some(self.flavor.text_color(appearance)),
                     font_weight: Some(Weight::Bold),

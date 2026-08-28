@@ -930,8 +930,8 @@ impl Action {
             | Self::OpenRepo
             | Self::NewAgentConversation => W::default(),
             Self::NewTab => W::ShowPrimaryWindow(WindowActivationFallbackBehavior::Notify {
-                title: "New tab created".to_owned(),
-                description: "Go to InfiniShell to see your new tab.".to_owned(),
+                title: crate::t!("uri-new-tab-created-title"),
+                description: crate::t!("uri-new-tab-created-description"),
             }),
             Self::NewWindow => W::Nothing,
         }
@@ -974,7 +974,7 @@ pub fn handle_incoming_uri(url: &Url, ctx: &mut AppContext) {
         Err(e) => {
             if let Some(window_id) = primary_window_id {
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = DismissibleToast::error(format!("Custom URI is invalid: {e:?}"));
+                    let toast = DismissibleToast::error(crate::t!("uri-custom-uri-invalid"));
                     toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                 });
             }

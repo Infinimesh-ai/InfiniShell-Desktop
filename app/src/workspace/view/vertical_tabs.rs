@@ -1898,7 +1898,7 @@ fn render_groups(
         } else {
             return Container::new(
                 Text::new_inline(
-                    "No tabs match your search.",
+                    crate::t!("workspace-no-tabs-match-search"),
                     appearance.ui_font_family(),
                     12.,
                 )

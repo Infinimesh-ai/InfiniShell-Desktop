@@ -194,7 +194,8 @@ pub(super) fn render_completed_todo_items(
                 )
                 .as_str()
             } else {
-                completed_text += format!("Completed {}", completed_item.title).as_str()
+                completed_text +=
+                    crate::t!("ai-completed-task", title = completed_item.title.as_str()).as_str()
             }
         } else if let Some((index, list_len)) = index_and_len {
             completed_text +=

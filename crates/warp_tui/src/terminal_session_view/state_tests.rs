@@ -2,7 +2,6 @@ use warpui_core::keymap::Context;
 use warpui_core::{App, TuiView};
 
 use super::{
-    ASK_AGENT_HINT, COMMANDS_HINT, CONVERSATIONS_HINT, SHELL_HINT, SHELL_MODE_HINT, SHORTCUTS_HINT,
     TuiAgentEditorState, TuiBlockSessionState, TuiComposerMode, TuiInteractionState, TuiPtyState,
     TuiTerminalSessionState, TuiTerminalSessionStateResolveError, agent_input_hint,
     upgrade_terminal_model,
@@ -13,6 +12,13 @@ use crate::terminal_session_view::{
     BlockingInputSource, SESSION_CAN_DETACH_AGENT_FROM_RUNNING_COMMAND_FLAG, TuiTerminalSessionView,
 };
 use crate::terminal_use::TuiInputTarget;
+
+const ASK_AGENT_HINT: &str = "Ask the agent anything";
+const COMMANDS_HINT: &str = "/ for commands";
+const CONVERSATIONS_HINT: &str = "← for conversations";
+const SHELL_HINT: &str = "Run a shell command • ? for shortcuts • esc for agent mode";
+const SHELL_MODE_HINT: &str = "! for shell mode";
+const SHORTCUTS_HINT: &str = "? for shortcuts";
 
 fn agent_editor_state(
     mode: TuiComposerMode,

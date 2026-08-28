@@ -221,7 +221,10 @@ impl TerminalView {
                 match &self.inline_banners_state.open_in_warp_banner {
                     Some(banner_state) => {
                         ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
-                            format!("Open {} in InfiniShell", banner_state.target.path.display()),
+                            crate::t!(
+                                "terminal-open-path-in-infinishell",
+                                path = banner_state.target.path.display().to_string()
+                            ),
                             WarpA11yRole::UserAction,
                         ))
                     }

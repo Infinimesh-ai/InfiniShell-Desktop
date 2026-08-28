@@ -201,16 +201,16 @@ impl TuiConversationMenuModel {
         };
         let status = if list.rows().is_empty() {
             Some(if list.is_loading() {
-                TuiInlineMenuStatus::Loading("Loading conversations…".to_owned())
+                TuiInlineMenuStatus::Loading(warp::t!("tui-conversations-loading"))
             } else {
-                TuiInlineMenuStatus::Empty("No conversations found".to_owned())
+                TuiInlineMenuStatus::Empty(warp::t!("tui-conversations-empty"))
             })
         } else {
             None
         };
         Some(TuiInlineMenuSnapshot {
             header: Some(TuiInlineMenuHeader {
-                title: Some("Conversations".to_owned()),
+                title: Some(warp::t!("tui-conversations-title")),
                 tabs: Vec::new(),
             }),
             rows: list

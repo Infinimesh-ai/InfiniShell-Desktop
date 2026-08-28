@@ -548,9 +548,10 @@ impl TuiEditorElement {
                     .expect("ghost display rows have source text");
                 (content, self.styles.ghost)
             }
-            DisplayRowKind::Gap { line_range } => {
-                (format!("… {} lines", line_range.len()), self.styles.gap)
-            }
+            DisplayRowKind::Gap { line_range } => (
+                warp::t!("tui-hidden-lines", count = line_range.len()),
+                self.styles.gap,
+            ),
         };
         let gutter = self.gutter_cells(row);
         // An empty `TuiText` lays out to zero rows, which would collapse the

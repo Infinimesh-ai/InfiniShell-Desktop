@@ -97,17 +97,20 @@ impl SearchItem for FileSearchItem {
 
     fn accessibility_label(&self) -> String {
         if self.is_directory {
-            format!("Directory: {}", self.path.display())
+            crate::t!(
+                "search-directory-a11y",
+                path = self.path.display().to_string()
+            )
         } else {
-            format!("File: {}", self.path.display())
+            crate::t!("search-file-a11y", path = self.path.display().to_string())
         }
     }
 
     fn accessibility_help_message(&self) -> Option<String> {
         Some(if self.is_directory {
-            "Press Enter to navigate to this directory".to_string()
+            crate::t!("search-directory-help")
         } else {
-            "Press Enter to open this file".to_string()
+            crate::t!("search-file-help")
         })
     }
 
@@ -161,7 +164,7 @@ impl SearchItem for CreateFileSearchItem {
         let text_color = highlight_state.sub_text_fill(appearance).into_solid();
 
         let label = Text::new_inline(
-            format!("Create a file named {}…", &self.file_name),
+            crate::t!("search-create-file-label", name = self.file_name.as_str()),
             appearance.ui_font_family(),
             appearance.monospace_font_size(),
         )
@@ -195,13 +198,13 @@ impl SearchItem for CreateFileSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Create file: {}", self.file_name)
+        crate::t!("search-create-file-a11y", name = self.file_name.as_str())
     }
 
     fn accessibility_help_message(&self) -> Option<String> {
-        Some(format!(
-            "Press Enter to create {} in the current directory",
-            self.file_name
+        Some(crate::t!(
+            "search-create-file-help",
+            name = self.file_name.as_str()
         ))
     }
 

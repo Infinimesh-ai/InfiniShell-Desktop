@@ -191,7 +191,7 @@ impl ConversationEndedTombstoneView {
             })
             .unwrap_or_default();
         if display_data.is_error && task_id.is_none() && !display_data.conversation_is_transcript {
-            display_data.title = Some("Cloud agent failed to start".to_string());
+            display_data.title = Some(crate::t!("terminal-cloud-agent-start-failed"));
             display_data.credits = None;
         }
 
@@ -200,8 +200,8 @@ impl ConversationEndedTombstoneView {
         let continue_in_cloud_button = match tombstone_cta {
             Some(TombstoneCta::ContinueInCloud { task_id }) => {
                 Some(ctx.add_typed_action_view(move |_| {
-                    ActionButton::new("Continue", PrimaryTheme)
-                        .with_tooltip("Continue this cloud conversation")
+                    ActionButton::new(crate::t!("terminal-continue-cloud"), PrimaryTheme)
+                        .with_tooltip(crate::t!("terminal-continue-cloud-tooltip"))
                         .on_click(move |ctx| {
                             ctx.dispatch_typed_action(
                                 ConversationEndedTombstoneAction::ContinueInCloud { task_id },
@@ -304,7 +304,7 @@ impl ConversationEndedTombstoneView {
 
         if is_transcript {
             return Text::new(
-                "You're viewing a snapshot",
+                crate::t!("terminal-viewing-snapshot"),
                 appearance.overline_font_family(),
                 appearance.monospace_font_size(),
             )
@@ -336,7 +336,7 @@ impl ConversationEndedTombstoneView {
             .display_data
             .title
             .clone()
-            .unwrap_or_else(|| "Agent task".to_string());
+            .unwrap_or_else(|| crate::t!("terminal-agent-task"));
         Flex::row()
             .with_main_axis_size(MainAxisSize::Min)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
@@ -363,8 +363,7 @@ impl ConversationEndedTombstoneView {
         let theme = appearance.theme();
         Container::new(
             Text::new(
-                "This shared conversation shows the state when you opened it. \
-                 If the agent is still running, refresh to see the latest progress.",
+                crate::t!("terminal-snapshot-description"),
                 appearance.overline_font_family(),
                 appearance.monospace_font_size(),
             )
@@ -382,24 +381,36 @@ impl ConversationEndedTombstoneView {
 
         if let Some(dir) = &self.display_data.working_directory {
             let display_dir = home_relative_path(Path::new(dir));
-            parts.push(format!("Directory: {display_dir}"));
+            parts.push(crate::t!(
+                "terminal-metadata-directory",
+                directory = display_dir
+            ));
         }
 
         if let Some(source) = &self.display_data.source {
-            parts.push(format!("Source: {source}"));
+            parts.push(crate::t!(
+                "agent-management-metadata-source",
+                source = source
+            ));
         }
 
         if let Some(skill) = &self.display_data.skill_name {
-            parts.push(format!("Skill: {skill}"));
+            parts.push(crate::t!("terminal-metadata-skill", skill = skill));
         }
 
         if let Some(run_time) = &self.display_data.run_time {
-            parts.push(format!("Run time: {run_time}"));
+            parts.push(crate::t!(
+                "agent-management-metadata-run-time",
+                run_time = run_time
+            ));
         }
 
         if !UserWorkspaces::as_ref(app).is_byo_api_key_enabled(app) {
             if let Some(credits) = &self.display_data.credits {
-                parts.push(format!("Credits used: {credits}"));
+                parts.push(crate::t!(
+                    "agent-management-metadata-credits-used",
+                    usage = credits
+                ));
             }
         }
 

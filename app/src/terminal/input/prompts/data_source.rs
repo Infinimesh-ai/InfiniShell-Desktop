@@ -243,7 +243,7 @@ impl SearchItem for PromptSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Prompt: {}", self.name)
+        crate::t!("search-prompt-a11y", name = self.name.as_str())
     }
 }
 

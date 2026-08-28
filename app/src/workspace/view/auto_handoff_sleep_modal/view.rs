@@ -84,14 +84,14 @@ impl AutoHandoffSleepModal {
         });
 
         let enable_button = ctx.add_view(|_ctx| {
-            ActionButton::new("Enable", PrimaryTheme)
+            ActionButton::new(crate::t!("workspace-auto-handoff-enable"), PrimaryTheme)
                 .with_full_width(true)
                 .with_size(ButtonSize::Default)
                 .on_click(|ctx| ctx.dispatch_typed_action(AutoHandoffSleepModalAction::Enable))
         });
 
         let dismiss_button = ctx.add_view(|_ctx| {
-            ActionButton::new("Dismiss", SecondaryTheme)
+            ActionButton::new(crate::t!("common-dismiss"), SecondaryTheme)
                 .with_full_width(true)
                 .with_size(ButtonSize::Default)
                 .on_click(|ctx| ctx.dispatch_typed_action(AutoHandoffSleepModalAction::Dismiss))
@@ -145,7 +145,7 @@ impl AutoHandoffSleepModal {
         let text_color: ColorU = red.into();
         let background_color = appearance.theme().ansi_overlay_2(red);
         let text = Text::new_inline(
-            "Run Connection Lost".to_string(),
+            crate::t!("workspace-auto-handoff-badge"),
             appearance.ui_font_family(),
             14.,
         )
@@ -169,21 +169,24 @@ impl AutoHandoffSleepModal {
     }
 
     fn render_title(appearance: &Appearance) -> Box<dyn Element> {
-        Text::new("Enable auto-handoff?", appearance.ui_font_family(), 20.)
-            .with_color(
-                appearance
-                    .theme()
-                    .main_text_color(appearance.theme().surface_3())
-                    .into_solid(),
-            )
-            .with_style(Properties::default().weight(Weight::Semibold))
-            .finish()
+        Text::new(
+            crate::t!("workspace-auto-handoff-title"),
+            appearance.ui_font_family(),
+            20.,
+        )
+        .with_color(
+            appearance
+                .theme()
+                .main_text_color(appearance.theme().surface_3())
+                .into_solid(),
+        )
+        .with_style(Properties::default().weight(Weight::Semibold))
+        .finish()
     }
 
     fn render_description(appearance: &Appearance) -> Box<dyn Element> {
         Text::new(
-            "Give Warp the option to automatically move active local agents to the cloud when \
-             your computer sleeps.",
+            crate::t!("workspace-auto-handoff-description"),
             appearance.ui_font_family(),
             14.,
         )

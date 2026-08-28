@@ -69,7 +69,7 @@ fn query_filters_server_rows_case_insensitively() {
     assert_eq!(rows[0].title, "GitHub");
     assert_eq!(
         rows[0].description.as_deref(),
-        Some("CLI local · stdio · running · 2 tools")
+        Some("Local CLI · stdio · running · 2 tools")
     );
     assert_eq!(rows[0].primary_action, Some(TuiMcpAction::Stop(first)));
 }
@@ -90,7 +90,7 @@ fn available_row_is_distinct_from_offline_and_requires_enable() {
     assert_eq!(rows[0].primary_action, Some(TuiMcpAction::Enable(id)));
     assert_eq!(
         rows[0].description.as_deref(),
-        Some("shared by Warp · stdio · available")
+        Some("Shared by InfiniShell · stdio · available")
     );
 }
 
@@ -126,8 +126,8 @@ fn same_named_synced_templates_explain_their_distinct_provenance() {
             .map(|row| row.description.as_deref())
             .collect::<Vec<_>>(),
         vec![
-            Some("from another device · stdio · available"),
-            Some("shared by Roland Huang · stdio · available"),
+            Some("Synced from another device · stdio · available"),
+            Some("Shared by Roland Huang · stdio · available"),
         ]
     );
 }
@@ -159,7 +159,9 @@ fn file_provenance_includes_provider_scope_and_repository() {
 
     assert_eq!(
         rows[0].description.as_deref(),
-        Some("Claude global, Other Agents · project · stdio · offline")
+        Some(
+            "Claude global configuration, Other Agents project configuration (project) · stdio · offline"
+        )
     );
 }
 

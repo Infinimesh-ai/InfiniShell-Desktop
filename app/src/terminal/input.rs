@@ -210,6 +210,8 @@ use crate::code::editor_management::CodeSource;
 use crate::code_review::diff_state::DiffMode;
 use crate::completer::SessionContext;
 use crate::context_chips::display::{PromptDisplay, PromptDisplayEvent};
+#[cfg(test)]
+use crate::context_chips::display_chip::PromptChipShellMessage;
 use crate::context_chips::display_chip::{DisplayChipConfig, PromptChipShellCommand};
 use crate::context_chips::prompt_type::PromptType;
 use crate::context_chips::spacing;
@@ -283,7 +285,7 @@ use crate::terminal::input::prompts::{InlinePromptsMenuEvent, InlinePromptsMenuV
 use crate::terminal::input::repos::{InlineReposMenuEvent, InlineReposMenuView};
 use crate::terminal::input::rewind::{RewindMenuEvent, RewindMenuView};
 use crate::terminal::input::skills::{
-    InlineSkillSelectorEvent, InlineSkillSelectorView, LOCAL_SKILLS_REMOTE_EXECUTION_ERROR_MESSAGE,
+    InlineSkillSelectorEvent, InlineSkillSelectorView, local_skills_remote_execution_error_message,
 };
 use crate::terminal::input::slash_command_model::{SlashCommandEntryState, SlashCommandModel};
 use crate::terminal::input::slash_commands::{
@@ -370,7 +372,6 @@ pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_TOP_PADDING: f32 = 10.;
 pub(super) const CLI_AGENT_RICH_INPUT_EDITOR_BOTTOM_PADDING: f32 = 8.;
 pub(super) const CLI_AGENT_RICH_INPUT_HINT_KEY: &str = "terminal-input-cli-agent-rich-input-hint";
 /// InfiniShell:合并时该常量定义随上游 hunk 丢失,这里按上游原文补回。
-const CLOUD_MODE_V2_HINT_TEXT: &str = "Kick off a cloud agent";
 const SHORT_CIRCUIT_HIGHLIGHTING_ACTIONS: [Option<PlainTextEditorViewAction>; 7] = [
     Some(PlainTextEditorViewAction::Space),
     Some(PlainTextEditorViewAction::NonExpandingSpace),
@@ -451,10 +452,9 @@ const AGENT_MODE_AI_ENABLED_STEER_HINT_KEY_CLASSIC: &str =
 const AGENT_MODE_AI_ENABLED_FOLLOW_UP_HINT_KEY_UDI: &str = "terminal-input-follow-up-hint";
 const AGENT_MODE_AI_ENABLED_FOLLOW_UP_HINT_KEY_CLASSIC: &str =
     "terminal-input-follow-up-backspace-hint";
-// 上游新增的「排队追问」提示,暂未 i18n 化,保持英文字面量。
-const AGENT_MODE_AI_ENABLED_QUEUE_HINT_TEXT_UDI: &str = "Queue a follow up for the running agent";
-const AGENT_MODE_AI_ENABLED_QUEUE_HINT_TEXT_CLASSIC: &str =
-    "Queue a follow up for the running agent, or backspace to exit";
+const AGENT_MODE_AI_ENABLED_QUEUE_HINT_KEY_UDI: &str = "terminal-input-queue-follow-up-hint";
+const AGENT_MODE_AI_ENABLED_QUEUE_HINT_KEY_CLASSIC: &str =
+    "terminal-input-queue-follow-up-backspace-hint";
 
 /// Action name for setting input mode to agent mode
 pub const SET_INPUT_MODE_AGENT_ACTION_NAME: &str = "input:set_mode_agent";
@@ -498,11 +498,6 @@ enum InputPrefixMode {
 
 const VIM_STATUS_BAR_BOTTOM_PADDING: f32 = 20.;
 
-const DYNAMIC_ENUM_GENERATE_MESSAGE: &str = "Run the following command to generate variants:";
-const DYNAMIC_ENUM_RUN_MESSAGE: &str = "Run command";
-const DYNAMIC_ENUM_PENDING_MESSAGE: &str = "Command pending...";
-const DYNAMIC_ENUM_FAILURE_MESSAGE: &str = "Command failed";
-const DYNAMIC_ENUM_NO_RESULTS_MESSAGE: &str = "Command returned no results";
 const DYNAMIC_ENUM_MENU_PADDING: f32 = 10.;
 const DYNAMIC_ENUM_MENU_HEIGHT_OFFSET: f32 = 25.;
 const DYNAMIC_ENUM_HORIZONTAL_TEXT_PADDING: f32 = 5.;
@@ -953,7 +948,10 @@ fn render_prompt_chip_shell_command(
         }
         PromptChipShellCommand::NvmInstallLatestNode => "nvm install node".to_string(),
         PromptChipShellCommand::Echo { message } => {
-            format!("echo {}", shell_quote_arg(message, shell_type))
+            format!(
+                "echo {}",
+                shell_quote_arg(&message.localized_text(), shell_type)
+            )
         }
     }
 }
@@ -3289,9 +3287,9 @@ impl Input {
                     let window_id = ctx.window_id();
                     ToastStack::handle(ctx).update(ctx, |ts, ctx| {
                         ts.add_ephemeral_toast(
-                            DismissibleToast::error(
-                                "Attached images were removed — the selected model does not support images.".to_string(),
-                            ),
+                            DismissibleToast::error(crate::t!(
+                                "editor-images-removed-model-unsupported"
+                            )),
                             window_id,
                             ctx,
                         );
@@ -4291,10 +4289,7 @@ impl Input {
         let window_id = ctx.window_id();
         ToastStack::handle(ctx).update(ctx, |ts, ctx| {
             ts.add_ephemeral_toast(
-                DismissibleToast::error(
-                    "Custom models can't run in the cloud. Switch to a Warp model to hand off."
-                        .to_owned(),
-                ),
+                DismissibleToast::error(crate::t!("terminal-custom-model-cloud-unsupported")),
                 window_id,
                 ctx,
             );
@@ -4622,7 +4617,7 @@ impl Input {
                     }
                     _ => {
                         ctx.emit(Event::ShowToast {
-                            message: "Couldn't navigate to conversation.".to_string(),
+                            message: crate::t!("terminal-conversation-navigation-failed"),
                             flavor: ToastFlavor::Error,
                         });
                     }
@@ -5505,9 +5500,7 @@ impl Input {
             let window_id = ctx.window_id();
             ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                 toast_stack.add_ephemeral_toast(
-                    DismissibleToast::default(
-                        LOCAL_SKILLS_REMOTE_EXECUTION_ERROR_MESSAGE.to_owned(),
-                    ),
+                    DismissibleToast::default(local_skills_remote_execution_error_message()),
                     window_id,
                     ctx,
                 );
@@ -5622,13 +5615,15 @@ impl Input {
                 let display_path = export.path().display().to_string();
                 ToastStack::handle(ctx).update(ctx, move |toast_stack, ctx| {
                     if export.overwrote_existing() {
-                        let toast = DismissibleToast::default(format!(
-                            "File {display_path} already exists and will be overwritten"
+                        let toast = DismissibleToast::default(crate::t!(
+                            "terminal-export-file-overwritten",
+                            path = display_path.as_str()
                         ));
                         toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                     }
-                    let toast = DismissibleToast::default(format!(
-                        "Conversation exported to {display_path}"
+                    let toast = DismissibleToast::default(crate::t!(
+                        "terminal-conversation-exported-to",
+                        path = display_path.as_str()
                     ));
                     toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                 });
@@ -5681,11 +5676,11 @@ impl Input {
         if images_removed > 0 {
             let window_id = ctx.window_id();
 
-            let message = if images_removed == 1 {
-                "1 image was removed - limit is 20 per conversation.".into()
-            } else {
-                format!("{images_removed} images were removed - limit is 20 per conversation.")
-            };
+            let message = crate::t!(
+                "editor-images-removed-conversation-limit",
+                count = images_removed,
+                limit = MAX_IMAGES_PER_CONVERSATION
+            );
 
             ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                 toast_stack.add_persistent_toast(DismissibleToast::error(message), window_id, ctx);
@@ -6130,11 +6125,14 @@ impl Input {
                     let agent_name = conversation.agent_name().unwrap_or("child");
                     if conversation.status().is_in_progress() {
                         if is_queue_next_prompt_enabled {
-                            return format!("Queue a follow up for the {agent_name} agent");
+                            return crate::t!(
+                                "terminal-input-child-queue-follow-up",
+                                agent = agent_name
+                            );
                         }
-                        return format!("Steer the {agent_name} agent");
+                        return crate::t!("terminal-input-child-steer", agent = agent_name);
                     }
-                    return format!("Ask the {agent_name} agent a follow up");
+                    return crate::t!("terminal-input-child-follow-up", agent = agent_name);
                 }
 
                 // Follow the `agent_indicator` pattern (see `app/src/tab.rs`):
@@ -6149,9 +6147,9 @@ impl Input {
                     Some(status) if status.is_in_progress() => {
                         if is_queue_next_prompt_enabled {
                             if is_udi_enabled {
-                                AGENT_MODE_AI_ENABLED_QUEUE_HINT_TEXT_UDI.to_owned()
+                                translate_input_key(AGENT_MODE_AI_ENABLED_QUEUE_HINT_KEY_UDI)
                             } else {
-                                AGENT_MODE_AI_ENABLED_QUEUE_HINT_TEXT_CLASSIC.to_owned()
+                                translate_input_key(AGENT_MODE_AI_ENABLED_QUEUE_HINT_KEY_CLASSIC)
                             }
                         } else if is_udi_enabled {
                             translate_input_key(AGENT_MODE_AI_ENABLED_STEER_HINT_KEY_UDI)
@@ -6619,9 +6617,9 @@ impl Input {
             // InfiniShell:云端环境目录已删除,无法按环境名生成 "Hand off to <env>" 文案,
             // 非空会话统一回落到通用提示。
             let hint = if conversation_is_empty {
-                CLOUD_MODE_V2_HINT_TEXT.to_owned()
+                crate::t!("terminal-input-cloud-agent-hint")
             } else {
-                "Handoff to cloud".to_owned()
+                crate::t!("terminal-input-handoff-cloud")
             };
             self.editor.update(ctx, |editor, ctx| {
                 editor.set_placeholder_text(&hint, ctx);
@@ -6651,10 +6649,8 @@ impl Input {
             .active_commands()
             .filter_map(|(_, command)| {
                 command
-                    .argument
-                    .as_ref()
-                    .and_then(|argument| argument.hint_text)
-                    .map(|hint_text| (command.name, hint_text))
+                    .argument_hint()
+                    .map(|hint| (command.name, hint.text))
             })
             .collect_vec();
 
@@ -7064,8 +7060,9 @@ impl Input {
                 let window_id = ctx.window_id();
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                     toast_stack.add_ephemeral_toast(
-                        DismissibleToast::error(format!(
-                            "Cannot run `{truncated_command}` (command already running)."
+                        DismissibleToast::error(crate::t!(
+                            "terminal-command-already-running",
+                            command = truncated_command
                         )),
                         window_id,
                         ctx,
@@ -7789,7 +7786,10 @@ impl Input {
         // Emit the a11y content as the last step so that it overwrites any of the a11y content
         // emitted by the editor (if multiple `AccessibilityContent`s are emitted within the same
         // event loop, the last one wins).
-        let mut accessibility_text = format!("Workflow command {} inserted.", &command_to_insert);
+        let mut accessibility_text = crate::t!(
+            "terminal-workflow-command-inserted-a11y",
+            command = command_to_insert.as_str()
+        );
         if let Some(a11y_content) = self.selected_workflow_a11y_text(ctx) {
             let _ = write!(accessibility_text, " {a11y_content}");
         }
@@ -7894,8 +7894,12 @@ impl Input {
             .as_ref()
             .and_then(|selected_workflow_state| {
                 selected_workflow_state.more_info_view.read(ctx, |view, _| {
-                    view.selected_argument()
-                        .map(|argument| format!("Selected Workflow argument {}", argument.name()))
+                    view.selected_argument().map(|argument| {
+                        crate::t!(
+                            "terminal-selected-workflow-argument-a11y",
+                            name = argument.name()
+                        )
+                    })
                 })
             })
     }
@@ -8147,7 +8151,7 @@ impl Input {
                 self.try_execute_command(&command, ctx);
 
                 ctx.emit_a11y_content(AccessibilityContent::new_without_help(
-                    format!("Executed: {command}"),
+                    crate::t!("terminal-executed-command-a11y", command = command.as_str()),
                     WarpA11yRole::UserAction,
                 ));
             }
@@ -11296,17 +11300,17 @@ impl Input {
 
         // Show toast for excess images if any
         if excess_images > 0 {
-            let (limit_name, limit_value) = if available_per_query < available_per_conversation {
-                ("per query", MAX_IMAGE_COUNT_FOR_QUERY)
+            let message = if available_per_query < available_per_conversation {
+                crate::t!(
+                    "editor-images-not-attached-query-limit",
+                    count = excess_images,
+                    limit = MAX_IMAGE_COUNT_FOR_QUERY
+                )
             } else {
-                ("per conversation", MAX_IMAGES_PER_CONVERSATION)
-            };
-
-            let message = if excess_images == 1 {
-                format!("1 image wasn't attached - limit is {limit_value} images {limit_name}.")
-            } else {
-                format!(
-                    "{excess_images} images weren't attached - limit is {limit_value} images {limit_name}."
+                crate::t!(
+                    "editor-images-not-attached-conversation-limit",
+                    count = excess_images,
+                    limit = MAX_IMAGES_PER_CONVERSATION
                 )
             };
             self.show_image_paste_error(ctx, message);
@@ -13123,10 +13127,7 @@ impl Input {
                         let window_id = ctx.window_id();
                         ToastStack::handle(ctx).update(ctx, |ts, ctx| {
                             ts.add_ephemeral_toast(
-                                DismissibleToast::error(
-                                    "No agent harnesses are available. Contact your team admin."
-                                        .to_string(),
-                                ),
+                                DismissibleToast::error(crate::t!("terminal-no-agent-harnesses")),
                                 window_id,
                                 ctx,
                             );
@@ -15521,9 +15522,9 @@ impl TypedActionView for Input {
                     let window_id = ctx.window_id();
                     ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                         toast_stack.add_ephemeral_toast(
-                            DismissibleToast::error(
-                                "Cannot start a new conversation while agent is monitoring a command.".to_string()
-                            ),
+                            DismissibleToast::error(crate::t!(
+                                "terminal-new-conversation-monitoring-command"
+                            )),
                             window_id,
                             ctx,
                         );

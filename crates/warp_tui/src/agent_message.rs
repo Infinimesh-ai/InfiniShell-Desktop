@@ -67,7 +67,7 @@ fn child_identity_index(
     assign_agent_identity_indices(
         siblings
             .iter()
-            .map(|sibling| sibling.agent_name().unwrap_or("Agent")),
+            .map(|sibling| sibling.agent_name().unwrap_or(warp::t_static!("tui-agent"))),
         palette_len,
     )
     .get(sender_index)
@@ -102,7 +102,7 @@ fn message_presentation(
     });
     let (name, identity) = match participant.kind {
         OrchestrationParticipantKind::Orchestrator => {
-            ("Orchestrator".to_owned(), AgentIdentity::default())
+            (warp::t!("tui-orchestrator-title"), AgentIdentity::default())
         }
         OrchestrationParticipantKind::Agent { name } => (
             name,
@@ -117,7 +117,7 @@ fn message_presentation(
                 .unwrap_or_default(),
         ),
         OrchestrationParticipantKind::Unknown => (
-            "Unknown agent".to_owned(),
+            warp::t!("tui-unknown-agent"),
             fallback_identity_index
                 .and_then(|index| palette.get(index))
                 .cloned()

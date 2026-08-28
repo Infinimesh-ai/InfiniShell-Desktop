@@ -102,7 +102,12 @@ impl View for DeleteConversationConfirmationDialog {
         let title = self
             .source
             .as_ref()
-            .map(|s| format!("Delete '{}'?", s.conversation_title))
+            .map(|s| {
+                crate::t!(
+                    "ai-delete-conversation-title",
+                    title = s.conversation_title.as_str()
+                )
+            })
             .unwrap_or_else(|| "Delete conversation?".into());
 
         let dialog = Dialog::new(

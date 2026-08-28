@@ -521,12 +521,12 @@ pub enum MCPProvider {
 }
 
 impl MCPProvider {
-    pub fn display_name(&self) -> &str {
+    pub fn display_name(&self) -> String {
         match self {
-            MCPProvider::InfiniShell => "InfiniShell",
-            MCPProvider::Claude => "Claude",
-            MCPProvider::Codex => "Codex",
-            MCPProvider::Agents => "Other Agents",
+            MCPProvider::InfiniShell => "InfiniShell".to_string(),
+            MCPProvider::Claude => "Claude".to_string(),
+            MCPProvider::Codex => "Codex".to_string(),
+            MCPProvider::Agents => crate::t!("ai-mcp-other-agents"),
         }
     }
 

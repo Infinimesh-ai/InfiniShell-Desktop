@@ -27,9 +27,6 @@ const CONTAINER_PADDING: f32 = 25.;
 const ELEMENT_SPACING: f32 = 10.;
 const EDITOR_DIVIDE: f32 = 6.;
 
-const SECRET_SPAN: &str = "Secret command";
-const COMMAND_PLACEHOLDER_TEXT: &str = "Command";
-
 #[derive(Debug, Clone)]
 pub enum EnvVarCommandDialogAction {
     Close,
@@ -95,7 +92,7 @@ impl EnvVarCommandDialog {
                 };
 
                 let mut editor = EditorView::new(options, ctx);
-                editor.set_placeholder_text(COMMAND_PLACEHOLDER_TEXT, ctx);
+                editor.set_placeholder_text(crate::t!("env-vars-command-placeholder"), ctx);
                 editor
             })
         };
@@ -252,7 +249,7 @@ impl EnvVarCommandDialog {
         Container::new(
             appearance
                 .ui_builder()
-                .span(SECRET_SPAN)
+                .span(crate::t!("env-vars-secret-command"))
                 .with_style(UiComponentStyles {
                     font_size: Some(SPAN_FONT_SIZE),
                     ..Default::default()

@@ -81,7 +81,6 @@ const DIALOG_WIDTH: f32 = 460.;
 const AI_ASSIST_BUTTON_SIZE: f32 = 96.;
 const SCROLLBAR_WIDTH: ScrollbarWidth = ScrollbarWidth::Auto;
 
-const COMMAND_EDITOR_PLACEHOLDER_TEXT: &str = "echo \"Hello {{your_name}}\" # insert arguments with curly braces\n# enter a single-line command or an entire shell script";
 const DEFAULT_ARGUMENT_PREFIX: &str = "argument";
 
 #[derive(Default)]
@@ -228,7 +227,7 @@ impl WorkflowModal {
             ctx,
             Some(CONTENT_EDITOR_FONT_SIZE),
             None,
-            Some(COMMAND_EDITOR_PLACEHOLDER_TEXT),
+            Some(&crate::t!("workflow-command-placeholder")),
             true,  /* vim_keybindings */
             false, /* single_line */
         );

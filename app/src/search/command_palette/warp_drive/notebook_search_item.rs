@@ -62,7 +62,7 @@ impl SearchItem for NotebookSearchItem {
     ) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let title = if self.notebook.model().title.is_empty() {
-            "Untitled".to_string()
+            crate::t!("common-untitled")
         } else {
             self.notebook.model().title.clone()
         };
@@ -142,6 +142,9 @@ impl SearchItem for NotebookSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Notebook: {}", self.notebook.model().title)
+        crate::t!(
+            "search-notebook-a11y",
+            name = self.notebook.model().title.as_str()
+        )
     }
 }

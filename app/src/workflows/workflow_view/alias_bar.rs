@@ -466,7 +466,7 @@ impl View for AliasBar {
             .with_text_and_icon_label(
                 TextAndIcon::new(
                     TextAndIconAlignment::IconFirst,
-                    "Add alias",
+                    crate::t!("workflow-add-alias"),
                     Icon::Plus.to_warpui_icon(
                         appearance
                             .theme()

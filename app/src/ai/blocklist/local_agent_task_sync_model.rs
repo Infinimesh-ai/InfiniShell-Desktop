@@ -418,12 +418,13 @@ fn map_conversation_status(
         }
         ConversationStatus::Cancelled => (
             AgentTaskState::Cancelled,
-            Some(TaskStatusUpdate::message("Cancelled by user")),
+            Some(TaskStatusUpdate::message(crate::t!("agent-task-cancelled-by-user"))),
         ),
         ConversationStatus::Blocked { blocked_action } => (
             AgentTaskState::Blocked,
-            Some(TaskStatusUpdate::message(format!(
-                "The agent got stuck waiting for user confirmation on the action: {blocked_action}"
+            Some(TaskStatusUpdate::message(crate::t!(
+                "agent-task-waiting-confirmation",
+                action = blocked_action.to_string()
             ))),
         ),
     }
@@ -484,21 +485,27 @@ pub(crate) fn classify_renderable_error(
         RenderableAIError::ContextWindowExceeded(msg) => (
             AgentTaskState::Failed,
             Some(TaskStatusUpdate::with_error_code(
-                format!("Context window exceeded: {msg}"),
+                crate::t!("ai-error-context-window-exceeded", message = msg.as_str()),
                 PlatformErrorCode::InternalError,
             )),
         ),
         RenderableAIError::InvalidApiKey { provider, .. } => (
             AgentTaskState::Failed,
             Some(TaskStatusUpdate::with_error_code(
-                format!("Invalid API key for {provider}. Update your API key in settings."),
+                crate::t!(
+                    "ai-invalid-api-key-update-settings",
+                    provider = provider.as_str()
+                ),
                 PlatformErrorCode::AuthenticationRequired,
             )),
         ),
         RenderableAIError::AwsBedrockCredentialsExpiredOrInvalid { model_name } => (
             AgentTaskState::Failed,
             Some(TaskStatusUpdate::with_error_code(
-                format!("AWS Bedrock credentials expired or invalid for {model_name}."),
+                crate::t!(
+                    "ai-error-bedrock-credentials-invalid",
+                    model = model_name.as_str()
+                ),
                 PlatformErrorCode::AuthenticationRequired,
             )),
         ),
@@ -585,7 +592,7 @@ fn map_cli_session_status(
         ),
         CLIAgentSessionStatus::Cancelled => (
             AgentTaskState::Cancelled,
-            Some(TaskStatusUpdate::message("Cancelled by user")),
+            Some(TaskStatusUpdate::message(crate::t!("agent-task-cancelled-by-user"))),
         ),
     }
 }

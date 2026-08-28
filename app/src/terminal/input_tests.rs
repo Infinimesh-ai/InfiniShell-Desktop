@@ -171,16 +171,16 @@ fn renders_change_directory_prompt_chip_command_as_single_shell_argument() {
 #[test]
 fn renders_echo_prompt_chip_command_as_single_shell_argument() {
     let command = PromptChipShellCommand::Echo {
-        message: "a message containing \"double\" and 'single' quotes",
+        message: PromptChipShellMessage::BranchWorktreePathUnavailable,
     };
 
     assert_eq!(
         render_prompt_chip_shell_command(&command, ShellType::Bash),
-        r#"echo 'a message containing "double" and '"'"'single'"'"' quotes'"#
+        r#"echo 'The branch is already checked out in another worktree, but InfiniShell couldn'"'"'t find its path.'"#
     );
     assert_eq!(
         render_prompt_chip_shell_command(&command, ShellType::PowerShell),
-        r#"echo 'a message containing "double" and ''single'' quotes'"#
+        r#"echo 'The branch is already checked out in another worktree, but InfiniShell couldn''t find its path.'"#
     );
 }
 

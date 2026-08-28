@@ -179,7 +179,7 @@ impl SearchItem for ProfileSearchItem {
     fn accessibility_label(&self) -> String {
         match &self.kind {
             ProfileSearchItemKind::Profile { profile_name, .. } => {
-                format!("Profile: {profile_name}")
+                crate::t!("search-profile-a11y", name = profile_name.as_str())
             }
             ProfileSearchItemKind::ManageProfiles => crate::t!("terminal-manage-profiles"),
         }

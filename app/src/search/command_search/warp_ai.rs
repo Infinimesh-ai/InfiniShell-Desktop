@@ -15,10 +15,6 @@ use crate::themes::theme::Blend;
 use crate::ui_components::icons::Icon as UIIcon;
 use crate::util::color::{ContrastingColor, MinimumAllowedContrast};
 
-const OPEN_WARP_AI_ITEM_BODY_TEXT: &str = "Ask InfiniShell AI for command suggestions";
-const TRANSLATE_WITH_WARP_AI_ITEM_BODY_TEXT: &str =
-    "Translate into shell command using InfiniShell AI";
-
 #[derive(Clone, Debug)]
 pub enum WarpAISearchItem {
     /// Translates the query within command search.
@@ -29,10 +25,10 @@ pub enum WarpAISearchItem {
 }
 
 impl WarpAISearchItem {
-    fn item_body_text(&self) -> &'static str {
+    fn item_body_text(&self) -> String {
         match self {
-            WarpAISearchItem::Translate => TRANSLATE_WITH_WARP_AI_ITEM_BODY_TEXT,
-            WarpAISearchItem::Open => OPEN_WARP_AI_ITEM_BODY_TEXT,
+            WarpAISearchItem::Translate => crate::t!("command-search-ai-translate"),
+            WarpAISearchItem::Open => crate::t!("command-search-ai-ask"),
         }
     }
 }
@@ -120,7 +116,10 @@ impl SearchItem for WarpAISearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("InfiniShell AI: {}", self.item_body_text())
+        crate::t!(
+            "command-search-ai-accessibility-label",
+            action = self.item_body_text()
+        )
     }
 }
 

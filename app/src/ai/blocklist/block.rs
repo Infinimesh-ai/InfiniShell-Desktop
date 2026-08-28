@@ -205,9 +205,6 @@ use crate::{
     send_telemetry_from_ctx,
 };
 
-/// The default display name used for the user if they have no associated display name.
-const DEFAULT_USER_DISPLAY_NAME: &str = "User";
-
 const HAS_PENDING_ACTION: &str = "HasPendingAction";
 const DISPATCHED_REQUESTED_EDIT_KEYMAP_CONTEXT: &str = "PendingAIRequestedEdits";
 
@@ -236,7 +233,7 @@ fn current_user_avatar_info(app: &AppContext) -> UserAvatarInfo {
     UserAvatarInfo {
         display_name: auth_state
             .username_for_display()
-            .unwrap_or_else(|| DEFAULT_USER_DISPLAY_NAME.to_owned()),
+            .unwrap_or_else(|| crate::t!("common-user")),
         profile_image_path: auth_state.user_photo_url(),
     }
 }
@@ -1886,7 +1883,7 @@ impl AIBlock {
 
             if !self.action_buttons.contains_key(&action.id) {
                 let run_button = CompactibleActionButton::new(
-                    "Run".to_string(),
+                    crate::t!("ai-block-run"),
                     Some(KeystrokeSource::Fixed(ENTER_KEYSTROKE.clone())),
                     ButtonSize::InlineActionHeader,
                     AIBlockAction::ExecuteRequestedAction {
@@ -1993,9 +1990,13 @@ impl AIBlock {
                         other => other.clone(),
                     };
                     let command_text = if display_input.is_null() {
-                        format!("MCP Tool: {name}")
+                        crate::t!("ai-mcp-tool-title", name = name.as_str())
                     } else {
-                        format!("MCP Tool: {name} ({display_input})")
+                        crate::t!(
+                            "ai-mcp-tool-title-with-input",
+                            name = name.as_str(),
+                            input = display_input.as_str()
+                        )
                     };
                     self.handle_mcp_tool_stream_update(
                         action_id,
@@ -5641,8 +5642,12 @@ fn set_imported_comment_button_disabled(
     handle.update(ctx, |button, ctx| {
         button.set_disabled(should_disable, ctx);
         if should_disable {
-            let tooltip = repo_path
-                .map(|path| format!("Navigate to {} to open these comments", path.display_path()));
+            let tooltip = repo_path.map(|path| {
+                crate::t!(
+                    "ai-navigate-to-open-comments",
+                    path = path.display_path().to_string()
+                )
+            });
             button.set_tooltip(tooltip, ctx);
         } else {
             button.set_tooltip(None::<String>, ctx);
@@ -6546,7 +6551,7 @@ impl TypedActionView for AIBlock {
                 let window_id = ctx.window_id();
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                     toast_stack.add_ephemeral_toast(
-                        DismissibleToast::error("Failed to open recording.".to_string()),
+                        DismissibleToast::error(crate::t!("ai-recording-open-failed")),
                         window_id,
                         ctx,
                     );

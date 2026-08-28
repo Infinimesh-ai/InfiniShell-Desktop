@@ -13,7 +13,7 @@ use warpui_core::elements::tui::{
     Modifier, TuiChildView, TuiContainer, TuiElement, TuiFlex, TuiParentElement, TuiText,
 };
 
-use super::{CardMode, ORCHESTRATION_BLOCK_TITLE, TuiOrchestrationBlock};
+use super::{CardMode, TuiOrchestrationBlock};
 use crate::agent_block_sections::render_fallback_tool_call_section;
 use crate::orchestrated_agent_identity_styling::{AgentIdentity, assign_agent_identity_indices};
 use crate::tui_builder::TuiUiBuilder;
@@ -43,7 +43,7 @@ impl TuiOrchestrationBlock {
             Some(harness) => HarnessAvailabilityModel::as_ref(ctx)
                 .display_name_for(harness)
                 .to_string(),
-            None => "Warp".to_string(),
+            None => "InfiniShell".to_string(),
         }
     }
 
@@ -93,21 +93,25 @@ impl TuiOrchestrationBlock {
     ) -> Box<dyn TuiElement> {
         let state = &self.orchestration_edit_state.orchestration_config_state;
         let is_remote = state.execution_mode.is_remote();
-        let mut entries: Vec<(&str, String)> = vec![(
-            "Location",
-            if is_remote { "Cloud" } else { "Local" }.to_string(),
+        let mut entries: Vec<(String, String)> = vec![(
+            warp::t!("tui-location"),
+            if is_remote {
+                warp::t!("tui-cloud")
+            } else {
+                warp::t!("tui-local")
+            },
         )];
-        entries.push(("Harness", self.harness_label(app)));
+        entries.push((warp::t!("tui-harness"), self.harness_label(app)));
         if is_remote {
             if should_show_auth_secret_picker(state) {
                 let api_key = match &state.auth_secret_selection {
                     AuthSecretSelection::Named(name) => name.clone(),
-                    AuthSecretSelection::Inherit => "Skip (advanced)".to_string(),
+                    AuthSecretSelection::Inherit => warp::t!("tui-skip-advanced"),
                     AuthSecretSelection::Unset | AuthSecretSelection::CreatingNew => {
-                        "Select an API key".to_string()
+                        warp::t!("tui-select-api-key")
                     }
                 };
-                entries.push(("API key", api_key));
+                entries.push((warp::t!("tui-api-key"), api_key));
             }
             let host = match &state.execution_mode {
                 RunAgentsExecutionMode::Remote { worker_host, .. }
@@ -119,26 +123,26 @@ impl TuiOrchestrationBlock {
                     ORCHESTRATION_WARP_WORKER_HOST.to_string()
                 }
             };
-            entries.push(("Host", host));
+            entries.push((warp::t!("tui-host"), host));
             let environment_id = match &state.execution_mode {
                 RunAgentsExecutionMode::Remote { environment_id, .. } => environment_id.clone(),
                 RunAgentsExecutionMode::Local => String::new(),
             };
             entries.push((
-                "Environment",
+                warp::t!("tui-environment"),
                 Self::label_for_id(
                     &environment_snapshot(state, app),
                     &environment_id,
-                    "Empty environment",
+                    &warp::t!("tui-empty-environment"),
                 ),
             ));
         }
         entries.push((
-            "Model",
+            warp::t!("tui-model"),
             Self::label_for_id(
                 &model_snapshot(state, app),
                 &state.model_id,
-                "Default model",
+                &warp::t!("tui-default-model"),
             ),
         ));
 
@@ -159,9 +163,9 @@ impl TuiOrchestrationBlock {
         let mut column = TuiFlex::column();
 
         column.add_child(
-            TuiText::new(format!(
-                "Agents ({}):",
-                self.request_fields.agent_run_configs.len()
+            TuiText::new(warp::t!(
+                "tui-agents-count-heading",
+                count = self.request_fields.agent_run_configs.len()
             ))
             .with_style(builder.primary_text_style())
             .truncate()
@@ -194,7 +198,7 @@ impl TuiOrchestrationBlock {
         TuiText::from_spans([
             ("■ ".to_string(), builder.attention_glyph_style()),
             (
-                ORCHESTRATION_BLOCK_TITLE.to_string(),
+                warp::t!("tui-orchestration-permission-title"),
                 builder.primary_text_style(),
             ),
         ])
@@ -211,19 +215,37 @@ impl TuiOrchestrationBlock {
         let spans = match self.mode {
             CardMode::Acceptance => vec![
                 ("Enter ".to_string(), builder.primary_text_style()),
-                ("to accept  ".to_string(), builder.muted_text_style()),
+                (
+                    format!("{}  ", warp::t!("tui-hint-accept")),
+                    builder.muted_text_style(),
+                ),
                 ("Ctrl + E".to_string(), builder.primary_text_style()),
-                (" to edit ".to_string(), builder.muted_text_style()),
+                (
+                    format!(" {} ", warp::t!("tui-hint-edit")),
+                    builder.muted_text_style(),
+                ),
                 ("Ctrl + C".to_string(), builder.primary_text_style()),
-                (" to reject".to_string(), builder.muted_text_style()),
+                (
+                    format!(" {}", warp::t!("tui-hint-reject")),
+                    builder.muted_text_style(),
+                ),
             ],
             CardMode::Configuring { .. } => vec![
                 ("Enter ".to_string(), builder.primary_text_style()),
-                ("to accept  ".to_string(), builder.muted_text_style()),
-                ("Tab or ← →".to_string(), builder.primary_text_style()),
-                (" to navigate  ".to_string(), builder.muted_text_style()),
+                (
+                    format!("{}  ", warp::t!("tui-hint-accept")),
+                    builder.muted_text_style(),
+                ),
+                (
+                    warp::t!("tui-key-tab-or-arrows"),
+                    builder.primary_text_style(),
+                ),
+                (
+                    format!(" {}  ", warp::t!("tui-hint-navigate")),
+                    builder.muted_text_style(),
+                ),
                 ("Esc ".to_string(), builder.primary_text_style()),
-                ("to go back".to_string(), builder.muted_text_style()),
+                (warp::t!("tui-hint-go-back"), builder.muted_text_style()),
             ],
         };
         TuiText::from_spans(spans).finish()

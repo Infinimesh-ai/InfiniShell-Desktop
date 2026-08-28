@@ -48,7 +48,7 @@ impl OpenInWarpBannerState {
 fn file_title_text(openable_path: &OpenablePath) -> String {
     match openable_path.file_type {
         OpenableFileType::Markdown => {
-            "Did you know that InfiniShell can directly display Markdown files?".to_string()
+            crate::t!("terminal-open-file-banner-markdown-description")
         }
         OpenableFileType::Code | OpenableFileType::Text => {
             cfg_if::cfg_if! {
@@ -59,13 +59,16 @@ fn file_title_text(openable_path: &OpenablePath) -> String {
 
                     match language.as_ref().map(|language| language.display_name()) {
                         Some(display_name) => {
-                            format!("Did you know that InfiniShell can directly edit {display_name} files?")
+                            crate::t!(
+                                "terminal-open-file-banner-language-description",
+                                language = display_name
+                            )
                         }
-                        None => "Did you know that InfiniShell can directly edit code?".to_string(),
+                        None => crate::t!("terminal-open-file-banner-code-description"),
                     }
                 } else {
                     // The `languages` crate is not available on WASM, so use a fallback message.
-                    "Did you know that InfiniShell can directly edit code?".to_string()
+                    crate::t!("terminal-open-file-banner-code-description")
                 }
             }
         }
@@ -78,12 +81,14 @@ pub fn render_open_in_warp_banner(
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let button_text = match state.target.file_type {
-        OpenableFileType::Markdown => "View in InfiniShell",
-        OpenableFileType::Code | OpenableFileType::Text => "Edit in InfiniShell",
+        OpenableFileType::Markdown => crate::t!("terminal-open-file-banner-view"),
+        OpenableFileType::Code | OpenableFileType::Text => {
+            crate::t!("terminal-open-file-banner-edit")
+        }
     };
 
     let open_button = InlineBannerTextButton {
-        text: button_text.to_string(),
+        text: button_text,
         text_color: appearance.theme().active_ui_text_color().into_solid(),
         button_state: InlineBannerButtonState {
             on_click_event: TerminalAction::OpenInWarpBanner(OpenInWarpBannerAction::OpenFile),

@@ -1,5 +1,6 @@
 //! Configurable terminal-session statusline formatting, rendering, and metadata subscriptions.
 
+use std::borrow::Cow;
 use std::time::Duration;
 
 use chrono::{Local, NaiveDateTime};
@@ -14,10 +15,8 @@ use warpui_core::elements::tui::{
 use warpui_core::{AppContext, ViewContext};
 
 use super::{
-    CTRL_C_EXIT_HINT, CTRL_C_KILL_CHILD_HINT, ConversationRestoreState, LOADING_CONVERSATION_HINT,
-    RUNNING_COMMAND_DETACH_HINT, SHELL_MODE_HINT, TuiConversationRestoreOrigin,
-    TuiTerminalSessionAction, TuiTerminalSessionView, render_mcp_install_footer,
-    render_mcp_menu_footer,
+    ConversationRestoreState, TuiConversationRestoreOrigin, TuiTerminalSessionAction,
+    TuiTerminalSessionView, render_mcp_install_footer, render_mcp_menu_footer,
 };
 use crate::transient_hint::TransientHintTone;
 use crate::tui_builder::TuiUiBuilder;
@@ -28,7 +27,7 @@ use crate::voice_input::TuiVoiceInputState;
 const STATUSLINE_DATETIME_REPAINT_INTERVAL: Duration = Duration::from_secs(60);
 
 struct FooterHint<'a> {
-    text: &'a str,
+    text: Cow<'a, str>,
     style: FooterHintStyle,
 }
 
@@ -41,17 +40,17 @@ enum FooterHintStyle {
 }
 
 impl<'a> FooterHint<'a> {
-    fn muted(text: &'a str) -> Self {
+    fn muted(text: impl Into<Cow<'a, str>>) -> Self {
         Self {
-            text,
+            text: text.into(),
             style: FooterHintStyle::Muted,
         }
     }
 
     #[cfg(feature = "voice_input")]
-    fn voice_input(text: &'a str) -> Self {
+    fn voice_input(text: impl Into<Cow<'a, str>>) -> Self {
         Self {
-            text,
+            text: text.into(),
             style: FooterHintStyle::VoiceInput,
         }
     }
@@ -92,7 +91,14 @@ pub(super) fn format_context_window_usage(usage: f32) -> ContextWindowUsage {
     }
 }
 pub(super) fn format_statusline_date(now: NaiveDateTime) -> String {
-    now.format("%B %-d, %Y").to_string()
+    if warp::i18n::current_languages()
+        .first()
+        .is_some_and(|language| language.to_string().starts_with("zh"))
+    {
+        now.format("%Y年%-m月%-d日").to_string()
+    } else {
+        now.format("%B %-d, %Y").to_string()
+    }
 }
 pub(super) fn format_statusline_time_12_hour(now: NaiveDateTime) -> String {
     now.format("%-I:%M%P").to_string()
@@ -205,7 +211,7 @@ pub(super) fn render_status_footer_row(
         match segment {
             FooterSegment::ShellMode => {
                 row = row.child(
-                    TuiText::new(SHELL_MODE_HINT)
+                    TuiText::new(warp::t!("tui-shell-mode"))
                         .with_style(builder.shell_command_accent_style())
                         .truncate()
                         .finish(),
@@ -255,7 +261,7 @@ pub(super) fn render_status_footer_row(
                             format!("{} {}% ", usage.bar, usage.percentage_remaining),
                             value_style,
                         ),
-                        ("context remaining".to_owned(), muted),
+                        (warp::t!("tui-context-remaining"), muted),
                     ])
                     .truncate()
                     .finish(),
@@ -344,9 +350,9 @@ impl TuiTerminalSessionView {
             // so the user knows the next ctrl-c will kill the child agent rather
             // than exiting the whole TUI.
             if self.child_kill_armed_conversation.is_some() {
-                return Some(FooterHint::muted(CTRL_C_KILL_CHILD_HINT));
+                return Some(FooterHint::muted(warp::t!("tui-ctrl-c-kill-child")));
             }
-            return Some(FooterHint::muted(CTRL_C_EXIT_HINT));
+            return Some(FooterHint::muted(warp::t!("tui-ctrl-c-exit")));
         }
         if matches!(
             &self.conversation_restore_state,
@@ -355,7 +361,7 @@ impl TuiTerminalSessionView {
                 ..
             }
         ) {
-            return Some(FooterHint::muted(LOADING_CONVERSATION_HINT));
+            return Some(FooterHint::muted(warp::t!("tui-conversation-loading")));
         }
         if let Some((text, tone)) = self.transient_hint.current() {
             let style = match tone {
@@ -363,13 +369,16 @@ impl TuiTerminalSessionView {
                 TransientHintTone::Success => FooterHintStyle::Success,
                 TransientHintTone::Error => FooterHintStyle::Error,
             };
-            return Some(FooterHint { text, style });
+            return Some(FooterHint {
+                text: Cow::Borrowed(text),
+                style,
+            });
         }
         if self
             .session_state(ctx)
             .is_ok_and(|state| state.agent_is_tagged_in())
         {
-            return Some(FooterHint::muted(RUNNING_COMMAND_DETACH_HINT));
+            return Some(FooterHint::muted(warp::t!("tui-running-command-return")));
         }
         #[cfg(feature = "voice_input")]
         {
@@ -379,14 +388,16 @@ impl TuiTerminalSessionView {
             match self.input_view.as_ref(ctx).voice_state(ctx) {
                 TuiVoiceInputState::Listening => {
                     let hint = if self.input_view.as_ref(ctx).voice_hold_key(ctx).is_some() {
-                        "listening to voice input... · release key to stop"
+                        warp::t!("tui-voice-listening-release-to-stop")
                     } else {
-                        "listening to voice input... · esc or enter to stop"
+                        warp::t!("tui-voice-listening-key-to-stop")
                     };
                     return Some(FooterHint::voice_input(hint));
                 }
                 TuiVoiceInputState::Transcribing => {
-                    return Some(FooterHint::voice_input("Transcribing... · esc to cancel"));
+                    return Some(FooterHint::voice_input(warp::t!(
+                        "tui-voice-transcribing-cancel"
+                    )));
                 }
                 TuiVoiceInputState::Idle => {}
             }
@@ -691,16 +702,18 @@ impl TuiTerminalSessionView {
             .is_ok_and(|state| state.is_hovered());
         let (label, style) = match state {
             TuiVoiceInputState::Idle => (
-                "◉ Voice",
+                warp::t!("tui-voice-label"),
                 if hovered {
                     builder.primary_text_style().add_modifier(Modifier::BOLD)
                 } else {
                     builder.primary_text_style()
                 },
             ),
-            TuiVoiceInputState::Listening => ("◉ Voice", builder.success_glyph_style()),
+            TuiVoiceInputState::Listening => {
+                (warp::t!("tui-voice-label"), builder.success_glyph_style())
+            }
             TuiVoiceInputState::Transcribing => {
-                return TuiText::new("… Transcribing")
+                return TuiText::new(warp::t!("tui-voice-transcribing"))
                     .with_style(builder.voice_input_status_style())
                     .truncate()
                     .finish();

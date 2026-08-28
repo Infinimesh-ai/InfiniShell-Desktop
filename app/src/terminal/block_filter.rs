@@ -44,10 +44,6 @@ const MAXIMUM_CONTEXT_LINES: u16 = 99;
 const MAXIMUM_CONTEXT_LINE_EDITOR_BUFFER_LENGTH: usize = 2;
 pub type ContextLines = u16;
 pub const DEFAULT_CONTEXT_LINES_VALUE: ContextLines = 0;
-const CONTEXT_LINE_EDITOR_TOOLTIP_LABEL: &str = "Show context lines around matches";
-const REGEX_TOOLTIP_LABEL: &str = "Regex toggle";
-const CASE_SENSITIVITY_TOOLTIP_LABEL: &str = "Case sensitive search";
-const INVERT_FILTER_TOOLTIP_LABEL: &str = "Invert filter";
 
 pub const BLOCK_FILTER_DOTTED_LINE_DASH: Dash = Dash {
     dash_length: 4.,
@@ -532,7 +528,7 @@ impl View for BlockFilterEditor {
             self.mouse_state_handles.regex_mouse_state_handle.clone(),
             BlockFilterEditorAction::ToggleRegex,
             editor_height,
-            Some(REGEX_TOOLTIP_LABEL),
+            Some(&crate::t!("find-regex-tooltip")),
         );
         let case_sensitive_icon = self.render_hoverable_icon(
             appearance,
@@ -543,7 +539,7 @@ impl View for BlockFilterEditor {
                 .clone(),
             BlockFilterEditorAction::ToggleCaseSensitivity,
             editor_height,
-            Some(CASE_SENSITIVITY_TOOLTIP_LABEL),
+            Some(&crate::t!("find-case-sensitive-tooltip")),
         );
         let invert_filter_icon = self.render_hoverable_icon(
             appearance,
@@ -554,7 +550,7 @@ impl View for BlockFilterEditor {
                 .clone(),
             BlockFilterEditorAction::ToggleInvertFilter,
             editor_height,
-            Some(INVERT_FILTER_TOOLTIP_LABEL),
+            Some(&crate::t!("find-invert-filter-tooltip")),
         );
 
         let query_editor = Shrinkable::new(
@@ -654,7 +650,7 @@ impl View for BlockFilterEditor {
                 if state.is_hovered() {
                     let tool_tip = appearance
                         .ui_builder()
-                        .tool_tip(CONTEXT_LINE_EDITOR_TOOLTIP_LABEL.to_string())
+                        .tool_tip(crate::t!("find-context-lines-tooltip"))
                         .build()
                         .finish();
                     stack.add_positioned_child(

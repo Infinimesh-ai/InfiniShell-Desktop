@@ -185,23 +185,23 @@ impl TuiMcpInstallFlowModel {
         let request = self
             .request
             .as_ref()
-            .ok_or_else(|| "The MCP installation flow is no longer active".to_owned())?;
+            .ok_or_else(|| warp::t!("tui-mcp-install-inactive"))?;
         let TuiMcpInstallStep::Variable { index, .. } = &self.step else {
-            return Err("The MCP installation flow is not collecting a variable".to_owned());
+            return Err(warp::t!("tui-mcp-install-not-collecting-variable"));
         };
         let variable = request
             .variables
             .get(*index)
-            .ok_or_else(|| "The MCP variable is no longer available".to_owned())?;
+            .ok_or_else(|| warp::t!("tui-mcp-install-variable-unavailable"))?;
         if variable.key != key || value.is_empty() {
-            return Err("Enter a value for the required MCP variable".to_owned());
+            return Err(warp::t!("tui-mcp-install-required-value"));
         }
         if variable
             .allowed_values
             .as_ref()
             .is_some_and(|allowed| !allowed.contains(&value))
         {
-            return Err("Select one of the listed values".to_owned());
+            return Err(warp::t!("tui-mcp-install-select-listed-value"));
         }
 
         self.values.push(TuiMcpVariableValue { key, value });
@@ -222,18 +222,18 @@ impl TuiMcpInstallFlowModel {
         Ok(completion)
     }
 
-    pub(crate) fn primary_action_hint(&self) -> Option<&'static str> {
+    pub(crate) fn primary_action_hint(&self) -> Option<String> {
         let request = self.request.as_ref()?;
         match &self.step {
             TuiMcpInstallStep::Closed => None,
             TuiMcpInstallStep::Variable { index, .. } if *index + 1 == request.variables.len() => {
-                Some("to install and enable")
+                Some(warp::t!("tui-hint-install-and-enable"))
             }
-            TuiMcpInstallStep::Variable { .. } => Some("to continue"),
+            TuiMcpInstallStep::Variable { .. } => Some(warp::t!("tui-hint-continue")),
         }
     }
 
-    pub(crate) fn input_hint_text(&self, ctx: &AppContext) -> Option<&'static str> {
+    pub(crate) fn input_hint_text(&self, ctx: &AppContext) -> Option<String> {
         if !self.is_open(ctx) {
             return None;
         }
@@ -245,7 +245,7 @@ impl TuiMcpInstallFlowModel {
             .variables
             .get(*index)
             .is_some_and(|variable| variable.allowed_values.is_none())
-            .then_some("Enter value…")
+            .then(|| warp::t!("tui-enter-value"))
     }
 
     pub(crate) fn snapshot(&self, ctx: &AppContext) -> Option<TuiInlineMenuSnapshot> {
@@ -253,7 +253,7 @@ impl TuiMcpInstallFlowModel {
             return None;
         }
         let request = self.request.as_ref()?;
-        let title = format!("Install and enable {}", request.name);
+        let title = warp::t!("tui-mcp-install-title", name = request.name.clone());
         let header = Some(TuiInlineMenuHeader {
             title: Some(title),
             tabs: Vec::new(),
@@ -263,11 +263,12 @@ impl TuiMcpInstallFlowModel {
             TuiMcpInstallStep::Variable { index, choices } => {
                 let variable = request.variables.get(*index)?;
                 let status = variable.allowed_values.is_none().then(|| {
-                    TuiInlineMenuStatus::Empty(format!(
-                        "Enter a value for {} ({}/{})",
-                        variable.key,
-                        index + 1,
-                        request.variables.len()
+                    let current = *index + 1;
+                    TuiInlineMenuStatus::Empty(warp::t!(
+                        "tui-mcp-install-enter-variable",
+                        key = variable.key.clone(),
+                        current = current,
+                        total = request.variables.len()
                     ))
                 });
                 Some(TuiInlineMenuSnapshot {

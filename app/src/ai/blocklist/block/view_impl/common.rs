@@ -78,8 +78,7 @@ use crate::ai::blocklist::inline_action::requested_action::RenderableAction;
 use crate::ai::blocklist::model::{AIBlockModel, AIBlockModelHelper};
 use crate::ai::blocklist::secret_redaction::{SecretRedactionState, redact_secrets_in_element};
 use crate::ai::blocklist::view_util::{
-    FailedOutputPresentation, OUT_OF_CREDITS_SUBSCRIBE_LABEL, error_color,
-    failed_output_presentation,
+    FailedOutputPresentation, error_color, failed_output_presentation,
 };
 use crate::ai::blocklist::{BlocklistAIActionModel, ShellCommandExecutor, TextLocation};
 use crate::ai::loading::shimmering_warp_loading_text;
@@ -108,36 +107,90 @@ use crate::workspaces::workspace::CustomerType;
 
 pub const STATUS_ICON_SIZE_DELTA: f32 = 4.;
 pub const STATUS_FOOTER_VERTICAL_PADDING: f32 = 4.;
-pub const WAITING_FOR_USER_INPUT_MESSAGE: &str = "Agent waiting for instructions...";
 const IMAGE_SOURCE_LINK_LINE_INDEX: usize = 1;
 
-pub const LOAD_OUTPUT_MESSAGE: &str = "Warping...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_ADJUSTING: &str = "Adjusting tasks...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_PASSIVE_CODE_GEN: &str = "Generating fix...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_CREATING_DIFF: &str = "Creating diff...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_PREPARING_QUESTION: &str = "Preparing question...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_GENERATING_PLAN: &str = "Generating plan...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_UPDATING_PLAN: &str = "Updating plan...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_SUMMARIZING_CONVERSATION: &str = "Summarizing conversation...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_SUMMARIZING_TOOL_CALL_RESULT: &str =
-    "Summarizing command output...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_READING_FILES: &str = "Reading files...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_GREP: &str = "Grepping...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_FILE_GLOB: &str = "Finding files...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_RUNNING_COMMAND: &str = "Executing command...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_WRITING_TO_COMMAND: &str = "Writing command input...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_WAITING_FOR_COMMAND_COMPLETION: &str =
-    "Waiting for command to exit...";
-pub const LOAD_OUTPUT_MESSAGE_FOR_WEB_SEARCH: &str = "Searching the web...";
+pub fn waiting_for_user_input_message() -> String {
+    crate::t!("ai-status-waiting-for-instructions")
+}
+
+pub fn load_output_message() -> String {
+    crate::t!("ai-status-warping")
+}
+
+pub fn load_output_message_for_adjusting() -> String {
+    crate::t!("ai-status-adjusting-tasks")
+}
+
+pub fn load_output_message_for_passive_code_gen() -> String {
+    crate::t!("ai-status-generating-fix")
+}
+
+pub fn load_output_message_for_creating_diff() -> String {
+    crate::t!("ai-status-creating-diff")
+}
+
+pub fn load_output_message_for_preparing_question() -> String {
+    crate::t!("ai-status-preparing-question")
+}
+
+pub fn load_output_message_for_generating_plan() -> String {
+    crate::t!("ai-status-generating-plan")
+}
+
+pub fn load_output_message_for_updating_plan() -> String {
+    crate::t!("ai-status-updating-plan")
+}
+
+pub fn load_output_message_for_summarizing_conversation() -> String {
+    crate::t!("ai-status-summarizing-conversation")
+}
+
+pub fn load_output_message_for_summarizing_tool_call_result() -> String {
+    crate::t!("ai-status-summarizing-command-output")
+}
+
+pub fn load_output_message_for_reading_files() -> String {
+    crate::t!("ai-status-reading-files")
+}
+
+pub fn load_output_message_for_grep() -> String {
+    crate::t!("ai-status-grepping")
+}
+
+pub fn load_output_message_for_file_glob() -> String {
+    crate::t!("ai-status-finding-files")
+}
+
+pub fn load_output_message_for_running_command() -> String {
+    crate::t!("ai-status-executing-command")
+}
+
+pub fn load_output_message_for_writing_to_command() -> String {
+    crate::t!("ai-status-writing-command-input")
+}
+
+pub fn load_output_message_for_waiting_for_command_completion() -> String {
+    crate::t!("ai-status-waiting-for-command-exit")
+}
+
+pub fn load_output_message_for_web_search() -> String {
+    crate::t!("ai-status-searching-web")
+}
 
 #[cfg(feature = "local_fs")]
 pub(crate) type ResolvedBlocklistImageSources = HashMap<String, Option<AssetSource>>;
 
-pub const BLOCKED_ACTION_MESSAGE_FOR_WRITE_TO_LONG_RUNNING_SHELL_COMMAND: &str =
-    "Can I write the following to this running command?";
-pub const BLOCKED_ACTION_MESSAGE_FOR_READING_FILES: &str = "Grant access to the following files?";
-pub const BLOCKED_ACTION_MESSAGE_FOR_GREP_OR_FILE_GLOB: &str =
-    "OK if I search the files in this directory?";
+pub fn blocked_action_message_for_write_to_long_running_shell_command() -> String {
+    crate::t!("ai-permission-write-running-command")
+}
+
+pub fn blocked_action_message_for_reading_files() -> String {
+    crate::t!("ai-permission-read-files")
+}
+
+pub fn blocked_action_message_for_grep_or_file_glob() -> String {
+    crate::t!("ai-permission-search-directory")
+}
 
 const BLOCKLIST_VISUAL_SECTION_HEIGHT_LINE_MULTIPLIER: f32 = 10.0;
 const BLOCKLIST_MERMAID_MAX_HEIGHT_LINE_MULTIPLIER: f32 = 40.0;
@@ -285,10 +338,10 @@ pub fn render_warping_indicator<V: View>(
         // Choose the appropriate message based on summarization type
         let base_message = match summarization_type {
             SummarizationType::ConversationSummary => {
-                LOAD_OUTPUT_MESSAGE_FOR_SUMMARIZING_CONVERSATION
+                load_output_message_for_summarizing_conversation()
             }
             SummarizationType::ToolCallResultSummary => {
-                LOAD_OUTPUT_MESSAGE_FOR_SUMMARIZING_TOOL_CALL_RESULT
+                load_output_message_for_summarizing_tool_call_result()
             }
         };
 
@@ -304,36 +357,36 @@ pub fn render_warping_indicator<V: View>(
             // Move the timer / token text outside of the base message, we don't want it to shimmer
             // since that would cause the animation to reset every time the tokens or time changes.
             non_shimmering_text = Some(timer_text.to_string());
-            base_message.into()
+            base_message
         } else {
-            base_message.to_string()
+            base_message
         }
     } else if props.model.contains_update_document_action(app) {
-        LOAD_OUTPUT_MESSAGE_FOR_UPDATING_PLAN.to_string()
+        load_output_message_for_updating_plan()
     } else if props.model.contains_create_document_action(app) {
-        LOAD_OUTPUT_MESSAGE_FOR_GENERATING_PLAN.to_string()
+        load_output_message_for_generating_plan()
     } else if props.model.request_type(app).is_passive_code_diff() {
-        LOAD_OUTPUT_MESSAGE_FOR_PASSIVE_CODE_GEN.to_string()
+        load_output_message_for_passive_code_gen()
     } else if is_last_message_requesting_file_edits {
-        LOAD_OUTPUT_MESSAGE_FOR_CREATING_DIFF.to_string()
+        load_output_message_for_creating_diff()
     } else if is_last_message_asking_user_question {
-        LOAD_OUTPUT_MESSAGE_FOR_PREPARING_QUESTION.to_string()
+        load_output_message_for_preparing_question()
     } else if is_searching_web {
-        LOAD_OUTPUT_MESSAGE_FOR_WEB_SEARCH.to_string()
+        load_output_message_for_web_search()
     } else if is_interrupt_query_for_same_conversation
         && output_to_render
             .as_ref()
             .is_none_or(|output| output.get().messages.is_empty())
     {
         // Only "Adjusting..." if nothing from the current exchange has streamed yet.
-        LOAD_OUTPUT_MESSAGE_FOR_ADJUSTING.to_string()
+        load_output_message_for_adjusting()
     } else {
         match props
             .action_model
             .get_async_running_action(app)
             .map(|action| &action.action)
         {
-            Some(AIAgentActionType::Grep { .. }) => LOAD_OUTPUT_MESSAGE_FOR_GREP.to_owned(),
+            Some(AIAgentActionType::Grep { .. }) => load_output_message_for_grep(),
             Some(AIAgentActionType::CallMCPTool {
                 server_id, name, ..
             }) => {
@@ -341,19 +394,21 @@ pub fn render_warping_indicator<V: View>(
                     .as_ref()
                     .and_then(|id| TemplatableMCPServerManager::get_mcp_name(id, app))
                 {
-                    Some(server) => format!("Calling \"{name}\" MCP tool on {server}..."),
-                    None => format!("Calling \"{name}\" MCP tool..."),
+                    Some(server) => crate::t!(
+                        "ai-status-calling-mcp-tool-on-server",
+                        name = name.as_str(),
+                        server = server.as_str()
+                    ),
+                    None => crate::t!("ai-status-calling-mcp-tool", name = name.as_str()),
                 }
             }
             Some(AIAgentActionType::ReadMCPResource { name, .. }) => {
-                format!("Reading \"{name}\" MCP resource...")
+                crate::t!("ai-status-reading-mcp-resource", name = name.as_str())
             }
             Some(AIAgentActionType::FileGlob { .. })
-            | Some(AIAgentActionType::FileGlobV2 { .. }) => {
-                LOAD_OUTPUT_MESSAGE_FOR_FILE_GLOB.to_owned()
-            }
+            | Some(AIAgentActionType::FileGlobV2 { .. }) => load_output_message_for_file_glob(),
             Some(AIAgentActionType::WriteToLongRunningShellCommand { .. }) => {
-                LOAD_OUTPUT_MESSAGE_FOR_WRITING_TO_COMMAND.to_owned()
+                load_output_message_for_writing_to_command()
             }
             action => {
                 let active_block = props.terminal_model.block_list().active_block();
@@ -363,7 +418,7 @@ pub fn render_warping_indicator<V: View>(
                 {
                     if action.is_none() {
                         should_render_waiting_icon = true;
-                        WAITING_FOR_USER_INPUT_MESSAGE.to_owned()
+                        waiting_for_user_input_message()
                     } else {
                         // Choose the base message depending on whether the agent is waiting
                         // for the command to exit or polling at a fixed interval.
@@ -371,8 +426,8 @@ pub fn render_warping_indicator<V: View>(
                             Some(AIAgentActionType::ReadShellCommandOutput {
                                 delay: Some(ShellCommandDelay::OnCompletion),
                                 ..
-                            }) => LOAD_OUTPUT_MESSAGE_FOR_WAITING_FOR_COMMAND_COMPLETION,
-                            _ => LOAD_OUTPUT_MESSAGE_FOR_RUNNING_COMMAND,
+                            }) => load_output_message_for_waiting_for_command_completion(),
+                            _ => load_output_message_for_running_command(),
                         };
                         // Compute "Next check in {time}" for fixed-interval polls. Only
                         // `ReadShellCommandOutput { delay: Duration(_) }` has a meaningful
@@ -399,16 +454,19 @@ pub fn render_warping_indicator<V: View>(
                             } else {
                                 format!("{}m", secs / 60)
                             };
-                            let suffix = format!(" · Next check in {formatted}");
+                            let suffix = crate::t!(
+                                "ai-status-next-check-suffix",
+                                duration = formatted.as_str()
+                            );
 
                             // Keep the base message constant so the shimmering animation
                             // isn't interrupted every time the countdown ticks. The
                             // suffix is rendered as a separate non-shimmering element,
                             // matching the same pattern used by the summarization timer.
                             non_shimmering_text = Some(suffix);
-                            base.to_owned()
+                            base
                         } else {
-                            base.to_owned()
+                            base
                         }
                     }
                 } else {
@@ -3085,7 +3143,7 @@ pub fn render_failed_output(props: FailedOutputProps, app: &AppContext) -> Box<d
         }
         FailedOutputPresentation::InvalidApiKey { title, detail } => {
             return render_invalid_api_key_error(
-                title,
+                &title,
                 &detail,
                 props.invalid_api_key_button_handle,
                 app,
@@ -3235,19 +3293,22 @@ fn render_out_of_credits_error(
     })
     .finish();
 
-    let subscribe_button =
-        out_of_credits_cta_button(OUT_OF_CREDITS_SUBSCRIBE_LABEL, subscribe_button_handle, app)
-            .build()
-            // 去中心化分支:`WorkspaceAction::ShowUpgrade`(云端订阅升级页)已删除。
-            // Zap 走 BYOK,额度耗尽时唯一可行的补救是配置自己的 API key,
-            // 因此与 invalid-API-key 错误一样跳到 API keys 设置。
-            .on_click(|ctx, _, _| {
-                ctx.dispatch_typed_action(WorkspaceAction::ShowSettingsPageWithSearch {
-                    search_query: "api keys".to_string(),
-                    section: Some(SettingsSection::WarpAgent),
-                });
-            })
-            .finish();
+    let subscribe_button = out_of_credits_cta_button(
+        &crate::t!("ai-error-subscribe"),
+        subscribe_button_handle,
+        app,
+    )
+    .build()
+    // 去中心化分支:`WorkspaceAction::ShowUpgrade`(云端订阅升级页)已删除。
+    // Zap 走 BYOK,额度耗尽时唯一可行的补救是配置自己的 API key,
+    // 因此与 invalid-API-key 错误一样跳到 API keys 设置。
+    .on_click(|ctx, _, _| {
+        ctx.dispatch_typed_action(WorkspaceAction::ShowSettingsPageWithSearch {
+            search_query: "api keys".to_string(),
+            section: Some(SettingsSection::WarpAgent),
+        });
+    })
+    .finish();
 
     Flex::column()
         .with_cross_axis_alignment(CrossAxisAlignment::Start)
@@ -3473,7 +3534,7 @@ pub(crate) fn render_debug_footer<V: View>(
 
     // render the conversation's debug id so screenshots automatically show the debug id
     let debug_text = Text::new(
-        format!("Debug information: {debug_info}"),
+        crate::t!("ai-debug-information", info = debug_info.as_str()),
         appearance.ui_font_family(),
         appearance.monospace_font_size(),
     )

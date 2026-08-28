@@ -20,8 +20,6 @@ use crate::env_vars::view::env_var_collection::{
 // Metadata labels (name and description)
 const METADATA_SPACING: f32 = 8.;
 const LAST_ROW_ELEMENT_SPACING: f32 = 2.;
-const TITLE_LABEL_TEXT: &str = "Title";
-const DESCRIPTION_LABEL_TEXT: &str = "Description";
 
 const VERTICAL_TEXT_INPUT_PADDING: f32 = 5.;
 const HORIZONTAL_TEXT_INPUT_PADDING: f32 = 10.;
@@ -362,9 +360,11 @@ impl EnvVarCollectionView {
 
         Flex::column()
             .with_child(
-                Container::new(self.render_metadata_label(TITLE_LABEL_TEXT, appearance))
-                    .with_margin_bottom(METADATA_SPACING)
-                    .finish(),
+                Container::new(
+                    self.render_metadata_label(crate::t!("env-vars-title-label"), appearance),
+                )
+                .with_margin_bottom(METADATA_SPACING)
+                .finish(),
             )
             .with_child(
                 Container::new(self.render_metadata_editor(
@@ -377,9 +377,12 @@ impl EnvVarCollectionView {
             )
             .with_child(
                 SavePosition::new(
-                    Container::new(self.render_metadata_label(DESCRIPTION_LABEL_TEXT, appearance))
-                        .with_margin_bottom(METADATA_SPACING)
-                        .finish(),
+                    Container::new(self.render_metadata_label(
+                        crate::t!("env-vars-description-label"),
+                        appearance,
+                    ))
+                    .with_margin_bottom(METADATA_SPACING)
+                    .finish(),
                     DESCRIPTION_EDITOR_POSITION,
                 )
                 .finish(),

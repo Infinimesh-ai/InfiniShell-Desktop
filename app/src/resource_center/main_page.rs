@@ -390,7 +390,7 @@ impl ResourceCenterMainView {
                 .with_text_and_icon_label(
                     TextAndIcon::new(
                         TextAndIconAlignment::IconFirst,
-                        "Invite a friend to InfiniShell",
+                        crate::t!("resource-center-invite-friend"),
                         Icon::new(SEND_SVG_PATH, appearance.theme().accent()),
                         MainAxisSize::Max,
                         MainAxisAlignment::Center,
@@ -429,7 +429,7 @@ impl ResourceCenterMainView {
 
                     appearance
                         .ui_builder()
-                        .wrappable_text("Mark all as read", false)
+                        .wrappable_text(crate::t!("resource-center-mark-all-read"), false)
                         .with_style(style)
                         .build()
                         .finish()

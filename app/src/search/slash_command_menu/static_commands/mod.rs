@@ -207,7 +207,7 @@ pub struct StaticCommand {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SlashCommandArgumentHint {
     pub input_prefix: String,
-    pub text: &'static str,
+    pub text: String,
 }
 
 impl StaticCommand {
@@ -239,8 +239,110 @@ impl StaticCommand {
         session_context.contains(self.availability)
     }
 
+    /// 返回当前界面语言下的命令说明。
+    ///
+    /// `description` 字段仍保留英文原文，供静态注册和不初始化界面资源的底层测试使用；
+    /// 所有面向用户的菜单都必须通过本方法取值。
+    pub fn localized_description(&self) -> String {
+        match self.name {
+            "/agent" => crate::t!("slash-cmd-agent-desc"),
+            "/cloud-agent" => crate::t!("slash-cmd-cloud-agent-desc"),
+            "/add-mcp" => crate::t!("slash-cmd-add-mcp-desc"),
+            "/reset-statusline" => crate::t!("slash-cmd-reset-statusline-desc"),
+            "/statusline" => crate::t!("slash-cmd-statusline-desc"),
+            "/auto-approve" => crate::t!("slash-cmd-auto-approve-desc"),
+            "/mcp" => crate::t!("slash-cmd-mcp-desc"),
+            "/view-logs" => crate::t!("slash-cmd-view-logs-desc"),
+            "/voice" => crate::t!("slash-cmd-voice-desc"),
+            "/natural-language-detection" => {
+                crate::t!("slash-cmd-natural-language-detection-desc")
+            }
+            "/api-keys" => crate::t!("slash-cmd-api-keys-desc"),
+            "/connect-grok" => crate::t!("slash-cmd-connect-grok-desc"),
+            "/upgrade" => crate::t!("slash-cmd-upgrade-desc"),
+            "/theme" => crate::t!("slash-cmd-theme-desc"),
+            "/exit" => crate::t!("slash-cmd-exit-desc"),
+            "/status" => crate::t!("slash-cmd-status-desc"),
+            "/create-environment" => crate::t!("slash-cmd-create-environment-desc"),
+            "/docker-sandbox" => crate::t!("slash-cmd-docker-sandbox-desc"),
+            "/create-new-project" => crate::t!("slash-cmd-create-new-project-desc"),
+            "/open-skill" => crate::t!("slash-cmd-open-skill-desc"),
+            "/skills" => crate::t!("slash-cmd-skills-desc"),
+            "/add-prompt" => crate::t!("slash-cmd-add-prompt-desc"),
+            "/add-rule" => crate::t!("slash-cmd-add-rule-desc"),
+            "/open-file" => crate::t!("slash-cmd-open-file-desc"),
+            "/rename-tab" => crate::t!("slash-cmd-rename-tab-desc"),
+            "/rename-conversation" => crate::t!("slash-cmd-rename-conversation-desc"),
+            "/set-tab-color" => crate::t!("slash-cmd-set-tab-color-desc"),
+            "/fork" => crate::t!("slash-cmd-fork-desc"),
+            "/handoff" => crate::t!("slash-cmd-handoff-desc"),
+            "/pr-comments" => crate::t!("slash-cmd-pr-comments-desc"),
+            "/open-code-review" => crate::t!("slash-cmd-open-code-review-desc"),
+            "/index" => crate::t!("slash-cmd-index-desc"),
+            "/init" => crate::t!("slash-cmd-init-desc"),
+            "/open-project-rules" => crate::t!("slash-cmd-open-project-rules-desc"),
+            "/open-mcp-servers" => crate::t!("slash-cmd-open-mcp-servers-desc"),
+            "/open-settings-file" => crate::t!("slash-cmd-open-settings-file-desc"),
+            "/changelog" => crate::t!("slash-cmd-changelog-desc"),
+            "/feedback" => crate::t!("slash-cmd-feedback-desc"),
+            "/open-repo" => crate::t!("slash-cmd-open-repo-desc"),
+            "/open-rules" => crate::t!("slash-cmd-open-rules-desc"),
+            "/new" => crate::t!("slash-cmd-new-desc"),
+            "/clear" => crate::t!("slash-cmd-clear-desc"),
+            "/model" => crate::t!("slash-cmd-model-desc"),
+            "/host" => crate::t!("slash-cmd-host-desc"),
+            "/harness" => crate::t!("slash-cmd-harness-desc"),
+            "/environment" => crate::t!("slash-cmd-environment-desc"),
+            "/profile" => crate::t!("slash-cmd-profile-desc"),
+            "/plan" => crate::t!("slash-cmd-plan-desc"),
+            "/orchestrate" => crate::t!("slash-cmd-orchestrate-desc"),
+            "/compact" => crate::t!("slash-cmd-compact-desc"),
+            "/compact-and" => crate::t!("slash-cmd-compact-and-desc"),
+            "/queue" => crate::t!("slash-cmd-queue-desc"),
+            "/fork-and-compact" => crate::t!("slash-cmd-fork-and-compact-desc"),
+            "/fork-from" => crate::t!("slash-cmd-fork-from-desc"),
+            "/continue-locally" => crate::t!("slash-cmd-continue-locally-desc"),
+            "/usage" => crate::t!("slash-cmd-usage-desc"),
+            "/remote-control" => crate::t!("slash-cmd-remote-control-desc"),
+            "/cost" => crate::t!("slash-cmd-cost-desc"),
+            "/conversations" => crate::t!("slash-cmd-conversations-desc"),
+            "/prompts" => crate::t!("slash-cmd-prompts-desc"),
+            "/rewind" => crate::t!("slash-cmd-rewind-desc"),
+            "/export-to-clipboard" => crate::t!("slash-cmd-export-to-clipboard-desc"),
+            "/export-to-file" => crate::t!("slash-cmd-export-to-file-desc"),
+            "/vim-mode" => crate::t!("slash-cmd-vim-mode-desc"),
+            "/copy-debugging-id" => crate::t!("slash-cmd-copy-debugging-id-desc"),
+            command_name => {
+                log::warn!("未找到斜杠命令 {command_name:?} 的本地化说明，回退到注册文本");
+                self.description.to_owned()
+            }
+        }
+    }
+
     pub fn argument_hint(&self) -> Option<SlashCommandArgumentHint> {
-        let text = self.argument.as_ref()?.hint_text?;
+        let fallback = self.argument.as_ref()?.hint_text?;
+        let text = match self.name {
+            "/theme" => crate::t!("slash-cmd-theme-hint"),
+            "/create-environment" => crate::t!("slash-cmd-create-environment-hint"),
+            "/create-new-project" => crate::t!("slash-cmd-create-new-project-hint"),
+            "/open-file" => crate::t!("slash-cmd-open-file-hint"),
+            "/rename-tab" => crate::t!("slash-cmd-rename-tab-hint"),
+            "/rename-conversation" => crate::t!("slash-cmd-rename-conversation-hint"),
+            "/fork" => crate::t!("slash-cmd-fork-hint"),
+            "/handoff" => crate::t!("slash-cmd-handoff-hint"),
+            "/plan" | "/orchestrate" => crate::t!("slash-cmd-plan-hint"),
+            "/compact" => crate::t!("slash-cmd-compact-hint"),
+            "/compact-and" => crate::t!("slash-cmd-compact-and-hint"),
+            "/queue" => crate::t!("slash-cmd-queue-hint"),
+            "/fork-and-compact" => crate::t!("slash-cmd-fork-and-compact-hint"),
+            "/continue-locally" => crate::t!("slash-cmd-continue-locally-hint"),
+            "/export-to-file" => crate::t!("slash-cmd-export-to-file-hint"),
+            "/set-tab-color" => fallback.to_owned(),
+            command_name => {
+                log::warn!("未找到斜杠命令 {command_name:?} 的本地化参数提示，回退到注册文本");
+                fallback.to_owned()
+            }
+        };
         Some(SlashCommandArgumentHint {
             input_prefix: format!("{} ", self.name),
             text,

@@ -30,7 +30,6 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 #[cfg(target_os = "macos")]
 use std::env;
-use std::fmt::Write;
 #[cfg(all(target_os = "macos", feature = "crash_reporting"))]
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -319,10 +318,10 @@ use crate::settings_view::{SettingsSection, SettingsView, SettingsViewEvent, fla
 #[cfg(all(target_os = "windows", feature = "local_tty"))]
 use crate::shell_indicator::ShellIndicatorType;
 use crate::tab::{
-    COMPACT_TAB_WIDTH_THRESHOLD, ColorPickerTarget, MOVE_TO_GROUP_LABEL, NewSessionMenuItem,
-    PaneNameMenuTarget, SelectedTabColor, TAB_BAR_BORDER_HEIGHT, TAB_INDICATOR_HEIGHT,
-    TAB_PIN_INDICATOR_ICON_SIZE, TAB_PIN_VANISH_THRESHOLD, TabBarState, TabComponent, TabData,
-    TabTelemetryAction, color_picker_menu_items, tab_position_id, uses_vertical_tabs,
+    COMPACT_TAB_WIDTH_THRESHOLD, ColorPickerTarget, NewSessionMenuItem, PaneNameMenuTarget,
+    SelectedTabColor, TAB_BAR_BORDER_HEIGHT, TAB_INDICATOR_HEIGHT, TAB_PIN_INDICATOR_ICON_SIZE,
+    TAB_PIN_VANISH_THRESHOLD, TabBarState, TabComponent, TabData, TabTelemetryAction,
+    color_picker_menu_items, move_to_group_label, tab_position_id, uses_vertical_tabs,
 };
 use crate::tab_configs::action_sidecar::SidecarItemKind;
 use crate::tab_configs::remove_confirmation_dialog::{
@@ -570,7 +569,6 @@ const NEW_SESSION_SIDECAR_SEARCH_BOX_HORIZONTAL_PADDING: f32 = 12.;
 const NEW_SESSION_SIDECAR_SEARCH_BOX_VERTICAL_PADDING: f32 = 6.;
 const NEW_SESSION_SIDECAR_FOOTER_HORIZONTAL_PADDING: f32 = 16.;
 const NEW_SESSION_SIDECAR_FOOTER_VERTICAL_PADDING: f32 = 8.;
-const SESSION_CONFIG_TAB_CONFIG_CHIP_TEXT: &str = "Access your tab configs here.";
 const SESSION_CONFIG_TAB_CONFIG_CHIP_WIDTH: f32 = 206.;
 const SHOW_SETTINGS_KEYBINDING_NAME: &str = "workspace:show_settings";
 pub const TOGGLE_COMMAND_PALETTE_KEYBINDING_NAME: &str = "workspace:toggle_command_palette";
@@ -634,9 +632,6 @@ const MAX_FORK_TOAST_TITLE_LENGTH: usize = 100;
 
 // The max length of the window title (matching conversation title truncation).
 const MAX_WINDOW_TITLE_LENGTH: usize = 80;
-
-/// The default display name used for the user if they have no associated display name.
-pub const DEFAULT_USER_DISPLAY_NAME: &str = "User";
 
 lazy_static! {
     static ref OPENING_WARP_DRIVE_ON_START_UP: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
@@ -2043,9 +2038,13 @@ impl Workspace {
                 }
                 if let Err(e) = std::fs::remove_file(path) {
                     log::warn!("Failed to remove tab config file: {e:?}");
+                    let error = e.to_string();
                     self.toast_stack.update(ctx, |toast_stack, ctx| {
                         toast_stack.add_ephemeral_toast(
-                            DismissibleToast::error(format!("Failed to remove tab config: {e}")),
+                            DismissibleToast::error(crate::t!(
+                                "workspace-toast-failed-remove-tab-config",
+                                error = error.as_str()
+                            )),
                             ctx,
                         );
                     });
@@ -2408,7 +2407,7 @@ impl Workspace {
         .finish();
 
         let text = Text::new_inline(
-            SESSION_CONFIG_TAB_CONFIG_CHIP_TEXT.to_string(),
+            crate::t!("workspace-session-config-tab-config-chip"),
             appearance.ui_font_family(),
             12.,
         )
@@ -2516,9 +2515,10 @@ impl Workspace {
                             &raw_path,
                             home_dir.as_ref().and_then(|h| h.to_str()),
                         );
-                        let message = format!(
-                            "Failed to load tab config {friendly_path}: {}",
-                            error.error_message
+                        let message = crate::t!(
+                            "workspace-toast-failed-load-tab-config",
+                            path = friendly_path,
+                            error = error.error_message.as_str()
                         );
                         let path = error.file_path.clone();
                         let toast = DismissibleToast::error(message)
@@ -2550,15 +2550,16 @@ impl Workspace {
                             &raw_path,
                             home_dir.as_ref().and_then(|h| h.to_str()),
                         );
-                        let message = format!(
-                            "Failed to load model config {friendly_path}: {}",
-                            error.error_message
+                        let message = crate::t!(
+                            "workspace-toast-failed-load-model-config",
+                            path = friendly_path,
+                            error = error.error_message.as_str()
                         );
                         let path = error.file_path.clone();
                         let toast = DismissibleToast::error(message)
                             .with_object_id(object_id.clone())
                             .with_link(
-                                ToastLink::new("Open file".to_string()).with_onclick_action(
+                                ToastLink::new(crate::t!("common-open-file")).with_onclick_action(
                                     WorkspaceAction::OpenTabConfigErrorFile {
                                         path,
                                         toast_object_id: object_id,
@@ -2619,13 +2620,23 @@ impl Workspace {
         let toast = match result {
             Ok(path) => {
                 ctx.open_file_path_in_explorer(&path);
-                DismissibleToast::success(format!("Wrote heap profile to {}", path.display()))
-                    .with_link(
-                        ToastLink::new("Show in file explorer".to_string())
-                            .with_onclick_action(WorkspaceAction::OpenInExplorer { path }),
-                    )
+                let display_path = path.display().to_string();
+                DismissibleToast::success(crate::t!(
+                    "workspace-heap-profile-written",
+                    path = display_path.as_str()
+                ))
+                .with_link(
+                    ToastLink::new(crate::t!("common-show-in-file-explorer"))
+                        .with_onclick_action(WorkspaceAction::OpenInExplorer { path }),
+                )
             }
-            Err(err) => DismissibleToast::error(format!("Failed to write heap profile: {err:#}")),
+            Err(err) => {
+                let error = format!("{err:#}");
+                DismissibleToast::error(crate::t!(
+                    "workspace-heap-profile-write-failed",
+                    error = error.as_str()
+                ))
+            }
         };
 
         self.toast_stack.update(ctx, |toast_stack, ctx| {
@@ -4095,9 +4106,8 @@ impl Workspace {
 
     fn show_local_conversation_not_found_toast(&mut self, ctx: &mut ViewContext<Self>) {
         self.toast_stack.update(ctx, |view, ctx| {
-            let new_toast = DismissibleToast::error(
-                "Conversation is not available in local InfiniShell history.".to_string(),
-            );
+            let new_toast =
+                DismissibleToast::error(crate::t!("workspace-local-conversation-unavailable"));
             view.add_ephemeral_toast(new_toast, ctx);
         });
     }
@@ -5220,7 +5230,7 @@ impl Workspace {
                     .unwrap_or_else(|| {
                         let title = configuration.title().trim();
                         if title.is_empty() {
-                            "Untitled pane".to_string()
+                            crate::t!("workspace-untitled-pane")
                         } else {
                             title.to_string()
                         }
@@ -5570,7 +5580,7 @@ impl Workspace {
         };
         let current_team_uid = user_workspaces.team_uid_for_window(window_id);
         let mut items: Vec<MenuItem<WorkspaceAction>> = vec![
-            MenuItemFields::new("Switch team")
+            MenuItemFields::new(crate::t!("workspace-switch-team"))
                 .with_disabled(true)
                 .into_item(),
         ];
@@ -6750,7 +6760,10 @@ impl Workspace {
                     ctx.open_file_path_in_explorer(&path);
                 }
                 Ok(Err(err)) => {
-                    let error_message = format!("Failed to create log bundle: {err}");
+                    let error_message = crate::t!(
+                        "workspace-log-bundle-create-failed",
+                        error = err.to_string()
+                    );
                     report_error!(err.context("Failed to create log bundle"));
                     me.toast_stack.update(ctx, |toast_stack, ctx| {
                         let toast = DismissibleToast::error(error_message);
@@ -6758,7 +6771,10 @@ impl Workspace {
                     });
                 }
                 Err(err) => {
-                    let error_message = format!("Failed to create log bundle: {err}");
+                    let error_message = crate::t!(
+                        "workspace-log-bundle-create-failed",
+                        error = err.to_string()
+                    );
                     report_error!(anyhow::Error::new(err).context("Failed to create log bundle"));
                     me.toast_stack.update(ctx, |toast_stack, ctx| {
                         let toast = DismissibleToast::error(error_message);
@@ -7167,7 +7183,7 @@ impl Workspace {
         if FeatureFlag::GroupedTabs.is_enabled() {
             menu_items.push(MenuItem::Separator);
             menu_items.push(
-                MenuItemFields::new("New tab group")
+                MenuItemFields::new(crate::t!("workspace-new-tab-group"))
                     .with_on_select_action(WorkspaceAction::SelectNewSessionMenuItem(
                         NewSessionMenuItem::CreateNewTabGroup,
                     ))
@@ -7394,7 +7410,10 @@ impl Workspace {
                 .and_then(|view| view.as_ref(ctx).pwd())
                 .map(PathBuf::from);
 
-            let modal_title = format!("Open: {}", tab_config.name);
+            let modal_title = crate::t!(
+                "workspace-open-tab-config-title",
+                name = tab_config.name.as_str()
+            );
             self.tab_config_params_modal.view.update(ctx, |modal, ctx| {
                 modal.body().update(ctx, |body, ctx| {
                     body.set_title(modal_title);
@@ -7576,7 +7595,7 @@ impl Workspace {
         let seed_text = group
             .name
             .clone()
-            .unwrap_or_else(|| "New Group".to_string());
+            .unwrap_or_else(|| crate::t!("workspace-new-group"));
 
         self.current_workspace_state
             .set_tab_group_being_renamed(group_id);
@@ -8209,13 +8228,13 @@ impl Workspace {
         let pane_name_target = match target {
             VerticalTabsPaneContextMenuTarget::ClickedPane(locator) => PaneNameMenuTarget {
                 locator,
-                rename_label: "Rename pane",
-                reset_label: "Reset pane name",
+                rename_label: crate::t!("workspace-rename-pane"),
+                reset_label: crate::t!("workspace-reset-pane-name"),
             },
             VerticalTabsPaneContextMenuTarget::ActivePane(locator) => PaneNameMenuTarget {
                 locator,
-                rename_label: "Rename active pane",
-                reset_label: "Reset active pane name",
+                rename_label: crate::t!("workspace-rename-active-pane"),
+                reset_label: crate::t!("workspace-reset-active-pane-name"),
             },
         };
         let can_move_left = self.can_move_tab(tab_index, TabMovement::Left);
@@ -8255,21 +8274,27 @@ impl Workspace {
             && let Some(version) = ChannelState::app_version()
         {
             menu_items.push(
-                MenuItemFields::new(format!("Current version is {version}"))
+                MenuItemFields::new(crate::t!("workspace-current-version", version = version))
                     .with_disabled(true)
                     .into_item(),
             );
             match autoupdate::get_update_state(ctx) {
                 AutoupdateStage::UpdateReady { new_version, .. }
                 | AutoupdateStage::UpdatedPendingRestart { new_version } => menu_items.push(
-                    MenuItemFields::new(format!("Install update ({})", new_version.version))
-                        .with_on_select_action(WorkspaceAction::ApplyUpdate)
-                        .into_item(),
+                    MenuItemFields::new(crate::t!(
+                        "workspace-install-update",
+                        version = new_version.version.as_str()
+                    ))
+                    .with_on_select_action(WorkspaceAction::ApplyUpdate)
+                    .into_item(),
                 ),
                 AutoupdateStage::Updating { new_version, .. } => menu_items.push(
-                    MenuItemFields::new(format!("Updating to ({})", new_version.version))
-                        .with_disabled(true)
-                        .into_item(),
+                    MenuItemFields::new(crate::t!(
+                        "workspace-updating-to-version",
+                        version = new_version.version.as_str()
+                    ))
+                    .with_disabled(true)
+                    .into_item(),
                 ),
                 AutoupdateStage::UnableToUpdateToNewVersion { .. } => menu_items.push(
                     MenuItemFields::new(crate::t!("workspace-menu-update-warp-manually"))
@@ -9376,15 +9401,15 @@ impl Workspace {
     fn install_oz(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.spawn(async { cli_install::install_oz() }, |view, result, ctx| {
             let command_name = ChannelState::channel().cli_command_name();
-            let message = format!("Installed the InfiniShell Agent CLI globally. You can now run '{command_name}' from any terminal outside of InfiniShell.");
+            let message = crate::t!("workspace-cli-agent-installed", command = command_name);
             let toast = DismissibleToast::success(message).with_link(
-                ToastLink::new("Learn more".to_string())
+                ToastLink::new(crate::t!("common-learn-more"))
                     .with_href("https://docs.warp.dev/reference/cli".to_string()),
             );
             view.handle_cli_command_result(
                 result,
                 toast,
-                "Failed to install the InfiniShell Agent CLI command",
+                &crate::t!("workspace-cli-agent-install-failed"),
                 ctx,
             );
         });
@@ -9396,14 +9421,11 @@ impl Workspace {
         ctx.spawn(
             async { cli_install::uninstall_oz() },
             |view, result, ctx| {
-                let toast = DismissibleToast::success(
-                    "Removed the global InfiniShell Agent CLI installation — it still works inside InfiniShell."
-                        .to_string(),
-                );
+                let toast = DismissibleToast::success(crate::t!("workspace-cli-agent-removed"));
                 view.handle_cli_command_result(
                     result,
                     toast,
-                    "Failed to uninstall the InfiniShell Agent CLI command",
+                    &crate::t!("workspace-cli-agent-uninstall-failed"),
                     ctx,
                 );
             },
@@ -9417,12 +9439,12 @@ impl Workspace {
             async { cli_install::install_warpctrl() },
             |view, result, ctx| {
                 let command_name = ChannelState::channel().warpctrl_command_name();
-                let message = format!("Installed the Warp Control CLI globally. You can now run '{command_name}' from any terminal outside of Warp.");
+                let message = crate::t!("workspace-warp-control-installed", command = command_name);
                 let toast = DismissibleToast::success(message);
                 view.handle_cli_command_result(
                     result,
                     toast,
-                    "Failed to install Warp Control command",
+                    &crate::t!("workspace-warp-control-install-failed"),
                     ctx,
                 );
             },
@@ -9435,14 +9457,11 @@ impl Workspace {
         ctx.spawn(
             async { cli_install::uninstall_warpctrl() },
             |view, result, ctx| {
-                let toast = DismissibleToast::success(
-                    "Removed the global Warp Control CLI installation — it still works inside Warp."
-                        .to_string(),
-                );
+                let toast = DismissibleToast::success(crate::t!("workspace-warp-control-removed"));
                 view.handle_cli_command_result(
                     result,
                     toast,
-                    "Failed to uninstall Warp Control command",
+                    &crate::t!("workspace-warp-control-uninstall-failed"),
                     ctx,
                 );
             },
@@ -10203,9 +10222,9 @@ impl Workspace {
             let mut items = vec![];
             if can_move_up {
                 let label = if is_vertical {
-                    "Move group up"
+                    crate::t!("menu-tab-group-move-up")
                 } else {
-                    "Move group left"
+                    crate::t!("menu-tab-group-move-left")
                 };
                 items.push(
                     MenuItemFields::new(label)
@@ -10215,9 +10234,9 @@ impl Workspace {
             }
             if can_move_down {
                 let label = if is_vertical {
-                    "Move group down"
+                    crate::t!("menu-tab-group-move-down")
                 } else {
-                    "Move group right"
+                    crate::t!("menu-tab-group-move-right")
                 };
                 items.push(
                     MenuItemFields::new(label)
@@ -10230,22 +10249,22 @@ impl Workspace {
 
         let close_section = {
             let mut items = vec![
-                MenuItemFields::new("Close all tabs in group")
+                MenuItemFields::new(crate::t!("menu-tab-group-close-all"))
                     .with_on_select_action(WorkspaceAction::CloseTabGroup(group_id))
                     .into_item(),
             ];
             if has_tabs_outside {
                 items.push(
-                    MenuItemFields::new("Close other tabs")
+                    MenuItemFields::new(crate::t!("menu-tab-close-other"))
                         .with_on_select_action(WorkspaceAction::CloseTabsOutsideGroup(group_id))
                         .into_item(),
                 );
             }
             if has_tabs_above {
                 let label = if is_vertical {
-                    "Close tabs above"
+                    crate::t!("menu-tab-group-close-above")
                 } else {
-                    "Close tabs to the left"
+                    crate::t!("menu-tab-group-close-left")
                 };
                 items.push(
                     MenuItemFields::new(label)
@@ -10255,9 +10274,9 @@ impl Workspace {
             }
             if has_tabs_below {
                 let label = if is_vertical {
-                    "Close tabs below"
+                    crate::t!("menu-tab-group-close-below")
                 } else {
-                    "Close tabs to the right"
+                    crate::t!("menu-tab-group-close-right")
                 };
                 items.push(
                     MenuItemFields::new(label)
@@ -10270,9 +10289,15 @@ impl Workspace {
 
         let pin_section = if FeatureFlag::PinnedTabs.is_enabled() {
             let (label, action) = if self.tab_groups.get(&group_id).is_some_and(|g| g.pinned) {
-                ("Unpin group", WorkspaceAction::UnpinTabGroup(group_id))
+                (
+                    crate::t!("menu-tab-group-unpin"),
+                    WorkspaceAction::UnpinTabGroup(group_id),
+                )
             } else {
-                ("Pin group", WorkspaceAction::PinTabGroup(group_id))
+                (
+                    crate::t!("menu-tab-group-pin"),
+                    WorkspaceAction::PinTabGroup(group_id),
+                )
             };
             vec![
                 MenuItemFields::new(label)
@@ -10301,16 +10326,16 @@ impl Workspace {
         for section_items in [
             pin_section,
             vec![
-                MenuItemFields::new("Ungroup tabs")
+                MenuItemFields::new(crate::t!("menu-tab-group-ungroup"))
                     .with_on_select_action(WorkspaceAction::UngroupTabs(group_id))
                     .into_item(),
-                MenuItemFields::new("New tab in group")
+                MenuItemFields::new(crate::t!("menu-tab-group-new-tab"))
                     .with_on_select_action(WorkspaceAction::NewTabInGroup(group_id))
                     .into_item(),
             ],
             move_section,
             vec![
-                MenuItemFields::new("Rename")
+                MenuItemFields::new(crate::t!("common-rename"))
                     .with_on_select_action(WorkspaceAction::RenameTabGroup(group_id))
                     .into_item(),
             ],
@@ -10359,7 +10384,7 @@ impl Workspace {
             return;
         };
 
-        if label == MOVE_TO_GROUP_LABEL {
+        if label == move_to_group_label() {
             // Single-tab pane menu carries a `tab_index`; the multi-tab
             // selection menu has no single source tab so we pass `None` and
             // the sidecar builder infers the multi-tab selection.
@@ -10417,8 +10442,9 @@ impl Workspace {
         .finish();
 
         // Flip the anchor side when the sidecar would overflow the window.
+        let move_to_group_label = move_to_group_label();
         let render_left =
-            self.should_render_sidecar_left(MOVE_TO_GROUP_LABEL, MOVE_TO_GROUP_SIDECAR_WIDTH, app);
+            self.should_render_sidecar_left(&move_to_group_label, MOVE_TO_GROUP_SIDECAR_WIDTH, app);
         let (offset, parent_anchor, child_anchor) = if render_left {
             (
                 vec2f(-4., 0.),
@@ -10436,7 +10462,7 @@ impl Workspace {
         stack.add_positioned_overlay_child(
             sidecar_element,
             OffsetPositioning::offset_from_save_position_element(
-                MOVE_TO_GROUP_LABEL,
+                move_to_group_label,
                 offset,
                 PositionedElementOffsetBounds::WindowByPosition,
                 parent_anchor,
@@ -11142,12 +11168,20 @@ impl Workspace {
             .unwrap_or_else(|| repo.to_string());
         let config_name = match worktree_branch_name {
             Some(name) if !name.is_empty() => {
-                format!("New worktree: {repo_display_name}, {name}")
+                crate::t!(
+                    "workspace-new-worktree-with-branch",
+                    repo = repo_display_name.as_str(),
+                    branch = name
+                )
             }
             _ if !base_branch.is_empty() => {
-                format!("New worktree: {repo_display_name}, {base_branch}")
+                crate::t!(
+                    "workspace-new-worktree-with-branch",
+                    repo = repo_display_name.as_str(),
+                    branch = base_branch
+                )
             }
-            _ => format!("New worktree: {repo_display_name}"),
+            _ => crate::t!("workspace-new-worktree", repo = repo_display_name.as_str()),
         };
 
         let filename_hint = if let Some(name) = worktree_branch_name {
@@ -11265,7 +11299,7 @@ impl Workspace {
             .file_name()
             .map(|name| name.to_string_lossy().to_string())
             .unwrap_or_else(|| repo_path.clone());
-        let config_name = format!("Worktree: {repo_display_name}");
+        let config_name = crate::t!("workspace-worktree", repo = repo_display_name.as_str());
         // Use the user's default session mode to decide pane type.
         let pane_type = if AISettings::as_ref(ctx).is_any_ai_enabled(ctx)
             && AISettings::as_ref(ctx).default_session_mode(ctx) == DefaultSessionMode::Agent
@@ -13238,7 +13272,10 @@ impl Workspace {
                         let window_id = ctx.window_id();
                         ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                             toast_stack.add_ephemeral_toast(
-                                DismissibleToast::error(format!("{err}")),
+                                DismissibleToast::error(crate::t!(
+                                    "file-picker-select-folder-error",
+                                    error = err.to_string()
+                                )),
                                 window_id,
                                 ctx,
                             );
@@ -13796,7 +13833,9 @@ impl Workspace {
             Err(e) => {
                 report_error!(e.context("Conversation forking failed"));
                 WorkspaceToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = DismissibleToast::error("Conversation forking failed.".to_owned());
+                    let toast = DismissibleToast::error(crate::t!(
+                        "workspace-toast-conversation-forking-failed"
+                    ));
                     toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                 });
                 return;
@@ -14042,20 +14081,23 @@ impl Workspace {
             .conversation(&conversation_id)
             .and_then(|c| c.title())
             .map(|s| s.to_string())
-            .unwrap_or_else(|| "Conversation".to_string());
+            .unwrap_or_else(|| crate::t!("workspace-conversation-list-fallback-title"));
 
         let title = if source_title.chars().count() > MAX_FORK_TOAST_TITLE_LENGTH {
             let truncated: String = source_title
                 .chars()
                 .take(MAX_FORK_TOAST_TITLE_LENGTH)
                 .collect();
-            format!("{truncated}...")
+            format!("{truncated}…")
         } else {
             source_title
         };
 
         WorkspaceToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-            let toast = DismissibleToast::default(format!("Forked \"{title}\""));
+            let toast = DismissibleToast::default(crate::t!(
+                "workspace-toast-forked-conversation",
+                title = title.as_str()
+            ));
             toast_stack.add_ephemeral_toast(toast, window_id, ctx);
         });
     }
@@ -17104,9 +17146,9 @@ impl Workspace {
                                 else {
                                     self.toast_stack.update(ctx, |view, ctx| {
                                         view.add_ephemeral_toast(
-                                            DismissibleToast::error(
-                                                "This workflow is no longer available.".to_string(),
-                                            ),
+                                            DismissibleToast::error(crate::t!(
+                                                "workspace-workflow-unavailable"
+                                            )),
                                             ctx,
                                         );
                                     });
@@ -17368,10 +17410,9 @@ impl Workspace {
                                 let new_toast = if let Some(workflow) = cloned_workflow {
                                     DismissibleToast::error(message)
                                         .with_link(
-                                            ToastLink::new(
-                                                "Check out the latest version and try again."
-                                                    .to_string(),
-                                            )
+                                            ToastLink::new(crate::t!(
+                                                "workspace-check-latest-version"
+                                            ))
                                             .with_onclick_action(
                                                 WorkspaceAction::HandleConflictingWorkflow(
                                                     workflow.id,
@@ -17382,10 +17423,9 @@ impl Workspace {
                                 } else if let Some(env_var_collection) = cloned_env_var_collection {
                                     DismissibleToast::error(message)
                                         .with_link(
-                                            ToastLink::new(
-                                                "Check out the latest version and try again."
-                                                    .to_string(),
-                                            )
+                                            ToastLink::new(crate::t!(
+                                                "workspace-check-latest-version"
+                                            ))
                                             .with_onclick_action(
                                                 WorkspaceAction::HandleConflictingEnvVarCollection(
                                                     env_var_collection.id,
@@ -17901,16 +17941,19 @@ impl Workspace {
                 prev_mouse_reporting_enabled
             });
 
-        let verb = if prev_mouse_reporting_enabled {
-            "disabled"
+        let mut message = if prev_mouse_reporting_enabled {
+            crate::t!("workspace-toast-mouse-reporting-disabled")
         } else {
-            "enabled"
+            crate::t!("workspace-toast-mouse-reporting-enabled")
         };
-        let mut message = format!("You {verb} mouse reporting.");
         if let Some(keystroke) =
             keybinding_name_to_keystroke("workspace:toggle_mouse_reporting", ctx)
         {
-            let _ = write!(message, " Press {} to undo.", keystroke.displayed());
+            let key = keystroke.displayed().to_string();
+            message.push_str(&crate::t!(
+                "workspace-toast-press-to-undo",
+                key = key.as_str()
+            ));
         }
 
         self.toast_stack.update(ctx, |view, ctx| {
@@ -18659,11 +18702,7 @@ impl Workspace {
 
         let body = appearance
             .ui_builder()
-            .wrappable_text(
-                "Ask InfiniShell AI to explain errors, suggest commands or write scripts."
-                    .to_owned(),
-                true,
-            )
+            .wrappable_text(crate::t!("workspace-ai-warm-welcome-description"), true)
             .with_style(UiComponentStyles {
                 font_size: Some(12.),
                 font_color: Some(sub_text_color),
@@ -19000,7 +19039,7 @@ impl Workspace {
         let title = group
             .name
             .clone()
-            .unwrap_or_else(|| "New Group".to_string());
+            .unwrap_or_else(|| crate::t!("workspace-new-group"));
         let show_header_pin = FeatureFlag::PinnedTabs.is_enabled() && group.pinned;
         let normal_right_pad = if is_collapsed { 8. } else { 9. };
 
@@ -20534,7 +20573,7 @@ impl Workspace {
         let display_name = self
             .auth_state
             .username_for_display()
-            .unwrap_or(DEFAULT_USER_DISPLAY_NAME.to_owned());
+            .unwrap_or_else(|| crate::t!("common-user"));
 
         let avatar_content = if self.auth_state.is_anonymous_or_logged_out() {
             AvatarContent::Icon(icons::Icon::Gear)
@@ -20995,7 +21034,7 @@ impl Workspace {
             AISettings::as_ref(app)
                 .is_any_ai_enabled(app)
                 .then(|| WorkspaceBannerButtonDetails {
-                    text: "Fix with InfiniShell Agent".to_owned(),
+                    text: crate::t!("workspace-fix-with-agent"),
                     action: WorkspaceAction::FixSettingsWithAgent {
                         error_description: error.to_string(),
                     },
@@ -23637,13 +23676,20 @@ impl TypedActionView for Workspace {
 
                     status.is_syncing_all_inputs(window_id)
                 });
-                let verb = if enabled { "enabled" } else { "disabled" };
-                let mut message = format!("You {verb} synchronized inputs in all tabs.");
+                let mut message = if enabled {
+                    crate::t!("workspace-toast-sync-all-enabled")
+                } else {
+                    crate::t!("workspace-toast-sync-all-disabled")
+                };
                 if let Some(keystroke) = keybinding_name_to_keystroke(
                     "workspace:toggle_sync_all_terminal_inputs_in_all_tabs",
                     ctx,
                 ) {
-                    let _ = write!(message, " Press {} to undo.", keystroke.displayed());
+                    let key = keystroke.displayed().to_string();
+                    message.push_str(&crate::t!(
+                        "workspace-toast-press-to-undo",
+                        key = key.as_str()
+                    ));
                 }
                 self.toast_stack.update(ctx, |view, ctx| {
                     let new_toast = DismissibleToast::default(message);
@@ -23670,13 +23716,20 @@ impl TypedActionView for Workspace {
 
                     status.should_sync_this_pane_group(current_pane_group_id, window_id)
                 });
-                let verb = if enabled { "enabled" } else { "disabled" };
-                let mut message = format!("You {verb} synchronized inputs in this tab.");
+                let mut message = if enabled {
+                    crate::t!("workspace-toast-sync-tab-enabled")
+                } else {
+                    crate::t!("workspace-toast-sync-tab-disabled")
+                };
                 if let Some(keystroke) = keybinding_name_to_keystroke(
                     "workspace:toggle_sync_terminal_inputs_in_tab",
                     ctx,
                 ) {
-                    let _ = write!(message, " Press {} to undo.", keystroke.displayed());
+                    let key = keystroke.displayed().to_string();
+                    message.push_str(&crate::t!(
+                        "workspace-toast-press-to-undo",
+                        key = key.as_str()
+                    ));
                 }
                 self.toast_stack.update(ctx, |view, ctx| {
                     let new_toast = DismissibleToast::default(message);
@@ -24375,7 +24428,7 @@ impl TypedActionView for Workspace {
                         let entry = format!("file://{}", plugin_path.display());
                         set_opencode_warp_plugin(&entry)
                     }
-                    None => "Failed to determine home directory".to_string(),
+                    None => crate::t!("workspace-home-directory-unavailable"),
                 };
                 self.toast_stack.update(ctx, |view, ctx| {
                     view.add_ephemeral_toast(DismissibleToast::default(message), ctx);
@@ -24432,7 +24485,10 @@ impl TypedActionView for Workspace {
                                     );
                                 }
 
-                                format!("Process sample saved to {output_path}")
+                                crate::t!(
+                                    "workspace-process-sample-saved",
+                                    path = output_path.as_str()
+                                )
                             }
                             Ok(Ok(output)) => {
                                 let stderr = String::from_utf8_lossy(&output.stderr);
@@ -24441,19 +24497,19 @@ impl TypedActionView for Workspace {
                                     "sample command failed",
                                     extra: { "status" => %output.status }
                                 );
-                                "Failed to sample process (check logs)".to_string()
+                                crate::t!("workspace-process-sample-failed")
                             }
                             Ok(Err(io_err)) => {
                                 report_error!(
                                     anyhow::Error::new(io_err).context("Failed to run sample command")
                                 );
-                                "Failed to sample process (check logs)".to_string()
+                                crate::t!("workspace-process-sample-failed")
                             }
                             Err(join_err) => {
                                 report_error!(
                                     anyhow::Error::new(join_err).context("Sample task panicked")
                                 );
-                                "Failed to sample process (check logs)".to_string()
+                                crate::t!("workspace-process-sample-failed")
                             }
                         };
                         me.toast_stack.update(ctx, |view, ctx| {

@@ -136,7 +136,7 @@ impl Requests {
             TranscriptPartSubType::Question,
             raw_request,
         );
-        let response = "InfiniShell AI Assistant cloud requests are disabled in InfiniShell. Use Agent Mode with a configured BYOP model instead.".to_owned();
+        let response = crate::t!("ai-assistant-cloud-disabled");
         let response_in_markdown = markdown_segments_from_text(
             transcript_part_index,
             TranscriptPartSubType::Answer,
@@ -238,11 +238,11 @@ impl Requests {
                 let num_hours = num_minutes / 60;
                 let num_days = num_hours / 24;
                 let remaining_text = if num_days > 0 {
-                    format!("{num_days} days")
+                    crate::t!("ai-assistant-duration-days", count = num_days)
                 } else if num_hours > 0 {
-                    format!("{num_hours} hours")
+                    crate::t!("ai-assistant-duration-hours", count = num_hours)
                 } else {
-                    format!("{num_minutes} minutes")
+                    crate::t!("ai-assistant-duration-minutes", count = num_minutes)
                 };
                 Some(remaining_text)
             }

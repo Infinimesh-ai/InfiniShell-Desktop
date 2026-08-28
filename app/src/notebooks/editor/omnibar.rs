@@ -223,7 +223,7 @@ impl Omnibar {
     fn reset_conversion_menu(&self, block_type: BlockType, ctx: &mut ViewContext<Self>) {
         let block_name = block_type.label();
         self.block_conversion_dropdown.update(ctx, |dropdown, ctx| {
-            dropdown.set_selected_by_name(block_name, ctx);
+            dropdown.set_selected_by_name(&block_name, ctx);
         });
     }
 
@@ -441,14 +441,20 @@ impl TypedActionView for Omnibar {
                 .style_toggle_a11y(BufferTextStyle::InlineCode),
             OmnibarAction::ConvertBlock(style) => {
                 ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
-                    format!("Convert to {}", BlockType::from(style).label()),
+                    crate::t!(
+                        "notebook-a11y-convert-to-block",
+                        block = BlockType::from(style).label()
+                    ),
                     WarpA11yRole::UserAction,
                 ))
             }
             OmnibarAction::OpenLinkEditor => ActionAccessibilityContent::from_debug(),
-            OmnibarAction::UnstyleLink => ActionAccessibilityContent::Custom(
-                AccessibilityContent::new_without_help("Remove link", WarpA11yRole::UserAction),
-            ),
+            OmnibarAction::UnstyleLink => {
+                ActionAccessibilityContent::Custom(AccessibilityContent::new_without_help(
+                    crate::t!("notebook-a11y-remove-link"),
+                    WarpA11yRole::UserAction,
+                ))
+            }
         }
     }
 }

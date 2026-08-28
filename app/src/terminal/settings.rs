@@ -42,11 +42,11 @@ impl Osc52ClipboardAccess {
         matches!(self, Self::ReadWrite)
     }
 
-    pub fn as_dropdown_label(self) -> &'static str {
+    pub fn as_dropdown_label(self) -> String {
         match self {
-            Self::Deny => "Deny",
-            Self::WriteOnly => "Write only",
-            Self::ReadWrite => "Read and write",
+            Self::Deny => crate::t!("common-deny"),
+            Self::WriteOnly => crate::t!("settings-clipboard-write-only"),
+            Self::ReadWrite => crate::t!("settings-clipboard-read-write"),
         }
     }
 }

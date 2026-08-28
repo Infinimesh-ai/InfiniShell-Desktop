@@ -788,10 +788,7 @@ impl NotebookView {
                 let window_id = ctx.window_id();
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                     toast_stack.add_ephemeral_toast(
-                        DismissibleToast::error(
-                            "This notebook cannot be saved because its content contains secrets"
-                                .to_string(),
-                        ),
+                        DismissibleToast::error(crate::t!("notebook-content-contains-secrets")),
                         window_id,
                         ctx,
                     );
@@ -1717,10 +1714,7 @@ impl NotebookView {
                 let window_id = ctx.window_id();
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                     toast_stack.add_ephemeral_toast(
-                        DismissibleToast::error(
-                            "This notebook cannot be saved because its title contains secrets"
-                                .to_string(),
-                        ),
+                        DismissibleToast::error(crate::t!("notebook-title-contains-secrets")),
                         window_id,
                         ctx,
                     );
@@ -1797,8 +1791,8 @@ impl NotebookView {
 
     fn run_notebook_workflow(&self, workflow: &NotebookWorkflow, ctx: &mut ViewContext<Self>) {
         // If the notebook workflow was anonymous, synthesize metadata for it.
-        let workflow_type =
-            workflow.named_workflow(|| Some(format!("Command from {}", self.title(ctx))));
+        let workflow_type = workflow
+            .named_workflow(|| Some(crate::t!("notebook-command-from", source = self.title(ctx))));
 
         let notebook_id = self.server_id(ctx);
         let source = workflow.source.unwrap_or_else(|| {
@@ -2154,7 +2148,7 @@ impl View for NotebookView {
 
     fn accessibility_contents(&self, ctx: &AppContext) -> Option<AccessibilityContent> {
         Some(AccessibilityContent::new_without_help(
-            format!("{} notebook", self.title(ctx)),
+            crate::t!("notebook-a11y-notebook-title", title = self.title(ctx)),
             WarpA11yRole::TextRole,
         ))
     }

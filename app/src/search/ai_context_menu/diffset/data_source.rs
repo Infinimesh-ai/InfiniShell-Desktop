@@ -6,9 +6,6 @@ use crate::search::ai_context_menu::mixer::AIContextMenuSearchableAction;
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::{DataSourceRunErrorWrapper, SyncDataSource};
 
-const UNCOMMITTED_CHANGES_NAME: &str = "uncommitted changes";
-const MAIN_BRANCH_CHANGES_NAME: &str = "changes vs. main branch";
-
 pub struct DiffSetDataSource;
 
 impl SyncDataSource for DiffSetDataSource {
@@ -22,10 +19,12 @@ impl SyncDataSource for DiffSetDataSource {
         // Filter based on query if provided
         let query_text = &query.text.to_lowercase();
         let mut results: Vec<QueryResult<Self::Action>> = vec![];
+        let uncommitted_changes_name = crate::t!("ai-context-diffset-uncommitted-changes");
+        let main_branch_changes_name = crate::t!("ai-context-diffset-changes-vs-main-branch");
 
         // Add uncommitted changes option
         if let Some(match_result) =
-            fuzzy_match::match_indices_case_insensitive(UNCOMMITTED_CHANGES_NAME, query_text)
+            fuzzy_match::match_indices_case_insensitive(&uncommitted_changes_name, query_text)
         {
             results.push(
                 DiffSetSearchItem {
@@ -38,7 +37,7 @@ impl SyncDataSource for DiffSetDataSource {
 
         // Add main branch comparison option
         if let Some(match_result) =
-            fuzzy_match::match_indices_case_insensitive(MAIN_BRANCH_CHANGES_NAME, query_text)
+            fuzzy_match::match_indices_case_insensitive(&main_branch_changes_name, query_text)
         {
             results.push(
                 DiffSetSearchItem {

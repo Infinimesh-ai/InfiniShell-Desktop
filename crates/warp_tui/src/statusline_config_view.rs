@@ -40,7 +40,7 @@ pub(crate) fn init(app: &mut AppContext) {
     app.register_editable_bindings([
         EditableBinding::new(
             "tui:statusline:toggle",
-            "Toggle the highlighted statusline item",
+            warp::t_static!("tui-keybinding-toggle-statusline-item"),
             TuiStatuslineConfigAction::Toggle,
         )
         .with_context_predicate(active.clone())
@@ -48,7 +48,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("enter"),
         EditableBinding::new(
             "tui:statusline:save",
-            "Save and close the statusline configuration",
+            warp::t_static!("tui-keybinding-save-statusline"),
             TuiStatuslineConfigAction::Save,
         )
         .with_context_predicate(active)
@@ -56,7 +56,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("escape"),
         EditableBinding::new(
             "tui:statusline:move_left",
-            "Move the highlighted statusline item left",
+            warp::t_static!("tui-keybinding-move-statusline-left"),
             TuiStatuslineConfigAction::MoveBackward,
         )
         .with_context_predicate(reorder.clone())
@@ -64,7 +64,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("left"),
         EditableBinding::new(
             "tui:statusline:move_right",
-            "Move the highlighted statusline item right",
+            warp::t_static!("tui-keybinding-move-statusline-right"),
             TuiStatuslineConfigAction::MoveForward,
         )
         .with_context_predicate(reorder)
@@ -146,7 +146,7 @@ impl TuiStatuslineConfigView {
                     .position(|candidate| candidate == item)
                     .map(|index| OptionRow {
                         id: index.to_string(),
-                        label: item.label().to_owned(),
+                        label: statusline_item_label(*item),
                         harness: None,
                         badge: None,
                         disabled_reason: None,
@@ -253,11 +253,14 @@ impl TuiStatuslineConfigView {
         let builder = TuiUiBuilder::from_app(app);
         TuiText::from_spans([
             ("Enter ".to_owned(), builder.primary_text_style()),
-            ("to toggle  ".to_owned(), builder.muted_text_style()),
+            (warp::t!("tui-hint-toggle"), builder.muted_text_style()),
             ("Esc ".to_owned(), builder.primary_text_style()),
-            ("to save and close  ".to_owned(), builder.muted_text_style()),
+            (
+                warp::t!("tui-hint-save-and-close"),
+                builder.muted_text_style(),
+            ),
             ("← → ".to_owned(), builder.primary_text_style()),
-            ("to reorder".to_owned(), builder.muted_text_style()),
+            (warp::t!("tui-hint-reorder"), builder.muted_text_style()),
         ])
         .truncate()
         .finish()
@@ -269,13 +272,13 @@ impl TuiStatuslineConfigView {
 fn statusline_question() -> AskUserQuestionItem {
     AskUserQuestionItem {
         question_id: STATUSLINE_QUESTION_ID.to_owned(),
-        question: "Configure statusline".to_owned(),
+        question: warp::t!("tui-configure-statusline"),
         question_type: AskUserQuestionType::MultipleChoice {
             is_multiselect: true,
             options: TuiStatuslineItem::ALL
                 .iter()
                 .map(|item| AskUserQuestionOption {
-                    label: item.label().to_owned(),
+                    label: statusline_item_label(*item),
                     recommended: false,
                 })
                 .collect(),
@@ -308,7 +311,7 @@ impl TuiView for TuiStatuslineConfigView {
 
     fn render(&self, app: &AppContext) -> Box<dyn TuiElement> {
         let builder = TuiUiBuilder::from_app(app);
-        let title = TuiText::new("Configure statusline")
+        let title = TuiText::new(warp::t!("tui-configure-statusline"))
             .with_style(builder.primary_text_style().add_modifier(Modifier::BOLD))
             .finish();
         let body = TuiFlex::column()
@@ -321,6 +324,26 @@ impl TuiView for TuiStatuslineConfigView {
             .with_padding(1)
             .with_background(builder.question_surface_background())
             .finish()
+    }
+}
+
+fn statusline_item_label(item: TuiStatuslineItem) -> String {
+    match item {
+        TuiStatuslineItem::AutoApprove => warp::t!("tui-statusline-auto-approve"),
+        TuiStatuslineItem::VimModeIndicator => warp::t!("tui-statusline-vim-mode"),
+        TuiStatuslineItem::Model => warp::t!("tui-statusline-model"),
+        TuiStatuslineItem::WorkingDirectory => warp::t!("tui-statusline-working-directory"),
+        TuiStatuslineItem::GitBranch => warp::t!("tui-statusline-git-branch"),
+        TuiStatuslineItem::GitBranchStatus => warp::t!("tui-statusline-git-branch-status"),
+        TuiStatuslineItem::GitDiffStatus => warp::t!("tui-statusline-git-diff-status"),
+        TuiStatuslineItem::GitHubPullRequest => warp::t!("tui-statusline-github-pull-request"),
+        TuiStatuslineItem::CreditUsage => warp::t!("tui-statusline-credit-usage"),
+        TuiStatuslineItem::ContextWindowUsage => warp::t!("tui-statusline-context-window-usage"),
+        TuiStatuslineItem::Date => warp::t!("tui-statusline-date"),
+        TuiStatuslineItem::Time12Hour => warp::t!("tui-statusline-time-12-hour"),
+        TuiStatuslineItem::Time24Hour => warp::t!("tui-statusline-time-24-hour"),
+        TuiStatuslineItem::AgentTodoList => warp::t!("tui-statusline-agent-todo-list"),
+        TuiStatuslineItem::VoiceInput => warp::t!("tui-statusline-voice-input"),
     }
 }
 

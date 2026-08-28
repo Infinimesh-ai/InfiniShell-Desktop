@@ -45,14 +45,14 @@ impl SessionType {
     }
 
     /// Short label for the session type pill in the modal.
-    pub(crate) fn pill_label(&self) -> &'static str {
+    pub(crate) fn pill_label(&self) -> String {
         match self {
-            SessionType::Terminal => "Terminal",
-            SessionType::Oz => "Built in agent",
-            SessionType::CliAgent(CLIAgent::Claude) => "Claude",
-            SessionType::CliAgent(CLIAgent::Codex) => "Codex",
-            SessionType::CliAgent(CLIAgent::Gemini) => "Gemini",
-            SessionType::CliAgent(agent) => agent.display_name(),
+            SessionType::Terminal => crate::t!("default-session-terminal"),
+            SessionType::Oz => crate::t!("tab-config-built-in-agent"),
+            SessionType::CliAgent(CLIAgent::Claude) => "Claude".to_owned(),
+            SessionType::CliAgent(CLIAgent::Codex) => "Codex".to_owned(),
+            SessionType::CliAgent(CLIAgent::Gemini) => "Gemini".to_owned(),
+            SessionType::CliAgent(agent) => agent.display_name().to_owned(),
         }
     }
 }
@@ -129,7 +129,7 @@ pub fn build_tab_config(
             params.insert(
                 WORKTREE_BRANCH_PARAM.to_string(),
                 TabConfigParam {
-                    description: Some("New worktree branch name".to_string()),
+                    description: Some(crate::t!("tab-config-new-worktree-branch-name")),
                     default: Some(WORKTREE_BRANCH_DEFAULT.to_string()),
                     param_type: TabConfigParamType::Text,
                 },

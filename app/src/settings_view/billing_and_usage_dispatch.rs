@@ -47,7 +47,11 @@ impl BillingAndUsageDispatchView {
             ctx.notify();
         });
 
-        let page = PageType::new_monolith(BillingAndUsageWidget, Some("Billing and Usage"), true);
+        let page = PageType::new_monolith(
+            BillingAndUsageWidget,
+            Some(crate::t_static!("settings-billing-title")),
+            true,
+        );
 
         Self { page, v1, v2 }
     }

@@ -173,11 +173,11 @@ impl HarnessAvailabilityModel {
         &self.harnesses
     }
 
-    pub fn display_name_for(&self, harness: Harness) -> &str {
+    pub fn display_name_for(&self, harness: Harness) -> String {
         self.harnesses
             .iter()
             .find(|h| h.harness == harness)
-            .map(|h| h.display_name.as_str())
+            .map(|h| h.display_name.clone())
             .unwrap_or_else(|| harness_display::display_name(harness))
     }
 

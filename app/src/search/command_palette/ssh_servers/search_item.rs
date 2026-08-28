@@ -156,6 +156,10 @@ impl SearchItem for SshServerSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("SSH server: {} {}", self.display_name, self.host_user)
+        crate::t!(
+            "search-ssh-server-a11y",
+            name = self.display_name.as_str(),
+            host = self.host_user.as_str()
+        )
     }
 }

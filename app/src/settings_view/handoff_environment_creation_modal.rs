@@ -110,10 +110,8 @@ impl HandoffEnvironmentCreationModal {
         let body = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
             .with_child(
-                // Zap:纯占位文案。本地版没有云端环境创建能力,不新增 i18n key,
-                // 因为整个入口按计划会被整体删除。
                 Text::new_inline(
-                    "Creating a cloud environment is not available in this build.".to_string(),
+                    crate::t!("settings-env-modal-cloud-unavailable"),
                     appearance.ui_font_family(),
                     BODY_FONT_SIZE,
                 )
@@ -127,7 +125,7 @@ impl HandoffEnvironmentCreationModal {
             .finish();
 
         let dialog = Dialog::new(
-            "Create environment".to_string(),
+            crate::t!("settings-env-modal-create-environment"),
             None,
             dialog_styles(appearance),
         )

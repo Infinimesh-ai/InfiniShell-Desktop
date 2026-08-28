@@ -40,7 +40,7 @@ pub(crate) fn init(app: &mut AppContext) {
     app.register_editable_bindings([
         EditableBinding::new(
             "tui:permission-prompt:confirm",
-            "Confirm the selected permission response",
+            warp::t_static!("tui-keybinding-confirm-permission-response"),
             TuiPermissionPromptAction::Confirm,
         )
         .with_context_predicate(predicate.clone())
@@ -48,7 +48,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("enter"),
         EditableBinding::new(
             "tui:permission-prompt:edit",
-            "Edit the requested action",
+            warp::t_static!("tui-keybinding-edit-requested-action"),
             TuiPermissionPromptAction::EditBody,
         )
         .with_context_predicate(editable_predicate)
@@ -107,14 +107,14 @@ impl TuiPermissionPrompt {
             let rows = vec![
                 OptionRow {
                     id: YES_ID.to_owned(),
-                    label: "yes".to_owned(),
+                    label: warp::t!("tui-yes"),
                     harness: None,
                     badge: None,
                     disabled_reason: None,
                 },
                 OptionRow {
                     id: NO_ID.to_owned(),
-                    label: "no".to_owned(),
+                    label: warp::t!("tui-no"),
                     harness: None,
                     badge: None,
                     disabled_reason: None,
@@ -128,7 +128,7 @@ impl TuiPermissionPrompt {
                         selected_id: Some(YES_ID.to_owned()),
                         status: OptionSourceStatus::Ready,
                         footer: Some(OptionFooter::CustomText {
-                            label: "Other".to_owned(),
+                            label: warp::t!("tui-other"),
                         }),
                     },
                     searchable: false,
@@ -246,15 +246,15 @@ impl TuiPermissionPrompt {
         // When the body editor owns focus, Esc exits the editor rather than
         // cancelling the whole tool call — reflect that in the visible hint.
         let esc_hint = if self.body_editor_is_focused(app) {
-            " to exit editor  "
+            warp::t!("tui-hint-exit-editor")
         } else {
-            " to cancel  "
+            warp::t!("tui-permission-hint-cancel")
         };
         let spans = vec![
             ("Esc".to_owned(), builder.primary_text_style()),
-            (esc_hint.to_owned(), builder.muted_text_style()),
+            (esc_hint, builder.muted_text_style()),
             ("Enter".to_owned(), builder.primary_text_style()),
-            (" to run".to_owned(), builder.muted_text_style()),
+            (warp::t!("tui-hint-run"), builder.muted_text_style()),
         ];
         TuiText::from_spans(spans).truncate().finish()
     }

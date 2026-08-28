@@ -97,28 +97,33 @@ pub enum AIContextMenuCategory {
 }
 
 impl AIContextMenuCategory {
-    pub fn name(&self) -> &'static str {
+    pub fn name(&self) -> String {
         match self {
-            AIContextMenuCategory::CurrentFolderFiles => "Files and folders",
-            AIContextMenuCategory::RepoFiles => "Files and folders",
-            AIContextMenuCategory::Commands => "Commands",
-            AIContextMenuCategory::Blocks => "Blocks",
-            AIContextMenuCategory::Workflows => "Workflows",
-            AIContextMenuCategory::Notebooks => "Notebooks",
-            AIContextMenuCategory::Plans => "Plans",
-            AIContextMenuCategory::Diffs => "Diffs",
-            AIContextMenuCategory::Docs => "Docs",
-            AIContextMenuCategory::Tasks => "Past tasks",
-            AIContextMenuCategory::Rules => "Rules",
-            AIContextMenuCategory::Servers => "Servers and integrations",
-            AIContextMenuCategory::Terminal => "Terminal",
-            AIContextMenuCategory::Web => "Web",
-            AIContextMenuCategory::RecentDiff => "Most recent diff",
-            AIContextMenuCategory::RecentBlock => "Most recent block",
-            AIContextMenuCategory::Code => "Code",
-            AIContextMenuCategory::DiffSet => "Diff sets",
-            AIContextMenuCategory::Conversations => "Conversations",
-            AIContextMenuCategory::Skills => "Skills",
+            AIContextMenuCategory::CurrentFolderFiles | AIContextMenuCategory::RepoFiles => {
+                crate::t!("ai-context-category-files-and-folders")
+            }
+            AIContextMenuCategory::Commands => crate::t!("ai-context-category-commands"),
+            AIContextMenuCategory::Blocks => crate::t!("ai-context-category-blocks"),
+            AIContextMenuCategory::Workflows => crate::t!("ai-context-category-workflows"),
+            AIContextMenuCategory::Notebooks => crate::t!("ai-context-category-notebooks"),
+            AIContextMenuCategory::Plans => crate::t!("ai-context-category-plans"),
+            AIContextMenuCategory::Diffs => crate::t!("ai-context-category-diffs"),
+            AIContextMenuCategory::Docs => crate::t!("ai-context-category-docs"),
+            AIContextMenuCategory::Tasks => crate::t!("ai-context-category-past-tasks"),
+            AIContextMenuCategory::Rules => crate::t!("ai-context-category-rules"),
+            AIContextMenuCategory::Servers => {
+                crate::t!("ai-context-category-servers-and-integrations")
+            }
+            AIContextMenuCategory::Terminal => crate::t!("ai-context-category-terminal"),
+            AIContextMenuCategory::Web => crate::t!("ai-context-category-web"),
+            AIContextMenuCategory::RecentDiff => crate::t!("ai-context-category-recent-diff"),
+            AIContextMenuCategory::RecentBlock => crate::t!("ai-context-category-recent-block"),
+            AIContextMenuCategory::Code => crate::t!("ai-context-category-code"),
+            AIContextMenuCategory::DiffSet => crate::t!("ai-context-category-diff-sets"),
+            AIContextMenuCategory::Conversations => {
+                crate::t!("ai-context-category-conversations")
+            }
+            AIContextMenuCategory::Skills => crate::t!("ai-context-category-skills"),
         }
     }
 
@@ -1307,7 +1312,7 @@ impl AIContextMenu {
         let theme = appearance.theme();
         Container::new(
             Text::new(
-                "Loading results...",
+                crate::t!("common-loading"),
                 appearance.ui_font_family(),
                 appearance.monospace_font_size(),
             )

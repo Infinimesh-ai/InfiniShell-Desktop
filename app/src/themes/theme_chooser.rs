@@ -46,7 +46,6 @@ use crate::window_settings::WindowSettings;
 use crate::workspace::PANEL_HEADER_HEIGHT;
 
 // All units in px
-const THEME_CHOOSER_TITLE: &str = "Themes";
 const CLOSE_BUTTON_MARGIN_RIGHT: f32 = 6.;
 const THEME_NAME_FONT_SIZE: f32 = 14.;
 const TITLE_MARGIN: f32 = 12.;
@@ -90,21 +89,20 @@ pub enum ThemeScope {
 }
 
 impl ThemeScope {
-    const ALL_WINDOWS_LABEL: &'static str = "All windows";
-    const THIS_WINDOW_LABEL: &'static str = "This window";
-
-    fn label(self) -> &'static str {
+    fn label(self) -> String {
         match self {
-            ThemeScope::AllWindows => Self::ALL_WINDOWS_LABEL,
-            ThemeScope::ThisWindow => Self::THIS_WINDOW_LABEL,
+            ThemeScope::AllWindows => crate::t!("theme-scope-all-windows"),
+            ThemeScope::ThisWindow => crate::t!("theme-scope-this-window"),
         }
     }
 
     fn from_label(label: &str) -> Option<Self> {
-        match label {
-            Self::ALL_WINDOWS_LABEL => Some(ThemeScope::AllWindows),
-            Self::THIS_WINDOW_LABEL => Some(ThemeScope::ThisWindow),
-            _ => None,
+        if label == crate::t!("theme-scope-all-windows") {
+            Some(ThemeScope::AllWindows)
+        } else if label == crate::t!("theme-scope-this-window") {
+            Some(ThemeScope::ThisWindow)
+        } else {
+            None
         }
     }
 }
@@ -699,7 +697,7 @@ impl ThemeChooser {
                     Align::new(
                         appearance
                             .ui_builder()
-                            .span(THEME_CHOOSER_TITLE.to_string())
+                            .span(crate::t!("settings-appearance-category-themes"))
                             .with_style(UiComponentStyles {
                                 font_family_id: Some(appearance.ui_font_family()),
                                 font_size: Some(appearance.ui_font_heading_3()),
@@ -761,9 +759,10 @@ impl ThemeChooser {
             ),
         ];
 
+        let selected_label = self.scope.label();
         let selector = render_tab_selector(
             tabs,
-            self.scope.label(),
+            &selected_label,
             |label, ctx| {
                 if let Some(scope) = ThemeScope::from_label(label) {
                     ctx.dispatch_typed_action(ThemeChooserAction::SetScope(scope));

@@ -24,7 +24,7 @@ impl AIBlockModel for DebugAIBlockModel {
             },
             None => AIBlockOutputStatus::Failed {
                 error: RenderableAIError::Other {
-                    error_message: "No output received.".to_owned(),
+                    error_message: crate::t!("ai-no-output-received"),
                     will_attempt_resume: false,
                     waiting_for_network: false,
                     is_user_error: false,

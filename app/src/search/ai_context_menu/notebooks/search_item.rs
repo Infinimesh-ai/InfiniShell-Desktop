@@ -191,9 +191,13 @@ impl SearchItem for NotebookSearchItem {
 
     fn accessibility_label(&self) -> String {
         if let Some(description) = &self.notebook_description {
-            format!("Notebook: {} - {}", self.notebook_name, description)
+            crate::t!(
+                "search-notebook-with-description-a11y",
+                name = self.notebook_name.as_str(),
+                description = description.as_str()
+            )
         } else {
-            format!("Notebook: {}", self.notebook_name)
+            crate::t!("search-notebook-a11y", name = self.notebook_name.as_str())
         }
     }
 
@@ -202,7 +206,7 @@ impl SearchItem for NotebookSearchItem {
 
         // Use notebook name, or "Untitled" if empty
         let display_name = if self.notebook_name.is_empty() {
-            "Untitled".to_string()
+            crate::t!("common-untitled")
         } else {
             self.notebook_name.clone()
         };

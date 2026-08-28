@@ -81,23 +81,54 @@ pub fn accept_disabled_reason_with_auth(
     ctx: &AppContext,
 ) -> Option<String> {
     if let Some(reason) = state.accept_disabled_reason() {
-        return Some(reason.to_string());
+        let localized_reason = match &state.execution_mode {
+            RunAgentsExecutionMode::Local
+                if Harness::parse_local_child_harness(&state.harness_type)
+                    == Some(Harness::Codex) =>
+            {
+                crate::t!("ai-orchestration-local-codex-disabled")
+            }
+            RunAgentsExecutionMode::Remote { .. }
+                if state.harness_type.eq_ignore_ascii_case("opencode") =>
+            {
+                crate::t!("ai-orchestration-opencode-cloud-unsupported")
+            }
+            RunAgentsExecutionMode::Local | RunAgentsExecutionMode::Remote { .. } => {
+                reason.to_string()
+            }
+        };
+        return Some(localized_reason);
     }
     if matches!(state.execution_mode, RunAgentsExecutionMode::Local)
         && let Some(harness) = Harness::parse_local_child_harness(&state.harness_type)
     {
         match local_harness_setup_state(harness) {
             LocalHarnessSetupState::MissingHarness { tooltip } => {
-                return Some(tooltip.to_string());
+                let tooltip = match harness {
+                    Harness::Claude => crate::t!("ai-orchestration-install-claude"),
+                    Harness::Codex => crate::t!("ai-orchestration-install-codex"),
+                    Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Unknown => {
+                        tooltip.to_string()
+                    }
+                };
+                return Some(tooltip);
             }
             LocalHarnessSetupState::ProductDisabled { message } => {
-                return Some(message.to_string());
+                let message = match harness {
+                    Harness::Codex => crate::t!("ai-orchestration-local-codex-disabled"),
+                    Harness::Oz
+                    | Harness::Claude
+                    | Harness::OpenCode
+                    | Harness::Gemini
+                    | Harness::Unknown => message.to_string(),
+                };
+                return Some(message);
             }
             LocalHarnessSetupState::Ready => {}
         }
     }
     if auth_secret_selection_required(state, ctx) {
-        return Some("Select an API key for this harness to continue.".to_string());
+        return Some(crate::t!("ai-orchestration-select-api-key"));
     }
     None
 }

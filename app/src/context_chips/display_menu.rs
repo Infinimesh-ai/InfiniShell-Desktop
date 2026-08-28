@@ -311,14 +311,14 @@ impl DisplayChipMenu {
                     };
                     let mut editor = EditorView::new(options, ctx);
                     let placeholder_text = match chip_menu_type {
-                        ChipMenuType::Directories => "Search directories...",
-                        ChipMenuType::Branches => "Search branches...",
-                        ChipMenuType::Environments => "Search environments...",
+                        ChipMenuType::Directories => crate::t!("context-search-directories"),
+                        ChipMenuType::Branches => crate::t!("context-search-branches"),
+                        ChipMenuType::Environments => crate::t!("context-search-environments"),
                         ChipMenuType::CodeReview => {
                             unreachable!("search input should not be constructed")
                         }
                     };
-                    editor.set_placeholder_text(placeholder_text, ctx);
+                    editor.set_placeholder_text(placeholder_text.as_str(), ctx);
                     editor
                 }))
             }

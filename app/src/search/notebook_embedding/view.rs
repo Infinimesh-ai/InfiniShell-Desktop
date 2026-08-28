@@ -23,8 +23,6 @@ use crate::search::notebook_embedding::workflows::EmbeddedWorkflowsDataSource;
 use crate::search::result_renderer::{QueryResultRenderer, QueryResultRendererStyles};
 use crate::search::search_bar::{SearchBar, SearchBarEvent, SearchBarState, SearchResultOrdering};
 
-const DEFAULT_PLACEHOLDER_TEXT: &str = "Search for a reference";
-
 lazy_static! {
     static ref QUERY_RESULT_RENDERER_STYLES: QueryResultRendererStyles =
         QueryResultRendererStyles {
@@ -83,7 +81,7 @@ impl EmbeddingSearchMenu {
             SearchBar::new(
                 mixer.clone(),
                 search_bar_state.clone(),
-                DEFAULT_PLACEHOLDER_TEXT,
+                crate::t!("notebook-reference-search-placeholder"),
                 |result_index, result| {
                     QueryResultRenderer::new(
                         result,

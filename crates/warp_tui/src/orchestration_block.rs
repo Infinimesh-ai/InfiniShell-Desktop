@@ -48,8 +48,6 @@ use crate::orchestrated_agent_identity_styling::AgentIdentity;
 use crate::tui_ask_question_view::PageNavigationDirection;
 use crate::tui_builder::TuiUiBuilder;
 
-const ORCHESTRATION_BLOCK_TITLE: &str = "Can I start additional agents for this task?";
-
 /// Keymap-context flag set while the acceptance card is active.
 const ACCEPTANCE_CONTEXT_FLAG: &str = "TuiOrchestrationBlockAcceptance";
 /// Keymap-context flag set while a configuration page is active.
@@ -512,7 +510,7 @@ impl TuiOrchestrationBlock {
         let position = sequence.iter().position(|p| *p == page).unwrap_or(0) + 1;
         let selector_page = OptionSelectorPage {
             header: Some(OptionSelectorHeader {
-                field_label: "Edit agent configuration".to_string(),
+                field_label: warp::t!("tui-edit-agent-configuration"),
                 position: (position, sequence.len()),
                 prompt: page.question(self.request_fields.agent_run_configs.len()),
             }),

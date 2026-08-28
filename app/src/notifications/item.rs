@@ -33,11 +33,11 @@ pub enum NotificationFilter {
 }
 
 impl NotificationFilter {
-    pub(crate) fn label(&self) -> &'static str {
+    pub(crate) fn label(&self) -> String {
         match self {
-            NotificationFilter::All => "All tabs",
-            NotificationFilter::Unread => "Unread",
-            NotificationFilter::Errors => "Errors",
+            NotificationFilter::All => crate::t!("notifications-filter-all-tabs"),
+            NotificationFilter::Unread => crate::t!("notifications-filter-unread"),
+            NotificationFilter::Errors => crate::t!("notifications-filter-errors"),
         }
     }
 }

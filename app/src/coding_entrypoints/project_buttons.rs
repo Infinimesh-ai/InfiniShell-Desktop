@@ -224,11 +224,11 @@ impl View for ProjectButtons {
         if FeatureFlag::CreateProjectFlow.is_enabled() {
             row.add_children([
                 Container::new(self.glowing_button(
-                    "Create new project",
+                    crate::t!("coding-project-create"),
                     Icon::Plus,
                     ProjectButtonsAction::CreateProject,
                     TooltipData {
-                        text: "Create and initialize a brand new project".to_string(),
+                        text: crate::t!("coding-project-create-tooltip"),
                         keybinding: keybinding_name_to_display_string(
                             "project_buttons:create_new_project",
                             app,
@@ -240,11 +240,11 @@ impl View for ProjectButtons {
                 .with_margin_right(16.)
                 .finish(),
                 Container::new(self.glowing_button(
-                    "Open repository",
+                    crate::t!("coding-project-open-repository"),
                     Icon::Folder,
                     ProjectButtonsAction::OpenRepository,
                     TooltipData {
-                        text: "Open an existing local folder or repository".to_string(),
+                        text: crate::t!("coding-project-open-repository-tooltip"),
                         keybinding: keybinding_name_to_display_string(
                             "project_buttons:open_repository",
                             app,
@@ -256,11 +256,11 @@ impl View for ProjectButtons {
                 .with_margin_right(16.)
                 .finish(),
                 self.glowing_button(
-                    "Clone repository",
+                    crate::t!("coding-project-clone-repository"),
                     Icon::Duplicate,
                     ProjectButtonsAction::CloneRepository,
                     TooltipData {
-                        text: "Clone a repo from GitHub or another source".to_string(),
+                        text: crate::t!("coding-project-clone-repository-tooltip"),
                         keybinding: None,
                     },
                     self.state_handles.clone_repo_button.clone(),
@@ -272,11 +272,11 @@ impl View for ProjectButtons {
                 Expanded::new(
                     1.,
                     self.glowing_button(
-                        "Open repository",
+                        crate::t!("coding-project-open-repository"),
                         Icon::Plus,
                         ProjectButtonsAction::CreateProject,
                         TooltipData {
-                            text: "Open an existing local folder or repository".to_string(),
+                            text: crate::t!("coding-project-open-repository-tooltip"),
                             keybinding: keybinding_name_to_display_string(
                                 "project_buttons:open_repository",
                                 app,

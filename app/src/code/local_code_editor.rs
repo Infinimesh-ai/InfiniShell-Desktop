@@ -962,7 +962,7 @@ impl LocalCodeEditorView {
                         Shrinkable::new(
                             1.,
                             Text::new_inline(
-                                "Add as context",
+                                crate::t!("code-add-selection-as-context"),
                                 appearance.ui_font_family(),
                                 appearance.ui_font_size(),
                             )
@@ -1128,7 +1128,7 @@ impl DiffViewer for LocalCodeEditorView {
             .update(ctx, |model, ctx| {
                 model.save(file_id, base_content, buffer_version, ctx)
             })
-            .map_err(|e| format!("Failed to save file: {e:?}"))
+            .map_err(|e| crate::t!("code-save-file-failed", error = format!("{e:?}")))
     }
 }
 
@@ -1299,7 +1299,7 @@ pub fn render_unsaved_changes_banner(
             Shrinkable::new(
                 1.,
                 Text::new(
-                    "This file has saved changes that are not reflected here.",
+                    crate::t!("code-saved-changes-not-reflected"),
                     appearance.ui_font_family(),
                     appearance.ui_font_size(),
                 )
@@ -1396,7 +1396,7 @@ pub fn render_remote_disconnected_banner(appearance: &Appearance) -> Box<dyn Ele
             Shrinkable::new(
                 1.,
                 Text::new(
-                    "Remote host disconnected. You will not be able to see updates and save changes.",
+                    crate::t!("code-remote-host-disconnected"),
                     appearance.ui_font_family(),
                     appearance.ui_font_size(),
                 )

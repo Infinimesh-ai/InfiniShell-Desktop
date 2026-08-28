@@ -64,7 +64,7 @@ pub(crate) fn init(app: &mut AppContext) {
     let predicate = id!(TuiFileEditsView::ui_name()) & id!(FILE_EDITS_PERMISSION_ACTIVE);
     app.register_editable_bindings([EditableBinding::new(
         "tui:file-edits-permission:toggle-expand-all",
-        "Expand or collapse all diffs",
+        warp::t_static!("tui-keybinding-toggle-all-diffs"),
         TuiFileEditsViewAction::ToggleExpandAll,
     )
     .with_context_predicate(predicate)
@@ -119,7 +119,7 @@ struct FileSection {
     /// in the render state's char-cell temporary blocks via `expand_diffs`.
     editor: ModelHandle<CodeEditorModel>,
     /// Header verb: `Updated`, `Created`, or `Deleted`.
-    verb: &'static str,
+    verb: String,
     /// Display name: the file name, or `old → new` for renames.
     name: String,
     /// Whether the diff has been computed and expanded (ghost rows pushed);
@@ -468,17 +468,18 @@ impl TuiFileEditsView {
                     .chain(deleted_files.iter().map(String::as_str))
                     .unique()
                     .count();
-                let files_label = if files == 1 { "file" } else { "files" };
                 match file_edit_stats_label(*lines_added, *lines_removed) {
-                    Some(stats) => format!("Edited {files} {files_label} ({stats})"),
-                    None => format!("Edited {files} {files_label}"),
+                    Some(stats) => {
+                        warp::t!("tui-files-edited-with-stats", count = files, stats = stats)
+                    }
+                    None => warp::t!("tui-files-edited", count = files),
                 }
             }
-            Some(RequestFileEditsResult::Cancelled) => "File edits cancelled".to_string(),
+            Some(RequestFileEditsResult::Cancelled) => warp::t!("tui-file-edits-cancelled"),
             Some(RequestFileEditsResult::DiffApplicationFailed { .. }) => {
-                "File edits failed".to_string()
+                warp::t!("tui-file-edits-failed")
             }
-            None => "Preparing edits…".to_string(),
+            None => warp::t!("tui-file-edits-preparing"),
         }
     }
 
@@ -562,7 +563,7 @@ impl TuiFileEditsView {
             let line_stats = section.line_stats(app);
             // Zero-change (and not-yet-computed) diffs have no body to toggle.
             let has_body = line_stats.is_some_and(|stats| stats != (0, 0));
-            let label = file_edit_header_label(state, section.verb, &section.name);
+            let label = file_edit_header_label(state, &section.verb, &section.name);
             let file_section = self.render_section(
                 SectionKey::File(index),
                 &label,
@@ -633,11 +634,11 @@ fn file_edit_header_label(
     subject: &str,
 ) -> String {
     let verb = if state == ToolCallDisplayState::Blocked {
-        "Editing"
+        warp::t!("tui-editing")
     } else {
-        completed_verb
+        completed_verb.to_owned()
     };
-    format!("{verb} {subject}")
+    warp::t!("tui-file-edit-header", verb = verb, subject = subject)
 }
 
 fn file_edit_stat_labels(added: usize, removed: usize) -> [Option<String>; 2] {
@@ -683,7 +684,7 @@ fn file_edit_header_spans(
 
 /// The header verb and display name for a diff: file names only (no
 /// directories), with renames shown as `old → new`.
-fn verb_and_name(diff: &FileDiff) -> (&'static str, String) {
+fn verb_and_name(diff: &FileDiff) -> (String, String) {
     let file_name = |path: &str| {
         Path::new(path)
             .file_name()
@@ -692,19 +693,19 @@ fn verb_and_name(diff: &FileDiff) -> (&'static str, String) {
     };
     let name = file_name(&diff.base.file_path);
     match &diff.diff_type {
-        DiffType::Create { .. } => ("Created", name),
-        DiffType::Delete { .. } => ("Deleted", name),
+        DiffType::Create { .. } => (warp::t!("tui-created"), name),
+        DiffType::Delete { .. } => (warp::t!("tui-deleted"), name),
         DiffType::Update {
             rename: Some(to), ..
         } => {
             let to_name = file_name(&to.to_string_lossy());
             if to_name == name {
-                ("Updated", name)
+                (warp::t!("tui-updated"), name)
             } else {
-                ("Updated", format!("{name} → {to_name}"))
+                (warp::t!("tui-updated"), format!("{name} → {to_name}"))
             }
         }
-        DiffType::Update { rename: None, .. } => ("Updated", name),
+        DiffType::Update { rename: None, .. } => (warp::t!("tui-updated"), name),
     }
 }
 
@@ -783,14 +784,17 @@ impl TuiView for TuiFileEditsView {
         let builder = TuiUiBuilder::from_app(app);
         let expand_collapse_hint = TuiText::from_spans([
             ("e".to_owned(), builder.primary_text_style()),
-            (" to expand/collapse".to_owned(), builder.muted_text_style()),
+            (
+                format!(" {}", warp::t!("tui-hint-expand-collapse")),
+                builder.muted_text_style(),
+            ),
         ])
         .truncate()
         .finish();
 
         render_permission_card(
             &self.permission_prompt,
-            "Is it OK if I make these file edits?",
+            warp::t_static!("tui-permission-file-edits"),
             Some(content),
             Some(expand_collapse_hint),
             app,
@@ -820,8 +824,8 @@ impl TuiFileEditsView {
             SectionKey::Summary,
             &file_edit_header_label(
                 self.display_state(app),
-                "Edited",
-                &format!("{} files", self.sections.len()),
+                &warp::t!("tui-edited"),
+                &warp::t!("tui-count-files", count = self.sections.len()),
             ),
             self.aggregate_stats(app),
             &builder,

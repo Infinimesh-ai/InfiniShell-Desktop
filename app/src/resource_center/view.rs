@@ -43,11 +43,11 @@ pub enum ResourceCenterFooterItem {
 }
 
 impl ResourceCenterFooterItem {
-    pub fn ui_label(&self) -> &'static str {
+    pub fn ui_label(&self) -> String {
         match self {
-            ResourceCenterFooterItem::Docs => "Docs",
-            ResourceCenterFooterItem::Slack => "Join our Slack community",
-            ResourceCenterFooterItem::Feedback => "Feedback",
+            ResourceCenterFooterItem::Docs => crate::t!("resource-center-footer-docs"),
+            ResourceCenterFooterItem::Slack => crate::t!("resource-center-footer-slack"),
+            ResourceCenterFooterItem::Feedback => crate::t!("resource-center-footer-feedback"),
         }
     }
 
@@ -330,11 +330,11 @@ impl ResourceCenterView {
             Some(ResourceCenterPage::Keybindings) => {
                 crate::t!("resource-center-keyboard-shortcuts")
             }
-            _ => {
+            Some(ResourceCenterPage::Main) | None => {
                 if FeatureFlag::AvatarInTabBar.is_enabled() {
                     String::new()
                 } else {
-                    "InfiniShell Essentials".to_string()
+                    crate::t!("resource-center-essentials-title")
                 }
             }
         };
@@ -430,7 +430,7 @@ impl ResourceCenterView {
         let button = appearance
             .ui_builder()
             .button(ButtonVariant::Text, mouse_state)
-            .with_text_label(item.ui_label().to_string())
+            .with_text_label(item.ui_label())
             .with_style(
                 UiComponentStyles::default().set_padding(Coords::default().left(SCROLLBAR_OFFSET)),
             )

@@ -50,19 +50,19 @@ pub enum InlineMenuType {
 }
 
 impl InlineMenuType {
-    fn display_label(&self) -> &'static str {
+    fn display_label(&self) -> String {
         match self {
-            InlineMenuType::SlashCommands => "/Commands",
-            InlineMenuType::ModelSelector => "/Model",
-            InlineMenuType::ConversationMenu => "/Conversations",
-            InlineMenuType::ProfileSelector => "/Profiles",
-            InlineMenuType::PromptsMenu => "/Prompts",
-            InlineMenuType::SkillMenu => "/Skills",
-            InlineMenuType::UserQueryMenu => "/Fork",
-            InlineMenuType::RewindMenu => "/Rewind",
-            InlineMenuType::InlineHistoryMenu => "History",
-            InlineMenuType::IndexedReposMenu => "/Repos",
-            InlineMenuType::PlanMenu => "/Plans",
+            InlineMenuType::SlashCommands => crate::t!("terminal-menu-commands"),
+            InlineMenuType::ModelSelector => crate::t!("terminal-menu-model"),
+            InlineMenuType::ConversationMenu => crate::t!("terminal-menu-conversations"),
+            InlineMenuType::ProfileSelector => crate::t!("terminal-menu-profiles"),
+            InlineMenuType::PromptsMenu => crate::t!("terminal-menu-prompts"),
+            InlineMenuType::SkillMenu => crate::t!("terminal-menu-skills"),
+            InlineMenuType::UserQueryMenu => crate::t!("terminal-menu-fork"),
+            InlineMenuType::RewindMenu => crate::t!("terminal-menu-rewind"),
+            InlineMenuType::InlineHistoryMenu => crate::t!("terminal-menu-history"),
+            InlineMenuType::IndexedReposMenu => crate::t!("terminal-menu-repositories"),
+            InlineMenuType::PlanMenu => crate::t!("terminal-menu-plans"),
         }
     }
 

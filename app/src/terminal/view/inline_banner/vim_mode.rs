@@ -27,7 +27,7 @@ pub fn render_vim_mode_banner(
     let active_ui_text_color = appearance.theme().active_ui_text_color();
 
     let buttons = vec![InlineBannerTextButton {
-        text: "Enable".to_owned(),
+        text: crate::t!("common-enable"),
         text_color: active_ui_text_color.into_solid(),
         button_state: InlineBannerButtonState {
             on_click_event: TerminalAction::VimModeBanner(VimModeBannerAction::Enable),
@@ -47,7 +47,7 @@ pub fn render_vim_mode_banner(
         InlineBannerStyle::LowPriority,
         appearance,
         InlineBannerContent {
-            title: "Enable InfiniShell's Vim keybindings?".to_string(),
+            title: crate::t!("terminal-banner-enable-vim-keybindings"),
             buttons,
             close_button: Some(close_button),
             ..Default::default()

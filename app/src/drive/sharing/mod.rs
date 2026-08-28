@@ -29,11 +29,11 @@ pub enum SharingAccessLevel {
 }
 
 impl SharingAccessLevel {
-    pub fn label(&self) -> &'static str {
+    pub fn label(&self) -> String {
         match self {
-            SharingAccessLevel::View => "Can view",
-            SharingAccessLevel::Edit => "Can edit",
-            SharingAccessLevel::Full => "Full access",
+            SharingAccessLevel::View => crate::t!("drive-sharing-access-can-view"),
+            SharingAccessLevel::Edit => crate::t!("drive-sharing-access-can-edit"),
+            SharingAccessLevel::Full => crate::t!("drive-sharing-access-full"),
         }
     }
 
@@ -214,7 +214,9 @@ impl SubjectExt for Subject {
             Subject::User(kind) => kind.name(app),
             Subject::PendingUser { email } => email.clone().map(Cow::from),
             Subject::Team(kind) => kind.display_name(app).map(Cow::from),
-            Subject::AnyoneWithLink(_) => Some(Cow::from("Anyone with the link")),
+            Subject::AnyoneWithLink(_) => {
+                Some(Cow::Owned(crate::t!("drive-sharing-anyone-with-link")))
+            }
         }
     }
 

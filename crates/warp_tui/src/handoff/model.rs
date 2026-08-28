@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use chrono::Local;
+use chrono::{Local, NaiveDateTime};
 use futures::channel::oneshot;
 use parking_lot::FairMutex;
 use warp::settings::{AISettings, PrivacySettings, PrivacySettingsChangedEvent};
@@ -25,6 +25,17 @@ use warp::tui_export::{
 };
 use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _};
 
+fn format_handoff_time(time: NaiveDateTime) -> String {
+    if warp::i18n::current_languages()
+        .iter()
+        .any(|language| language.language.as_str() == "zh")
+    {
+        time.format("%-m月%-d日 %H:%M").to_string()
+    } else {
+        time.format("%B %-d at %-I:%M%P").to_string()
+    }
+}
+
 /// Editable selector pages in their handoff configuration order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TuiHandoffSelectorKind {
@@ -36,8 +47,8 @@ impl TuiHandoffSelectorKind {
     /// User-facing question shown above this selector page.
     pub(crate) fn question(self) -> &'static str {
         match self {
-            Self::Environment => "Which environment should run this conversation?",
-            Self::Model => "Which model should run this conversation?",
+            Self::Environment => warp::t_static!("tui-handoff-environment-question"),
+            Self::Model => warp::t_static!("tui-handoff-model-question"),
         }
     }
 }
@@ -122,7 +133,7 @@ impl TuiHandoffModel {
         if !AISettings::as_ref(ctx).is_cloud_handoff_enabled(ctx) {
             return Err(TuiHandoffPreparationFailure {
                 replacement_input: None,
-                message: "Cloud handoff is unavailable.".to_owned(),
+                message: warp::t!("tui-handoff-unavailable"),
             });
         }
 
@@ -297,24 +308,24 @@ impl TuiHandoffModel {
     fn prepare_error_message(error: &HandoffPrepareError) -> &'static str {
         match error {
             HandoffPrepareError::LongRunningCommand => {
-                "Can't hand off while a command is running. Cancel it or wait for it to finish."
+                warp::t_static!("tui-handoff-command-running")
             }
             HandoffPrepareError::ActiveOrBlockedChild => {
-                "Can't hand off while child work is active or waiting for input."
+                warp::t_static!("tui-handoff-child-active")
             }
             HandoffPrepareError::EmptySourceAndPrompt => {
-                "Nothing to hand off — start a conversation or add a prompt."
+                warp::t_static!("tui-handoff-nothing")
             }
             HandoffPrepareError::MissingServerConversationToken => {
-                "This conversation hasn't synced yet. Send another message, then try again."
+                warp::t_static!("tui-handoff-not-synced")
             }
-            HandoffPrepareError::InvalidModel => "The selected model can't run in Oz cloud.",
+            HandoffPrepareError::InvalidModel => warp::t_static!("tui-handoff-invalid-model"),
             HandoffPrepareError::SourceConversationChanged
             | HandoffPrepareError::SourceNotInProgress
             | HandoffPrepareError::HandoffDisabled
             | HandoffPrepareError::MissingRequiredEnvironment
             | HandoffPrepareError::InvalidEnvironment => {
-                "Couldn't start the handoff. Check the current conversation and try again."
+                warp::t_static!("tui-handoff-start-failed")
             }
         }
     }
@@ -322,22 +333,24 @@ impl TuiHandoffModel {
     fn validation_message(error: &HandoffPrepareError) -> &'static str {
         match error {
             HandoffPrepareError::MissingRequiredEnvironment => {
-                "Select an environment before starting the handoff."
+                warp::t_static!("tui-handoff-select-environment-first")
             }
             HandoffPrepareError::InvalidEnvironment => {
-                "The selected environment is no longer available."
+                warp::t_static!("tui-handoff-environment-unavailable")
             }
             HandoffPrepareError::InvalidModel => {
-                "The selected model cannot run in Oz cloud. Choose a compatible model."
+                warp::t_static!("tui-handoff-choose-compatible-model")
             }
-            HandoffPrepareError::HandoffDisabled => "Cloud handoff is no longer available.",
+            HandoffPrepareError::HandoffDisabled => {
+                warp::t_static!("tui-handoff-no-longer-available")
+            }
             HandoffPrepareError::SourceConversationChanged
             | HandoffPrepareError::EmptySourceAndPrompt
             | HandoffPrepareError::SourceNotInProgress
             | HandoffPrepareError::LongRunningCommand
             | HandoffPrepareError::ActiveOrBlockedChild
             | HandoffPrepareError::MissingServerConversationToken => {
-                "The handoff can no longer start. Return to local input and try again."
+                warp::t_static!("tui-handoff-return-local")
             }
         }
     }
@@ -443,7 +456,7 @@ impl TuiHandoffModel {
         OptionSnapshot {
             status: if rows.is_empty() {
                 OptionSourceStatus::Empty {
-                    message: "No cloud environments available".to_owned(),
+                    message: warp::t!("tui-no-cloud-environments"),
                 }
             } else {
                 OptionSourceStatus::Ready
@@ -476,7 +489,7 @@ impl TuiHandoffModel {
                     .find(|environment| environment.id == selected)
                     .map(|environment| environment.name.clone())
             })
-            .unwrap_or_else(|| "Select an environment".to_owned())
+            .unwrap_or_else(|| warp::t!("tui-select-environment"))
     }
 
     pub(crate) fn model_label(&self, ctx: &AppContext) -> String {
@@ -494,7 +507,7 @@ impl TuiHandoffModel {
         if !LLMPreferences::as_ref(ctx)
             .is_cloud_runnable_oz_model_id(&LLMId::from(presentation.model_id.as_str()))
         {
-            format!("{label} (incompatible)")
+            warp::t!("tui-incompatible-label", label = label)
         } else {
             label
         }
@@ -647,9 +660,7 @@ impl TuiHandoffModel {
                     model.dismissed = true;
                     ctx.emit(TuiHandoffModelEvent::Failed {
                         restoration: failure.restoration,
-                        message:
-                            "Couldn't start the handoff. Check your network connection and try again."
-                                .to_owned(),
+                        message: warp::t!("tui-handoff-network-failed"),
                     });
                     ctx.notify();
                 }
@@ -668,10 +679,7 @@ impl TuiHandoffModel {
                     );
                     model.phase = TuiHandoffPhase::Created {
                         url: created.url,
-                        completed_at: Local::now()
-                            .naive_local()
-                            .format("%B %-d at %-I:%M%P")
-                            .to_string(),
+                        completed_at: format_handoff_time(Local::now().naive_local()),
                     };
                     ctx.emit(TuiHandoffModelEvent::Changed { focus_block: true });
                     ctx.notify();

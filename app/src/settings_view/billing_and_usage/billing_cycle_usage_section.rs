@@ -412,10 +412,14 @@ impl BillingCycleUsageSectionView {
             .with_main_axis_size(MainAxisSize::Max);
 
         row.add_child(
-            Text::new_inline("Usage", appearance.ui_font_family(), HEADER_FONT_SIZE)
-                .with_style(Properties::default().weight(Weight::Bold))
-                .with_color(theme.active_ui_text_color().into())
-                .finish(),
+            Text::new_inline(
+                crate::t!("settings-billing-usage"),
+                appearance.ui_font_family(),
+                HEADER_FONT_SIZE,
+            )
+            .with_style(Properties::default().weight(Weight::Bold))
+            .with_color(theme.active_ui_text_color().into())
+            .finish(),
         );
 
         let mut right_side = Flex::row()
@@ -475,10 +479,13 @@ impl BillingCycleUsageSectionView {
             return None;
         }
         let theme = appearance.theme();
-        let reset_str = AIRequestUsageModel::as_ref(app)
-            .next_refresh_time_local()
-            .format("Resets %b %d, %-I:%M %p")
-            .to_string();
+        let reset_time = AIRequestUsageModel::as_ref(app).next_refresh_time_local();
+        let reset_date = if uses_chinese_date_format() {
+            reset_time.format("%Y-%m-%d %H:%M").to_string()
+        } else {
+            reset_time.format("%b %d, %Y at %-I:%M %p").to_string()
+        };
+        let reset_str = crate::t!("settings-billing-resets", date = reset_date.as_str());
         Some(
             Text::new_inline(
                 reset_str,
@@ -692,7 +699,12 @@ impl BillingCycleUsageSectionView {
         let appearance = Appearance::as_ref(app);
         let (link_text, trailing_copy, action, leading_icon) =
             if self.viewer_is_native_workspaces_admin(workspace, app) {
-                NATIVE_WORKSPACES_CTA
+                (
+                    crate::t!("settings-billing-cta-open-admin"),
+                    crate::t!("settings-billing-cta-manage-workspace-suffix"),
+                    BillingCycleUsageAction::OpenWorkspaceAdminPanel,
+                    Icon::Users,
+                )
             } else {
                 // Only show when there are teammates -- a single-member team
                 // doesn't benefit from any of the team-level visibility CTAs.
@@ -717,7 +729,7 @@ impl BillingCycleUsageSectionView {
         let body = FormattedTextElement::new(
             FormattedText::new([FormattedTextLine::Line(vec![
                 FormattedTextFragment::hyperlink_action(link_text, action),
-                FormattedTextFragment::plain_text(format!(" {trailing_copy}")),
+                FormattedTextFragment::plain_text(trailing_copy),
             ])]),
             appearance.ui_font_size(),
             appearance.ui_font_family(),
@@ -757,64 +769,71 @@ impl BillingCycleUsageSectionView {
     }
 }
 
-const NATIVE_WORKSPACES_CTA: (&str, &str, BillingCycleUsageAction, Icon) = (
-    "Open the admin panel",
-    "to manage workspace settings and spend limits.",
-    BillingCycleUsageAction::OpenWorkspaceAdminPanel,
-    Icon::Users,
-);
-
 /// Returns the (link text, trailing copy, action, icon) tuple for the
 /// visibility CTA banner, or `None` to suppress the banner entirely.
 fn visibility_cta_for(
     granularity: UsageVisibilityGranularity,
-) -> Option<(&'static str, &'static str, BillingCycleUsageAction, Icon)> {
+) -> Option<(String, String, BillingCycleUsageAction, Icon)> {
     match granularity {
         UsageVisibilityGranularity::OwnOnly => Some((
-            "Upgrade to Build",
-            "to see team-level credit usage.",
+            crate::t!("settings-billing-cta-upgrade-build"),
+            crate::t!("settings-billing-cta-team-usage-suffix"),
             BillingCycleUsageAction::OpenUpgrade,
             Icon::ArrowCircleBrokenUp,
         )),
         UsageVisibilityGranularity::TeamAggregate => Some((
-            "Upgrade to Business",
-            "to see per-user credit attribution.",
+            crate::t!("settings-billing-cta-upgrade-business"),
+            crate::t!("settings-billing-cta-user-attribution-suffix"),
             BillingCycleUsageAction::OpenUpgrade,
             Icon::ArrowCircleBrokenUp,
         )),
         UsageVisibilityGranularity::PerUserTotals => Some((
-            "Upgrade to Enterprise",
-            "to see fine-grained credit attribution and set per-user spend limits.",
+            crate::t!("settings-billing-cta-upgrade-enterprise"),
+            crate::t!("settings-billing-cta-fine-grained-suffix"),
             BillingCycleUsageAction::OpenUpgrade,
             Icon::ArrowCircleBrokenUp,
         )),
         // FullBreakdown viewers already have full visibility; nudge them to
         // the admin panel where per-user spend limits actually get configured.
         UsageVisibilityGranularity::FullBreakdown => Some((
-            "Open the admin panel",
-            "to set per-user spend limits.",
+            crate::t!("settings-billing-cta-open-admin"),
+            crate::t!("settings-billing-cta-spend-limits-suffix"),
             BillingCycleUsageAction::OpenTeamAdminPanel,
             Icon::Users,
         )),
     }
 }
 
-fn legend_style_for(cost_type: AiCreditsUsageAndCostType) -> (ColorU, &'static str) {
+fn legend_style_for(cost_type: AiCreditsUsageAndCostType) -> (ColorU, String) {
     match cost_type {
-        AiCreditsUsageAndCostType::BaseLimit => (BASE_CREDITS_DOT_COLOR, "Base"),
-        AiCreditsUsageAndCostType::BonusGrant => (BONUS_CREDITS_DOT_COLOR, "Add-ons"),
-        AiCreditsUsageAndCostType::Payg => (PAYG_CREDITS_DOT_COLOR, "Pay-as-you-go"),
-        AiCreditsUsageAndCostType::AmbientBonusGrant => (AMBIENT_CREDITS_DOT_COLOR, "Cloud-only"),
-        AiCreditsUsageAndCostType::Aggregate => (AGGREGATE_CREDITS_DOT_COLOR, "Combined"),
-        AiCreditsUsageAndCostType::Other(_) => (BASE_CREDITS_DOT_COLOR, ""),
+        AiCreditsUsageAndCostType::BaseLimit => (
+            BASE_CREDITS_DOT_COLOR,
+            crate::t!("settings-billing-cost-base"),
+        ),
+        AiCreditsUsageAndCostType::BonusGrant => (
+            BONUS_CREDITS_DOT_COLOR,
+            crate::t!("settings-billing-cost-addons"),
+        ),
+        AiCreditsUsageAndCostType::Payg => (
+            PAYG_CREDITS_DOT_COLOR,
+            crate::t!("settings-billing-cost-payg"),
+        ),
+        AiCreditsUsageAndCostType::AmbientBonusGrant => (
+            AMBIENT_CREDITS_DOT_COLOR,
+            crate::t!("settings-billing-cost-cloud-only"),
+        ),
+        AiCreditsUsageAndCostType::Aggregate => (
+            AGGREGATE_CREDITS_DOT_COLOR,
+            crate::t!("settings-billing-cost-combined"),
+        ),
+        AiCreditsUsageAndCostType::Other(_) => (BASE_CREDITS_DOT_COLOR, String::new()),
     }
 }
 
 fn render_aggregate_legend_tooltip(appearance: &Appearance) -> Box<dyn Element> {
     let theme = appearance.theme();
     let text = Text::new_inline(
-        "Other team members' usage across add-on, pay-as-you-go, and cloud-only credits."
-            .to_string(),
+        crate::t!("settings-billing-combined-tooltip"),
         appearance.ui_font_family(),
         12.,
     )
@@ -833,14 +852,22 @@ fn render_aggregate_legend_tooltip(appearance: &Appearance) -> Box<dyn Element> 
         .finish()
 }
 
+fn uses_chinese_date_format() -> bool {
+    crate::i18n::current_languages()
+        .first()
+        .is_some_and(|language| language.to_string().starts_with("zh"))
+}
+
 fn format_period_range(start: DateTime<Utc>, end: DateTime<Utc>) -> String {
     let start = start.with_timezone(&Local);
     let end = end.with_timezone(&Local);
-    if start.year() == end.year() {
-        format!("{} - {}", start.format("%b %d"), end.format("%b %d, %Y"))
+    if uses_chinese_date_format() {
+        format!("{} 至 {}", start.format("%Y-%m-%d"), end.format("%Y-%m-%d"))
+    } else if start.year() == end.year() {
+        format!("{} – {}", start.format("%b %d"), end.format("%b %d, %Y"))
     } else {
         format!(
-            "{} - {}",
+            "{} – {}",
             start.format("%b %d, %Y"),
             end.format("%b %d, %Y")
         )

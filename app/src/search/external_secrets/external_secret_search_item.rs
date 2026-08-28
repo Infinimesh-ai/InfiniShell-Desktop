@@ -94,6 +94,7 @@ impl SearchItem for ExternalSecretSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Secret: {}", &self.external_secret.get_display_name())
+        let name = self.external_secret.get_display_name();
+        crate::t!("search-secret-a11y", name = name.as_str())
     }
 }

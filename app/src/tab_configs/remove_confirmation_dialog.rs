@@ -108,13 +108,11 @@ impl View for RemoveTabConfigConfirmationDialog {
             .with_margin_right(12.)
             .finish();
 
-        let title = format!("Remove '{}'?", self.config_name);
+        let title = crate::t!("tab-config-remove-title", name = self.config_name.as_str());
 
         let dialog = Dialog::new(
             title,
-            Some(
-                "This tab config will be permanently deleted. This action cannot be undone.".into(),
-            ),
+            Some(crate::t!("tab-config-remove-description")),
             UiComponentStyles {
                 width: Some(DIALOG_WIDTH),
                 ..dialog_styles(appearance)

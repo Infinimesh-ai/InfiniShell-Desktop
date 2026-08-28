@@ -6,7 +6,7 @@ use warpui::{EntityId, UpdateView, ViewContext};
 
 use super::{Workspace, group_member_indices};
 use crate::menu::{MenuItem, MenuItemFields};
-use crate::tab::{MOVE_TO_GROUP_LABEL, TabData};
+use crate::tab::{TabData, move_to_group_label};
 use crate::workspace::action::{TabContextMenuAnchor, WorkspaceAction};
 use crate::workspace::tab_group::{TabGroup, TabGroupId};
 use crate::workspace::util::PaneViewLocator;
@@ -464,7 +464,7 @@ impl Workspace {
     fn tab_selection_menu_items(&self) -> Vec<MenuItem<WorkspaceAction>> {
         let shared_group = self.selection_shared_group();
         let mut menu_items = vec![
-            MenuItemFields::new("Create group from tabs")
+            MenuItemFields::new(crate::t!("menu-tab-group-create-from-tabs"))
                 .with_on_select_action(WorkspaceAction::NewTabGroupFromSelectedTabs)
                 .into_item(),
         ];
@@ -472,7 +472,7 @@ impl Workspace {
         // Only single-group selections have an unambiguous group to leave.
         if shared_group.is_some() {
             menu_items.push(
-                MenuItemFields::new("Remove from group")
+                MenuItemFields::new(crate::t!("menu-tab-remove-from-group"))
                     .with_on_select_action(WorkspaceAction::RemoveSelectedTabsFromGroup)
                     .into_item(),
             );
@@ -484,7 +484,7 @@ impl Workspace {
             .keys()
             .any(|group_id| Some(*group_id) != shared_group);
         if has_destination_group {
-            menu_items.push(MenuItemFields::new_submenu(MOVE_TO_GROUP_LABEL).into_item());
+            menu_items.push(MenuItemFields::new_submenu(move_to_group_label()).into_item());
         }
         menu_items
     }
@@ -701,7 +701,7 @@ impl Workspace {
                     .tab_groups
                     .get(&group_id)
                     .and_then(|g| g.name.clone())
-                    .unwrap_or_else(|| "Untitled group".to_string());
+                    .unwrap_or_else(|| crate::t!("menu-tab-untitled-group"));
                 let action = match tab_index {
                     Some(tab_index) => WorkspaceAction::MoveTabToGroup {
                         tab_index,

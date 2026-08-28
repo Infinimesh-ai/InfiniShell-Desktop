@@ -15,10 +15,8 @@ use warpui::presenter::ChildView;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
 use super::{
-    DYNAMIC_ENUM_FAILURE_MESSAGE, DYNAMIC_ENUM_GENERATE_MESSAGE,
     DYNAMIC_ENUM_HORIZONTAL_TEXT_PADDING, DYNAMIC_ENUM_MENU_HEIGHT_OFFSET,
-    DYNAMIC_ENUM_MENU_PADDING, DYNAMIC_ENUM_NO_RESULTS_MESSAGE, DYNAMIC_ENUM_PENDING_MESSAGE,
-    DYNAMIC_ENUM_RUN_MESSAGE, DynamicEnumSuggestionStatus, HISTORY_DETAILS_VIEW_WIDTH_REQUIREMENT,
+    DYNAMIC_ENUM_MENU_PADDING, DynamicEnumSuggestionStatus, HISTORY_DETAILS_VIEW_WIDTH_REQUIREMENT,
     Input, InputAction, MenuPositioning, RUN_DYNAMIC_ENUM_COMMAND_KEYSTROKE,
     TERMINAL_VIEW_PADDING_LEFT,
 };
@@ -154,16 +152,22 @@ impl Input {
                 SuggestionsResizeConfig::WidthOnly,
             ),
             DynamicEnumSuggestionStatus::Pending => (
-                self.render_dynamic_enum_status_message(DYNAMIC_ENUM_PENDING_MESSAGE, appearance),
+                self.render_dynamic_enum_status_message(
+                    &crate::t!("terminal-dynamic-enum-command-pending"),
+                    appearance,
+                ),
                 SuggestionsResizeConfig::WidthAndHeight,
             ),
             DynamicEnumSuggestionStatus::Failure => (
-                self.render_dynamic_enum_status_message(DYNAMIC_ENUM_FAILURE_MESSAGE, appearance),
+                self.render_dynamic_enum_status_message(
+                    &crate::t!("terminal-dynamic-enum-command-failed"),
+                    appearance,
+                ),
                 SuggestionsResizeConfig::WidthAndHeight,
             ),
             DynamicEnumSuggestionStatus::Success if suggestions.is_empty() => (
                 self.render_dynamic_enum_status_message(
-                    DYNAMIC_ENUM_NO_RESULTS_MESSAGE,
+                    &crate::t!("terminal-dynamic-enum-no-results"),
                     appearance,
                 ),
                 SuggestionsResizeConfig::WidthAndHeight,
@@ -291,7 +295,7 @@ impl Input {
                 ConstrainedBox::new(
                     Container::new(
                         Text::new_inline(
-                            String::from(DYNAMIC_ENUM_GENERATE_MESSAGE),
+                            crate::t!("terminal-dynamic-enum-generate-message"),
                             appearance.ui_font_family(),
                             appearance.ui_font_size(),
                         )
@@ -342,7 +346,7 @@ impl Input {
                                 1.,
                                 Container::new(
                                     Text::new_inline(
-                                        String::from(DYNAMIC_ENUM_RUN_MESSAGE),
+                                        crate::t!("terminal-dynamic-enum-run-command"),
                                         appearance.ui_font_family(),
                                         appearance.ui_font_size(),
                                     )

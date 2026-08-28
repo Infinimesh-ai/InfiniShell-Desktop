@@ -137,7 +137,7 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
         if still_outdated {
             log.push_str("Post-update version check: plugin is still outdated\n");
             return Err(PluginInstallError {
-                message: "Plugin update did not take effect".to_owned(),
+                message: crate::t!("cli-agent-plugin-update-not-effective"),
                 log,
             });
         }
@@ -145,11 +145,11 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
     }
 
     fn install_success_message(&self) -> &'static str {
-        "InfiniShell plugin installed. Please run /reload-plugins to activate."
+        crate::t_static!("cli-agent-plugin-claude-installed")
     }
 
     fn update_success_message(&self) -> &'static str {
-        "InfiniShell plugin updated. Please run /reload-plugins to activate."
+        crate::t_static!("cli-agent-plugin-claude-updated")
     }
 
     fn install_instructions(&self) -> &'static PluginInstructions {
@@ -201,7 +201,7 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
         if still_outdated {
             log.push_str("Post-update version check: platform plugin is still outdated\n");
             return Err(PluginInstallError {
-                message: "Platform plugin update did not take effect".to_owned(),
+                message: crate::t!("cli-agent-platform-plugin-update-not-effective"),
                 log,
             });
         }

@@ -36,7 +36,6 @@ use crate::ui_components::blended_colors;
 use crate::view_components::action_button::{ActionButton, PrimaryTheme};
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
-const HEADER_TEXT: &str = "Suggested rule";
 const MAX_EDITOR_HEIGHT: f32 = 240.;
 
 pub fn init(app: &mut AppContext) {
@@ -94,7 +93,7 @@ impl SuggestedRuleModal {
 
         let view_handle = view.clone();
         let modal = ctx.add_typed_action_view(|ctx| {
-            Modal::new(Some(HEADER_TEXT.to_string()), view, ctx)
+            Modal::new(Some(crate::t!("ai-rule-suggested-title")), view, ctx)
                 .with_modal_style(UiComponentStyles {
                     width: Some(510.),
                     background: Some(background.into()),
@@ -246,7 +245,7 @@ impl SuggestedRuleView {
         ctx.subscribe_to_model(&network_status, |me, _, _event, ctx| {
             let is_edit_allowed = me.is_edit_allowed(ctx);
             let tooltip = if !is_edit_allowed {
-                Some("Editing is disabled while offline.".to_string())
+                Some(crate::t!("ai-rule-offline-edit-disabled"))
             } else {
                 None
             };
@@ -491,7 +490,8 @@ impl SuggestedRuleView {
         {
             let AIFact::Memory(AIMemory { name, content, .. }) = rule.model().string_model.clone();
             self.name_editor.update(ctx, |name_editor, ctx| {
-                name_editor.set_buffer_text(&name.unwrap_or("Untitled".to_string()), ctx);
+                name_editor
+                    .set_buffer_text(&name.unwrap_or_else(|| crate::t!("common-untitled")), ctx);
             });
             self.content_editor.update(ctx, |content_editor, ctx| {
                 content_editor.set_buffer_text(&content, ctx);

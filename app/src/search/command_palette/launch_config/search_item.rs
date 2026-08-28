@@ -71,7 +71,10 @@ impl crate::search::item::SearchItem for SearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Selected {}.", self.launch_config.name)
+        crate::t!(
+            "search-selected-a11y",
+            item = self.launch_config.name.as_str()
+        )
     }
 
     fn accessibility_help_message(&self) -> Option<String> {

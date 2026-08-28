@@ -49,9 +49,6 @@ const SECTION_FONT_SIZE: f32 = 16.;
 const SPAN_FONT_SIZE: f32 = 16.;
 const VARIANT_FONT_SIZE: f32 = 13.;
 
-const DYNAMIC_PLACEHOLDER_TEXT: &str =
-    "# Enter a shell command that generates variants, delimited by newlines.\n\ngit branch -a";
-
 #[derive(Debug, Clone)]
 pub enum EnumCreationDialogAction {
     Close,
@@ -187,7 +184,7 @@ impl EnumCreationDialog {
                 };
 
                 let mut editor = EditorView::new(options, ctx);
-                editor.set_placeholder_text(DYNAMIC_PLACEHOLDER_TEXT, ctx);
+                editor.set_placeholder_text(&crate::t!("workflow-enum-dynamic-placeholder"), ctx);
                 editor.set_autogrow(true);
                 editor
             })

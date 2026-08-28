@@ -43,7 +43,7 @@ impl RewindSearchItem {
     pub fn new_current() -> Self {
         Self {
             exchange_id: None,
-            query_text: "Current".to_string(),
+            query_text: crate::t!("common-current"),
             file_changes: FileChangesInfo::default(),
             query_match_result: None,
             score: OrderedFloat(0.0),
@@ -141,7 +141,7 @@ impl SearchItem for RewindSearchItem {
         let changes_element: Box<dyn Element> = if self.is_current {
             // "Current" item shows "No code to be restored"
             Text::new_inline(
-                "No code to be restored".to_string(),
+                crate::t!("terminal-rewind-no-code-to-restore"),
                 appearance.ui_font_family(),
                 secondary_font_size,
             )
@@ -174,7 +174,7 @@ impl SearchItem for RewindSearchItem {
             row.finish()
         } else {
             Text::new_inline(
-                "No code to be restored".to_string(),
+                crate::t!("terminal-rewind-no-code-to-restore"),
                 appearance.ui_font_family(),
                 secondary_font_size,
             )
@@ -225,7 +225,10 @@ impl SearchItem for RewindSearchItem {
                 self.query_text, self.file_changes.lines_added, self.file_changes.lines_removed
             )
         } else {
-            format!("Rewind to: {} (no code changes)", self.query_text)
+            crate::t!(
+                "terminal-rewind-no-code-a11y",
+                query = self.query_text.as_str()
+            )
         }
     }
 }

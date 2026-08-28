@@ -80,14 +80,14 @@ impl CliAgentOscEventPublisher {
 
     pub(crate) fn publish_session_start(&self, ctx: &AppContext) {
         let mut notification = self.notification("session_start", ctx);
-        notification.summary = Some("InfiniShell TUI session started.".to_owned());
+        notification.summary = Some(warp::t!("tui-notification-session-started"));
         self.publish(notification);
     }
 
     pub(crate) fn publish_prompt_submit(&self, prompt: String, ctx: &AppContext) {
         let mut notification = self.notification("prompt_submit", ctx);
         notification.query = notification_excerpt(&prompt);
-        notification.summary = Some("InfiniShell TUI is working on your request.".to_owned());
+        notification.summary = Some(warp::t!("tui-notification-working"));
         self.publish(notification);
     }
 
@@ -192,18 +192,15 @@ impl CliAgentOscEventPublisher {
         };
         let mut notification = self.notification(status_event.event, ctx);
         notification.error_type = status_event.error_type.map(str::to_owned);
-        notification.summary = Some(
-            match new_status {
-                ConversationStatus::Success => "InfiniShell TUI completed your request.",
-                ConversationStatus::Error => "InfiniShell TUI encountered an error.",
-                ConversationStatus::Cancelled => "InfiniShell TUI was cancelled.",
-                ConversationStatus::InProgress => "InfiniShell TUI is working on your request.",
-                ConversationStatus::Blocked { .. } => "InfiniShell TUI is waiting for your input.",
-                ConversationStatus::TransientError => "InfiniShell TUI is reconnecting.",
-                ConversationStatus::WaitingForEvents => "InfiniShell TUI is waiting for events.",
-            }
-            .to_owned(),
-        );
+        notification.summary = Some(match new_status {
+            ConversationStatus::Success => warp::t!("tui-notification-completed"),
+            ConversationStatus::Error => warp::t!("tui-notification-error"),
+            ConversationStatus::Cancelled => warp::t!("tui-notification-cancelled"),
+            ConversationStatus::InProgress => warp::t!("tui-notification-working"),
+            ConversationStatus::Blocked { .. } => warp::t!("tui-notification-waiting-input"),
+            ConversationStatus::TransientError => warp::t!("tui-notification-reconnecting"),
+            ConversationStatus::WaitingForEvents => warp::t!("tui-notification-waiting-events"),
+        });
         if let Some(conversation) =
             BlocklistAIHistoryModel::as_ref(ctx).conversation(conversation_id)
         {
@@ -238,9 +235,7 @@ impl CliAgentOscEventPublisher {
                         .strip_prefix("Error: ")
                         .and_then(notification_excerpt)
                 }),
-                ConversationStatus::Cancelled => {
-                    Some("The task was cancelled before completion.".to_owned())
-                }
+                ConversationStatus::Cancelled => Some(warp::t!("tui-notification-task-cancelled")),
                 ConversationStatus::InProgress
                 | ConversationStatus::Blocked { .. }
                 | ConversationStatus::TransientError

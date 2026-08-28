@@ -133,9 +133,11 @@ pub(crate) fn render_formatted_text(
             }
             FormattedTextLine::Table(table) => render_formatted_table(table, palette),
             FormattedTextLine::Image(image) => image_fallback(image, palette),
-            FormattedTextLine::Embedded(_) => TuiText::new("[Unsupported embedded content]")
-                .with_style(palette.fallback)
-                .finish(),
+            FormattedTextLine::Embedded(_) => {
+                { TuiText::new(warp::t!("tui-unsupported-embedded-content")) }
+                    .with_style(palette.fallback)
+                    .finish()
+            }
             FormattedTextLine::LineBreak => blank_row(),
             FormattedTextLine::HorizontalRule => TuiMarkdownRule::new(palette.rule).finish(),
         };
@@ -342,11 +344,17 @@ fn image_fallback(image: &FormattedImage, palette: TuiMarkdownPalette) -> Box<dy
         image.title.as_deref()
     };
     let mut spans = if let Some(description) = description {
-        vec![(format!("Image: {description}"), palette.fallback)]
+        vec![(
+            warp::t!("tui-image-description", description = description),
+            palette.fallback,
+        )]
     } else if !image.source.is_empty() {
-        vec![(format!("Image: {}", image.source), palette.link)]
+        vec![(
+            warp::t!("tui-image-description", description = image.source.clone()),
+            palette.link,
+        )]
     } else {
-        vec![("[Image without description]".to_owned(), palette.fallback)]
+        vec![(warp::t!("tui-image-without-description"), palette.fallback)]
     };
     if description.is_some() && !image.source.is_empty() {
         spans.push((format!(" ({})", image.source), palette.link));

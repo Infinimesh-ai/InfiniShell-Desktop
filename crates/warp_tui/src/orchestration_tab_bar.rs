@@ -60,7 +60,7 @@ pub(crate) fn register_orchestration_surface_bindings<A>(
     app.register_editable_bindings([
         EditableBinding::new(
             "tui:orchestration_tabs:previous",
-            "Select the previous orchestration tab",
+            warp::t_static!("tui-keybinding-previous-orchestration-tab"),
             navigation_action(TuiOrchestrationTabNavigationAction::Previous),
         )
         .with_context_predicate(tab_context.clone())
@@ -68,7 +68,7 @@ pub(crate) fn register_orchestration_surface_bindings<A>(
         .with_key_binding("left"),
         EditableBinding::new(
             "tui:orchestration_tabs:previous",
-            "Select the previous orchestration tab",
+            warp::t_static!("tui-keybinding-previous-orchestration-tab"),
             navigation_action(TuiOrchestrationTabNavigationAction::Previous),
         )
         .with_context_predicate(tab_context.clone())
@@ -76,7 +76,7 @@ pub(crate) fn register_orchestration_surface_bindings<A>(
         .with_key_binding("shift-tab"),
         EditableBinding::new(
             "tui:orchestration_tabs:next",
-            "Select the next orchestration tab",
+            warp::t_static!("tui-keybinding-next-orchestration-tab"),
             navigation_action(TuiOrchestrationTabNavigationAction::Next),
         )
         .with_context_predicate(tab_context.clone())
@@ -84,7 +84,7 @@ pub(crate) fn register_orchestration_surface_bindings<A>(
         .with_key_binding("right"),
         EditableBinding::new(
             "tui:orchestration_tabs:next",
-            "Select the next orchestration tab",
+            warp::t_static!("tui-keybinding-next-orchestration-tab"),
             navigation_action(TuiOrchestrationTabNavigationAction::Next),
         )
         .with_context_predicate(tab_context.clone())
@@ -92,7 +92,7 @@ pub(crate) fn register_orchestration_surface_bindings<A>(
         .with_key_binding("tab"),
         EditableBinding::new(
             "tui:orchestration_tabs:first_child",
-            "Select the first child agent",
+            warp::t_static!("tui-keybinding-first-child-agent"),
             navigation_action(TuiOrchestrationTabNavigationAction::FirstChild),
         )
         .with_context_predicate(tab_context.clone())
@@ -100,7 +100,7 @@ pub(crate) fn register_orchestration_surface_bindings<A>(
         .with_key_binding("shift-left"),
         EditableBinding::new(
             "tui:orchestration_tabs:last_child",
-            "Select the last child agent",
+            warp::t_static!("tui-keybinding-last-child-agent"),
             navigation_action(TuiOrchestrationTabNavigationAction::LastChild),
         )
         .with_context_predicate(tab_context)
@@ -149,10 +149,10 @@ pub(crate) fn orchestration_tab_bar_config(
         })
         .collect();
     let mut config = TuiTabBarConfig::new(tabs);
-    config.leading = Some("   Agents:   ".to_owned());
+    config.leading = Some(format!("   {}:   ", warp::t!("tui-agents")));
     config.main_tab = Some(TuiTab::new(
         snapshot.root_conversation_id.to_string(),
-        "orchestrator",
+        warp::t!("tui-orchestrator"),
     ));
     config.selected_key = Some(snapshot.selected_conversation_id.to_string());
     config.focused = focused;
@@ -168,12 +168,12 @@ pub(crate) fn render_orchestration_tab_footer(builder: &TuiUiBuilder) -> Box<dyn
     let primary = builder.primary_text_style();
     let muted = builder.muted_text_style();
     TuiText::from_spans([
-        ("Tab or ← →".to_string(), primary),
-        (" to navigate  ".to_string(), muted),
+        (warp::t!("tui-key-tab-or-arrows"), primary),
+        (format!(" {}  ", warp::t!("tui-hint-navigate")), muted),
         ("Shift + ← →".to_string(), primary),
-        (" to go to start/end  ".to_string(), muted),
+        (format!(" {}  ", warp::t!("tui-hint-go-start-end")), muted),
         ("↓".to_string(), primary),
-        (" to send a message".to_string(), muted),
+        (format!(" {}", warp::t!("tui-hint-send-message")), muted),
     ])
     .truncate()
     .finish()
@@ -188,14 +188,14 @@ pub(crate) fn render_orchestration_child_selected_tab_footer(
     let primary = builder.primary_text_style();
     let muted = builder.muted_text_style();
     TuiText::from_spans([
-        ("Tab or ← →".to_string(), primary),
-        (" to navigate  ".to_string(), muted),
+        (warp::t!("tui-key-tab-or-arrows"), primary),
+        (format!(" {}  ", warp::t!("tui-hint-navigate")), muted),
         ("Shift + ← →".to_string(), primary),
-        (" to go to start/end  ".to_string(), muted),
+        (format!(" {}  ", warp::t!("tui-hint-go-start-end")), muted),
         ("↓".to_string(), primary),
-        (" to send a message  ".to_string(), muted),
+        (format!(" {}  ", warp::t!("tui-hint-send-message")), muted),
         ("Ctrl+C ".to_string(), primary),
-        ("to kill sub-agent".to_string(), muted),
+        (warp::t!("tui-hint-kill-subagent"), muted),
     ])
     .truncate()
     .finish()
@@ -205,14 +205,14 @@ pub(crate) fn render_cloud_orchestration_tab_footer(builder: &TuiUiBuilder) -> B
     let primary = builder.primary_text_style();
     let muted = builder.muted_text_style();
     TuiText::from_spans([
-        ("Tab or ← →".to_string(), primary),
-        (" to navigate | ".to_string(), muted),
+        (warp::t!("tui-key-tab-or-arrows"), primary),
+        (format!(" {} | ", warp::t!("tui-hint-navigate")), muted),
         ("Shift + ← →".to_string(), primary),
-        (" to go to start/end | ".to_string(), muted),
+        (format!(" {} | ", warp::t!("tui-hint-go-start-end")), muted),
         ("↓".to_string(), primary),
-        (" to send a message  ".to_string(), muted),
+        (format!(" {}  ", warp::t!("tui-hint-send-message")), muted),
         ("Ctrl+C ".to_string(), primary),
-        ("to kill sub-agent".to_string(), muted),
+        (warp::t!("tui-hint-kill-subagent"), muted),
     ])
     .truncate()
     .finish()

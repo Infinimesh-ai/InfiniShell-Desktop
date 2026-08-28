@@ -167,7 +167,7 @@ impl VoiceInputToggleKey {
     }
 
     /// Display name for choosing key from the AI settings page.
-    pub fn display_name(&self) -> &'static str {
+    pub fn display_name(&self) -> String {
         // We use the underlying host OS to determine the correct key name to display.
         let (super_key_name, alt_key_name): (&'static str, &'static str) =
             match OperatingSystem::get() {
@@ -177,24 +177,32 @@ impl VoiceInputToggleKey {
             };
 
         match self {
-            VoiceInputToggleKey::None => "None",
-            VoiceInputToggleKey::Fn => "Fn",
+            VoiceInputToggleKey::None => crate::t!("common-none"),
+            VoiceInputToggleKey::Fn => "Fn".to_string(),
             VoiceInputToggleKey::AltLeft => {
-                Box::leak(format!("{alt_key_name} (Left)").into_boxed_str())
+                crate::t!("settings-key-side-left", key = alt_key_name)
             }
             VoiceInputToggleKey::AltRight => {
-                Box::leak(format!("{alt_key_name} (Right)").into_boxed_str())
+                crate::t!("settings-key-side-right", key = alt_key_name)
             }
-            VoiceInputToggleKey::ControlLeft => "Control (Left)",
-            VoiceInputToggleKey::ControlRight => "Control (Right)",
+            VoiceInputToggleKey::ControlLeft => {
+                crate::t!("settings-key-side-left", key = "Control")
+            }
+            VoiceInputToggleKey::ControlRight => {
+                crate::t!("settings-key-side-right", key = "Control")
+            }
             VoiceInputToggleKey::SuperLeft => {
-                Box::leak(format!("{super_key_name} (Left)").into_boxed_str())
+                crate::t!("settings-key-side-left", key = super_key_name)
             }
             VoiceInputToggleKey::SuperRight => {
-                Box::leak(format!("{super_key_name} (Right)").into_boxed_str())
+                crate::t!("settings-key-side-right", key = super_key_name)
             }
-            VoiceInputToggleKey::ShiftLeft => "Shift (Left)",
-            VoiceInputToggleKey::ShiftRight => "Shift (Right)",
+            VoiceInputToggleKey::ShiftLeft => {
+                crate::t!("settings-key-side-left", key = "Shift")
+            }
+            VoiceInputToggleKey::ShiftRight => {
+                crate::t!("settings-key-side-right", key = "Shift")
+            }
         }
     }
 
@@ -249,24 +257,24 @@ impl VoiceInputToggleKey {
         match self.keystroke() {
             Some(keystroke) => {
                 let symbol = keystroke.displayed();
-                let side = match self {
+                let key_name = match self {
                     VoiceInputToggleKey::AltLeft
                     | VoiceInputToggleKey::ControlLeft
                     | VoiceInputToggleKey::SuperLeft
-                    | VoiceInputToggleKey::ShiftLeft => Some("Left"),
+                    | VoiceInputToggleKey::ShiftLeft => {
+                        crate::t!("settings-key-side-left", key = symbol.as_str())
+                    }
                     VoiceInputToggleKey::AltRight
                     | VoiceInputToggleKey::ControlRight
                     | VoiceInputToggleKey::SuperRight
-                    | VoiceInputToggleKey::ShiftRight => Some("Right"),
-                    VoiceInputToggleKey::None | VoiceInputToggleKey::Fn => None,
+                    | VoiceInputToggleKey::ShiftRight => {
+                        crate::t!("settings-key-side-right", key = symbol.as_str())
+                    }
+                    VoiceInputToggleKey::None | VoiceInputToggleKey::Fn => symbol,
                 };
-                let key_name = match side {
-                    Some(side) => format!("{side} {symbol}"),
-                    None => symbol,
-                };
-                format!("Voice input (hold {key_name} key)")
+                crate::t!("settings-voice-input-hold-key", key = key_name.as_str())
             }
-            None => "Voice input".to_string(),
+            None => crate::t!("settings-ai-voice-input-label"),
         }
     }
 
@@ -515,13 +523,13 @@ settings::macros::implement_setting_for_enum!(
 
 impl DefaultSessionMode {
     /// Display name for the settings dropdown.
-    pub fn display_name(&self) -> &'static str {
+    pub fn display_name(&self) -> String {
         match self {
-            DefaultSessionMode::Terminal => "Terminal",
-            DefaultSessionMode::Agent => "Agent",
-            DefaultSessionMode::AmbientAgent => "Ambient Agent",
-            DefaultSessionMode::TabConfig => "Tab Config",
-            DefaultSessionMode::DockerSandbox => "Local Docker Sandbox",
+            DefaultSessionMode::Terminal => crate::t!("default-session-terminal"),
+            DefaultSessionMode::Agent => crate::t!("default-session-agent"),
+            DefaultSessionMode::AmbientAgent => crate::t!("default-session-ambient-agent"),
+            DefaultSessionMode::TabConfig => crate::t!("default-session-tab-config"),
+            DefaultSessionMode::DockerSandbox => crate::t!("default-session-local-docker-sandbox"),
         }
     }
 }
@@ -566,11 +574,13 @@ settings::macros::implement_setting_for_enum!(
 
 impl ThinkingDisplayMode {
     /// Display name for the settings dropdown.
-    pub fn display_name(&self) -> &'static str {
+    pub fn display_name(&self) -> String {
         match self {
-            ThinkingDisplayMode::ShowAndCollapse => "Show & collapse",
-            ThinkingDisplayMode::AlwaysShow => "Always show",
-            ThinkingDisplayMode::NeverShow => "Never show",
+            ThinkingDisplayMode::ShowAndCollapse => {
+                crate::t!("thinking-display-show-collapse-label")
+            }
+            ThinkingDisplayMode::AlwaysShow => crate::t!("thinking-display-always-show-label"),
+            ThinkingDisplayMode::NeverShow => crate::t!("thinking-display-never-show-label"),
         }
     }
 
@@ -724,23 +734,23 @@ impl TuiStatuslineItem {
         Self::VoiceInput,
     ];
 
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match self {
-            Self::AutoApprove => "Auto-approve indicator",
-            Self::VimModeIndicator => "Vim mode indicator",
-            Self::Model => "Model",
-            Self::WorkingDirectory => "Working directory",
-            Self::GitBranch => "Git branch",
-            Self::GitBranchStatus => "Git branch status",
-            Self::GitDiffStatus => "Git diff status",
-            Self::GitHubPullRequest => "GitHub pull request",
-            Self::CreditUsage => "Credit usage",
-            Self::ContextWindowUsage => "Context window usage",
-            Self::Date => "Date",
-            Self::Time12Hour => "Time (12 hour format)",
-            Self::Time24Hour => "Time (24 hour format)",
-            Self::AgentTodoList => "Agent to-do list",
-            Self::VoiceInput => "Voice input",
+            Self::AutoApprove => crate::t!("settings-tui-statusline-auto-approve"),
+            Self::VimModeIndicator => crate::t!("settings-tui-statusline-vim-mode"),
+            Self::Model => crate::t!("settings-tui-statusline-model"),
+            Self::WorkingDirectory => crate::t!("settings-tui-statusline-working-directory"),
+            Self::GitBranch => crate::t!("settings-tui-statusline-git-branch"),
+            Self::GitBranchStatus => crate::t!("settings-tui-statusline-git-branch-status"),
+            Self::GitDiffStatus => crate::t!("settings-tui-statusline-git-diff-status"),
+            Self::GitHubPullRequest => crate::t!("settings-tui-statusline-github-pull-request"),
+            Self::CreditUsage => crate::t!("settings-tui-statusline-credit-usage"),
+            Self::ContextWindowUsage => crate::t!("settings-tui-statusline-context-window-usage"),
+            Self::Date => crate::t!("settings-tui-statusline-date"),
+            Self::Time12Hour => crate::t!("settings-tui-statusline-time-12-hour"),
+            Self::Time24Hour => crate::t!("settings-tui-statusline-time-24-hour"),
+            Self::AgentTodoList => crate::t!("settings-tui-statusline-agent-todo-list"),
+            Self::VoiceInput => crate::t!("settings-tui-statusline-voice-input"),
         }
     }
 }
@@ -818,24 +828,30 @@ impl TuiUsageDisplayMode {
 
 impl OrchestrationMessageDisplayMode {
     /// Display name for the settings dropdown.
-    pub fn display_name(&self) -> &'static str {
+    pub fn display_name(&self) -> String {
         match self {
-            OrchestrationMessageDisplayMode::ShowAndCollapse => "Show & collapse",
-            OrchestrationMessageDisplayMode::AlwaysShow => "Always show",
-            OrchestrationMessageDisplayMode::AlwaysCollapse => "Always collapse",
+            OrchestrationMessageDisplayMode::ShowAndCollapse => {
+                crate::t!("orchestration-display-show-collapse-label")
+            }
+            OrchestrationMessageDisplayMode::AlwaysShow => {
+                crate::t!("orchestration-display-always-show-label")
+            }
+            OrchestrationMessageDisplayMode::AlwaysCollapse => {
+                crate::t!("orchestration-display-always-collapse-label")
+            }
         }
     }
 
-    pub fn command_palette_description(&self) -> &'static str {
+    pub fn command_palette_description(&self) -> String {
         match self {
             OrchestrationMessageDisplayMode::ShowAndCollapse => {
-                "Set child-agent message display: show & collapse"
+                crate::t!("orchestration-display-show-collapse-command")
             }
             OrchestrationMessageDisplayMode::AlwaysShow => {
-                "Set child-agent message display: always show"
+                crate::t!("orchestration-display-always-show-command")
             }
             OrchestrationMessageDisplayMode::AlwaysCollapse => {
-                "Set child-agent message display: always collapse"
+                crate::t!("orchestration-display-always-collapse-command")
             }
         }
     }
@@ -900,18 +916,18 @@ settings::macros::implement_setting_for_enum!(
 
 impl PromptSubmissionMode {
     /// Display name for the settings dropdown.
-    pub fn display_name(&self) -> &'static str {
+    pub fn display_name(&self) -> String {
         match self {
-            PromptSubmissionMode::Interrupt => "Interrupt response",
-            PromptSubmissionMode::Queue => "Queue until response finishes",
+            PromptSubmissionMode::Interrupt => crate::t!("prompt-submission-interrupt-label"),
+            PromptSubmissionMode::Queue => crate::t!("prompt-submission-queue-label"),
         }
     }
 
-    pub fn command_palette_description(&self) -> &'static str {
+    pub fn command_palette_description(&self) -> String {
         match self {
-            PromptSubmissionMode::Interrupt => "Set default prompt submission: interrupt response",
+            PromptSubmissionMode::Interrupt => crate::t!("prompt-submission-interrupt-command"),
             PromptSubmissionMode::Queue => {
-                "Set default prompt submission: queue until response finishes"
+                crate::t!("prompt-submission-queue-command")
             }
         }
     }
@@ -962,22 +978,24 @@ settings::macros::implement_setting_for_enum!(
 
 impl LongRunningCommandSubmissionMode {
     /// Display name for the settings dropdown.
-    pub fn display_name(&self) -> &'static str {
+    pub fn display_name(&self) -> String {
         match self {
-            LongRunningCommandSubmissionMode::SendImmediately => "Send immediately",
+            LongRunningCommandSubmissionMode::SendImmediately => {
+                crate::t!("lrc-submission-send-immediately-label")
+            }
             LongRunningCommandSubmissionMode::QueueUntilCommandCompletes => {
-                "Queue until command finishes"
+                crate::t!("lrc-submission-queue-label")
             }
         }
     }
 
-    pub fn command_palette_description(&self) -> &'static str {
+    pub fn command_palette_description(&self) -> String {
         match self {
             LongRunningCommandSubmissionMode::SendImmediately => {
-                "Set long-running command submission: send immediately"
+                crate::t!("lrc-submission-send-immediately-command")
             }
             LongRunningCommandSubmissionMode::QueueUntilCommandCompletes => {
-                "Set long-running command submission: queue until command finishes"
+                crate::t!("lrc-submission-queue-command")
             }
         }
     }
@@ -1153,11 +1171,11 @@ pub enum ResponsesStateModeSetting {
 }
 
 impl ResponsesStateModeSetting {
-    pub fn display_name(self) -> &'static str {
+    pub fn display_name(self) -> String {
         match self {
-            Self::LocalReplay => "Local / ZDR",
-            Self::PreviousResponse => "Provider chain",
-            Self::Conversation => "Cloud conversation",
+            Self::LocalReplay => crate::t!("settings-responses-state-local-zdr"),
+            Self::PreviousResponse => crate::t!("settings-responses-state-provider-chain"),
+            Self::Conversation => crate::t!("settings-responses-state-cloud-conversation"),
         }
     }
 }
@@ -1277,16 +1295,16 @@ pub enum ReasoningEffortSetting {
 }
 
 impl ReasoningEffortSetting {
-    pub fn display_name(&self) -> &'static str {
+    pub fn display_name(&self) -> String {
         match self {
-            Self::Auto => "Auto",
-            Self::Off => "Off",
-            Self::Minimal => "Minimal",
-            Self::Low => "Low",
-            Self::Medium => "Medium",
-            Self::High => "High",
-            Self::XHigh => "XHigh",
-            Self::Max => "Max",
+            Self::Auto => crate::t!("reasoning-effort-auto"),
+            Self::Off => crate::t!("reasoning-effort-off"),
+            Self::Minimal => crate::t!("reasoning-effort-minimal"),
+            Self::Low => crate::t!("reasoning-effort-low"),
+            Self::Medium => crate::t!("reasoning-effort-medium"),
+            Self::High => crate::t!("reasoning-effort-high"),
+            Self::XHigh => crate::t!("reasoning-effort-xhigh"),
+            Self::Max => crate::t!("reasoning-effort-max"),
         }
     }
 

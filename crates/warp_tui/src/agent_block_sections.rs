@@ -122,8 +122,11 @@ pub(crate) fn render_thinking_section(
     app: &AppContext,
 ) -> Box<dyn TuiElement> {
     let header = match finished_duration {
-        Some(duration) => format!("Thought for {}", format_elapsed_seconds(duration)),
-        None => "Thinking...".to_owned(),
+        Some(duration) => warp::t!(
+            "tui-thought-for-duration",
+            duration = format_elapsed_seconds(duration)
+        ),
+        None => warp::t!("tui-thinking-ellipsis"),
     };
     render_collapsible_message_section(
         states,
@@ -151,7 +154,7 @@ pub(crate) fn render_summarization_section(
     render_collapsible_message_section(
         states,
         message_id,
-        "Conversation summary".to_owned(),
+        warp::t!("tui-conversation-summary"),
         // Always collapsed by default; a manual override in
         // `CollapsibleSectionStates` still wins so users can expand it.
         true,
@@ -239,7 +242,7 @@ pub(crate) fn render_todo_list_section(
     builder.prominent_collapsible(
         collapsed,
         TASK_LIST_HEADER_GLYPH,
-        format!("Tasks {}", todos.len()),
+        warp::t!("tui-tasks-count", count = todos.len()),
         states.hover_state(message_id),
         body.finish(),
         move |event_ctx, _app| {
@@ -302,9 +305,17 @@ pub(crate) fn completed_todos_label(
             })
             .unwrap_or_default();
         if index == 0 {
-            label += &format!("Completed {}{position}", item.title);
+            label += &warp::t!(
+                "tui-completed-task-item",
+                title = item.title.clone(),
+                position = position
+            );
         } else {
-            label += &format!(", {}{position}", item.title);
+            label += &warp::t!(
+                "tui-additional-task-item",
+                title = item.title.clone(),
+                position = position
+            );
         }
     }
     label

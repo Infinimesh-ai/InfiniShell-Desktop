@@ -43,8 +43,6 @@ use crate::view_components::action_button::{
 };
 use crate::view_components::dropdown::DropdownAction;
 
-pub const HEADER_TEXT: &str = "Router Editor";
-
 const EDITOR_CONTENT_WIDTH: f32 = 340.;
 const MODEL_MENU_WIDTH: f32 = 340.;
 
@@ -146,7 +144,7 @@ impl CustomRouterEditorView {
         let title = existing
             .as_ref()
             .map(|r| r.info.display_name.clone())
-            .unwrap_or_else(|| "New Router".to_string());
+            .unwrap_or_else(|| crate::t!("custom-router-new"));
         let pane_configuration = ctx.add_model(|_ctx| PaneConfiguration::new(&title));
 
         let router_type = match existing.as_ref().map(|r| &r.routing) {
@@ -183,8 +181,10 @@ impl CustomRouterEditorView {
             .display_name()
             .as_deref()
             .and_then(|name| name.split_whitespace().next())
-            .map(|first_name| format!("{first_name}'s custom router"))
-            .unwrap_or_else(|| "My custom router".to_string());
+            .map(|first_name| {
+                crate::t!("custom-router-name-placeholder-personal", name = first_name)
+            })
+            .unwrap_or_else(|| crate::t!("custom-router-name-placeholder-generic"));
         let name_editor = ctx.add_view(move |ctx| {
             let font_size = Appearance::as_ref(ctx).ui_font_size();
             let mut editor = EditorView::single_line(
@@ -223,8 +223,12 @@ impl CustomRouterEditorView {
                         icon_color: theme.main_text_color(theme.background()).into(),
                         label: Some(LabelConfig {
                             label: match router_type {
-                                RouterEditorType::Complexity => "Complexity".into(),
-                                RouterEditorType::Prompt => "Rules".into(),
+                                RouterEditorType::Complexity => {
+                                    crate::t!("custom-router-type-complexity").into()
+                                }
+                                RouterEditorType::Prompt => {
+                                    crate::t!("custom-router-type-rules").into()
+                                }
                             },
                             width_override: Some(70.0),
                             color: if is_selected {
@@ -321,17 +325,17 @@ impl CustomRouterEditorView {
         }
 
         let save_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Save", PrimaryTheme)
+            ActionButton::new(crate::t!("common-save"), PrimaryTheme)
                 .with_size(ButtonSize::Small)
                 .on_click(|ctx| ctx.dispatch_typed_action(CustomRouterEditorAction::Save))
         });
         let cancel_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Cancel", SecondaryTheme)
+            ActionButton::new(crate::t!("common-cancel"), SecondaryTheme)
                 .with_size(ButtonSize::Small)
                 .on_click(|ctx| ctx.dispatch_typed_action(CustomRouterEditorAction::Close))
         });
         let add_rule_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("+ Add rule", SecondaryTheme)
+            ActionButton::new(crate::t!("custom-router-add-rule"), SecondaryTheme)
                 .with_size(ButtonSize::Small)
                 .on_click(|ctx| ctx.dispatch_typed_action(CustomRouterEditorAction::AddPromptRule))
         });
@@ -445,7 +449,7 @@ impl CustomRouterEditorView {
     fn try_save(&mut self, ctx: &mut ViewContext<Self>) {
         let name = self.router_name(ctx);
         if name.is_empty() {
-            self.save_error = Some("Router name is required.".to_string());
+            self.save_error = Some(crate::t!("custom-router-name-required"));
             ctx.notify();
             return;
         }
@@ -453,16 +457,26 @@ impl CustomRouterEditorView {
         let routing = match self.router_type {
             RouterEditorType::Complexity => {
                 for (field, val) in [
-                    ("Default", self.complexity_default.as_str()),
-                    ("Easy", self.complexity_easy.as_deref().unwrap_or_default()),
                     (
-                        "Medium",
+                        crate::t!("custom-router-field-default"),
+                        self.complexity_default.as_str(),
+                    ),
+                    (
+                        crate::t!("custom-router-field-easy"),
+                        self.complexity_easy.as_deref().unwrap_or_default(),
+                    ),
+                    (
+                        crate::t!("custom-router-field-medium"),
                         self.complexity_medium.as_deref().unwrap_or_default(),
                     ),
-                    ("Hard", self.complexity_hard.as_deref().unwrap_or_default()),
+                    (
+                        crate::t!("custom-router-field-hard"),
+                        self.complexity_hard.as_deref().unwrap_or_default(),
+                    ),
                 ] {
                     if val.is_empty() {
-                        self.save_error = Some(format!("{field} model is required."));
+                        self.save_error =
+                            Some(crate::t!("custom-router-model-required", field = field));
                         ctx.notify();
                         return;
                     }
@@ -476,7 +490,7 @@ impl CustomRouterEditorView {
             }
             RouterEditorType::Prompt => {
                 if self.prompt_default_model.is_empty() {
-                    self.save_error = Some("A default model is required.".to_string());
+                    self.save_error = Some(crate::t!("custom-router-default-model-required"));
                     ctx.notify();
                     return;
                 }
@@ -500,9 +514,7 @@ impl CustomRouterEditorView {
                     })
                     .collect();
                 if rules.is_empty() {
-                    self.save_error = Some(
-                        "At least one rule with a description and model is required.".to_string(),
-                    );
+                    self.save_error = Some(crate::t!("custom-router-rule-required"));
                     ctx.notify();
                     return;
                 }
@@ -519,7 +531,7 @@ impl CustomRouterEditorView {
             .and_then(|r| r.source_path.as_deref());
         let router = CustomModelRouter::new_local(name.clone(), routing, existing_path);
         if let Err(e) = router.validate() {
-            self.save_error = Some(format!("Validation: {e}"));
+            self.save_error = Some(crate::t!("custom-router-validation-error", error = e));
             ctx.notify();
             return;
         }
@@ -529,14 +541,19 @@ impl CustomRouterEditorView {
             let yaml = match router.to_yaml_string() {
                 Ok(y) => y,
                 Err(e) => {
-                    self.save_error = Some(format!("Serialization: {e}"));
+                    let error = e.to_string();
+                    self.save_error = Some(crate::t!(
+                        "custom-router-serialization-error",
+                        error = error
+                    ));
                     ctx.notify();
                     return;
                 }
             };
             let ep = self.existing.as_ref().and_then(|r| r.source_path.clone());
             if let Err(e) = WarpConfig::save_custom_model_router(&name, &yaml, ep.as_deref()) {
-                self.save_error = Some(format!("Write error: {e}"));
+                let error = e.to_string();
+                self.save_error = Some(crate::t!("custom-router-write-error", error = error));
                 ctx.notify();
                 return;
             }
@@ -626,15 +643,18 @@ impl CustomRouterEditorView {
 
     fn render_complexity_section(&self, appearance: &Appearance) -> Box<dyn Element> {
         Flex::column()
-            .with_child(Self::section_label("Models", appearance))
+            .with_child(Self::section_label(
+                crate::t!("custom-router-models"),
+                appearance,
+            ))
             .with_child(labeled_dropdown(
-                "Default (required)",
+                crate::t!("custom-router-default-required"),
                 &self.complexity_default_dropdown,
                 appearance,
             ))
             .with_child(
                 Container::new(labeled_dropdown(
-                    "Easy (required)",
+                    crate::t!("custom-router-easy-required"),
                     &self.complexity_easy_dropdown,
                     appearance,
                 ))
@@ -643,7 +663,7 @@ impl CustomRouterEditorView {
             )
             .with_child(
                 Container::new(labeled_dropdown(
-                    "Medium (required)",
+                    crate::t!("custom-router-medium-required"),
                     &self.complexity_medium_dropdown,
                     appearance,
                 ))
@@ -652,7 +672,7 @@ impl CustomRouterEditorView {
             )
             .with_child(
                 Container::new(labeled_dropdown(
-                    "Hard (required)",
+                    crate::t!("custom-router-hard-required"),
                     &self.complexity_hard_dropdown,
                     appearance,
                 ))
@@ -662,17 +682,16 @@ impl CustomRouterEditorView {
             .finish()
     }
 
-    fn render_prompt_section(
-        &self,
-        appearance: &Appearance,
-        _app: &AppContext,
-    ) -> Box<dyn Element> {
+    fn render_prompt_section(&self, appearance: &Appearance) -> Box<dyn Element> {
         let _sub = appearance
             .theme()
             .sub_text_color(appearance.theme().surface_1());
 
         let mut column = Flex::column()
-            .with_child(Self::section_label("Default model", appearance))
+            .with_child(Self::section_label(
+                crate::t!("custom-router-default-model"),
+                appearance,
+            ))
             .with_child(
                 ConstrainedBox::new(ChildView::new(&self.prompt_default_dropdown).finish())
                     .with_width(EDITOR_CONTENT_WIDTH)
@@ -681,17 +700,20 @@ impl CustomRouterEditorView {
 
         if !self.prompt_rules.is_empty() {
             column.add_child(
-                Container::new(Self::section_label("Rules".to_string(), appearance))
-                    .with_margin_top(12.)
-                    .finish(),
+                Container::new(Self::section_label(
+                    crate::t!("custom-router-type-rules"),
+                    appearance,
+                ))
+                .with_margin_top(12.)
+                .finish(),
             );
             let rules_copy = FormattedText::new([
-                FormattedTextLine::Line(vec![FormattedTextFragment::plain_text(
-                    "Rules are custom prompts that describe when to use a specific model. Warp intelligently matches your tasks against these rules.",
-                )]),
-                FormattedTextLine::Line(vec![FormattedTextFragment::plain_text(
-                    "Rules are matched top to bottom — rules higher in the list take precedence over those below.",
-                )]),
+                FormattedTextLine::Line(vec![FormattedTextFragment::plain_text(crate::t!(
+                    "custom-router-rules-description"
+                ))]),
+                FormattedTextLine::Line(vec![FormattedTextFragment::plain_text(crate::t!(
+                    "custom-router-rules-order"
+                ))]),
             ]);
             column.add_child(
                 Container::new(
@@ -725,14 +747,17 @@ impl CustomRouterEditorView {
         column.finish()
     }
 
-    fn render_content(&self, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
+    fn render_content(&self, appearance: &Appearance) -> Box<dyn Element> {
         let mut col = Flex::column();
 
         // Name
         col.add_child(
             Container::new(
                 Flex::column()
-                    .with_child(Self::section_label("Router name", appearance))
+                    .with_child(Self::section_label(
+                        crate::t!("custom-router-name"),
+                        appearance,
+                    ))
                     .with_child(
                         ConstrainedBox::new(editor_row(&self.name_editor, None, appearance))
                             .with_width(EDITOR_CONTENT_WIDTH)
@@ -748,22 +773,23 @@ impl CustomRouterEditorView {
         // above the segmented control.
         let routing_type_copy = FormattedText::new([
             FormattedTextLine::Line(vec![
-                FormattedTextFragment::bold("Complexity-based"),
-                FormattedTextFragment::plain_text(
-                    " routing chooses a model based on Warp's classification of the task's difficulty.",
-                ),
+                FormattedTextFragment::bold(crate::t!("custom-router-complexity-based")),
+                FormattedTextFragment::plain_text(crate::t!(
+                    "custom-router-complexity-description"
+                )),
             ]),
             FormattedTextLine::Line(vec![
-                FormattedTextFragment::bold("Rule-based"),
-                FormattedTextFragment::plain_text(
-                    " routing chooses a model based on custom prompts.",
-                ),
+                FormattedTextFragment::bold(crate::t!("custom-router-rule-based")),
+                FormattedTextFragment::plain_text(crate::t!("custom-router-rule-description")),
             ]),
         ]);
         col.add_child(
             Container::new(
                 Flex::column()
-                    .with_child(Self::section_label("Router type", appearance))
+                    .with_child(Self::section_label(
+                        crate::t!("custom-router-type"),
+                        appearance,
+                    ))
                     .with_child(
                         Container::new(
                             FormattedTextElement::new(
@@ -801,7 +827,7 @@ impl CustomRouterEditorView {
             }
             RouterEditorType::Prompt => {
                 col.add_child(
-                    Container::new(self.render_prompt_section(appearance, app))
+                    Container::new(self.render_prompt_section(appearance))
                         .with_margin_bottom(8.)
                         .finish(),
                 );
@@ -859,7 +885,7 @@ impl View for CustomRouterEditorView {
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
-        let content = Container::new(self.render_content(appearance, app))
+        let content = Container::new(self.render_content(appearance))
             .with_padding_top(24.)
             .with_padding_bottom(24.)
             .with_padding_left(24.)
@@ -947,7 +973,7 @@ impl BackingView for CustomRouterEditorView {
         _app: &AppContext,
     ) -> view::HeaderContent {
         view::HeaderContent::Standard(view::StandardHeader {
-            title: HEADER_TEXT.into(),
+            title: crate::t!("custom-router-editor-title"),
             title_secondary: None,
             title_style: None,
             title_clip_config: warpui::text_layout::ClipConfig::start(),
@@ -1089,7 +1115,7 @@ fn make_prompt_rule_row(
             },
             ctx,
         );
-        editor.set_placeholder_text("Describe when to use this model\u{2026}", ctx);
+        editor.set_placeholder_text(crate::t!("settings-ai-router-description-placeholder"), ctx);
         // Use the UI font (rather than the editor's default mono font) so the
         // input matches the rest of the editor's text inputs.
         let font_family = Appearance::as_ref(ctx).ui_font_family();
@@ -1321,12 +1347,12 @@ fn render_rule_row(
     const MODEL_WIDTH: f32 = 170.;
 
     let description_field = labeled_field(
-        "Rule",
+        crate::t!("custom-router-rule"),
         editor_row(&row.description_editor, Some(RULE_FIELD_HEIGHT), appearance),
         appearance,
     );
     let model_field = labeled_field(
-        "Model",
+        crate::t!("custom-router-model"),
         ConstrainedBox::new(ChildView::new(&row.model_dropdown).finish())
             .with_width(MODEL_WIDTH)
             .finish(),

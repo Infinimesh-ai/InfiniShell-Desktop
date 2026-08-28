@@ -74,11 +74,11 @@ pub(super) fn confirm_icon(publish: bool) -> Icon {
     }
 }
 
-fn loading_label(publish: bool) -> &'static str {
+fn loading_label(publish: bool) -> String {
     if publish {
-        "Publishing…"
+        crate::t!("code-review-publishing-loading")
     } else {
-        "Pushing…"
+        crate::t!("code-review-pushing-loading")
     }
 }
 
@@ -179,7 +179,7 @@ fn render_commits_section(state: &PushState, appearance: &Appearance) -> Box<dyn
     let sub_color = theme.sub_text_color(theme.surface_1()).into_solid();
 
     let label = Text::new(
-        "Included commits",
+        crate::t!("code-review-included-commits"),
         appearance.ui_font_family(),
         appearance.ui_font_size(),
     )

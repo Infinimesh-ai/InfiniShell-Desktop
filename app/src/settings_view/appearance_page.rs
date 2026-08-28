@@ -224,7 +224,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
 
     app.register_fixed_bindings(vec![
         FixedBinding::empty(
-            "Start Input at the Top".to_string(),
+            crate::t!("settings-appearance-command-input-waterfall"),
             builder(SettingsAction::AppearancePageToggle(
                 AppearancePageAction::SetInputMode {
                     new_mode: InputMode::Waterfall,
@@ -238,7 +238,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
 
     app.register_fixed_bindings(vec![
         FixedBinding::empty(
-            "Pin Input to the Top".to_string(),
+            crate::t!("settings-appearance-command-input-pinned-top"),
             builder(SettingsAction::AppearancePageToggle(
                 AppearancePageAction::SetInputMode {
                     new_mode: InputMode::PinnedToTop,
@@ -251,7 +251,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ]);
 
     app.register_fixed_bindings(vec![FixedBinding::empty(
-        "Pin Input to the Bottom".to_string(),
+        crate::t!("settings-appearance-command-input-pinned-bottom"),
         builder(SettingsAction::AppearancePageToggle(
             AppearancePageAction::SetInputMode {
                 new_mode: InputMode::PinnedToBottom,
@@ -264,7 +264,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     // Add command palette entry for toggling between Zap and Classic input modes
     app.register_fixed_bindings(vec![
         FixedBinding::empty(
-            "Toggle Input Mode (InfiniShell/Classic)".to_string(),
+            crate::t!("settings-appearance-command-toggle-input-mode"),
             builder(SettingsAction::AppearancePageToggle(
                 AppearancePageAction::ToggleInputMode,
             )),
@@ -377,7 +377,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         // Add bindings for each visibility option.
         app.register_fixed_bindings([
             FixedBinding::empty(
-                "Always show tab bar".to_string(),
+                crate::t!("settings-appearance-command-tab-bar-always"),
                 builder(SettingsAction::AppearancePageToggle(
                     AppearancePageAction::SetWorkspaceDecorationVisibility(
                         WorkspaceDecorationVisibility::AlwaysShow,
@@ -387,7 +387,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             )
             .with_group(bindings::BindingGroup::Settings.as_str()),
             FixedBinding::empty(
-                "Hide tab bar if fullscreen".to_string(),
+                crate::t!("settings-appearance-command-tab-bar-windowed"),
                 builder(SettingsAction::AppearancePageToggle(
                     AppearancePageAction::SetWorkspaceDecorationVisibility(
                         WorkspaceDecorationVisibility::HideFullscreen,
@@ -397,7 +397,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             )
             .with_group(bindings::BindingGroup::Settings.as_str()),
             FixedBinding::empty(
-                "Only show tab bar on hover".to_string(),
+                crate::t!("settings-appearance-command-tab-bar-hover"),
                 builder(SettingsAction::AppearancePageToggle(
                     AppearancePageAction::SetWorkspaceDecorationVisibility(
                         WorkspaceDecorationVisibility::OnHover,
@@ -4197,7 +4197,7 @@ impl SettingsWidget for ToolsPanelProjectExplorerWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         render_body_item::<AppearancePageAction>(
-            "Project explorer".to_string(),
+            crate::t!("workspace-left-panel-project-explorer"),
             None,
             LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
@@ -4213,7 +4213,9 @@ impl SettingsWidget for ToolsPanelProjectExplorerWidget {
                     );
                 })
                 .finish(),
-            Some("Show the project explorer / file tree tab in the tools panel.".to_string()),
+            Some(crate::t!(
+                "settings-appearance-tools-panel-project-explorer-description"
+            )),
         )
     }
 }
@@ -4237,7 +4239,7 @@ impl SettingsWidget for ToolsPanelConversationHistoryWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         render_body_item::<AppearancePageAction>(
-            "Agent conversations".to_string(),
+            crate::t!("workspace-left-panel-agent-conversations"),
             None,
             LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
@@ -4253,7 +4255,9 @@ impl SettingsWidget for ToolsPanelConversationHistoryWidget {
                     );
                 })
                 .finish(),
-            Some("Show the agent conversation history tab in the tools panel.".to_string()),
+            Some(crate::t!(
+                "settings-appearance-tools-panel-agent-conversations-description"
+            )),
         )
     }
 }
@@ -4277,7 +4281,7 @@ impl SettingsWidget for ToolsPanelGlobalSearchWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         render_body_item::<AppearancePageAction>(
-            "Global search".to_string(),
+            crate::t!("workspace-left-panel-global-search"),
             None,
             LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
@@ -4292,7 +4296,9 @@ impl SettingsWidget for ToolsPanelGlobalSearchWidget {
                         .dispatch_typed_action(AppearancePageAction::ToggleToolsPanelGlobalSearch);
                 })
                 .finish(),
-            Some("Show the global file search tab in the tools panel.".to_string()),
+            Some(crate::t!(
+                "settings-appearance-tools-panel-global-search-description"
+            )),
         )
     }
 }
@@ -4316,7 +4322,7 @@ impl SettingsWidget for ToolsPanelWarpDriveWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         render_body_item::<AppearancePageAction>(
-            "Warp Drive".to_string(),
+            crate::t!("workspace-left-panel-warp-drive"),
             None,
             LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
@@ -4330,7 +4336,9 @@ impl SettingsWidget for ToolsPanelWarpDriveWidget {
                     evt_ctx.dispatch_typed_action(AppearancePageAction::ToggleToolsPanelWarpDrive);
                 })
                 .finish(),
-            Some("Show the Warp Drive tab in the tools panel.".to_string()),
+            Some(crate::t!(
+                "settings-appearance-tools-panel-drive-description"
+            )),
         )
     }
 }

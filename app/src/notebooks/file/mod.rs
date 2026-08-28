@@ -313,7 +313,7 @@ impl FileNotebookView {
             .as_ref()
             .map(|location| location.name.clone())
             .or_else(|| self.file_state.display_name())
-            .unwrap_or_else(|| "Untitled".to_string())
+            .unwrap_or_else(|| crate::t!("common-untitled"))
     }
 
     pub fn focus(&self, ctx: &mut ViewContext<Self>) {
@@ -733,9 +733,9 @@ impl FileNotebookView {
             EditorViewEvent::Focused => ctx.emit(FileNotebookEvent::Pane(PaneEvent::FocusSelf)),
             EditorViewEvent::RunWorkflow(workflow) => {
                 let workflow_type = workflow.named_workflow(|| {
-                    self.location
-                        .as_ref()
-                        .map(|location| format!("Command from {}", location.name))
+                    self.location.as_ref().map(|location| {
+                        crate::t!("notebook-command-from", source = location.name.as_str())
+                    })
                 });
                 let source = workflow.source.unwrap_or(WorkflowSource::Notebook {
                     notebook_id: None,
@@ -967,7 +967,7 @@ impl View for FileNotebookView {
 
     fn accessibility_contents(&self, _ctx: &AppContext) -> Option<AccessibilityContent> {
         Some(AccessibilityContent::new_without_help(
-            format!("{} notebook", self.title()),
+            crate::t!("notebook-a11y-notebook-title", title = self.title()),
             WarpA11yRole::TextRole,
         ))
     }

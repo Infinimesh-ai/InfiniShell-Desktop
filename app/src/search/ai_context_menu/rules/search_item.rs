@@ -232,6 +232,6 @@ impl SearchItem for RuleSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Rule: {}", self.rule_content)
+        crate::t!("search-rule-a11y", rule = self.rule_content.as_str())
     }
 }

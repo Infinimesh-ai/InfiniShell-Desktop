@@ -75,18 +75,23 @@ pub struct InstallationModalBody {
 impl InstallationModalBody {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
         let cancel_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("Cancel", NakedTheme).on_click(|ctx| {
-                ctx.dispatch_typed_action(InstallationModalBodyAction::Cancel);
-            })
+            ActionButton::new(crate::t!("settings-mcp-install-modal-cancel"), NakedTheme).on_click(
+                |ctx| {
+                    ctx.dispatch_typed_action(InstallationModalBodyAction::Cancel);
+                },
+            )
         });
 
         let enter_keystroke = Keystroke::parse("enter").expect("valid keystroke");
         let install_button = ctx.add_typed_action_view(|ctx| {
-            ActionButton::new("Install", PrimaryTheme)
-                .with_keybinding(KeystrokeSource::Fixed(enter_keystroke), ctx)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(InstallationModalBodyAction::Install);
-                })
+            ActionButton::new(
+                crate::t!("settings-mcp-install-modal-install"),
+                PrimaryTheme,
+            )
+            .with_keybinding(KeystrokeSource::Fixed(enter_keystroke), ctx)
+            .on_click(|ctx| {
+                ctx.dispatch_typed_action(InstallationModalBodyAction::Install);
+            })
         });
 
         Self {
@@ -352,7 +357,10 @@ impl InstallationModalBody {
             )
             .with_margin_bottom(INSTALLATION_MODAL_TITLE_VERTICAL_SPACING)
             .finish()),
-            Err(e) => Err(format!("Failed to parse markdown: {e:?}")),
+            Err(e) => Err(crate::t!(
+                "settings-mcp-parse-markdown-failed",
+                error = format!("{e:?}")
+            )),
         }
     }
 

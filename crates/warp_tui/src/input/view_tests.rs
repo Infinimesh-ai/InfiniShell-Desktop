@@ -122,7 +122,7 @@ impl TuiInlineMenuHandle for ModelHandle<TestSecretMenu> {
         None
     }
 
-    fn input_argument_hint_text(&self, _ctx: &AppContext) -> Option<&'static str> {
+    fn input_argument_hint_text(&self, _ctx: &AppContext) -> Option<String> {
         None
     }
 
@@ -1124,7 +1124,7 @@ impl TuiInlineMenuHandle for TestMcpMenu {
         None
     }
 
-    fn input_argument_hint_text(&self, _ctx: &AppContext) -> Option<&'static str> {
+    fn input_argument_hint_text(&self, _ctx: &AppContext) -> Option<String> {
         None
     }
 
@@ -1482,7 +1482,7 @@ fn shell_mode_placeholder_hint_teaches_exit() {
             assert!(
                 line.starts_with(&format!(
                     " {}",
-                    crate::terminal_session_view::state::SHELL_HINT
+                    "Run a shell command • ? for shortcuts • esc for agent mode"
                 )),
                 "unexpected line: {line:?}"
             );
@@ -1652,7 +1652,7 @@ impl TuiInlineMenuHandle for TestConversationMenuHandle {
         None
     }
 
-    fn input_argument_hint_text(&self, _ctx: &AppContext) -> Option<&'static str> {
+    fn input_argument_hint_text(&self, _ctx: &AppContext) -> Option<String> {
         None
     }
 

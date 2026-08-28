@@ -86,8 +86,8 @@ pub use crate::ai::blocklist::telemetry::{
     RunAgentsCardDecision, run_agents_card_decision_event,
 };
 pub use crate::ai::blocklist::view_util::{
-    FAILED_OUTPUT_USAGE_NOTICE_TEXT, FailedOutputPresentation, OUT_OF_CREDITS_SUBSCRIBE_LABEL,
-    failed_output_presentation, format_credits, should_show_failed_output_usage_notice,
+    FailedOutputPresentation, failed_output_presentation, format_credits,
+    should_show_failed_output_usage_notice,
 };
 pub use crate::ai::blocklist::{
     AIActionStatus, AskUserQuestionExecutor, AttachmentType, BlocklistAIActionEvent,
@@ -123,16 +123,15 @@ pub use crate::ai::llms::{
 pub use crate::ai::orchestration::{
     AuthSecretSelection, CloudAgentStartupAuthFlow, CloudAgentStartupBlocker,
     CloudAgentStartupFailure, CloudAgentStartupIssue, CloudAgentStartupPresentation,
-    ORCHESTRATION_ENV_NONE_LABEL, ORCHESTRATION_WARP_WORKER_HOST, OptionBadge, OptionFooter,
-    OptionRow, OptionSnapshot, OptionSourceStatus, OrchestrationConfigState,
-    OrchestrationEditState, PrepareRemoteChildLaunchError, PreparedRemoteChildLaunch,
-    RemoteChildLaunchConfig, accept_disabled_reason_with_auth, api_key_snapshot,
-    auth_secret_selection_required, classify_cloud_agent_startup_error,
-    empty_env_recommendation_message, environment_snapshot, harness_is_selectable,
-    harness_snapshot, host_snapshot, location_snapshot, model_snapshot, oz_model_snapshot,
-    oz_run_url, persist_environment_selection, persist_host_selection, prepare_remote_child_launch,
-    resolve_auth_secret_selection_for_harness, resolve_default_environment_id,
-    resolve_default_host_slug, should_show_auth_secret_picker,
+    ORCHESTRATION_WARP_WORKER_HOST, OptionBadge, OptionFooter, OptionRow, OptionSnapshot,
+    OptionSourceStatus, OrchestrationConfigState, OrchestrationEditState,
+    PrepareRemoteChildLaunchError, PreparedRemoteChildLaunch, RemoteChildLaunchConfig,
+    accept_disabled_reason_with_auth, api_key_snapshot, auth_secret_selection_required,
+    classify_cloud_agent_startup_error, empty_env_recommendation_message, environment_snapshot,
+    harness_is_selectable, harness_snapshot, host_snapshot, location_snapshot, model_snapshot,
+    oz_model_snapshot, oz_run_url, persist_environment_selection, persist_host_selection,
+    prepare_remote_child_launch, resolve_auth_secret_selection_for_harness,
+    resolve_default_environment_id, resolve_default_host_slug, should_show_auth_secret_picker,
 };
 #[cfg(feature = "voice_input")]
 pub use crate::ai::request_usage_model::AIRequestUsageModel;
@@ -175,7 +174,7 @@ pub use crate::terminal::input::CommandExecutionSource;
 pub use crate::terminal::input::decorations::parse_current_commands_and_tokens;
 pub use crate::terminal::input::models::{ModelPickerChoice, query_model_picker_choices};
 pub use crate::terminal::input::skills::{
-    AcceptSkill, LOCAL_SKILLS_REMOTE_EXECUTION_ERROR_MESSAGE, SelectableSkill,
+    AcceptSkill, SelectableSkill, local_skills_remote_execution_error_message,
     query_selectable_skills,
 };
 pub use crate::terminal::input::slash_command_model::{

@@ -23,14 +23,7 @@ use crate::terminal_use::{TuiInputTarget, inline_process_owns_input, tui_input_t
 use crate::transcript_view::TuiTranscriptView;
 use crate::tui_cli_subagent_view::{HAND_BACK_KEY_BINDING, TAKE_CONTROL_KEY_BINDING};
 
-const ASK_AGENT_HINT: &str = "Ask the agent anything";
-const ORCHESTRATION_HINT: &str = "Shift + ↑ for other agents";
-const SHORTCUTS_HINT: &str = "? for shortcuts";
-const SHELL_MODE_HINT: &str = "! for shell mode";
-const COMMANDS_HINT: &str = "/ for commands";
-const CONVERSATIONS_HINT: &str = "← for conversations";
 const HINT_SEPARATOR: &str = " • ";
-pub(crate) const SHELL_HINT: &str = "Run a shell command • ? for shortcuts • esc for agent mode";
 enum TuiTerminalSessionStateSource {
     Session {
         terminal_model: Weak<FairMutex<TerminalModel>>,
@@ -77,14 +70,21 @@ pub(crate) enum TuiTerminalSessionStateResolveError {
 
 impl fmt::Display for TuiTerminalSessionStateResolveError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Self::TerminalModel => "terminal model is unavailable",
-            Self::CliSubagentController => "CLI subagent controller is unavailable",
-            Self::Transcript => "transcript view is unavailable",
-            Self::InputMode => "input-mode model is unavailable",
-            Self::SuggestionsMode => "suggestions-mode model is unavailable",
-            Self::OrchestrationTabBar => "orchestration tab bar is unavailable",
-        })
+        let message = match self {
+            Self::TerminalModel => warp::t!("tui-session-state-terminal-unavailable"),
+            Self::CliSubagentController => {
+                warp::t!("tui-session-state-cli-controller-unavailable")
+            }
+            Self::Transcript => warp::t!("tui-session-state-transcript-unavailable"),
+            Self::InputMode => warp::t!("tui-session-state-input-mode-unavailable"),
+            Self::SuggestionsMode => {
+                warp::t!("tui-session-state-suggestions-mode-unavailable")
+            }
+            Self::OrchestrationTabBar => {
+                warp::t!("tui-session-state-orchestration-tabs-unavailable")
+            }
+        };
+        formatter.write_str(&message)
     }
 }
 
@@ -504,7 +504,7 @@ impl TuiTerminalSessionState {
             return None;
         }
         Some(match agent_editor.mode {
-            TuiComposerMode::Shell => SHELL_HINT.to_owned(),
+            TuiComposerMode::Shell => warp::t!("tui-shell-input-hint"),
             TuiComposerMode::Agent { .. } => {
                 agent_input_hint(state.transcript_is_empty, state.orchestration_available)
             }
@@ -527,10 +527,10 @@ impl TuiTerminalSessionState {
         let agent_editor = match &state.interaction {
             TuiInteractionState::Blocking(BlockingInputSource::LongRunningCommand) => {
                 return vec![TuiShortcutSection {
-                    title: "Terminal",
+                    title: warp::t_static!("tui-terminal"),
                     shortcuts: vec![TuiShortcut {
                         key: "ctrl-c".to_owned(),
-                        description: "interrupt command",
+                        description: warp::t_static!("tui-shortcut-interrupt-command"),
                     }],
                 }];
             }
@@ -544,10 +544,10 @@ impl TuiTerminalSessionState {
             | TuiInteractionState::Pty(TuiPtyState::Process) => return Vec::new(),
             TuiInteractionState::Pty(TuiPtyState::UserControlledTerminalUse) => {
                 return vec![TuiShortcutSection {
-                    title: "Terminal",
+                    title: warp::t_static!("tui-terminal"),
                     shortcuts: vec![TuiShortcut {
                         key: HAND_BACK_KEY_BINDING.to_owned(),
-                        description: "hand back control",
+                        description: warp::t_static!("tui-shortcut-hand-back-control"),
                     }],
                 }];
             }
@@ -556,38 +556,38 @@ impl TuiTerminalSessionState {
 
         let mut shortcuts = vec![TuiShortcut {
             key: "?".to_owned(),
-            description: "shortcuts",
+            description: warp::t_static!("tui-shortcuts-lowercase"),
         }];
         match agent_editor.mode {
             TuiComposerMode::Agent { .. } => shortcuts.extend([
                 TuiShortcut {
                     key: "/".to_owned(),
-                    description: "commands",
+                    description: warp::t_static!("tui-commands-lowercase"),
                 },
                 TuiShortcut {
                     key: "!".to_owned(),
-                    description: "shell mode",
+                    description: warp::t_static!("tui-shell-mode-lowercase"),
                 },
                 TuiShortcut {
                     key: "←".to_owned(),
-                    description: "conversations",
+                    description: warp::t_static!("tui-conversations-lowercase"),
                 },
             ]),
             TuiComposerMode::Shell => shortcuts.push(TuiShortcut {
                 key: "Esc".to_owned(),
-                description: "agent mode",
+                description: warp::t_static!("tui-agent-mode-lowercase"),
             }),
         }
         if matches!(agent_editor.mode, TuiComposerMode::Agent { .. }) {
             shortcuts.push(TuiShortcut {
                 key: "↑".to_owned(),
-                description: "input history",
+                description: warp::t_static!("tui-input-history-lowercase"),
             });
         }
         if let Some(key) = binding_hint(AUTO_APPROVE_TOGGLE_BINDING_NAME, context, ctx) {
             shortcuts.push(TuiShortcut {
                 key,
-                description: "toggle auto-approve",
+                description: warp::t_static!("tui-toggle-auto-approve-lowercase"),
             });
         }
         if state.plan_available
@@ -595,12 +595,12 @@ impl TuiTerminalSessionState {
         {
             shortcuts.push(TuiShortcut {
                 key,
-                description: "expand/collapse plans",
+                description: warp::t_static!("tui-expand-collapse-plans-lowercase"),
             });
         }
 
         let mut sections = vec![TuiShortcutSection {
-            title: "Shortcuts",
+            title: warp::t_static!("tui-shortcuts"),
             shortcuts,
         }];
         if matches!(
@@ -610,10 +610,10 @@ impl TuiTerminalSessionState {
             }
         ) {
             sections.push(TuiShortcutSection {
-                title: "Terminal use",
+                title: warp::t_static!("tui-terminal-use"),
                 shortcuts: vec![TuiShortcut {
                     key: TAKE_CONTROL_KEY_BINDING.to_owned(),
-                    description: "take control",
+                    description: warp::t_static!("tui-take-control-lowercase"),
                 }],
             });
         } else if state.agent_is_tagged_in
@@ -621,19 +621,19 @@ impl TuiTerminalSessionState {
                 binding_hint(DETACH_AGENT_FROM_RUNNING_COMMAND_BINDING_NAME, context, ctx)
         {
             sections.push(TuiShortcutSection {
-                title: "Terminal use",
+                title: warp::t_static!("tui-terminal-use"),
                 shortcuts: vec![TuiShortcut {
                     key,
-                    description: "return control to command",
+                    description: warp::t_static!("tui-return-control-command-lowercase"),
                 }],
             });
         }
         if state.orchestration_available {
             sections.push(TuiShortcutSection {
-                title: "Orchestration",
+                title: warp::t_static!("tui-orchestration"),
                 shortcuts: vec![TuiShortcut {
                     key: "Shift+↑".to_owned(),
-                    description: "navigate to agents",
+                    description: warp::t_static!("tui-navigate-agents-lowercase"),
                 }],
             });
         }
@@ -644,18 +644,24 @@ impl TuiTerminalSessionState {
 fn agent_input_hint(transcript_is_empty: bool, orchestration_tabs_available: bool) -> String {
     let mut hints = Vec::with_capacity(5);
     if transcript_is_empty {
-        hints.push(SHORTCUTS_HINT);
+        hints.push(warp::t!("tui-hint-shortcuts"));
         if orchestration_tabs_available {
-            hints.push(ORCHESTRATION_HINT);
+            hints.push(warp::t!("tui-hint-other-agents"));
         }
-        hints.extend([COMMANDS_HINT, CONVERSATIONS_HINT]);
+        hints.extend([
+            warp::t!("tui-hint-commands"),
+            warp::t!("tui-hint-conversations"),
+        ]);
     } else {
-        hints.push(ASK_AGENT_HINT);
-        hints.push(SHORTCUTS_HINT);
+        hints.push(warp::t!("tui-hint-ask-agent"));
+        hints.push(warp::t!("tui-hint-shortcuts"));
         if orchestration_tabs_available {
-            hints.push(ORCHESTRATION_HINT);
+            hints.push(warp::t!("tui-hint-other-agents"));
         }
-        hints.extend([SHELL_MODE_HINT, COMMANDS_HINT]);
+        hints.extend([
+            warp::t!("tui-hint-shell-mode"),
+            warp::t!("tui-hint-commands"),
+        ]);
     }
     hints.join(HINT_SEPARATOR)
 }

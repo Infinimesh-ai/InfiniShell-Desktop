@@ -15,10 +15,6 @@ use warpui::{AppContext, SingletonEntity};
 
 use crate::remote_server::manager::RemoteServerManager;
 
-/// Fallback label used when a `RemotePath`'s host is not currently tracked.
-/// Matches the fallback in `terminal::writeable_pty::remote_server_controller::connection_label_from_user_and_host`.
-const UNKNOWN_HOST_LABEL: &str = "Remote host";
-
 /// Returns the display name of a local or remote path, prefixed with the
 /// host label for remote paths.
 pub fn display_name_with_host(path: &LocalOrRemotePath, ctx: &AppContext) -> String {
@@ -28,7 +24,8 @@ pub fn display_name_with_host(path: &LocalOrRemotePath, ctx: &AppContext) -> Str
         LocalOrRemotePath::Remote(remote) => {
             let host_label = RemoteServerManager::as_ref(ctx)
                 .host_label(&remote.host_id)
-                .unwrap_or(UNKNOWN_HOST_LABEL);
+                .map(str::to_owned)
+                .unwrap_or_else(|| crate::t!("terminal-remote-host"));
             format!("{host_label}:{name}")
         }
     }
@@ -59,7 +56,8 @@ pub fn display_path_with_host(
         LocalOrRemotePath::Remote(remote) => {
             let host_label = RemoteServerManager::as_ref(ctx)
                 .host_label(&remote.host_id)
-                .unwrap_or(UNKNOWN_HOST_LABEL);
+                .map(str::to_owned)
+                .unwrap_or_else(|| crate::t!("terminal-remote-host"));
             format!("{host_label}:{}", path.display_path())
         }
     }

@@ -114,7 +114,7 @@ pub struct SearchBar<T: Action + Clone> {
     mixer: ModelHandle<SearchMixer<T>>,
     /// The placeholder text that is rendered in the search bar when no query has been run or
     /// filters have been applied.
-    placeholder_text: &'static str,
+    placeholder_text: String,
     create_query_result_renderer_fn: CreateQueryResultRendererFn<T>,
     /// Font family to use when rendering the editor and query filters. If `None` the monospace font
     /// family is used.
@@ -339,7 +339,7 @@ impl<T: Action + Clone> SearchBar<T> {
     pub fn new(
         mixer: ModelHandle<SearchMixer<T>>,
         state: ModelHandle<SearchBarState<T>>,
-        placeholder_text: &'static str,
+        placeholder_text: impl Into<String>,
         create_query_result_renderer_fn: CreateQueryResultRendererFn<T>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
@@ -366,7 +366,7 @@ impl<T: Action + Clone> SearchBar<T> {
         let me = Self {
             editor_handle,
             mixer,
-            placeholder_text,
+            placeholder_text: placeholder_text.into(),
             state,
             create_query_result_renderer_fn,
             font_family_override: None,
@@ -690,7 +690,10 @@ impl<T: Action + Clone> SearchBar<T> {
         if let Some(loading_filters) = self.mixer.as_ref(ctx).loading_query_filters() {
             for loading_filter in loading_filters.into_iter() {
                 ctx.emit_a11y_content(AccessibilityContent::new_without_help(
-                    format!("Loading {} suggestions", loading_filter.display_name()),
+                    crate::t!(
+                        "search-loading-suggestions-a11y",
+                        filter = loading_filter.display_name()
+                    ),
                     WarpA11yRole::MenuItemRole,
                 ));
             }
@@ -708,7 +711,10 @@ impl<T: Action + Clone> SearchBar<T> {
         }
 
         if let Some(selected_result) = self.state.as_ref(ctx).selected_result() {
-            let a11y_content_text = format!("Selected {}", selected_result.accessibility_label(),);
+            let a11y_content_text = crate::t!(
+                "search-selected-a11y",
+                item = selected_result.accessibility_label()
+            );
             let a11y_content = match selected_result.accessibility_help_message() {
                 None => AccessibilityContent::new_without_help(
                     a11y_content_text,
@@ -777,7 +783,7 @@ impl<T: Action + Clone> SearchBar<T> {
                         editor.set_placeholder_text(filter.placeholder_text(), ctx);
                     }
                     None => {
-                        editor.set_placeholder_text(self.placeholder_text, ctx);
+                        editor.set_placeholder_text(self.placeholder_text.clone(), ctx);
                     }
                 }
             }

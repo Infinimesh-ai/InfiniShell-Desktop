@@ -55,16 +55,6 @@ use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme
 const MAX_PROMPT_LINES: f32 = 5.;
 /// Max characters shown in a row's single-line preview before truncation.
 const PROMPT_PREVIEW_MAX_CHARS: usize = 500;
-const INITIAL_CLOUD_MODE_PROMPT_TOOLTIP: &str = "The first cloud-mode prompt cannot be changed.";
-const SEND_NOW_DURING_CLOUD_SETUP_TOOLTIP: &str =
-    "Prompts cannot be sent until environment setup is complete.";
-const SEND_NOW_PENDING_LRC_TOOLTIP: &str =
-    "Prompts cannot be sent until the full terminal use agent is initialized.";
-const SEND_NOW_TO_FULL_TERMINAL_USE_AGENT_TOOLTIP: &str = "Send to full terminal use agent";
-const SEND_NOW_AS_READ_ONLY_VIEWER_TOOLTIP: &str = "Read-only viewers cannot send prompts.";
-/// Suffix on rows auto-queued during an agent-requested long-running command, which fire
-/// when that command completes rather than at the end of the full response.
-const LRC_AUTO_QUEUE_ROW_SUFFIX: &str = "(queued until the command finishes)";
 
 /// Returns the position-cache id used to look up a row's bounding rect during a drag.
 /// Indexed by the row's current visual index so swaps maintain stable lookups.
@@ -82,15 +72,15 @@ fn build_row_state(
     // The send-now tooltip is owned by `update_send_now_availability`, which swaps in a
     // "wait for the cloud agent" message while send-now is disabled; "Send now" is the default.
     let edit_tooltip = if is_initial_cloud_mode_prompt {
-        INITIAL_CLOUD_MODE_PROMPT_TOOLTIP
+        crate::t!("terminal-queued-initial-cloud-locked")
     } else {
-        "Edit"
+        crate::t!("common-edit")
     };
 
     let send_now_button = ctx.add_typed_action_view(move |_| {
         ActionButton::new("", NakedTheme)
             .with_icon(TerminalIcon::ArrowUp)
-            .with_tooltip("Send now")
+            .with_tooltip(crate::t!("ai-block-send-now"))
             .with_size(ButtonSize::XSmall)
             .with_disabled_theme(NakedTheme)
             .on_click(move |ctx| {
@@ -110,7 +100,7 @@ fn build_row_state(
     let delete_button = ctx.add_typed_action_view(move |_| {
         ActionButton::new("", NakedTheme)
             .with_icon(TerminalIcon::Trash)
-            .with_tooltip("Delete")
+            .with_tooltip(crate::t!("common-delete"))
             .with_size(ButtonSize::XSmall)
             .with_disabled_theme(NakedTheme)
             .on_click(move |ctx| {
@@ -121,7 +111,7 @@ fn build_row_state(
         ctx.add_typed_action_view(move |_| {
             ActionButton::new("", NakedTheme)
                 .with_icon(TerminalIcon::Copy)
-                .with_tooltip("Copy")
+                .with_tooltip(crate::t!("common-copy"))
                 .with_size(ButtonSize::XSmall)
                 .with_disabled_theme(NakedTheme)
                 .on_click(move |ctx| {
@@ -440,15 +430,15 @@ impl QueuedPromptsPanelView {
             let disabled =
                 disabled_for_pending_lrc || disabled_for_cloud_setup || !self.can_send_prompt;
             let tooltip = if disabled_for_pending_lrc {
-                SEND_NOW_PENDING_LRC_TOOLTIP
+                crate::t!("terminal-queued-wait-full-terminal-agent")
             } else if disabled_for_cloud_setup {
-                SEND_NOW_DURING_CLOUD_SETUP_TOOLTIP
+                crate::t!("terminal-queued-wait-environment")
             } else if !self.can_send_prompt {
-                SEND_NOW_AS_READ_ONLY_VIEWER_TOOLTIP
+                crate::t!("terminal-queued-read-only")
             } else if lrc_subagent_in_progress {
-                SEND_NOW_TO_FULL_TERMINAL_USE_AGENT_TOOLTIP
+                crate::t!("terminal-queued-send-full-terminal-agent")
             } else {
-                "Send now"
+                crate::t!("ai-block-send-now")
             };
             send_now_button.update(ctx, |button, ctx| {
                 button.set_disabled(disabled, ctx);
@@ -1078,14 +1068,18 @@ fn render_header(
             );
             row.add_child(Container::new(keycap).with_margin_left(4.).finish());
             row.add_child(
-                Text::new("to send", ui_font_family, ui_font_size)
-                    .with_style(Properties {
-                        style: Style::Normal,
-                        weight: Weight::Normal,
-                    })
-                    .with_color(sub_text_color)
-                    .with_selectable(false)
-                    .finish(),
+                Text::new(
+                    crate::t!("terminal-queued-to-send"),
+                    ui_font_family,
+                    ui_font_size,
+                )
+                .with_style(Properties {
+                    style: Style::Normal,
+                    weight: Weight::Normal,
+                })
+                .with_color(sub_text_color)
+                .with_selectable(false)
+                .finish(),
             );
         }
         let row = row.finish();
@@ -1221,7 +1215,7 @@ fn render_row(props: RenderRowProps<'_>, app: &AppContext) -> Box<dyn Element> {
             {
                 let suffix_color: ColorU = theme.sub_text_color(theme.surface_1()).into();
                 let suffix = Text::new(
-                    LRC_AUTO_QUEUE_ROW_SUFFIX.to_owned(),
+                    crate::t!("terminal-queued-until-command-finishes"),
                     appearance.ui_font_family(),
                     queued_input_font_size,
                 )
@@ -1268,7 +1262,7 @@ fn render_row(props: RenderRowProps<'_>, app: &AppContext) -> Box<dyn Element> {
                 if drag_state.is_hovered() {
                     stack.add_positioned_overlay_child(
                         ui_builder
-                            .tool_tip(INITIAL_CLOUD_MODE_PROMPT_TOOLTIP.to_owned())
+                            .tool_tip(crate::t!("terminal-queued-initial-cloud-locked"))
                             .build()
                             .finish(),
                         OffsetPositioning::offset_from_parent(
@@ -1363,5 +1357,5 @@ fn render_row(props: RenderRowProps<'_>, app: &AppContext) -> Box<dyn Element> {
 
 /// Returns the user-visible header label for `count` queued prompts.
 fn header_label_text(count: usize) -> String {
-    format!("{count} queued")
+    crate::t!("terminal-queued-count", count = count)
 }

@@ -75,7 +75,7 @@ fn allowed_values_are_presented_as_selectable_rows() {
             assert_eq!(snapshot.selected_index, Some(0));
             assert_eq!(
                 flow.as_ref(ctx).primary_action_hint(),
-                Some("to install and enable")
+                Some("to install and enable".to_owned())
             );
         });
     });

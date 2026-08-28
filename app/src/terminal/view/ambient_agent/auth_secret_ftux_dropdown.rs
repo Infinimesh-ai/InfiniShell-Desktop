@@ -93,7 +93,7 @@ impl AuthSecretFtuxDropdown {
                 },
                 ctx,
             );
-            editor.set_placeholder_text("Search secrets or create a new one", ctx);
+            editor.set_placeholder_text(crate::t!("terminal-secrets-search-or-create"), ctx);
             editor
         });
 
@@ -320,12 +320,15 @@ impl AuthSecretFtuxDropdown {
             // Compact (modal) mode: only render "+ New …" entries.
             for (index, info) in auth_secret_types_for_harness(harness).iter().enumerate() {
                 items.push(MenuItem::Item(
-                    MenuItemFields::new(format!("New {}", info.display_name))
-                        .with_font_size_override(FONT_SIZE)
-                        .with_padding_override(MENU_ITEM_VERTICAL_PADDING, MENU_HORIZONTAL_PADDING)
-                        .with_override_hover_background_color(hover_background)
-                        .with_icon(Icon::Plus)
-                        .with_on_select_action(FtuxDropdownAction::SelectNewType(index)),
+                    MenuItemFields::new(crate::t!(
+                        "terminal-secrets-new",
+                        name = info.display_name
+                    ))
+                    .with_font_size_override(FONT_SIZE)
+                    .with_padding_override(MENU_ITEM_VERTICAL_PADDING, MENU_HORIZONTAL_PADDING)
+                    .with_override_hover_background_color(hover_background)
+                    .with_icon(Icon::Plus)
+                    .with_on_select_action(FtuxDropdownAction::SelectNewType(index)),
                 ));
             }
             self.menu.update(ctx, |menu, ctx| {
@@ -358,7 +361,7 @@ impl AuthSecretFtuxDropdown {
                 }
                 if !matched {
                     items.push(MenuItem::Item(
-                        MenuItemFields::new("No secrets found")
+                        MenuItemFields::new(crate::t!("terminal-secrets-none-found"))
                             .with_font_size_override(FONT_SIZE)
                             .with_padding_override(
                                 MENU_ITEM_VERTICAL_PADDING,
@@ -371,7 +374,7 @@ impl AuthSecretFtuxDropdown {
             }
             AuthSecretFetchState::NotFetched | AuthSecretFetchState::Loading => {
                 items.push(MenuItem::Item(
-                    MenuItemFields::new("Loading…")
+                    MenuItemFields::new(crate::t!("common-loading"))
                         .with_font_size_override(FONT_SIZE)
                         .with_padding_override(MENU_ITEM_VERTICAL_PADDING, MENU_HORIZONTAL_PADDING)
                         .with_disabled(true)
@@ -380,7 +383,7 @@ impl AuthSecretFtuxDropdown {
             }
             AuthSecretFetchState::Failed(_) => {
                 items.push(MenuItem::Item(
-                    MenuItemFields::new("Unable to load secrets")
+                    MenuItemFields::new(crate::t!("terminal-secrets-load-failed"))
                         .with_font_size_override(FONT_SIZE)
                         .with_padding_override(MENU_ITEM_VERTICAL_PADDING, MENU_HORIZONTAL_PADDING)
                         .with_disabled(true)
@@ -393,7 +396,7 @@ impl AuthSecretFtuxDropdown {
 
         for (index, info) in auth_secret_types_for_harness(harness).iter().enumerate() {
             items.push(MenuItem::Item(
-                MenuItemFields::new(format!("New {}", info.display_name))
+                MenuItemFields::new(crate::t!("terminal-secrets-new", name = info.display_name))
                     .with_font_size_override(FONT_SIZE)
                     .with_padding_override(MENU_ITEM_VERTICAL_PADDING, MENU_HORIZONTAL_PADDING)
                     .with_override_hover_background_color(hover_background)
@@ -406,8 +409,8 @@ impl AuthSecretFtuxDropdown {
 
         items.push(MenuItem::Item(
             MenuItemFields::new_with_label(
-                "Skip (advanced)",
-                "Only if your key is already set in the environment (e.g. injected as a Kubernetes secret)",
+                crate::t!("terminal-secrets-skip-advanced"),
+                crate::t!("terminal-secrets-skip-advanced-description"),
             )
             .with_font_size_override(FONT_SIZE)
             .with_padding_override(MENU_ITEM_VERTICAL_PADDING, MENU_HORIZONTAL_PADDING)
@@ -499,8 +502,7 @@ impl AuthSecretFtuxDropdown {
         let theme = appearance.theme();
         let color = internal_colors::text_sub(theme, theme.surface_1());
         Text::new_inline(
-            "No secrets found. Save to use this value directly or click the key to add a secret."
-                .to_string(),
+            crate::t!("terminal-secrets-none-found-helper"),
             appearance.ui_font_family(),
             HELPER_FONT_SIZE,
         )

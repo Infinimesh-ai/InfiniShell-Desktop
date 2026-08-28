@@ -45,9 +45,9 @@ pub enum Language {
 impl std::fmt::Display for Language {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = match self {
-            Language::System => "System default",
-            Language::English => "English",
-            Language::SimplifiedChinese => "简体中文",
+            Language::System => crate::t!("settings-language-system-default"),
+            Language::English => crate::t!("settings-language-english"),
+            Language::SimplifiedChinese => crate::t!("settings-language-simplified-chinese"),
         };
         write!(f, "{value}")
     }

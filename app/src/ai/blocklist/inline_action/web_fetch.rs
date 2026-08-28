@@ -46,7 +46,7 @@ impl WebFetchView {
         let text = if urls.len() == 1 {
             "Fetching from the web...".to_string()
         } else {
-            format!("Fetching {} web pages...", urls.len())
+            crate::t!("ai-web-fetch-fetching", count = urls.len())
         };
 
         super::search_results_common::render_loading_header_animated(
@@ -64,9 +64,13 @@ impl WebFetchView {
     ) -> Box<dyn Element> {
         let successful_count = pages.iter().filter(|(_, _, success)| *success).count();
         let title_text = if successful_count == pages.len() {
-            format!("Fetched {} web pages", pages.len())
+            crate::t!("ai-web-fetch-fetched", count = pages.len())
         } else {
-            format!("Fetched {} of {} web pages", successful_count, pages.len())
+            crate::t!(
+                "ai-web-fetch-fetched-partial",
+                successful = successful_count,
+                total = pages.len()
+            )
         };
 
         let body = if self.collapsible.is_expanded {
@@ -133,7 +137,7 @@ impl WebFetchView {
 
         if pages.is_empty() {
             let no_results = Text::new_inline(
-                "No URLs fetched".to_string(),
+                crate::t!("ai-web-fetch-no-urls"),
                 appearance.ui_font_family(),
                 appearance.monospace_font_size(),
             )

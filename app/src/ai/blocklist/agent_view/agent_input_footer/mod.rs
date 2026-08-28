@@ -476,7 +476,10 @@ impl AgentInputFooter {
                 #[cfg(not(target_family = "wasm"))]
                 if let CLIAgentSessionsModelEvent::Started { .. } = event {
                     if let Some(agent) = me.cli_agent(ctx) {
-                        let label = format!("Enable {} notifications", agent.display_name());
+                        let label = crate::t!(
+                            "ai-footer-enable-agent-notifications",
+                            agent = agent.display_name()
+                        );
                         me.install_plugin_button.update(ctx, |button, ctx| {
                             button.set_label(label, ctx);
                         });
@@ -820,7 +823,10 @@ impl AgentInputFooter {
                     let window_id = ctx.window_id();
                     ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                         toast_stack.add_ephemeral_toast(
-                            DismissibleToast::error(format!("{err}")),
+                            DismissibleToast::error(crate::t!(
+                                "file-picker-select-file-error",
+                                error = err.to_string()
+                            )),
                             window_id,
                             ctx,
                         );
@@ -1066,7 +1072,7 @@ impl AgentInputFooter {
                 else {
                     return Err((
                         PluginInstallError {
-                            message: "No plugin manager available".to_owned(),
+                            message: crate::t!("cli-agent-plugin-manager-unavailable"),
                             log: String::new(),
                         },
                         None,
@@ -1672,9 +1678,9 @@ impl AgentInputFooter {
         AISettings::handle(ctx).update(ctx, |settings, ctx| {
             if let Some(toggle_key) = settings.maybe_setup_first_time_voice(ctx) {
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = DismissibleToast::success(format!(
-                        "Voice input is enabled. You can also press and hold the `{}` key to activate voice input (configure in Settings > AI > Voice)",
-                        toggle_key.display_name()
+                    let toast = DismissibleToast::success(crate::t!(
+                        "ai-voice-enabled-toast",
+                        key = toggle_key.display_name()
                     ));
                     toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                 });
@@ -1950,7 +1956,7 @@ fn render_ftu_callout(
                     Expanded::new(
                         1.,
                         Text::new(
-                            "Now using Full Terminal Agent's default model.",
+                            crate::t!("ai-full-terminal-agent-default-model"),
                             appearance.ui_font_family(),
                             appearance.monospace_font_size() - 2.,
                         )

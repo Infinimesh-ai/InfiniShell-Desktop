@@ -56,7 +56,7 @@ impl FeaturePopup {
         match self.badge {
             FeaturePopupBadge::New => Container::new(
                 Text::new(
-                    "NEW",
+                    crate::t!("common-new-feature"),
                     appearance.ui_font_family(),
                     appearance.ui_font_size(),
                 )

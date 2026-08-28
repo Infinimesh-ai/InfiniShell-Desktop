@@ -249,14 +249,14 @@ impl WorkflowsMoreInfoView {
         appearance: &Appearance,
     ) -> Box<dyn Element> {
         let label = if workflow.model().data.is_agent_mode_workflow() {
-            "Edit prompt"
+            crate::t!("workflow-edit-prompt")
         } else {
-            "Edit workflow"
+            crate::t!("workflow-edit-workflow")
         };
         let workflow = workflow.clone();
         render_hoverable_card_button(
             icons::Icon::Rename,
-            Some(label.to_owned()),
+            Some(label),
             self.button_mouse_states.edit_cloud_workflow.clone(),
             move |ctx: &mut warpui::EventContext<'_>, _, _| {
                 ctx.dispatch_typed_action(TerminalAction::OpenWorkflowModalWithWorkflowObject(
@@ -327,7 +327,11 @@ impl WorkflowsMoreInfoView {
         appearance: &Appearance,
     ) -> Box<dyn Element> {
         let title_string = match (arg.name(), arg.description()) {
-            (name, Some(description)) => format!("{name}: {description}"),
+            (name, Some(description)) => crate::t!(
+                "workflow-name-with-description",
+                name = name,
+                description = description
+            ),
             (name, None) => name.to_string(),
         };
 
@@ -435,7 +439,7 @@ impl WorkflowsMoreInfoView {
             .with_child(
                 Container::new(
                     Text::new_inline(
-                        "Command edited.",
+                        crate::t!("workflow-command-edited"),
                         appearance.ui_font_family(),
                         appearance.monospace_font_size(),
                     )
@@ -457,7 +461,7 @@ impl WorkflowsMoreInfoView {
                         ButtonVariant::Text,
                         self.button_mouse_states.reset_command.clone(),
                     )
-                    .with_centered_text_label(String::from("Reset"))
+                    .with_centered_text_label(crate::t!("common-reset"))
                     .with_style(UiComponentStyles {
                         font_family_id: Some(appearance.ui_font_family()),
                         font_size: Some(appearance.monospace_font_size()),
@@ -500,7 +504,7 @@ impl WorkflowsMoreInfoView {
                     1.,
                     Container::new(
                         Text::new_inline(
-                            "to cycle parameters",
+                            crate::t!("workflow-cycle-parameters"),
                             appearance.ui_font_family(),
                             appearance.monospace_font_size(),
                         )
@@ -534,7 +538,7 @@ impl WorkflowsMoreInfoView {
         let workflow = self.workflow.as_workflow().to_owned();
         render_hoverable_card_button(
             icons::Icon::Workflow,
-            Some("Save as workflow".to_string()),
+            Some(crate::t!("workflow-save-as-workflow")),
             self.button_mouse_states.save_as_workflow.clone(),
             move |ctx, _, _| {
                 ctx.dispatch_typed_action(TerminalAction::OpenWorkflowModalForAIWorkflow(
@@ -1004,7 +1008,7 @@ impl WorkflowsMoreInfoView {
             appearance
                 .ui_builder()
                 .link(
-                    "View Context".into(),
+                    crate::t!("workflow-view-context"),
                     Some(workflow_source),
                     None,
                     self.button_mouse_states.view_context.clone(),

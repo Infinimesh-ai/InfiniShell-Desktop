@@ -526,9 +526,10 @@ impl TypedActionView for ImportModalBody {
             }
             ImportModalBodyAction::FilePickerError(err) => {
                 let window_id = ctx.window_id();
+                let message = crate::t!("drive-import-file-picker-error", error = err.to_string());
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                     toast_stack.add_ephemeral_toast(
-                        DismissibleToast::error(format!("{err}")),
+                        DismissibleToast::error(message),
                         window_id,
                         ctx,
                     );

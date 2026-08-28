@@ -38,8 +38,6 @@ use crate::ai::blocklist::inline_action::inline_action_header::{
 use crate::ai::blocklist::inline_action::inline_action_icons::icon_size;
 use crate::ui_components::blended_colors;
 
-const REQUESTED_ACTION_RUN_LABEL: &str = "Run";
-
 const KEYBOARD_SHORTCUT_MARGIN_RIGHT: f32 = 8.;
 
 lazy_static! {
@@ -245,6 +243,7 @@ pub(super) fn render_header_buttons(
     let appearance = Appearance::as_ref(app);
 
     let cancel_label = crate::t!("common-cancel");
+    let run_label = crate::t!("ai-requested-command-run");
     let width_required_for_full_size_layout = approx_keystroke_button_width(
         &cancel_label,
         appearance.monospace_font_size(),
@@ -253,7 +252,7 @@ pub(super) fn render_header_buttons(
         app,
     ) + BUTTON_MARGIN_RIGHT
         + approx_keystroke_button_width(
-            REQUESTED_ACTION_RUN_LABEL,
+            &run_label,
             appearance.monospace_font_size(),
             run_keystroke,
             None,
@@ -274,7 +273,7 @@ pub(super) fn render_header_buttons(
         app,
     )
     .max(approx_keystroke_button_width(
-        REQUESTED_ACTION_RUN_LABEL,
+        &run_label,
         compact_button_font_size,
         run_keystroke,
         Some(compact_button_styles),
@@ -310,7 +309,7 @@ pub(super) fn render_header_buttons(
 
     if should_show_accept_button {
         default_row.add_child(render_keyboard_shortcut_button(
-            REQUESTED_ACTION_RUN_LABEL,
+            run_label.clone(),
             Some(run_keystroke.clone()),
             run_button.clone(),
             accept_callback,
@@ -320,7 +319,7 @@ pub(super) fn render_header_buttons(
 
         size_constrained_column.add_child(
             Container::new(render_keyboard_shortcut_button(
-                REQUESTED_ACTION_RUN_LABEL,
+                run_label,
                 Some(run_keystroke.clone()),
                 run_button.clone(),
                 accept_clone,

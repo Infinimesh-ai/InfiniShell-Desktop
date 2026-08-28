@@ -36,7 +36,7 @@ pub struct GeminiEnterpriseCredentialsErrorView {
 impl GeminiEnterpriseCredentialsErrorView {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
         let refresh_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Refresh credentials", PrimaryTheme)
+            ActionButton::new(crate::t!("ai-gemini-refresh-credentials"), PrimaryTheme)
                 .with_size(ButtonSize::InlineActionHeader)
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(
@@ -51,13 +51,17 @@ impl GeminiEnterpriseCredentialsErrorView {
 
             match manager.as_ref(ctx).geap_credentials_state().clone() {
                 GeapCredentialsState::Refreshing { .. } => {
-                    view.update_refresh_button("Refreshing...", true, ctx);
+                    view.update_refresh_button(crate::t!("ai-gemini-refreshing"), true, ctx);
                 }
                 GeapCredentialsState::Loaded {
                     ref credentials, ..
                 } if !credentials.needs_refresh() => {
                     view.refresh_succeeded = true;
-                    view.update_refresh_button("Credentials refreshed", true, ctx);
+                    view.update_refresh_button(
+                        crate::t!("ai-gemini-credentials-refreshed-button"),
+                        true,
+                        ctx,
+                    );
                 }
                 GeapCredentialsState::Missing
                 | GeapCredentialsState::Disabled
@@ -66,13 +70,13 @@ impl GeminiEnterpriseCredentialsErrorView {
                 | GeapCredentialsState::Failed { .. } => {
                     view.refresh_requested = false;
                     view.refresh_succeeded = false;
-                    view.update_refresh_button("Try again", false, ctx);
+                    view.update_refresh_button(crate::t!("ai-gemini-try-again"), false, ctx);
                 }
             }
             ctx.notify();
         });
         let manage_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Manage", NakedTheme)
+            ActionButton::new(crate::t!("common-manage"), NakedTheme)
                 .with_size(ButtonSize::InlineActionHeader)
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(GeminiEnterpriseCredentialsErrorAction::OpenSettings)
@@ -87,13 +91,8 @@ impl GeminiEnterpriseCredentialsErrorView {
         }
     }
 
-    fn update_refresh_button(
-        &self,
-        label: &'static str,
-        disabled: bool,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        self.refresh_button.update(ctx, |button, ctx| {
+    fn update_refresh_button(&self, label: String, disabled: bool, ctx: &mut ViewContext<Self>) {
+        self.refresh_button.update(ctx, move |button, ctx| {
             button.set_label(label, ctx);
             button.set_disabled(disabled, ctx);
         });
@@ -102,7 +101,7 @@ impl GeminiEnterpriseCredentialsErrorView {
     pub fn reset(&mut self, ctx: &mut ViewContext<Self>) {
         self.refresh_requested = false;
         self.refresh_succeeded = false;
-        self.update_refresh_button("Refresh credentials", false, ctx);
+        self.update_refresh_button(crate::t!("ai-gemini-refresh-credentials"), false, ctx);
         ctx.notify();
     }
 }
@@ -121,18 +120,18 @@ impl View for GeminiEnterpriseCredentialsErrorView {
         let theme = appearance.theme();
 
         let title = if self.refresh_succeeded {
-            "Gemini Enterprise credentials refreshed"
+            crate::t!("ai-gemini-refreshed-title")
         } else if self.refresh_requested {
-            "Refreshing Gemini Enterprise credentials..."
+            crate::t!("ai-gemini-refreshing-title")
         } else {
-            "Gemini Enterprise credentials expired or invalid"
+            crate::t!("ai-gemini-invalid-title")
         };
         let detail = if self.refresh_succeeded {
-            "Your credentials are ready. Retry the request to continue."
+            crate::t!("ai-gemini-refreshed-detail")
         } else if self.refresh_requested {
-            "Warp is refreshing your Google Cloud credentials."
+            crate::t!("ai-gemini-refreshing-detail")
         } else {
-            "Warp couldn't authenticate with Google Cloud. Refresh your Gemini Enterprise credentials, then retry the request."
+            crate::t!("ai-gemini-invalid-detail")
         };
         let header_color = if self.refresh_succeeded {
             theme.ansi_fg_green()
@@ -228,7 +227,7 @@ impl TypedActionView for GeminiEnterpriseCredentialsErrorView {
             GeminiEnterpriseCredentialsErrorAction::RefreshCredentials => {
                 self.refresh_requested = true;
                 self.refresh_succeeded = false;
-                self.update_refresh_button("Refreshing...", true, ctx);
+                self.update_refresh_button(crate::t!("ai-gemini-refreshing"), true, ctx);
                 ctx.emit(GeminiEnterpriseCredentialsErrorEvent::RefreshCredentials);
                 ctx.notify();
             }

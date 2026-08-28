@@ -79,12 +79,6 @@ const MAX_PROFILE_NAME_WIDTH_SCALE_FACTOR: f32 = 10.0;
 
 const PROFILE_SELECTOR_POSITION_ID: &str = "profile_selector";
 
-const PROFILE_PICKER_TOOLTIP: &str = "Choose an AI execution profile";
-const MODEL_PICKER_TOOLTIP: &str = "Choose an agent model";
-const MODEL_LOCKED_FOR_FOLLOWUP_TOOLTIP: &str = "Follow-ups use the original run's model";
-const MODEL_REQUIRES_EDIT_ACCESS_TOOLTIP: &str = "Request edit access to change model";
-const HARNESS_DEFAULT_MODEL_LABEL: &str = "default";
-
 pub fn calculate_scaled_font_size(appearance: &warp_core::ui::appearance::Appearance) -> f32 {
     if FeatureFlag::AgentView.is_enabled() {
         udi_font_size(appearance)
@@ -684,7 +678,7 @@ impl ProfileModelSelector {
         }
 
         let model_name = if self.is_third_party_harness(ctx) {
-            HARNESS_DEFAULT_MODEL_LABEL.to_string()
+            crate::t!("common-default")
         } else {
             let llm_preferences = LLMPreferences::as_ref(ctx);
             let active_llm = if FeatureFlag::InlineMenuHeaders.is_enabled()
@@ -715,23 +709,23 @@ impl ProfileModelSelector {
 
         // Non-Oz runs lock silently: the harness owns model selection, and the
         // user already knows that, so no tooltip is shown.
-        let model_tooltip: Option<&str> = if self.is_locked_for_non_oz_run(ctx) {
+        let model_tooltip = if self.is_locked_for_non_oz_run(ctx) {
             None
         } else {
-            Some(MODEL_PICKER_TOOLTIP)
+            Some(crate::t!("terminal-choose-agent-model-tooltip"))
         };
         let locked = self.is_model_locked(ctx);
         self.model_button.update(ctx, |button, ctx| {
             button.set_label(model_name, ctx);
             button.set_disabled(locked, ctx);
-            match model_tooltip {
+            match model_tooltip.as_deref() {
                 Some(t) => button.set_tooltip(Some(t), ctx),
                 None => button.clear_tooltip(ctx),
             }
         });
         self.model_compact_button.update(ctx, |button, ctx| {
             button.set_disabled(locked, ctx);
-            match model_tooltip {
+            match model_tooltip.as_deref() {
                 Some(t) => button.set_tooltip(Some(t), ctx),
                 None => button.clear_tooltip(ctx),
             }
@@ -873,7 +867,7 @@ impl ProfileModelSelector {
     //  `terminal/view/ambient_agent/model.rs` 没有这套 API(spawn 时只发
     //  `HarnessConfig::from_harness_type`,不带 model/reasoning_level),
     //  持久化用的 `CloudAgentSettings` 也未引入。故整块选择器移除,
-    //  3p harness 的模型按钮固定显示 `HARNESS_DEFAULT_MODEL_LABEL`。
+    // 第三方 harness 的模型按钮固定显示本地化的“默认”标签。
     //  若日后 view model 补齐上述 API,可从上游/git 历史整块恢复。
 
     fn refresh_model_menu(&mut self, ctx: &mut ViewContext<Self>) {
@@ -979,12 +973,13 @@ impl ProfileModelSelector {
                 items.push(MenuItem::Separator);
             }
             items.push(MenuItem::Header {
-                fields: MenuItemFields::new("Custom models").with_override_text_color(
-                    appearance
-                        .theme()
-                        .sub_text_color(appearance.theme().background())
-                        .into_solid(),
-                ),
+                fields: MenuItemFields::new(crate::t!("terminal-custom-models"))
+                    .with_override_text_color(
+                        appearance
+                            .theme()
+                            .sub_text_color(appearance.theme().background())
+                            .into_solid(),
+                    ),
                 clickable: false,
                 right_side_fields: None,
             });
@@ -1527,7 +1522,7 @@ impl ProfileModelSelector {
 
                 let tooltip = appearance
                     .ui_builder()
-                    .tool_tip(PROFILE_PICKER_TOOLTIP.to_owned());
+                    .tool_tip(crate::t!("terminal-choose-execution-profile-tooltip"));
                 let mut stack = Stack::new();
                 stack.add_child(button_with_hover);
                 stack.add_positioned_overlay_child(
@@ -1578,7 +1573,7 @@ impl ProfileModelSelector {
         drop(terminal_model);
 
         let model_display_name = if self.is_third_party_harness(app) {
-            HARNESS_DEFAULT_MODEL_LABEL.to_string()
+            crate::t!("common-default")
         } else if is_lrc {
             llm_preferences
                 .get_active_cli_agent_model(app, Some(self.terminal_view_id))
@@ -1675,7 +1670,7 @@ impl ProfileModelSelector {
 
                 let tooltip = appearance
                     .ui_builder()
-                    .tool_tip(MODEL_PICKER_TOOLTIP.to_owned());
+                    .tool_tip(crate::t!("terminal-choose-agent-model-tooltip"));
                 let mut stack = Stack::new();
                 stack.add_child(button_with_hover);
                 stack.add_positioned_overlay_child(
@@ -1690,14 +1685,14 @@ impl ProfileModelSelector {
                 stack.finish()
             } else if state.is_hovered() {
                 // Non-Oz runs lock silently — skip the tooltip entirely.
-                let tooltip_text: Option<&str> = if is_locked_for_non_oz {
+                let tooltip_text = if is_locked_for_non_oz {
                     None
                 } else {
-                    Some(MODEL_REQUIRES_EDIT_ACCESS_TOOLTIP)
+                    Some(crate::t!("terminal-model-edit-access-tooltip"))
                 };
 
                 if let Some(text) = tooltip_text {
-                    let tooltip = appearance.ui_builder().tool_tip(text.to_owned());
+                    let tooltip = appearance.ui_builder().tool_tip(text);
                     let mut stack = Stack::new();
                     stack.add_child(button_with_save_position);
                     stack.add_positioned_overlay_child(
@@ -1861,7 +1856,7 @@ impl ProfileModelSelector {
             Flex::row()
                 .with_main_axis_size(MainAxisSize::Max)
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(self.render_model_spec_value_label("Cost".to_string(), app))
+                .with_child(self.render_model_spec_value_label(crate::t!("model-spec-cost"), app))
                 .with_child(
                     Expanded::new(
                         1.,
@@ -1908,18 +1903,23 @@ impl ProfileModelSelector {
     ) -> Box<dyn Element> {
         let mut spec_values = vec![
             self.render_model_spec_value(
-                "Intelligence".to_string(),
+                crate::t!("model-spec-intelligence"),
                 spec.quality,
                 bg_bar_color,
                 app,
             ),
-            self.render_model_spec_value("Speed".to_string(), spec.speed, bg_bar_color, app),
+            self.render_model_spec_value(
+                crate::t!("model-spec-speed"),
+                spec.speed,
+                bg_bar_color,
+                app,
+            ),
         ];
         if let Some(byo_key_source) = byo_key_source {
             spec_values.push(self.render_model_spec_api_key(byo_key_source, app));
         } else {
             spec_values.push(self.render_model_spec_value(
-                "Cost".to_string(),
+                crate::t!("model-spec-cost"),
                 spec.cost,
                 bg_bar_color,
                 app,

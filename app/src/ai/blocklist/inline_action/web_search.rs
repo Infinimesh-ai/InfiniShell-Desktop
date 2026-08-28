@@ -60,7 +60,7 @@ impl WebSearchView {
         // 个性化进行时短语,对齐 opencode "Searching web..."。
         let _ = Appearance::as_ref(app);
         let text = if let Some(q) = query {
-            format!("Searching the web for \"{q}\"...")
+            crate::t!("ai-web-search-searching", query = q.as_str())
         } else {
             "Searching the web...".to_string()
         };
@@ -82,7 +82,7 @@ impl WebSearchView {
         let title_text = if query.is_empty() {
             "Searched the web".to_string()
         } else {
-            format!("Searched the web for \"{query}\"")
+            crate::t!("ai-web-search-searched", query = query)
         };
 
         let body = if self.collapsible.is_expanded {
@@ -133,7 +133,7 @@ impl WebSearchView {
 
         if pages.is_empty() {
             let no_results = Text::new_inline(
-                "No URLs found".to_string(),
+                crate::t!("ai-web-search-no-urls"),
                 appearance.ui_font_family(),
                 appearance.monospace_font_size(),
             )
@@ -188,7 +188,7 @@ impl View for WebSearchView {
                 let text = if query.is_empty() {
                     "Web search failed".to_string()
                 } else {
-                    format!("Web search failed for \"{query}\"")
+                    crate::t!("ai-web-search-failed", query = query.as_str())
                 };
                 super::search_results_common::render_status_header(
                     text,

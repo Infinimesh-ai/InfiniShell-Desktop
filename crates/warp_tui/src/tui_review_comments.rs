@@ -68,7 +68,7 @@ pub(crate) fn render_review_comments_tool_call(
 
 fn format_comment_target(comment: &InsertReviewComment) -> String {
     let Some(location) = &comment.comment_location else {
-        return "Pull request".to_owned();
+        return warp::t!("tui-pull-request");
     };
     format_location(location)
 }
@@ -86,9 +86,9 @@ fn format_location(location: &InsertedCommentLocation) -> String {
         format!("{}-{}", range.start, range.end)
     };
     let side = match line.side {
-        Some(CommentSide::Right) => "new",
-        Some(CommentSide::Left) => "old",
-        None => "diff",
+        Some(CommentSide::Right) => warp::t!("tui-diff-side-new"),
+        Some(CommentSide::Left) => warp::t!("tui-diff-side-old"),
+        None => warp::t!("tui-diff-side-diff"),
     };
     format!("{}:{line_label} ({side})", location.relative_file_path)
 }

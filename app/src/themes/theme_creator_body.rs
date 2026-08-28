@@ -242,25 +242,26 @@ impl ThemeCreatorBody {
 
         ctx.spawn(
             InMemoryThemeOptions::new(file_stem_string.clone(), path.clone()),
-            move |theme_creator_body, theme_options, ctx| {
-                match theme_options {
-                    Ok(theme_options) => {
-                        AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-                            appearance_manager.clear_transient_theme(ctx);
-                        });
+            move |theme_creator_body, theme_options, ctx| match theme_options {
+                Ok(theme_options) => {
+                    AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
+                        appearance_manager.clear_transient_theme(ctx);
+                    });
 
-                        theme_creator_body.theme_options = Some(theme_options);
-                        theme_creator_body.editor.update(ctx, |editor, ctx| {
-                            editor.set_buffer_text(&file_stem_string, ctx);
-                        });
-                        theme_creator_body.image_state = ThemeCreatorImageState::Uploaded;
-                    },
-                    Err(e) => {
-                        theme_creator_body.send_error_toast(
-                            format!("Failed to process selected image due to error: {e}. Please try again with a different image."),
-                            ctx,
-                        );
-                    }
+                    theme_creator_body.theme_options = Some(theme_options);
+                    theme_creator_body.editor.update(ctx, |editor, ctx| {
+                        editor.set_buffer_text(&file_stem_string, ctx);
+                    });
+                    theme_creator_body.image_state = ThemeCreatorImageState::Uploaded;
+                }
+                Err(e) => {
+                    theme_creator_body.send_error_toast(
+                        crate::t!(
+                            "theme-creator-process-image-failed-with-error",
+                            error = e.to_string()
+                        ),
+                        ctx,
+                    );
                 }
             },
         );

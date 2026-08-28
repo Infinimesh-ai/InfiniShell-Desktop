@@ -133,7 +133,7 @@ impl View for GoToLineView {
         let theme = appearance.theme();
 
         let label = Text::new_inline(
-            "Go to line",
+            crate::t!("editor-go-to-line"),
             appearance.ui_font_family(),
             appearance.ui_font_body(),
         )

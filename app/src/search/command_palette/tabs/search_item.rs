@@ -105,7 +105,7 @@ impl SearchItemTrait for SearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Selected tab: {}.", self.tab.title)
+        crate::t!("search-selected-tab-a11y", title = self.tab.title.as_str())
     }
 
     fn accessibility_help_message(&self) -> Option<String> {

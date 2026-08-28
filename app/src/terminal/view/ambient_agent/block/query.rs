@@ -7,7 +7,6 @@ use crate::ai::blocklist::block::view_impl::query::render_query;
 use crate::ai::blocklist::block::view_impl::{CONTENT_VERTICAL_PADDING, WithContentItemSpacing};
 use crate::auth::AuthStateProvider;
 use crate::terminal::view::ambient_agent::{AmbientAgentViewModel, AmbientAgentViewModelEvent};
-use crate::workspace::view::DEFAULT_USER_DISPLAY_NAME;
 
 /// Renders the submitted prompt immediately while the environment is still being set up, so ambient-agent setup feels like local agent mode even before the first exchange is available in history.
 pub struct AmbientAgentInitialUserQuery {
@@ -60,7 +59,7 @@ fn render_user_query(
     let auth_state = AuthStateProvider::as_ref(app).get().clone();
     let user_display_name = auth_state
         .username_for_display()
-        .unwrap_or_else(|| DEFAULT_USER_DISPLAY_NAME.to_owned());
+        .unwrap_or_else(|| crate::t!("common-user"));
     let profile_image_url = auth_state.user_photo_url();
 
     let mut column = Flex::column().with_child(
@@ -89,7 +88,7 @@ fn render_user_query(
     if ambient_agent_model.error_message().is_some() {
         column.add_child(
             Text::new(
-                "Failed",
+                crate::t!("common-failed"),
                 appearance.ui_font_family(),
                 appearance.monospace_font_size(),
             )

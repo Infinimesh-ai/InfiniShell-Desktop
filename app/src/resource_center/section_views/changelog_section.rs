@@ -30,9 +30,6 @@ struct ChangelogMouseStateHandles {
     view_changelogs_mouse_state: MouseStateHandle,
 }
 
-const CHANGELOG_FETCH_ERROR_MSG: &str = "Unable to fetch the latest changelog.";
-const CHANGELOG_LOADING_MSG: &str = "Loading...";
-
 pub struct ChangelogSectionView {
     changelog_model_handle: ModelHandle<ChangelogModel>,
     changelog_button_mouse_states: ChangelogMouseStateHandles,
@@ -96,10 +93,10 @@ impl ChangelogSectionView {
             new_features_highlighted_link: Default::default(),
             improvements_highlighted_link: Default::default(),
             bug_fixes_highlighted_link: Default::default(),
-            changelog_fetch_error: create_formatted_text_from_string(
-                CHANGELOG_FETCH_ERROR_MSG.to_string(),
-            ),
-            changelog_loading: create_formatted_text_from_string(CHANGELOG_LOADING_MSG.to_string()),
+            changelog_fetch_error: create_formatted_text_from_string(crate::t!(
+                "resource-center-changelog-fetch-error"
+            )),
+            changelog_loading: create_formatted_text_from_string(crate::t!("common-loading")),
         }
     }
 
@@ -118,9 +115,10 @@ impl ChangelogSectionView {
         model: &ChangelogModel,
         appearance: &Appearance,
     ) {
-        let title = ChangelogHeader::NewFeatures.to_string();
+        let changelog_key = ChangelogHeader::NewFeatures.to_string();
+        let title = changelog_header_label(ChangelogHeader::NewFeatures);
         let icon = icons::Icon::Gift;
-        let Some(markdown) = model.parsed_changelog.get(&title) else {
+        let Some(markdown) = model.parsed_changelog.get(&changelog_key) else {
             return;
         };
 
@@ -199,10 +197,11 @@ impl ChangelogSectionView {
         ];
 
         for (section, icon, link) in additional_sections {
-            let title = section.to_string();
-            let Some(markdown) = model.parsed_changelog.get(&title) else {
+            let changelog_key = section.to_string();
+            let Some(markdown) = model.parsed_changelog.get(&changelog_key) else {
                 continue;
             };
+            let title = changelog_header_label(section);
 
             // Title
             content.add_child(render_basic_changelog_header(
@@ -367,7 +366,7 @@ impl SectionView for ChangelogSectionView {
             appearance
                 .ui_builder()
                 .link(
-                    "Read all changelogs".into(),
+                    crate::t!("resource-center-read-all-changelogs").into(),
                     Some("".into()),
                     None,
                     self.changelog_button_mouse_states
@@ -384,6 +383,14 @@ impl SectionView for ChangelogSectionView {
                 .build()
                 .finish(),
         )
+    }
+}
+
+fn changelog_header_label(header: ChangelogHeader) -> String {
+    match header {
+        ChangelogHeader::NewFeatures => crate::t!("resource-center-changelog-new-features"),
+        ChangelogHeader::Improvements => crate::t!("resource-center-changelog-improvements"),
+        ChangelogHeader::BugFixes => crate::t!("resource-center-changelog-bug-fixes"),
     }
 }
 

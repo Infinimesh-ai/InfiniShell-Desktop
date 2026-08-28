@@ -882,7 +882,9 @@ impl FileUploadState {
 
         file_node_to_update.status = match result {
             UploadResult::Success(id) => UploadStatus::Loaded(id),
-            UploadResult::Error(e) => UploadStatus::Error(format!("Failed to parse file: {e}")),
+            UploadResult::Error(error) => {
+                UploadStatus::Error(crate::t!("drive-import-parse-file-error", error = error))
+            }
         };
 
         let parent_id = file_node_to_update.parent_id;

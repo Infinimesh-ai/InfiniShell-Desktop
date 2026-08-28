@@ -373,8 +373,8 @@ impl HoaOnboardingFlow {
 
     fn render_callout_content(
         &self,
-        title: &'static str,
-        description: &'static str,
+        title: String,
+        description: String,
         extra_child: Option<Box<dyn Element>>,
         button: &ViewHandle<ActionButton>,
         appearance: &Appearance,
@@ -424,7 +424,7 @@ impl HoaOnboardingFlow {
             .finish();
 
         let checkbox_label = Text::new_inline(
-            "Switch back to horizontal tabs".to_string(),
+            crate::t!("hoa-switch-horizontal-tabs"),
             appearance.ui_font_family(),
             12.,
         )
@@ -445,8 +445,8 @@ impl HoaOnboardingFlow {
         };
 
         self.render_callout_content(
-            "Introducing vertical tabs - the new default",
-            "Vertical tabs show all open agent and terminal panes, grouped by tab. Customize what information you want to see to support your workflow.",
+            crate::t!("hoa-vertical-tabs-callout-title"),
+            crate::t!("hoa-vertical-tabs-callout-description"),
             Some(checkbox_row),
             button,
             appearance,
@@ -455,7 +455,7 @@ impl HoaOnboardingFlow {
 
     fn render_inbox_callout(&self, appearance: &Appearance) -> Box<dyn Element> {
         let title = Text::new(
-            "Meet your new agent inbox",
+            crate::t!("hoa-agent-inbox-callout-title"),
             appearance.ui_font_family(),
             16.,
         )
@@ -474,9 +474,7 @@ impl HoaOnboardingFlow {
         };
 
         let formatted = FormattedText::new([FormattedTextLine::Line(vec![
-            FormattedTextFragment::plain_text(
-                "InfiniShell pipes through notifications from any CLI coding agent into a unified notification center that works across all coding agents and harnesses. ",
-            ),
+            FormattedTextFragment::plain_text(crate::t!("hoa-agent-inbox-callout-description")),
             learn_more_fragment,
         ])]);
 

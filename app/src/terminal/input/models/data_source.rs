@@ -22,8 +22,8 @@ use warpui::{
 };
 
 use super::model_spec_scores::{
-    CUSTOM_MODEL_ROUTER_DESCRIPTION, CUSTOM_MODEL_ROUTER_TITLE, CostRow, ModelSpecScoresLayout,
-    render_byop_spec_scores, render_model_spec_header, render_model_spec_scores,
+    CostRow, ModelSpecScoresLayout, render_byop_spec_scores, render_model_spec_header,
+    render_model_spec_scores,
 };
 use crate::ai::agent_providers::{llm_id as byop_llm_id, lookup_byop};
 use crate::ai::custom_model_routers::is_custom_router_id;
@@ -51,7 +51,6 @@ use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// Auto models pick their concrete model server-side, so the cost line names the
 /// class of inference rather than a host the request may never reach.
-const AUTO_HOSTED_INFERENCE_LABEL: &str = "Inference may use your hosted inference";
 
 #[derive(Clone, Debug)]
 pub struct AcceptModel {
@@ -581,11 +580,9 @@ impl SearchItem for ModelSearchItem {
 
         // Custom auto models get an informational blurb instead of spec bars.
         if self.is_custom_router {
-            let header = render_model_spec_header(
-                CUSTOM_MODEL_ROUTER_TITLE,
-                CUSTOM_MODEL_ROUTER_DESCRIPTION,
-                app,
-            );
+            let title = crate::t!("terminal-custom-model-router-title");
+            let description = crate::t!("terminal-custom-model-router-description");
+            let header = render_model_spec_header(&title, &description, app);
             let source_text = Text::new(
                 self.description.as_deref().unwrap_or("").to_string(),
                 appearance.ui_font_family(),
@@ -716,15 +713,15 @@ impl SearchItem for ModelSearchItem {
                 label: if self.is_auto
                     && (self.is_using_bedrock || self.is_using_gemini_enterprise_agent_platform)
                 {
-                    AUTO_HOSTED_INFERENCE_LABEL
+                    crate::t!("model-spec-inference-may-use-hosted")
                 } else if self.is_using_bedrock {
-                    "Inference via Bedrock"
+                    crate::t!("model-spec-inference-via-bedrock")
                 } else if self.is_using_gemini_enterprise_agent_platform {
-                    "Inference via Gemini Enterprise Agent Platform"
+                    crate::t!("model-spec-inference-via-gemini-enterprise")
                 } else if let Some(source) = self.byo_key_source {
                     source.inference_label()
                 } else {
-                    "Inference via API key"
+                    crate::t!("model-spec-inference-via-api-key")
                 },
                 manage_button: Container::new(manage_button).finish(),
             }
@@ -846,7 +843,7 @@ impl SearchItem for ModelSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        let mut label = format!("Model: {}", self.display_text);
+        let mut label = crate::t!("search-model-a11y", name = self.display_text.as_str());
         if self.is_selected {
             label.push_str(" (selected)");
         }

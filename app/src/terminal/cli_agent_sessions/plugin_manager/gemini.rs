@@ -98,7 +98,7 @@ impl CliAgentPluginManager for GeminiPluginManager {
         if still_outdated {
             log.push_str("Post-update version check: plugin is still outdated\n");
             return Err(PluginInstallError {
-                message: "Plugin update did not take effect".to_owned(),
+                message: crate::t!("cli-agent-plugin-update-not-effective"),
                 log,
             });
         }
@@ -106,11 +106,11 @@ impl CliAgentPluginManager for GeminiPluginManager {
     }
 
     fn install_success_message(&self) -> &'static str {
-        "InfiniShell plugin installed. Please restart Gemini CLI to activate."
+        crate::t_static!("cli-agent-plugin-gemini-installed")
     }
 
     fn update_success_message(&self) -> &'static str {
-        "InfiniShell plugin updated. Please restart Gemini CLI to activate."
+        crate::t_static!("cli-agent-plugin-gemini-updated")
     }
 
     fn install_instructions(&self) -> &'static PluginInstructions {

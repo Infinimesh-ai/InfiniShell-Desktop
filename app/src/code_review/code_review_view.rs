@@ -3582,7 +3582,7 @@ impl CodeReviewView {
             )
             .with_child(
                 Text::new(
-                    "Error loading diffs",
+                    crate::t!("code-review-error-loading-diffs"),
                     appearance.ui_font_family(),
                     appearance.ui_font_subheading(),
                 )
@@ -3625,7 +3625,7 @@ impl CodeReviewView {
                         )
                         .with_text_and_icon_label(TextAndIcon::new(
                             TextAndIconAlignment::IconFirst,
-                            " Retry".to_string(),
+                            format!(" {}", crate::t!("common-retry")),
                             Icon::Refresh.to_warpui_icon(warp_core::ui::theme::Fill::Solid(
                                 theme.main_text_color(theme.background()).into(),
                             )),
@@ -3690,7 +3690,7 @@ impl CodeReviewView {
             )
             .with_child(
                 Text::new(
-                    "Cannot detect diffs for this folder",
+                    crate::t!("code-review-cannot-detect-diffs"),
                     appearance.ui_font_family(),
                     appearance.ui_font_subheading(),
                 )
@@ -3855,7 +3855,7 @@ impl CodeReviewView {
             .with_child(
                 Container::new(
                     Text::new(
-                        "As you or the Agent make changes, you'll be able to track them here.",
+                        crate::t!("code-review-no-changes-description"),
                         appearance.ui_font_family(),
                         14.,
                     )
@@ -3876,7 +3876,7 @@ impl CodeReviewView {
                 zero_state_column.add_child(
                     Container::new(
                         Text::new(
-                            format!("Repo is initialized with a {file_name} file."),
+                            crate::t!("code-review-repo-initialized-with-file", file = file_name),
                             appearance.ui_font_family(),
                             12.,
                         )
@@ -4708,8 +4708,10 @@ impl CodeReviewView {
             {
                 let save_keystroke = Keystroke::parse("cmdorctrl-s").unwrap_or_default();
                 let save_shortcut = save_keystroke.displayed();
-                let tooltip_text =
-                    format!("This file has unsaved changes. {save_shortcut} to save");
+                let tooltip_text = crate::t!(
+                    "code-review-unsaved-changes-tooltip",
+                    shortcut = save_shortcut
+                );
                 render_unsaved_circle_with_tooltip(
                     editor_state.unsaved_changes_mouse_state(),
                     tooltip_text,
@@ -4972,7 +4974,7 @@ impl CodeReviewView {
         if file.file_diff.is_binary {
             Self::styled_file_content_container(
                 Text::new(
-                    "Binary file - no diff available",
+                    crate::t!("code-review-binary-no-diff"),
                     appearance.monospace_font_family(),
                     appearance.monospace_font_size(),
                 )
@@ -4983,7 +4985,7 @@ impl CodeReviewView {
         } else if file.file_diff.status.is_renamed() && file.file_diff.is_empty() {
             Self::styled_file_content_container(
                 Text::new(
-                    "File renamed without changes",
+                    crate::t!("code-review-file-renamed-without-changes"),
                     appearance.monospace_font_family(),
                     appearance.monospace_font_size(),
                 )
@@ -4994,7 +4996,7 @@ impl CodeReviewView {
         } else if file.file_diff.status.is_new_file() && file.file_diff.is_empty() {
             Self::styled_file_content_container(
                 Text::new(
-                    "New empty file",
+                    crate::t!("code-review-new-empty-file"),
                     appearance.monospace_font_family(),
                     appearance.monospace_font_size(),
                 )
@@ -5024,7 +5026,7 @@ impl CodeReviewView {
         } else {
             Self::styled_file_content_container(
                 Text::new(
-                    "Unable to load file content",
+                    crate::t!("code-review-file-content-unavailable"),
                     appearance.ui_font_family(),
                     appearance.ui_font_size(),
                 )
@@ -5116,7 +5118,7 @@ impl CodeReviewView {
 
         if self.discard_dialog_state.discard_file_paths.is_empty() {
             return Text::new(
-                "No file selected",
+                crate::t!("code-review-no-file-selected"),
                 appearance.ui_font_family(),
                 appearance.ui_font_size(),
             )
@@ -5131,7 +5133,7 @@ impl CodeReviewView {
 
         let CodeReviewViewState::Loaded(loaded) = self.state() else {
             return Text::new(
-                "No files to discard",
+                crate::t!("code-review-no-files-to-discard"),
                 appearance.ui_font_family(),
                 appearance.ui_font_size(),
             )
@@ -5401,9 +5403,9 @@ impl CodeReviewView {
 
                 let toast_id = self.revert_hunk_toast_id(ctx);
                 crate::workspace::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = crate::view_components::DismissibleToast::default(
-                        "Diff removed".to_string(),
-                    )
+                    let toast = crate::view_components::DismissibleToast::default(crate::t!(
+                        "code-review-diff-removed"
+                    ))
                     .with_object_id(toast_id)
                     .with_action_button(self.undo_action_button.clone());
                     toast_stack.add_ephemeral_toast(toast, self.window_id, ctx);
@@ -5503,9 +5505,9 @@ impl CodeReviewView {
             if is_long_running {
                 let toast_id = self.attach_context_not_allowed_toast_id(ctx);
                 crate::workspace::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = crate::view_components::DismissibleToast::default(
-                        "Cannot attach context when terminal is running".to_string(),
-                    )
+                    let toast = crate::view_components::DismissibleToast::default(crate::t!(
+                        "code-review-cannot-attach-terminal-running"
+                    ))
                     .with_object_id(toast_id);
                     toast_stack.add_ephemeral_toast(toast, self.window_id, ctx);
                 });
@@ -5611,9 +5613,9 @@ impl CodeReviewView {
             if !is_input_box_visible {
                 let toast_id = self.attach_diff_not_allowed_toast_id(ctx);
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = DismissibleToast::default(
-                        "Cannot attach diff while input is not available".to_string(),
-                    )
+                    let toast = DismissibleToast::default(crate::t!(
+                        "code-review-cannot-attach-input-unavailable"
+                    ))
                     .with_object_id(toast_id);
                     toast_stack.add_ephemeral_toast(toast, self.window_id, ctx);
                 });
@@ -6353,7 +6355,7 @@ impl CodeReviewView {
                     button.set_label(crate::t!("common-push"), ctx);
                     button.set_icon(Some(Icon::ArrowUp), ctx);
                     button.set_disabled(false, ctx);
-                    button.set_tooltip(Some("Push commits to remote"), ctx);
+                    button.set_tooltip(Some(crate::t!("code-review-push-tooltip")), ctx);
                     button.set_on_click(
                         |ctx| ctx.dispatch_typed_action(CodeReviewAction::OpenPushDialog),
                         ctx,
@@ -6369,7 +6371,7 @@ impl CodeReviewView {
                     button.set_label(crate::t!("code-review-create-pr"), ctx);
                     button.set_icon(Some(Icon::Github), ctx);
                     button.set_disabled(false, ctx);
-                    button.set_tooltip(Some("Create a pull request"), ctx);
+                    button.set_tooltip(Some(crate::t!("code-review-create-pr-tooltip")), ctx);
                     button.set_on_click(
                         |ctx| ctx.dispatch_typed_action(CodeReviewAction::OpenCreatePrDialog),
                         ctx,
@@ -6390,9 +6392,9 @@ impl CodeReviewView {
                         button.set_disabled(is_pr_info_refreshing, ctx);
                         button.set_tooltip(
                             Some(if is_pr_info_refreshing {
-                                "Refreshing PR info"
+                                crate::t!("code-review-refreshing-pr-info")
                             } else {
-                                "View pull request on GitHub"
+                                crate::t!("code-review-view-pr-github")
                             }),
                             ctx,
                         );
@@ -6411,7 +6413,7 @@ impl CodeReviewView {
                     button.set_label(crate::t!("common-publish"), ctx);
                     button.set_icon(Some(Icon::UploadCloud), ctx);
                     button.set_disabled(false, ctx);
-                    button.set_tooltip(Some("Publish branch to remote"), ctx);
+                    button.set_tooltip(Some(crate::t!("code-review-publish-tooltip")), ctx);
                     button.set_on_click(
                         |ctx| ctx.dispatch_typed_action(CodeReviewAction::PublishBranch),
                         ctx,

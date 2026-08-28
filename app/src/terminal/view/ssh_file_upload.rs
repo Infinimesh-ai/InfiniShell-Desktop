@@ -366,9 +366,15 @@ impl FileUpload {
     /// assembly.
     fn render_file_detail_text(&self, file: &FileUploadInfo) -> FormattedText {
         let status_string = match file.status {
-            FileUploadStatus::Started | FileUploadStatus::AwaitingPassword => "Uploading",
-            FileUploadStatus::Completed { successful: true } => "Uploaded",
-            FileUploadStatus::Completed { successful: false } => "Failed to upload",
+            FileUploadStatus::Started | FileUploadStatus::AwaitingPassword => {
+                crate::t!("terminal-file-uploading")
+            }
+            FileUploadStatus::Completed { successful: true } => {
+                crate::t!("terminal-file-uploaded")
+            }
+            FileUploadStatus::Completed { successful: false } => {
+                crate::t!("terminal-file-upload-failed")
+            }
         };
 
         let mut file_iter = file.local_file_paths.iter().peekable();
@@ -393,7 +399,7 @@ impl FileUpload {
         }
 
         let mut dest_fragments = vec![
-            FormattedTextFragment::plain_text(" to "),
+            FormattedTextFragment::plain_text(crate::t!("terminal-file-upload-to")),
             FormattedTextFragment::inline_code(&file.remote_host),
         ];
         if let Some(remote_path) = &file.remote_dest_path {

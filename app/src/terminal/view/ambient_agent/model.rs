@@ -13,7 +13,7 @@ use crate::ai::ambient_agents::spawn::{AmbientAgentEvent, spawn_task};
 use crate::ai::ambient_agents::task::{HarnessAuthSecretsConfig, HarnessConfig};
 use crate::ai::ambient_agents::{
     AgentConfigSnapshot, AmbientAgentTaskId, AmbientAgentTaskState, AttachmentInput,
-    OUT_OF_CREDITS_TASK_FAILURE_MESSAGE, SERVER_OVERLOADED_TASK_FAILURE_MESSAGE, SpawnAgentRequest,
+    SpawnAgentRequest, out_of_credits_task_failure_message, server_overloaded_task_failure_message,
 };
 use crate::ai::api_error::AIApiError;
 use crate::ai::blocklist::{BlocklistAIHistoryModel, BlocklistAIPermissions};
@@ -588,7 +588,7 @@ impl AmbientAgentViewModel {
                             match ai_api_error {
                                 AIApiError::QuotaLimit => {
                                     me.handle_spawn_error(
-                                        OUT_OF_CREDITS_TASK_FAILURE_MESSAGE.to_string(),
+                                        out_of_credits_task_failure_message(),
                                         ctx,
                                     );
                                     ctx.emit(AmbientAgentViewModelEvent::ShowAICreditModal);
@@ -596,7 +596,7 @@ impl AmbientAgentViewModel {
                                 }
                                 AIApiError::ServerOverloaded => {
                                     me.handle_spawn_error(
-                                        SERVER_OVERLOADED_TASK_FAILURE_MESSAGE.to_string(),
+                                        server_overloaded_task_failure_message(),
                                         ctx,
                                     );
                                     return;

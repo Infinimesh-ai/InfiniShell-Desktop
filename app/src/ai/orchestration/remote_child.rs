@@ -23,8 +23,8 @@ use crate::ai::ambient_agents::task::{
     AgentConfigSnapshot, HarnessAuthSecretsConfig, HarnessConfig, normalize_orchestrator_agent_name,
 };
 use crate::ai::ambient_agents::{
-    OUT_OF_CREDITS_TASK_FAILURE_MESSAGE, SERVER_OVERLOADED_TASK_FAILURE_MESSAGE, SpawnAgentRequest,
-    github_auth_url,
+    SpawnAgentRequest, github_auth_url, out_of_credits_task_failure_message,
+    server_overloaded_task_failure_message,
 };
 use crate::ai::api_error::{AIApiError, ClientError};
 use crate::ai::blocklist::StartAgentRequest;
@@ -111,12 +111,12 @@ impl PrepareRemoteChildLaunchError {
     pub fn user_message(&self) -> String {
         match self {
             Self::MissingParentRunId => {
-                "Remote child agents require the parent run_id to be available.".to_string()
+                crate::t!("ai-orchestration-parent-run-required")
             }
             Self::UnresolvedSkills { references } => {
-                format!(
-                    "Failed to resolve child agent skills: {}",
-                    references.join(", ")
+                crate::t!(
+                    "ai-orchestration-skill-resolution-failed",
+                    references = references.join(", ")
                 )
             }
         }
@@ -184,16 +184,16 @@ pub enum CloudAgentStartupAuthFlow {
 /// Renderer-neutral content for a cloud-agent startup card.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CloudAgentStartupPresentation {
-    pub title: &'static str,
+    pub title: String,
     pub detail: String,
-    pub action_label: Option<&'static str>,
+    pub action_label: Option<String>,
     pub primary_url: Option<String>,
 }
 
 impl CloudAgentStartupPresentation {
     pub fn failure(message: impl Into<String>) -> Self {
         Self {
-            title: "Failed to start environment",
+            title: crate::t!("ai-orchestration-cloud-environment-failed"),
             detail: message.into(),
             action_label: None,
             primary_url: None,
@@ -203,16 +203,16 @@ impl CloudAgentStartupPresentation {
     pub fn github_auth(auth_url: impl Into<String>, flow: CloudAgentStartupAuthFlow) -> Self {
         let detail = match flow {
             CloudAgentStartupAuthFlow::RetryRetainedRequest => {
-                "Please authenticate with GitHub to continue"
+                crate::t!("ai-orchestration-github-auth-continue")
             }
             CloudAgentStartupAuthFlow::RerunOrchestrationRequest => {
-                "Authenticate with GitHub, then run the orchestration request again."
+                crate::t!("ai-orchestration-github-auth-rerun")
             }
         };
         Self {
-            title: "GitHub Authentication Required",
-            detail: detail.to_string(),
-            action_label: Some("Authenticate with GitHub"),
+            title: crate::t!("ai-orchestration-github-auth-required"),
+            detail,
+            action_label: Some(crate::t!("ai-orchestration-authenticate-github")),
             primary_url: Some(auth_url.into()),
         }
     }
@@ -332,13 +332,13 @@ pub fn classify_cloud_agent_startup_error(error: &anyhow::Error) -> CloudAgentSt
         match ai_api_error {
             AIApiError::QuotaLimit => {
                 return CloudAgentStartupIssue::Failed(CloudAgentStartupFailure::OutOfCredits {
-                    message: OUT_OF_CREDITS_TASK_FAILURE_MESSAGE.to_string(),
+                    message: out_of_credits_task_failure_message(),
                 });
             }
             AIApiError::ServerOverloaded => {
                 return CloudAgentStartupIssue::Failed(
                     CloudAgentStartupFailure::ServerOverloaded {
-                        message: SERVER_OVERLOADED_TASK_FAILURE_MESSAGE.to_string(),
+                        message: server_overloaded_task_failure_message(),
                     },
                 );
             }

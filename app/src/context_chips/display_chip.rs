@@ -584,23 +584,25 @@ impl GitBranchTrackingStatus {
     fn tooltip_text(&self) -> String {
         match &self.upstream {
             Some(upstream) if self.is_rebased() => {
-                format!("Tracking {upstream} • branch was rebased")
+                crate::t!("context-git-tracking-rebased", upstream = upstream.as_str())
             }
-            Some(upstream) if self.counts_available => format!(
-                "Tracking {upstream} • ahead {}, behind {}",
-                self.ahead, self.behind
+            Some(upstream) if self.counts_available => crate::t!(
+                "context-git-tracking-counts",
+                upstream = upstream.as_str(),
+                ahead = self.ahead,
+                behind = self.behind
             ),
-            Some(upstream) => {
-                format!("Tracking {upstream}; ahead/behind counts are unavailable")
-            }
-            None if self.is_rebased() => {
-                "Branch was rebased; upstream name is unavailable".to_string()
-            }
-            None if self.counts_available => format!(
-                "Ahead {}, behind {}; upstream name is unavailable",
-                self.ahead, self.behind
+            Some(upstream) => crate::t!(
+                "context-git-tracking-counts-unavailable",
+                upstream = upstream.as_str()
             ),
-            None => "No upstream configured".to_string(),
+            None if self.is_rebased() => crate::t!("context-git-rebased-no-upstream"),
+            None if self.counts_available => crate::t!(
+                "context-git-counts-no-upstream",
+                ahead = self.ahead,
+                behind = self.behind
+            ),
+            None => crate::t!("context-git-no-upstream"),
         }
     }
 }
@@ -716,7 +718,7 @@ impl GitBranch {
 
         if branch.is_linked_worktree {
             return PromptChipShellCommand::Echo {
-                message: "The branch is already checked out in another worktree, but Warp couldn't find its path.",
+                message: PromptChipShellMessage::BranchWorktreePathUnavailable,
             };
         }
 
@@ -782,7 +784,7 @@ impl GenericMenuItem for CreateGitBranch {
     }
 
     fn name(&self) -> String {
-        format!("Create new branch \"{}\"", self.0)
+        crate::t!("context-chip-create-branch", name = self.0.as_str())
     }
 
     fn icon(&self, _app: &AppContext) -> Option<Icon> {
@@ -2104,12 +2106,24 @@ pub enum PromptChipShellCommand {
     },
     NvmInstallLatestNode,
     Echo {
-        /// The message to echo.
-        ///
-        /// This is very intentionally a `&'static str` to ensure that the message is a compile-time constant.
-        /// This is to prevent accidental injection of user input into the message.
-        message: &'static str,
+        /// 仅允许预定义消息，避免把用户输入拼进 `echo` 命令。
+        message: PromptChipShellMessage,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PromptChipShellMessage {
+    BranchWorktreePathUnavailable,
+}
+
+impl PromptChipShellMessage {
+    pub fn localized_text(self) -> String {
+        match self {
+            Self::BranchWorktreePathUnavailable => {
+                crate::t!("context-branch-worktree-path-unavailable")
+            }
+        }
+    }
 }
 
 pub enum PromptDisplayChipEvent {

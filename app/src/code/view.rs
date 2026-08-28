@@ -938,7 +938,7 @@ impl CodeView {
 
         let title = match &file_location {
             Some(location) => display_path_with_host(location, false, ctx),
-            None => "Untitled".to_string(),
+            None => crate::t!("common-untitled"),
         };
 
         self.pane_configuration.update(ctx, |pane_config, ctx| {
@@ -946,7 +946,7 @@ impl CodeView {
             if self.tab_group.len() > 1 {
                 secondary.push_str(&format!(" (+{})", self.tab_group.len() - 1));
             } else if is_new {
-                secondary.push_str(" (new)");
+                secondary.push_str(&crate::t!("code-new-file-suffix"));
             }
 
             pane_config.set_title(title, ctx);
@@ -1073,7 +1073,7 @@ impl CodeView {
     fn display_remote_disconnected_save_failure(window_id: WindowId, ctx: &mut ViewContext<Self>) {
         ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
             let toast =
-                DismissibleToast::error(String::from("Cannot save — remote session disconnected."))
+                DismissibleToast::error(crate::t!("code-cannot-save-remote-session-disconnected"))
                     .with_object_id("failed_to_save_file_remote_disconnected".to_string());
             toast_stack.add_ephemeral_toast(toast, window_id, ctx);
         });
@@ -1801,7 +1801,7 @@ impl CodeView {
             .as_ref()
             .map(|loc| display_name_with_host(loc, app))
             .filter(|n| !n.is_empty())
-            .unwrap_or_else(|| "Untitled".to_string());
+            .unwrap_or_else(|| crate::t!("common-untitled"));
         let language_icon =
             icon_from_file_path(&file_name, appearance, ItemHighlightState::Default);
         row.add_child(
@@ -2191,7 +2191,7 @@ impl CodeView {
                     .map(|loc| display_name_with_host(loc, app))
                     .filter(|n| !n.is_empty())
             })
-            .unwrap_or_else(|| "Untitled".to_string());
+            .unwrap_or_else(|| crate::t!("common-untitled"));
 
         let appearance = Appearance::as_ref(app);
         let is_pane_dragging = header_ctx.draggable_state.is_dragging();
@@ -2329,9 +2329,12 @@ impl CodeView {
         };
 
         let mut items = vec![
-            MenuItemFields::new_with_label("Close saved", &format!("{modifier_keys} U"))
-                .with_on_select_action(CodeViewAction::CloseSaved)
-                .into_item(),
+            MenuItemFields::new_with_label(
+                crate::t!("code-close-saved"),
+                format!("{modifier_keys} U"),
+            )
+            .with_on_select_action(CodeViewAction::CloseSaved)
+            .into_item(),
             MenuItemFields::toggle_pane_action(is_maximized)
                 .with_on_select_action(CodeViewAction::ToggleMaximized)
                 .into_item(),
@@ -2355,11 +2358,11 @@ impl CodeView {
 
             if local_path.is_some() {
                 let reveal_label = if cfg!(target_os = "macos") {
-                    "Reveal in Finder"
+                    crate::t!("code-reveal-in-finder")
                 } else if cfg!(target_os = "windows") {
-                    "Reveal in Explorer"
+                    crate::t!("code-reveal-in-explorer")
                 } else {
-                    "Reveal in file manager"
+                    crate::t!("code-reveal-in-file-manager")
                 };
                 items.push(
                     MenuItemFields::new(reveal_label)

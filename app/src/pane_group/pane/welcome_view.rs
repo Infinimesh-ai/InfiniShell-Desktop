@@ -160,7 +160,10 @@ impl WelcomeView {
                 Err(err) => {
                     ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                         toast_stack.add_ephemeral_toast(
-                            DismissibleToast::error(format!("{err}")),
+                            DismissibleToast::error(crate::t!(
+                                "file-picker-select-folder-error",
+                                error = err.to_string()
+                            )),
                             window_id,
                             ctx,
                         );

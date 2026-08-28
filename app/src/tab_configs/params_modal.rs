@@ -282,7 +282,7 @@ impl TabConfigParamsModal {
                 TabConfigParamType::Text => {
                     let default_text = param.default.clone().unwrap_or_default();
                     let placeholder = if default_text.is_empty() {
-                        format!("Enter {name}")
+                        crate::t!("tab-config-enter-parameter", name = name.as_str())
                     } else {
                         default_text.clone()
                     };
@@ -597,7 +597,7 @@ impl View for TabConfigParamsModal {
                 form.add_child(
                     Container::new(
                         Text::new_inline(
-                            format!("Default: {default_value}"),
+                            crate::t!("tab-config-default-value", value = default_value.as_str()),
                             appearance.ui_font_family(),
                             appearance.ui_font_footnote(),
                         )

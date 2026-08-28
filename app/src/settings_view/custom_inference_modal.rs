@@ -134,7 +134,10 @@ impl CustomEndpointModal {
                 ..Default::default()
             };
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text("e.g., Zach's external models", ctx);
+            editor.set_placeholder_text(
+                crate::t!("settings-agent-providers-custom-endpoint-name-placeholder"),
+                ctx,
+            );
             if let Some(ep) = endpoint {
                 editor.set_buffer_text(&ep.name, ctx);
             }
@@ -154,7 +157,10 @@ impl CustomEndpointModal {
                 ..Default::default()
             };
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text("Please include 'https://'", ctx);
+            editor.set_placeholder_text(
+                crate::t!("settings-agent-providers-custom-endpoint-url-placeholder"),
+                ctx,
+            );
             if let Some(ep) = endpoint {
                 editor.set_buffer_text(&ep.url, ctx);
             }
@@ -175,7 +181,10 @@ impl CustomEndpointModal {
                 ..Default::default()
             };
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text("e.g., sk-...", ctx);
+            editor.set_placeholder_text(
+                crate::t!("settings-agent-providers-custom-endpoint-api-key-placeholder"),
+                ctx,
+            );
             if let Some(ep) = endpoint {
                 editor.set_buffer_text(&ep.api_key, ctx);
             }
@@ -262,7 +271,7 @@ impl CustomEndpointModal {
             });
         }
         let remove_endpoint_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Remove", DangerSecondaryTheme)
+            ActionButton::new(crate::t!("common-remove"), DangerSecondaryTheme)
                 .with_icon(Icon::Trash)
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(CustomEndpointModalAction::RemoveEndpoint);
@@ -307,7 +316,10 @@ impl CustomEndpointModal {
                 ..Default::default()
             };
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text("e.g., GLM-5-FP8", ctx);
+            editor.set_placeholder_text(
+                crate::t!("settings-agent-providers-custom-endpoint-model-name-placeholder"),
+                ctx,
+            );
             if let Some(n) = name {
                 editor.set_buffer_text(n, ctx);
             }
@@ -327,7 +339,10 @@ impl CustomEndpointModal {
                 ..Default::default()
             };
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text("e.g., GLM-5", ctx);
+            editor.set_placeholder_text(
+                crate::t!("settings-agent-providers-custom-endpoint-model-alias-placeholder"),
+                ctx,
+            );
             if let Some(a) = alias {
                 editor.set_buffer_text(a, ctx);
             }
@@ -740,7 +755,7 @@ impl View for CustomEndpointModal {
 
         let label_font_family = appearance.ui_font_family();
         let label_text_color = theme.active_ui_text_color().into();
-        let label = move |text: &'static str| {
+        let label = move |text: String| {
             Text::new(text, label_font_family, LABEL_FONT_SIZE)
                 .with_color(label_text_color)
                 .finish()
@@ -762,7 +777,7 @@ impl View for CustomEndpointModal {
         column.add_child(
             Container::new(
                 Text::new(
-                    "Provide your endpoint details below. You can add as many models from the endpoint as you'd like and can also provide aliases for the model picker in your input.",
+                    crate::t!("settings-agent-providers-custom-endpoint-description"),
                     appearance.ui_font_family(),
                     LABEL_FONT_SIZE,
                 )
@@ -775,9 +790,11 @@ impl View for CustomEndpointModal {
         );
         // Request/response protocol
         column.add_child(
-            Container::new(label("API schema"))
-                .with_margin_bottom(4.)
-                .finish(),
+            Container::new(label(crate::t!(
+                "settings-agent-providers-custom-endpoint-api-schema"
+            )))
+            .with_margin_bottom(4.)
+            .finish(),
         );
         column.add_child(
             Container::new(ChildView::new(&self.schema_dropdown).finish())
@@ -787,9 +804,11 @@ impl View for CustomEndpointModal {
 
         // Endpoint name
         column.add_child(
-            Container::new(label("Endpoint name"))
-                .with_margin_bottom(4.)
-                .finish(),
+            Container::new(label(crate::t!(
+                "settings-agent-providers-custom-endpoint-name"
+            )))
+            .with_margin_bottom(4.)
+            .finish(),
         );
         column.add_child(
             SavePosition::new(
@@ -810,9 +829,11 @@ impl View for CustomEndpointModal {
 
         // Endpoint URL
         column.add_child(
-            Container::new(label("Endpoint URL"))
-                .with_margin_bottom(4.)
-                .finish(),
+            Container::new(label(crate::t!(
+                "settings-agent-providers-custom-endpoint-url"
+            )))
+            .with_margin_bottom(4.)
+            .finish(),
         );
         let url_border_fill = if self.url_has_error {
             theme.ui_error_color().into()
@@ -840,9 +861,11 @@ impl View for CustomEndpointModal {
 
         // API key
         column.add_child(
-            Container::new(label("API key"))
-                .with_margin_bottom(4.)
-                .finish(),
+            Container::new(label(crate::t!(
+                "settings-agent-providers-custom-endpoint-api-key"
+            )))
+            .with_margin_bottom(4.)
+            .finish(),
         );
         column.add_child(
             SavePosition::new(
@@ -871,14 +894,18 @@ impl View for CustomEndpointModal {
                 Flex::row()
                     .with_spacing(MODEL_ROW_SPACING)
                     .with_child(
-                        ConstrainedBox::new(label("Model name"))
-                            .with_width(MODEL_INPUT_WIDTH)
-                            .finish(),
+                        ConstrainedBox::new(label(crate::t!(
+                            "settings-agent-providers-custom-endpoint-model-name"
+                        )))
+                        .with_width(MODEL_INPUT_WIDTH)
+                        .finish(),
                     )
                     .with_child(
-                        ConstrainedBox::new(label("Model alias (optional)"))
-                            .with_width(MODEL_INPUT_WIDTH)
-                            .finish(),
+                        ConstrainedBox::new(label(crate::t!(
+                            "settings-agent-providers-custom-endpoint-model-alias"
+                        )))
+                        .with_width(MODEL_INPUT_WIDTH)
+                        .finish(),
                     )
                     .finish(),
             );
@@ -965,7 +992,7 @@ impl View for CustomEndpointModal {
                 ButtonVariant::Secondary,
                 self.add_model_button_mouse_state.clone(),
             )
-            .with_text_label("+ Add model".to_string())
+            .with_text_label(crate::t!("settings-agent-providers-add-model"))
             .with_style(UiComponentStyles {
                 font_size: Some(14.),
                 padding: Some(Coords::uniform(6.).left(8.).right(8.)),
@@ -1002,7 +1029,7 @@ impl View for CustomEndpointModal {
                     ButtonVariant::Secondary,
                     self.cancel_button_mouse_state.clone(),
                 )
-                .with_text_label("Cancel".to_string())
+                .with_text_label(crate::t!("common-cancel"))
                 .with_style(button_style)
                 .build()
                 .on_click(move |ctx, _, _| {
@@ -1015,9 +1042,9 @@ impl View for CustomEndpointModal {
             .ui_builder()
             .button(ButtonVariant::Accent, self.save_button_mouse_state.clone())
             .with_text_label(if is_editing {
-                "Save".to_string()
+                crate::t!("common-save")
             } else {
-                "Add endpoint".to_string()
+                crate::t!("settings-agent-providers-custom-endpoint-add-action")
             })
             .with_style(button_style);
         if !is_valid {

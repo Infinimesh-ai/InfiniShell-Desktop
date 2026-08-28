@@ -164,7 +164,7 @@ pub fn render_ambient_agent_error_screen(
 
     // Error title text
     let title_text = Text::new(
-        "Failed to start environment",
+        crate::t!("ambient-agent-environment-start-failed"),
         appearance.ui_font_family(),
         appearance.monospace_font_size() + 2.,
     )
@@ -254,7 +254,7 @@ pub fn render_ambient_agent_github_auth_required_screen(
 
     // Title text - "GitHub Authentication Required"
     let title_text = Text::new(
-        "GitHub Authentication Required",
+        crate::t!("ambient-agent-github-auth-required"),
         appearance.ui_font_family(),
         appearance.monospace_font_size() + 2.,
     )
@@ -264,7 +264,7 @@ pub fn render_ambient_agent_github_auth_required_screen(
 
     // Message text - "Please authenticate with GitHub to continue"
     let message_text = Text::new(
-        "Please authenticate with GitHub to continue",
+        crate::t!("ambient-agent-github-auth-description"),
         appearance.ui_font_family(),
         appearance.monospace_font_size(),
     )
@@ -341,7 +341,7 @@ pub fn render_ambient_agent_cancelled_screen(appearance: &Appearance) -> Box<dyn
 
     // Title text - "Agent Run Cancelled"
     let title_text = Text::new(
-        "Agent Run Cancelled",
+        crate::t!("ambient-agent-run-cancelled"),
         appearance.ui_font_family(),
         appearance.monospace_font_size() + 2.,
     )
@@ -351,7 +351,7 @@ pub fn render_ambient_agent_cancelled_screen(appearance: &Appearance) -> Box<dyn
 
     // Subtitle text - "No environment was started"
     let subtitle_text = Text::new(
-        "No environment was started",
+        crate::t!("ambient-agent-no-environment-started"),
         appearance.ui_font_family(),
         appearance.monospace_font_size(),
     )

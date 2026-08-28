@@ -30,7 +30,6 @@ use crate::orchestration_tab_bar::{
 };
 use crate::session_registry::TuiSessions;
 use crate::tab_bar::{TuiTabBarConfig, TuiTabBarEvent, TuiTabBarView};
-use crate::terminal_session_view::CTRL_C_KILL_CHILD_HINT;
 use crate::tui_builder::TuiUiBuilder;
 use crate::ui::centered_in_viewport;
 
@@ -47,7 +46,7 @@ struct CloudRunDisplayState {
     status: ConversationStatus,
     status_label: String,
     detail: Option<String>,
-    link_instruction: Option<&'static str>,
+    link_instruction: Option<String>,
     link_url: Option<String>,
 }
 
@@ -77,7 +76,7 @@ pub(crate) fn init(app: &mut AppContext) {
     app.register_editable_bindings([
         EditableBinding::new(
             "tui:cloud_session:open_url",
-            "Open the cloud run link",
+            warp::t_static!("tui-keybinding-open-cloud-run-link"),
             TuiCloudRunAction::OpenPrimaryUrl,
         )
         .with_context_predicate(view_context.clone())
@@ -85,7 +84,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("enter"),
         EditableBinding::new(
             "tui:cloud_session:focus_orchestration_tabs",
-            "Focus the orchestration tab bar",
+            warp::t_static!("tui-keybinding-focus-orchestration-tabs"),
             TuiCloudRunAction::FocusOrchestrationTabs,
         )
         .with_context_predicate(view_context)
@@ -226,7 +225,7 @@ impl TuiCloudRunView {
         match state.startup() {
             TuiCloudRunStartup::Dispatching => CloudRunDisplayState {
                 status: ConversationStatus::InProgress,
-                status_label: "Starting cloud run…".to_string(),
+                status_label: warp::t!("tui-cloud-run-starting"),
                 detail: None,
                 link_instruction: None,
                 link_url: None,
@@ -240,9 +239,9 @@ impl TuiCloudRunView {
                     status: ConversationStatus::Blocked {
                         blocked_action: presentation.detail.clone(),
                     },
-                    status_label: presentation.title.to_string(),
-                    detail: Some(presentation.detail),
-                    link_instruction: Some("to authenticate or click the link below"),
+                    status_label: warp::t!("tui-github-auth-required"),
+                    detail: Some(warp::t!("tui-github-auth-rerun-orchestration")),
+                    link_instruction: Some(warp::t!("tui-hint-authenticate-or-click-link")),
                     link_url: presentation.primary_url,
                 }
             }
@@ -250,7 +249,7 @@ impl TuiCloudRunView {
                 let presentation = CloudAgentStartupPresentation::failure(failure.message());
                 CloudRunDisplayState {
                     status: ConversationStatus::Error,
-                    status_label: presentation.title.to_string(),
+                    status_label: warp::t!("tui-cloud-environment-start-failed"),
                     detail: Some(presentation.detail),
                     link_instruction: None,
                     link_url: None,
@@ -268,17 +267,17 @@ impl TuiCloudRunView {
                 let status_label = match status {
                     ConversationStatus::InProgress
                     | ConversationStatus::TransientError
-                    | ConversationStatus::WaitingForEvents => "Cloud run in progress",
-                    ConversationStatus::Blocked { .. } => "Cloud run blocked",
-                    ConversationStatus::Success => "Cloud run succeeded",
-                    ConversationStatus::Error => "Cloud run failed",
-                    ConversationStatus::Cancelled => "Cloud run cancelled",
+                    | ConversationStatus::WaitingForEvents => warp::t!("tui-cloud-run-in-progress"),
+                    ConversationStatus::Blocked { .. } => warp::t!("tui-cloud-run-blocked"),
+                    ConversationStatus::Success => warp::t!("tui-cloud-run-succeeded"),
+                    ConversationStatus::Error => warp::t!("tui-cloud-run-failed"),
+                    ConversationStatus::Cancelled => warp::t!("tui-cloud-run-cancelled"),
                 };
                 CloudRunDisplayState {
                     status: status.clone(),
-                    status_label: status_label.to_string(),
+                    status_label,
                     detail: None,
-                    link_instruction: Some("to view or click the link below"),
+                    link_instruction: Some(warp::t!("tui-hint-view-or-click-link")),
                     link_url: state.run_url().map(str::to_string),
                 }
             }
@@ -524,7 +523,10 @@ impl TuiView for TuiCloudRunView {
             content = content
                 .child(
                     TuiText::from_spans([
-                        ("Press ".to_string(), builder.muted_text_style()),
+                        (
+                            format!("{} ", warp::t!("tui-press")),
+                            builder.muted_text_style(),
+                        ),
                         (
                             "enter".to_string(),
                             builder.primary_text_style().add_modifier(Modifier::BOLD),
@@ -557,12 +559,12 @@ impl TuiView for TuiCloudRunView {
             let footer = if self.orchestration_tabs_focused {
                 render_cloud_orchestration_tab_footer(&builder)
             } else if self.child_kill_armed && self.exit_confirmation.is_armed() {
-                TuiText::new(CTRL_C_KILL_CHILD_HINT)
+                TuiText::new(warp::t!("tui-ctrl-c-kill-child"))
                     .with_style(builder.muted_text_style())
                     .truncate()
                     .finish()
             } else {
-                TuiText::new("Shift + ↑ sub-agents")
+                TuiText::new(warp::t!("tui-hint-focus-subagents"))
                     .with_style(builder.muted_text_style())
                     .truncate()
                     .finish()
@@ -579,7 +581,7 @@ impl TuiView for TuiCloudRunView {
             // Even when this run has no sub-agents, show the kill-child hint
             // so the user can see the confirmation before the second ctrl-c.
             let hint = TuiContainer::new(
-                TuiText::new(CTRL_C_KILL_CHILD_HINT)
+                TuiText::new(warp::t!("tui-ctrl-c-kill-child"))
                     .with_style(builder.muted_text_style())
                     .truncate()
                     .finish(),

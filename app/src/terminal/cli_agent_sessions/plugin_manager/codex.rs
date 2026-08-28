@@ -185,7 +185,7 @@ impl CliAgentPluginManager for CodexPluginManager {
         if still_outdated {
             log.push_str("Post-update version check: plugin is still outdated\n");
             return Err(PluginInstallError {
-                message: "Plugin update did not take effect".to_owned(),
+                message: crate::t!("cli-agent-plugin-update-not-effective"),
                 log,
             });
         }
@@ -193,11 +193,11 @@ impl CliAgentPluginManager for CodexPluginManager {
     }
 
     fn install_success_message(&self) -> &'static str {
-        "Warp plugin installed. Please restart Codex to activate."
+        crate::t_static!("cli-agent-plugin-codex-warp-installed")
     }
 
     fn update_success_message(&self) -> &'static str {
-        "Warp plugin updated. Please restart Codex to activate."
+        crate::t_static!("cli-agent-plugin-codex-warp-updated")
     }
 
     fn install_instructions(&self) -> &'static PluginInstructions {
@@ -236,7 +236,7 @@ impl CliAgentPluginManager for CodexPluginManager {
         if !updated {
             log.push_str("Post-install version check: platform plugin is still outdated\n");
             return Err(PluginInstallError {
-                message: "Platform plugin installation did not take effect".to_owned(),
+                message: crate::t!("cli-agent-platform-plugin-install-not-effective"),
                 log,
             });
         }
@@ -263,7 +263,7 @@ impl CliAgentPluginManager for CodexPluginManager {
         if !updated {
             log.push_str("Post-update version check: platform plugin is still outdated\n");
             return Err(PluginInstallError {
-                message: "Platform plugin update did not take effect".to_owned(),
+                message: crate::t!("cli-agent-platform-plugin-update-not-effective"),
                 log,
             });
         }
@@ -273,46 +273,45 @@ impl CliAgentPluginManager for CodexPluginManager {
 
 static PLUGIN_INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> =
     LazyLock::new(|| PluginInstructions {
-        title: "Install Warp Plugin for Codex",
-        subtitle: "Run the following commands, then restart Codex.",
+        title: crate::t_static!("cli-agent-plugin-codex-warp-install-title"),
+        subtitle: crate::t_static!("cli-agent-plugin-codex-run-commands-restart"),
         steps: vec![
             PluginInstructionStep {
-                description: "Add the Warp plugin marketplace repository",
+                description: crate::t_static!("cli-agent-plugin-add-marketplace-step"),
                 command: "codex plugin marketplace add warpdotdev/codex-warp",
                 executable: true,
                 link: None,
             },
             PluginInstructionStep {
-                description: "Install the Warp plugin",
+                description: crate::t_static!("cli-agent-plugin-install-warp-plugin-step"),
                 command: "codex plugin add warp@codex-warp",
                 executable: true,
                 link: None,
             },
         ],
-        post_install_notes: vec!["Restart Codex to activate the plugin."],
+        post_install_notes: vec![crate::t_static!("cli-agent-plugin-codex-activate-note")],
     });
 
-static NATIVE_INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
-    PluginInstructions {
-        title: "Enable Warp Notifications for Codex",
-        subtitle: "Update Codex to the latest version, then enable in-focus notifications so Warp can display them while you work.",
+static NATIVE_INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> =
+    LazyLock::new(|| PluginInstructions {
+        title: crate::t_static!("cli-agent-plugin-codex-install-title"),
+        subtitle: crate::t_static!("cli-agent-plugin-codex-install-subtitle"),
         steps: vec![
             PluginInstructionStep {
-                description: "Update Codex to the latest version.",
+                description: crate::t_static!("cli-agent-plugin-codex-update-step"),
                 command: "",
                 executable: false,
                 link: Some("https://developers.openai.com/codex/cli#upgrade"),
             },
             PluginInstructionStep {
-                description: "Set the notification condition to \"always\" in your Codex config. Open or create ~/.codex/config.toml and add:",
+                description: crate::t_static!("cli-agent-plugin-codex-notification-step"),
                 command: "[tui]\nnotification_condition = \"always\"",
                 executable: false,
                 link: None,
             },
         ],
-        post_install_notes: vec!["Restart Codex to apply the changes."],
-    }
-});
+        post_install_notes: vec![crate::t_static!("cli-agent-plugin-codex-restart-note")],
+    });
 
 static EMPTY_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| PluginInstructions {
     title: "",
@@ -321,30 +320,29 @@ static EMPTY_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plugi
     post_install_notes: vec![],
 });
 
-static PLUGIN_UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
-    PluginInstructions {
-        title: "Update Warp Plugin for Codex",
-        subtitle: "Run the following commands, then restart Codex.",
+static PLUGIN_UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> =
+    LazyLock::new(|| PluginInstructions {
+        title: crate::t_static!("cli-agent-plugin-codex-warp-update-title"),
+        subtitle: crate::t_static!("cli-agent-plugin-codex-run-commands-restart"),
         steps: vec![
             PluginInstructionStep {
-                description: "Upgrade the marketplace",
+                description: crate::t_static!("cli-agent-plugin-upgrade-marketplace-step"),
                 command: "codex plugin marketplace upgrade codex-warp",
                 executable: true,
                 link: None,
             },
             PluginInstructionStep {
-                description: "Reinstall the Warp plugin",
+                description: crate::t_static!("cli-agent-plugin-reinstall-warp-plugin-step"),
                 command: "codex plugin add warp@codex-warp",
                 executable: true,
                 link: None,
             },
         ],
         post_install_notes: vec![
-            "Restart Codex to activate the update.",
-            "If this fails because codex-warp is not configured as a Git marketplace, remove and re-add the marketplace.",
+            crate::t_static!("cli-agent-plugin-codex-activate-update-note"),
+            crate::t_static!("cli-agent-plugin-codex-marketplace-recovery-note"),
         ],
-    }
-});
+    });
 
 fn check_installed(codex_dir: &Path) -> bool {
     check_plugin_enabled(codex_dir, PLUGIN_KEY)

@@ -48,7 +48,7 @@ pub(super) trait GutterButton {
     fn is_enabled(&self) -> bool;
 
     /// The tooltip text displayed when the button is hovered.
-    fn tooltip_text(&self) -> Option<&'static str>;
+    fn tooltip_text(&self) -> Option<String>;
 
     /// The icon of the button.
     fn icon(&self) -> Icon;
@@ -70,11 +70,11 @@ impl GutterButton for AddAsContextButton {
         self.is_enabled
     }
 
-    fn tooltip_text(&self) -> Option<&'static str> {
+    fn tooltip_text(&self) -> Option<String> {
         if self.is_enabled {
-            Some("Add diff hunk as context")
+            Some(crate::t!("code-gutter-add-diff-context"))
         } else {
-            Some("Save changes to attach as context.")
+            Some(crate::t!("code-gutter-save-to-attach-context"))
         }
     }
 
@@ -99,11 +99,11 @@ impl GutterButton for RevertHunkButton {
         self.is_enabled
     }
 
-    fn tooltip_text(&self) -> Option<&'static str> {
+    fn tooltip_text(&self) -> Option<String> {
         if self.is_enabled {
-            Some("Revert diff hunk")
+            Some(crate::t!("code-gutter-revert-diff-hunk"))
         } else {
-            Some("Save changes to revert")
+            Some(crate::t!("code-gutter-save-to-revert"))
         }
     }
 
@@ -152,11 +152,11 @@ impl GutterButton for CommentButton {
         )
     }
 
-    fn tooltip_text(&self) -> Option<&'static str> {
+    fn tooltip_text(&self) -> Option<String> {
         match self {
-            CommentButton::CreateNewComment => Some("Add comment on line"),
-            CommentButton::Disabled => Some("Save changes to add comment"),
-            CommentButton::AddedComment => Some("Show saved comment"),
+            CommentButton::CreateNewComment => Some(crate::t!("code-gutter-add-line-comment")),
+            CommentButton::Disabled => Some(crate::t!("code-gutter-save-to-add-comment")),
+            CommentButton::AddedComment => Some(crate::t!("code-gutter-show-saved-comment")),
             CommentButton::EditorOpenedToCreateNewComment
             | CommentButton::EditorOpenedToUpdateComment => None,
         }

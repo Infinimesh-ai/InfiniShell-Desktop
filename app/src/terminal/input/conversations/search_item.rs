@@ -164,6 +164,9 @@ impl SearchItem for ConversationSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Conversation: {}", self.entry.display.title)
+        crate::t!(
+            "search-conversation-a11y",
+            title = self.entry.display.title.as_str()
+        )
     }
 }

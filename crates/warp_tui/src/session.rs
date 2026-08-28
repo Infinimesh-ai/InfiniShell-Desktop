@@ -9,8 +9,8 @@ use std::io::{self, IsTerminal as _, Read as _};
 use ai::LLMProvider;
 use ai::api_keys::ApiKeyManager;
 use anyhow::{Context, Result, anyhow};
-use clap::Parser;
 use clap::error::ErrorKind;
+use clap::{CommandFactory, FromArgMatches, Parser};
 use inquire::{InquireError, Password, PasswordDisplayMode};
 use warp::settings::{TuiThemeSettings, TuiZeroStateSettings, TuiZeroStateSettingsChangedEvent};
 #[cfg(feature = "voice_input")]
@@ -95,7 +95,7 @@ enum ProviderApiKeyCommand {
 /// from stdin. Empty input and interactive cancellation return `Ok(None)`.
 fn read_provider_api_key() -> Result<Option<String>> {
     if io::stdin().is_terminal() {
-        return match Password::new("Provider API key:")
+        return match Password::new(&warp::t!("tui-cli-provider-api-key-prompt"))
             .with_display_mode(PasswordDisplayMode::Masked)
             .without_confirmation()
             .prompt()
@@ -116,12 +116,15 @@ fn read_provider_api_key() -> Result<Option<String>> {
 /// Validates and wraps a server conversation token from the command line.
 fn parse_resume_token(token: String) -> Result<ServerConversationToken> {
     uuid::Uuid::parse_str(&token)
-        .with_context(|| format!("invalid server conversation token: {token}"))?;
+        .with_context(|| warp::t!("tui-cli-invalid-resume-token", token = token.clone()))?;
     Ok(ServerConversationToken::new(token))
 }
 
 /// Boots the headless Warp app and mounts the transcript-capable TUI session.
 pub fn run() -> Result<()> {
+    // TUI 与 GUI 共用 Fluent 资源；settings 初始化后会继续应用显式语言设置。
+    warp::i18n::init(None);
+
     // Protect this managed version before any worker dispatch or resource
     // access. The guard stays alive until this process exits.
     let _version_lease = crate::autoupdate::VersionLease::acquire_for_current_process()?;
@@ -131,8 +134,24 @@ pub fn run() -> Result<()> {
     if let Some(result) = warp::run_tui_worker_if_requested() {
         return result;
     }
-    let args = match TuiArgs::try_parse() {
-        Ok(args) => args,
+    let command = TuiArgs::command()
+        .about(warp::t!("tui-cli-about"))
+        .mut_arg("resume", |arg| arg.help(warp::t!("tui-cli-help-resume")))
+        .mut_arg("auto_approve", |arg| {
+            arg.help(warp::t!("tui-cli-help-auto-approve"))
+        })
+        .mut_arg("full_access", |arg| {
+            arg.help(warp::t!("tui-cli-help-full-access"))
+        })
+        .mut_arg("api_key", |arg| arg.help(warp::t!("tui-cli-help-api-key")))
+        .mut_arg("set_provider_api_key", |arg| {
+            arg.help(warp::t!("tui-cli-help-set-provider-api-key"))
+        })
+        .mut_arg("clear_provider_api_key", |arg| {
+            arg.help(warp::t!("tui-cli-help-clear-provider-api-key"))
+        });
+    let matches = match command.try_get_matches() {
+        Ok(matches) => matches,
         // Match the zero-state version line: bare tag/version, no binary name prefix.
         Err(error) if error.kind() == ErrorKind::DisplayVersion => {
             println!("{CLI_VERSION}");
@@ -144,22 +163,19 @@ pub fn run() -> Result<()> {
         }
         Err(error) => return Err(anyhow::Error::new(error)),
     };
+    let args = TuiArgs::from_arg_matches(&matches).map_err(anyhow::Error::new)?;
     let provider_api_key_command = if let Some(provider) = args.set_provider_api_key {
         if !provider.supports_pasted_api_key() {
-            return Err(anyhow!(
-                "Grok credentials must be connected with /api-keys in an active TUI"
-            ));
+            return Err(anyhow!(warp::t!("tui-cli-grok-connect-in-tui")));
         }
         let Some(api_key) = read_provider_api_key()? else {
-            return Err(anyhow!("No provider API key was supplied"));
+            return Err(anyhow!(warp::t!("tui-cli-no-provider-api-key")));
         };
         Some(ProviderApiKeyCommand::Set { provider, api_key })
     } else {
         match args.clear_provider_api_key {
             Some(LLMProvider::Xai) => {
-                return Err(anyhow!(
-                    "Grok credentials must be cleared with /api-keys in an active TUI"
-                ));
+                return Err(anyhow!(warp::t!("tui-cli-grok-clear-in-tui")));
             }
             Some(provider) => Some(ProviderApiKeyCommand::Clear { provider }),
             None => None,
@@ -167,11 +183,9 @@ pub fn run() -> Result<()> {
     };
     if let Some(command) = provider_api_key_command {
         return warp::run_tui_cli_command(Box::new(move |ctx| {
-            let (provider, api_key, success_verb) = match command {
-                ProviderApiKeyCommand::Set { provider, api_key } => {
-                    (provider, Some(api_key), "saved")
-                }
-                ProviderApiKeyCommand::Clear { provider } => (provider, None, "cleared"),
+            let (provider, api_key, was_saved) = match command {
+                ProviderApiKeyCommand::Set { provider, api_key } => (provider, Some(api_key), true),
+                ProviderApiKeyCommand::Clear { provider } => (provider, None, false),
             };
             let result = ApiKeyManager::handle(ctx)
                 .update(ctx, |manager, ctx| {
@@ -180,7 +194,18 @@ pub fn run() -> Result<()> {
                 .and_then(|()| warp::tui_export::notify_tui_api_keys_changed());
             match result {
                 Ok(()) => {
-                    println!("{} API key {success_verb}", provider.display_name());
+                    let message = if was_saved {
+                        warp::t!(
+                            "tui-cli-provider-api-key-saved",
+                            provider = provider.display_name()
+                        )
+                    } else {
+                        warp::t!(
+                            "tui-cli-provider-api-key-cleared",
+                            provider = provider.display_name()
+                        )
+                    };
+                    println!("{message}");
                     ctx.terminate_app(TerminationMode::ForceTerminate, None);
                 }
                 Err(error) => {
@@ -214,7 +239,7 @@ pub fn run() -> Result<()> {
         && let Some(token) = exit_summary.token()
     {
         let token = token.as_str();
-        println!("To continue this conversation, run:");
+        println!("{}", warp::t!("tui-cli-continue-conversation"));
         let command = tui_resume_shell_command(ChannelState::channel(), token);
         println!("{command}");
     }

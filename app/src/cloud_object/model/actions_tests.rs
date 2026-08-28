@@ -5,6 +5,7 @@ use super::{ObjectAction, ObjectActionSubtype, ObjectActionType, ObjectActions};
 
 #[test]
 fn test_object_actions_daily() {
+    crate::i18n::init(Some("en"));
     App::test((), |mut app| async move {
         let actions: Vec<ObjectAction> = vec![
             ObjectAction {
@@ -83,7 +84,7 @@ fn test_object_actions_daily() {
                     &"asdfljk".to_string(),
                     ObjectActionType::Execute,
                 ),
-                Some("2 runs in the last day".to_string())
+                Some(crate::t!("cloud-object-action-runs-last-day", count = 2))
             )
         });
     });
@@ -91,6 +92,7 @@ fn test_object_actions_daily() {
 
 #[test]
 fn test_object_actions_rollup_weekly() {
+    crate::i18n::init(Some("en"));
     App::test((), |mut app| async move {
         let actions: Vec<ObjectAction> = vec![
             ObjectAction {
@@ -169,7 +171,7 @@ fn test_object_actions_rollup_weekly() {
                     &"q23423aaf".to_string(),
                     ObjectActionType::Execute,
                 ),
-                Some("1 run in the last week".to_string())
+                Some(crate::t!("cloud-object-action-runs-last-week", count = 1))
             )
         });
     });
@@ -177,6 +179,7 @@ fn test_object_actions_rollup_weekly() {
 
 #[test]
 fn test_object_actions_rollup_monthly() {
+    crate::i18n::init(Some("en"));
     App::test((), |mut app| async move {
         let actions: Vec<ObjectAction> = vec![
             ObjectAction {
@@ -266,7 +269,7 @@ fn test_object_actions_rollup_monthly() {
                     &"q23423aaf".to_string(),
                     ObjectActionType::Execute,
                 ),
-                Some("3 runs in the last month".to_string())
+                Some(crate::t!("cloud-object-action-runs-last-month", count = 3))
             )
         });
     });
@@ -274,6 +277,7 @@ fn test_object_actions_rollup_monthly() {
 
 #[test]
 fn test_object_actions_rollup_yearly() {
+    crate::i18n::init(Some("en"));
     App::test((), |mut app| async move {
         let actions: Vec<ObjectAction> = vec![
             ObjectAction {
@@ -363,7 +367,7 @@ fn test_object_actions_rollup_yearly() {
                     &"q23423aaf".to_string(),
                     ObjectActionType::Execute,
                 ),
-                Some("5 runs in the last year".to_string())
+                Some(crate::t!("cloud-object-action-runs-last-year", count = 5))
             )
         });
     });
@@ -371,6 +375,7 @@ fn test_object_actions_rollup_yearly() {
 
 #[test]
 fn test_object_actions_rollup_out_of_date_bundle() {
+    crate::i18n::init(Some("en"));
     App::test((), |mut app| async move {
         let actions: Vec<ObjectAction> = vec![
             ObjectAction {
@@ -460,7 +465,7 @@ fn test_object_actions_rollup_out_of_date_bundle() {
                     &"q23423aaf".to_string(),
                     ObjectActionType::Execute,
                 ),
-                Some("0 runs in the last year".to_string())
+                Some(crate::t!("cloud-object-action-runs-last-year", count = 0))
             )
         });
     });
@@ -468,6 +473,7 @@ fn test_object_actions_rollup_out_of_date_bundle() {
 
 #[test]
 fn test_object_actions_rollup_none() {
+    crate::i18n::init(Some("en"));
     App::test((), |mut app| async move {
         let actions: Vec<ObjectAction> = vec![
             ObjectAction {
@@ -557,7 +563,7 @@ fn test_object_actions_rollup_none() {
                     &"q23423aaf".to_string(),
                     ObjectActionType::Execute,
                 ),
-                Some("0 runs in the last year".to_string())
+                Some(crate::t!("cloud-object-action-runs-last-year", count = 0))
             )
         });
     });

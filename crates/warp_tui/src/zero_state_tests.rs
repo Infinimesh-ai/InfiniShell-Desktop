@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use channel_versions::{Changelog, MarkdownSection, Section};
 use chrono::DateTime;
+use command::blocking::Command;
 use uuid::Uuid;
 use warp::tui_export::{
     TuiMcpConfigDiagnostic, TuiMcpServerId, TuiMcpServerSnapshot, TuiMcpServerSource,
@@ -28,6 +29,8 @@ use crate::zero_state_animation::{
     WarpLogoStyles, ZeroStateAnimationConfig, ZeroStateAnimationElement,
     ZeroStateInteractionHandle, ZeroStateStarfieldElement,
 };
+
+const ZH_CN_RENDER_CHILD_ENV: &str = "INFINISHELL_TUI_ZH_CN_RENDER_CHILD";
 
 fn server(id: u64, status: TuiMcpServerStatus) -> TuiMcpServerSnapshot {
     TuiMcpServerSnapshot {
@@ -80,7 +83,7 @@ fn changelog_bullets_are_empty_when_only_other_surfaces_have_updates() {
 fn failed_autoupdate_status_has_visible_label() {
     assert_eq!(
         autoupdate_status_label(TuiAutoupdateStatus::Failed),
-        Some("automatic update failed")
+        Some("automatic update failed".to_owned())
     );
 }
 
@@ -132,6 +135,57 @@ fn first_zero_state_matches_welcome_design_copy() {
 }
 
 #[test]
+fn zh_cn_first_run_render_uses_shared_resources() {
+    if std::env::var_os(ZH_CN_RENDER_CHILD_ENV).is_some() {
+        warp::i18n::set_locale("zh-CN");
+        App::test((), |mut app| async move {
+            register_tui_session_view_test_singletons(&mut app);
+
+            let rendered = app.read(|ctx| {
+                let builder = TuiUiBuilder::from_app(ctx);
+                render_element_lines(
+                    render_first_run_top_section(&builder, ctx).finish(),
+                    ctx,
+                    LEFT_COLUMN_COLS,
+                    16,
+                )
+                .join("\n")
+            });
+            for expected in [
+                "欢迎使用 InfiniShell TUI",
+                "InfiniShell TUI 有何不同",
+                "✶ 先进的编程智能体",
+                "✶ 前沿模型与开放权重模型",
+                "✶ 可完全自定义的模型路由器",
+                "✶ 编排大规模智能体团队",
+                "✶ 更出色的 Shell 命令支持",
+            ] {
+                assert!(
+                    rendered.contains(expected),
+                    "中文首次启动界面应包含 {expected:?}：\n{rendered}"
+                );
+            }
+        });
+        return;
+    }
+
+    // Fluent 语言选择是进程级全局状态；子进程可验证中文渲染且不会污染并行英文快照。
+    let output = Command::new(std::env::current_exe().unwrap())
+        .arg("--exact")
+        .arg("zero_state::tests::zh_cn_first_run_render_uses_shared_resources")
+        .arg("--nocapture")
+        .env(ZH_CN_RENDER_CHILD_ENV, "1")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "中文 TUI 子进程渲染测试失败：\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn mcp_summary_keeps_empty_catalog_action_short() {
     let snapshot = TuiMcpSnapshot {
         diagnostics: Vec::new(),
@@ -167,7 +221,7 @@ fn mcp_summary_reports_mixed_runtime_states() {
     assert_eq!(
         mcp_status_label(&snapshot),
         (
-            "1 connected · 1 starting · 1 needs auth · 1 stopping · 1 failed · 1 offline · 1 available · /mcp"
+            "1 connected · 1 starting · 1 needs authentication · 1 stopping · 1 failed · 1 offline · 1 available · /mcp"
                 .to_string(),
             false
         )

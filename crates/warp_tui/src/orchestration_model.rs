@@ -145,7 +145,7 @@ impl TuiOrchestrationModel {
                     label: conversation
                         .agent_name()
                         .filter(|name| !name.is_empty())
-                        .unwrap_or("Agent")
+                        .unwrap_or(warp::t_static!("tui-agent"))
                         .to_owned(),
                     spawn_index: descendant.spawn_index,
                     status: conversation.status().clone(),
@@ -226,16 +226,15 @@ impl TuiOrchestrationModel {
                 ..
             } => self.fail_child_request(
                 &request,
-                format!(
-                    "Local {harness_type} child agents aren't supported in InfiniShell TUI yet."
+                warp::t!(
+                    "tui-local-harness-child-unsupported",
+                    harness = harness_type
                 ),
                 ctx,
             ),
-            StartAgentExecutionMode::Remote { .. } => self.fail_child_request(
-                &request,
-                "Remote child agents are unavailable in this local build.".to_owned(),
-                ctx,
-            ),
+            StartAgentExecutionMode::Remote { .. } => {
+                self.fail_child_request(&request, warp::t!("tui-remote-child-unavailable"), ctx)
+            }
         }
     }
 
@@ -264,7 +263,7 @@ impl TuiOrchestrationModel {
             }),
             Err(error) => model.fail_child_request(
                 &request,
-                format!("Failed to create local child task: {error}"),
+                warp::t!("tui-local-child-create-failed", error = error.to_string()),
                 ctx,
             ),
         });

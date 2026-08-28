@@ -905,18 +905,22 @@ impl TerminalView {
 
         match &restore_context_state {
             RestorationDirState::MissingOriginalDir => {
-                items.push(MessageItem::text(
-                    "couldn't find original conversation directory ",
-                ));
+                items.push(MessageItem::text(crate::t!(
+                    "terminal-restore-original-directory-missing"
+                )));
                 items.push(open_repo_hint.clone());
-                items.push(MessageItem::text(" change repos"));
+                items.push(MessageItem::text(crate::t!(
+                    "terminal-restore-change-repositories"
+                )));
             }
             RestorationDirState::NeedsCd { .. } => {
-                items.push(MessageItem::text(
-                    "changed directory to continue conversation ",
-                ));
+                items.push(MessageItem::text(crate::t!(
+                    "terminal-restore-directory-changed"
+                )));
                 items.push(open_repo_hint.clone());
-                items.push(MessageItem::text(" change repos"));
+                items.push(MessageItem::text(crate::t!(
+                    "terminal-restore-change-repositories"
+                )));
             }
             RestorationDirState::Unchanged | RestorationDirState::SkippedNonLocalConversation => {}
         }

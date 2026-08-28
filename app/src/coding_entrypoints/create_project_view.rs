@@ -28,14 +28,15 @@ pub struct CreateProjectView {
 }
 
 struct BuildSuggestion {
-    prompt: &'static str,
+    prompt: String,
     mouse_state: MouseStateHandle,
 }
 
 impl CreateProjectView {
     pub fn new(is_ftux: bool, ctx: &mut ViewContext<Self>) -> Self {
-        let editor =
-            ctx.add_typed_action_view(|ctx| GlowingEditor::new("What do you want to build?", ctx));
+        let editor = ctx.add_typed_action_view(|ctx| {
+            GlowingEditor::new(crate::t!("coding-project-build-placeholder"), ctx)
+        });
 
         ctx.subscribe_to_view(&editor, move |me, _, event, ctx| {
             me.handle_editor_event(event, ctx);
@@ -43,23 +44,23 @@ impl CreateProjectView {
 
         let suggestions = vec![
             BuildSuggestion {
-                prompt: "Build a Minesweeper clone in React",
+                prompt: crate::t!("coding-project-suggestion-minesweeper"),
                 mouse_state: Default::default(),
             },
             BuildSuggestion {
-                prompt: "Code a Node.js server that returns random quotes from a JSON file",
+                prompt: crate::t!("coding-project-suggestion-node-quotes"),
                 mouse_state: Default::default(),
             },
             BuildSuggestion {
-                prompt: "Write a CSV to JSON converter CLI",
+                prompt: crate::t!("coding-project-suggestion-csv-json"),
                 mouse_state: Default::default(),
             },
             BuildSuggestion {
-                prompt: "Create a starter template for a résumé web page",
+                prompt: crate::t!("coding-project-suggestion-resume"),
                 mouse_state: Default::default(),
             },
             BuildSuggestion {
-                prompt: "Make a Conway's Game of Life simulation",
+                prompt: crate::t!("coding-project-suggestion-game-of-life"),
                 mouse_state: Default::default(),
             },
         ];
@@ -122,7 +123,7 @@ impl CreateProjectView {
         let font_color = theme.sub_text_color(theme.background()).into_solid();
 
         let mouse_state = suggestion.mouse_state.clone();
-        let prompt = suggestion.prompt;
+        let prompt = suggestion.prompt.clone();
 
         let row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
@@ -140,7 +141,7 @@ impl CreateProjectView {
                 .finish(),
                 Expanded::new(
                     1.,
-                    Text::new(prompt, font_family, font_size)
+                    Text::new(prompt.clone(), font_family, font_size)
                         .with_color(font_color)
                         .with_style(Properties::default().weight(Weight::Medium))
                         .soft_wrap(false)

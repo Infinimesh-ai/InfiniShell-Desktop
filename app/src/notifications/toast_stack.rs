@@ -458,7 +458,7 @@ fn render_keybinding_hint(keystroke: Keystroke, appearance: &Appearance) -> Box<
 
     let hint_text = appearance
         .ui_builder()
-        .wrappable_text("Open conversation".to_string(), false)
+        .wrappable_text(crate::t!("notifications-open-conversation"), false)
         .with_style(UiComponentStyles {
             font_size: Some(12.),
             font_color: Some(theme.disabled_text_color(theme.surface_2()).into()),

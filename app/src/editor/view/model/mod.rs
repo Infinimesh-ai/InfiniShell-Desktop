@@ -527,15 +527,20 @@ impl EditorModel {
                 let action = if inclusive_contains(&selection_after, start)
                     && inclusive_contains(&selection_after, end)
                 {
-                    "selected"
+                    crate::t!("editor-a11y-selected")
                 } else {
-                    "unselected"
+                    crate::t!("editor-a11y-unselected")
                 };
-                AccessibilityContent::new(delta, format!(", {action}"), WarpA11yRole::UserAction)
+                AccessibilityContent::new(
+                    delta,
+                    crate::t!("editor-a11y-selection-state", state = action.as_str()),
+                    WarpA11yRole::UserAction,
+                )
             }
-            (true, false) => {
-                AccessibilityContent::new_without_help("Unselected", WarpA11yRole::UserAction)
-            }
+            (true, false) => AccessibilityContent::new_without_help(
+                crate::t!("editor-a11y-unselected"),
+                WarpA11yRole::UserAction,
+            ),
         }
     }
 

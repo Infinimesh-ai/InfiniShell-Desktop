@@ -1,7 +1,9 @@
 //! Banner shown when the remote-server binary check, installation, or connection fails on the remote host.
 //! We fall back to the existing Warpification behavior and display this banner so the user knows why advanced features are unavailable.
 
-use remote_server::transport::UserFacingError;
+use remote_server::transport::{
+    SetupStage, UserFacingError, UserFacingErrorBody, UserFacingErrorDetail,
+};
 use warp_core::ui::theme::AnsiColorIdentifier;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{
@@ -14,11 +16,6 @@ use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View
 use crate::Appearance;
 use crate::terminal::model::session::SessionId;
 use crate::ui_components::icons::Icon;
-
-const BANNER_TITLE: &str = "Couldn't connect to the InfiniShell SSH extension";
-
-const BANNER_BODY: &str = "While advanced features like file browsing and code review are currently \
-    disabled, the rest of your terminal session remains fully available.";
 
 #[derive(Clone, Debug)]
 pub enum SshRemoteServerFailedBannerAction {
@@ -47,6 +44,41 @@ impl SshRemoteServerFailedBanner {
 
     pub fn session_id(&self) -> SessionId {
         self.session_id
+    }
+
+    fn localized_error_body(&self) -> String {
+        match &self.error.body {
+            UserFacingErrorBody::SetupStage(stage) => match stage {
+                SetupStage::DetectPlatform => {
+                    crate::t!("terminal-ssh-error-detect-platform")
+                }
+                SetupStage::PreinstallCheck => {
+                    crate::t!("terminal-ssh-error-preinstall-check")
+                }
+                SetupStage::CheckBinary => crate::t!("terminal-ssh-error-check-extension"),
+                SetupStage::InstallBinary => crate::t!("terminal-ssh-error-install-extension"),
+                SetupStage::Launch => crate::t!("terminal-ssh-error-launch-extension"),
+            },
+            UserFacingErrorBody::Custom(body) => body.clone(),
+        }
+    }
+
+    fn localized_error_detail(&self) -> Option<String> {
+        self.error.detail.as_ref().map(|detail| match detail {
+            UserFacingErrorDetail::TimedOut => crate::t!("terminal-ssh-error-timeout"),
+            UserFacingErrorDetail::UnsupportedOs(os) => {
+                crate::t!("terminal-ssh-error-unsupported-os", os = os)
+            }
+            UserFacingErrorDetail::UnsupportedArch(arch) => {
+                crate::t!("terminal-ssh-error-unsupported-architecture", arch = arch)
+            }
+            UserFacingErrorDetail::ScriptFailed { exit_code, stderr } => crate::t!(
+                "terminal-ssh-error-script-failed",
+                code = exit_code.to_string(),
+                stderr = stderr
+            ),
+            UserFacingErrorDetail::Custom(detail) => detail.clone(),
+        })
     }
 }
 
@@ -78,7 +110,7 @@ impl View for SshRemoteServerFailedBanner {
         .finish();
 
         let title = Text::new(
-            BANNER_TITLE.to_string(),
+            crate::t!("terminal-ssh-extension-connect-failed"),
             appearance.ui_font_family(),
             font_size,
         )
@@ -86,7 +118,7 @@ impl View for SshRemoteServerFailedBanner {
         .finish();
 
         let body = Text::new(
-            BANNER_BODY.to_string(),
+            crate::t!("terminal-ssh-extension-connect-failed-description"),
             appearance.ui_font_family(),
             small_font_size,
         )
@@ -99,10 +131,15 @@ impl View for SshRemoteServerFailedBanner {
             let error_bg = theme.ansi_overlay_1(ansi_red);
             let error_text_color = theme.ansi_fg_red();
 
-            let error_description = if let Some(detail) = &self.error.detail {
-                format!("{}. {}", self.error.body, detail)
+            let body = self.localized_error_body();
+            let error_description = if let Some(detail) = self.localized_error_detail() {
+                crate::t!(
+                    "terminal-ssh-error-with-detail",
+                    body = body,
+                    detail = detail
+                )
             } else {
-                format!("{}.", self.error.body)
+                crate::t!("terminal-ssh-error-body-only", body = body)
             };
 
             let error_text = Text::new(

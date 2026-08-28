@@ -70,9 +70,9 @@ impl CursorDisplayType {
 impl Display for CursorDisplayType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let value = match &self {
-            CursorDisplayType::Bar => "Bar",
-            CursorDisplayType::Block => "Block",
-            CursorDisplayType::Underline => "Underline",
+            CursorDisplayType::Bar => crate::t!("settings-cursor-bar"),
+            CursorDisplayType::Block => crate::t!("settings-cursor-block"),
+            CursorDisplayType::Underline => crate::t!("settings-cursor-underline"),
         };
         write!(f, "{value}")
     }
@@ -102,10 +102,10 @@ pub enum CodeEditorLineNumberMode {
 }
 
 impl CodeEditorLineNumberMode {
-    pub fn dropdown_item_label(&self) -> &'static str {
+    pub fn dropdown_item_label(&self) -> String {
         match self {
-            Self::Absolute => "Absolute",
-            Self::Relative => "Relative",
+            Self::Absolute => crate::t!("settings-line-numbers-absolute"),
+            Self::Relative => crate::t!("settings-line-numbers-relative"),
         }
     }
 }
@@ -159,12 +159,12 @@ pub enum WarpPromptSeparator {
 }
 
 impl WarpPromptSeparator {
-    pub fn dropdown_item_label(&self) -> &'static str {
+    pub fn dropdown_item_label(&self) -> String {
         match self {
-            Self::None => "None",
-            Self::PercentSign => "%",
-            Self::DollarSign => "$",
-            Self::ChevronSymbol => ">",
+            Self::None => crate::t!("common-none"),
+            Self::PercentSign => "%".to_owned(),
+            Self::DollarSign => "$".to_owned(),
+            Self::ChevronSymbol => ">".to_owned(),
         }
     }
 

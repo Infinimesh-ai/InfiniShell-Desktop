@@ -51,10 +51,6 @@ pub enum HostPickerEvent {
     Closed,
 }
 
-const CUSTOM_HOST_LABEL: &str = "Custom host…";
-const DEFAULT_BADGE: &str = "Default";
-const CONNECTED_BADGE: &str = "Connected";
-const DISCONNECTED_BADGE: &str = "Disconnected";
 const EDITOR_PLACEHOLDER: &str = "my-worker-host";
 
 // ── Internal action plumbing ────────────────────────────────────────
@@ -430,11 +426,14 @@ pub(crate) fn build_menu_items(
 ) -> Vec<MenuItem<DropdownAction>> {
     let mut items: Vec<MenuItem<DropdownAction>> = Vec::new();
     let mut known_slugs: Vec<String> = Vec::new();
+    let default_badge = crate::t!("ai-orchestration-badge-default");
+    let connected_badge = crate::t!("ai-orchestration-badge-connected");
+    let disconnected_badge = crate::t!("ai-orchestration-badge-disconnected");
 
     if let Some(slug) = default_host {
         items.push(menu_item_for_known(
             slug,
-            Some(DEFAULT_BADGE),
+            Some(&default_badge),
             InternalAction::SelectKnown(slug.to_string()),
         ));
         known_slugs.push(slug.to_string());
@@ -456,7 +455,7 @@ pub(crate) fn build_menu_items(
         }
         items.push(menu_item_for_known(
             slug,
-            Some(CONNECTED_BADGE),
+            Some(&connected_badge),
             InternalAction::SelectKnown(slug.to_string()),
         ));
         known_slugs.push(slug.to_string());
@@ -472,12 +471,12 @@ pub(crate) fn build_menu_items(
         // state explicit.
         items.push(menu_item_for_known(
             slug,
-            Some(DISCONNECTED_BADGE),
+            Some(&disconnected_badge),
             InternalAction::SelectKnown(slug.to_string()),
         ));
     }
     items.push(MenuItem::Item(
-        MenuItemFields::new(CUSTOM_HOST_LABEL).with_on_select_action(
+        MenuItemFields::new(crate::t!("ai-orchestration-custom-host")).with_on_select_action(
             DropdownAction::select_action_and_close(InternalAction::EnterCustomMode),
         ),
     ));
@@ -490,7 +489,7 @@ pub(crate) fn build_menu_items(
 #[cfg(test)]
 pub(crate) fn menu_label_for(slug: &str, default_host: Option<&str>) -> String {
     if default_host == Some(slug) {
-        format_known_label(slug, Some(DEFAULT_BADGE))
+        format_known_label(slug, Some(&crate::t!("ai-orchestration-badge-default")))
     } else {
         format_known_label(slug, None)
     }

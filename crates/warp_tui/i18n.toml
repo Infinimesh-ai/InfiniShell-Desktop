@@ -1,0 +1,5 @@
+# TUI 与 GUI 共享 app/i18n 下的 Fluent 资源；本文件仅供 fl! 宏做编译期 key 校验。
+fallback_language = "en"
+
+[fluent]
+assets_dir = "../../app/i18n"

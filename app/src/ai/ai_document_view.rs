@@ -966,12 +966,12 @@ impl AIDocumentView {
         let title = AIDocumentModel::as_ref(ctx)
             .get_current_document(&self.document_id)
             .map(|doc| doc.title.clone())
-            .unwrap_or_else(|| "Untitled".to_string());
+            .unwrap_or_else(|| crate::t!("common-untitled"));
 
         // Sanitize the title for use as a filename
         let sanitized_title = safe_filename(&title);
         let filename = if sanitized_title.is_empty() {
-            "Untitled.md".to_string()
+            crate::t!("ai-document-untitled-filename")
         } else {
             format!("{sanitized_title}.md")
         };
@@ -1088,7 +1088,7 @@ impl TypedActionView for AIDocumentView {
                 let window_id = ctx.window_id();
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                     toast_stack.add_ephemeral_toast(
-                        DismissibleToast::success("Copied to clipboard as Markdown".to_string()),
+                        DismissibleToast::success(crate::t!("ai-document-copied-as-markdown")),
                         window_id,
                         ctx,
                     );
@@ -1263,7 +1263,7 @@ impl BackingView for AIDocumentView {
         // 原本仅在云同步成功后才显示,本地路径完全不可达,直接删除。
 
         menu_items.push(
-            MenuItemFields::new("Copy as Markdown")
+            MenuItemFields::new(crate::t!("ai-document-copy-as-markdown"))
                 .with_on_select_action(AIDocumentAction::CopyAsMarkdown)
                 .with_icon(Icon::Copy)
                 .into_item(),

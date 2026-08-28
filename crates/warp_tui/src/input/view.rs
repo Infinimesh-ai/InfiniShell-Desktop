@@ -110,7 +110,7 @@ pub fn init(app: &mut AppContext) {
         // Submit and contextual Escape are prompt policy, not editor policy.
         EditableBinding::new(
             "tui:input:submit",
-            "Submit the input",
+            warp::t_static!("tui-keybinding-submit-input"),
             TuiInputAction::Submit,
         )
         .with_context_predicate(id!("TuiInputView"))
@@ -118,7 +118,7 @@ pub fn init(app: &mut AppContext) {
         .with_key_binding("enter"),
         EditableBinding::new(
             "tui:input:handle_escape",
-            "Handle contextual input escape",
+            warp::t_static!("tui-keybinding-contextual-escape"),
             TuiInputAction::HandleEscape,
         )
         .with_context_predicate(id!("TuiInputView") & id!(INPUT_HANDLES_ESCAPE_FLAG))
@@ -126,7 +126,7 @@ pub fn init(app: &mut AppContext) {
         .with_key_binding("escape"),
         EditableBinding::new(
             MCP_LOGOUT_BINDING_NAME,
-            "Log out of the selected MCP server and remove its credentials",
+            warp::t_static!("tui-keybinding-mcp-logout"),
             TuiInputAction::LogOutSelectedMcp,
         )
         .with_context_predicate(id!("TuiInputView") & id!(MCP_MENU_ACTIVE_FLAG))
@@ -134,7 +134,7 @@ pub fn init(app: &mut AppContext) {
         .with_key_binding("ctrl-r"),
         EditableBinding::new(
             "tui:input:complete_shell_command",
-            "Complete the shell command",
+            warp::t_static!("tui-keybinding-complete-shell-command"),
             TuiInputAction::Complete,
         )
         .with_context_predicate(id!("TuiInputView") & id!(SHELL_COMPLETION_AVAILABLE_FLAG))

@@ -19,10 +19,13 @@ pub use task::{
     AmbientAgentTaskState, AttachmentInput, ExecutionLocation, TaskStatusMessage,
     cancel_task_silently, cancel_task_with_toast,
 };
-pub const OUT_OF_CREDITS_TASK_FAILURE_MESSAGE: &str =
-    "Agent usage limit reached. Please try again later.";
-pub const SERVER_OVERLOADED_TASK_FAILURE_MESSAGE: &str =
-    "InfiniShell is temporarily overloaded. Please try again shortly.";
+pub fn out_of_credits_task_failure_message() -> String {
+    crate::t!("ambient-agent-usage-limit-reached")
+}
+
+pub fn server_overloaded_task_failure_message() -> String {
+    crate::t!("ambient-agent-server-overloaded")
+}
 
 /// JSON payload for starting an agent run. In Zap this is only used by local UI/CLI
 /// plumbing; no remote run endpoint is contacted.

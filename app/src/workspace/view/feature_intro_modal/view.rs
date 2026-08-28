@@ -54,14 +54,8 @@ pub struct FeatureIntro {
     pub id: FeatureIntroId,
     /// Bundled hero image shown at the top of the card.
     pub hero_image_path: &'static str,
-    /// Optional metadata label rendered above the title (e.g. "NEW").
-    pub badge: Option<&'static str>,
-    pub title: &'static str,
-    pub description: &'static str,
     /// Optional icon rendered to the left of the description.
     pub description_icon: Option<Icon>,
-    /// Label for the primary call-to-action button.
-    pub cta_label: &'static str,
     /// Destination opened when the user clicks the call-to-action. `None`
     /// simply dismisses the popover.
     pub cta_target: Option<FeatureIntroCtaTarget>,
@@ -72,16 +66,42 @@ pub struct FeatureIntro {
 pub const FEATURE_INTROS: &[FeatureIntro] = &[FeatureIntro {
     id: FeatureIntroId::CustomModelRouter,
     hero_image_path: "async/png/onboarding/custom_model_router_intro_banner.png",
-    badge: Some("NEW"),
-    title: "Build a custom model router for the Warp Agent.",
-    description: "Custom routers can be complexity-based, where tasks are routed based on how difficult they are, or rule-based, where they are routed based on a set of natural language prompts.",
     description_icon: Some(Icon::Compass),
-    cta_label: "Get started",
     cta_target: Some(FeatureIntroCtaTarget::SettingsWidget {
         page: SettingsSection::WarpAgent,
         widget_id: custom_model_routers_widget_id,
     }),
 }];
+
+impl FeatureIntro {
+    fn badge(&self) -> Option<String> {
+        match self.id {
+            FeatureIntroId::CustomModelRouter => Some(crate::t!("feature-intro-new")),
+        }
+    }
+
+    fn title(&self) -> String {
+        match self.id {
+            FeatureIntroId::CustomModelRouter => {
+                crate::t!("feature-intro-custom-router-title")
+            }
+        }
+    }
+
+    fn description(&self) -> String {
+        match self.id {
+            FeatureIntroId::CustomModelRouter => {
+                crate::t!("feature-intro-custom-router-description")
+            }
+        }
+    }
+
+    fn cta_label(&self) -> String {
+        match self.id {
+            FeatureIntroId::CustomModelRouter => crate::t!("feature-intro-get-started"),
+        }
+    }
+}
 
 /// Looks up a feature-intro descriptor by its id.
 pub fn feature_intro_by_id(id: FeatureIntroId) -> Option<&'static FeatureIntro> {
@@ -164,7 +184,7 @@ impl FeatureIntroModal {
         });
 
         let cta_button = ctx.add_view(|_ctx| {
-            ActionButton::new("Get started", PrimaryTheme)
+            ActionButton::new(crate::t!("feature-intro-get-started"), PrimaryTheme)
                 .on_click(|ctx| ctx.dispatch_typed_action(FeatureIntroModalAction::GetStarted))
         });
 
@@ -185,7 +205,7 @@ impl FeatureIntroModal {
         self.current = intro;
         if let Some(intro) = intro {
             self.cta_button.update(ctx, |button, ctx| {
-                button.set_label(intro.cta_label, ctx);
+                button.set_label(intro.cta_label(), ctx);
             });
         }
         ctx.notify();
@@ -230,14 +250,14 @@ impl FeatureIntroModal {
         hero_stack.finish()
     }
 
-    fn render_badge(label: &'static str, appearance: &Appearance) -> Box<dyn Element> {
-        Text::new_inline(label.to_string(), appearance.ui_font_family(), 11.)
+    fn render_badge(label: String, appearance: &Appearance) -> Box<dyn Element> {
+        Text::new_inline(label, appearance.ui_font_family(), 11.)
             .with_color(modal_text_sub(appearance))
             .with_style(Properties::default().weight(Weight::Semibold))
             .finish()
     }
 
-    fn render_title(title: &'static str, appearance: &Appearance) -> Box<dyn Element> {
+    fn render_title(title: String, appearance: &Appearance) -> Box<dyn Element> {
         Text::new(title, appearance.ui_font_family(), 20.)
             .with_color(modal_text_main(appearance))
             .with_style(Properties::default().weight(Weight::Semibold))
@@ -245,7 +265,7 @@ impl FeatureIntroModal {
     }
 
     fn render_description(intro: &FeatureIntro, appearance: &Appearance) -> Box<dyn Element> {
-        let description = Text::new(intro.description, appearance.ui_font_family(), 14.)
+        let description = Text::new(intro.description(), appearance.ui_font_family(), 14.)
             .with_color(modal_text_sub(appearance))
             .finish();
 
@@ -277,10 +297,10 @@ impl FeatureIntroModal {
         let mut header = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .with_spacing(8.);
-        if let Some(badge) = intro.badge {
+        if let Some(badge) = intro.badge() {
             header.add_child(Self::render_badge(badge, appearance));
         }
-        header.add_child(Self::render_title(intro.title, appearance));
+        header.add_child(Self::render_title(intro.title(), appearance));
         header.add_child(Self::render_description(intro, appearance));
 
         let body = Container::new(header.finish())

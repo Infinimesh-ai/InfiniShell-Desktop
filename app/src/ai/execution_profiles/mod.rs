@@ -23,10 +23,11 @@ pub(crate) const LONG_CONTEXT_PRICING_WARNING_URL: &str =
     "https://developers.openai.com/api/docs/pricing";
 pub(crate) fn long_context_pricing_warning_title() -> FormattedTextInline {
     vec![
-        FormattedTextFragment::plain_text(
-            "OpenAI automatically applies long-context pricing when context exceeds 272,000 tokens. ",
+        FormattedTextFragment::plain_text(crate::t!("ai-long-context-pricing-warning")),
+        FormattedTextFragment::hyperlink(
+            crate::t!("common-learn-more"),
+            LONG_CONTEXT_PRICING_WARNING_URL,
         ),
-        FormattedTextFragment::hyperlink("Learn more", LONG_CONTEXT_PRICING_WARNING_URL),
     ]
 }
 
@@ -245,9 +246,9 @@ impl StringModel for AIExecutionProfile {
     fn display_name(&self) -> String {
         // Handles case where default profile was previously created and named "Untitled"
         if self.is_default_profile {
-            "Default".to_string()
+            crate::t!("common-default")
         } else if self.name.trim().is_empty() {
-            "Untitled".to_string()
+            crate::t!("common-untitled")
         } else {
             self.name.clone()
         }

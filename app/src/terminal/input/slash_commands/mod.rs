@@ -581,10 +581,9 @@ impl Input {
                             let window_id = ctx.window_id();
                             ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                                 toast_stack.add_ephemeral_toast(
-                                    DismissibleToast::error(
-                                        "The /open-file command is only available for local sessions"
-                                            .to_owned(),
-                                    ),
+                                    DismissibleToast::error(crate::t!(
+                                        "terminal-open-file-local-only"
+                                    )),
                                     window_id,
                                     ctx,
                                 );
@@ -625,7 +624,10 @@ impl Input {
                             }
                             Err(_) => {
                                 show_error_toast(
-                                    format!("File not found: {}", file_path.display()),
+                                    crate::t!(
+                                        "terminal-file-not-found",
+                                        path = file_path.display().to_string()
+                                    ),
                                     ctx,
                                 );
                                 return true;
@@ -668,8 +670,8 @@ impl Input {
                 // Show a toast to confirm the export
                 let window_id = ctx.window_id();
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = DismissibleToast::default(String::from(
-                        "Conversation exported to clipboard",
+                    let toast = DismissibleToast::default(crate::t!(
+                        "terminal-conversation-exported-clipboard"
                     ));
                     toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                 });
@@ -1120,7 +1122,7 @@ pub fn slash_command_is_submitted_as_prompt(command: &StaticCommand) -> bool {
 /// callers rendering the button and callers inserting the command always agree.
 #[cfg(not(target_family = "wasm"))]
 pub(crate) struct ForkButtonAction {
-    pub tooltip: &'static str,
+    pub tooltip: String,
     pub command_name: &'static str,
 }
 
@@ -1137,7 +1139,7 @@ pub(crate) fn fork_button_action(
     _ctx: &warpui::AppContext,
 ) -> ForkButtonAction {
     ForkButtonAction {
-        tooltip: "Fork conversation",
+        tooltip: crate::t!("terminal-fork-conversation"),
         command_name: commands::FORK.name,
     }
 }

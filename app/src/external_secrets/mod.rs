@@ -182,16 +182,23 @@ impl SecretManager {
         &self,
         error_type: SecretErrorType,
     ) -> ErrorMessageAndCommand {
+        let manager = self.to_string();
         match error_type {
             SecretErrorType::NotInstalled => {
-                let message = format!("{} CLI is not installed", &self);
+                let message = crate::t!(
+                    "external-secrets-cli-not-installed",
+                    manager = manager.clone()
+                );
 
                 let (link, link_message) = (
                     match self {
                         SecretManager::OnePassword => Some(ONEPASSWORD_DOCS_LINK.to_owned()),
                         SecretManager::LastPass => Some(LASTPASS_DOCS_LINK.to_owned()),
                     },
-                    Some(format!("View {} CLI installation documentation", &self)),
+                    Some(crate::t!(
+                        "external-secrets-view-installation-docs",
+                        manager = manager.clone()
+                    )),
                 );
 
                 ErrorMessageAndCommand {
@@ -204,21 +211,18 @@ impl SecretManager {
                 let (link, link_message) = match self {
                     SecretManager::OnePassword => (
                         Some(ONEPASSWORD_DOCS_LINK.to_owned()),
-                        Some("Integrate 1Password app with CLI".to_owned()),
+                        Some(crate::t!("external-secrets-integrate-one-password")),
                     ),
                     SecretManager::LastPass => (None, None),
                 };
                 ErrorMessageAndCommand {
-                    message: format!(
-                        "{} didn't return secrets (likely not configured or authenticated)",
-                        &self
-                    ),
+                    message: crate::t!("external-secrets-fetch-failed", manager = manager),
                     link,
                     link_message,
                 }
             }
             SecretErrorType::InvalidPlatform => ErrorMessageAndCommand {
-                message: "Platform not supported".to_owned(),
+                message: crate::t!("external-secrets-platform-unsupported"),
                 link: None,
                 link_message: None,
             },

@@ -131,7 +131,7 @@ impl View for CloseSessionConfirmationDialog {
 
         let dialog = Container::new(
             Dialog::new(
-                "Close session?".into(),
+                crate::t!("workspace-close-session-title"),
                 Some(
                     "You are about to close a session that is currently being shared. Closing it will end sharing for everyone."
                         .into(),

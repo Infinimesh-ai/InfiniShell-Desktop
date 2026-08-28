@@ -592,7 +592,7 @@ impl BackingView for TerminalView {
                 items.push(MenuItem::Separator);
             }
             items.push(
-                MenuItemFields::new("Save SSH access path".to_string())
+                MenuItemFields::new(crate::t!("terminal-save-ssh-access-path"))
                     .with_on_select_action(TerminalAction::SaveCurrentSshRoute)
                     .into_item(),
             );

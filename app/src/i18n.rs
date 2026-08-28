@@ -1,4 +1,4 @@
-//! Fluent-based localization layer for Zap Desktop.
+//! Fluent-based localization layer for InfiniShell Desktop.
 //!
 //! 加载链:
 //!   1. `init()` 在启动时调用一次(idempotent),用 `RustEmbed` 加载 `app/i18n/{locale}/*.ftl`
@@ -10,12 +10,13 @@
 //!   - 当前 locale 没有 → fluent 内部 fallback 到 fallback_language (en)
 //!   - 连英文都没有 → 返回 key 本身字符串(并 log::warn,便于 CI 抓未翻译条目)
 
+use std::borrow::Cow;
 use std::sync::OnceLock;
 
 #[cfg(not(target_os = "macos"))]
 use i18n_embed::DesktopLanguageRequester;
-use i18n_embed::LanguageLoader;
 use i18n_embed::fluent::{FluentLanguageLoader, fluent_language_loader};
+use i18n_embed::{I18nAssets, LanguageLoader};
 use rust_embed::RustEmbed;
 use unic_langid::LanguageIdentifier;
 
@@ -23,6 +24,37 @@ use unic_langid::LanguageIdentifier;
 #[derive(RustEmbed)]
 #[folder = "i18n/"]
 struct Localizations;
+
+/// 将桌面端与 TUI 的 Fluent domain 合并到共享的 `warp` 运行时加载器中。
+///
+/// 两个 crate 仍各自用 `warp.ftl` / `warp_tui.ftl` 做编译期消息键校验；运行时查询统一
+/// 经过本模块，因此在加载 `warp.ftl` 时同时返回同语言的 `warp_tui.ftl`。Fluent loader
+/// 原生支持同一路径对应多个资源 bundle，无需复制消息或维护第二套全局 locale 状态。
+struct MergedLocalizations;
+
+impl I18nAssets for MergedLocalizations {
+    fn get_files(&self, file_path: &str) -> Vec<Cow<'_, [u8]>> {
+        let mut files = Localizations::get(file_path)
+            .map(|file| file.data)
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        if let Some((locale, domain)) = file_path.rsplit_once('/')
+            && domain == "warp.ftl"
+        {
+            let tui_path = format!("{locale}/warp_tui.ftl");
+            if let Some(file) = Localizations::get(&tui_path) {
+                files.push(file.data);
+            }
+        }
+
+        files
+    }
+
+    fn filenames_iter(&self) -> Box<dyn Iterator<Item = String> + '_> {
+        Box::new(Localizations::iter().map(|path| path.to_string()))
+    }
+}
 
 static LANGUAGE_LOADER: OnceLock<FluentLanguageLoader> = OnceLock::new();
 
@@ -38,7 +70,7 @@ pub fn init(override_locale: Option<&str>) {
     let loader = fluent_language_loader!();
 
     // 总是先加载 fallback (en) bundle —— 任何 locale 缺 key 都会落到它。
-    if let Err(e) = loader.load_fallback_language(&Localizations) {
+    if let Err(e) = loader.load_fallback_language(&MergedLocalizations) {
         log::error!("[i18n] failed to load fallback (en) bundle: {e}");
     }
 
@@ -54,9 +86,13 @@ pub fn init(override_locale: Option<&str>) {
         None => system_requested_languages(),
     };
 
-    if let Err(e) = i18n_embed::select(&loader, &Localizations, &requested) {
+    if let Err(e) = i18n_embed::select(&loader, &MergedLocalizations, &requested) {
         log::warn!("[i18n] select() failed: {e} — running with fallback only");
     }
+    // Fluent 默认在每个插值变量两侧加入 FSI/PDI 双向文本隔离符。桌面/TUI 渲染器都按
+    // 可见单元格测量字符串，这些隐藏字符会破坏截断、快照和复制文本；本产品当前只提供
+    // LTR 界面语言，因此统一关闭隔离符。
+    loader.set_use_isolating(false);
 
     log::info!(
         "[i18n] initialized; current_languages={:?}, fallback={}",
@@ -169,10 +205,11 @@ pub fn set_locale(locale: &str) {
             return;
         }
     };
-    if let Err(e) = loader.load_languages(&Localizations, &[lang_id]) {
+    if let Err(e) = loader.load_languages(&MergedLocalizations, &[lang_id]) {
         log::warn!("[i18n] set_locale({locale:?}) failed: {e}");
         return;
     }
+    loader.set_use_isolating(false);
     log::info!(
         "[i18n] locale switched to {locale:?}; current_languages={:?}",
         loader.current_languages()
@@ -186,9 +223,10 @@ pub fn reset_to_system_locale() {
         return;
     };
     let requested = system_requested_languages();
-    if let Err(e) = i18n_embed::select(loader, &Localizations, &requested) {
+    if let Err(e) = i18n_embed::select(loader, &MergedLocalizations, &requested) {
         log::warn!("[i18n] reset_to_system_locale failed: {e}");
     }
+    loader.set_use_isolating(false);
     propagate_ui_locale(loader);
 }
 
@@ -255,47 +293,5 @@ pub fn t_or(message_id: &str, fallback: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn init_is_idempotent() {
-        init(Some("en"));
-        init(Some("en"));
-        assert!(loader().is_some());
-    }
-
-    #[test]
-    fn fallback_chain_works() {
-        let loader = fluent_language_loader!();
-        loader.load_fallback_language(&Localizations).unwrap();
-        let languages = ["zh-CN".parse().unwrap()];
-        i18n_embed::select(&loader, &Localizations, &languages).unwrap();
-        // common-ok 中文已译
-        assert_eq!(loader.get("common-ok"), "确定");
-        // 不存在的 key — fluent 会返回 key 本身或带 marker 的字符串
-        let missing = loader.get("definitely-does-not-exist");
-        assert!(missing.contains("definitely-does-not-exist"));
-    }
-
-    #[test]
-    fn requested_languages_keep_preferred_order() {
-        let languages = ["zh-CN", "en"]
-            .into_iter()
-            .filter_map(parse_language_identifier)
-            .collect();
-
-        let languages = languages_or_fallback(languages);
-
-        assert_eq!(languages[0].to_string(), "zh-CN");
-        assert_eq!(languages[1].to_string(), "en");
-    }
-
-    #[test]
-    fn requested_languages_fall_back_to_english_when_empty() {
-        let languages = languages_or_fallback(Vec::new());
-
-        assert_eq!(languages.len(), 1);
-        assert_eq!(languages[0].to_string(), "en");
-    }
-}
+#[path = "i18n_tests.rs"]
+mod tests;

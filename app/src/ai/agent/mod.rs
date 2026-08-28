@@ -739,8 +739,6 @@ pub enum RenderableAIError {
 }
 
 impl RenderableAIError {
-    const TRANSIENT_NETWORK_ERROR_MESSAGE: &'static str =
-        "Warp lost connection while receiving the agent response. This is usually temporary.";
     /// Creates a transient network error. `kind` is the structured cause (including the raw API
     /// error where one exists), preserved so user reports can disambiguate the different causes
     /// behind the shared user-facing copy.
@@ -873,7 +871,7 @@ impl From<&Arc<AIApiError>> for RenderableAIError {
             | AIApiError::NoContextFound
             | AIApiError::ErrorStatus(_, _)
             | AIApiError::Stream { .. } => Self::Other {
-                error_message: format!("Request failed with error: {value:?}"),
+                error_message: crate::t!("ai-error-request-failed", error = format!("{value:?}")),
                 will_attempt_resume: false,
                 waiting_for_network: false,
                 is_user_error,
@@ -891,44 +889,51 @@ impl Display for RenderableAIError {
                 if let Some(message) = user_display_message {
                     write!(f, "{message}")
                 } else {
-                    write!(f, "Quota limit reached.")
+                    write!(f, "{}", crate::t!("ai-error-quota-limit-reached"))
                 }
             }
-            Self::ServerOverloaded => {
+            Self::ServerOverloaded => write!(f, "{}", crate::t!("ai-error-server-overloaded")),
+            Self::InternalWarpError => write!(f, "{}", crate::t!("ai-error-internal")),
+            Self::ContextWindowExceeded(message) => {
                 write!(
                     f,
-                    "InfiniShell is currently overloaded. Please try again later."
+                    "{}",
+                    crate::t!("ai-error-context-window-exceeded", message = message)
                 )
             }
-            Self::InternalWarpError => write!(f, "Internal InfiniShell error."),
-            Self::ContextWindowExceeded(message) => {
-                write!(f, "Context window exceeded: {message}")
-            }
             Self::InvalidApiKey { provider, .. } => {
-                write!(f, "Invalid API key for {provider}")
+                write!(
+                    f,
+                    "{}",
+                    crate::t!("ai-error-invalid-api-key", provider = provider)
+                )
             }
             Self::AwsBedrockCredentialsExpiredOrInvalid { model_name } => {
                 write!(
                     f,
-                    "AWS Bedrock credentials expired or invalid for {model_name}"
+                    "{}",
+                    crate::t!("ai-error-bedrock-credentials-invalid", model = model_name)
                 )
             }
             Self::GeminiEnterpriseCredentialsExpiredOrInvalid => {
-                write!(f, "Gemini Enterprise credentials expired or invalid")
+                write!(
+                    f,
+                    "{}",
+                    crate::t!("ai-error-gemini-enterprise-credentials-invalid")
+                )
             }
             Self::TransientNetworkError { kind, .. } => {
                 write!(
                     f,
-                    "{}\n\nDebug info: {kind}",
-                    Self::TRANSIENT_NETWORK_ERROR_MESSAGE
+                    "{}",
+                    crate::t!("ai-error-transient-network", debug = kind.to_string())
                 )
             }
             Self::Other { error_message, .. } => write!(f, "{error_message}"),
             Self::AgentExitedShell { command } => write!(
                 f,
-                "The shell exited while the agent was running the command `{command}`, so the run \
-                 could not continue. Ensure the agent is not asked to run commands or source \
-                 scripts that can exit the shell."
+                "{}",
+                crate::t!("ai-error-agent-exited-shell", command = command)
             ),
             Self::CloudStartupFailed(msg) => write!(f, "{msg}"),
         }
@@ -2890,7 +2895,7 @@ impl AIAgentInput {
                 ..
             } => Some(url.query.clone()),
             Self::InitProjectRules { display_query, .. } => display_query.clone(),
-            Self::CodeReview { .. } => Some("Address these comments".to_string()),
+            Self::CodeReview { .. } => Some(crate::t!("ai-code-review-address-comments")),
             Self::InvokeSkill {
                 skill, user_query, ..
             } => {

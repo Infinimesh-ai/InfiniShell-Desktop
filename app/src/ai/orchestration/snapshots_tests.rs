@@ -1,10 +1,10 @@
 use warp_cli::agent::Harness;
 
 use super::{
-    AUTH_SECRET_INHERIT_LABEL, AuthSecretNamesInput, DEFAULT_MODEL_LABEL, HarnessEntryInput,
-    ModelChoiceInput, OptionBadge, OptionFooter, OptionSourceStatus, build_api_key_snapshot,
-    build_environment_snapshot, build_harness_snapshot, build_host_snapshot,
-    build_non_oz_model_snapshot, build_oz_model_snapshot, build_runner_snapshot,
+    AuthSecretNamesInput, HarnessEntryInput, ModelChoiceInput, OptionBadge, OptionFooter,
+    OptionSourceStatus, build_api_key_snapshot, build_environment_snapshot, build_harness_snapshot,
+    build_host_snapshot, build_non_oz_model_snapshot, build_oz_model_snapshot,
+    build_runner_snapshot,
 };
 use crate::ai::local_harness_setup::LocalHarnessSetupState;
 use crate::ai::orchestration::config_state::AuthSecretSelection;
@@ -164,7 +164,10 @@ fn non_oz_model_snapshot_puts_default_first_and_selects_server_model() {
         "sonnet",
     );
 
-    assert_eq!(snapshot.rows[0].label, DEFAULT_MODEL_LABEL);
+    assert_eq!(
+        snapshot.rows[0].label,
+        crate::t!("ai-orchestration-default-model")
+    );
     assert_eq!(snapshot.rows[0].id, "");
     assert_eq!(snapshot.selected_id.as_deref(), Some("sonnet"));
 }
@@ -192,7 +195,14 @@ fn api_key_snapshot_lists_skip_then_names() {
     );
 
     let labels: Vec<&str> = snapshot.rows.iter().map(|r| r.label.as_str()).collect();
-    assert_eq!(labels, vec![AUTH_SECRET_INHERIT_LABEL, "key-a", "key-b"]);
+    assert_eq!(
+        labels,
+        vec![
+            crate::t!("ai-orchestration-skip-api-key"),
+            "key-a".to_string(),
+            "key-b".to_string(),
+        ]
+    );
     assert_eq!(snapshot.selected_id.as_deref(), Some("key-b"));
     assert_eq!(snapshot.status, OptionSourceStatus::Ready);
     assert_eq!(snapshot.footer, Some(OptionFooter::CreateNewAuthSecret));
@@ -274,7 +284,10 @@ fn environment_snapshot_puts_empty_option_first() {
     );
 
     assert_eq!(snapshot.rows[0].id, "");
-    assert_eq!(snapshot.rows[0].label, super::ORCHESTRATION_ENV_NONE_LABEL);
+    assert_eq!(
+        snapshot.rows[0].label,
+        crate::t!("ai-orchestration-empty-environment")
+    );
     assert_eq!(snapshot.selected_id.as_deref(), Some("env-b"));
 }
 
@@ -294,7 +307,7 @@ fn runner_snapshot_puts_use_default_first_and_selects() {
     assert_eq!(snapshot.rows[0].id, "");
     assert_eq!(
         snapshot.rows[0].label,
-        super::ORCHESTRATION_RUNNER_NONE_LABEL
+        crate::t!("ai-orchestration-use-default")
     );
     assert_eq!(snapshot.selected_id.as_deref(), Some("r-b"));
     assert_eq!(snapshot.status, OptionSourceStatus::Ready);

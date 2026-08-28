@@ -155,9 +155,13 @@ pub(super) fn render_beta_chip(appearance: &Appearance) -> Box<dyn Element> {
     let theme = appearance.theme();
     let chip_color = theme.sub_text_color(theme.surface_3()).into_solid();
     Container::new(
-        Text::new_inline("BETA", appearance.ui_font_family(), 10.)
-            .with_color(chip_color)
-            .finish(),
+        Text::new_inline(
+            crate::t!("common-beta-uppercase"),
+            appearance.ui_font_family(),
+            10.,
+        )
+        .with_color(chip_color)
+        .finish(),
     )
     .with_background(theme.surface_3())
     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
@@ -2236,10 +2240,10 @@ impl SettingsView {
         Container::new(
             Align::new(
                 Flex::column()
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
                     .with_children([
                         Text::new(
-                            "No settings match your search.",
+                            crate::t!("settings-search-empty-title"),
                             appearance.ui_font_family(),
                             appearance.ui_font_size(),
                         )
@@ -2247,7 +2251,7 @@ impl SettingsView {
                         .with_color(theme.sub_text_color(theme.background()).into_solid())
                         .finish(),
                         Text::new(
-                            "You may want to try using different keywords or checking for any possible typos.",
+                            crate::t!("settings-search-empty-description"),
                             appearance.ui_font_family(),
                             appearance.ui_font_size(),
                         )
@@ -2258,7 +2262,7 @@ impl SettingsView {
             )
             .finish(),
         )
-            .with_uniform_margin(16.)
+        .with_uniform_margin(16.)
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
         .with_background(internal_colors::fg_overlay_1(appearance.theme()))
         .finish()

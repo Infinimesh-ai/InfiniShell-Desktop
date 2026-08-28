@@ -173,9 +173,12 @@ pub(super) async fn prepare_local_harness_child_launch(
     let Some(harness) = normalize_local_child_harness(&harness_type) else {
         let harness_name = harness_type.trim();
         return Err(if harness_name.is_empty() {
-            "Local child harness type is missing.".to_string()
+            crate::t!("ambient-agent-local-harness-missing")
         } else {
-            format!("Unsupported local child harness '{harness_name}'.")
+            crate::t!(
+                "ambient-agent-local-harness-unsupported",
+                name = harness_name
+            )
         });
     };
     if let Some(message) = local_harness_product_disabled_message(harness) {

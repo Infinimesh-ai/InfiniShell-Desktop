@@ -26,8 +26,6 @@ use crate::workflows::workflow_view::{WorkflowView, WorkflowViewEvent};
 use crate::workflows::{WorkflowSelectionSource, WorkflowSource, WorkflowType};
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
-const SUGGESTED_PROMPT_MODAL_HEADER: &str = "Prompt";
-
 /// A modal component for displaying and managing suggested agent mode workflows.
 /// This component wraps a WorkflowView in a modal dialog with proper styling and
 /// event handling.
@@ -112,38 +110,34 @@ impl SuggestedAgentModeWorkflowModal {
         let background = blended_colors::neutral_2(appearance.theme());
 
         let modal = ctx.add_typed_action_view(|ctx| {
-            let mut modal = Modal::new(
-                Some(SUGGESTED_PROMPT_MODAL_HEADER.to_string()),
-                workflow_view_handle,
-                ctx,
-            )
-            .with_modal_style(UiComponentStyles {
-                width: Some(810.),
-                background: Some(background.into()),
-                ..Default::default()
-            })
-            .with_header_style(UiComponentStyles {
-                padding: Some(Coords {
-                    top: 8.,
-                    bottom: 0.,
-                    left: 24.,
-                    right: 24.,
-                }),
-                font_size: Some(16.),
-                font_weight: Some(Weight::Bold),
-                ..Default::default()
-            })
-            .with_body_style(UiComponentStyles {
-                padding: Some(Coords {
-                    top: 0.,
-                    bottom: 24.,
-                    left: 24.,
-                    right: 24.,
-                }),
-                ..Default::default()
-            })
-            .with_background_opacity(100)
-            .with_dismiss_on_click();
+            let mut modal = Modal::new(Some(crate::t!("common-prompt")), workflow_view_handle, ctx)
+                .with_modal_style(UiComponentStyles {
+                    width: Some(810.),
+                    background: Some(background.into()),
+                    ..Default::default()
+                })
+                .with_header_style(UiComponentStyles {
+                    padding: Some(Coords {
+                        top: 8.,
+                        bottom: 0.,
+                        left: 24.,
+                        right: 24.,
+                    }),
+                    font_size: Some(16.),
+                    font_weight: Some(Weight::Bold),
+                    ..Default::default()
+                })
+                .with_body_style(UiComponentStyles {
+                    padding: Some(Coords {
+                        top: 0.,
+                        bottom: 24.,
+                        left: 24.,
+                        right: 24.,
+                    }),
+                    ..Default::default()
+                })
+                .with_background_opacity(100)
+                .with_dismiss_on_click();
             modal.set_offset_positioning(OffsetPositioning::offset_from_save_position_element(
                 format!(
                     "agent_mode_workflow_position_{}",

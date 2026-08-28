@@ -48,7 +48,7 @@ impl CustomRouterView {
     pub fn new(router: CustomModelRouter, ctx: &mut ViewContext<Self>) -> Self {
         let is_any_ai_enabled = AISettings::as_ref(ctx).is_any_ai_enabled(ctx);
         let open_file_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("Open file", SecondaryTheme)
+            ActionButton::new(crate::t!("common-open-file"), SecondaryTheme)
                 .with_icon(Icon::File)
                 .with_size(ButtonSize::Small)
                 .with_height(HEADER_BUTTON_HEIGHT)
@@ -61,7 +61,7 @@ impl CustomRouterView {
         });
 
         let edit_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("Edit", SecondaryTheme)
+            ActionButton::new(crate::t!("common-edit"), SecondaryTheme)
                 .with_icon(Icon::Pencil)
                 .with_size(ButtonSize::Small)
                 .with_height(HEADER_BUTTON_HEIGHT)
@@ -74,7 +74,7 @@ impl CustomRouterView {
         });
 
         let delete_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("Delete", DangerSecondaryTheme)
+            ActionButton::new(crate::t!("common-delete"), DangerSecondaryTheme)
                 .with_icon(Icon::Trash)
                 .with_size(ButtonSize::Small)
                 .with_height(HEADER_BUTTON_HEIGHT)
@@ -178,8 +178,8 @@ impl View for CustomRouterView {
 
         // Type label row
         let type_label = match &self.router.routing {
-            CustomModelRouting::Complexity(_) => "Complexity-based routing",
-            CustomModelRouting::Prompt(_) => "Prompt-based routing",
+            CustomModelRouting::Complexity(_) => crate::t!("custom-router-complexity-routing"),
+            CustomModelRouting::Prompt(_) => crate::t!("custom-router-prompt-routing"),
         };
         let type_row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)

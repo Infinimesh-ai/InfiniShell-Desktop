@@ -1015,7 +1015,7 @@ impl SftpBrowserView {
 
         if filtered_indices.is_empty() {
             let text_el = Text::new_inline(
-                "This folder is empty".to_string(),
+                crate::t!("sftp-folder-empty"),
                 appearance.ui_font_family(),
                 appearance.ui_font_size(),
             )

@@ -14,8 +14,6 @@ use crate::workspace::tab_settings::{
     HeaderToolbarChipSelection, TabSettings, TabSettingsChangedEvent,
 };
 
-const MODAL_TITLE: &str = "Edit toolbar";
-
 pub fn init(app: &mut AppContext) {
     use warpui::keymap::macros::*;
 
@@ -247,10 +245,11 @@ impl View for HeaderToolbarInlineEditor {
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
+        let available_section_label = crate::t!("toolbar-editor-available-items");
         render_chip_editor_sections(
             &self.chip_configurator,
             ChipEditorSectionsConfig {
-                available_section_label: "Available items",
+                available_section_label: &available_section_label,
                 is_at_defaults: is_toolbar_editor_at_defaults(&self.chip_configurator),
                 reset_action: HeaderToolbarInlineEditorAction::ResetDefault,
                 activate_action: HeaderToolbarInlineEditorAction::Activate,
@@ -341,11 +340,13 @@ impl View for HeaderToolbarEditorModal {
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
+        let title = crate::t!("toolbar-editor-title");
+        let available_section_label = crate::t!("toolbar-editor-available-items");
         render_chip_editor_modal(
             &self.chip_configurator,
             ChipEditorModalConfig {
-                title: MODAL_TITLE,
-                available_section_label: "Available items",
+                title: &title,
+                available_section_label: &available_section_label,
                 is_at_defaults: self.is_at_defaults(),
                 is_dirty: self.is_dirty,
                 cancel_action: HeaderToolbarEditorAction::Cancel,
@@ -362,9 +363,8 @@ impl View for HeaderToolbarEditorModal {
 
 fn build_configurable_item(kind: &HeaderToolbarItemKind) -> ConfigurableItem {
     let id = serde_json::to_string(kind).expect("HeaderToolbarItemKind is serializable");
-    let renderer =
-        ControlItemRenderer::new_with_label_and_icon(kind.display_label().to_string(), kind.icon())
-            .with_identifier(id);
+    let renderer = ControlItemRenderer::new_with_label_and_icon(kind.display_label(), kind.icon())
+        .with_identifier(id);
     let renderer = match kind {
         HeaderToolbarItemKind::TabsPanel => renderer.non_removable(),
         _ => renderer,

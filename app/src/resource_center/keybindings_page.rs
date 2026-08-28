@@ -29,7 +29,6 @@ use crate::editor::{
     TextOptions,
 };
 use crate::search_bar::SearchBar;
-use crate::settings_view;
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
 use crate::util::bindings::{CommandBinding, filter_bindings_including_keystroke};
 use crate::workspace::WorkspaceAction;
@@ -89,7 +88,7 @@ impl KeybindingsView {
 
         search_editor.update(ctx, |editor, ctx| {
             editor.clear_buffer_and_reset_undo_stack(ctx);
-            editor.set_placeholder_text(settings_view::keybindings::SEARCH_PLACEHOLDER, ctx);
+            editor.set_placeholder_text(crate::t!("settings-keybindings-search-placeholder"), ctx);
         });
 
         let search_bar = {
@@ -345,7 +344,11 @@ impl KeybindingsView {
                         .build()
                         .finish(),
                 )
-                .with_child(self.render_text("To toggle this panel".into(), None, appearance))
+                .with_child(self.render_text(
+                    crate::t!("resource-center-keybindings-toggle-panel").into(),
+                    None,
+                    appearance,
+                ))
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .finish();
 
@@ -360,7 +363,7 @@ impl KeybindingsView {
             appearance
                 .ui_builder()
                 .link(
-                    "here.".into(),
+                    crate::t!("resource-center-keybindings-open-settings").into(),
                     None,
                     Some(Box::new(|ctx| {
                         ctx.dispatch_typed_action(WorkspaceAction::ConfigureKeybindingSettings {
@@ -383,7 +386,7 @@ impl KeybindingsView {
         Container::new(
             column
                 .with_child(self.render_text(
-                    "Go to settings > keyboard shortcuts to configure custom keybindings".into(),
+                    crate::t!("resource-center-keybindings-settings-description").into(),
                     None,
                     appearance,
                 ))

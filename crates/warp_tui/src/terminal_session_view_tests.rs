@@ -64,19 +64,15 @@ use super::statusline::{
 };
 use super::{
     ACCEPT_BLOCKED_TERMINAL_USE_ACTION_BINDING_NAME, ATTACH_AGENT_TO_RUNNING_COMMAND_BINDING_NAME,
-    AUTO_APPROVE_DISABLED_HINT, AUTO_APPROVE_ENABLED_HINT, AUTO_APPROVE_FEEDBACK_DURATION,
-    AUTO_APPROVE_TOGGLE_BINDING_NAME, BlockingInputSource, COST_CONVERSATION_IN_PROGRESS_HINT,
-    COST_EMPTY_CONVERSATION_HINT, COST_NO_ACTIVE_CONVERSATION_HINT, CTRL_C_EXIT_HINT,
-    CTRL_C_KILL_CHILD_HINT, ConversationRestoreState,
-    DETACH_AGENT_FROM_RUNNING_COMMAND_BINDING_NAME, INLINE_MENU_TOP_PADDING_ROWS,
-    LOADING_CONVERSATION_HINT, LOG_BUNDLE_FAILED_HINT, RUNNING_COMMAND_DETACH_HINT,
-    SESSION_CAN_ACCEPT_BLOCKED_TERMINAL_USE_ACTION_FLAG,
+    AUTO_APPROVE_FEEDBACK_DURATION, AUTO_APPROVE_TOGGLE_BINDING_NAME, BlockingInputSource,
+    ConversationRestoreState, DETACH_AGENT_FROM_RUNNING_COMMAND_BINDING_NAME,
+    INLINE_MENU_TOP_PADDING_ROWS, SESSION_CAN_ACCEPT_BLOCKED_TERMINAL_USE_ACTION_FLAG,
     SESSION_CAN_ATTACH_AGENT_TO_RUNNING_COMMAND_FLAG,
-    SESSION_CAN_DETACH_AGENT_FROM_RUNNING_COMMAND_FLAG, SHELL_MODE_HINT, STATUSLINE_RESET_HINT,
-    TuiConversationRestoreOrigin, TuiTerminalSessionAction, TuiTerminalSessionEvent,
-    TuiTerminalSessionView, attachment_focus_available, cost_command_unavailable_hint,
-    export_file_success_message, log_bundle_success_message, mcp_primary_action_hint,
-    raw_prompt_if_not_blank, render_mcp_install_footer, render_mcp_menu_footer,
+    SESSION_CAN_DETACH_AGENT_FROM_RUNNING_COMMAND_FLAG, TuiConversationRestoreOrigin,
+    TuiTerminalSessionAction, TuiTerminalSessionEvent, TuiTerminalSessionView,
+    attachment_focus_available, cost_command_unavailable_hint, export_file_success_message,
+    log_bundle_success_message, mcp_primary_action_hint, raw_prompt_if_not_blank,
+    render_mcp_install_footer, render_mcp_menu_footer,
 };
 #[cfg(feature = "voice_input")]
 use super::{
@@ -122,6 +118,35 @@ use crate::zero_state_animation::{
     ZeroStateAnimationConfig, ZeroStateAnimationConfigEvent, ZeroStateAnimationLoadFailure,
 };
 
+const AUTO_APPROVE_DISABLED_HINT: &str = "Auto approve off";
+const AUTO_APPROVE_ENABLED_HINT: &str = "Auto approve on";
+const COST_CONVERSATION_IN_PROGRESS_HINT: &str =
+    "Cannot show conversation cost: conversation is in progress";
+const COST_EMPTY_CONVERSATION_HINT: &str = "Cannot show conversation cost: conversation is empty";
+const COST_NO_ACTIVE_CONVERSATION_HINT: &str =
+    "Cannot show conversation cost: no active conversation";
+const CTRL_C_EXIT_HINT: &str = "ctrl-c again to exit";
+const CTRL_C_KILL_CHILD_HINT: &str = "ctrl-c again to kill child agent";
+const LOADING_CONVERSATION_HINT: &str = "Loading conversation…";
+const LOG_BUNDLE_FAILED_HINT: &str = "Failed to create log bundle (check logs)";
+const RUNNING_COMMAND_DETACH_HINT: &str = "ctrl-c to return to command";
+const SHELL_MODE_HINT: &str = "Shell mode";
+const STATUSLINE_RESET_HINT: &str = "Statusline reset to defaults.";
+const ZERO_STATE_ASCII_RELOAD_FAILED_HINT: &str =
+    "Could not reload custom ASCII art. Keeping the current object.";
+const ZERO_STATE_ASCII_INITIAL_LOAD_FAILED_HINT: &str =
+    "Could not load custom ASCII art. Using the built-in InfiniShell logo.";
+const SETTINGS_INVALID_VALUES_HINT: &str = "Settings failed to load: invalid values.";
+const SETTINGS_PARSE_FAILED_HINT: &str = "Settings failed to load: invalid syntax.";
+const THEME_INVALID_ARGUMENT_HINT: &str = "Theme must be auto, light, or dark.";
+const STATUSLINE_SAVED_HINT: &str = "Statusline configuration saved.";
+const FORK_EMPTY_CONVERSATION_HINT: &str = "Nothing to fork — start a conversation first.";
+const FORK_NO_RESUME_ID_HINT: &str = "This conversation cannot be forked until it has a resume ID.";
+const VIM_MODE_ENABLED_HINT: &str = "Vim mode enabled.";
+const VIM_MODE_DISABLED_HINT: &str = "Vim mode disabled.";
+const COPY_DEBUGGING_ID_NO_TOKEN_HINT: &str =
+    "No debugging ID available for this conversation yet.";
+
 struct FocusTestFixture {
     window_id: warpui_core::WindowId,
     sessions: ModelHandle<TuiSessions>,
@@ -141,7 +166,7 @@ fn mcp_install_footer_labels_final_value_as_install_and_enable() {
             ctx.add_singleton_model(|_| Appearance::mock());
             let footer = render_mcp_install_footer(
                 &TuiUiBuilder::from_app(ctx),
-                Some("to install and enable"),
+                Some("to install and enable".to_owned()),
             )
             .finish();
             assert_eq!(
@@ -325,7 +350,7 @@ fn api_keys_slash_command_opens_inline_and_clears_the_input() {
         let rendered = render_session(&mut app, &view, 100, 40).join("\n");
         assert!(rendered.contains("API keys"), "{rendered}");
         assert!(rendered.contains("Anthropic API key"), "{rendered}");
-        assert!(rendered.contains("enter to set api key"), "{rendered}");
+        assert!(rendered.contains("enter to set API key"), "{rendered}");
         assert!(!rendered.contains("ctrl + x"), "{rendered}");
         assert!(!rendered.contains("/api-keys"), "{rendered}");
     });
@@ -358,23 +383,23 @@ fn mcp_primary_action_hints_match_available_actions() {
     let id = TuiMcpServerId::FileBased(1);
     assert_eq!(
         mcp_primary_action_hint(TuiMcpAction::Enable(id)),
-        Some("to install and enable")
+        Some("to install and enable".to_owned())
     );
     assert_eq!(
         mcp_primary_action_hint(TuiMcpAction::Start(id)),
-        Some("to start")
+        Some("to start".to_owned())
     );
     assert_eq!(
         mcp_primary_action_hint(TuiMcpAction::Stop(id)),
-        Some("to stop")
+        Some("to stop".to_owned())
     );
     assert_eq!(
         mcp_primary_action_hint(TuiMcpAction::Retry(id)),
-        Some("to retry")
+        Some("to retry".to_owned())
     );
     assert_eq!(
         mcp_primary_action_hint(TuiMcpAction::ReopenAuthorization(id)),
-        Some("to authenticate")
+        Some("to authenticate".to_owned())
     );
     assert_eq!(mcp_primary_action_hint(TuiMcpAction::LogOut(id)), None);
     assert_eq!(mcp_primary_action_hint(TuiMcpAction::ReloadConfig), None);
@@ -1125,7 +1150,7 @@ fn zero_state_reload_failure_renders_as_an_error_footer_hint() {
                     .map(|(text, tone)| (text.to_owned(), tone))
             }),
             Some((
-                super::ZERO_STATE_ASCII_RELOAD_FAILED_HINT.to_owned(),
+                ZERO_STATE_ASCII_RELOAD_FAILED_HINT.to_owned(),
                 TransientHintTone::Error
             ))
         );
@@ -1135,7 +1160,7 @@ fn zero_state_reload_failure_renders_as_an_error_footer_hint() {
             let buffer = render_element(footer, ctx, 120);
             assert_eq!(
                 buffer.to_lines(),
-                vec![super::ZERO_STATE_ASCII_RELOAD_FAILED_HINT.to_owned()]
+                vec![ZERO_STATE_ASCII_RELOAD_FAILED_HINT.to_owned()]
             );
             assert_eq!(
                 buffer[(0, 0)].fg,
@@ -1169,7 +1194,7 @@ fn settings_reload_failure_renders_as_an_error_footer_hint() {
                     .map(|(text, tone)| (text.to_owned(), tone))
             }),
             Some((
-                super::SETTINGS_INVALID_VALUES_HINT.to_owned(),
+                SETTINGS_INVALID_VALUES_HINT.to_owned(),
                 TransientHintTone::Error
             ))
         );
@@ -1178,7 +1203,7 @@ fn settings_reload_failure_renders_as_an_error_footer_hint() {
             let footer = view.as_ref(ctx).render_footer(ctx).finish();
             assert_eq!(
                 render_element(footer, ctx, 120).to_lines(),
-                vec![super::SETTINGS_INVALID_VALUES_HINT.to_owned()]
+                vec![SETTINGS_INVALID_VALUES_HINT.to_owned()]
             );
         });
     });
@@ -1250,7 +1275,7 @@ fn theme_slash_command_accepts_direct_selection_and_rejects_invalid_values() {
                     .current()
                     .map(|(text, _)| text.to_owned())
             }),
-            Some(super::THEME_INVALID_ARGUMENT_HINT.to_owned())
+            Some(THEME_INVALID_ARGUMENT_HINT.to_owned())
         );
     });
 }
@@ -1278,7 +1303,7 @@ fn zero_state_initial_load_failure_shows_an_error_footer_hint() {
                     .map(|(text, tone)| (text.to_owned(), tone))
             }),
             Some((
-                super::ZERO_STATE_ASCII_INITIAL_LOAD_FAILED_HINT.to_owned(),
+                ZERO_STATE_ASCII_INITIAL_LOAD_FAILED_HINT.to_owned(),
                 TransientHintTone::Error
             ))
         );
@@ -1302,7 +1327,7 @@ fn startup_settings_parse_failure_renders_as_an_error_footer_hint() {
                     .map(|(text, tone)| (text.to_owned(), tone))
             }),
             Some((
-                super::SETTINGS_PARSE_FAILED_HINT.to_owned(),
+                SETTINGS_PARSE_FAILED_HINT.to_owned(),
                 TransientHintTone::Error
             ))
         );
@@ -1311,7 +1336,7 @@ fn startup_settings_parse_failure_renders_as_an_error_footer_hint() {
             let footer = view.as_ref(ctx).render_footer(ctx).finish();
             assert_eq!(
                 render_element(footer, ctx, 120).to_lines(),
-                vec![super::SETTINGS_PARSE_FAILED_HINT.to_owned()]
+                vec![SETTINGS_PARSE_FAILED_HINT.to_owned()]
             );
         });
     });
@@ -1981,7 +2006,7 @@ fn theme_slash_command_rejects_a_missing_argument() {
                     .current()
                     .map(|(text, _)| text.to_owned())
             }),
-            Some(super::THEME_INVALID_ARGUMENT_HINT.to_owned())
+            Some(THEME_INVALID_ARGUMENT_HINT.to_owned())
         );
     });
 }
@@ -2087,7 +2112,7 @@ fn saving_statusline_configuration_persists_and_restores_input_focus() {
             assert!(ctx.check_view_or_child_focused(fixture.window_id, &view.input_view.id()));
             assert_eq!(
                 view.transient_hint.current().map(|(text, _)| text),
-                Some(super::STATUSLINE_SAVED_HINT),
+                Some(STATUSLINE_SAVED_HINT),
             );
         });
     });
@@ -2190,7 +2215,7 @@ fn fork_slash_command_rejects_an_empty_conversation() {
         view.read(&app, |view, ctx| {
             assert_eq!(
                 view.transient_hint.current().map(|(text, _)| text),
-                Some(super::FORK_EMPTY_CONVERSATION_HINT),
+                Some(FORK_EMPTY_CONVERSATION_HINT),
             );
             assert!(view.input_view.as_ref(ctx).is_empty(ctx));
         });
@@ -2224,7 +2249,7 @@ fn fork_slash_command_keeps_a_conversation_without_a_resume_id_selected() {
             );
             assert_eq!(
                 view.transient_hint.current().map(|(text, _)| text),
-                Some(super::FORK_NO_RESUME_ID_HINT),
+                Some(FORK_NO_RESUME_ID_HINT),
             );
         });
     });
@@ -2328,15 +2353,15 @@ fn fork_slash_command_replaces_the_surface_and_renders_original_resume_guidance(
 fn cost_command_uses_the_gui_eligibility_rules() {
     assert_eq!(
         cost_command_unavailable_hint(None),
-        Some(COST_NO_ACTIVE_CONVERSATION_HINT),
+        Some(COST_NO_ACTIVE_CONVERSATION_HINT.to_owned()),
     );
     assert_eq!(
         cost_command_unavailable_hint(Some((true, false))),
-        Some(COST_EMPTY_CONVERSATION_HINT),
+        Some(COST_EMPTY_CONVERSATION_HINT.to_owned()),
     );
     assert_eq!(
         cost_command_unavailable_hint(Some((false, false))),
-        Some(COST_CONVERSATION_IN_PROGRESS_HINT),
+        Some(COST_CONVERSATION_IN_PROGRESS_HINT.to_owned()),
     );
     assert_eq!(cost_command_unavailable_hint(Some((false, true))), None);
 }
@@ -6243,7 +6268,7 @@ fn vim_mode_slash_command_persists_toggle() {
                     .current()
                     .map(|(text, _)| text.to_owned())
             }),
-            Some(super::VIM_MODE_ENABLED_HINT.to_owned()),
+            Some(VIM_MODE_ENABLED_HINT.to_owned()),
             "should surface an enabled hint after enabling vim mode"
         );
 
@@ -6261,7 +6286,7 @@ fn vim_mode_slash_command_persists_toggle() {
                     .current()
                     .map(|(text, _)| text.to_owned())
             }),
-            Some(super::VIM_MODE_DISABLED_HINT.to_owned()),
+            Some(VIM_MODE_DISABLED_HINT.to_owned()),
             "should surface a disabled hint after disabling vim mode"
         );
     });
@@ -6333,7 +6358,7 @@ fn copy_debugging_id_footer_hint_renders_in_session() {
         // the footer row at the bottom of the session canvas).
         let rendered = render_session(&mut app, &view, 80, 24).join("\n");
         assert!(
-            rendered.contains(super::COPY_DEBUGGING_ID_NO_TOKEN_HINT),
+            rendered.contains(COPY_DEBUGGING_ID_NO_TOKEN_HINT),
             "rendered session must contain the no-token hint in the footer; got:\n{rendered}",
         );
     });
@@ -6464,7 +6489,7 @@ fn copy_debugging_id_shows_error_hint_when_no_server_token() {
             let hint = view.transient_hint.current();
             assert_eq!(
                 hint.map(|(text, _)| text),
-                Some(super::COPY_DEBUGGING_ID_NO_TOKEN_HINT),
+                Some(COPY_DEBUGGING_ID_NO_TOKEN_HINT),
                 "/copy-debugging-id with no server token must set the no-token error hint",
             );
             assert_eq!(

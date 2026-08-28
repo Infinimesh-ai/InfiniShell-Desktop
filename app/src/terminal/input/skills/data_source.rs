@@ -300,7 +300,7 @@ impl SearchItem for SkillSearchItem {
             let badge_text_color =
                 inline_styles::disabled_text_color(theme, background_color.into());
             let badge_text = Text::new_inline(
-                "Project Skill".to_string(),
+                crate::t!("terminal-project-skill-badge"),
                 appearance.ui_font_family(),
                 badge_font_size,
             )
@@ -353,6 +353,6 @@ impl SearchItem for SkillSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Skill: {}", self.skill_name)
+        crate::t!("search-skill-a11y", name = self.skill_name.as_str())
     }
 }

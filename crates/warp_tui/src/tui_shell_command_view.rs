@@ -58,7 +58,7 @@ pub(crate) fn init(app: &mut AppContext) {
     app.register_editable_bindings([
         EditableBinding::new(
             "tui:shell-permission:save",
-            "Save the edited shell command",
+            warp::t_static!("tui-keybinding-save-shell-command"),
             TuiShellCommandViewAction::SaveCommandEdit,
         )
         .with_context_predicate(predicate.clone())
@@ -66,7 +66,7 @@ pub(crate) fn init(app: &mut AppContext) {
         .with_key_binding("enter"),
         EditableBinding::new(
             "tui:shell-permission:save",
-            "Save the edited shell command",
+            warp::t_static!("tui-keybinding-save-shell-command"),
             TuiShellCommandViewAction::SaveCommandEdit,
         )
         .with_context_predicate(predicate)
@@ -248,7 +248,7 @@ impl TuiShellCommandView {
         let command = self.command_editor.as_ref(ctx).text(ctx);
         if command.trim().is_empty() {
             self.permission_prompt.update(ctx, |prompt, ctx| {
-                prompt.set_body_error(Some("Enter a command to continue.".to_owned()), ctx);
+                prompt.set_body_error(Some(warp::t!("tui-enter-command-to-continue")), ctx);
             });
             self.invalidate_layout(ctx);
             return;
@@ -280,13 +280,16 @@ impl TuiShellCommandView {
         let builder = TuiUiBuilder::from_app(app);
         let edit_hint = TuiText::from_spans([
             ("e".to_owned(), builder.primary_text_style()),
-            (" to edit command".to_owned(), builder.muted_text_style()),
+            (
+                format!(" {}", warp::t!("tui-hint-edit-command")),
+                builder.muted_text_style(),
+            ),
         ])
         .truncate()
         .finish();
         render_permission_card(
             &self.permission_prompt,
-            "Is it OK if I run this command and read the output?",
+            warp::t_static!("tui-permission-run-command"),
             None,
             Some(edit_hint),
             app,

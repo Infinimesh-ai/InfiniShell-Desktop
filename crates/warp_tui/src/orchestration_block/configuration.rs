@@ -56,14 +56,18 @@ pub(super) enum ConfigPage {
 impl ConfigPage {
     /// Returns the page question with the request's agent count pluralized.
     pub(super) fn question(self, agent_count: usize) -> String {
-        let agent = if agent_count == 1 { "agent" } else { "agents" };
         match self {
-            Self::Location => format!("Where should the {agent} run?"),
-            Self::Harness => format!("Which harness should the {agent} use?"),
-            Self::ApiKey => format!("Which API key should the {agent} use?"),
-            Self::Host => format!("Which host should run the {agent}?"),
-            Self::Environment => format!("Which environment should the {agent} use?"),
-            Self::Model => format!("Which model should the {agent} use?"),
+            Self::Location => warp::t!("tui-orchestration-location-question", count = agent_count),
+            Self::Harness => warp::t!("tui-orchestration-harness-question", count = agent_count),
+            Self::ApiKey => warp::t!("tui-orchestration-api-key-question", count = agent_count),
+            Self::Host => warp::t!("tui-orchestration-host-question", count = agent_count),
+            Self::Environment => {
+                warp::t!(
+                    "tui-orchestration-environment-question",
+                    count = agent_count
+                )
+            }
+            Self::Model => warp::t!("tui-orchestration-model-question", count = agent_count),
         }
     }
 

@@ -603,7 +603,7 @@ impl InlineItem {
             action: AcceptSlashCommandOrSavedPrompt::SlashCommand { id: *command_id },
             icon_path: command.supported_surfaces.gui_icon_path(),
             name: command.name.to_owned(),
-            description: Some(command.description.to_owned()),
+            description: Some(command.localized_description()),
             font_family: appearance.monospace_font_family(),
             name_match_result: None,
             description_match_result: None,

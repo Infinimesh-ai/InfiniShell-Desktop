@@ -135,18 +135,18 @@ where
                 redaction,
                 TooltipRedaction::SecretNotSentToLLMMessaging { .. }
             ) {
-                "This wasn't included in the AI conversation."
+                crate::t!("tooltip-secret-not-included")
             } else {
-                "This won't be included in any AI conversations or shared blocks."
+                crate::t!("tooltip-secret-will-not-be-included")
             };
 
             // Generate the appropriate message based on secret level
             let secret_message = match secret_level {
                 Some(SecretLevel::Enterprise) => {
-                    "Pattern matched your organization's secret redaction regex list."
+                    crate::t!("tooltip-secret-matched-organization-pattern")
                 }
-                Some(SecretLevel::User) => "Pattern matched your secret redaction regex list.",
-                None => "Pattern matched the secret redaction regex list.",
+                Some(SecretLevel::User) => crate::t!("tooltip-secret-matched-user-pattern"),
+                None => crate::t!("tooltip-secret-matched-pattern"),
             };
 
             tooltip.add_child(

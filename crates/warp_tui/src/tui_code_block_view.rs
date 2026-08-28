@@ -18,7 +18,6 @@ use crate::tui_builder::TuiUiBuilder;
 
 const MAX_HIGHLIGHT_BYTES: usize = 256 * 1024;
 const MAX_CODE_LINES: usize = 5_000;
-const TRUNCATION_NOTICE: &str = "… code block truncated …";
 
 /// Events emitted to the Markdown-owning parent.
 pub(crate) enum TuiCodeBlockViewEvent {
@@ -225,7 +224,7 @@ fn bounded_fallback_text(code: &str) -> Option<String> {
         if !fallback_text.ends_with('\n') {
             fallback_text.push('\n');
         }
-        fallback_text.push_str(TRUNCATION_NOTICE);
+        fallback_text.push_str(&warp::t!("tui-code-block-truncated"));
     }
     Some(fallback_text)
 }

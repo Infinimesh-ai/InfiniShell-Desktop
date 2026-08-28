@@ -41,9 +41,6 @@ pub enum CommitSubAction {
 }
 
 const EDITOR_MIN_HEIGHT: f32 = 72.;
-/// Loading-state label while the commit / chain runs. Static because the shared
-/// button API currently stores borrowed labels.
-const LOADING_LABEL: &str = "Committing\u{2026}";
 pub struct CommitState {
     pub(super) intent: CommitChainMode,
     include_unstaged: bool,
@@ -215,11 +212,11 @@ fn has_committable_changes(state: &CommitState) -> bool {
 
 /// Returns a tooltip to show on the disabled Confirm button when the
 /// user needs to take action, or `None` when no tooltip is needed.
-pub(super) fn confirm_tooltip(state: &CommitState, app: &AppContext) -> Option<&'static str> {
+pub(super) fn confirm_tooltip(state: &CommitState, app: &AppContext) -> Option<String> {
     // Only nudge for a missing message; an empty Changes box is self-evident,
     // and gating a tooltip on it would also flash during the open-time load.
     if has_committable_changes(state) && commit_message(state, app).is_none() {
-        return Some("Enter a commit message");
+        return Some(crate::t!("code-review-enter-commit-message"));
     }
     None
 }
@@ -372,7 +369,7 @@ pub(super) fn start_confirm(me: &mut GitDialog, ctx: &mut ViewContext<GitDialog>
     // user has it enabled (ignored for commit-only / commit-and-push).
     let autogenerate_pr_content = should_send_git_ops_ai_request(ctx);
 
-    me.set_loading(LOADING_LABEL, ctx);
+    me.set_loading(crate::t!("code-review-committing-loading"), ctx);
 
     // Lock the commit message editor while the async op is in flight.
     message_editor.update(ctx, |editor, ctx| {
@@ -537,7 +534,7 @@ fn render_changes_section(state: &CommitState, appearance: &Appearance) -> Box<d
     let sub_color = theme.sub_text_color(theme.surface_1()).into_solid();
 
     let changes_label = Text::new(
-        "Changes",
+        crate::t!("code-review-changes"),
         appearance.ui_font_family(),
         appearance.ui_font_size(),
     )
@@ -545,7 +542,7 @@ fn render_changes_section(state: &CommitState, appearance: &Appearance) -> Box<d
     .finish();
 
     let include_label = Text::new(
-        "Include unstaged",
+        crate::t!("code-review-include-unstaged"),
         appearance.ui_font_family(),
         appearance.ui_font_size(),
     )

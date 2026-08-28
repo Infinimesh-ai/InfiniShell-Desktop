@@ -409,7 +409,7 @@ impl NotificationMailboxView {
 
         let label = appearance
             .ui_builder()
-            .wrappable_text("Notifications".to_string(), false)
+            .wrappable_text(crate::t!("notifications-title"), false)
             .with_style(UiComponentStyles {
                 font_size: Some(14.),
                 font_color: Some(theme.main_text_color(theme.surface_2()).into()),
@@ -546,7 +546,7 @@ impl NotificationMailboxView {
         Container::new(
             appearance
                 .ui_builder()
-                .wrappable_text("No notifications".to_string(), false)
+                .wrappable_text(crate::t!("notifications-empty"), false)
                 .with_style(UiComponentStyles {
                     font_size: Some(14.),
                     font_color: Some(theme.sub_text_color(theme.surface_2()).into()),

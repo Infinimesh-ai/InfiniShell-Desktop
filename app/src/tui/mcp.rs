@@ -64,34 +64,42 @@ pub enum TuiMcpServerSource {
 impl TuiMcpServerSource {
     pub fn label(&self) -> String {
         match self {
-            Self::Installation => "CLI local".to_owned(),
+            Self::Installation => crate::t!("tui-mcp-source-cli-local"),
             Self::SyncedTemplate {
                 provenance: TuiMcpSyncedTemplateProvenance::FromAnotherDevice,
-            } => "from another device".to_owned(),
+            } => crate::t!("tui-mcp-source-another-device"),
             Self::SyncedTemplate {
                 provenance: TuiMcpSyncedTemplateProvenance::Shared { creator },
             } => creator
                 .as_ref()
-                .map(|creator| format!("shared by {creator}"))
-                .unwrap_or_else(|| "shared template".to_owned()),
-            Self::Gallery => "shared by Warp".to_owned(),
+                .map(|creator| crate::t!("tui-mcp-source-shared-by", creator = creator.as_str()))
+                .unwrap_or_else(|| crate::t!("tui-mcp-source-shared-template")),
+            Self::Gallery => crate::t!("tui-mcp-source-shared-by-warp"),
             Self::FileBased { sources } => {
                 let labels = sources
                     .iter()
                     .map(|source| match source.scope {
-                        TuiMcpFileScope::Global => format!("{} global", source.provider),
+                        TuiMcpFileScope::Global => crate::t!(
+                            "tui-mcp-source-provider-global",
+                            provider = source.provider.as_str()
+                        ),
                         TuiMcpFileScope::Project => {
                             let root = source
                                 .root_path
                                 .file_name()
                                 .and_then(|name| name.to_str())
-                                .unwrap_or("project");
-                            format!("{} · {root}", source.provider)
+                                .map(str::to_owned)
+                                .unwrap_or_else(|| crate::t!("tui-mcp-source-project"));
+                            crate::t!(
+                                "tui-mcp-source-provider-project",
+                                provider = source.provider.as_str(),
+                                project = root.as_str()
+                            )
                         }
                     })
                     .collect::<Vec<_>>();
                 if labels.is_empty() {
-                    "file config".to_owned()
+                    crate::t!("tui-mcp-source-file-config")
                 } else {
                     labels.join(", ")
                 }
@@ -255,7 +263,7 @@ impl TuiMcpManager {
             .iter()
             .any(|server| server.id == id && matches!(server.status, TuiMcpServerStatus::Available))
         {
-            return Err("This MCP is no longer available to enable".to_owned());
+            return Err(crate::t!("tui-mcp-no-longer-available"));
         }
 
         let server = match id {
@@ -263,14 +271,14 @@ impl TuiMcpManager {
                 TemplatableMCPServerManager::as_ref(ctx)
                     .get_templatable_mcp_server(template_uuid)
                     .cloned()
-                    .ok_or_else(|| "The synced MCP template is no longer available".to_owned())?
+                    .ok_or_else(|| crate::t!("tui-mcp-synced-template-unavailable"))?
             }
             TuiMcpServerId::Gallery(gallery_uuid) => MCPGalleryManager::as_ref(ctx)
                 .get_templatable_mcp_server(gallery_uuid)
                 .cloned()
-                .ok_or_else(|| "The gallery MCP template is no longer available".to_owned())?,
+                .ok_or_else(|| crate::t!("tui-mcp-gallery-template-unavailable"))?,
             TuiMcpServerId::FileBased(_) | TuiMcpServerId::Installation(_) => {
-                return Err("This MCP is already installed".to_owned());
+                return Err(crate::t!("tui-mcp-already-installed"));
             }
         };
 
@@ -304,21 +312,20 @@ impl TuiMcpManager {
                 TemplatableMCPServerManager::as_ref(ctx)
                     .get_templatable_mcp_server(template_uuid)
                     .cloned()
-                    .ok_or_else(|| "The synced MCP template is no longer available".to_owned())?
+                    .ok_or_else(|| crate::t!("tui-mcp-synced-template-unavailable"))?
             }
             TuiMcpServerId::Gallery(gallery_uuid) => MCPGalleryManager::as_ref(ctx)
                 .get_templatable_mcp_server(gallery_uuid)
                 .cloned()
-                .ok_or_else(|| "The gallery MCP template is no longer available".to_owned())?,
+                .ok_or_else(|| crate::t!("tui-mcp-gallery-template-unavailable"))?,
             TuiMcpServerId::FileBased(_) | TuiMcpServerId::Installation(_) => {
-                return Err("This MCP is already installed".to_owned());
+                return Err(crate::t!("tui-mcp-already-installed"));
             }
         };
         let installation = TemplatableMCPServerManager::handle(ctx).update(ctx, |manager, ctx| {
             manager.install_from_template(server, values, true, ctx)
         });
-        let installation =
-            installation.ok_or_else(|| "Unable to install this MCP server".to_owned())?;
+        let installation = installation.ok_or_else(|| crate::t!("tui-mcp-install-failed"))?;
         let uuid = installation.uuid();
         self.refresh(ctx);
         Ok(uuid)
@@ -553,13 +560,13 @@ fn validate_variable_values(
         .map(|variable| variable.key.as_str())
         .collect::<HashSet<_>>();
     if values.len() != expected.len() {
-        return Err("Every required MCP variable must have a value".to_owned());
+        return Err(crate::t!("ai-mcp-required-variables"));
     }
 
     let mut resolved = HashMap::new();
     for value in values {
         if value.value.is_empty() || !expected.contains(value.key.as_str()) {
-            return Err("Every required MCP variable must have a value".to_owned());
+            return Err(crate::t!("ai-mcp-required-variables"));
         }
         let variable = variables
             .iter()
@@ -570,7 +577,7 @@ fn validate_variable_values(
             .as_ref()
             .is_some_and(|allowed| !allowed.contains(&value.value))
         {
-            return Err("Select one of the allowed values for this MCP variable".to_owned());
+            return Err(crate::t!("tui-mcp-select-allowed-value"));
         }
         if resolved
             .insert(
@@ -582,7 +589,7 @@ fn validate_variable_values(
             )
             .is_some()
         {
-            return Err("Each MCP variable may only be provided once".to_owned());
+            return Err(crate::t!("tui-mcp-variable-once"));
         }
     }
     Ok(resolved)
@@ -729,8 +736,7 @@ fn runtime_status(uuid: Uuid, runtime_manager: &TemplatableMCPServerManager) -> 
         Some(MCPServerState::FailedToStart) => TuiMcpServerStatus::Failed {
             message: runtime_manager
                 .get_server_error_message(uuid)
-                .unwrap_or("Failed to start")
-                .to_owned(),
+                .map_or_else(|| crate::t!("tui-mcp-start-failed"), str::to_owned),
         },
     }
 }

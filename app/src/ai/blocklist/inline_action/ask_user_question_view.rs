@@ -221,7 +221,7 @@ impl AskUserQuestionView {
             ctx,
         );
         let skip_button = CompactibleActionButton::new(
-            "Skip all".to_string(),
+            crate::t!("ai-question-skip-all"),
             Some(KeystrokeSource::Fixed(CTRL_C_KEYSTROKE.clone())),
             ButtonSize::InlineActionHeader,
             AskUserQuestionViewAction::SkipAll,
@@ -230,7 +230,7 @@ impl AskUserQuestionView {
             ctx,
         );
         let next_button = CompactibleActionButton::new(
-            "Next".to_string(),
+            crate::t!("common-next"),
             Some(KeystrokeSource::Fixed(
                 Keystroke::parse("enter").expect("keystroke should parse"),
             )),

@@ -41,13 +41,13 @@ pub(super) struct DeleteAuthSecretConfirmationDialog {
 impl DeleteAuthSecretConfirmationDialog {
     pub(super) fn new(ctx: &mut ViewContext<Self>) -> Self {
         let cancel_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Cancel", NakedTheme).on_click(|ctx| {
+            ActionButton::new(crate::t!("common-cancel"), NakedTheme).on_click(|ctx| {
                 ctx.dispatch_typed_action(DeleteAuthSecretConfirmationDialogAction::Cancel);
             })
         });
 
         let delete_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Delete", DangerPrimaryTheme).on_click(|ctx| {
+            ActionButton::new(crate::t!("common-delete"), DangerPrimaryTheme).on_click(|ctx| {
                 ctx.dispatch_typed_action(DeleteAuthSecretConfirmationDialogAction::Confirm);
             })
         });
@@ -93,13 +93,13 @@ impl View for DeleteAuthSecretConfirmationDialog {
         };
 
         let appearance = Appearance::as_ref(app);
-        let description = format!(
-            "Are you sure you want to delete {}? This action cannot be undone. Any agents or environments referencing this secret will no longer have access to it.",
-            pending_deletion.name
+        let description = crate::t!(
+            "auth-secret-delete-description",
+            name = pending_deletion.name.as_str()
         );
 
         let dialog = Dialog::new(
-            "Delete secret".to_string(),
+            crate::t!("auth-secret-delete-title"),
             Some(description),
             dialog_styles(appearance),
         )

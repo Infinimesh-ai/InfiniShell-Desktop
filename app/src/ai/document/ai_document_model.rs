@@ -325,9 +325,7 @@ impl AIDocumentModel {
                     notebook.model().data.clone(),
                 )
             })
-            .ok_or_else(|| {
-                format!("Plan document {ai_document_id} was not found in Warp Drive.")
-            })?;
+            .ok_or_else(|| crate::t!("ai-plan-not-found", id = ai_document_id.to_string()))?;
         let (sync_id, title, content) = notebook;
         if sync_id.into_server().is_none() {
             return Err(format!(

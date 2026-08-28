@@ -45,10 +45,10 @@ fn apply_deltas_to_content(content: &str, deltas: &[DiffDelta]) -> Result<String
         let start = delta.replacement_line_range.start.saturating_sub(1);
         let end = delta.replacement_line_range.end.saturating_sub(1);
         if start > lines.len() || end > lines.len() || start > end {
-            return Err(format!(
-                "Diff range {:?} is out of bounds for file with {} lines",
-                delta.replacement_line_range,
-                lines.len()
+            return Err(warp::t!(
+                "tui-diff-range-out-of-bounds",
+                range = format!("{:?}", delta.replacement_line_range),
+                count = lines.len()
             ));
         }
         let mut insertion = delta.insertion;
@@ -112,8 +112,9 @@ fn register_file(
     match session_type {
         DiffSessionType::Local => Ok(file_model.register_file_path(Path::new(path), false, ctx)),
         DiffSessionType::Remote(host_id) => {
-            let standardized = StandardizedPath::try_new(path)
-                .map_err(|_| FileSaveError::RemoteError(format!("Invalid remote path: {path}")))?;
+            let standardized = StandardizedPath::try_new(path).map_err(|_| {
+                FileSaveError::RemoteError(warp::t!("tui-invalid-remote-path", path = path))
+            })?;
             Ok(file_model.register_remote_file(host_id.clone(), standardized))
         }
     }

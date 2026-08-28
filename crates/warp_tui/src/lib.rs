@@ -29,6 +29,12 @@ mod tui_ask_question_view;
 mod tui_builder;
 mod ui;
 
+#[cfg(test)]
+#[ctor::ctor]
+fn init_test_i18n() {
+    warp::i18n::init(Some("en"));
+}
+
 mod completion_menu;
 mod conversation_menu;
 mod conversation_selection;

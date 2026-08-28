@@ -24,9 +24,9 @@ use warpui::{
 use super::cli_controller::{CLISubagentController, CLISubagentEvent, UserTakeOverReason};
 use super::model::{AIBlockModel, AIBlockModelImpl, AIBlockOutputStatus};
 use super::view_impl::common::{
-    AutoExecuteButtonProps, ButtonProps, ForceRefreshButtonProps, LOAD_OUTPUT_MESSAGE,
-    MaybeShimmeringText, WAITING_FOR_USER_INPUT_MESSAGE, WarpingIndicatorProps, WarpingProps,
-    render_switch_control_to_user_button, render_warping_indicator, render_warping_indicator_base,
+    AutoExecuteButtonProps, ButtonProps, ForceRefreshButtonProps, MaybeShimmeringText,
+    WarpingIndicatorProps, WarpingProps, load_output_message, render_switch_control_to_user_button,
+    render_warping_indicator, render_warping_indicator_base, waiting_for_user_input_message,
 };
 use crate::ai::AgentTip;
 use crate::ai::agent::conversation::AIConversationId;
@@ -833,9 +833,8 @@ impl BlocklistAIStatusBar {
             app,
         );
         let default_warping_text = fallback_warping_text
-            .as_deref()
-            .unwrap_or(LOAD_OUTPUT_MESSAGE)
-            .to_owned();
+            .clone()
+            .unwrap_or_else(load_output_message);
         let secondary_element = if fallback_warping_text.is_some() {
             Some(render_fallback_explanation(model.as_ref(), app))
         } else {
@@ -969,14 +968,18 @@ impl BlocklistAIStatusBar {
         if let Some(auth_url) = ambient_agent_model.github_auth_url() {
             let error_message = ambient_agent_model
                 .github_auth_error_message()
-                .unwrap_or("Missing GitHub authentication.");
+                .map(str::to_owned)
+                .unwrap_or_else(|| crate::t!("ai-github-authentication-missing"));
             return Some(render_wrapping_standard_message_bar(
                 CoreIcon::Triangle,
                 error_color,
                 error_color,
                 vec![
                     FormattedTextFragment::plain_text(format!("{error_message} ")),
-                    FormattedTextFragment::hyperlink("Authenticate GitHub", auth_url.to_owned()),
+                    FormattedTextFragment::hyperlink(
+                        crate::t!("ai-authenticate-github"),
+                        auth_url.to_owned(),
+                    ),
                 ],
                 app,
             ));
@@ -988,9 +991,9 @@ impl BlocklistAIStatusBar {
                 CoreIcon::StopFilled,
                 color,
                 color,
-                vec![FormattedTextFragment::plain_text(
-                    "Cloud agent run cancelled",
-                )],
+                vec![FormattedTextFragment::plain_text(crate::t!(
+                    "ai-cloud-agent-run-cancelled"
+                ))],
                 app,
             ));
         }
@@ -1115,10 +1118,8 @@ fn render_fallback_explanation<V: View>(
         .and_then(|base_id| llm_prefs.get_llm_info(base_id))
         .map(|info| info.base_model_name.as_str());
     let text = match primary_name {
-        Some(primary) => {
-            format!("The primary model ({primary}) failed. Retrying with the fallback model.")
-        }
-        None => "The primary model failed. Retrying with the fallback model.".to_owned(),
+        Some(primary) => crate::t!("ai-fallback-primary-failed-named", primary = primary),
+        None => crate::t!("ai-fallback-primary-failed"),
     };
     let appearance = Appearance::as_ref(app);
     Text::new_inline(
@@ -1172,8 +1173,8 @@ fn resolve_fallback_warping_message<V: View>(
         return None;
     }
     Some(match display_name.as_deref() {
-        Some(name) => format!("Warping with {name}."),
-        None => "Warping with another model.".to_owned(),
+        Some(name) => crate::t!("ai-fallback-warping-with-model", model = name),
+        None => crate::t!("ai-fallback-warping-with-another-model"),
     })
 }
 
@@ -1216,7 +1217,7 @@ impl View for BlocklistAIStatusBar {
                         WarpingIndicatorProps {
                             icon: None,
                             warping_indicator_text: MaybeShimmeringText::Shimmering {
-                                text: "Setting up environment".into(),
+                                text: crate::t!("ambient-agent-setting-up-environment").into(),
                                 shimmering_text_handle: self.shimmering_text_handle.clone(),
                             },
                             non_shimmering_text: None,
@@ -1243,7 +1244,7 @@ impl View for BlocklistAIStatusBar {
                         WarpingIndicatorProps {
                             icon: Some(icons::gray_clock_icon(appearance).finish()),
                             warping_indicator_text: MaybeShimmeringText::Static(
-                                WAITING_FOR_USER_INPUT_MESSAGE.into(),
+                                waiting_for_user_input_message().into(),
                             ),
                             non_shimmering_text: None,
                             non_shimmering_suffix: None,

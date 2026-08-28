@@ -239,11 +239,11 @@ pub enum CtrlTabBehavior {
 }
 
 impl CtrlTabBehavior {
-    pub fn as_dropdown_label(&self) -> &str {
+    pub fn as_dropdown_label(&self) -> String {
         match self {
-            Self::ActivatePrevNextTab => "Activate previous/next tab",
-            Self::CycleMostRecentSession => "Cycle most recent session",
-            Self::CycleMostRecentTab => "Cycle most recent tab",
+            Self::ActivatePrevNextTab => crate::t!("settings-ctrl-tab-previous-next"),
+            Self::CycleMostRecentSession => crate::t!("settings-ctrl-tab-recent-session"),
+            Self::CycleMostRecentTab => crate::t!("settings-ctrl-tab-recent-tab"),
         }
     }
 }
@@ -289,11 +289,11 @@ pub enum GlobalHotkeyMode {
 }
 
 impl GlobalHotkeyMode {
-    pub fn as_dropdown_label(&self) -> &str {
+    pub fn as_dropdown_label(&self) -> String {
         match self {
-            Self::Disabled => "Disabled",
-            Self::QuakeMode => "Dedicated hotkey window",
-            Self::ActivationHotkey => "Show/hide all windows",
+            Self::Disabled => crate::t!("common-disabled"),
+            Self::QuakeMode => crate::t!("settings-hotkey-dedicated-window"),
+            Self::ActivationHotkey => crate::t!("settings-hotkey-toggle-all-windows"),
         }
     }
 }

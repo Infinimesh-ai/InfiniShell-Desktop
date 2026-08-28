@@ -62,25 +62,24 @@ fn modal_terminal_magenta_overlay_1(appearance: &Appearance) -> ColorU {
 
 struct FeatureItem {
     icon: Icon,
-    label: &'static str,
-    title: &'static str,
-    description: &'static str,
+    title: String,
+    description: String,
 }
 
-const FEATURE_ITEMS: &[FeatureItem] = &[
-    FeatureItem {
-        icon: Icon::LayoutAlt01,
-        label: "What's new:",
-        title: "Use InfiniShell TUI anywhere",
-        description: "InfiniShell's coding agent is available in any terminal through its standalone TUI.",
-    },
-    FeatureItem {
-        icon: Icon::Inbox,
-        label: "What's special:",
-        title: "Built-in terminal multiplexer",
-        description: "Each InfiniShell TUI session creates its own PTY for REPLs, SSH, directory switching, and more.",
-    },
-];
+fn feature_items() -> [FeatureItem; 2] {
+    [
+        FeatureItem {
+            icon: Icon::LayoutAlt01,
+            title: crate::t!("workspace-agent-cli-intro-anywhere-title"),
+            description: crate::t!("workspace-agent-cli-intro-anywhere-description"),
+        },
+        FeatureItem {
+            icon: Icon::Inbox,
+            title: crate::t!("workspace-agent-cli-intro-multiplexer-title"),
+            description: crate::t!("workspace-agent-cli-intro-multiplexer-description"),
+        },
+    ]
+}
 
 pub fn init(app: &mut AppContext) {
     use warpui::keymap::macros::*;
@@ -156,7 +155,7 @@ impl AgentCliLaunchModal {
         });
 
         let get_started_button = ctx.add_view(|_ctx| {
-            ActionButton::new("Get started", CtaButtonTheme)
+            ActionButton::new(crate::t!("agent-management-get-started"), CtaButtonTheme)
                 .with_full_width(true)
                 .on_click(|ctx| ctx.dispatch_typed_action(AgentCliLaunchModalAction::GetStarted))
         });
@@ -208,7 +207,7 @@ impl AgentCliLaunchModal {
     fn render_badge(appearance: &Appearance) -> Box<dyn Element> {
         let text_color = modal_terminal_magenta(appearance);
         let background_color = modal_terminal_magenta_overlay_1(appearance);
-        let text = Text::new_inline("New".to_string(), appearance.ui_font_family(), 14.)
+        let text = Text::new_inline(crate::t!("common-new"), appearance.ui_font_family(), 14.)
             .with_color(text_color)
             .finish();
         ConstrainedBox::new(
@@ -230,7 +229,7 @@ impl AgentCliLaunchModal {
 
     fn render_title(appearance: &Appearance) -> Box<dyn Element> {
         Text::new(
-            "Introducing InfiniShell TUI: your coding agent in any terminal",
+            crate::t!("workspace-agent-cli-intro-title"),
             appearance.ui_font_family(),
             20.,
         )
@@ -249,15 +248,22 @@ impl AgentCliLaunchModal {
         .with_height(16.)
         .finish();
 
-        let title = format!("{} {}", item.label, item.title);
-        let label_char_count = item.label.chars().count();
-        let title_row = Text::new(title, appearance.ui_font_family(), FEATURE_FONT_SIZE)
-            .with_color(modal_text_main(appearance))
-            .with_single_highlight(
-                Highlight::new().with_properties(Properties::default().weight(Weight::Bold)),
-                (0..label_char_count).collect(),
-            )
-            .finish();
+        let label_char_count = item
+            .title
+            .chars()
+            .position(|character| matches!(character, ':' | '：'))
+            .map_or(0, |index| index + 1);
+        let title_row = Text::new(
+            item.title.clone(),
+            appearance.ui_font_family(),
+            FEATURE_FONT_SIZE,
+        )
+        .with_color(modal_text_main(appearance))
+        .with_single_highlight(
+            Highlight::new().with_properties(Properties::default().weight(Weight::Bold)),
+            (0..label_char_count).collect(),
+        )
+        .finish();
 
         let text_col = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
@@ -265,7 +271,7 @@ impl AgentCliLaunchModal {
             .with_child(title_row)
             .with_child(
                 Text::new(
-                    item.description,
+                    item.description.clone(),
                     appearance.ui_font_family(),
                     FEATURE_FONT_SIZE,
                 )
@@ -286,8 +292,8 @@ impl AgentCliLaunchModal {
         let mut features_col = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .with_spacing(16.);
-        for item in FEATURE_ITEMS {
-            features_col.add_child(Self::render_feature_row(item, appearance));
+        for item in feature_items() {
+            features_col.add_child(Self::render_feature_row(&item, appearance));
         }
 
         let column = Flex::column()

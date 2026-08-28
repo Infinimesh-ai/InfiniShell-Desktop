@@ -5,7 +5,7 @@ use warpui_core::AppContext;
 use warpui_core::elements::CrossAxisAlignment;
 use warpui_core::elements::animation::AnimationClock;
 use warpui_core::elements::tui::{
-    Modifier, TuiConstrainedBox, TuiElement, TuiFlex, TuiStyle, TuiText,
+    Modifier, TuiConstrainedBox, TuiElement, TuiFlex, TuiStyle, TuiText, text_width,
 };
 
 use crate::tui_builder::TuiUiBuilder;
@@ -57,7 +57,8 @@ pub(crate) fn compact_footer_path(path: &str) -> String {
 /// Placeholder shown while a requested conversation is restored.
 pub(crate) fn conversation_restoring(app: &AppContext) -> Box<dyn TuiElement> {
     let muted = TuiUiBuilder::from_app(app).muted_text_style();
-    let hint = "Esc or Ctrl-C to cancel and start a new session";
+    let hint = warp::t!("tui-conversation-restoring-cancel-hint");
+    let hint_width = text_width(&hint) as u16;
 
     centered_in_viewport(
         TuiConstrainedBox::new(
@@ -67,7 +68,7 @@ pub(crate) fn conversation_restoring(app: &AppContext) -> Box<dyn TuiElement> {
                     muted,
                 ))
                 .child(
-                    TuiText::new("Loading session...")
+                    TuiText::new(warp::t!("tui-conversation-restoring"))
                         .with_style(muted)
                         .truncate()
                         .finish(),
@@ -76,7 +77,7 @@ pub(crate) fn conversation_restoring(app: &AppContext) -> Box<dyn TuiElement> {
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .finish(),
         )
-        .with_max_cols(hint.len() as u16)
+        .with_max_cols(hint_width)
         .finish(),
     )
 }
@@ -87,12 +88,15 @@ pub(crate) fn conversation_restore_failed(message: &str) -> Box<dyn TuiElement> 
     vertically_centered(
         TuiFlex::column()
             .child(
-                TuiText::new(format!("Could not restore conversation: {message}"))
-                    .truncate()
-                    .finish(),
+                TuiText::new(warp::t!(
+                    "tui-conversation-restore-failed",
+                    message = message
+                ))
+                .truncate()
+                .finish(),
             )
             .child(
-                TuiText::new("Press Ctrl-C to exit.")
+                TuiText::new(warp::t!("tui-press-ctrl-c-to-exit"))
                     .with_style(dim)
                     .truncate()
                     .finish(),
@@ -128,7 +132,7 @@ pub(crate) fn centered_in_viewport(content: Box<dyn TuiElement>) -> Box<dyn TuiE
 }
 
 pub(crate) fn render_welcome_title(builder: &TuiUiBuilder) -> Box<dyn TuiElement> {
-    TuiText::new("Welcome to InfiniShell TUI")
+    TuiText::new(warp::t!("tui-welcome-title"))
         .with_style(builder.brand_primary_style().add_modifier(Modifier::BOLD))
         .truncate()
         .finish()
@@ -139,21 +143,21 @@ pub(crate) fn append_welcome_capability_section(
     builder: &TuiUiBuilder,
 ) -> TuiFlex {
     column = column.child(
-        TuiText::new("What’s different about InfiniShell TUI")
+        TuiText::new(warp::t!("tui-welcome-capabilities-title"))
             .with_style(builder.muted_text_style())
             .truncate()
             .finish(),
     );
     for description in [
-        "State of the art coding agents",
-        "Frontier and open-weight models",
-        "Fully customizable model routers",
-        "Orchestration for fleets of agents",
-        "Better shell command support",
+        warp::t!("tui-welcome-capability-coding-agents"),
+        warp::t!("tui-welcome-capability-models"),
+        warp::t!("tui-welcome-capability-model-routers"),
+        warp::t!("tui-welcome-capability-orchestration"),
+        warp::t!("tui-welcome-capability-shell"),
     ] {
         column = column.child(capability_row(
             "✶",
-            description,
+            &description,
             builder.brand_accent_style(),
             builder.primary_text_style(),
         ));
@@ -179,7 +183,7 @@ pub(crate) fn terminal_starting() -> Box<dyn TuiElement> {
     let dim = TuiStyle::default().add_modifier(Modifier::DIM);
     vertically_centered(
         TuiFlex::column().child(
-            TuiText::new("Starting terminal…")
+            TuiText::new(warp::t!("tui-terminal-starting"))
                 .with_style(dim)
                 .truncate()
                 .finish(),

@@ -38,8 +38,6 @@ lazy_static! {
         };
 }
 
-const DEFAULT_PLACEHOLDER_TEXT: &str = "Search for a secret";
-
 pub struct ExternalSecretsMenu {
     scroll_state: ScrollStateHandle,
     list_state: UniformListState,
@@ -85,7 +83,7 @@ impl ExternalSecretsMenu {
             SearchBar::new(
                 mixer.clone(),
                 search_bar_state.clone(),
-                DEFAULT_PLACEHOLDER_TEXT,
+                crate::t!("external-secrets-search-placeholder"),
                 |result_index, result| {
                     QueryResultRenderer::new(
                         result,

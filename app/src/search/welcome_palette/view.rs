@@ -706,8 +706,11 @@ impl WelcomePalette {
             .with_text_and_icon_label(TextAndIcon::new(
                 TextAndIconAlignment::IconFirst,
                 match &self.open_project_keybinding {
-                    Some(keystroke) => format!("Add repository {keystroke}"),
-                    None => "Add repository".to_string(),
+                    Some(keystroke) => crate::t!(
+                        "welcome-palette-add-repository-with-shortcut",
+                        shortcut = keystroke.to_string()
+                    ),
+                    None => crate::t!("welcome-palette-add-repository"),
                 },
                 Icon::Plus.to_warpui_icon(theme.foreground()),
                 MainAxisSize::Max,
@@ -729,8 +732,11 @@ impl WelcomePalette {
             .with_text_and_icon_label(TextAndIcon::new(
                 TextAndIconAlignment::IconFirst,
                 match &self.terminal_session_keybinding {
-                    Some(keystroke) => format!("Terminal session {keystroke}"),
-                    None => "Terminal session".to_string(),
+                    Some(keystroke) => crate::t!(
+                        "welcome-palette-terminal-session-with-shortcut",
+                        shortcut = keystroke.to_string()
+                    ),
+                    None => crate::t!("welcome-palette-terminal-session"),
                 },
                 Icon::Terminal.to_warpui_icon(theme.foreground()),
                 MainAxisSize::Max,

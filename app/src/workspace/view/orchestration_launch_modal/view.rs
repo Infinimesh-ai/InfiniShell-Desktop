@@ -58,31 +58,33 @@ fn modal_terminal_magenta_overlay_1(appearance: &Appearance) -> ColorU {
 
 struct FeatureItem {
     icon: Icon,
-    title: &'static str,
-    description: &'static str,
-    badge: Option<&'static str>,
+    title: String,
+    description: String,
+    badge: Option<String>,
 }
 
-const FEATURE_ITEMS: &[FeatureItem] = &[
-    FeatureItem {
-        icon: Icon::Cloud,
-        title: "Run any agent harness in the cloud",
-        description: "Use InfiniShell Agent to spin up Claude Code or Codex agents in the cloud and track or steer their work.",
-        badge: None,
-    },
-    FeatureItem {
-        icon: Icon::Atom,
-        title: "Multi-agent orchestration",
-        description: "Warp Agents will now orchestrate swarms of subagents, allowing you to parallelize tasks.",
-        badge: None,
-    },
-    FeatureItem {
-        icon: Icon::Cognition,
-        title: "Agent Memory",
-        description: "Agents will now store and access long-term memories, enabling self-improvement over time.",
-        badge: Some("Research preview"),
-    },
-];
+fn feature_items() -> [FeatureItem; 3] {
+    [
+        FeatureItem {
+            icon: Icon::Cloud,
+            title: crate::t!("workspace-orchestration-intro-cloud-title"),
+            description: crate::t!("workspace-orchestration-intro-cloud-description"),
+            badge: None,
+        },
+        FeatureItem {
+            icon: Icon::Atom,
+            title: crate::t!("workspace-orchestration-intro-multi-agent-title"),
+            description: crate::t!("workspace-orchestration-intro-multi-agent-description"),
+            badge: None,
+        },
+        FeatureItem {
+            icon: Icon::Cognition,
+            title: crate::t!("workspace-orchestration-intro-memory-title"),
+            description: crate::t!("workspace-orchestration-intro-memory-description"),
+            badge: Some(crate::t!("workspace-orchestration-intro-research-preview")),
+        },
+    ]
+}
 
 pub fn init(app: &mut AppContext) {
     use warpui::keymap::macros::*;
@@ -184,7 +186,7 @@ impl OrchestrationLaunchModal {
         });
 
         let learn_more_button = ctx.add_view(|_ctx| {
-            ActionButton::new("Learn more", LearnMoreButtonTheme)
+            ActionButton::new(crate::t!("common-learn-more"), LearnMoreButtonTheme)
                 .with_icon(Icon::LinkExternal)
                 .with_full_width(true)
                 .on_click(|ctx| {
@@ -193,7 +195,7 @@ impl OrchestrationLaunchModal {
         });
 
         let go_to_warp_button = ctx.add_view(|_ctx| {
-            ActionButton::new("Close", CtaButtonTheme)
+            ActionButton::new(crate::t!("common-close"), CtaButtonTheme)
                 .with_full_width(true)
                 .on_click(|ctx| ctx.dispatch_typed_action(OrchestrationLaunchModalAction::Close))
         });
@@ -247,7 +249,7 @@ impl OrchestrationLaunchModal {
     fn render_badge(appearance: &Appearance) -> Box<dyn Element> {
         let text_color = modal_terminal_magenta(appearance);
         let background_color = modal_terminal_magenta_overlay_1(appearance);
-        let text = Text::new_inline("New".to_string(), appearance.ui_font_family(), 14.)
+        let text = Text::new_inline(crate::t!("common-new"), appearance.ui_font_family(), 14.)
             .with_color(text_color)
             .finish();
         ConstrainedBox::new(
@@ -269,7 +271,7 @@ impl OrchestrationLaunchModal {
 
     fn render_title(appearance: &Appearance) -> Box<dyn Element> {
         Text::new(
-            "Orchestrate any agent, anywhere",
+            crate::t!("workspace-orchestration-intro-title"),
             appearance.ui_font_family(),
             20.,
         )
@@ -280,7 +282,7 @@ impl OrchestrationLaunchModal {
 
     fn render_description(appearance: &Appearance) -> Box<dyn Element> {
         Text::new(
-            "We've made major improvements to InfiniShell's agent orchestration platform.",
+            crate::t!("workspace-orchestration-intro-description"),
             appearance.ui_font_family(),
             14.,
         )
@@ -288,11 +290,11 @@ impl OrchestrationLaunchModal {
         .finish()
     }
 
-    fn render_feature_badge(label: &'static str, appearance: &Appearance) -> Box<dyn Element> {
+    fn render_feature_badge(label: String, appearance: &Appearance) -> Box<dyn Element> {
         let font_family = appearance.ui_font_family();
         let color = modal_text_sub(appearance);
         Container::new(
-            Text::new_inline(label.to_string(), font_family, 11.)
+            Text::new_inline(label, font_family, 11.)
                 .with_color(color)
                 .finish(),
         )
@@ -317,12 +319,12 @@ impl OrchestrationLaunchModal {
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_spacing(6.);
         title_row.add_child(
-            Text::new_inline(item.title.to_string(), appearance.ui_font_family(), 14.)
+            Text::new_inline(item.title.clone(), appearance.ui_font_family(), 14.)
                 .with_color(modal_text_main(appearance))
                 .finish(),
         );
-        if let Some(badge_label) = item.badge {
-            title_row.add_child(Self::render_feature_badge(badge_label, appearance));
+        if let Some(badge_label) = &item.badge {
+            title_row.add_child(Self::render_feature_badge(badge_label.clone(), appearance));
         }
 
         let text_col = Flex::column()
@@ -330,7 +332,7 @@ impl OrchestrationLaunchModal {
             .with_spacing(2.)
             .with_child(title_row.finish())
             .with_child(
-                Text::new(item.description, appearance.ui_font_family(), 14.)
+                Text::new(item.description.clone(), appearance.ui_font_family(), 14.)
                     .with_color(modal_text_sub(appearance))
                     .finish(),
             )
@@ -348,8 +350,8 @@ impl OrchestrationLaunchModal {
         let mut features_col = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .with_spacing(12.);
-        for item in FEATURE_ITEMS {
-            features_col.add_child(self.render_feature_row(item, appearance));
+        for item in feature_items() {
+            features_col.add_child(self.render_feature_row(&item, appearance));
         }
 
         let footer = Flex::row()

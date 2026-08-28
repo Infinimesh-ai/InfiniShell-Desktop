@@ -564,13 +564,16 @@ impl InputSuggestions {
         self.get_selected_item()
             .and_then(|item| item.details.as_ref())
             .and_then(|details| match details {
-                DetailContent::RichHistory(entry) => entry
-                    .start_ts
-                    .map(|ts| format!("Last ran {}", format_approx_duration_from_now(ts))),
+                DetailContent::RichHistory(entry) => entry.start_ts.map(|ts| {
+                    crate::t!(
+                        "input-suggestion-last-ran",
+                        time = format_approx_duration_from_now(ts)
+                    )
+                }),
                 DetailContent::Description(desc) => Some(desc.clone()),
-                DetailContent::AIQueryHistory(entry) => Some(format!(
-                    "Last ran {}",
-                    format_approx_duration_from_now(entry.start_time)
+                DetailContent::AIQueryHistory(entry) => Some(crate::t!(
+                    "input-suggestion-last-ran",
+                    time = format_approx_duration_from_now(entry.start_time)
                 )),
             })
     }
@@ -615,14 +618,14 @@ impl InputSuggestions {
         ) {
             (Some(text), Some(desc)) => {
                 ctx.emit_a11y_content(AccessibilityContent::new(
-                    format!("Suggestion: {text}.\n"),
+                    crate::t!("input-suggestion-a11y", text = text),
                     desc,
                     WarpA11yRole::MenuItemRole,
                 ));
             }
             (Some(text), None) => {
                 ctx.emit_a11y_content(AccessibilityContent::new_without_help(
-                    format!("Suggestion: {text}.\n"),
+                    crate::t!("input-suggestion-a11y", text = text),
                     WarpA11yRole::MenuItemRole,
                 ));
             }
@@ -646,7 +649,7 @@ impl InputSuggestions {
 
         if let Some(text) = self.get_selected_item_text() {
             ctx.emit_a11y_content(AccessibilityContent::new_without_help(
-                format!("Selected: {text}"),
+                crate::t!("input-suggestion-selected-a11y", text = text),
                 WarpA11yRole::MenuItemRole,
             ));
         }

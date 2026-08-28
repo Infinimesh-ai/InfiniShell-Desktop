@@ -109,8 +109,8 @@ impl CustomModelRouter {
         let id = local_id_from_path(source_path, &name);
         let config_key = format!("{LOCAL_CUSTOM_ROUTER_PREFIX}{id}");
         let routing_kind = match &routing {
-            CustomModelRouting::Complexity(_) => "Routes by task complexity",
-            CustomModelRouting::Prompt(_) => "Routes by prompt content",
+            CustomModelRouting::Complexity(_) => crate::t!("custom-router-routes-by-complexity"),
+            CustomModelRouting::Prompt(_) => crate::t!("custom-router-routes-by-prompt"),
         };
         let description = match source_path {
             Some(path) => {
@@ -119,7 +119,7 @@ impl CustomModelRouter {
                     warp_core::paths::home_relative_path(path)
                 )
             }
-            None => routing_kind.to_owned(),
+            None => routing_kind,
         };
         let info = LLMInfo {
             display_name: name.clone(),

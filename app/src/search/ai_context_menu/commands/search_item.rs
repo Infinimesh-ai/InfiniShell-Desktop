@@ -81,6 +81,6 @@ impl SearchItem for CommandSearchItem {
     }
 
     fn accessibility_label(&self) -> String {
-        format!("Command: {}", self.command)
+        crate::t!("search-command-a11y", command = self.command.as_str())
     }
 }

@@ -291,8 +291,8 @@ fn agent_block_renders_invalid_api_key_detail_without_usage_notice() {
             assert_eq!(
                 lines,
                 vec![
-                    "⚠ Provided API key is not valid",
-                    "  Failed to authenticate with OpenAI when using GPT. Double-check that your API key is correct.",
+                    "⚠ The provided API key is not valid",
+                    "  Authentication with OpenAI failed while using GPT. Double-check that your API key is correct.",
                 ]
             );
             assert!(
