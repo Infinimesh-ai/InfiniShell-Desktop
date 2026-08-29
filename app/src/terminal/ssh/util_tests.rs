@@ -60,6 +60,12 @@ fn ssh_alias_expanded_commands() {
         parse_interactive_ssh_command("ssh user@host").unwrap().host,
         Some("user@host".to_string())
     );
+    assert_eq!(
+        parse_interactive_ssh_command("ssh user@host")
+            .unwrap()
+            .username,
+        Some("user".to_string())
+    );
 
     // Alias with key and user: alias company1='ssh -i /path/to/key user@server'
     assert_eq!(
@@ -134,4 +140,63 @@ fn ssh_interactive_shell_parsing() {
             .host
             == Some("localhost".to_string())
     );
+}
+
+#[test]
+fn destination_username_is_parsed() {
+    let command = parse_interactive_ssh_command("ssh user@example.com").unwrap();
+
+    assert_eq!(command.username, Some("user".to_string()));
+    assert_eq!(command.host, Some("user@example.com".to_string()));
+    assert_eq!(command.port, None);
+}
+
+#[test]
+fn login_option_username_is_parsed() {
+    let command = parse_interactive_ssh_command("ssh -l user example.com").unwrap();
+
+    assert_eq!(command.username, Some("user".to_string()));
+    assert_eq!(command.host, Some("example.com".to_string()));
+    assert_eq!(command.port, None);
+}
+
+#[test]
+fn destination_with_custom_port_is_parsed() {
+    let command = parse_interactive_ssh_command("ssh -p 2222 user@example.com").unwrap();
+
+    assert_eq!(command.username, Some("user".to_string()));
+    assert_eq!(command.host, Some("user@example.com".to_string()));
+    assert_eq!(command.port, Some("2222".to_string()));
+}
+
+#[test]
+fn login_option_with_custom_port_is_parsed() {
+    let command = parse_interactive_ssh_command("ssh -l user -p 2222 example.com").unwrap();
+
+    assert_eq!(command.username, Some("user".to_string()));
+    assert_eq!(command.host, Some("example.com".to_string()));
+    assert_eq!(command.port, Some("2222".to_string()));
+}
+
+#[test]
+fn destination_username_takes_precedence_over_login_option() {
+    let command = parse_interactive_ssh_command("ssh -l ignored user@example.com").unwrap();
+
+    assert_eq!(command.username, Some("user".to_string()));
+}
+
+#[test]
+fn ssh_command_without_username_does_not_invent_one() {
+    let command = parse_interactive_ssh_command("ssh example.com").unwrap();
+
+    assert_eq!(command.username, None);
+}
+
+#[test]
+fn ssh_like_commands_have_no_destination_credentials() {
+    let command = parse_interactive_ssh_command("gcloud compute ssh my-instance").unwrap();
+
+    assert_eq!(command.username, None);
+    assert_eq!(command.host, None);
+    assert_eq!(command.port, None);
 }

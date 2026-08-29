@@ -25,7 +25,9 @@ use warp_util::standardized_path::StandardizedPath;
 
 use crate::ai::block_context::BlockContext;
 use crate::global_resource_handles::GlobalResourceHandlesProvider;
-use crate::ssh_manager::onekey::{OneKeyCredentialKind, load_saved_ssh_credentials};
+use crate::ssh_manager::onekey::{
+    OneKeyCredentialKind, load_saved_ssh_credentials, load_unique_matching_ssh_password,
+};
 use crate::ssh_manager::password_prompt::{
     append_password_submit_byte, bytes_look_like_password_prompt,
 };
@@ -21431,26 +21433,8 @@ impl TerminalView {
             InputEvent::PageUp => self.page_up(ctx),
             InputEvent::PageDown => self.page_down(ctx),
             InputEvent::ExecuteCommand(event) => {
-                self.update_scroll_position_locking(
-                    ScrollPositionUpdate::AfterCommandExecutionStarted,
-                    ctx,
-                );
-                if let Some(active_session) = self
-                    .active_block_session_id()
-                    .and_then(|session_id| self.sessions.as_ref(ctx).get(session_id))
-                {
-                    active_session.cancel_active_commands();
-                }
-
-                // Don't steal focus from other parts of the app.
-                if ctx.is_self_or_child_focused() {
-                    self.focus_terminal(ctx);
-                }
-
-                ctx.emit(Event::ExecuteCommand(event.as_ref().clone()));
-
-                if self.block_onboarding_active {
-                    self.interrupt_onboarding_blocks(ctx);
+                if !self.prepare_saved_ssh_password(event, ctx) {
+                    self.emit_execute_command(event.as_ref().clone(), ctx);
                 }
             }
             InputEvent::ExecuteAIQuery => {
@@ -21872,6 +21856,94 @@ impl TerminalView {
                     &WorkspaceAction::ShowCloudModeV2EnvironmentCreationModal,
                 );
             }
+        }
+    }
+
+    fn prepare_saved_ssh_password(
+        &mut self,
+        event: &ExecuteCommandEvent,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        if !matches!(&event.source, CommandExecutionSource::User)
+            || self.ssh_secret_auto_injection_in_flight
+        {
+            return false;
+        }
+        let Some(command) = parse_interactive_ssh_command(&event.command) else {
+            return false;
+        };
+        let Some(username) = command.username else {
+            return false;
+        };
+        let Some(destination) = command.host else {
+            return false;
+        };
+        let host = destination
+            .rsplit_once('@')
+            .map_or(destination.as_str(), |(_, host)| host)
+            .to_string();
+        if host.is_empty() {
+            return false;
+        }
+        let port = match command.port {
+            Some(port) => {
+                let Ok(port) = port.parse::<u16>() else {
+                    return false;
+                };
+                port
+            }
+            None => 22,
+        };
+        let event = event.clone();
+        let future = async move {
+            tokio::task::spawn_blocking(move || {
+                load_unique_matching_ssh_password(&username, &host, port)
+            })
+            .await
+            .unwrap_or_else(|e| Err(anyhow::anyhow!("ssh credential lookup join error: {e}")))
+        };
+        ctx.spawn(future, move |view, result, ctx| {
+            match result {
+                Ok(Some(secret)) => {
+                    let pty_reads_rx = view.inactive_pty_reads_rx(ctx);
+                    crate::ssh_manager::secret_injector::spawn_password_injector(
+                        pty_reads_rx,
+                        view.view_handle.clone(),
+                        secret,
+                        ctx,
+                    );
+                }
+                Ok(None) => {}
+                Err(_) => {
+                    log::warn!("ssh credential lookup failed; continuing without injection");
+                }
+            }
+            view.emit_execute_command(event, ctx);
+        });
+        true
+    }
+
+    fn emit_execute_command(&mut self, event: ExecuteCommandEvent, ctx: &mut ViewContext<Self>) {
+        self.update_scroll_position_locking(
+            ScrollPositionUpdate::AfterCommandExecutionStarted,
+            ctx,
+        );
+        if let Some(active_session) = self
+            .active_block_session_id()
+            .and_then(|session_id| self.sessions.as_ref(ctx).get(session_id))
+        {
+            active_session.cancel_active_commands();
+        }
+
+        // Don't steal focus from other parts of the app.
+        if ctx.is_self_or_child_focused() {
+            self.focus_terminal(ctx);
+        }
+
+        ctx.emit(Event::ExecuteCommand(event));
+
+        if self.block_onboarding_active {
+            self.interrupt_onboarding_blocks(ctx);
         }
     }
 

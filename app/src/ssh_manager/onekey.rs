@@ -12,7 +12,7 @@
 use anyhow::Result;
 use warp_ssh_manager::{
     AuthType, KeychainSecretStore, NodeKind, OneKeyCredentialKind as StoredOneKeyCredentialKind,
-    SecretKind, SshRepository, SshSecretStore,
+    ResolvedSshAuth, SecretKind, SshRepository, SshSecretStore, SshServerInfo,
 };
 use zeroize::Zeroizing;
 
@@ -32,6 +32,83 @@ pub struct OneKeyCredential {
 pub fn load_saved_ssh_credentials() -> Result<Vec<OneKeyCredential>> {
     let store = KeychainSecretStore;
     load_saved_ssh_credentials_with_store(&store)
+}
+
+#[derive(Clone, Debug)]
+struct SavedSshPasswordLookup {
+    host: String,
+    port: u16,
+    username: String,
+    secret_lookup_id: String,
+    secret_kind: SecretKind,
+}
+
+impl SavedSshPasswordLookup {
+    fn from_resolved_auth(server: &SshServerInfo, auth: ResolvedSshAuth) -> Option<Self> {
+        if auth.auth_type != AuthType::Password {
+            return None;
+        }
+        Some(Self {
+            host: server.host.clone(),
+            port: server.port,
+            username: auth.username,
+            secret_lookup_id: auth.secret_lookup_id,
+            secret_kind: auth.secret_kind,
+        })
+    }
+}
+
+pub fn load_unique_matching_ssh_password(
+    username: &str,
+    host: &str,
+    port: u16,
+) -> Result<Option<Zeroizing<String>>> {
+    let store = KeychainSecretStore;
+    let lookups = load_saved_ssh_password_lookups()?;
+    load_unique_matching_ssh_password_from_lookups(&lookups, username, host, port, &store)
+}
+
+fn load_saved_ssh_password_lookups() -> Result<Vec<SavedSshPasswordLookup>> {
+    warp_ssh_manager::with_conn(|conn| {
+        let nodes = SshRepository::list_nodes(conn)?;
+        let mut lookups = Vec::new();
+        for node in nodes {
+            if node.kind != NodeKind::Server {
+                continue;
+            }
+            let Some(server) = SshRepository::get_server(conn, &node.id)? else {
+                continue;
+            };
+            let Ok(auth) = SshRepository::resolve_server_auth(conn, &server) else {
+                continue;
+            };
+            if let Some(lookup) = SavedSshPasswordLookup::from_resolved_auth(&server, auth) {
+                lookups.push(lookup);
+            }
+        }
+        Ok(lookups)
+    })
+}
+
+fn load_unique_matching_ssh_password_from_lookups(
+    lookups: &[SavedSshPasswordLookup],
+    username: &str,
+    host: &str,
+    port: u16,
+    store: &dyn SshSecretStore,
+) -> Result<Option<Zeroizing<String>>> {
+    let mut matches = lookups.iter().filter(|lookup| {
+        lookup.username == username && lookup.host.eq_ignore_ascii_case(host) && lookup.port == port
+    });
+    let Some(lookup) = matches.next() else {
+        return Ok(None);
+    };
+    if matches.next().is_some() {
+        return Ok(None);
+    }
+    Ok(store
+        .get(&lookup.secret_lookup_id, lookup.secret_kind)?
+        .filter(|secret| !secret.is_empty()))
 }
 
 fn load_saved_ssh_credentials_with_store(
@@ -126,3 +203,7 @@ fn load_saved_ssh_credentials_with_store(
         Ok(credentials)
     })
 }
+
+#[cfg(test)]
+#[path = "onekey_tests.rs"]
+mod tests;
