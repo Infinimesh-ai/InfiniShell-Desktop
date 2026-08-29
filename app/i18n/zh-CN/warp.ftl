@@ -1868,6 +1868,7 @@ keybinding-desc-workspace-toggle-navigation-palette = 切换导航面板
 keybinding-desc-workspace-toggle-navigation-palette-menu = 导航面板
 keybinding-desc-workspace-toggle-launch-config-palette = 启动配置面板
 keybinding-desc-workspace-toggle-files-palette = 切换文件面板
+keybinding-desc-workspace-connect-ssh-in-active-terminal = SSH：在当前终端连接
 keybinding-desc-workspace-search-drive = 搜索 InfiniShell Drive
 keybinding-desc-workspace-move-tab-left = 标签页左移
 keybinding-desc-workspace-move-tab-up = 标签页上移

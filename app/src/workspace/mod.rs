@@ -1219,6 +1219,13 @@ pub fn init(app: &mut AppContext) {
         .with_context_predicate(id!("Workspace") & !id!("Workspace_ViewOnlySharedSession"))
         .with_custom_action(CustomAction::FilesPalette),
         EditableBinding::new(
+            "workspace:connect_ssh_in_active_terminal",
+            crate::t!("keybinding-desc-workspace-connect-ssh-in-active-terminal"),
+            WorkspaceAction::OpenSshServersPalette,
+        )
+        .with_group(bindings::BindingGroup::Navigation.as_str())
+        .with_context_predicate(id!("Workspace")),
+        EditableBinding::new(
             "workspace:open_launch_config_save_modal",
             crate::t!("keybinding-desc-workspace-save-launch-config"),
             WorkspaceAction::OpenLaunchConfigSaveModal,

@@ -18,6 +18,7 @@ pub mod su_password_injector;
 pub enum SshConnectionTarget {
     NewTab,
     SplitPane,
+    CurrentTerminal,
 }
 
 // `CandidatesViewModel` 暂时只被 `panel.rs` 引用;`CandidateRow` 仅是 panel

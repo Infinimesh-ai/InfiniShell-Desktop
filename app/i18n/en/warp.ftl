@@ -1907,6 +1907,7 @@ keybinding-desc-workspace-toggle-navigation-palette = Toggle navigation palette
 keybinding-desc-workspace-toggle-navigation-palette-menu = Navigation Palette
 keybinding-desc-workspace-toggle-launch-config-palette = Launch configuration palette
 keybinding-desc-workspace-toggle-files-palette = Toggle Files Palette
+keybinding-desc-workspace-connect-ssh-in-active-terminal = SSH: Connect in current terminal
 keybinding-desc-workspace-search-drive = Search InfiniShell Drive
 keybinding-desc-workspace-move-tab-left = Move tab left
 keybinding-desc-workspace-move-tab-up = move tab up

@@ -267,6 +267,8 @@ pub enum WorkspaceAction {
         server: warp_ssh_manager::SshServerInfo,
         target: crate::ssh_manager::SshConnectionTarget,
     },
+    /// 选择已保存的 SSH 服务器，并在当前终端中连接。
+    OpenSshServersPalette,
     /// 打开/关闭左侧 panel 的 SSH 管理器视图(openWarp 独有)。
     ToggleSshManager,
     /// 打开/关闭左侧 panel 的 Skill 管理器视图(openWarp 独有)。
@@ -979,6 +981,7 @@ impl WorkspaceAction {
             | ResetZoom
             | OpenPalette { .. }
             | TogglePalette { mode: _, source: _ }
+            | OpenSshServersPalette
             | JoinSlack
             | ViewUserDocs
             | ViewLatestChangelog

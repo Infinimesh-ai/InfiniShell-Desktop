@@ -6251,13 +6251,16 @@ impl Workspace {
                     pane_group.terminal_view_from_pane_id(pane_id, ctx)
                 })
             }
+            SshConnectionTarget::CurrentTerminal => self.active_session_view(ctx),
         };
         let Some(terminal_view) = terminal_view else {
             log::warn!("open_ssh_terminal: failed to create target terminal");
             return None;
         };
 
-        if AISettings::as_ref(ctx).default_session_mode(ctx) == DefaultSessionMode::Agent {
+        if target != SshConnectionTarget::CurrentTerminal
+            && AISettings::as_ref(ctx).default_session_mode(ctx) == DefaultSessionMode::Agent
+        {
             terminal_view.update(ctx, |view, _| {
                 view.set_enter_agent_view_after_ssh_bootstrap(
                     AgentViewEntryOrigin::DefaultSessionMode,
@@ -6317,6 +6320,11 @@ impl Workspace {
 
         // 3. 排队 ssh 命令,等 bootstrap 完成自动 flush。
         terminal_view.update(ctx, |view, ctx| {
+            if target == SshConnectionTarget::CurrentTerminal {
+                view.input().update(ctx, |input, ctx| {
+                    input.replace_buffer_content("", ctx);
+                });
+            }
             view.execute_command_or_set_pending(&cmd, ctx);
         });
 
@@ -14476,6 +14484,17 @@ impl Workspace {
             view.set_active_query_filter(QueryFilter::Files, ctx);
         });
     }
+
+    fn open_ssh_servers_palette(&mut self, ctx: &mut ViewContext<Self>) {
+        let source = PaletteSource::Keybinding;
+        self.set_palette_sources(source, ctx);
+        self.open_palette(PaletteMode::Command, source, ctx);
+        self.palette.update(ctx, |view, ctx| {
+            view.set_ssh_connection_target(SshConnectionTarget::CurrentTerminal);
+            view.set_active_query_filter(QueryFilter::SshServers, ctx);
+        });
+    }
+
     fn set_command_palette_binding_source(
         &mut self,
         source: PaletteSource,
@@ -23119,6 +23138,7 @@ impl TypedActionView for Workspace {
                 mode: palette_mode,
                 source,
             } => self.toggle_palette(*palette_mode, *source, ctx),
+            OpenSshServersPalette => self.open_ssh_servers_palette(ctx),
             // 去中心化分支:`ShowUpgrade` / `ShowReferralSettingsPage` 已删除。
             JoinSlack => self.join_slack(ctx),
             ViewUserDocs => self.view_user_docs(ctx),
