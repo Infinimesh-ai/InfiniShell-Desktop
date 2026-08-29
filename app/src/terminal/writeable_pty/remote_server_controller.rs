@@ -201,6 +201,11 @@ impl<T: EventLoopSender> RemoteServerController<T> {
         }
     }
 
+    pub(crate) fn cancel_pending_setup_for_terminal_close(&mut self) {
+        // 终端即将销毁时不能再把暂存脚本写回 PTY，也不能让异步检查结果继续推进连接。
+        self.state = SshInitState::Idle;
+    }
+
     /// Extracts the `SessionInfo` from the stash and writes the bootstrap
     /// script to the PTY via `PtyController::initialize_shell`.
     fn flush_stashed_bootstrap(&mut self, session_info: SessionInfo, ctx: &mut ModelContext<Self>) {

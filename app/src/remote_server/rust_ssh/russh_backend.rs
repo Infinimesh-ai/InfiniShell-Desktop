@@ -171,7 +171,7 @@ async fn run_session(
         RusshPreparedMode::Plain => None,
     };
 
-    let exit_code = bridge_interactive_channel(interactive, config.escape_char).await?;
+    let bridge_result = bridge_interactive_channel(interactive, config.escape_char).await;
     if let Some(broker) = broker {
         broker.abort();
     }
@@ -179,7 +179,7 @@ async fn run_session(
     let _ = handle
         .disconnect(russh::Disconnect::ByApplication, "session closed", "")
         .await;
-    Ok(exit_code)
+    bridge_result
 }
 
 enum RusshPreparedMode {
@@ -953,20 +953,24 @@ async fn bridge_interactive_channel(
     mut channel: russh::Channel<client::Msg>,
     escape_char: Option<u8>,
 ) -> Result<i32> {
-    let (input_tx, mut input_rx) = mpsc::unbounded_channel::<Option<Vec<u8>>>();
+    let (input_tx, mut input_rx) = mpsc::unbounded_channel::<io::Result<Option<Vec<u8>>>>();
     std::thread::spawn(move || {
         let mut stdin = io::stdin().lock();
         let mut buffer = [0_u8; 8192];
         loop {
-            match stdin.read(&mut buffer) {
-                Ok(0) | Err(_) => {
-                    let _ = input_tx.send(None);
-                    return;
-                }
-                Ok(read) => {
-                    if input_tx.send(Some(buffer[..read].to_vec())).is_err() {
+            match read_stdin_chunk(&mut stdin, &mut buffer) {
+                Ok(Some(input)) => {
+                    if input_tx.send(Ok(Some(input))).is_err() {
                         return;
                     }
+                }
+                Ok(None) => {
+                    let _ = input_tx.send(Ok(None));
+                    return;
+                }
+                Err(error) => {
+                    let _ = input_tx.send(Err(error));
+                    return;
                 }
             }
         }
@@ -976,12 +980,11 @@ async fn bridge_interactive_channel(
     let mut dimensions = terminal_dimensions();
     let mut resize = tokio::time::interval(RESIZE_POLL_INTERVAL);
     let mut exit_status = 255_i32;
-    let mut stdin_eof = false;
     loop {
         tokio::select! {
-            input = input_rx.recv(), if !stdin_eof => {
-                match input.flatten() {
-                    Some(input) => {
+            input = input_rx.recv() => {
+                match input {
+                    Some(Ok(Some(input))) => {
                         let output = escape_filter.push(&input);
                         if !output.bytes.is_empty() {
                             channel.data_bytes(output.bytes).await?;
@@ -994,14 +997,16 @@ async fn bridge_interactive_channel(
                             return Ok(0);
                         }
                     }
-                    None => {
-                        stdin_eof = true;
+                    Some(Ok(None)) | None => {
                         let remaining = escape_filter.finish();
                         if !remaining.is_empty() {
                             channel.data_bytes(remaining).await?;
                         }
                         channel.eof().await?;
+                        channel.close().await?;
+                        return Ok(exit_status);
                     }
+                    Some(Err(error)) => return Err(error.into()),
                 }
             }
             _ = resize.tick() => {
@@ -1043,6 +1048,17 @@ async fn bridge_interactive_channel(
                     Some(_) => {}
                 }
             }
+        }
+    }
+}
+
+fn read_stdin_chunk(reader: &mut impl Read, buffer: &mut [u8]) -> io::Result<Option<Vec<u8>>> {
+    loop {
+        match reader.read(buffer) {
+            Ok(0) => return Ok(None),
+            Ok(read) => return Ok(Some(buffer[..read].to_vec())),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
         }
     }
 }

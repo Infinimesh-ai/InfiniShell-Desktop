@@ -8612,10 +8612,35 @@ impl TerminalView {
         self.active_env_var_collection_block(app).is_some()
     }
 
-    /// Shuts down the pty and event loop, terminating the shell process.
-    /// Also marks this view as manually shut down for telemetry attribution.
-    pub fn shutdown_pty(&mut self, ctx: &mut ViewContext<Self>) {
+    pub(crate) fn prepare_for_pty_shutdown(&mut self, ctx: &mut ViewContext<Self>) {
         self.manual_pty_shutdown_requested = true;
+
+        #[cfg(not(target_family = "wasm"))]
+        if FeatureFlag::SshRemoteServer.is_enabled()
+            && let Some(session_id) = self.active_block_session_id()
+        {
+            let manager = RemoteServerManager::handle(ctx);
+            let root_session_id = {
+                let manager = manager.as_ref(ctx);
+                manager
+                    .ssh_route_path(session_id)
+                    .first()
+                    .map(|node| node.session_id)
+                    .or_else(|| manager.session(session_id).is_some().then_some(session_id))
+            };
+            if let Some(root_session_id) = root_session_id {
+                manager.update(ctx, |manager, ctx| {
+                    manager.deregister_session(root_session_id, ctx);
+                });
+            }
+        }
+    }
+
+    /// 关闭 PTY 与事件循环并终止 shell 进程。
+    /// 若当前终端持有 remote-server SSH 路由，先注销整条路由，避免代理重连或残留。
+    pub fn shutdown_pty(&mut self, ctx: &mut ViewContext<Self>) {
+        self.prepare_for_pty_shutdown(ctx);
+
         ctx.emit(Event::ShutdownPty);
     }
 

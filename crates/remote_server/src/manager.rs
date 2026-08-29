@@ -2558,19 +2558,13 @@ impl RemoteServerManager {
         })
     }
 
-    /// Removes a session from the manager and tears down its connection.
+    /// 从管理器中移除会话并关闭其连接。
     ///
-    /// Assumes the caller has already observed that the user's shell
-    /// has exited (in practice this is only invoked from the
-    /// `ExitShell` teardown path). Under that assumption we also force
-    /// the local SSH `ControlMaster` to exit immediately via
-    /// `ssh -O exit`, which is required because the master is the
-    /// user's interactive ssh process and, without the explicit
-    /// `-O exit`, it hangs waiting for remote-side cleanup of
-    /// multiplexed channels (see [`crate::ssh::stop_control_master`]).
-    /// Sessions multiplexed through an external master carry
-    /// [`ControlPath::UserOwned`], so this step is skipped and the
-    /// user's master is left running.
+    /// 调用方必须已经观察到 shell 退出，或正在显式关闭其 PTY。两种路径都需要通过
+    /// `ssh -O exit` 立即结束本地 SSH `ControlMaster`；否则作为交互式 ssh 进程的
+    /// master 会等待远端复用通道清理而无法退出（见 [`crate::ssh::stop_control_master`]）。
+    /// 通过外部 master 复用的会话使用 [`ControlPath::UserOwned`]，不会关闭用户持有的
+    /// master。
     ///
     /// Mechanically:
     /// 1. Remove the session entry. Dropping the `RemoteSessionState`

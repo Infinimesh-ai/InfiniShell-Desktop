@@ -12225,21 +12225,6 @@ impl Workspace {
         if !re_adopted && detach_panes_for_close {
             let working_directories_model = self.working_directories_model.clone();
             pane_group.update(ctx, |pane_group, ctx| {
-                pane_group.for_all_terminal_panes(
-                    |terminal_view, ctx| {
-                        if terminal_view
-                            .model
-                            .lock()
-                            .block_list()
-                            .active_block()
-                            .is_active_and_long_running()
-                        {
-                            terminal_view.shutdown_pty(ctx);
-                        }
-                    },
-                    ctx,
-                );
-
                 pane_group.detach_panes_for_close(&working_directories_model, ctx);
             });
         }
