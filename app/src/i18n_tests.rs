@@ -235,6 +235,22 @@ fn fallback_chain_works() {
 }
 
 #[test]
+fn workflow_command_placeholder_renders_literal_template_braces() {
+    for locale in ["en", "zh-CN"] {
+        let loader = fluent_language_loader!();
+        loader.load_fallback_language(&MergedLocalizations).unwrap();
+        let languages = [locale.parse().unwrap()];
+        i18n_embed::select(&loader, &MergedLocalizations, &languages).unwrap();
+
+        let placeholder = loader.get("workflow-command-placeholder");
+        assert!(
+            placeholder.contains("{{your_name}}"),
+            "{locale} 工作流命令占位符未渲染字面量模板花括号：{placeholder:?}"
+        );
+    }
+}
+
+#[test]
 fn shared_runtime_loader_includes_tui_resources() {
     let loader = fluent_language_loader!();
     loader.load_fallback_language(&MergedLocalizations).unwrap();

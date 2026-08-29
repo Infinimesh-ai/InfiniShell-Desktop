@@ -4070,7 +4070,7 @@ env-vars-secret-command = Secret command
 env-vars-run = Run
 env-vars-run-command-confirmation = Is it okay to run this command and read its output?
 
-workflow-command-placeholder = echo "Hello {{your_name}}" # insert arguments with curly braces{"\u000A"}# enter a single-line command or an entire shell script
+workflow-command-placeholder = echo "Hello {"{{"}your_name{"}}"}" # insert arguments with curly braces{"\u000A"}# enter a single-line command or an entire shell script
 workflow-error-saving-aliases = Error saving aliases
 workflow-error-contains-secrets = This workflow cannot be saved because it contains secrets.
 workflow-error-create = Could not create workflow

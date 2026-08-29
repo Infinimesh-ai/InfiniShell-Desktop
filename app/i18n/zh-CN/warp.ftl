@@ -3993,7 +3993,7 @@ env-vars-secret-command = 密钥命令
 env-vars-run = 运行
 env-vars-run-command-confirmation = 是否允许运行此命令并读取其输出？
 
-workflow-command-placeholder = echo "Hello {{your_name}}" # 使用花括号插入参数{"\u000A"}# 输入单行命令或完整的 Shell 脚本
+workflow-command-placeholder = echo "Hello {"{{"}your_name{"}}"}" # 使用花括号插入参数{"\u000A"}# 输入单行命令或完整的 Shell 脚本
 workflow-error-saving-aliases = 保存别名时出错
 workflow-error-contains-secrets = 此工作流包含密钥，无法保存。
 workflow-error-create = 无法创建工作流
