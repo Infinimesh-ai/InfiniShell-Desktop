@@ -6051,6 +6051,11 @@ impl TerminalView {
                 ..
             } => {
                 self.maybe_send_lrc_queued_prompts_after_subagent_handoff(*conversation_id, ctx);
+                self.maybe_create_live_cli_subagent_view_for_exchange(
+                    *conversation_id,
+                    task_id,
+                    ctx,
+                );
 
                 // Close any open usage footer(s) when a new AI block is added
                 if !self.usage_footer_view_ids.is_empty() {
@@ -6520,6 +6525,19 @@ impl TerminalView {
         initial_requested_command_action_id: Option<&AIAgentActionId>,
         ctx: &mut ViewContext<Self>,
     ) {
+        let task_has_exchange = BlocklistAIHistoryModel::as_ref(ctx)
+            .conversation(&conversation_id)
+            .and_then(|conversation| conversation.get_task(&task_id))
+            .and_then(|task| task.last_exchange())
+            .is_some();
+        if !task_has_exchange {
+            log::debug!(
+                "Skipping CLI subagent view without an exchange: \
+                 conversation={conversation_id:?} task={task_id:?}"
+            );
+            return;
+        }
+
         let is_live = mode == CLISubagentViewMode::Live;
         let block_id_for_view = block_id.clone();
         let task_id_for_view = task_id.clone();
@@ -6586,6 +6604,45 @@ impl TerminalView {
                 }
             }
         }
+    }
+
+    fn maybe_create_live_cli_subagent_view_for_exchange(
+        &mut self,
+        conversation_id: AIConversationId,
+        task_id: &TaskId,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let Some(block_id) = BlocklistAIHistoryModel::as_ref(ctx)
+            .conversation(&conversation_id)
+            .and_then(|conversation| conversation.get_task(task_id))
+            .and_then(|task| task.cli_subagent_block_id())
+        else {
+            return;
+        };
+        if self.cli_subagent_views.contains_key(&block_id) {
+            return;
+        }
+
+        let initial_requested_command_action_id = {
+            let model = self.model.lock();
+            model
+                .block_list()
+                .block_with_id(&block_id)
+                .filter(|block| block.is_agent_monitoring())
+                .map(|block| block.requested_command_action_id().cloned())
+        };
+        let Some(initial_requested_command_action_id) = initial_requested_command_action_id else {
+            return;
+        };
+
+        self.create_cli_subagent_view(
+            block_id,
+            conversation_id,
+            task_id.clone(),
+            CLISubagentViewMode::Live,
+            initial_requested_command_action_id.as_ref(),
+            ctx,
+        );
     }
 
     fn handle_cli_subagent_view_event(
@@ -20321,7 +20378,9 @@ impl TerminalView {
         }
 
         self.update_find_selection(ctx);
-        ctx.focus(&self.input);
+        if !self.input.as_ref(ctx).editor().is_focused(ctx) {
+            ctx.focus(&self.input);
+        }
         ctx.notify();
     }
 

@@ -8571,6 +8571,9 @@ impl Input {
             });
             return;
         }
+        if self.editor.is_focused(ctx) {
+            return;
+        }
         ctx.focus_self();
     }
 

@@ -11,6 +11,7 @@ use parking_lot::FairMutex;
 use warp_cli::agent::Harness;
 use warp_multi_agent_api as api;
 use warp_terminal::model::escape_sequences::{BRACKETED_PASTE_END, BRACKETED_PASTE_START, C0};
+use warp_util::user_input::UserInput;
 use warpui::notification::UserNotification;
 use warpui::platform::WindowStyle;
 use warpui::{App, EntityIdSet, Presenter, WindowInvalidation};
@@ -239,6 +240,60 @@ fn build_restored_conversation_with_cli_subagent_for_test(
 
     AIConversation::new_restored(AIConversationId::new(), vec![root_task, subtask], None)
         .expect("restored CLI subagent conversation should build")
+}
+
+#[allow(deprecated)]
+fn build_restored_conversation_with_empty_cli_subagent_for_test(
+    block_id: BlockId,
+    task_id: TaskId,
+) -> AIConversation {
+    let root_task_id = "root-task";
+    let block_id_string = String::from(block_id);
+    let task_id_string = String::from(task_id);
+    let root_task = create_api_task(
+        root_task_id,
+        vec![
+            tool_call_message_with_tool_for_test(
+                "run-shell-call",
+                "run-shell-call-1",
+                run_shell_command_tool_for_test("xray run -config /tmp/xray.json"),
+            ),
+            tool_call_result_message_with_result_for_test(
+                "run-shell-result",
+                "run-shell-call-1",
+                api::message::tool_call_result::Result::RunShellCommand(
+                    api::RunShellCommandResult {
+                        command: "xray run -config /tmp/xray.json".to_string(),
+                        output: String::new(),
+                        exit_code: 0,
+                        result: Some(api::run_shell_command_result::Result::CommandFinished(
+                            api::ShellCommandFinished {
+                                command_id: block_id_string.clone(),
+                                output: "service output".to_string(),
+                                exit_code: 0,
+                                start_ts: None,
+                                finish_ts: None,
+                            },
+                        )),
+                    },
+                ),
+            ),
+            create_subagent_tool_call_message(
+                "cli-subagent-call",
+                root_task_id,
+                &task_id_string,
+                Some(api::message::tool_call::subagent::Metadata::Cli(
+                    api::message::tool_call::subagent::CliSubagent {
+                        command_id: block_id_string,
+                    },
+                )),
+            ),
+        ],
+    );
+    let subtask = create_api_subtask(&task_id_string, root_task_id, vec![]);
+
+    AIConversation::new_restored(AIConversationId::new(), vec![root_task, subtask], None)
+        .expect("restored empty CLI subagent conversation should build")
 }
 
 fn empty_agent_conversation_data_for_test() -> AgentConversationData {
@@ -701,6 +756,36 @@ fn ordinary_agent_restore_does_not_create_cli_subagent_views() {
             assert!(
                 !view.rich_content_views.is_empty(),
                 "ordinary /agent block should still restore"
+            );
+        });
+    });
+}
+
+#[test]
+fn empty_cli_subagent_does_not_render_root_task_exchange() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+
+        let block_id = BlockId::from("empty-cli-subagent-block".to_string());
+        let task_id = TaskId::new("empty-cli-subagent-task".to_string());
+        let conversation =
+            build_restored_conversation_with_empty_cli_subagent_for_test(block_id.clone(), task_id);
+        let serialized_blocks = serialized_blocks_for_restored_cli_subagent_for_test(&conversation);
+        let terminal = add_window_with_terminal(&mut app, Some(&serialized_blocks));
+
+        terminal.update(&mut app, |view, ctx| {
+            view.restore_conversation_after_view_creation(
+                RestoredAIConversation::new(conversation),
+                true,
+                RestoreConversationEntryBehavior::EnterRestoredConversation,
+                ctx,
+            );
+        });
+
+        terminal.read(&app, |view, _| {
+            assert!(
+                !view.cli_subagent_views.contains_key(&block_id),
+                "没有自身 exchange 的 CLI 子任务不能用主任务内容创建浮窗"
             );
         });
     });
@@ -1388,6 +1473,39 @@ fn ordinary_block_selection_unchanged_outside_agent_view() {
             assert_eq!(second.0 + 1, first.0);
             assert_eq!(view.agent_transcript_navigated_ai_block(ctx), None);
             assert!(navigation_ring_targets(view, ctx).is_empty());
+        });
+    })
+}
+
+#[test]
+fn focus_reconciliation_preserves_input_ime_composition() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _ime_marked_text = FeatureFlag::ImeMarkedText.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+
+        let editor = terminal.update(&mut app, |view, ctx| {
+            view.focus_input_box(ctx);
+            view.input().as_ref(ctx).editor().clone()
+        });
+        editor.update(&mut app, |editor, ctx| {
+            editor.handle_action(
+                &EditorAction::SetMarkedText {
+                    marked_text: UserInput::new("nihao"),
+                    selected_range: 5..5,
+                },
+                ctx,
+            );
+            assert_eq!(editor.selected_text(ctx), "nihao");
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            assert!(view.redetermine_terminal_focus(ctx));
+            assert!(view.input().as_ref(ctx).editor().is_focused(ctx));
+        });
+        editor.update(&mut app, |editor, ctx| {
+            editor.handle_action(&EditorAction::ImeCommit(UserInput::new("你好")), ctx);
+            assert_eq!(editor.buffer_text(ctx), "你好");
         });
     })
 }

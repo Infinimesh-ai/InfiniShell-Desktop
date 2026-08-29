@@ -351,15 +351,6 @@ pub(crate) struct ConversationTaskGraphDiagnostics {
     pub(crate) tracked_cli_subtask_active: bool,
 }
 
-impl ConversationTaskGraphDiagnostics {
-    fn tracked_cli_subtask_is_reachable(&self) -> bool {
-        self.tracked_cli_subtask_present
-            && self.tracked_cli_subtask_initialized
-            && self.tracked_cli_subtask_has_parent_edge
-            && self.tracked_cli_subtask_active
-    }
-}
-
 /// An Agent Mode conversation.
 #[derive(Debug, Clone)]
 pub struct AIConversation {
@@ -3615,103 +3606,6 @@ impl AIConversation {
             task_id: new_task_id.clone(),
         });
         new_task_id
-    }
-
-    /// Zap BYOP 专用:agent 自起 LRC 收到 snapshot 时,在 conversation 直接落地
-    /// 一个 Server-backed cli subagent task。
-    ///
-    /// 不走 `create_optimistic_cli_subagent_task`(它产出 `TaskImpl::Optimistic`,且
-    /// 内部 emit `CreatedSubtask`):
-    /// 1. Optimistic task 的 `add_messages`(`task.rs:649`)/ `try_get_source`
-    ///    (`task.rs:627`)等入口会直接返回 `TaskNotInitialized`,后续 user follow-up
-    ///    query 路由进来后,模型回包的 stream chunks 走 `apply_client_action` 调
-    ///    `add_messages` 时全部失败 → "TaskNotFound" / "Failed to apply client
-    ///    actions"。
-    /// 2. emit `CreatedSubtask` 触发 `CLISubagentView::new`,要求 `task.last_exchange()`
-    ///    存在,而 silent 路径不触发新 query → task 始终空 → `expect("Exchange exists")`
-    ///    panic;`block/cli.rs:438` 已加 root_task fallback 兜底,这里仍然由 cli_controller
-    ///    自己控制 emit 时机。
-    ///
-    /// 实现:`Task::new_byop_silent_cli_subtask` 本地合成 `api::Task` + 合成
-    /// `SubagentParams { command_id }`,task 一开始就 Server-backed;同时在 root task
-    /// 写入虚拟 `Subagent` ToolCall,让 `compute_active_tasks` 能沿任务图找到该 subtask。
-    /// **不 emit CreatedSubtask**,由调用方(cli_controller)在升级 block 后手动 emit
-    /// `SpawnedSubagent` 创建浮窗。
-    pub fn create_optimistic_cli_subagent_task_silent(
-        &mut self,
-        block_id: &BlockId,
-    ) -> Result<TaskId, UpdateConversationError> {
-        if self.optimistic_cli_subagent_subtask_id.is_some() {
-            report_error!(
-                "Tried to optimistically create new subtask for CLI agent when one exists already."
-            );
-        }
-
-        let parent_task_id = self.task_store.root_task_id().clone();
-        let (new_task, parent_tool_call) = Task::new_byop_silent_cli_subtask(
-            block_id.clone(),
-            String::from(parent_task_id.clone()),
-        );
-        let new_task_id = new_task.id().clone();
-        self.task_store
-            .modify_task(&parent_task_id, |task| {
-                task.append_source_messages(vec![parent_tool_call])
-            })
-            .ok_or(UpdateConversationError::TaskNotFound)??;
-        // 仍然记录到 optimistic_cli_subagent_subtask_id,保持
-        // `has_active_subagent`、`controller.rs:1107-1130` 的 LRC subtask 检测路径
-        // 与上游一致。该字段名仅指"未经 server 确认",和 task 内部存储格式无关。
-        self.optimistic_cli_subagent_subtask_id = Some(new_task_id.clone());
-        self.task_store.insert(new_task);
-        let diagnostics = self.task_graph_diagnostics();
-        if diagnostics.tracked_cli_subtask_is_reachable() {
-            log::info!(
-                "[byop-lrc] silent CLI subtask linked conversation_id={} parent_task_id={} \
-                 subtask_id={} stored_tasks={} initialized_tasks={} initialized_messages={} \
-                 initialized_tool_calls={} initialized_tool_results={} \
-                 initialized_subagent_calls={} active_tasks={} active_messages={} \
-                 active_tool_calls={} active_tool_results={} active_subagent_calls={}",
-                self.id,
-                parent_task_id,
-                new_task_id,
-                diagnostics.stored_task_count,
-                diagnostics.initialized.task_count,
-                diagnostics.initialized.message_count,
-                diagnostics.initialized.tool_call_count,
-                diagnostics.initialized.tool_result_count,
-                diagnostics.initialized.subagent_call_count,
-                diagnostics.active.task_count,
-                diagnostics.active.message_count,
-                diagnostics.active.tool_call_count,
-                diagnostics.active.tool_result_count,
-                diagnostics.active.subagent_call_count
-            );
-        } else {
-            report_error!(
-                "Silent CLI subtask is not reachable in the conversation task graph",
-                extra: {
-                    "conversation_id" => %self.id,
-                    "parent_task_id" => %parent_task_id,
-                    "subtask_id" => %new_task_id,
-                    "stored_tasks" => %diagnostics.stored_task_count,
-                    "initialized_tasks" => %diagnostics.initialized.task_count,
-                    "initialized_messages" => %diagnostics.initialized.message_count,
-                    "initialized_tool_calls" => %diagnostics.initialized.tool_call_count,
-                    "initialized_tool_results" => %diagnostics.initialized.tool_result_count,
-                    "initialized_subagent_calls" => %diagnostics.initialized.subagent_call_count,
-                    "active_tasks" => %diagnostics.active.task_count,
-                    "active_messages" => %diagnostics.active.message_count,
-                    "active_tool_calls" => %diagnostics.active.tool_call_count,
-                    "active_tool_results" => %diagnostics.active.tool_result_count,
-                    "active_subagent_calls" => %diagnostics.active.subagent_call_count,
-                    "tracked_cli_subtask_present" => %diagnostics.tracked_cli_subtask_present,
-                    "tracked_cli_subtask_initialized" => %diagnostics.tracked_cli_subtask_initialized,
-                    "tracked_cli_subtask_has_parent_edge" => %diagnostics.tracked_cli_subtask_has_parent_edge,
-                    "tracked_cli_subtask_active" => %diagnostics.tracked_cli_subtask_active,
-                }
-            );
-        }
-        Ok(new_task_id)
     }
 
     /// Marks an optimistic CLI subagent active without emitting UI events.
