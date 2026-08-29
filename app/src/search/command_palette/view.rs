@@ -900,7 +900,11 @@ impl View {
             }
             CommandPaletteItemAction::OpenSshServer { node_id, server } => {
                 self.dispatch_typed_action_on_view(
-                    &crate::workspace::WorkspaceAction::OpenSshTerminal { node_id, server },
+                    &crate::workspace::WorkspaceAction::OpenSshTerminal {
+                        node_id,
+                        server,
+                        target: crate::ssh_manager::SshConnectionTarget::NewTab,
+                    },
                     ctx,
                 );
             }

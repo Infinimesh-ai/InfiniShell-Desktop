@@ -3034,6 +3034,7 @@ workspace-left-panel-ssh-manager-menu-new-folder = New folder
 workspace-left-panel-ssh-manager-menu-new-server = New SSH server
 workspace-left-panel-ssh-manager-menu-edit = Edit
 workspace-left-panel-ssh-manager-menu-connect = Connect
+workspace-left-panel-ssh-manager-menu-connect-split-pane = Connect in split pane
 workspace-left-panel-ssh-manager-menu-sftp = File Manager
 workspace-left-panel-ssh-manager-menu-clone = Clone
 workspace-left-panel-ssh-manager-menu-delete = Delete

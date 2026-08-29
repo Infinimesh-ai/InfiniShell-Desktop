@@ -14,6 +14,12 @@ pub mod shell_prompt;
 pub mod startup_command_injector;
 pub mod su_password_injector;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SshConnectionTarget {
+    NewTab,
+    SplitPane,
+}
+
 // `CandidatesViewModel` 暂时只被 `panel.rs` 引用;`CandidateRow` 仅是 panel
 // 内部布局用的中间表示,不需要导出。需要被外部消费时再加 re-export。
 #[allow(unused_imports)]

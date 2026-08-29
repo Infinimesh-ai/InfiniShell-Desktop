@@ -265,6 +265,7 @@ pub enum WorkspaceAction {
     OpenSshTerminal {
         node_id: String,
         server: warp_ssh_manager::SshServerInfo,
+        target: crate::ssh_manager::SshConnectionTarget,
     },
     /// 打开/关闭左侧 panel 的 SSH 管理器视图(openWarp 独有)。
     ToggleSshManager,

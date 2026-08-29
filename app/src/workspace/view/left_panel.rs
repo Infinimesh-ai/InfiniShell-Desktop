@@ -45,6 +45,7 @@ use crate::server::telemetry::CodePanelsFileOpenEntrypoint;
 use crate::server::telemetry::{FileTreeSource, WarpDriveSource};
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
 use crate::skill_manager::{SkillManagerPanel, SkillManagerPanelEvent};
+use crate::ssh_manager::SshConnectionTarget;
 use crate::ssh_manager::SshManagerPanel;
 use crate::terminal::model::session::Session;
 use crate::terminal::resizable_data::{ModalType, ResizableData};
@@ -140,6 +141,7 @@ pub enum LeftPanelEvent {
     OpenSshTerminal {
         node_id: String,
         server: warp_ssh_manager::SshServerInfo,
+        target: SshConnectionTarget,
     },
     /// 用户点击已保存的多级 SSH 路径，由工作区创建第一跳终端并自动推进后续跳点。
     OpenSshRoute {
@@ -328,10 +330,15 @@ impl LeftPanelView {
                         node_id: node_id.clone(),
                     });
                 }
-                SshManagerPanelEvent::OpenSshTerminal { node_id, server } => {
+                SshManagerPanelEvent::OpenSshTerminal {
+                    node_id,
+                    server,
+                    target,
+                } => {
                     ctx.emit(LeftPanelEvent::OpenSshTerminal {
                         node_id: node_id.clone(),
                         server: server.clone(),
+                        target: *target,
                     });
                 }
                 SshManagerPanelEvent::OpenSftpPane { node_id, server } => {

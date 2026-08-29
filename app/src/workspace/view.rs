@@ -317,6 +317,7 @@ use crate::settings_view::pane_manager::SettingsPaneManager;
 use crate::settings_view::{SettingsSection, SettingsView, SettingsViewEvent, flags};
 #[cfg(all(target_os = "windows", feature = "local_tty"))]
 use crate::shell_indicator::ShellIndicatorType;
+use crate::ssh_manager::SshConnectionTarget;
 use crate::tab::{
     COMPACT_TAB_WIDTH_THRESHOLD, ColorPickerTarget, NewSessionMenuItem, PaneNameMenuTarget,
     SelectedTabColor, TAB_BAR_BORDER_HEIGHT, TAB_INDICATOR_HEIGHT, TAB_PIN_INDICATOR_ICON_SIZE,
@@ -6043,8 +6044,12 @@ impl Workspace {
             LeftPanelEvent::OpenSshServerEditor { node_id } => {
                 self.open_ssh_server(node_id.clone(), ctx);
             }
-            LeftPanelEvent::OpenSshTerminal { node_id, server } => {
-                self.open_ssh_terminal(node_id.clone(), server.clone(), ctx);
+            LeftPanelEvent::OpenSshTerminal {
+                node_id,
+                server,
+                target,
+            } => {
+                self.open_ssh_terminal(node_id.clone(), server.clone(), *target, ctx);
             }
             LeftPanelEvent::OpenSshRoute { route } => {
                 self.open_ssh_route(route.clone(), ctx);
@@ -6057,7 +6062,12 @@ impl Workspace {
             }
             LeftPanelEvent::OpenProjectHostSession { node_id, server } => {
                 // 复用 SSH 管理器的连接链路(terminal pane + SecretInjector)。
-                self.open_ssh_terminal(node_id.clone(), server.clone(), ctx);
+                self.open_ssh_terminal(
+                    node_id.clone(),
+                    server.clone(),
+                    SshConnectionTarget::NewTab,
+                    ctx,
+                );
             }
             LeftPanelEvent::StartProjectConversation { project_id } => {
                 self.start_project_conversation(project_id.clone(), ctx);
@@ -6182,6 +6192,7 @@ impl Workspace {
         &mut self,
         node_id: String,
         server: warp_ssh_manager::SshServerInfo,
+        target: SshConnectionTarget,
         ctx: &mut ViewContext<Self>,
     ) -> Option<ViewHandle<TerminalView>> {
         use warp_ssh_manager::{KeychainSecretStore, SecretKind, SshRepository, SshSecretStore};
@@ -6211,28 +6222,38 @@ impl Workspace {
                 }
             };
         let cmd = warp_ssh_manager::build_ssh_command_line(&server_for_connection);
-        let window_id = ctx.window_id();
+        let terminal_view = match target {
+            SshConnectionTarget::NewTab => {
+                let window_id = ctx.window_id();
+                self.add_new_session_tab_internal_with_default_session_mode_behavior(
+                    NewSessionSource::Tab,
+                    Some(window_id),
+                    None, /* chosen_shell */
+                    None, /* conversation_restoration */
+                    true, /* hide_homepage */
+                    DefaultSessionModeBehavior::Ignore,
+                    ctx,
+                );
 
-        // 开新 tab(不分屏 — 之前用 add_terminal_pane(Direction::Right) 会切左/右
-        // 分屏,用户反馈不喜欢)。新 tab 添加后会自动成为 active tab。
-        self.add_new_session_tab_internal_with_default_session_mode_behavior(
-            NewSessionSource::Tab,
-            Some(window_id),
-            None, /* chosen_shell */
-            None, /* conversation_restoration */
-            true, /* hide_homepage */
-            DefaultSessionModeBehavior::Ignore,
-            ctx,
-        );
-
-        // 拿新 tab 的 focused terminal view。
-        let pane_group = self.active_tab_pane_group();
-        let focused_pane_id = pane_group.as_ref(ctx).focused_pane_id(ctx);
-        let Some(terminal_view) = pane_group
-            .as_ref(ctx)
-            .terminal_view_from_pane_id(focused_pane_id, ctx)
-        else {
-            log::warn!("open_ssh_terminal: no terminal in newly added tab");
+                let pane_group = self.active_tab_pane_group();
+                let focused_pane_id = pane_group.as_ref(ctx).focused_pane_id(ctx);
+                pane_group
+                    .as_ref(ctx)
+                    .terminal_view_from_pane_id(focused_pane_id, ctx)
+            }
+            SshConnectionTarget::SplitPane => {
+                self.active_tab_pane_group().update(ctx, |pane_group, ctx| {
+                    let pane_id = pane_group.add_terminal_pane_ignoring_default_session_mode(
+                        pane_group::Direction::Right,
+                        None,
+                        ctx,
+                    );
+                    pane_group.terminal_view_from_pane_id(pane_id, ctx)
+                })
+            }
+        };
+        let Some(terminal_view) = terminal_view else {
+            log::warn!("open_ssh_terminal: failed to create target terminal");
             return None;
         };
 
@@ -6352,7 +6373,9 @@ impl Workspace {
         let remaining_hops = route.hops.iter().skip(1).cloned().collect();
         let route_id = route.id;
 
-        let Some(terminal_view) = self.open_ssh_terminal(node_id, server, ctx) else {
+        let Some(terminal_view) =
+            self.open_ssh_terminal(node_id, server, SshConnectionTarget::NewTab, ctx)
+        else {
             return;
         };
         terminal_view.update(ctx, |view, ctx| {
@@ -6387,7 +6410,7 @@ impl Workspace {
             }
         };
         // open_ssh_terminal 内部会把新视图注册回路由器。
-        self.open_ssh_terminal(node_id.clone(), server, ctx);
+        self.open_ssh_terminal(node_id.clone(), server, SshConnectionTarget::NewTab, ctx);
     }
 
     /// 「从项目发起 Agent 对话」:创建不预选 SSH 主机的项目级 Agent 会话。
@@ -22847,8 +22870,12 @@ impl TypedActionView for Workspace {
                 );
                 ctx.notify();
             }
-            OpenSshTerminal { node_id, server } => {
-                self.open_ssh_terminal(node_id.clone(), server.clone(), ctx);
+            OpenSshTerminal {
+                node_id,
+                server,
+                target,
+            } => {
+                self.open_ssh_terminal(node_id.clone(), server.clone(), *target, ctx);
             }
             AddTabWithShell { shell, source } => {
                 self.add_tab_with_shell(shell.clone(), *source, ctx)

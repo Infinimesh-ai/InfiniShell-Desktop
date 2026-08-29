@@ -37,7 +37,7 @@ use crate::editor::{
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
-use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
+use crate::ssh_manager::{SshConnectionTarget, SshTreeChangedEvent, SshTreeChangedNotifier};
 use crate::view_components::dropdown::{Dropdown, DropdownItem};
 
 const FIELD_LABEL_MARGIN_TOP: f32 = 6.0;
@@ -855,6 +855,7 @@ impl SshServerView {
         ctx.dispatch_typed_action(&crate::workspace::WorkspaceAction::OpenSshTerminal {
             node_id: self.node_id.clone(),
             server,
+            target: SshConnectionTarget::NewTab,
         });
     }
 
