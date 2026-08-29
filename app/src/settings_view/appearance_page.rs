@@ -1926,11 +1926,11 @@ impl AppearanceSettingsPageView {
         }
     }
 
-    fn language_dropdown_item_label(val: Language) -> &'static str {
+    fn language_dropdown_item_label(val: Language) -> String {
         match val {
-            Language::System => crate::t_static!("settings-language-system-default"),
-            Language::English => crate::t_static!("settings-language-english"),
-            Language::SimplifiedChinese => "简体中文",
+            Language::System => crate::t!("settings-language-system-default"),
+            Language::English => crate::t!("settings-language-english"),
+            Language::SimplifiedChinese => crate::t!("settings-language-simplified-chinese"),
         }
     }
 

@@ -156,7 +156,7 @@ pub fn render_header(appearance: &Appearance) -> Box<dyn Element> {
     let name_el = Shrinkable::new(
         1.0,
         Text::new_inline(
-            String::from("名称"),
+            crate::t!("sftp-column-name"),
             appearance.ui_font_family(),
             appearance.ui_font_size(),
         )
@@ -167,7 +167,7 @@ pub fn render_header(appearance: &Appearance) -> Box<dyn Element> {
 
     let size_el = ConstrainedBox::new(
         Text::new_inline(
-            String::from("大小"),
+            crate::t!("sftp-column-size"),
             appearance.ui_font_family(),
             appearance.ui_font_size(),
         )
@@ -179,7 +179,7 @@ pub fn render_header(appearance: &Appearance) -> Box<dyn Element> {
 
     let date_el = ConstrainedBox::new(
         Text::new_inline(
-            String::from("修改时间"),
+            crate::t!("sftp-column-modified"),
             appearance.ui_font_family(),
             appearance.ui_font_size(),
         )

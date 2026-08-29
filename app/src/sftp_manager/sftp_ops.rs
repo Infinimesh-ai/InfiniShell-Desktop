@@ -37,11 +37,20 @@ pub enum SftpOpsError {
 impl std::fmt::Display for SftpOpsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SftpOpsError::Connection(msg) => write!(f, "连接错误: {msg}"),
-            SftpOpsError::Operation(msg) => write!(f, "操作错误: {msg}"),
-            SftpOpsError::LocalIo(msg) => write!(f, "本地 IO 错误: {msg}"),
-            SftpOpsError::NoCredentials(msg) => write!(f, "未找到凭据: {msg}"),
-            SftpOpsError::Cancelled => write!(f, "传输已取消"),
+            SftpOpsError::Connection(msg) => {
+                f.write_str(&crate::t!("sftp-error-connection", message = msg.as_str()))
+            }
+            SftpOpsError::Operation(msg) => {
+                f.write_str(&crate::t!("sftp-error-operation", message = msg.as_str()))
+            }
+            SftpOpsError::LocalIo(msg) => {
+                f.write_str(&crate::t!("sftp-error-local-io", message = msg.as_str()))
+            }
+            SftpOpsError::NoCredentials(msg) => f.write_str(&crate::t!(
+                "sftp-error-no-credentials",
+                message = msg.as_str()
+            )),
+            SftpOpsError::Cancelled => f.write_str(&crate::t!("sftp-error-transfer-cancelled")),
         }
     }
 }
@@ -83,7 +92,9 @@ pub fn connect_from_server(
 
 fn resolve_sftp_auth(server: &SshServerInfo) -> Result<ResolvedSshAuth, SftpOpsError> {
     warp_ssh_manager::with_conn(|conn| Ok(SshRepository::resolve_server_auth(conn, server)?))
-        .map_err(|e| SftpOpsError::NoCredentials(format!("解析认证失败: {e}")))
+        .map_err(|e| {
+            SftpOpsError::NoCredentials(crate::t!("sftp-ops-resolve-auth", error = e.to_string()))
+        })
 }
 
 /// 列出远程目录内容，转换为 UI 层 FileEntry
@@ -275,8 +286,10 @@ pub fn upload_file_streaming(
             if let Err(e) = rename_result {
                 // rename 失败时保留远程临时文件，避免数据丢失
                 let temp_display = temp_remote_path.display();
-                return Err(SftpOpsError::Operation(format!(
-                    "重命名远程临时文件失败: {e}。临时文件: {temp_display}"
+                return Err(SftpOpsError::Operation(crate::t!(
+                    "sftp-ops-rename-remote-temporary",
+                    error = e.to_string(),
+                    path = temp_display.to_string()
                 )));
             }
         }
@@ -348,8 +361,10 @@ pub fn download_file_streaming(
             if let Err(e) = fs::rename(&temp_local_path, local_path) {
                 // rename 失败时保留本地临时文件，避免数据丢失
                 let temp_display = temp_local_path.display();
-                return Err(SftpOpsError::LocalIo(format!(
-                    "重命名失败: {e}。已下载的临时文件保留在: {temp_display}"
+                return Err(SftpOpsError::LocalIo(crate::t!(
+                    "sftp-ops-rename-downloaded-temporary",
+                    error = e.to_string(),
+                    path = temp_display.to_string()
                 )));
             }
         }
@@ -473,9 +488,17 @@ fn build_auth_method(
         AuthType::Password | AuthType::OneKey => {
             let password = secret_store
                 .get(&resolved_auth.secret_lookup_id, resolved_auth.secret_kind)
-                .map_err(|e| SftpOpsError::NoCredentials(format!("读取密码失败: {e}")))?
+                .map_err(|e| {
+                    SftpOpsError::NoCredentials(crate::t!(
+                        "sftp-ops-read-password",
+                        error = e.to_string()
+                    ))
+                })?
                 .ok_or_else(|| {
-                    SftpOpsError::NoCredentials(format!("服务器 {} 未存储密码", server.host))
+                    SftpOpsError::NoCredentials(crate::t!(
+                        "sftp-ops-password-not-stored",
+                        host = server.host.as_str()
+                    ))
                 })?;
             Ok(AuthMethod::Password {
                 password: password.to_string(),
@@ -483,7 +506,7 @@ fn build_auth_method(
         }
         AuthType::Key => {
             let key_path = resolved_auth.key_path.as_ref().ok_or_else(|| {
-                SftpOpsError::NoCredentials("密钥认证但未指定密钥路径".to_string())
+                SftpOpsError::NoCredentials(crate::t!("sftp-ops-key-path-missing"))
             })?;
             let expanded = shellexpand_path(key_path);
             let passphrase = secret_store
@@ -537,7 +560,7 @@ mod tests {
     fn test_sftp_ops_error_display_connection() {
         assert_eq!(
             SftpOpsError::Connection("refused".into()).to_string(),
-            "连接错误: refused"
+            crate::t!("sftp-error-connection", message = "refused")
         );
     }
 
@@ -546,7 +569,7 @@ mod tests {
     fn test_sftp_ops_error_display_operation() {
         assert_eq!(
             SftpOpsError::Operation("not found".into()).to_string(),
-            "操作错误: not found"
+            crate::t!("sftp-error-operation", message = "not found")
         );
     }
 
@@ -555,7 +578,7 @@ mod tests {
     fn test_sftp_ops_error_display_local_io() {
         assert_eq!(
             SftpOpsError::LocalIo("disk full".into()).to_string(),
-            "本地 IO 错误: disk full"
+            crate::t!("sftp-error-local-io", message = "disk full")
         );
     }
 
@@ -564,14 +587,17 @@ mod tests {
     fn test_sftp_ops_error_display_no_credentials() {
         assert_eq!(
             SftpOpsError::NoCredentials("no key".into()).to_string(),
-            "未找到凭据: no key"
+            crate::t!("sftp-error-no-credentials", message = "no key")
         );
     }
 
     /// 测试 SftpOpsError::Cancelled Display 输出
     #[test]
     fn test_sftp_ops_error_display_cancelled() {
-        assert_eq!(SftpOpsError::Cancelled.to_string(), "传输已取消");
+        assert_eq!(
+            SftpOpsError::Cancelled.to_string(),
+            crate::t!("sftp-error-transfer-cancelled")
+        );
     }
 
     /// 测试从 std::io::Error 转换为 SftpOpsError
@@ -714,7 +740,7 @@ mod tests {
     fn test_sftp_ops_error_connection_empty() {
         assert_eq!(
             SftpOpsError::Connection(String::new()).to_string(),
-            "连接错误: "
+            crate::t!("sftp-error-connection", message = "")
         );
     }
 
@@ -723,7 +749,7 @@ mod tests {
     fn test_sftp_ops_error_operation_empty() {
         assert_eq!(
             SftpOpsError::Operation(String::new()).to_string(),
-            "操作错误: "
+            crate::t!("sftp-error-operation", message = "")
         );
     }
 
@@ -732,7 +758,7 @@ mod tests {
     fn test_sftp_ops_error_local_io_empty() {
         assert_eq!(
             SftpOpsError::LocalIo(String::new()).to_string(),
-            "本地 IO 错误: "
+            crate::t!("sftp-error-local-io", message = "")
         );
     }
 
@@ -741,7 +767,7 @@ mod tests {
     fn test_sftp_ops_error_no_credentials_empty() {
         assert_eq!(
             SftpOpsError::NoCredentials(String::new()).to_string(),
-            "未找到凭据: "
+            crate::t!("sftp-error-no-credentials", message = "")
         );
     }
 
@@ -751,7 +777,7 @@ mod tests {
         let s1 = SftpOpsError::Cancelled.to_string();
         let s2 = SftpOpsError::Cancelled.to_string();
         assert_eq!(s1, s2);
-        assert_eq!(s1, "传输已取消");
+        assert_eq!(s1, crate::t!("sftp-error-transfer-cancelled"));
     }
 
     /// 测试 shellexpand_path 多级 ~/ 展开

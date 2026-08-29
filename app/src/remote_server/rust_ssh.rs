@@ -520,7 +520,11 @@ fn run_ssh2_session_worker(args: &RustSshSessionArgs) -> Result<i32> {
                         }
                         Err(opt_in_error) => {
                             eprintln!(
-                                "InfiniShell could not enable enhanced SSH for this host: {opt_in_error:#}"
+                                "{}",
+                                crate::t!(
+                                    "terminal-ssh-enhanced-opt-in-enable-error",
+                                    error = format!("{opt_in_error:#}")
+                                )
                             );
                             return run_native_ssh_fallback(args, "OpenSSH configuration", &error);
                         }
@@ -735,18 +739,23 @@ fn request_enhanced_ssh_opt_in_with_io(
     validate_ssh_config_host(&opt_in.host)?;
     writeln!(
         output,
-        "InfiniShell enhanced SSH requires per-host OpenSSH settings because {} are enabled.",
-        opt_in.options.join(", ")
+        "{}",
+        crate::t!(
+            "terminal-ssh-enhanced-opt-in-required",
+            options = opt_in.options.join(", ")
+        )
     )?;
     writeln!(
         output,
-        "This disables automatic host-key updates and keystroke-timing obfuscation for this host."
+        "{}",
+        crate::t!("terminal-ssh-enhanced-opt-in-security-impact")
     )?;
 
     loop {
         write!(
             output,
-            "Press Enter or type yes to update ~/.ssh/config and continue, or type no to use native OpenSSH [Y/n]: "
+            "{} ",
+            crate::t!("terminal-ssh-enhanced-opt-in-prompt")
         )?;
         output.flush()?;
 
@@ -754,7 +763,8 @@ fn request_enhanced_ssh_opt_in_with_io(
         if input.read_line(&mut choice)? == 0 {
             writeln!(
                 output,
-                "Using native OpenSSH without InfiniShell SSH extension features."
+                "{}",
+                crate::t!("terminal-ssh-enhanced-opt-in-native-fallback")
             )?;
             return Ok(false);
         }
@@ -764,19 +774,27 @@ fn request_enhanced_ssh_opt_in_with_io(
                 upsert_enhanced_ssh_host_config(config_path, &opt_in.host)?;
                 writeln!(
                     output,
-                    "Enhanced SSH is enabled for {}; continuing this connection.",
-                    opt_in.host
+                    "{}",
+                    crate::t!(
+                        "terminal-ssh-enhanced-opt-in-enabled",
+                        host = opt_in.host.as_str()
+                    )
                 )?;
                 return Ok(true);
             }
             "n" | "no" => {
                 writeln!(
                     output,
-                    "Using native OpenSSH without InfiniShell SSH extension features."
+                    "{}",
+                    crate::t!("terminal-ssh-enhanced-opt-in-native-fallback")
                 )?;
                 return Ok(false);
             }
-            _ => writeln!(output, "Please press Enter or type yes or no.")?,
+            _ => writeln!(
+                output,
+                "{}",
+                crate::t!("terminal-ssh-enhanced-opt-in-invalid-choice")
+            )?,
         }
     }
 }

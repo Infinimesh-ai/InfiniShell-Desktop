@@ -222,10 +222,11 @@ pub struct SftpBrowserView {
 impl SftpBrowserView {
     /// 创建新的 SFTP 浏览器视图
     pub fn new(node_id: String, ctx: &mut ViewContext<Self>) -> Self {
-        let pane_configuration = ctx.add_model(|_ctx| PaneConfiguration::new("文件管理"));
-        let rename_editor = make_editor("Enter new name", ctx);
-        let new_folder_editor = make_editor("Folder name", ctx);
-        let search_editor = make_editor("Search files...", ctx);
+        let pane_configuration =
+            ctx.add_model(|_ctx| PaneConfiguration::new(crate::t!("sftp-file-manager-title")));
+        let rename_editor = make_editor(&crate::t!("sftp-rename-placeholder"), ctx);
+        let new_folder_editor = make_editor(&crate::t!("sftp-folder-name-placeholder"), ctx);
+        let search_editor = make_editor(&crate::t!("sftp-search-placeholder"), ctx);
 
         let mut me = Self {
             node_id,
@@ -395,8 +396,8 @@ impl SftpBrowserView {
             }
             Err(_) => {}
         }
-        let path = self.current_path.display();
-        let title = format!("SFTP: {path}");
+        let path = self.current_path.display().to_string();
+        let title = crate::t!("sftp-pane-title", path = path.as_str());
         self.pane_configuration.update(ctx, |config, ctx| {
             config.set_title(title, ctx);
         });
@@ -495,13 +496,12 @@ impl SftpBrowserView {
                                         me.refresh_dir(ctx);
                                     }
                                     Err(e) => {
-                                        me.connection = ConnectionState::Failed(format!(
-                                            "创建 SFTP 通道失败: {e}"
-                                        ));
-                                        me.show_error_toast(
-                                            format!("创建 SFTP 通道失败: {e}"),
-                                            ctx,
+                                        let message = crate::t!(
+                                            "sftp-error-create-channel",
+                                            error = e.to_string()
                                         );
+                                        me.connection = ConnectionState::Failed(message.clone());
+                                        me.show_error_toast(message, ctx);
                                     }
                                 }
                             }
@@ -511,7 +511,9 @@ impl SftpBrowserView {
                             }
                             Err(_) => {
                                 // JoinError（被 abort 或 panic）
-                                me.connection = ConnectionState::Failed("连接已取消".to_string());
+                                me.connection = ConnectionState::Failed(crate::t!(
+                                    "sftp-error-connection-cancelled"
+                                ));
                             }
                         }
                         ctx.notify();
@@ -519,13 +521,15 @@ impl SftpBrowserView {
                 );
             }
             Ok(None) => {
-                self.connection = ConnectionState::Failed("未找到服务器配置".to_string());
-                self.show_error_toast("未找到服务器配置".to_string(), ctx);
+                let message = crate::t!("sftp-error-server-config-not-found");
+                self.connection = ConnectionState::Failed(message.clone());
+                self.show_error_toast(message, ctx);
                 ctx.notify();
             }
             Err(e) => {
-                self.connection = ConnectionState::Failed(format!("读取服务器配置失败: {e}"));
-                self.show_error_toast(format!("读取服务器配置失败: {e}"), ctx);
+                let message = crate::t!("sftp-error-read-server-config", error = e.to_string());
+                self.connection = ConnectionState::Failed(message.clone());
+                self.show_error_toast(message, ctx);
                 ctx.notify();
             }
         }
@@ -564,7 +568,7 @@ impl SftpBrowserView {
         let sftp = match &self.sftp {
             Some(s) => s.clone(),
             None => {
-                self.show_error_toast("未连接到服务器".to_string(), ctx);
+                self.show_error_toast(crate::t!("sftp-error-not-connected"), ctx);
                 ctx.notify();
                 return;
             }
@@ -603,13 +607,16 @@ impl SftpBrowserView {
                         me.sync_row_mouse_handles();
                     }
                     Ok(Err(e)) => {
-                        me.show_error_toast(format!("列出目录失败: {e}"), ctx);
+                        me.show_error_toast(
+                            crate::t!("sftp-error-list-directory", error = e.to_string()),
+                            ctx,
+                        );
                     }
                     Err(_) => {}
                 }
 
-                let path = me.current_path.display();
-                let title = format!("SFTP: {path}");
+                let path = me.current_path.display().to_string();
+                let title = crate::t!("sftp-pane-title", path = path.as_str());
                 me.pane_configuration.update(ctx, |config, ctx| {
                     config.set_title(title, ctx);
                 });
@@ -723,7 +730,7 @@ impl SftpBrowserView {
         let sftp = match &self.sftp {
             Some(s) => s.clone(),
             None => {
-                self.show_error_toast("未连接到服务器".to_string(), ctx);
+                self.show_error_toast(crate::t!("sftp-error-not-connected"), ctx);
                 self.dialog = None;
                 ctx.notify();
                 return;
@@ -772,7 +779,10 @@ impl SftpBrowserView {
                         me.refresh_dir(ctx);
                     }
                     Ok(Err(e)) => {
-                        me.show_error_toast(format!("删除失败: {e}"), ctx);
+                        me.show_error_toast(
+                            crate::t!("sftp-error-delete", error = e.as_str()),
+                            ctx,
+                        );
                         me.refresh_dir(ctx);
                     }
                     Err(_) => {
@@ -834,7 +844,6 @@ impl SftpBrowserView {
         icon: Icon,
         handle: MouseStateHandle,
         action: SftpBrowserAction,
-        _tooltip: &str,
         appearance: &Appearance,
         position_id: &'static str,
     ) -> Box<dyn Element> {
@@ -874,7 +883,6 @@ impl SftpBrowserView {
                 Icon::ChevronLeft,
                 self.back_btn.clone(),
                 SftpBrowserAction::GoBack,
-                "Back",
                 appearance,
                 "sftp_btn:back",
             ))
@@ -882,7 +890,6 @@ impl SftpBrowserView {
                 Icon::ChevronRight,
                 self.forward_btn.clone(),
                 SftpBrowserAction::GoForward,
-                "Forward",
                 appearance,
                 "sftp_btn:forward",
             ))
@@ -890,7 +897,6 @@ impl SftpBrowserView {
                 Icon::ArrowUp,
                 self.up_btn.clone(),
                 SftpBrowserAction::GoUp,
-                "Up",
                 appearance,
                 "sftp_btn:up",
             ))
@@ -898,7 +904,6 @@ impl SftpBrowserView {
                 Icon::Refresh,
                 self.refresh_btn.clone(),
                 SftpBrowserAction::Refresh,
-                "Refresh",
                 appearance,
                 "sftp_btn:refresh",
             ))
@@ -912,7 +917,6 @@ impl SftpBrowserView {
                 Icon::UploadCloud,
                 self.upload_btn.clone(),
                 SftpBrowserAction::UploadFile,
-                "Upload",
                 appearance,
                 "sftp_btn:upload",
             ))
@@ -920,7 +924,6 @@ impl SftpBrowserView {
                 Icon::Plus,
                 self.new_folder_btn.clone(),
                 SftpBrowserAction::NewFolder,
-                "New folder",
                 appearance,
                 "sftp_btn:new_folder",
             ))
@@ -985,9 +988,11 @@ impl SftpBrowserView {
     /// 渲染连接状态（非连接时）
     fn render_connection_state(&self, appearance: &Appearance) -> Box<dyn Element> {
         let (msg, icon) = match &self.connection {
-            ConnectionState::Connecting => ("Connecting...".to_string(), Icon::Loading),
+            ConnectionState::Connecting => (crate::t!("sftp-status-connecting"), Icon::Loading),
             ConnectionState::Failed(err) => (err.clone(), Icon::AlertCircle),
-            ConnectionState::Disconnected => ("Disconnected".to_string(), Icon::AlertCircle),
+            ConnectionState::Disconnected => {
+                (crate::t!("sftp-status-disconnected"), Icon::AlertCircle)
+            }
             ConnectionState::Connected => {
                 return Container::new(Flex::row().finish()).finish();
             }
@@ -1066,7 +1071,7 @@ impl SftpBrowserView {
         let remote_path = match build_upload_remote_path(&self.current_path, &file_name) {
             Some(p) => p,
             None => {
-                self.show_error_toast("文件名包含非法字符".to_string(), ctx);
+                self.show_error_toast(crate::t!("sftp-error-invalid-file-name"), ctx);
                 return;
             }
         };
@@ -1190,7 +1195,10 @@ impl SftpBrowserView {
                         }
                         Ok(Err(e)) => {
                             log::error!("sftp: 上传失败: {e}");
-                            me.show_error_toast(format!("上传失败: {e}"), ctx);
+                            me.show_error_toast(
+                                crate::t!("sftp-error-upload", error = e.to_string()),
+                                ctx,
+                            );
                             ctx.notify();
                         }
                         Err(_) => {
@@ -1202,11 +1210,12 @@ impl SftpBrowserView {
                 self.transfer_handles.insert(task_id, handle);
             }
         } else {
+            let error = crate::t!("sftp-error-not-connected");
             if let Some(t) = self.transfers.iter_mut().find(|t| t.id == task_id) {
-                t.state = TransferState::Failed("未连接到服务器".to_string());
+                t.state = TransferState::Failed(error.clone());
             }
             log::error!("sftp: 上传失败: 未连接到服务器");
-            self.show_error_toast("上传失败: 未连接到服务器".to_string(), ctx);
+            self.show_error_toast(crate::t!("sftp-error-upload", error = error.as_str()), ctx);
             ctx.notify();
         }
     }
@@ -1285,7 +1294,10 @@ impl SftpBrowserView {
 
                     if let Ok(Err(e)) = &result {
                         log::error!("sftp: 下载失败: {e}");
-                        me.show_error_toast(format!("下载失败: {e}"), ctx);
+                        me.show_error_toast(
+                            crate::t!("sftp-error-download", error = e.to_string()),
+                            ctx,
+                        );
                     }
                     ctx.notify();
                 },
@@ -1293,11 +1305,15 @@ impl SftpBrowserView {
                 self.transfer_handles.insert(task_id, handle);
             }
         } else {
+            let error = crate::t!("sftp-error-not-connected");
             if let Some(t) = self.transfers.iter_mut().find(|t| t.id == task_id) {
-                t.state = TransferState::Failed("未连接到服务器".to_string());
+                t.state = TransferState::Failed(error.clone());
             }
             log::error!("sftp: 下载失败: 未连接到服务器");
-            self.show_error_toast("下载失败: 未连接到服务器".to_string(), ctx);
+            self.show_error_toast(
+                crate::t!("sftp-error-download", error = error.as_str()),
+                ctx,
+            );
             ctx.notify();
         }
     }
@@ -1333,7 +1349,12 @@ impl SftpBrowserView {
 
     /// 渲染加载中状态
     fn render_loading(&self, appearance: &Appearance) -> Box<dyn Element> {
-        render_centered_status(Icon::Loading, "Loading...", 8.0, appearance)
+        render_centered_status(
+            Icon::Loading,
+            &crate::t!("sftp-status-loading"),
+            8.0,
+            appearance,
+        )
     }
 }
 
@@ -1484,16 +1505,13 @@ impl TypedActionView for SftpBrowserView {
                     let new_name = self.rename_editor.as_ref(ctx).buffer_text(ctx);
                     let new_name = new_name.trim().to_string();
                     if new_name.is_empty() {
-                        self.show_error_toast("名称不能为空".to_string(), ctx);
+                        self.show_error_toast(crate::t!("sftp-error-name-empty"), ctx);
                         return;
                     }
                     let new_path = match build_rename_path(original_path, &new_name) {
                         Some(p) => p,
                         None => {
-                            self.show_error_toast(
-                                "名称不合法：不能包含路径分隔符".to_string(),
-                                ctx,
-                            );
+                            self.show_error_toast(crate::t!("sftp-error-name-path-separator"), ctx);
                             return;
                         }
                     };
@@ -1512,7 +1530,10 @@ impl TypedActionView for SftpBrowserView {
                                         me.refresh_dir(ctx);
                                     }
                                     Ok(Err(e)) => {
-                                        me.show_error_toast(format!("重命名失败: {e}"), ctx);
+                                        me.show_error_toast(
+                                            crate::t!("sftp-error-rename", error = e.to_string()),
+                                            ctx,
+                                        );
                                     }
                                     Err(_) => {}
                                 }
@@ -1520,7 +1541,7 @@ impl TypedActionView for SftpBrowserView {
                             },
                         );
                     } else {
-                        self.show_error_toast("未连接到服务器".to_string(), ctx);
+                        self.show_error_toast(crate::t!("sftp-error-not-connected"), ctx);
                         self.dialog = None;
                     }
                 }
@@ -1530,16 +1551,13 @@ impl TypedActionView for SftpBrowserView {
                     let folder_name = self.new_folder_editor.as_ref(ctx).buffer_text(ctx);
                     let folder_name = folder_name.trim().to_string();
                     if folder_name.is_empty() {
-                        self.show_error_toast("文件夹名称不能为空".to_string(), ctx);
+                        self.show_error_toast(crate::t!("sftp-error-folder-name-empty"), ctx);
                         return;
                     }
                     let folder_path = match build_new_folder_path(parent_path, &folder_name) {
                         Some(p) => p,
                         None => {
-                            self.show_error_toast(
-                                "名称不合法：不能包含路径分隔符".to_string(),
-                                ctx,
-                            );
+                            self.show_error_toast(crate::t!("sftp-error-name-path-separator"), ctx);
                             return;
                         }
                     };
@@ -1557,7 +1575,13 @@ impl TypedActionView for SftpBrowserView {
                                         me.refresh_dir(ctx);
                                     }
                                     Ok(Err(e)) => {
-                                        me.show_error_toast(format!("创建文件夹失败: {e}"), ctx);
+                                        me.show_error_toast(
+                                            crate::t!(
+                                                "sftp-error-create-folder",
+                                                error = e.to_string()
+                                            ),
+                                            ctx,
+                                        );
                                     }
                                     Err(_) => {}
                                 }
@@ -1565,7 +1589,7 @@ impl TypedActionView for SftpBrowserView {
                             },
                         );
                     } else {
-                        self.show_error_toast("未连接到服务器".to_string(), ctx);
+                        self.show_error_toast(crate::t!("sftp-error-not-connected"), ctx);
                         self.dialog = None;
                     }
                 }
@@ -1664,7 +1688,7 @@ impl TypedActionView for SftpBrowserView {
                     let target_path = match safe_join_name(target_dir, &file_name) {
                         Some(p) => normalize_remote_path(&p),
                         None => {
-                            self.show_error_toast("目标路径不合法".to_string(), ctx);
+                            self.show_error_toast(crate::t!("sftp-error-invalid-target-path"), ctx);
                             self.dialog = None;
                             ctx.notify();
                             return;
@@ -1685,7 +1709,10 @@ impl TypedActionView for SftpBrowserView {
                                         me.refresh_dir(ctx);
                                     }
                                     Ok(Err(e)) => {
-                                        me.show_error_toast(format!("移动失败: {e}"), ctx);
+                                        me.show_error_toast(
+                                            crate::t!("sftp-error-move", error = e.to_string()),
+                                            ctx,
+                                        );
                                     }
                                     Err(_) => {}
                                 }
@@ -1693,7 +1720,7 @@ impl TypedActionView for SftpBrowserView {
                             },
                         );
                     } else {
-                        self.show_error_toast("未连接到服务器".to_string(), ctx);
+                        self.show_error_toast(crate::t!("sftp-error-not-connected"), ctx);
                         self.dialog = None;
                     }
                 }
@@ -1897,7 +1924,7 @@ impl View for SftpBrowserView {
         // 10. 拖拽视觉反馈
         if self.is_drag_hovering {
             let drop_hint = Text::new_inline(
-                "拖放文件以上传".to_string(),
+                crate::t!("sftp-drop-files-to-upload"),
                 appearance.ui_font_family(),
                 appearance.ui_font_size() + 2.0,
             )
@@ -1992,8 +2019,8 @@ impl BackingView for SftpBrowserView {
         _ctx: &view::HeaderRenderContext<'_>,
         _app: &AppContext,
     ) -> view::HeaderContent {
-        let path = self.current_path.display();
-        let title = format!("SFTP: {path}");
+        let path = self.current_path.display().to_string();
+        let title = crate::t!("sftp-pane-title", path = path.as_str());
         view::HeaderContent::simple(title)
     }
 

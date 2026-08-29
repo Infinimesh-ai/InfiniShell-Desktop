@@ -128,7 +128,8 @@ pub struct ProjectView {
 impl ProjectView {
     pub fn new(project_id: String, ctx: &mut ViewContext<Self>) -> Self {
         let name_editor = make_single_line_editor(&crate::t!("common-name"), ctx);
-        let root_path_editor = make_single_line_editor("/home/user/projects/app", ctx);
+        let root_path_editor =
+            make_single_line_editor(&crate::t!("project-view-root-path-placeholder"), ctx);
         let rules_editor = make_multiline_editor(&crate::t!("project-view-rules-placeholder"), ctx);
         let notes_editor = make_multiline_editor(&crate::t!("project-view-notes-placeholder"), ctx);
 
@@ -295,7 +296,8 @@ impl ProjectView {
             .map(|project| project.repositories.clone())
             .unwrap_or_default();
         for repository in repositories {
-            let editor = make_single_line_editor("https://github.com/example/repo.git", ctx);
+            let editor =
+                make_single_line_editor(&crate::t!("project-view-git-url-placeholder"), ctx);
             editor.update(ctx, |editor, ctx| {
                 editor.set_buffer_text(&repository.git_url, ctx);
                 editor.clear_selections(ctx);
@@ -437,7 +439,7 @@ impl ProjectView {
     }
 
     fn add_repository(&mut self, ctx: &mut ViewContext<Self>) {
-        let editor = make_single_line_editor("https://github.com/example/repo.git", ctx);
+        let editor = make_single_line_editor(&crate::t!("project-view-git-url-placeholder"), ctx);
         subscribe_project_editor(&editor, ctx);
         self.repositories.push(ProjectRepositoryEditorRow {
             id: Uuid::new_v4().to_string(),

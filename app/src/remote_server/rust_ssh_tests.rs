@@ -211,11 +211,10 @@ fn terminal_opt_in_enter_updates_the_config_and_continues() {
             .unwrap()
             .contains("Host terminal-opt-in-test\n    UpdateHostKeys no")
     );
-    assert!(
-        String::from_utf8(output).unwrap().contains(
-            "Enhanced SSH is enabled for terminal-opt-in-test; continuing this connection."
-        )
-    );
+    assert!(String::from_utf8(output).unwrap().contains(&crate::t!(
+        "terminal-ssh-enhanced-opt-in-enabled",
+        host = "terminal-opt-in-test"
+    )));
 }
 
 #[test]
@@ -261,7 +260,7 @@ fn terminal_opt_in_no_preserves_the_config_and_falls_back() {
     assert!(
         String::from_utf8(output)
             .unwrap()
-            .contains("Using native OpenSSH without InfiniShell SSH extension features.")
+            .contains(&crate::t!("terminal-ssh-enhanced-opt-in-native-fallback"))
     );
 }
 
