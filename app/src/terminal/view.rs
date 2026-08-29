@@ -26,7 +26,9 @@ use warp_util::standardized_path::StandardizedPath;
 use crate::ai::block_context::BlockContext;
 use crate::global_resource_handles::GlobalResourceHandlesProvider;
 use crate::ssh_manager::onekey::{OneKeyCredentialKind, load_saved_ssh_credentials};
-use crate::ssh_manager::password_prompt::bytes_look_like_password_prompt;
+use crate::ssh_manager::password_prompt::{
+    append_password_submit_byte, bytes_look_like_password_prompt,
+};
 use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
 pub(crate) mod docker_sandbox;
 mod link_detection;
@@ -17600,7 +17602,7 @@ impl TerminalView {
         // zeroize(属于既有架构限制),但至少把本帧栈上的明文窗口缩到最小。
         let mut bytes: zeroize::Zeroizing<Vec<u8>> =
             zeroize::Zeroizing::new(candidate.secret.as_bytes().to_vec());
-        bytes.push(b'\n');
+        append_password_submit_byte(&mut bytes);
         self.write_to_pty(bytes.to_vec(), ctx);
         self.close_context_menu(ctx, true);
     }
@@ -17760,7 +17762,7 @@ impl TerminalView {
     ) {
         let mut bytes: zeroize::Zeroizing<Vec<u8>> =
             zeroize::Zeroizing::new(password.as_bytes().to_vec());
-        bytes.push(b'\n');
+        append_password_submit_byte(&mut bytes);
         self.write_to_pty(bytes.to_vec(), ctx);
     }
 
