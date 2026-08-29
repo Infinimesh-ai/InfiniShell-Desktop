@@ -29,8 +29,10 @@ pub struct SshConfigCandidate {
 
 /// 解析 `ssh_config` 文件正文,返回有序的候选列表。
 ///
-/// 顺序按文件中 `Host` 块出现的顺序;`Host a b c` 一行展开成 3 条
-/// 共享 body 的候选。具体边界规则见 `PRODUCT.md` 第 4 节(F-L)。
+/// 顺序按别名首次出现的顺序;`Host a b c` 一行展开成 3 条共享 body 的候选。
+/// 同一别名出现在多个 `Host` 块时按 OpenSSH 的首次值优先语义合并，避免
+/// InfiniShell 写入的增强 SSH 选项块与用户原始块生成重复候选。
+/// 具体边界规则见 `PRODUCT.md` 第 4 节(F-L)。
 pub fn parse_ssh_config(content: &str) -> Vec<SshConfigCandidate> {
     let mut out = Vec::new();
     let mut state = ParseState::Outside;
@@ -118,14 +120,37 @@ fn flush(state: &mut ParseState, out: &mut Vec<SshConfigCandidate>) {
     let prev = std::mem::replace(state, ParseState::Outside);
     if let ParseState::InHost { aliases, body } = prev {
         for alias in aliases {
-            out.push(SshConfigCandidate {
+            let candidate = SshConfigCandidate {
                 alias,
                 hostname: body.hostname.clone(),
                 user: body.user.clone(),
                 port: body.port,
                 identity_file: body.identity_file.clone(),
-            });
+            };
+            if let Some(existing) = out
+                .iter_mut()
+                .find(|existing| existing.alias == candidate.alias)
+            {
+                merge_missing_fields(existing, candidate);
+            } else {
+                out.push(candidate);
+            }
         }
+    }
+}
+
+fn merge_missing_fields(existing: &mut SshConfigCandidate, candidate: SshConfigCandidate) {
+    if existing.hostname.is_none() {
+        existing.hostname = candidate.hostname;
+    }
+    if existing.user.is_none() {
+        existing.user = candidate.user;
+    }
+    if existing.port.is_none() {
+        existing.port = candidate.port;
+    }
+    if existing.identity_file.is_none() {
+        existing.identity_file = candidate.identity_file;
     }
 }
 
@@ -580,3 +605,7 @@ Host a
         }
     }
 }
+
+#[cfg(test)]
+#[path = "ssh_config_parser_tests.rs"]
+mod regression_tests;

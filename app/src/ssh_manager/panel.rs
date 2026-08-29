@@ -41,6 +41,7 @@ use crate::editor::{
 use crate::settings::SshSettings;
 use crate::ssh_manager::candidates::{CandidateRow, CandidatesViewModel};
 use crate::ssh_manager::{SshConnectionTarget, SshTreeChangedEvent, SshTreeChangedNotifier};
+use crate::ui_components::buttons::{icon_button, icon_button_with_color};
 
 // ---- 视觉常量(参考 Drive) ----
 const TOOLBAR_BUTTON_SIZE: f32 = 26.0;
@@ -1308,13 +1309,18 @@ impl SshManagerPanel {
         } = fields;
         let CandidateRowColors { main, muted } = colors;
         let theme = appearance.theme();
+        let first_line_offset = (warp_core::ui::icons::ICON_DIMENSIONS - ITEM_ICON_SIZE) / 2.0;
         let icon = crate::ui_components::icons::Icon::Key
             .to_warpui_icon(theme.sub_text_color(theme.background()))
             .finish();
-        let icon_el = ConstrainedBox::new(icon)
-            .with_width(ITEM_ICON_SIZE)
-            .with_height(ITEM_ICON_SIZE)
-            .finish();
+        let icon_el = Container::new(
+            ConstrainedBox::new(icon)
+                .with_width(ITEM_ICON_SIZE)
+                .with_height(ITEM_ICON_SIZE)
+                .finish(),
+        )
+        .with_padding_top(first_line_offset)
+        .finish();
 
         // 主标签 = alias;副标签 = "user@hostname:port" 简写,均按可选拼。
         // 已导入时整行字体颜色调淡(decision E:dimmed)。
@@ -1367,9 +1373,11 @@ impl SshManagerPanel {
         if let Some(s) = subtitle {
             label_col.add_child(s);
         }
-        let label_block = label_col.with_main_axis_size(MainAxisSize::Min).finish();
+        let label_block = Container::new(label_col.with_main_axis_size(MainAxisSize::Min).finish())
+            .with_padding_top(first_line_offset)
+            .finish();
 
-        // 行尾的 "+" 按钮或 "Added" 徽章。
+        // 行尾用同尺寸图标表示可添加 / 已添加，避免状态文字长度破坏列对齐。
         let add_state = self
             .candidate_add_states
             .get(alias)
@@ -1377,41 +1385,52 @@ impl SshManagerPanel {
             .unwrap_or_default();
         let alias_for_click = alias.to_string();
         let trailing: Box<dyn Element> = if added {
-            // PRODUCT.md decision E:已导入 → 显示 "Added"(无点击交互)。
-            Text::new_inline(
-                crate::t!("workspace-left-panel-ssh-manager-candidates-added"),
-                appearance.ui_font_family(),
-                appearance.ui_font_body(),
+            let tooltip = appearance
+                .ui_builder()
+                .clone()
+                .tool_tip(crate::t!(
+                    "workspace-left-panel-ssh-manager-candidates-added"
+                ))
+                .build()
+                .finish();
+            icon_button_with_color(
+                appearance,
+                crate::ui_components::icons::Icon::Check,
+                false,
+                add_state,
+                muted,
             )
-            .with_color(muted.into())
+            .with_tooltip(move || tooltip)
+            .build()
             .finish()
         } else {
-            let plus_icon = ConstrainedBox::new(
-                crate::ui_components::icons::Icon::Plus
-                    .to_warpui_icon(theme.sub_text_color(theme.background()))
-                    .finish(),
+            let tooltip = appearance
+                .ui_builder()
+                .clone()
+                .tool_tip(crate::t!("workspace-left-panel-ssh-manager-candidates-add"))
+                .build()
+                .finish();
+            icon_button(
+                appearance,
+                crate::ui_components::icons::Icon::Plus,
+                false,
+                add_state,
             )
-            .with_width(ITEM_ICON_SIZE)
-            .with_height(ITEM_ICON_SIZE)
-            .finish();
-            Hoverable::new(add_state, move |_| {
-                Container::new(plus_icon)
-                    .with_uniform_padding(2.0)
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.0)))
-                    .finish()
-            })
-            .with_cursor(Cursor::PointingHand)
+            .with_tooltip(move || tooltip)
+            .build()
             .on_click(move |ctx, _, _| {
                 ctx.dispatch_typed_action(SshManagerPanelAction::ImportCandidate {
                     alias: alias_for_click.clone(),
                 });
             })
+            .with_cursor(Cursor::PointingHand)
             .finish()
         };
 
-        // 使用 MainAxisSize::Max 让候选行填满面板宽度,消除右侧留白。
+        // 候选行固定为缩进、钥匙、主副标题、状态四列。标题占满中间剩余空间，
+        // 状态图标固定在最右侧；钥匙和标题首行与 24px 状态按钮视觉居中对齐。
         let row = Flex::row()
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .with_spacing(ITEM_ICON_TEXT_SPACING)
             .with_child(
                 ConstrainedBox::new(Empty::new().finish())
@@ -1419,12 +1438,7 @@ impl SshManagerPanel {
                     .finish(),
             )
             .with_child(icon_el)
-            .with_child(label_block)
-            .with_child(
-                ConstrainedBox::new(Empty::new().finish())
-                    .with_width(8.0)
-                    .finish(),
-            )
+            .with_child(warpui::elements::Expanded::new(1.0, label_block).finish())
             .with_child(trailing)
             .with_main_axis_size(MainAxisSize::Max)
             .finish();
