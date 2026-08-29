@@ -357,6 +357,7 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
     register_test!(test_focus_panes_on_hover);
 
     register_test!(test_close_tab_with_long_running_process);
+    register_test!(test_close_bootstrapped_ssh_tab_terminates_pty_during_undo_close);
     register_test!(test_reorder_tabs_with_drag);
     register_test!(test_detach_tab_to_new_window_with_drag);
     register_test!(test_attach_tab_to_other_window_and_continue_drag);

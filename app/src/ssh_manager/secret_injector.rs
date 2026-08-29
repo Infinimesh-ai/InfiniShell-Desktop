@@ -24,7 +24,9 @@ use warpui::r#async::FutureExt;
 use warpui::{ViewContext, WeakViewHandle};
 use zeroize::Zeroizing;
 
-use crate::ssh_manager::password_prompt::bytes_look_like_password_prompt;
+use crate::ssh_manager::password_prompt::{
+    append_password_submit_byte, bytes_look_like_password_prompt,
+};
 use crate::terminal::TerminalView;
 
 /// 注入超时上限。
@@ -85,10 +87,10 @@ pub fn spawn_password_injector<O>(
             return;
         };
         view.update(ctx, |view, ctx| {
-            // 把密码 + 换行作为字节写入 PTY,等同模拟键盘按键回应交互式 prompt。
+            // 把密码 + Enter 作为字节写入 PTY,等同模拟键盘回应交互式 prompt。
             // 此时 ssh 已经在跑(bootstrap 早完成),write_to_pty 直写是正解。
             let mut bytes = secret.as_bytes().to_vec();
-            bytes.push(b'\n');
+            append_password_submit_byte(&mut bytes);
             view.write_to_pty(bytes, ctx);
             view.note_ssh_secret_auto_injected(ctx);
             view.set_ssh_secret_auto_injection_in_flight(false);

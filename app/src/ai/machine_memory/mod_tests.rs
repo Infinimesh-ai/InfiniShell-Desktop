@@ -5,6 +5,7 @@ use super::*;
 
 fn ssh_info() -> InteractiveSshCommand {
     InteractiveSshCommand {
+        username: Some("root".to_owned()),
         host: Some("root@Web-01".to_owned()),
         port: None,
     }

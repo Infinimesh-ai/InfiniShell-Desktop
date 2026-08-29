@@ -1,4 +1,4 @@
-use super::bytes_look_like_password_prompt;
+use super::{append_password_submit_byte, bytes_look_like_password_prompt};
 
 fn matches(input: &str) -> bool {
     bytes_look_like_password_prompt(input.as_bytes())
@@ -9,6 +9,15 @@ fn matches_typical_password_prompt() {
     assert!(matches("user@host's password: "));
     assert!(matches("Password:"));
     assert!(matches("password: \r\n"));
+}
+
+#[test]
+fn password_submission_uses_carriage_return() {
+    let mut bytes = b"secret".to_vec();
+
+    append_password_submit_byte(&mut bytes);
+
+    assert_eq!(bytes, b"secret\r");
 }
 
 #[test]

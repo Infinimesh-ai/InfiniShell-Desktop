@@ -1679,6 +1679,12 @@ impl TerminalModel {
         self.pending_ssh_wrapper_session.is_some()
     }
 
+    pub(crate) fn should_shutdown_pty_on_reversible_close(&self) -> bool {
+        self.block_list.active_block().is_active_and_long_running()
+            || self.pending_ssh_wrapper_session.is_some()
+            || !self.active_ssh_command_blocks.is_empty()
+    }
+
     pub(crate) fn active_ssh_command_block_ids(&self) -> impl Iterator<Item = &BlockId> {
         self.active_ssh_command_blocks
             .iter()

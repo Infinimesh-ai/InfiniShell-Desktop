@@ -503,6 +503,13 @@ impl<S> TerminalManager<S> {
         self.remote_server_controller.clone()
     }
 
+    /// 直接通知 PTY controller 关闭终端，供 view 订阅即将移除的路径使用。
+    pub(super) fn shutdown_pty(&self, ctx: &mut AppContext) {
+        self.pty_controller.update(ctx, |controller, ctx| {
+            controller.shutdown_pty(ctx);
+        });
+    }
+
     /// Sends a shutdown message to the PTY event loop and waits for it to
     /// process that event.
     pub(super) fn shutdown_event_loop(&mut self) {

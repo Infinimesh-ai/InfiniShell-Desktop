@@ -1,3 +1,4 @@
+use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -161,4 +162,49 @@ fn compression_yes_prefers_delayed_openssh_compression() {
     assert_eq!(built.preferred.compression[0].as_ref(), "zlib@openssh.com");
     assert_eq!(built.preferred.compression[1].as_ref(), "zlib");
     assert_eq!(built.preferred.compression[2].as_ref(), "none");
+}
+
+struct InterruptedOnce<R> {
+    reader: R,
+    interrupted: bool,
+}
+
+impl<R: io::Read> io::Read for InterruptedOnce<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        if !self.interrupted {
+            self.interrupted = true;
+            return Err(io::Error::from(io::ErrorKind::Interrupted));
+        }
+        self.reader.read(buffer)
+    }
+}
+
+#[test]
+fn stdin_reader_retries_interrupted_reads_and_reports_eof() {
+    let mut reader = InterruptedOnce {
+        reader: io::Cursor::new(b"input"),
+        interrupted: false,
+    };
+    let mut buffer = [0_u8; 8];
+
+    assert_eq!(
+        read_stdin_chunk(&mut reader, &mut buffer).unwrap(),
+        Some(b"input".to_vec())
+    );
+    assert_eq!(read_stdin_chunk(&mut reader, &mut buffer).unwrap(), None);
+}
+
+struct FailingReader;
+
+impl io::Read for FailingReader {
+    fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+        Err(io::Error::from(io::ErrorKind::BrokenPipe))
+    }
+}
+
+#[test]
+fn stdin_reader_preserves_non_interrupted_errors() {
+    let error = read_stdin_chunk(&mut FailingReader, &mut [0_u8; 8]).unwrap_err();
+
+    assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
 }

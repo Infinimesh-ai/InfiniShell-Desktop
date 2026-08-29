@@ -43,6 +43,7 @@ use crate::server::ids::SyncId;
 use crate::server::telemetry::{LaunchConfigUiLocation, TelemetryEvent};
 use crate::session_management::SessionSource;
 use crate::settings::CtrlTabBehavior;
+use crate::ssh_manager::SshConnectionTarget;
 use crate::terminal::keys_settings::KeysSettings;
 use crate::themes::theme::WarpTheme;
 use crate::view_components::DismissibleToast;
@@ -138,6 +139,8 @@ pub struct View {
     /// Whether the active session is a shared session viewer.
     /// This is set by the workspace when opening the palette.
     is_shared_session_viewer: bool,
+
+    ssh_connection_target: SshConnectionTarget,
 }
 
 impl Entity for View {
@@ -318,6 +321,7 @@ impl View {
             suggested_binding_ids,
             zero_state_items,
             is_shared_session_viewer: false,
+            ssh_connection_target: SshConnectionTarget::NewTab,
         }
     }
 
@@ -342,6 +346,10 @@ impl View {
             view.set_query_filter(Some((filter, filter.filter_atom().primary_text)), ctx)
         });
         ctx.notify();
+    }
+
+    pub fn set_ssh_connection_target(&mut self, target: SshConnectionTarget) {
+        self.ssh_connection_target = target;
     }
 
     pub fn set_initial_selection_offset(&mut self, offset: isize, ctx: &mut ViewContext<Self>) {
@@ -631,6 +639,7 @@ impl View {
     }
 
     pub fn reset(&mut self, ctx: &mut ViewContext<Self>) {
+        self.ssh_connection_target = SshConnectionTarget::NewTab;
         self.state.clipped_scroll_state.scroll_to(Pixels::zero());
         self.search_bar.update(ctx, |search_bar, ctx| {
             search_bar.reset(
@@ -779,6 +788,12 @@ impl View {
                     self.close(ctx, Some(result_action.result_type()));
                     return;
                 }
+                Some(WorkspaceAction::OpenSshServersPalette) => {
+                    self.reset(ctx);
+                    self.set_ssh_connection_target(SshConnectionTarget::CurrentTerminal);
+                    self.set_active_query_filter(QueryFilter::SshServers, ctx);
+                    return;
+                }
                 _ => {}
             }
         }
@@ -900,7 +915,11 @@ impl View {
             }
             CommandPaletteItemAction::OpenSshServer { node_id, server } => {
                 self.dispatch_typed_action_on_view(
-                    &crate::workspace::WorkspaceAction::OpenSshTerminal { node_id, server },
+                    &crate::workspace::WorkspaceAction::OpenSshTerminal {
+                        node_id,
+                        server,
+                        target: self.ssh_connection_target,
+                    },
                     ctx,
                 );
             }

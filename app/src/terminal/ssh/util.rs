@@ -84,6 +84,7 @@ pub fn check_ssh_login_state(block_output: &str) -> SshLoginState {
 /// successfully detect an interactive SSH command.
 #[derive(Clone, Debug, Default)]
 pub struct InteractiveSshCommand {
+    pub username: Option<String>,
     pub host: Option<String>,
     pub port: Option<String>,
 }
@@ -98,6 +99,7 @@ impl InteractiveSshCommand {
             command
         };
         let tokens = parse_ssh_command_tokens(command)?;
+        let mut username: Option<String> = None;
         let mut host: Option<String> = None;
         let mut port: Option<String> = None;
 
@@ -116,9 +118,18 @@ impl InteractiveSshCommand {
                     }
                 }
 
+                "-l" => {
+                    i += 1;
+                    if i < tokens.len() {
+                        username = Some(tokens[i].clone());
+                    } else {
+                        return None;
+                    }
+                }
+
                 // SSH option that doesn't change interactivity and require an argument: Skip the next item.
                 "-B" | "-b" | "-c" | "-D" | "-E" | "-e" | "-F" | "-I" | "-i" | "-J" | "-L"
-                | "-l" | "-m" | "-O" | "-o" | "-P" | "-Q" | "-R" | "-S" | "-w" => {
+                | "-m" | "-O" | "-o" | "-P" | "-Q" | "-R" | "-S" | "-w" => {
                     i += 1;
                 }
 
@@ -137,7 +148,20 @@ impl InteractiveSshCommand {
             i += 1;
         }
 
-        Some(InteractiveSshCommand { host, port })
+        if let Some(destination_username) = host
+            .as_deref()
+            .and_then(|destination| destination.rsplit_once('@'))
+            .map(|(username, _)| username)
+            .filter(|username| !username.is_empty())
+        {
+            username = Some(destination_username.to_string());
+        }
+
+        Some(InteractiveSshCommand {
+            username,
+            host,
+            port,
+        })
     }
 }
 

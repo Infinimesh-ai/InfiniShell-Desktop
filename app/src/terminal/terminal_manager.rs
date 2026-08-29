@@ -29,8 +29,8 @@ pub trait TerminalManager: Any {
     /// do not do anything with high latency here. Note that we cannot rely on events emitted
     /// here to be processed before the window closes.
     ///
-    /// Implementations should preserve state on [`DetachType::HiddenForClose`] or
-    /// [`DetachType::Moved`] and clean up only on [`DetachType::Closed`].
+    /// 实现应在 [`DetachType::Moved`] 时保留状态。对 [`DetachType::HiddenForClose`]，
+    /// 空闲终端应保留以支持撤销关闭，但活动命令或远端会话可以提前终止 PTY。
     fn on_view_detached(&self, _detach_type: DetachType, _app: &mut AppContext) {}
 
     /// Returns this [`TerminalManager`] as an [`Any`], to support downcasting.

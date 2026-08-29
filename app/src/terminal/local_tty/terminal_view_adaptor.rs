@@ -192,12 +192,29 @@ impl TerminalManagerTrait for TerminalManager<TerminalView> {
 
     fn on_view_detached(
         &self,
-        // The detach type is intentionally ignored: a sharer always stops sharing immediately,
-        // even on a reversible `HiddenForClose` detach. This is desirable for security — a sharer
-        // should not continue accepting commands from viewers while the session is not visible.
         detach_type: crate::pane_group::pane::DetachType,
         app: &mut AppContext,
     ) {
+        let should_shutdown_pty = match detach_type {
+            crate::pane_group::pane::DetachType::Closed => true,
+            crate::pane_group::pane::DetachType::HiddenForClose => {
+                self.model.lock().should_shutdown_pty_on_reversible_close()
+            }
+            crate::pane_group::pane::DetachType::Moved => false,
+        };
+        if should_shutdown_pty {
+            self.remote_server_controller()
+                .update(app, |controller, _| {
+                    controller.cancel_pending_setup_for_terminal_close();
+                });
+            self.view.update(app, |terminal_view, ctx| {
+                terminal_view.prepare_for_pty_shutdown(ctx);
+            });
+            // 关闭窗口时 View 事件可能在订阅被移除后才刷新，因此必须直接通知 PTY controller。
+            self.shutdown_pty(app);
+        }
+
+        // 共享会话即使只是可撤销隐藏也必须立即停止，避免不可见终端继续接受远端输入。
         let is_sharer = self.model.lock().shared_session_status().is_sharer();
         if !is_sharer {
             return;

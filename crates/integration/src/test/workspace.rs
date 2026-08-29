@@ -1,11 +1,14 @@
 //! Integration tests for workspace-level behavior.
 
+use std::cell::RefCell;
 use std::fs;
+use std::rc::Rc;
 use std::time::Duration;
 
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{Vector2F, vec2f};
 use settings::Setting as _;
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use warp::cmd_or_ctrl_shift;
 use warp::features::FeatureFlag;
 use warp::integration_testing::clipboard::assert_clipboard_contains_string;
@@ -28,9 +31,13 @@ use warp::integration_testing::workspace::{
     assert_focused_tab_index, assert_tab_count, press_native_modal_button,
 };
 use warp::settings::PaneSettings;
+use warp::terminal::TerminalView;
+use warp::terminal::local_tty::TerminalManager as LocalTtyTerminalManager;
+use warp::terminal::model::ansi::{Handler as _, InitShellValue, PreexecValue, SSHValue};
 use warp::terminal::shell::ShellType;
 use warp::workspace::tab_settings::{TabSettings, VerticalTabsDisplayGranularity};
 use warp::workspace::{NEW_TAB_BUTTON_POSITION_ID, WorkspaceAction};
+use warp_core::SessionId;
 use warpui_core::event::{Event, ModifiersState};
 use warpui_core::integration::{AssertionCallback, AssertionOutcome, StepDataMap, TestStep};
 use warpui_core::windowing::WindowManager;
@@ -650,6 +657,113 @@ pub fn test_close_tab_with_long_running_process() -> Builder {
         )
         .with_step(press_native_modal_button(0))
         .with_step(TestStep::new("Wait for tab to close").add_assertion(assert_tab_count(1)))
+}
+
+pub fn test_close_bootstrapped_ssh_tab_terminates_pty_during_undo_close() -> Builder {
+    FeatureFlag::UndoClosedPanes.set_enabled(true);
+    let shell_pid = Rc::new(RefCell::new(None));
+    let shell_pid_for_capture = shell_pid.clone();
+
+    new_builder()
+        .with_step(
+            TestStep::new("Open a second tab")
+                .with_keystrokes(&[cmd_or_ctrl_shift("t")])
+                .add_assertion(assert_tab_count(2)),
+        )
+        .with_step(
+            TestStep::new("Wait for the second terminal process").add_named_assertion(
+                "second terminal process is running",
+                move |app, window_id| {
+                    let workspace = workspace_view(app, window_id);
+                    let pid = workspace.read(app, |workspace, _| {
+                        workspace
+                            .get_pane_group_view_unchecked(1)
+                            .read(app, |pane_group, ctx| {
+                                pane_group
+                                    .terminal_manager(0, ctx)
+                                    .expect("pane at index 0 is a terminal pane")
+                                    .as_ref(ctx)
+                                    .as_any()
+                                    .downcast_ref::<LocalTtyTerminalManager<TerminalView>>()
+                                    .expect("terminal pane at index 0 contains a local session")
+                                    .pid()
+                            })
+                    });
+                    if let Some(pid) = pid {
+                        *shell_pid_for_capture.borrow_mut() = Some(pid);
+                        AssertionOutcome::Success
+                    } else {
+                        AssertionOutcome::failure(
+                            "second terminal process is not running".to_owned(),
+                        )
+                    }
+                },
+            ),
+        )
+        .with_step(
+            TestStep::new("Mark the second terminal as a bootstrapped SSH session")
+                .with_action(move |app, window_id, _| {
+                    let terminal = terminal_view(app, window_id, 1, 0);
+                    terminal.update(app, |terminal, _| {
+                        let mut model = terminal.model.lock();
+                        model.block_list_mut().active_block_mut().start();
+                        model.preexec(PreexecValue {
+                            command: "ssh root@example.com".to_owned(),
+                            session_id: None,
+                        });
+                        let remote_session_id = SessionId::from(42);
+                        model.ssh(SSHValue {
+                            remote_shell: "zsh".to_owned(),
+                            remote_session_id: Some(remote_session_id.as_u64()),
+                            ..Default::default()
+                        });
+                        model.init_shell(InitShellValue {
+                            session_id: remote_session_id,
+                            shell: "zsh".to_owned(),
+                            user: "root".to_owned(),
+                            hostname: "example.com".to_owned(),
+                            ..Default::default()
+                        });
+                    });
+                })
+                .add_named_assertion("SSH bootstrap completed", |app, window_id| {
+                    let terminal = terminal_view(app, window_id, 1, 0);
+                    terminal.read(app, |terminal, _| {
+                        let model = terminal.model.lock();
+                        async_assert!(
+                            !model
+                                .block_list()
+                                .active_block()
+                                .is_active_and_long_running(),
+                            "the active block should no longer be marked long-running after SSH bootstrap"
+                        )
+                    })
+                }),
+        )
+        .with_step(
+            TestStep::new("Close the SSH tab into the undo-close stack")
+                .with_keystrokes(&[cmd_or_ctrl_shift("w")])
+                .add_assertion(assert_tab_count(1)),
+        )
+        .with_step(
+            TestStep::new("Verify the hidden SSH terminal process exits").add_named_assertion(
+                "hidden SSH terminal process exited",
+                move |_, _| {
+                    let pid = shell_pid
+                        .borrow()
+                        .expect("shell PID should have been recorded");
+                    let mut system = System::new();
+                    system.refresh_processes(
+                        ProcessesToUpdate::Some(&[Pid::from_u32(pid)]),
+                        false,
+                    );
+                    async_assert!(
+                        system.process(Pid::from_u32(pid)).is_none(),
+                        "the hidden SSH terminal process {pid} should have exited"
+                    )
+                },
+            ),
+        )
 }
 
 pub fn test_reorder_tabs_with_drag() -> Builder {

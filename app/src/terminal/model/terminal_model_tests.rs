@@ -517,6 +517,42 @@ fn tracks_ssh_command_block_until_remote_shell_exits() {
 }
 
 #[test]
+fn requires_pty_shutdown_while_bootstrapped_ssh_session_is_active() {
+    let mut terminal = TerminalModel::mock(None, None);
+    assert!(!terminal.should_shutdown_pty_on_reversible_close());
+
+    terminal.simulate_long_running_block("ssh root@example.com", "");
+    let remote_session_id = SessionId::from(42);
+
+    terminal.ssh(SSHValue {
+        remote_shell: "zsh".to_owned(),
+        remote_session_id: Some(remote_session_id.as_u64()),
+        ..Default::default()
+    });
+    terminal.init_shell(InitShellValue {
+        session_id: remote_session_id,
+        shell: "zsh".to_owned(),
+        user: "root".to_owned(),
+        hostname: "example.com".to_owned(),
+        ..Default::default()
+    });
+
+    assert!(
+        !terminal
+            .block_list()
+            .active_block()
+            .is_active_and_long_running()
+    );
+    assert!(terminal.should_shutdown_pty_on_reversible_close());
+
+    terminal.exit_shell(ExitShellValue {
+        session_id: remote_session_id,
+    });
+
+    assert!(!terminal.should_shutdown_pty_on_reversible_close());
+}
+
+#[test]
 // An empty block that is restored should have a nonzero height and it should not get deleted.
 pub fn test_restored_empty_command_block() {
     let restored_blocks = [create_default_serialized_block().into()];

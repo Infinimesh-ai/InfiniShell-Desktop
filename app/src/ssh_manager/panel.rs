@@ -40,7 +40,7 @@ use crate::editor::{
 };
 use crate::settings::SshSettings;
 use crate::ssh_manager::candidates::{CandidateRow, CandidatesViewModel};
-use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
+use crate::ssh_manager::{SshConnectionTarget, SshTreeChangedEvent, SshTreeChangedNotifier};
 
 // ---- 视觉常量(参考 Drive) ----
 const TOOLBAR_BUTTON_SIZE: f32 = 26.0;
@@ -56,7 +56,7 @@ const PANEL_HORIZONTAL_PADDING: f32 = 8.0;
 const CONTEXT_MENU_WIDTH: f32 = 200.0;
 const CONTEXT_MENU_ITEM_PADDING_V: f32 = 7.0;
 const CONTEXT_MENU_ITEM_PADDING_H: f32 = 12.0;
-const MAX_CONTEXT_MENU_ITEMS: usize = 5;
+const MAX_CONTEXT_MENU_ITEMS: usize = 6;
 const SSH_PANEL_POSITION_ID: &str = "ssh_manager_panel_root";
 const ROUTE_CONTEXT_PREFIX: &str = "saved-route:";
 
@@ -69,6 +69,7 @@ pub enum SshManagerPanelAction {
     AddServer,
     DeleteSelected,
     Connect,
+    ConnectInSplitPane,
     Edit,
     CloneServer(String),
     /// 单击行,处理逻辑根据 node 种类:
@@ -121,6 +122,7 @@ pub enum SshManagerPanelEvent {
     OpenSshTerminal {
         node_id: String,
         server: SshServerInfo,
+        target: SshConnectionTarget,
     },
     /// 用户右键 "SFTP 浏览",请求开 SFTP 文件浏览器 pane。
     OpenSftpPane {
@@ -552,7 +554,14 @@ impl SshManagerPanel {
         let Some(id) = self.selected_id.clone() else {
             return;
         };
-        self.dispatch_connect_for(&id, ctx);
+        self.dispatch_connect_for(&id, SshConnectionTarget::NewTab, ctx);
+    }
+
+    fn on_connect_in_split_pane(&mut self, ctx: &mut ViewContext<Self>) {
+        let Some(id) = self.selected_id.clone() else {
+            return;
+        };
+        self.dispatch_connect_for(&id, SshConnectionTarget::SplitPane, ctx);
     }
 
     /// 右键 "SFTP 浏览":emit OpenSftpPane 事件。
@@ -575,7 +584,12 @@ impl SshManagerPanel {
         }
     }
 
-    fn dispatch_connect_for(&self, id: &str, ctx: &mut ViewContext<Self>) {
+    fn dispatch_connect_for(
+        &self,
+        id: &str,
+        target: SshConnectionTarget,
+        ctx: &mut ViewContext<Self>,
+    ) {
         let kind = self.nodes.iter().find(|n| n.id == id).map(|n| n.kind);
         if !matches!(kind, Some(NodeKind::Server)) {
             return;
@@ -587,6 +601,7 @@ impl SshManagerPanel {
             ctx.emit(SshManagerPanelEvent::OpenSshTerminal {
                 node_id: id.to_string(),
                 server,
+                target,
             });
         }
     }
@@ -635,7 +650,7 @@ impl SshManagerPanel {
     fn on_double_click(&mut self, id: String, ctx: &mut ViewContext<Self>) {
         let kind = self.nodes.iter().find(|n| n.id == id).map(|n| n.kind);
         if matches!(kind, Some(NodeKind::Server)) {
-            self.dispatch_connect_for(&id, ctx);
+            self.dispatch_connect_for(&id, SshConnectionTarget::NewTab, ctx);
         }
     }
 
@@ -1857,6 +1872,10 @@ impl SshManagerPanel {
                             SshManagerPanelAction::Connect,
                         ),
                         (
+                            crate::t!("workspace-left-panel-ssh-manager-menu-connect-split-pane"),
+                            SshManagerPanelAction::ConnectInSplitPane,
+                        ),
+                        (
                             crate::t!("workspace-left-panel-ssh-manager-menu-sftp"),
                             SshManagerPanelAction::OpenSftp,
                         ),
@@ -1952,6 +1971,7 @@ impl TypedActionView for SshManagerPanel {
             SshManagerPanelAction::AddServer => self.on_add_server(ctx),
             SshManagerPanelAction::DeleteSelected => self.on_delete_selected(ctx),
             SshManagerPanelAction::Connect => self.on_connect(ctx),
+            SshManagerPanelAction::ConnectInSplitPane => self.on_connect_in_split_pane(ctx),
             SshManagerPanelAction::Edit => self.on_edit(ctx),
             SshManagerPanelAction::CloneServer(id) => self.on_clone_server(id, ctx),
             SshManagerPanelAction::Click(id) => self.on_click(id.clone(), ctx),
