@@ -379,7 +379,7 @@ fn test_clear_selections() -> Result<()> {
                 let a11y_label = editor_model
                     .delta_for_a11y(ByteOffset::from(0)..ByteOffset::from(0), true, ctx)
                     .value;
-                assert_eq!(a11y_label, "Unselected");
+                assert_eq!(a11y_label, "unselected");
             });
             assert_eq!(
                 view.selected_ranges(ctx),

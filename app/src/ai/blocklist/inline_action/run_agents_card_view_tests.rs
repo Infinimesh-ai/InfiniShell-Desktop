@@ -405,7 +405,7 @@ mod format_terminal_state_tests {
     fn single_failed_uses_singular_failure_label() {
         let result = launched_result(vec![failed("a", "boom")]);
         let (label, kind) = format_terminal_state(&result);
-        assert_eq!(label, "Failed to spawn agent");
+        assert_eq!(label, "Failed to spawn 1 agent");
         assert!(matches!(kind, StatusKind::Failure));
     }
 
@@ -451,7 +451,7 @@ mod format_terminal_state_tests {
     #[test]
     fn cancelled_uses_cancelled_status() {
         let (label, kind) = format_terminal_state(&RunAgentsResult::Cancelled);
-        assert_eq!(label, "Spawn agents cancelled");
+        assert_eq!(label, "Spawning agents cancelled");
         assert!(matches!(kind, StatusKind::Cancelled));
     }
 }

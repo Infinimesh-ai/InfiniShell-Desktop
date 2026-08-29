@@ -21,7 +21,10 @@ fn can_auto_install_is_false_without_codex_plugin() {
 fn install_instructions_are_native_without_codex_plugin() {
     let _guard = FeatureFlag::CodexPlugin.override_enabled(false);
     let instructions = CodexPluginManager::new(None, None, None).install_instructions();
-    assert_eq!(instructions.title, "Enable Warp Notifications for Codex");
+    assert_eq!(
+        instructions.title,
+        "Enable InfiniShell Notifications for Codex"
+    );
     assert_eq!(
         instructions.steps[1].command,
         "[tui]\nnotification_condition = \"always\""

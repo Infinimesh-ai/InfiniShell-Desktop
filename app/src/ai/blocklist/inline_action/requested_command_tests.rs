@@ -75,7 +75,7 @@ fn newline_then_multibyte_results_in_ellipsis_only() {
 fn mcp_blocked_title_surfaces_tool_and_server_when_known() {
     assert_eq!(
         mcp_blocked_title_text("create_issue", Some("github")),
-        "OK if I call MCP tool create_issue on server github"
+        "OK if I call MCP tool create_issue on server github?"
     );
 }
 
@@ -83,7 +83,7 @@ fn mcp_blocked_title_surfaces_tool_and_server_when_known() {
 fn mcp_blocked_title_falls_back_to_tool_name_when_server_unknown() {
     assert_eq!(
         mcp_blocked_title_text("create_issue", None),
-        "OK if I call MCP tool create_issue"
+        "OK if I call MCP tool create_issue?"
     );
 }
 
@@ -115,6 +115,6 @@ fn mcp_viewing_detail_title_surfaces_tool_and_server_when_known() {
 fn mcp_viewing_detail_title_falls_back_to_generic_message_when_tool_name_empty() {
     assert_eq!(
         mcp_viewing_detail_title_text("", Some("github")),
-        "Viewing MCP tool call detail"
+        "Viewing MCP tool call details"
     );
 }
