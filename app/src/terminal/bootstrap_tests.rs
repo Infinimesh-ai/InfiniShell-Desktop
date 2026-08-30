@@ -117,6 +117,10 @@ fn posix_windows_ssh_hooks_preserve_recursive_transport_scope() {
             hook.contains(r#""$control_scope" "$next_hop_depth""#),
             "{shell} Windows SSH hook 应传入当前 scope 和下一跳深度"
         );
+        assert!(
+            script.contains(r#""$WARP_CLI_AGENT_PROTOCOL_VERSION" "$next_hop_depth""#),
+            "{shell} Windows bootstrap 应传入下一跳深度"
+        );
     }
 }
 
@@ -196,7 +200,7 @@ fn windows_remote_bootstrap_command_fits_cmd_exe_limit() {
         ShellType::Bash,
     );
     let script = format!(
-        "{helper}\nwarp_windows_powershell_bootstrap_command 42 7b7d v0.2026.08.17.20.25.oss_00 1"
+        "{helper}\nwarp_windows_powershell_bootstrap_command 42 7b7d v0.2026.08.17.20.25.oss_00 1 2"
     );
     let output = Command::new("bash")
         .arg("-c")
@@ -209,6 +213,21 @@ fn windows_remote_bootstrap_command_fits_cmd_exe_limit() {
         "Windows bootstrap command is {} bytes",
         output.stdout.len()
     );
+    let encoded = String::from_utf8(output.stdout)
+        .expect("Windows bootstrap 命令应为 UTF-8")
+        .split_whitespace()
+        .last()
+        .expect("Windows bootstrap 命令应包含 Base64 payload")
+        .to_string();
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .expect("Windows bootstrap payload 应为 Base64");
+    let utf16 = decoded
+        .chunks_exact(2)
+        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        .collect::<Vec<_>>();
+    let bootstrap = String::from_utf16(&utf16).expect("Windows bootstrap payload 应为 UTF-16LE");
+    assert!(bootstrap.contains("$env:WARP_SSH_HOP_DEPTH='2'"));
 }
 
 #[cfg(unix)]

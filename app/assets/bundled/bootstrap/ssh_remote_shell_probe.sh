@@ -66,15 +66,21 @@ function warp_windows_powershell_bootstrap_command() {
     local ssh_hook_hex="$2"
     local client_version="$3"
     local protocol_version="$4"
+    local hop_depth="$5"
     local init_shell_gzip_base64='@@WARP_WINDOWS_REMOTE_INIT_SHELL_GZIP_BASE64@@'
 
     case "$client_version" in *[![:alnum:]._+-]*) client_version="" ;; esac
     case "$protocol_version" in *[![:alnum:]._+-]*) protocol_version="" ;; esac
+    case "$hop_depth" in "" | *[!0-9]*) hop_depth="1" ;; esac
+    if [[ "$hop_depth" -gt 8 ]]; then
+        hop_depth="1"
+    fi
 
     local bootstrap_script="\$env:TERM_PROGRAM='WarpTerminal'
 \$env:WARP_IS_SSH='1'
 \$env:WARP_CLIENT_VERSION='$client_version'
 \$env:WARP_CLI_AGENT_PROTOCOL_VERSION='$protocol_version'
+\$env:WARP_SSH_HOP_DEPTH='$hop_depth'
 [Console]::Out.Write(([char]27)+']9278;d;$ssh_hook_hex'+[char]7)
 \$c=[Convert]::FromBase64String('$init_shell_gzip_base64')
 \$m=[IO.MemoryStream]::new(\$c)

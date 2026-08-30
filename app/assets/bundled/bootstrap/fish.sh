@@ -660,6 +660,7 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1"
         set -l ssh_hook_hex "$argv[2]"
         set -l client_version "$argv[3]"
         set -l protocol_version "$argv[4]"
+        set -l hop_depth "$argv[5]"
         set -l init_shell_gzip_base64 '@@WARP_WINDOWS_REMOTE_INIT_SHELL_GZIP_BASE64@@'
 
         if not string match --quiet --regex '^[A-Za-z0-9._+-]*$' -- "$client_version"
@@ -668,11 +669,15 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1"
         if not string match --quiet --regex '^[A-Za-z0-9._+-]*$' -- "$protocol_version"
             set protocol_version ''
         end
+        if not string match --quiet --regex '^[0-9]+$' -- "$hop_depth"; or test "$hop_depth" -gt 8
+            set hop_depth 1
+        end
 
         set -l bootstrap_script "\$env:TERM_PROGRAM='WarpTerminal'
 \$env:WARP_IS_SSH='1'
 \$env:WARP_CLIENT_VERSION='$client_version'
 \$env:WARP_CLI_AGENT_PROTOCOL_VERSION='$protocol_version'
+\$env:WARP_SSH_HOP_DEPTH='$hop_depth'
 [Console]::Out.Write(([char]27)+']9278;d;$ssh_hook_hex'+[char]7)
 \$c=[Convert]::FromBase64String('$init_shell_gzip_base64')
 \$m=[IO.MemoryStream]::new(\$c)
@@ -800,7 +805,7 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1"
                     set -l windows_ssh_hook (printf '{"hook": "SSH", "value": {"socket_path": "%s", "transport": {"version": 1, "type": "control_master", "socket_path": "%s", "ownership": "%s"}, "remote_shell": "pwsh", "session_id": %s, "remote_session_id": %s, "control_scope": "%s", "hop_depth": %s, "external_control_master": %s}}' "$control_path" "$control_path" "$control_master_ownership" "$WARP_SESSION_ID" "$remote_session_id" "$control_scope" "$next_hop_depth" "$external_control_master" | command od -An -v -tx1 | command tr -d ' \n')
                     set -l windows_bootstrap_command (warp_windows_powershell_bootstrap_command \
                         "$remote_session_id" "$windows_ssh_hook" "$WARP_CLIENT_VERSION" \
-                        "$WARP_CLI_AGENT_PROTOCOL_VERSION")
+                        "$WARP_CLI_AGENT_PROTOCOL_VERSION" "$next_hop_depth")
                     if test -n "$windows_bootstrap_command"
                         command ssh -o ControlMaster=no -o ControlPath="$control_path" \
                             -t $argv "$windows_bootstrap_command"
