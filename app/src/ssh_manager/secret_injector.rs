@@ -16,6 +16,7 @@
 //!
 //! - **bytes::Regex**:PTY 输出可能含未完整 UTF-8 字节,用 `regex::bytes` 安全。
 
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -67,35 +68,74 @@ pub fn spawn_password_injector<O>(
         });
     }
 
-    let owned_secret = secret.clone();
-    let future = async move {
-        match watch_for_prompt(rx).with_timeout(INJECT_TIMEOUT).await {
-            Ok(true) => Some(owned_secret),
-            Ok(false) | Err(_) => None, // EOF or timeout → no-op
-        }
-    };
+    let future = password_injection_future(rx, secret);
     ctx.spawn(future, move |_owner, secret_opt, ctx| {
         let Some(view) = terminal_view.upgrade(ctx) else {
             log::debug!("ssh secret injector: terminal view dropped before injection");
             return;
         };
-        let Some(secret) = secret_opt else {
-            log::debug!("ssh secret injector: no prompt seen within timeout");
-            view.update(ctx, |view, _| {
-                view.set_ssh_secret_auto_injection_in_flight(false);
-            });
-            return;
-        };
         view.update(ctx, |view, ctx| {
-            // 把密码 + Enter 作为字节写入 PTY,等同模拟键盘回应交互式 prompt。
-            // 此时 ssh 已经在跑(bootstrap 早完成),write_to_pty 直写是正解。
-            let mut bytes = secret.as_bytes().to_vec();
-            append_password_submit_byte(&mut bytes);
-            view.write_to_pty(bytes, ctx);
-            view.note_ssh_secret_auto_injected(ctx);
-            view.set_ssh_secret_auto_injection_in_flight(false);
+            finish_password_injection(view, secret_opt, ctx);
         });
     });
+}
+
+/// 从 `TerminalView` 自身的 update 回调启动注入器。
+///
+/// 这里必须直接修改当前 `view`,不能再通过它自己的 handle 调用 `update`,否则
+/// WarpUI 会把同一实体的嵌套更新判定为 `Circular view update`。
+pub fn spawn_password_injector_from_terminal_view(
+    pty_reads_rx: Option<InactiveReceiver<Arc<Vec<u8>>>>,
+    secret: Zeroizing<String>,
+    view: &mut TerminalView,
+    ctx: &mut ViewContext<TerminalView>,
+) {
+    let Some(rx) = pty_reads_rx else {
+        log::debug!("ssh secret injector: no pty_reads_rx (non-local session) — skip");
+        return;
+    };
+    if secret.is_empty() {
+        log::debug!("ssh secret injector: empty secret — skip");
+        return;
+    }
+
+    view.set_ssh_secret_auto_injection_in_flight(true);
+    let future = password_injection_future(rx, secret);
+    ctx.spawn(future, |view, secret_opt, ctx| {
+        finish_password_injection(view, secret_opt, ctx);
+    });
+}
+
+fn password_injection_future(
+    rx: InactiveReceiver<Arc<Vec<u8>>>,
+    secret: Zeroizing<String>,
+) -> impl Future<Output = Option<Zeroizing<String>>> + Send + 'static {
+    async move {
+        match watch_for_prompt(rx).with_timeout(INJECT_TIMEOUT).await {
+            Ok(true) => Some(secret),
+            Ok(false) | Err(_) => None, // EOF or timeout → no-op
+        }
+    }
+}
+
+fn finish_password_injection(
+    view: &mut TerminalView,
+    secret: Option<Zeroizing<String>>,
+    ctx: &mut ViewContext<TerminalView>,
+) {
+    let Some(secret) = secret else {
+        log::debug!("ssh secret injector: no prompt seen within timeout");
+        view.set_ssh_secret_auto_injection_in_flight(false);
+        return;
+    };
+
+    // 把密码 + Enter 作为字节写入 PTY,等同模拟键盘回应交互式 prompt。
+    // 此时 ssh 已经在跑(bootstrap 早完成),write_to_pty 直写是正解。
+    let mut bytes = secret.as_bytes().to_vec();
+    append_password_submit_byte(&mut bytes);
+    view.write_to_pty(bytes, ctx);
+    view.note_ssh_secret_auto_injected(ctx);
+    view.set_ssh_secret_auto_injection_in_flight(false);
 }
 
 /// 异步循环:消费 PTY 广播,滑窗追加,**正则一旦命中行尾 prompt 就返回 true**;

@@ -21990,10 +21990,10 @@ impl TerminalView {
             match result {
                 Ok(Some(secret)) => {
                     let pty_reads_rx = view.inactive_pty_reads_rx(ctx);
-                    crate::ssh_manager::secret_injector::spawn_password_injector(
+                    crate::ssh_manager::secret_injector::spawn_password_injector_from_terminal_view(
                         pty_reads_rx,
-                        view.view_handle.clone(),
                         secret,
+                        view,
                         ctx,
                     );
                 }
