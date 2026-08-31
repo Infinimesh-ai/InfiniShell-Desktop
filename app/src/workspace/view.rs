@@ -574,11 +574,15 @@ const SESSION_CONFIG_TAB_CONFIG_CHIP_WIDTH: f32 = 206.;
 const SHOW_SETTINGS_KEYBINDING_NAME: &str = "workspace:show_settings";
 pub const TOGGLE_COMMAND_PALETTE_KEYBINDING_NAME: &str = "workspace:toggle_command_palette";
 
-const USER_AVATAR_BUTTON_POSITION_ID: &str = "workspace:user_avatar_button";
+const USER_MENU_BUTTON_POSITION_ID: &str = "workspace:user_menu_button";
 const NOTIFICATIONS_MAILBOX_POSITION_ID: &str = "workspace:notifications_mailbox";
 pub(crate) const JUMP_TO_LATEST_TOAST_BINDING_NAME: &str = "workspace:jump_to_latest_toast";
 pub(crate) const TOGGLE_NOTIFICATION_MAILBOX_BINDING_NAME: &str =
     "workspace:toggle_notification_mailbox";
+
+fn should_render_local_app_menu(avatar_in_tab_bar_enabled: bool) -> bool {
+    !avatar_in_tab_bar_enabled && cfg!(all(not(target_os = "macos"), not(target_family = "wasm")))
+}
 
 // these won't have to be public after we deprecate the code mode v1 project explorer which is defined in terminal
 pub(crate) const TOGGLE_PROJECT_EXPLORER_BINDING_NAME: &str = "workspace:toggle_project_explorer";
@@ -10099,14 +10103,25 @@ impl Workspace {
             MenuItemFields::new(crate::t!("workspace-menu-keyboard-shortcuts"))
                 .with_on_select_action(WorkspaceAction::ToggleKeybindingsPage)
                 .into_item(),
-            MenuItem::Separator,
-            MenuItemFields::new(crate::t!("workspace-menu-documentation"))
-                .with_on_select_action(WorkspaceAction::ViewUserDocs)
+            MenuItemFields::new(crate::t!("app-menu-help"))
+                .with_on_select_action(WorkspaceAction::ToggleResourceCenter)
                 .into_item(),
+            MenuItem::Separator,
+        ]);
+
+        if !links::USER_DOCS_URL.is_empty() {
+            items.push(
+                MenuItemFields::new(crate::t!("workspace-menu-documentation"))
+                    .with_on_select_action(WorkspaceAction::ViewUserDocs)
+                    .into_item(),
+            );
+        }
+
+        items.push(
             MenuItemFields::new(crate::t!("workspace-menu-feedback"))
                 .with_on_select_action(WorkspaceAction::SendFeedback)
                 .into_item(),
-        ]);
+        );
 
         #[cfg(not(target_family = "wasm"))]
         items.push(
@@ -10115,12 +10130,15 @@ impl Workspace {
                 .into_item(),
         );
 
-        items.extend([
-            MenuItemFields::new(crate::t!("workspace-menu-slack"))
-                .with_on_select_action(WorkspaceAction::JoinSlack)
-                .into_item(),
-            MenuItem::Separator,
-        ]);
+        if !links::SLACK_URL.is_empty() {
+            items.push(
+                MenuItemFields::new(crate::t!("workspace-menu-slack"))
+                    .with_on_select_action(WorkspaceAction::JoinSlack)
+                    .into_item(),
+            );
+        }
+
+        items.push(MenuItem::Separator);
 
         // 去中心化分支:此处原本会追加账号 CTA / Upgrade / Billing / Invite / Log out
         // 等账号相关项,本地模式下全部移除。
@@ -20323,14 +20341,21 @@ impl Workspace {
             );
         }
 
-        if FeatureFlag::AvatarInTabBar.is_enabled() {
+        let avatar_in_tab_bar_enabled = FeatureFlag::AvatarInTabBar.is_enabled();
+        if avatar_in_tab_bar_enabled {
             target.add_child(
                 Container::new(self.render_avatar_button(appearance, ctx))
                     .with_margin_left(TAB_BAR_PADDING_LEFT)
                     .finish(),
             );
+        } else if should_render_local_app_menu(avatar_in_tab_bar_enabled) {
+            target.add_child(
+                Container::new(self.render_local_app_menu_button(appearance))
+                    .with_margin_left(TAB_BAR_PADDING_LEFT)
+                    .finish(),
+            );
         } else {
-            // 去中心化分支:不再渲染 Zap Essentials(灯泡)按钮,只保留设置齿轮。
+            // macOS 继续通过系统菜单栏承载应用菜单,这里只保留设置齿轮。
             target.add_child(
                 Container::new(self.render_settings_button(appearance))
                     .with_margin_left(TAB_BAR_PADDING_LEFT)
@@ -20646,7 +20671,7 @@ impl Workspace {
             );
         }
 
-        let button = Hoverable::new(self.mouse_states.avatar_icon.clone(), |state| {
+        let button = Hoverable::new(self.mouse_states.user_menu_icon.clone(), |state| {
             let mut stack = Stack::new();
             let mut container = Container::new(avatar.build().finish())
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
@@ -20687,7 +20712,28 @@ impl Workspace {
         .with_cursor(Cursor::PointingHand)
         .finish();
 
-        SavePosition::new(Align::new(button).finish(), USER_AVATAR_BUTTON_POSITION_ID).finish()
+        SavePosition::new(Align::new(button).finish(), USER_MENU_BUTTON_POSITION_ID).finish()
+    }
+
+    fn render_local_app_menu_button(&self, appearance: &Appearance) -> Box<dyn Element> {
+        SavePosition::new(
+            Align::new(
+                self.render_tab_bar_icon_button(
+                    appearance,
+                    icons::Icon::DotsVertical,
+                    &self.mouse_states.user_menu_icon,
+                    WorkspaceAction::ToggleUserMenu,
+                    crate::t!("workspace-application-menu-tooltip"),
+                    None,
+                    self.is_user_menu_open,
+                    false,
+                )
+                .finish(),
+            )
+            .finish(),
+            USER_MENU_BUTTON_POSITION_ID,
+        )
+        .finish()
     }
 
     fn render_settings_button(&self, appearance: &Appearance) -> Box<dyn Element> {
@@ -25986,11 +26032,14 @@ impl View for Workspace {
             );
         }
 
-        if FeatureFlag::AvatarInTabBar.is_enabled() && self.is_user_menu_open {
+        let avatar_in_tab_bar_enabled = FeatureFlag::AvatarInTabBar.is_enabled();
+        if (avatar_in_tab_bar_enabled || should_render_local_app_menu(avatar_in_tab_bar_enabled))
+            && self.is_user_menu_open
+        {
             stack.add_positioned_overlay_child(
                 ChildView::new(&self.user_menu).finish(),
                 OffsetPositioning::offset_from_save_position_element(
-                    USER_AVATAR_BUTTON_POSITION_ID,
+                    USER_MENU_BUTTON_POSITION_ID,
                     Vector2F::zero(),
                     PositionedElementOffsetBounds::WindowByPosition,
                     PositionedElementAnchor::BottomRight,

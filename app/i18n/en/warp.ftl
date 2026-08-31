@@ -148,6 +148,7 @@ workspace-menu-update-warp-manually = Update InfiniShell manually
 workspace-menu-whats-new = What's new
 workspace-menu-settings = Settings
 workspace-menu-keyboard-shortcuts = Keyboard shortcuts
+workspace-application-menu-tooltip = Application menu
 workspace-menu-documentation = Documentation
 workspace-menu-feedback = Feedback
 workspace-menu-view-warp-logs = View InfiniShell logs

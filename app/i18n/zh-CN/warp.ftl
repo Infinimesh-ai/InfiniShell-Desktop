@@ -143,6 +143,7 @@ workspace-menu-update-warp-manually = 手动更新 InfiniShell
 workspace-menu-whats-new = 最新变化
 workspace-menu-settings = 设置
 workspace-menu-keyboard-shortcuts = 快捷键
+workspace-application-menu-tooltip = 应用菜单
 workspace-menu-documentation = 文档
 workspace-menu-feedback = 反馈
 workspace-menu-view-warp-logs = 查看 InfiniShell 日志
