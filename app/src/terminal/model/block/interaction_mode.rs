@@ -423,6 +423,7 @@ impl InteractionMode {
         reason: UserTakeOverReason,
     ) -> Result<(), UpdateInteractionModeError> {
         let Self::Agent(AgentInteractionMetadata {
+            requested_command_action_id,
             long_running_control_state,
             ..
         }) = self
@@ -430,10 +431,12 @@ impl InteractionMode {
             return Err(UpdateInteractionModeError::InvalidTakeOver);
         };
 
-        if !long_running_control_state
-            .as_ref()
-            .is_some_and(|state| state.is_agent_in_control())
-        {
+        let can_take_over = match long_running_control_state.as_ref() {
+            Some(LongRunningCommandControlState::Agent { .. }) => true,
+            Some(LongRunningCommandControlState::User { .. }) => false,
+            None => requested_command_action_id.is_some(),
+        };
+        if !can_take_over {
             return Err(UpdateInteractionModeError::InvalidTakeOver);
         }
 

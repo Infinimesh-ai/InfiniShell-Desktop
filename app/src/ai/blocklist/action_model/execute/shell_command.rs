@@ -17,6 +17,7 @@ use warpui::r#async::{Spawnable, Timer};
 use warpui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
+use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{
     AIAgentActionId, AIAgentActionResultType, AIAgentActionType, AIAgentPtyWriteMode,
     ReadShellCommandOutputResult, RequestCommandOutputResult, ShellCommandDelay, ShellCommandError,
@@ -226,7 +227,7 @@ impl ShellCommandExecutor {
                 }
             }
             AIAgentActionType::ReadShellCommandOutput { .. } => true,
-            AIAgentActionType::TransferShellCommandControlToUser { .. } => false,
+            AIAgentActionType::TransferShellCommandControlToUser { .. } => true,
             _ => false,
         }
     }
@@ -441,7 +442,8 @@ impl ShellCommandExecutor {
                 )
             }
             AIAgentActionType::TransferShellCommandControlToUser { reason } => {
-                let Some(transfer_target) = transfer_control_target(&model) else {
+                let Some(transfer_target) = transfer_control_target(&model, input.conversation_id)
+                else {
                     return ActionExecution::Sync(
                         AIAgentActionResultType::TransferShellCommandControlToUser(
                             TransferShellCommandControlToUserResult::Error(
@@ -983,9 +985,15 @@ struct TransferControlTarget {
     is_ssh_session: bool,
 }
 
-fn transfer_control_target(model: &TerminalModel) -> Option<TransferControlTarget> {
+fn transfer_control_target(
+    model: &TerminalModel,
+    conversation_id: AIConversationId,
+) -> Option<TransferControlTarget> {
     let active_block = model.block_list().active_block();
-    if active_block.is_active_and_long_running() {
+    if active_block.is_active_and_long_running()
+        && active_block.ai_conversation_id() == Some(conversation_id)
+        && active_block.is_agent_driving_command()
+    {
         return Some(TransferControlTarget {
             block_id: active_block.id().clone(),
             is_ssh_session: false,
@@ -997,13 +1005,12 @@ fn transfer_control_target(model: &TerminalModel) -> Option<TransferControlTarge
             .block_list()
             .block_with_id(block_id)
             .and_then(|block| {
-                block
-                    .agent_interaction_metadata()
-                    .is_some_and(|metadata| metadata.is_agent_in_control())
-                    .then(|| TransferControlTarget {
-                        block_id: block_id.clone(),
-                        is_ssh_session: true,
-                    })
+                (block.ai_conversation_id() == Some(conversation_id)
+                    && block.is_agent_driving_command())
+                .then(|| TransferControlTarget {
+                    block_id: block_id.clone(),
+                    is_ssh_session: true,
+                })
             })
     })
 }

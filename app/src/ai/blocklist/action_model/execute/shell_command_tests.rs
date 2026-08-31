@@ -2,29 +2,25 @@ use std::time::Duration;
 
 use super::*;
 use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::blocklist::block::cli_controller::LongRunningCommandControlState;
+use crate::ai::blocklist::block::cli_controller::{
+    LongRunningCommandControlState, UserTakeOverReason,
+};
 use crate::terminal::model::ansi::{ExitShellValue, Handler, InitShellValue, SSHValue};
-use crate::terminal::model::block::AgentInteractionMetadata;
 use crate::terminal::model::session::SessionId;
 
 #[test]
 fn treats_bootstrapped_ssh_command_as_running_until_remote_shell_exits() {
     let mut model = TerminalModel::mock(None, None);
     model.simulate_long_running_block("ssh root@example.com", "");
+    let conversation_id = AIConversationId::new();
     model
         .block_list_mut()
         .active_block_mut()
-        .set_agent_interaction_mode(AgentInteractionMetadata::new(
+        .set_agent_interaction_mode_for_requested_command(
+            AIAgentActionId::from("ssh-action".to_owned()),
             None,
-            AIConversationId::new(),
-            None,
-            Some(LongRunningCommandControlState::Agent {
-                is_blocked: false,
-                should_hide_responses: false,
-            }),
-            false,
-            false,
-        ));
+            conversation_id,
+        );
     let ssh_command_block_id = model.active_block_id().clone();
     let remote_session_id = SessionId::from(42);
 
@@ -42,7 +38,11 @@ fn treats_bootstrapped_ssh_command_as_running_until_remote_shell_exits() {
     });
 
     assert_eq!(
-        transfer_control_target(&model),
+        transfer_control_target(&model, AIConversationId::new()),
+        None
+    );
+    assert_eq!(
+        transfer_control_target(&model, conversation_id),
         Some(TransferControlTarget {
             block_id: ssh_command_block_id.clone(),
             is_ssh_session: true,
@@ -55,6 +55,24 @@ fn treats_bootstrapped_ssh_command_as_running_until_remote_shell_exits() {
     assert!(matches!(
         action_result_for_block(&model, ssh_command_block, false),
         ActionResult::LongRunningCommandSnapshot { .. }
+    ));
+
+    model
+        .block_list_mut()
+        .mut_block_from_id(&ssh_command_block_id)
+        .expect("SSH command block should remain in the block list")
+        .take_over_control_for_user(UserTakeOverReason::TransferFromAgent {
+            reason: "Use the remote shell".to_owned(),
+        })
+        .expect("agent-requested SSH command should transfer to user control");
+    assert!(matches!(
+        model
+            .block_list()
+            .block_with_id(&ssh_command_block_id)
+            .and_then(|block| block.long_running_control_state()),
+        Some(LongRunningCommandControlState::User {
+            reason: UserTakeOverReason::TransferFromAgent { .. }
+        })
     ));
 
     model.exit_shell(ExitShellValue {
