@@ -6,8 +6,8 @@
 
 | 项目 | 状态 |
 |---|---|
-| 英文资源 | 5,495 个 Fluent 消息（GUI 4,826 + TUI 669） |
-| 简体中文资源 | 5,495 个 Fluent 消息（GUI 4,826 + TUI 669） |
+| 英文资源 | 5,706 个 Fluent 消息（GUI 5,037 + TUI 669） |
+| 简体中文资源 | 5,706 个 Fluent 消息（GUI 5,037 + TUI 669） |
 | 消息键对应关系 | 一一对应 |
 | 插值变量对应关系 | 一一对应 |
 | 重复消息键 | 无 |
@@ -97,7 +97,7 @@ cargo check -p warp
 ## 验证记录
 
 - `cargo fmt --all`
-- `cargo test -p warp --lib i18n::tests`：7/7 通过
+- `cargo test -p warp --lib i18n::tests`：11/11 通过
 - `cargo nextest run -p warp_tui --no-fail-fast`：935/935 通过
 - `cargo nextest run -p warpui_core --no-fail-fast`：306/306 通过
 - 英文 TUI 通过 `./script/run-tui` 完成真实 PTY 启动；简体中文首屏渲染测试通过

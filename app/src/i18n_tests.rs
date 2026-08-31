@@ -214,6 +214,144 @@ fn literal_translation_keys(source: &str) -> Vec<(usize, String)> {
     keys
 }
 
+fn call_arguments<'a>(source: &'a str, callee: &str) -> Vec<(usize, Vec<&'a str>)> {
+    let bytes = source.as_bytes();
+    let mut calls = Vec::new();
+    let mut search_start = 0;
+
+    while let Some(relative_start) = source[search_start..].find(callee) {
+        let call_start = search_start + relative_start;
+        let after_callee = call_start + callee.len();
+        if bytes
+            .get(after_callee)
+            .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
+        {
+            search_start = after_callee;
+            continue;
+        }
+
+        let line_start = source[..call_start]
+            .rfind('\n')
+            .map_or(0, |newline| newline + 1);
+        if source[line_start..call_start].contains("//") {
+            search_start = after_callee;
+            continue;
+        }
+
+        let Some(relative_open) = source[after_callee..].find('(') else {
+            break;
+        };
+        let open = after_callee + relative_open;
+        if source[after_callee..open]
+            .bytes()
+            .any(|byte| matches!(byte, b',' | b';'))
+        {
+            search_start = after_callee;
+            continue;
+        }
+        let mut arguments = Vec::new();
+        let mut argument_start = open + 1;
+        let mut nesting = 0usize;
+        let mut index = open + 1;
+        let mut string_delimiter = None;
+        let mut escaped = false;
+        let mut line_comment = false;
+        let mut block_comment = false;
+
+        while index < bytes.len() {
+            let byte = bytes[index];
+            let next = bytes.get(index + 1).copied();
+
+            if line_comment {
+                if byte == b'\n' {
+                    line_comment = false;
+                }
+                index += 1;
+                continue;
+            }
+            if block_comment {
+                if byte == b'*' && next == Some(b'/') {
+                    block_comment = false;
+                    index += 2;
+                } else {
+                    index += 1;
+                }
+                continue;
+            }
+            if let Some(delimiter) = string_delimiter {
+                if escaped {
+                    escaped = false;
+                } else if byte == b'\\' {
+                    escaped = true;
+                } else if byte == delimiter {
+                    string_delimiter = None;
+                }
+                index += 1;
+                continue;
+            }
+
+            if byte == b'/' && next == Some(b'/') {
+                line_comment = true;
+                index += 2;
+                continue;
+            }
+            if byte == b'/' && next == Some(b'*') {
+                block_comment = true;
+                index += 2;
+                continue;
+            }
+            if byte == b'"' {
+                string_delimiter = Some(byte);
+                index += 1;
+                continue;
+            }
+
+            match byte {
+                b'(' | b'[' | b'{' => nesting += 1,
+                b')' if nesting == 0 => {
+                    arguments.push(source[argument_start..index].trim());
+                    index += 1;
+                    break;
+                }
+                b')' | b']' | b'}' => nesting = nesting.saturating_sub(1),
+                b',' if nesting == 0 => {
+                    arguments.push(source[argument_start..index].trim());
+                    argument_start = index + 1;
+                }
+                _ => {}
+            }
+            index += 1;
+        }
+
+        let line = source[..call_start]
+            .bytes()
+            .filter(|byte| *byte == b'\n')
+            .count()
+            + 1;
+        calls.push((line, arguments));
+        search_start = index.max(after_callee);
+    }
+
+    calls
+}
+
+fn argument_starts_with_nonempty_string(argument: &str) -> bool {
+    let mut value = argument.trim_start();
+    if let Some(rest) = value.strip_prefix('&') {
+        value = rest.trim_start();
+    }
+    if let Some(rest) = value.strip_prefix("Some(") {
+        value = rest.trim_start();
+        if let Some(rest) = value.strip_prefix('&') {
+            value = rest.trim_start();
+        }
+    }
+
+    value
+        .strip_prefix('"')
+        .is_some_and(|rest| !rest.starts_with('"'))
+}
+
 #[test]
 fn init_is_idempotent() {
     init(Some("en"));
@@ -293,6 +431,68 @@ let unrelated = format!("not-a-translation-key");
     assert_eq!(
         literal_translation_keys(source),
         vec![(3, "first-key".to_string()), (4, "second-key".to_string())]
+    );
+}
+
+#[test]
+fn settings_ui_helpers_do_not_receive_hardcoded_visible_text() {
+    let app_directory = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut paths = rust_source_files(&app_directory.join("src/settings_view"));
+    paths.push(app_directory.join("src/chip_configurator/modal_shell.rs"));
+    let checked_arguments: [(&str, &[usize]); 10] = [
+        ("render_body_item", &[0, 6]),
+        ("render_body_item_label", &[0]),
+        ("render_dropdown_item", &[1, 2]),
+        ("render_dropdown_item_label", &[0, 1]),
+        ("render_ai_setting_toggle", &[0]),
+        ("render_ai_setting_description", &[0]),
+        ("build_toggle_element", &[3]),
+        ("build_sub_header", &[1]),
+        ("Category::new", &[0]),
+        ("ToggleSettingActionPair::new", &[0]),
+    ];
+    let mut hardcoded = Vec::new();
+
+    for path in paths {
+        let source = fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("无法读取 Rust 源码 {}：{error}", path.display()));
+        for (callee, argument_indices) in checked_arguments {
+            for (line, arguments) in call_arguments(&source, callee) {
+                for argument_index in argument_indices {
+                    if arguments
+                        .get(*argument_index)
+                        .is_some_and(|argument| argument_starts_with_nonempty_string(argument))
+                    {
+                        hardcoded.push(format!(
+                            "{}:{line}: {callee} 的第 {} 个参数",
+                            path.strip_prefix(app_directory).unwrap_or(&path).display(),
+                            argument_index + 1
+                        ));
+                    }
+                }
+            }
+        }
+
+        for (line, arguments) in call_arguments(&source, "SettingActionPairDescriptions::new") {
+            for argument_index in [0, 1] {
+                if arguments
+                    .get(argument_index)
+                    .is_some_and(|argument| argument_starts_with_nonempty_string(argument))
+                {
+                    hardcoded.push(format!(
+                        "{}:{line}: SettingActionPairDescriptions::new 的第 {} 个参数",
+                        path.strip_prefix(app_directory).unwrap_or(&path).display(),
+                        argument_index + 1
+                    ));
+                }
+            }
+        }
+    }
+
+    assert!(
+        hardcoded.is_empty(),
+        "设置 UI 构造函数仍直接使用用户可见字符串，请改用 Fluent 消息键：\n{}",
+        hardcoded.join("\n")
     );
 }
 

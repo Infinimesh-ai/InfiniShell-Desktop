@@ -1250,7 +1250,7 @@ impl SettingsView {
         // 设置入口。
         let mut nav_items = vec![
             SettingsNavItem::Umbrella(SettingsUmbrella::new(
-                "Agents",
+                crate::t!("settings-section-agents"),
                 SettingsSection::ai_subpages().to_vec(),
             )),
             SettingsNavItem::Page(SettingsSection::Code),

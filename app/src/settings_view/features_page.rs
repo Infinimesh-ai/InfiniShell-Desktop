@@ -355,7 +355,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             flags::AUTOSUGGESTION_KEYBINDING_HINT_FLAG,
         ),
         ToggleSettingActionPair::new(
-            "autosuggestion ignore button",
+            &crate::t!("toggle-suffix-autosuggestion-ignore"),
             builder(SettingsAction::FeaturesPageToggle(
                 FeaturesPageAction::ToggleShowAutosuggestionIgnoreButton,
             )),
@@ -368,7 +368,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     // Zap:legacy SSH wrapper 开关跟随上游下线 —— `enable_ssh_warpification` 已是唯一
     // 开关(见 terminal_manager),tmux warpify 的开关在 Warpify 设置页。
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
-        "reuse existing SSH ControlMaster in the InfiniShell SSH wrapper",
+        &crate::t!("toggle-suffix-ssh-control-master"),
         builder(SettingsAction::FeaturesPageToggle(
             FeaturesPageAction::ToggleSshReuseControlMaster,
         )),
@@ -395,7 +395,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ));
     toggle_binding_pairs.push(
         ToggleSettingActionPair::new(
-            "long-running command notifications",
+            &crate::t!("toggle-suffix-long-running-notifications"),
             builder(SettingsAction::FeaturesPageToggle(
                 FeaturesPageAction::ToggleLongRunningNotifications,
             )),
@@ -410,7 +410,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     );
     toggle_binding_pairs.push(
         ToggleSettingActionPair::new(
-            "agent task completion notifications",
+            &crate::t!("toggle-suffix-agent-task-notifications"),
             builder(SettingsAction::FeaturesPageToggle(
                 FeaturesPageAction::ToggleAgentTaskCompletedNotifications,
             )),
@@ -425,7 +425,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     );
     toggle_binding_pairs.push(
         ToggleSettingActionPair::new(
-            "needs-attention notifications",
+            &crate::t!("toggle-suffix-needs-attention-notifications"),
             builder(SettingsAction::FeaturesPageToggle(
                 FeaturesPageAction::ToggleNeedsAttentionNotifications,
             )),
@@ -441,7 +441,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     #[cfg(target_os = "macos")]
     toggle_binding_pairs.push(
         ToggleSettingActionPair::new(
-            "notification sounds",
+            &crate::t!("toggle-suffix-notification-sounds"),
             builder(SettingsAction::FeaturesPageToggle(
                 FeaturesPageAction::ToggleNotificationSound,
             )),
@@ -456,7 +456,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     );
     toggle_binding_pairs.push(
         ToggleSettingActionPair::new(
-            "in-app agent notifications",
+            &crate::t!("toggle-suffix-in-app-agent-notifications"),
             builder(SettingsAction::FeaturesPageToggle(
                 FeaturesPageAction::ToggleAgentInAppNotifications,
             )),
@@ -483,7 +483,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     );
     toggle_binding_pairs.push(
         ToggleSettingActionPair::new(
-            "mouse reporting",
+            &crate::t!("toggle-suffix-mouse-reporting"),
             builder(SettingsAction::FeaturesPageToggle(
                 FeaturesPageAction::ToggleMouseReporting,
             )),
@@ -636,7 +636,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     if FeatureFlag::AgentView.is_enabled() && AISettings::as_ref(app).is_any_ai_enabled(app) {
         toggle_binding_pairs.push(
             ToggleSettingActionPair::new(
-                "help block in new sessions",
+                &crate::t!("toggle-suffix-help-block"),
                 builder(SettingsAction::FeaturesPageToggle(
                     FeaturesPageAction::ToggleShowTerminalZeroStateBlock,
                 )),
@@ -664,7 +664,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     );
     toggle_binding_pairs.push(
         ToggleSettingActionPair::new(
-            "'@' context menu in terminal mode",
+            &crate::t!("toggle-suffix-at-context-menu"),
             builder(SettingsAction::FeaturesPageToggle(
                 FeaturesPageAction::ToggleAtContextMenuInTerminalMode,
             )),
@@ -679,7 +679,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     );
 
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
-        "preserve input focus on block selection",
+        &crate::t!("toggle-suffix-preserve-input-focus"),
         builder(SettingsAction::FeaturesPageToggle(
             FeaturesPageAction::TogglePreserveInputFocusOnBlockSelection,
         )),
@@ -708,7 +708,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     // 这里也不再注册对应的命令面板开关。
     toggle_binding_pairs.push(
         ToggleSettingActionPair::new(
-            "global workflows in Command Search",
+            &crate::t!("toggle-suffix-global-workflows-command-search"),
             builder(SettingsAction::FeaturesPageToggle(
                 FeaturesPageAction::ToggleGlobalWorkflowsInUniversalSearch,
             )),
@@ -4554,6 +4554,16 @@ fn init_global_hotkey_dropdown(
     dropdown.set_selected_by_name(hotkey_mode.as_dropdown_label(), ctx);
 }
 
+fn display_idx_dropdown_label(display: DisplayIdx) -> String {
+    match display {
+        DisplayIdx::Primary => crate::t!("settings-features-main-screen"),
+        DisplayIdx::External(index) => crate::t!(
+            "settings-features-numbered-screen",
+            number = ((index + 2) as i64)
+        ),
+    }
+}
+
 fn init_display_count_dropdown(
     quake_mode_settings: &QuakeModeSettings,
     display_count: usize,
@@ -4567,14 +4577,14 @@ fn init_display_count_dropdown(
     );
     let mut items = vec![no_preference];
     items.push(DropdownItem::new(
-        format!("{}", DisplayIdx::Primary),
+        display_idx_dropdown_label(DisplayIdx::Primary),
         //move ||
         FeaturesPageAction::QuakeEditorSetPinScreen(Some(DisplayIdx::Primary)),
     ));
 
     (1..display_count).for_each(|idx| {
         items.push(DropdownItem::new(
-            format!("{}", DisplayIdx::External(idx - 1)),
+            display_idx_dropdown_label(DisplayIdx::External(idx - 1)),
             //move || {
             FeaturesPageAction::QuakeEditorSetPinScreen(Some(DisplayIdx::External(idx - 1))), //},
         ));
@@ -4583,7 +4593,7 @@ fn init_display_count_dropdown(
     dropdown.set_items(items, ctx);
     match quake_mode_settings.pin_screen {
         Some(idx) if idx.is_valid_given_display_count(display_count) => {
-            dropdown.set_selected_by_name(format!("{idx}"), ctx)
+            dropdown.set_selected_by_name(display_idx_dropdown_label(idx), ctx)
         }
         _ => dropdown.set_selected_by_name(crate::t!("settings-features-active-screen"), ctx),
     };
@@ -5870,7 +5880,7 @@ impl SettingsWidget for CodeEditorLineNumberModeWidget {
             || {
                 render_dropdown_item(
                     appearance,
-                    "Code editor line numbers:",
+                    &crate::t!("settings-features-code-editor-line-numbers"),
                     None,
                     None,
                     LocalOnlyIconState::for_setting(
@@ -6459,7 +6469,7 @@ impl SettingsWidget for PreserveInputFocusOnBlockSelectionWidget {
     ) -> Box<dyn Element> {
         let ui_builder = appearance.ui_builder();
         render_body_item::<FeaturesPageAction>(
-            "Preserve input focus on block selection".into(),
+            crate::t!("settings-features-preserve-input-focus"),
             None,
             LocalOnlyIconState::for_setting(
                 PreserveInputFocusOnBlockSelection::storage_key(),
@@ -7228,10 +7238,10 @@ impl SettingsWidget for Osc52ClipboardAccessWidget {
     ) -> Box<dyn Element> {
         render_dropdown_item(
             appearance,
-            "Clipboard access (OSC 52)",
-            Some(
-                "Controls whether programs running in the terminal can read or write your system clipboard.",
-            ),
+            &crate::t!("settings-features-osc52-clipboard-access"),
+            Some(&crate::t!(
+                "settings-features-osc52-clipboard-access-description"
+            )),
             None,
             LocalOnlyIconState::for_setting(
                 Osc52ClipboardAccessSetting::storage_key(),
@@ -7696,7 +7706,7 @@ impl SettingsWidget for AsyncFindWidget {
         let ui_builder = appearance.ui_builder();
 
         let label = render_body_item_label::<FeaturesPageAction>(
-            "Asynchronous find".into(),
+            crate::t!("settings-features-asynchronous-find"),
             None,
             None,
             LocalOnlyIconState::for_setting(
@@ -7731,10 +7741,7 @@ impl SettingsWidget for AsyncFindWidget {
             label_with_chip,
             switch,
             appearance,
-            Some(
-                "Use an improved implementation of find to keep the UI responsive while searching for matches on large outputs."
-                    .into(),
-            ),
+            Some(crate::t!("settings-features-asynchronous-find-description")),
         )
     }
 }

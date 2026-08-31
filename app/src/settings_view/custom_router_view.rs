@@ -257,7 +257,7 @@ fn render_targets_row(
     match routing {
         CustomModelRouting::Complexity(c) => {
             flex.add_child(render_model_line(
-                "Default:",
+                crate::t!("custom-router-summary-default"),
                 model_display_name(&c.default, app),
                 appearance,
                 sub_color,
@@ -265,7 +265,7 @@ fn render_targets_row(
             if let Some(easy) = &c.easy {
                 flex.add_child(
                     Container::new(render_model_line(
-                        "Easy:",
+                        crate::t!("custom-router-summary-easy"),
                         model_display_name(easy, app),
                         appearance,
                         sub_color,
@@ -277,7 +277,7 @@ fn render_targets_row(
             if let Some(medium) = &c.medium {
                 flex.add_child(
                     Container::new(render_model_line(
-                        "Medium:",
+                        crate::t!("custom-router-summary-medium"),
                         model_display_name(medium, app),
                         appearance,
                         sub_color,
@@ -289,7 +289,7 @@ fn render_targets_row(
             if let Some(hard) = &c.hard {
                 flex.add_child(
                     Container::new(render_model_line(
-                        "Hard:",
+                        crate::t!("custom-router-summary-hard"),
                         model_display_name(hard, app),
                         appearance,
                         sub_color,
@@ -301,18 +301,14 @@ fn render_targets_row(
         }
         CustomModelRouting::Prompt(p) => {
             flex.add_child(render_model_line(
-                "Default:",
+                crate::t!("custom-router-summary-default"),
                 model_display_name(&p.default_model, app),
                 appearance,
                 sub_color,
             ));
             let rule_count = p.rules.len();
             if rule_count > 0 {
-                let label = if rule_count == 1 {
-                    "1 rule".to_string()
-                } else {
-                    format!("{rule_count} rules")
-                };
+                let label = crate::t!("custom-router-summary-rule-count", count = rule_count);
                 flex.add_child(
                     Container::new(
                         Text::new(label, appearance.ui_font_family(), 12.)

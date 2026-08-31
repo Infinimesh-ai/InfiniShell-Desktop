@@ -388,7 +388,7 @@ impl View for ExecutionProfileView {
                         permissions_column.add_child(with_standard_vertical_margin(
                             render_run_agents_permission_line_with_icon(
                                 Icon::Workflow,
-                                "Run agents:",
+                                crate::t!("settings-exec-profile-run-agents"),
                                 &profile.run_agents,
                                 appearance,
                                 is_any_ai_enabled,

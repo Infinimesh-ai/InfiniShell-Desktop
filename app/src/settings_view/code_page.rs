@@ -230,7 +230,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
             vec![
                 ToggleSettingActionPair::new(
-                    "auto open code review panel",
+                    &crate::t!("toggle-suffix-auto-open-code-review"),
                     builder(SettingsAction::Code(
                         CodeSettingsPageAction::ToggleAutoOpenCodeReviewPane,
                     )),
@@ -238,7 +238,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                     flags::AUTO_OPEN_CODE_REVIEW_PANE_FLAG,
                 ),
                 ToggleSettingActionPair::new(
-                    "code review button",
+                    &crate::t!("toggle-suffix-code-review-button"),
                     builder(SettingsAction::Code(
                         CodeSettingsPageAction::ToggleCodeReviewPanel,
                     )),
@@ -246,7 +246,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                     flags::SHOW_CODE_REVIEW_BUTTON_FLAG,
                 ),
                 ToggleSettingActionPair::new(
-                    "diff stats on code review button",
+                    &crate::t!("toggle-suffix-code-review-diff-stats"),
                     builder(SettingsAction::Code(
                         CodeSettingsPageAction::ToggleShowCodeReviewDiffStats,
                     )),
@@ -254,7 +254,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                     flags::SHOW_CODE_REVIEW_DIFF_STATS_FLAG,
                 ),
                 ToggleSettingActionPair::new(
-                    "project explorer",
+                    &crate::t!("toggle-suffix-project-explorer"),
                     builder(SettingsAction::Code(
                         CodeSettingsPageAction::ToggleProjectExplorer,
                     )),
@@ -262,7 +262,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                     flags::SHOW_PROJECT_EXPLORER,
                 ),
                 ToggleSettingActionPair::new(
-                    "global file search",
+                    &crate::t!("toggle-suffix-global-file-search"),
                     builder(SettingsAction::Code(
                         CodeSettingsPageAction::ToggleGlobalSearch,
                     )),
@@ -270,7 +270,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                     flags::SHOW_GLOBAL_SEARCH,
                 ),
                 ToggleSettingActionPair::new(
-                    "show hidden files in project explorer",
+                    &crate::t!("toggle-suffix-show-hidden-project-files"),
                     builder(SettingsAction::Code(
                         CodeSettingsPageAction::ToggleShowHiddenFiles,
                     )),
@@ -560,7 +560,7 @@ impl SettingsWidget for ShowHiddenFilesToggleWidget {
         let code_settings = CodeSettings::as_ref(app);
 
         render_body_item::<CodeSettingsPageAction>(
-            "Show hidden files in project explorer".into(),
+            crate::t!("settings-code-show-hidden-files"),
             None,
             LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
@@ -574,9 +574,7 @@ impl SettingsWidget for ShowHiddenFilesToggleWidget {
                     ctx.dispatch_typed_action(CodeSettingsPageAction::ToggleShowHiddenFiles);
                 })
                 .finish(),
-            Some(
-                "Show dotfiles and hidden files (starting with .) in the project explorer.".into(),
-            ),
+            Some(crate::t!("settings-code-show-hidden-files-description")),
         )
     }
 }
@@ -602,7 +600,7 @@ impl SettingsWidget for AutoSaveToggleWidget {
         let code_settings = CodeSettings::as_ref(app);
 
         render_body_item::<CodeSettingsPageAction>(
-            "Auto save".into(),
+            crate::t!("settings-code-auto-save"),
             None,
             LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
@@ -616,10 +614,7 @@ impl SettingsWidget for AutoSaveToggleWidget {
                     ctx.dispatch_typed_action(CodeSettingsPageAction::ToggleAutoSave);
                 })
                 .finish(),
-            Some(
-                "Automatically saves changes in the InfiniShell text editor as you type and when the editor loses focus."
-                    .into(),
-            ),
+            Some(crate::t!("settings-code-auto-save-description")),
         )
     }
 }

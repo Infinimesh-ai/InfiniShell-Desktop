@@ -769,13 +769,13 @@ impl AgentProvidersWidget {
         {
             let mut states = row.responses_compaction_chip_states.borrow_mut();
             for (threshold, display) in [
-                (0, "Off"),
-                (32_000, "32k"),
-                (64_000, "64k"),
-                (128_000, "128k"),
+                (0, crate::t!("common-off")),
+                (32_000, "32k".to_string()),
+                (64_000, "64k".to_string()),
+                (128_000, "128k".to_string()),
             ] {
                 let button = Self::render_card_button_preserving_draft(
-                    selected_label(provider.responses.compact_threshold == threshold, display),
+                    selected_label(provider.responses.compact_threshold == threshold, &display),
                     states.entry(threshold).or_default().clone(),
                     draft_editors.clone(),
                     AISettingsPageAction::SetAgentProviderResponsesCompactThreshold {

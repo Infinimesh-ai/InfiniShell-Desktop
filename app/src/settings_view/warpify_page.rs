@@ -795,7 +795,7 @@ impl SettingsWidget for SSHWidget {
             move || {
                 let mut column = Flex::column();
                 column.add_child(render_body_item::<WarpifyPageAction>(
-                    "Reuse existing SSH ControlMaster".into(),
+                    crate::t!("settings-warpify-reuse-control-master"),
                     None,
                     LocalOnlyIconState::for_setting(
                         ReuseExistingSshControlMaster::storage_key(),

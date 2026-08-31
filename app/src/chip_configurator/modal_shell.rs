@@ -202,7 +202,10 @@ pub fn render_chip_editor_sections<A: Action + Clone + Copy + 'static>(
     );
 
     let left_section = Flex::column()
-        .with_child(render_section_label("Left side", appearance))
+        .with_child(render_section_label(
+            &crate::t!("toolbar-editor-left-side"),
+            appearance,
+        ))
         .with_child(
             Container::new(chip_configurator.render_left_drop_zone(
                 config.activate_action,
@@ -215,7 +218,10 @@ pub fn render_chip_editor_sections<A: Action + Clone + Copy + 'static>(
         .finish();
 
     let right_section = Flex::column()
-        .with_child(render_section_label("Right side", appearance))
+        .with_child(render_section_label(
+            &crate::t!("toolbar-editor-right-side"),
+            appearance,
+        ))
         .with_child(
             Container::new(chip_configurator.render_right_drop_zone(
                 config.activate_action,

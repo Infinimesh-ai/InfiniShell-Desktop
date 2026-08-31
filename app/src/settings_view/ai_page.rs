@@ -262,7 +262,10 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
         vec![
             ToggleSettingActionPair::custom(
-                SettingActionPairDescriptions::new("Show agent tips", "Hide agent tips"),
+                SettingActionPairDescriptions::new(
+                    &crate::t!("settings-command-show-agent-tips"),
+                    &crate::t!("settings-command-hide-agent-tips"),
+                ),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleShowAgentTips,
                 )),
@@ -403,7 +406,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
         vec![
             ToggleSettingActionPair::new(
-                "commit and pull request generation",
+                &crate::t!("toggle-suffix-git-operations"),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleGitOperationsAutogen,
                 )),
@@ -437,8 +440,8 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         vec![
             ToggleSettingActionPair::custom(
                 SettingActionPairDescriptions::new(
-                    "Show \"Use Agent\" footer",
-                    "Hide \"Use Agent\" footer",
+                    &crate::t!("settings-command-show-use-agent-footer"),
+                    &crate::t!("settings-command-hide-use-agent-footer"),
                 ),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleUseAgentToolbar,
@@ -460,7 +463,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
         vec![
             ToggleSettingActionPair::new(
-                "include agent-executed commands in history",
+                &crate::t!("toggle-suffix-agent-command-history"),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleIncludeAgentCommandsInHistory,
                 )),
@@ -471,13 +474,13 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             ToggleSettingActionPair::custom(
                 if FeatureFlag::AgentApprovalModes.is_enabled() {
                     SettingActionPairDescriptions::new(
-                        "Allow Full Access to bypass command denylist",
-                        "Require approval for denylisted commands in Full Access",
+                        &crate::t!("settings-command-allow-full-access-denylist-bypass"),
+                        &crate::t!("settings-command-require-full-access-denylist-approval"),
                     )
                 } else {
                     SettingActionPairDescriptions::new(
-                        "Allow auto-approve to bypass command denylist",
-                        "Require approval for denylisted commands in auto-approve",
+                        &crate::t!("settings-command-allow-auto-approve-denylist-bypass"),
+                        &crate::t!("settings-command-require-auto-approve-denylist-approval"),
                     )
                 },
                 builder(SettingsAction::AI(
@@ -495,7 +498,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             )
             .with_group(bindings::BindingGroup::WarpAi),
             ToggleSettingActionPair::new(
-                "conversation history in tools panel",
+                &crate::t!("toggle-suffix-conversation-history"),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleShowConversationHistory,
                 )),
@@ -504,7 +507,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             )
             .with_group(bindings::BindingGroup::WarpAi),
             ToggleSettingActionPair::new(
-                "model picker in prompt",
+                &crate::t!("toggle-suffix-model-picker"),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleShowBaseModelPickerInPrompt,
                 )),
@@ -513,7 +516,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             )
             .with_group(bindings::BindingGroup::WarpAi),
             ToggleSettingActionPair::new(
-                "coding agent toolbar",
+                &crate::t!("toggle-suffix-coding-agent-toolbar"),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleCLIAgentToolbar,
                 )),
@@ -574,7 +577,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
         vec![
             ToggleSettingActionPair::new(
-                "Warp credit fallback",
+                &crate::t!("toggle-suffix-warp-credit-fallback"),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleCanUseWarpCreditsForFallback,
                 )),
@@ -587,7 +590,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                     || UserWorkspaces::as_ref(app).is_custom_inference_enabled(app),
             ),
             ToggleSettingActionPair::new(
-                "auto show or hide Rich Input based on agent status",
+                &crate::t!("toggle-suffix-auto-toggle-rich-input"),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleAutoToggleRichInput,
                 )),
@@ -597,7 +600,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             .with_group(bindings::BindingGroup::WarpAi)
             .with_enabled(|| FeatureFlag::CLIAgentRichInput.is_enabled()),
             ToggleSettingActionPair::new(
-                "auto open Rich Input when a coding agent session starts",
+                &crate::t!("toggle-suffix-auto-open-rich-input"),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleAutoOpenRichInputOnCLIAgentStart,
                 )),
@@ -607,7 +610,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             .with_group(bindings::BindingGroup::WarpAi)
             .with_enabled(|| FeatureFlag::CLIAgentRichInput.is_enabled()),
             ToggleSettingActionPair::new(
-                "auto dismiss Rich Input after prompt submission",
+                &crate::t!("toggle-suffix-auto-dismiss-rich-input"),
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleAutoDismissRichInputAfterSubmit,
                 )),
@@ -5553,6 +5556,28 @@ fn render_ai_setting_description_with_font_size(
         .finish()
 }
 
+fn render_ai_status_text(
+    status: impl Into<Cow<'static, str>>,
+    app: &AppContext,
+) -> Box<dyn Element> {
+    let appearance = Appearance::as_ref(app);
+    appearance
+        .ui_builder()
+        .paragraph(status)
+        .with_style(UiComponentStyles {
+            font_size: Some(appearance.ui_font_size()),
+            font_color: Some(styles::description_font_color(true, app).into()),
+            margin: Some(
+                Coords::default()
+                    .bottom(styles::DESCRIPTION_MARGIN_BOTTOM)
+                    .right(styles::TOGGLE_WIDTH_MARGIN),
+            ),
+            ..Default::default()
+        })
+        .build()
+        .finish()
+}
+
 fn render_toolbar_layout_editor(
     editor: &ViewHandle<AgentToolbarInlineEditor>,
     appearance: &Appearance,
@@ -5888,9 +5913,9 @@ impl SettingsWidget for UsageWidget {
         .with_padding_bottom(HEADER_PADDING)
         .finish();
 
-        let request_limit_description = format!(
-            "This is the {} limit of AI credits for your account.",
-            ai_request_usage_model.refresh_duration_to_string()
+        let request_limit_description = crate::t!(
+            "settings-ai-usage-limit-description",
+            duration = ai_request_usage_model.refresh_duration_to_string()
         );
 
         let request_usage_row = self.render_ai_usage_limit_row(
@@ -7232,12 +7257,10 @@ impl SettingsWidget for AIInputWidget {
         if FeatureFlag::QueueSlashCommand.is_enabled() {
             widget_children.push(render_dropdown_item(
                 appearance,
-                "Default prompt submission mode",
-                Some(
-                    "What happens when you submit a new prompt while the agent is still \
-                     responding. You can override this per conversation using the auto-queue \
-                     toggle.",
-                ),
+                &crate::t!("settings-ai-default-prompt-submission-mode"),
+                Some(&crate::t!(
+                    "settings-ai-default-prompt-submission-description"
+                )),
                 None,
                 LocalOnlyIconState::for_setting(
                     PromptSubmissionMode::storage_key(),
@@ -7255,12 +7278,10 @@ impl SettingsWidget for AIInputWidget {
                 widget_children.push(
                     Container::new(render_dropdown_item(
                         appearance,
-                        "Default long-running command submission mode",
-                        Some(
-                            "What happens when you submit a prompt while an agent is driving an \
-                             agent-requested long-running command. Queued prompts are sent to the \
-                             agent when the command finishes.",
-                        ),
+                        &crate::t!("settings-ai-default-long-running-submission-mode"),
+                        Some(&crate::t!(
+                            "settings-ai-default-long-running-submission-description"
+                        )),
                         None,
                         LocalOnlyIconState::for_setting(
                             LongRunningCommandSubmissionMode::storage_key(),
@@ -8360,7 +8381,7 @@ impl SettingsWidget for CLIAgentAutoOpenRichInputWidget {
         }
 
         render_ai_setting_toggle::<AutoOpenRichInputOnCLIAgentStart>(
-            "Auto open Rich Input when a coding agent session starts",
+            crate::t!("settings-ai-auto-open-rich-input"),
             AISettingsPageAction::ToggleAutoOpenRichInputOnCLIAgentStart,
             *AISettings::as_ref(app).auto_open_rich_input_on_cli_agent_start,
             true,
@@ -8400,7 +8421,7 @@ impl SettingsWidget for CLIAgentAutoDismissRichInputWidget {
         }
 
         render_ai_setting_toggle::<AutoDismissRichInputAfterSubmit>(
-            "Auto dismiss Rich Input after prompt submission",
+            crate::t!("settings-ai-auto-dismiss-rich-input"),
             AISettingsPageAction::ToggleAutoDismissRichInputAfterSubmit,
             *AISettings::as_ref(app).auto_dismiss_rich_input_after_submit,
             true,
@@ -8440,7 +8461,7 @@ impl SettingsWidget for CLIAgentSubmitRichInputWidget {
         }
 
         render_ai_setting_toggle::<SubmitRichInputOnCtrlEnter>(
-            "Submit Rich Input with Ctrl+Enter",
+            crate::t!("settings-ai-submit-rich-input"),
             AISettingsPageAction::ToggleSubmitRichInputOnCtrlEnter,
             *AISettings::as_ref(app).submit_on_ctrl_enter,
             true,
@@ -8644,18 +8665,16 @@ impl CLIAgentWidget {
         );
 
         if !install_model.is_scan_complete() {
-            column.add_child(render_ai_setting_description(
+            column.add_child(render_ai_status_text(
                 crate::t!("settings-ai-per-agent-scanning"),
-                true,
                 app,
             ));
             return column.finish();
         }
 
         if installed_agents.is_empty() {
-            column.add_child(render_ai_setting_description(
+            column.add_child(render_ai_status_text(
                 crate::t!("settings-ai-per-agent-empty"),
-                true,
                 app,
             ));
             return column.finish();
@@ -9368,20 +9387,16 @@ impl GeminiEnterpriseWidget {
             is_section_enabled && user_workspaces.is_gemini_enterprise_credentials_toggleable();
         let are_credentials_enabled = user_workspaces.is_gemini_enterprise_credentials_enabled(app);
         let toggle_description = if is_admin_enforced {
-            "Warp routes eligible requests through your workspace's Gemini Enterprise Google Cloud \
-             project. This setting is managed by your organization."
-                .to_string()
+            crate::t!("settings-ai-gemini-enterprise-description-managed")
         } else {
-            "Warp routes eligible requests through your workspace's Gemini Enterprise Google Cloud \
-             project."
-                .to_string()
+            crate::t!("settings-ai-gemini-enterprise-description")
         };
 
         let mut column = Flex::column().with_spacing(16.).with_child(
             Flex::column()
                 .with_child(
                     render_ai_setting_toggle::<GeminiEnterpriseCredentialsEnabled>(
-                        "Use Gemini Enterprise credentials",
+                        crate::t!("settings-ai-gemini-enterprise-toggle"),
                         AISettingsPageAction::ToggleGeminiEnterpriseCredentialsEnabled,
                         are_credentials_enabled,
                         is_toggleable,
@@ -9504,7 +9519,7 @@ impl SettingsWidget for GeminiEnterpriseWidget {
             .with_child(
                 build_sub_header(
                     appearance,
-                    "Gemini Enterprise",
+                    crate::t!("settings-ai-gemini-enterprise-section"),
                     Some(styles::header_font_color(is_any_ai_enabled, app)),
                 )
                 .with_padding_bottom(HEADER_PADDING)
@@ -9558,7 +9573,14 @@ impl SettingsWidget for CustomModelRoutersWidget {
             .with_main_axis_size(MainAxisSize::Max)
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(build_sub_header(appearance, "Custom Routers", Some(header_color)).finish())
+            .with_child(
+                build_sub_header(
+                    appearance,
+                    crate::t!("settings-ai-custom-routers-section"),
+                    Some(header_color),
+                )
+                .finish(),
+            )
             .with_child({
                 #[cfg(feature = "local_fs")]
                 {
@@ -9582,7 +9604,7 @@ impl SettingsWidget for CustomModelRoutersWidget {
                     .finish(),
             )
             .with_child(render_ai_setting_description(
-                "Automatically route tasks to specific models based on task complexity or custom rules. Custom routers will appear in your model selector menu.",
+                crate::t!("settings-ai-custom-routers-description"),
                 is_any_ai_enabled,
                 app,
             ));

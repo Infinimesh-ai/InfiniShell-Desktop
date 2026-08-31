@@ -122,10 +122,19 @@ const MIN_NEW_WINDOW_ROWS_OR_COLS: u16 = 5;
 const MAX_NEW_WINDOW_ROWS_OR_COLS: u16 = 2000;
 
 fn default_font_label(is_ai_font: bool) -> String {
-    if is_ai_font {
-        format!("{} (default)", AIFontName::default_value())
+    let font = if is_ai_font {
+        AIFontName::default_value()
     } else {
-        format!("{} (default)", MonospaceFontName::default_value())
+        MonospaceFontName::default_value()
+    };
+    crate::t!("settings-appearance-font-default-option", font = font)
+}
+
+fn font_weight_dropdown_item_label(weight: Weight) -> String {
+    if weight == Weight::Bold {
+        crate::t!("settings-appearance-font-weight-bold")
+    } else {
+        crate::t!("settings-appearance-font-weight-normal")
     }
 }
 
@@ -273,7 +282,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         .with_group(bindings::BindingGroup::Settings.as_str()),
     ]);
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
-        "open new windows with custom size",
+        &crate::t!("toggle-suffix-window-custom-size"),
         builder(SettingsAction::AppearancePageToggle(
             AppearancePageAction::ToggleOpenWindowsAtCustomSize,
         )),
@@ -282,7 +291,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ));
 
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
-        "window blur acrylic texture",
+        &crate::t!("toggle-suffix-window-blur-texture"),
         builder(SettingsAction::AppearancePageToggle(
             AppearancePageAction::ToggleBlurTexture,
         )),
@@ -291,7 +300,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ));
 
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
-        "tools panel visibility across tabs",
+        &crate::t!("toggle-suffix-tools-panel-consistency"),
         builder(SettingsAction::AppearancePageToggle(
             AppearancePageAction::ToggleLeftPanelVisibility,
         )),
@@ -300,7 +309,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ));
 
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
-        "agent font matching terminal font",
+        &crate::t!("toggle-suffix-agent-font-match-terminal"),
         builder(SettingsAction::AppearancePageToggle(
             AppearancePageAction::ToggleMatchAIToTerminalFontFamily,
         )),
@@ -309,7 +318,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ));
 
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
-        "notebook font size matching terminal font size",
+        &crate::t!("toggle-suffix-notebook-font-match-terminal"),
         builder(SettingsAction::AppearancePageToggle(
             AppearancePageAction::ToggleMatchNotebookToMonospaceFontSize,
         )),
@@ -337,8 +346,8 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         toggle_binding_pairs.push(
             ToggleSettingActionPair::custom(
                 SettingActionPairDescriptions::new(
-                    "Show code review button in tab bar",
-                    "Hide code review button in tab bar",
+                    &crate::t!("settings-command-show-code-review-tab-button"),
+                    &crate::t!("settings-command-hide-code-review-tab-button"),
                 ),
                 builder(SettingsAction::AppearancePageToggle(
                     AppearancePageAction::ToggleShowCodeReviewButton,
@@ -436,7 +445,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             flags::USE_VERTICAL_TABS_FLAG,
         ));
         toggle_binding_pairs.push(ToggleSettingActionPair::new(
-            "show vertical tabs panel in restored windows",
+            &crate::t!("toggle-suffix-vertical-tabs-restored"),
             builder(SettingsAction::AppearancePageToggle(
                 AppearancePageAction::ToggleShowVerticalTabPanelInRestoredWindows,
             )),
@@ -444,7 +453,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             flags::SHOW_VERTICAL_TAB_PANEL_IN_RESTORED_WINDOWS_FLAG,
         ));
         toggle_binding_pairs.push(ToggleSettingActionPair::new(
-            "latest user prompt as conversation title in tab names",
+            &crate::t!("toggle-suffix-latest-prompt-tab-title"),
             builder(SettingsAction::AppearancePageToggle(
                 AppearancePageAction::ToggleUseLatestUserPromptAsConversationTitleInTabNames,
             )),
@@ -465,7 +474,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     }
 
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
-        "preserve active tab color for new tabs",
+        &crate::t!("toggle-suffix-preserve-active-tab-color"),
         builder(SettingsAction::AppearancePageToggle(
             AppearancePageAction::TogglePreserveActiveTabColor,
         )),
@@ -474,7 +483,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     ));
 
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
-        "custom padding in alt-screen",
+        &crate::t!("toggle-suffix-alt-screen-custom-padding"),
         builder(SettingsAction::AppearancePageToggle(
             AppearancePageAction::ToggleAltScreenPadding,
         )),
@@ -1290,13 +1299,14 @@ impl AppearanceSettingsPageView {
                 .iter()
                 .map(|weight| {
                     DropdownItem::new(
-                        weight.to_string(),
+                        font_weight_dropdown_item_label(*weight),
                         AppearancePageAction::SetFontWeight(*weight),
                     )
                 })
                 .collect();
             dropdown.add_items(items, ctx);
-            dropdown.set_selected_by_name(monospace_font_weight.to_string(), ctx);
+            dropdown
+                .set_selected_by_name(font_weight_dropdown_item_label(monospace_font_weight), ctx);
             dropdown
         });
 
@@ -1637,7 +1647,10 @@ impl AppearanceSettingsPageView {
         }
         tools_panel_widgets.push(Box::new(ToolsPanelWarpDriveWidget::default()));
         if !tools_panel_widgets.is_empty() {
-            categories.push(Category::new("Tools panel", tools_panel_widgets));
+            categories.push(Category::new(
+                Box::leak(crate::t!("settings-appearance-category-tools-panel").into_boxed_str()),
+                tools_panel_widgets,
+            ));
         }
 
         // Create the Input category with all widgets
@@ -1805,7 +1818,8 @@ impl AppearanceSettingsPageView {
             AppearanceEvent::MonospaceFontWeightChanged { .. } => {
                 let font_weight = handle.as_ref(ctx).monospace_font_weight();
                 self.font_weight_dropdown.update(ctx, |dropdown, ctx| {
-                    dropdown.set_selected_by_name(font_weight.to_string(), ctx);
+                    dropdown
+                        .set_selected_by_name(font_weight_dropdown_item_label(font_weight), ctx);
                 });
             }
             AppearanceEvent::LineHeightRatioChanged { .. } => {
@@ -1898,7 +1912,10 @@ impl AppearanceSettingsPageView {
     {
         let font_name = UiFontName::default_value();
         let mut initial_dropdown_item = DropdownItem::new(
-            format!("{} (default)", font_name),
+            crate::t!(
+                "settings-appearance-font-default-option",
+                font = font_name.clone()
+            ),
             AppearancePageAction::SetUIFontFamily(font_name.clone()),
         );
 
@@ -1934,25 +1951,25 @@ impl AppearanceSettingsPageView {
         }
     }
 
-    fn app_icon_dropdown_item_label(val: AppIcon) -> &'static str {
+    fn app_icon_dropdown_item_label(val: AppIcon) -> String {
         match val {
-            AppIcon::Aurora => "Aurora",
-            AppIcon::Default => "Default",
-            AppIcon::Classic1 => "Classic 1",
-            AppIcon::Classic2 => "Classic 2",
-            AppIcon::Classic3 => "Classic 3",
-            AppIcon::Comets => "Comets",
-            AppIcon::GlassSky => "Glass Sky",
-            AppIcon::Glitch => "Glitch",
-            AppIcon::Cow => "Cow",
-            AppIcon::Glow => "Glow",
-            AppIcon::Holographic => "Holographic",
-            AppIcon::Mono => "Mono",
-            AppIcon::Neon => "Neon",
-            AppIcon::Original => "Original",
-            AppIcon::Starburst => "Starburst",
-            AppIcon::Sticker => "Sticker",
-            AppIcon::WarpOne => "InfiniShell 1",
+            AppIcon::Aurora => crate::t!("settings-appearance-icon-aurora"),
+            AppIcon::Default => crate::t!("settings-appearance-icon-default"),
+            AppIcon::Classic1 => crate::t!("settings-appearance-icon-classic-1"),
+            AppIcon::Classic2 => crate::t!("settings-appearance-icon-classic-2"),
+            AppIcon::Classic3 => crate::t!("settings-appearance-icon-classic-3"),
+            AppIcon::Comets => crate::t!("settings-appearance-icon-comets"),
+            AppIcon::GlassSky => crate::t!("settings-appearance-icon-glass-sky"),
+            AppIcon::Glitch => crate::t!("settings-appearance-icon-glitch"),
+            AppIcon::Cow => crate::t!("settings-appearance-icon-cow"),
+            AppIcon::Glow => crate::t!("settings-appearance-icon-glow"),
+            AppIcon::Holographic => crate::t!("settings-appearance-icon-holographic"),
+            AppIcon::Mono => crate::t!("settings-appearance-icon-mono"),
+            AppIcon::Neon => crate::t!("settings-appearance-icon-neon"),
+            AppIcon::Original => crate::t!("settings-appearance-icon-original"),
+            AppIcon::Starburst => crate::t!("settings-appearance-icon-starburst"),
+            AppIcon::Sticker => crate::t!("settings-appearance-icon-sticker"),
+            AppIcon::WarpOne => crate::t!("settings-appearance-icon-infinishell-1"),
         }
     }
 
@@ -2680,9 +2697,12 @@ impl AppearanceSettingsPageView {
 
             if !font_name.is_empty() {
                 let label = if font_name == UiFontName::default_value() {
-                    &format!("{} (default)", UiFontName::default_value())
+                    crate::t!(
+                        "settings-appearance-font-default-option",
+                        font = UiFontName::default_value()
+                    )
                 } else {
-                    &font_name
+                    font_name
                 };
                 dropdown.set_selected_by_name(label, ctx);
             }
@@ -3673,7 +3693,7 @@ impl SettingsWidget for CustomAppIconWidget {
         );
 
         let show_dock_icon_toggle = render_body_item::<AppearancePageAction>(
-            "Show Warp in Dock".into(),
+            crate::t!("settings-appearance-show-in-dock"),
             None,
             LocalOnlyIconState::for_setting(
                 ShowDockIconState::storage_key(),
@@ -5996,7 +6016,7 @@ impl SettingsWidget for HideTitleBarSearchBarInVerticalTabsWidget {
         let tab_settings = TabSettings::as_ref(app);
 
         render_body_item::<AppearancePageAction>(
-            "Hide search bar in vertical tab layout".into(),
+            crate::t!("settings-appearance-tab-hide-title-bar-search-label"),
             None,
             LocalOnlyIconState::for_setting(
                 HideTitleBarSearchBarInVerticalTabs::storage_key(),
@@ -6017,10 +6037,9 @@ impl SettingsWidget for HideTitleBarSearchBarInVerticalTabsWidget {
                     );
                 })
                 .finish(),
-            Some(
-                "When using the vertical tab layout, hide the search bar in the title bar. Search stays available via the command palette and keyboard shortcuts."
-                    .to_string(),
-            ),
+            Some(crate::t!(
+                "settings-appearance-tab-hide-title-bar-search-description"
+            )),
         )
     }
 }

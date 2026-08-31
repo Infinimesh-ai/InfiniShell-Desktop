@@ -413,7 +413,7 @@ fn spawn_test_connection(
                     async move {
                         TestOutcome {
                             kind: TestKind::Tcp,
-                            result: Err("invalid proxy URL".to_string()),
+                            result: Err(crate::t!("settings-network-error-invalid-proxy-url")),
                         }
                     },
                     |me, outcome, ctx| {
@@ -462,7 +462,10 @@ fn spawn_tcp_probe(
             let outcome_result = match result {
                 Ok(Ok(_stream)) => Ok(start.elapsed().as_millis()),
                 Ok(Err(e)) => Err(format!("{e}")),
-                Err(_) => Err(format!("timeout after {}s", timeout.as_secs())),
+                Err(_) => Err(crate::t!(
+                    "settings-network-error-timeout",
+                    seconds = (timeout.as_secs() as i64)
+                )),
             };
             TestOutcome {
                 kind: TestKind::Tcp,

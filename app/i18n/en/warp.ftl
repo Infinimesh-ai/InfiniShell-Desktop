@@ -5575,3 +5575,124 @@ ai-export-failed = Failed to export to { $path }: { $error }
 code-save-file-failed = Failed to save file: { $error }
 code-delete-file-failed = Failed to delete file: { $error }
 settings-mcp-parse-markdown-failed = Failed to parse Markdown: { $error }
+
+# Settings UI residual localization audit
+common-off = Off
+settings-section-agents = Agents
+toolbar-editor-left-side = Left side
+toolbar-editor-right-side = Right side
+
+settings-ai-usage-duration-monthly = monthly
+settings-ai-usage-limit-description = This is the { $duration } limit of AI credits for your account.
+settings-ai-default-prompt-submission-mode = Default prompt submission mode
+settings-ai-default-prompt-submission-description = What happens when you submit a new prompt while the agent is still responding. You can override this per conversation using the auto-queue toggle.
+settings-ai-default-long-running-submission-mode = Default long-running command submission mode
+settings-ai-default-long-running-submission-description = What happens when you submit a prompt while an agent is driving an agent-requested long-running command. Queued prompts are sent to the agent when the command finishes.
+settings-ai-submit-rich-input = Submit Rich Input with Ctrl+Enter
+settings-ai-gemini-enterprise-section = Gemini Enterprise
+settings-ai-gemini-enterprise-toggle = Use Gemini Enterprise credentials
+settings-ai-gemini-enterprise-description = InfiniShell routes eligible requests through your workspace's Gemini Enterprise Google Cloud project.
+settings-ai-gemini-enterprise-description-managed = InfiniShell routes eligible requests through your workspace's Gemini Enterprise Google Cloud project. This setting is managed by your organization.
+settings-ai-custom-routers-section = Custom Routers
+settings-ai-custom-routers-description = Automatically route tasks to specific models based on task complexity or custom rules. Custom routers will appear in your model selector menu.
+custom-router-summary-default = Default:
+custom-router-summary-easy = Easy:
+custom-router-summary-medium = Medium:
+custom-router-summary-hard = Hard:
+custom-router-summary-rule-count = { $count ->
+    [one] 1 rule
+   *[other] { $count } rules
+}
+
+settings-command-show-agent-tips = Show agent tips
+settings-command-hide-agent-tips = Hide agent tips
+settings-command-show-use-agent-footer = Show “Use Agent” footer
+settings-command-hide-use-agent-footer = Hide “Use Agent” footer
+settings-command-allow-full-access-denylist-bypass = Allow Full Access to bypass command denylist
+settings-command-require-full-access-denylist-approval = Require approval for denylisted commands in Full Access
+settings-command-allow-auto-approve-denylist-bypass = Allow auto-approve to bypass command denylist
+settings-command-require-auto-approve-denylist-approval = Require approval for denylisted commands in auto-approve
+settings-command-show-code-review-tab-button = Show code review button in tab bar
+settings-command-hide-code-review-tab-button = Hide code review button in tab bar
+
+toggle-suffix-git-operations = commit and pull request generation
+toggle-suffix-agent-command-history = agent-executed commands in history
+toggle-suffix-conversation-history = conversation history in the tools panel
+toggle-suffix-model-picker = model picker in the prompt
+toggle-suffix-coding-agent-toolbar = coding agent toolbar
+toggle-suffix-warp-credit-fallback = InfiniShell credit fallback
+toggle-suffix-auto-toggle-rich-input = automatic Rich Input visibility based on agent status
+toggle-suffix-auto-open-rich-input = automatically opening Rich Input when a coding agent session starts
+toggle-suffix-auto-dismiss-rich-input = automatically dismissing Rich Input after prompt submission
+toggle-suffix-window-custom-size = opening new windows with a custom size
+toggle-suffix-window-blur-texture = acrylic window blur texture
+toggle-suffix-tools-panel-consistency = consistent tools panel visibility across tabs
+toggle-suffix-agent-font-match-terminal = matching the agent font to the terminal font
+toggle-suffix-notebook-font-match-terminal = matching the notebook font size to the terminal font size
+toggle-suffix-vertical-tabs-restored = showing the vertical tabs panel in restored windows
+toggle-suffix-latest-prompt-tab-title = using the latest user prompt as the conversation title in tab names
+toggle-suffix-preserve-active-tab-color = preserving the active tab color for new tabs
+toggle-suffix-alt-screen-custom-padding = custom padding in the alternate screen
+toggle-suffix-auto-open-code-review = automatically opening the code review panel
+toggle-suffix-code-review-button = the code review button
+toggle-suffix-code-review-diff-stats = diff stats on the code review button
+toggle-suffix-project-explorer = the project explorer
+toggle-suffix-global-file-search = global file search
+toggle-suffix-show-hidden-project-files = hidden files in the project explorer
+toggle-suffix-autosuggestion-ignore = the autosuggestion ignore button
+toggle-suffix-ssh-control-master = reusing an existing SSH ControlMaster in the InfiniShell SSH wrapper
+toggle-suffix-long-running-notifications = long-running command notifications
+toggle-suffix-agent-task-notifications = agent task completion notifications
+toggle-suffix-needs-attention-notifications = needs-attention notifications
+toggle-suffix-notification-sounds = notification sounds
+toggle-suffix-in-app-agent-notifications = in-app agent notifications
+toggle-suffix-mouse-reporting = mouse reporting
+toggle-suffix-help-block = the help block in new sessions
+toggle-suffix-at-context-menu = the “@” context menu in terminal mode
+toggle-suffix-preserve-input-focus = preserving input focus on block selection
+toggle-suffix-global-workflows-command-search = global workflows in Command Search
+
+settings-code-show-hidden-files = Show hidden files in project explorer
+settings-code-show-hidden-files-description = Show dotfiles and hidden files (starting with .) in the project explorer.
+settings-code-auto-save = Auto save
+settings-code-auto-save-description = Automatically save changes in the InfiniShell text editor as you type and when the editor loses focus.
+
+settings-appearance-category-tools-panel = Tools panel
+settings-appearance-font-default-option = { $font } (default)
+settings-appearance-font-weight-normal = Normal
+settings-appearance-font-weight-bold = Bold
+settings-appearance-show-in-dock = Show InfiniShell in Dock
+settings-appearance-tab-hide-title-bar-search-label = Hide search bar in vertical tab layout
+settings-appearance-tab-hide-title-bar-search-description = When using the vertical tab layout, hide the search bar in the title bar. Search stays available via the command palette and keyboard shortcuts.
+settings-appearance-icon-aurora = Aurora
+settings-appearance-icon-default = Default
+settings-appearance-icon-classic-1 = Classic 1
+settings-appearance-icon-classic-2 = Classic 2
+settings-appearance-icon-classic-3 = Classic 3
+settings-appearance-icon-comets = Comets
+settings-appearance-icon-glass-sky = Glass Sky
+settings-appearance-icon-glitch = Glitch
+settings-appearance-icon-cow = Cow
+settings-appearance-icon-glow = Glow
+settings-appearance-icon-holographic = Holographic
+settings-appearance-icon-mono = Mono
+settings-appearance-icon-neon = Neon
+settings-appearance-icon-original = Original
+settings-appearance-icon-starburst = Starburst
+settings-appearance-icon-sticker = Sticker
+settings-appearance-icon-infinishell-1 = InfiniShell 1
+
+settings-features-main-screen = Main Screen
+settings-features-numbered-screen = Screen { $number }
+settings-features-code-editor-line-numbers = Code editor line numbers:
+settings-features-preserve-input-focus = Preserve input focus on block selection
+settings-features-osc52-clipboard-access = Clipboard access (OSC 52)
+settings-features-osc52-clipboard-access-description = Control whether programs running in the terminal can read or write your system clipboard.
+settings-features-asynchronous-find = Asynchronous find
+settings-features-asynchronous-find-description = Use an improved implementation of find to keep the UI responsive while searching for matches in large outputs.
+
+settings-warp-drive-local-description = InfiniShell Drive is a local workspace in your terminal where you can save Workflows, Notebooks, Prompts, and Environment Variables on this device.
+settings-warpify-reuse-control-master = Reuse existing SSH ControlMaster
+settings-exec-profile-run-agents = Run agents:
+settings-network-error-invalid-proxy-url = Invalid proxy URL
+settings-network-error-timeout = Timed out after { $seconds } seconds

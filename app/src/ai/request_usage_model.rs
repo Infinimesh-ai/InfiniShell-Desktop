@@ -220,7 +220,7 @@ impl AIRequestUsageModel {
     }
 
     pub fn refresh_duration_to_string(&self) -> String {
-        "monthly".to_string()
+        crate::t!("settings-ai-usage-duration-monthly")
     }
 
     /// Zap(本地化):本地用户不存在 bonus grants。

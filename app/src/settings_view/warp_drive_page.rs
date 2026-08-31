@@ -36,8 +36,8 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         vec![
             ToggleSettingActionPair::custom(
                 SettingActionPairDescriptions::new(
-                    "Enable InfiniShell Drive",
-                    "Disable InfiniShell Drive",
+                    &crate::t!("auth-enable-warp-drive"),
+                    &crate::t!("auth-disable-warp-drive"),
                 ),
                 builder(SettingsAction::InfiniShellDrive(
                     WarpDriveSettingsPageAction::ToggleShowWarpDrive,
@@ -160,12 +160,10 @@ impl SettingsWidget for WarpDriveToggleWidget {
         let settings = WarpDriveSettings::as_ref(app);
 
         render_body_item::<WarpDriveSettingsPageAction>(
-            "InfiniShell Drive".into(),
+            crate::t!("settings-section-warp-drive"),
             Some(AdditionalInfo {
                 mouse_state: self.info_icon_mouse_state.clone(),
-                on_click_action: Some(WarpDriveSettingsPageAction::OpenUrl(
-                    "".to_string(),
-                )),
+                on_click_action: Some(WarpDriveSettingsPageAction::OpenUrl("".to_string())),
                 secondary_text: None,
                 tooltip_override_text: None,
             }),
@@ -181,7 +179,7 @@ impl SettingsWidget for WarpDriveToggleWidget {
                     ctx.dispatch_typed_action(WarpDriveSettingsPageAction::ToggleShowWarpDrive);
                 })
                 .finish(),
-            Some("InfiniShell Drive is a local workspace in your terminal where you can save Workflows, Notebooks, Prompts, and Environment Variables on this device.".into()),
+            Some(crate::t!("settings-warp-drive-local-description")),
         )
     }
 }
