@@ -237,6 +237,49 @@ pub(crate) fn mock_workspace(app: &mut App) -> ViewHandle<Workspace> {
     workspace
 }
 
+#[test]
+fn test_local_app_menu_visibility_matches_platform_and_avatar_state() {
+    assert!(!should_render_local_app_menu(true));
+    assert_eq!(
+        should_render_local_app_menu(false),
+        cfg!(all(not(target_os = "macos"), not(target_family = "wasm")))
+    );
+}
+
+#[test]
+fn test_user_menu_keeps_help_and_skips_empty_links() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+
+        let workspace = mock_workspace(&mut app);
+        workspace.read(&app, |workspace, ctx| {
+            let items = workspace.user_menu_items(ctx);
+            let has_action = |predicate: fn(&WorkspaceAction) -> bool| {
+                items.iter().any(|item| {
+                    if let MenuItem::Item(fields) = item {
+                        fields.on_select_action().is_some_and(predicate)
+                    } else {
+                        false
+                    }
+                })
+            };
+
+            assert!(has_action(|action| matches!(
+                action,
+                WorkspaceAction::ToggleResourceCenter
+            )));
+            assert_eq!(
+                has_action(|action| matches!(action, WorkspaceAction::ViewUserDocs)),
+                !links::USER_DOCS_URL.is_empty()
+            );
+            assert_eq!(
+                has_action(|action| matches!(action, WorkspaceAction::JoinSlack)),
+                !links::SLACK_URL.is_empty()
+            );
+        });
+    });
+}
+
 // Zap:云端 team 已剥离,`WorkspaceAction::OpenNewWindowForTeam` 变体不存在,
 // 原 `test_open_new_window_for_team_*` 两个用例随之删除。
 
