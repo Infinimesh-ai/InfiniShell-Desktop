@@ -382,6 +382,17 @@ async fn disconnected_on_closed_stream() {
 }
 
 #[tokio::test]
+async fn disconnect_event_closes_lifecycle_stream_while_writer_is_alive() {
+    let executor = executor::Background::default();
+    let (_client, event_rx, _failure_rx, _host_rx) =
+        RemoteServerClient::new(futures::io::empty(), futures::io::sink(), &executor);
+
+    let event = event_rx.recv().await.unwrap();
+    assert!(matches!(event, ClientEvent::Disconnected));
+    assert!(event_rx.is_closed());
+}
+
+#[tokio::test]
 async fn is_disconnected_starts_false() {
     let (client, _disconnect_rx, _executor) = setup_mock_client(|_| {
         server_message::Message::InitializeResponse(InitializeResponse {

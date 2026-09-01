@@ -1510,8 +1510,10 @@ impl RemoteServerClient {
         // Notify all pending requests that the connection is gone.
         pending_requests.clear();
 
-        // Signal disconnection as the final event.
-        let _ = event_tx.send(ClientEvent::Disconnected).await;
+        // writer task 仍持有另一个 sender；显式关闭通道，确保管理器在消费最终事件后
+        // 能执行流完成回调并推进会话状态。
+        let _ = event_tx.try_send(ClientEvent::Disconnected);
+        event_tx.close();
     }
 }
 
