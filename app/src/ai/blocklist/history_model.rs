@@ -2927,6 +2927,7 @@ pub enum BlocklistAIHistoryEvent {
 
     UpdatedTodoList {
         terminal_surface_id: EntityId,
+        conversation_id: AIConversationId,
     },
 
     UpdatedAutoexecuteOverride {

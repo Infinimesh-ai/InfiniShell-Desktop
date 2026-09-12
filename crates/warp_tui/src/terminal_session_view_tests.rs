@@ -1768,6 +1768,7 @@ fn todo_updates_preserve_scroll_and_close_the_menu_when_the_list_disappears() {
             view.handle_history_event(
                 &BlocklistAIHistoryEvent::UpdatedTodoList {
                     terminal_surface_id: view.terminal_surface_id,
+                    conversation_id,
                 },
                 ctx,
             );
@@ -1801,6 +1802,7 @@ fn todo_updates_preserve_scroll_and_close_the_menu_when_the_list_disappears() {
             view.handle_history_event(
                 &BlocklistAIHistoryEvent::UpdatedTodoList {
                     terminal_surface_id: view.terminal_surface_id,
+                    conversation_id,
                 },
                 ctx,
             );
@@ -1818,6 +1820,7 @@ fn todo_updates_preserve_scroll_and_close_the_menu_when_the_list_disappears() {
             view.handle_history_event(
                 &BlocklistAIHistoryEvent::UpdatedTodoList {
                     terminal_surface_id: view.terminal_surface_id,
+                    conversation_id,
                 },
                 ctx,
             );
