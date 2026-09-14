@@ -1375,10 +1375,12 @@ impl Workspace {
             .is_any_tab_group_being_renamed()
         {
             match event {
-                EditorEvent::Blurred | EditorEvent::Enter => {
+                EditorEvent::Enter => {
                     self.finish_tab_group_rename(ctx);
                 }
-                EditorEvent::Escape => {
+                // 非用户主动触发的焦点变化不应把半截输入持久化为标签组名称。
+                // Enter 仍负责确认，Blur 与 Escape 都放弃本次编辑。
+                EditorEvent::Blurred | EditorEvent::Escape => {
                     self.cancel_tab_group_rename(ctx);
                 }
                 _ => {}
@@ -7616,6 +7618,18 @@ impl Workspace {
         if let Some(group) = self.tab_groups.get_mut(&group_id) {
             group.collapsed = false;
             ctx.notify();
+        }
+    }
+
+    pub(crate) fn is_inline_rename_editor_focused(&self, ctx: &AppContext) -> bool {
+        match ctx.focused_view_id(self.window_id) {
+            Some(id) if id == self.tab_rename_editor.id() => {
+                self.current_workspace_state.is_tab_being_renamed()
+            }
+            Some(id) if id == self.tab_group_rename_editor.id() => self
+                .current_workspace_state
+                .is_any_tab_group_being_renamed(),
+            _ => false,
         }
     }
 
