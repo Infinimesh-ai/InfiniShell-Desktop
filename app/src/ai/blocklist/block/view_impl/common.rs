@@ -895,18 +895,19 @@ fn render_stop_button(props: ButtonProps, appearance: &Appearance) -> Box<dyn El
     )
     .finish();
 
-    render_warping_indicator_button(
+    let button = render_warping_indicator_button(
         props.button_handle.clone(),
         appearance,
         stop_icon,
         props.keystroke,
-        "Stop agent task".to_string(),
+        crate::t!("agent-stop-task-and-command"),
         props.is_active,
         false,
         |ctx: &mut EventContext<'_>| {
             ctx.dispatch_typed_action(BlocklistAIStatusBarAction::Stop);
         },
-    )
+    );
+    SavePosition::new(button, "agent_stop_task_button").finish()
 }
 
 fn render_queue_next_prompt_button(

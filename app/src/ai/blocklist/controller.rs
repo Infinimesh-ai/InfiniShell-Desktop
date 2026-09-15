@@ -31,7 +31,7 @@ use self::response_stream::{PendingTitleGeneration, ResponseStream, ResponseStre
 use super::action_model::{BlocklistAIActionEvent, BlocklistAIActionModel};
 use super::agent_view::{AgentViewController, AgentViewControllerEvent, AgentViewEntryOrigin};
 use super::context_model::{BlocklistAIContextModel, PendingContextSnapshot};
-use super::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
+use super::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel, UpdateHistoryError};
 use super::input_model::InputConfig;
 use super::{BlocklistAIInputModel, InputType, QueuedQueryModel, ResponseStreamId};
 use crate::ai::agent::api::{self, ServerConversationToken};
@@ -65,7 +65,6 @@ use crate::network::NetworkStatus;
 use crate::notebooks::editor::model::FileLinkResolutionContext;
 use crate::persistence::ModelEvent;
 use crate::search::slash_command_menu::static_commands::commands;
-use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::TelemetryEvent;
 use crate::terminal::ShellLaunchData;
 use crate::terminal::model::block::{
@@ -77,6 +76,7 @@ use crate::terminal::model::terminal_model::TerminalModel;
 use crate::terminal::shared_session::ParticipantId;
 use crate::terminal::ssh::util::InteractiveSshCommand;
 use crate::terminal::view::inline_banner::ZeroStatePromptSuggestionType;
+use crate::{report_error, send_telemetry_from_ctx};
 
 #[derive(Debug, Clone)]
 pub struct SessionContext {
@@ -211,6 +211,9 @@ pub enum BlocklistAIControllerEvent {
         stream_id: ResponseStreamId,
         conversation_id: AIConversationId,
     },
+
+    /// 会话状态写入失败后，终端负责中断该会话仍在运行的命令。
+    ConversationUpdateFailed { conversation_id: AIConversationId },
 
     /// Emitted when the export-to-file slash command is executed.
     ExportConversationToFile { filename: Option<String> },
@@ -2111,7 +2114,7 @@ impl BlocklistAIController {
             request_params.byop_repair_state = convo.byop_repair_state.clone();
         }
 
-        self.populate_lrc_request_params(&mut request_params, conversation_id);
+        self.populate_lrc_request_params(&mut request_params, conversation_id, ctx);
         request_params
     }
 
@@ -2119,6 +2122,7 @@ impl BlocklistAIController {
         &self,
         request_params: &mut api::RequestParams,
         conversation_id: AIConversationId,
+        ctx: &AppContext,
     ) {
         let terminal_model = self.terminal_model.lock();
         let active_block = terminal_model.block_list().active_block();
@@ -2127,12 +2131,27 @@ impl BlocklistAIController {
             && active_block
                 .agent_interaction_metadata()
                 .is_some_and(|metadata| metadata.conversation_id() == &conversation_id);
-        if !is_lrc_tagged_in && !is_matching_lrc_agent {
+        let target_task = request_params
+            .byop_target_task_id
+            .as_ref()
+            .and_then(|task_id| {
+                BlocklistAIHistoryModel::as_ref(ctx)
+                    .conversation(&conversation_id)?
+                    .get_task(&TaskId::new(task_id.clone()))
+            });
+        let targets_cli_task = target_task
+            .is_some_and(|task| task.cli_subagent_block_id().as_ref() == Some(active_block.id()));
+        let needs_cli_initialization =
+            targets_cli_task && target_task.is_some_and(|task| task.source().is_none());
+        if !is_lrc_tagged_in && !is_matching_lrc_agent && !needs_cli_initialization {
             return;
         }
 
         request_params.lrc_command_id = Some(active_block.id().to_string());
-        request_params.lrc_should_spawn_subagent = is_lrc_tagged_in;
+        // Agent 启动长命令后立即追问，也会创建尚未初始化的 CLI 子任务。
+        // 是否补发 CreateTask 取决于任务状态，不能只看用户有没有执行 tag-in。
+        request_params.lrc_should_spawn_subagent =
+            needs_cli_initialization || (is_lrc_tagged_in && !targets_cli_task);
 
         if let Some(running_command) = byop_get_running_command_for_lrc(&terminal_model) {
             request_params.lrc_running_command = Some(running_command.clone());
@@ -3635,38 +3654,10 @@ impl BlocklistAIController {
             }
         }
 
-        let response_stream = ctx.add_model(|ctx| {
-            // Create AIIdentifiers for the response stream
-            let ai_identifiers = AIIdentifiers {
-                server_output_id: None, // Will be populated by the successful response
-                server_conversation_id: server_conversation_token_for_identifiers.map(Into::into),
-                client_conversation_id: Some(conversation_data.id),
-                client_exchange_id: None,
-                model_id: Some(request_params.model.clone()),
-            };
-            ResponseStream::new(
-                request_params.clone(),
-                ai_identifiers,
-                can_attempt_resume_on_error && !is_summarization,
-                allow_auto_compaction,
-                persistence_checkpoint,
-                ctx,
-            )
-        });
-        let response_stream_id = response_stream.as_ref(ctx).id().clone();
-        let response_stream_clone = response_stream.clone();
+        let response_stream_id = ResponseStreamId::new_local();
         let input_contains_user_query = request_input
             .all_inputs()
             .any(|input| input.is_user_query());
-        ctx.subscribe_to_model(&response_stream, move |me, _, event, ctx| {
-            me.handle_response_stream_event(
-                input_contains_user_query,
-                event,
-                &response_stream_clone,
-                ctx,
-            );
-        });
-
         let is_passive_request = request_input
             .all_inputs()
             .any(|input| input.is_passive_request());
@@ -3685,25 +3676,20 @@ impl BlocklistAIController {
             }
         }
 
-        history_model.update(ctx, |history_model, ctx| {
-            match history_model.update_conversation_for_new_request_input(
+        // 先建立 exchange 与流的归属，失败时不能启动无法关联或取消的网络请求。
+        let history_update = history_model.update(ctx, |history_model, ctx| {
+            history_model.update_conversation_for_new_request_input(
                 request_input,
                 response_stream_id.clone(),
                 self.terminal_view_id,
                 ctx,
-            ) {
-                Ok(_) => {
-                    history_model.update_conversation_status(
-                        self.terminal_view_id,
-                        conversation_data.id,
-                        ConversationStatus::InProgress,
-                        ctx,
-                    );
-                }
-                Err(e) => {
-                    log::warn!("Failed to push new exchange to AI conversation: {e:?}");
-                }
-            }
+            )?;
+            history_model.update_conversation_status(
+                self.terminal_view_id,
+                conversation_data.id,
+                ConversationStatus::InProgress,
+                ctx,
+            );
             if let Some(recovery_id) = recovery_id
                 && let Some(conversation) = history_model.conversation_mut(&conversation_id)
             {
@@ -3716,6 +3702,41 @@ impl BlocklistAIController {
                         .set_recovery_owner(recovery_id, exchange_id);
                 }
             }
+            Ok::<(), UpdateHistoryError>(())
+        });
+        if let Err(error) = history_update {
+            // 流尚未登记，直接使用本次请求的会话 ID 收敛失败并停止关联命令。
+            self.fail_conversation_due_to_update_error(conversation_id, &response_stream_id, ctx);
+            return Err(error.into());
+        }
+
+        let response_stream = ctx.add_model(|ctx| {
+            // Create AIIdentifiers for the response stream
+            let ai_identifiers = AIIdentifiers {
+                server_output_id: None, // Will be populated by the successful response
+                server_conversation_id: server_conversation_token_for_identifiers.map(Into::into),
+                client_conversation_id: Some(conversation_data.id),
+                client_exchange_id: None,
+                model_id: Some(request_params.model.clone()),
+            };
+            ResponseStream::new(
+                response_stream_id.clone(),
+                request_params.clone(),
+                ai_identifiers,
+                can_attempt_resume_on_error && !is_summarization,
+                allow_auto_compaction,
+                persistence_checkpoint,
+                ctx,
+            )
+        });
+        let response_stream_clone = response_stream.clone();
+        ctx.subscribe_to_model(&response_stream, move |me, _, event, ctx| {
+            me.handle_response_stream_event(
+                input_contains_user_query,
+                event,
+                &response_stream_clone,
+                ctx,
+            );
         });
 
         self.in_flight_response_streams.register_new_stream(
@@ -3958,6 +3979,64 @@ impl BlocklistAIController {
         }
     }
 
+    /// 任务或历史状态已损坏时结束当前请求，避免继续消费输出或自动恢复。
+    fn fail_conversation_due_to_update_error(
+        &mut self,
+        conversation_id: AIConversationId,
+        stream_id: &ResponseStreamId,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        // 先封住延迟的 CLI 创建/恢复事件；取消和历史通知都在释放终端锁后执行。
+        {
+            let mut model = self.terminal_model.lock();
+            let block = model.block_list_mut().active_block_mut();
+            if block.is_executing() && block.ai_conversation_id() == Some(conversation_id) {
+                block.set_user_control_for_teardown();
+            }
+        }
+        let error = RenderableAIError::Other {
+            error_message: crate::t!("ai-error-conversation-update-failed"),
+            will_attempt_resume: false,
+            waiting_for_network: false,
+            is_user_error: false,
+        };
+        let terminal_view_id = self.terminal_view_id;
+        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+            if history.conversation_for_response_stream(stream_id) == Some(conversation_id) {
+                history.mark_response_stream_completed_with_error(
+                    error.clone(),
+                    false,
+                    stream_id,
+                    conversation_id,
+                    terminal_view_id,
+                    ctx,
+                );
+            }
+            // exchange 或 task 本身也可能缺失，不能依赖上面的写入成功才结束会话。
+            history.update_conversation_status_with_error(
+                terminal_view_id,
+                conversation_id,
+                ConversationStatus::Error,
+                Some(error),
+                ctx,
+            );
+        });
+        self.cancel_conversation_progress(
+            conversation_id,
+            CancellationReason::ConversationUpdateFailed,
+            ctx,
+        );
+        // 取消流时普通路径会等流完成后再处理动作；这里必须立即封住已排队的动作。
+        self.action_model.update(ctx, |actions, ctx| {
+            actions.cancel_all_pending_actions(
+                conversation_id,
+                Some(CancellationReason::ConversationUpdateFailed),
+                ctx,
+            );
+        });
+        ctx.emit(BlocklistAIControllerEvent::ConversationUpdateFailed { conversation_id });
+    }
+
     /// Clears finished action results for a conversation. Used when reverting.
     pub fn clear_finished_action_results(
         &mut self,
@@ -4051,13 +4130,21 @@ impl BlocklistAIController {
 
         match event {
             ResponseStreamEvent::ReceivedEvent(event) => {
-                // Dynamic lookup handles conversation splits mid-stream.
-                let Some(conversation_id) = BlocklistAIHistoryModel::as_ref(ctx)
-                    .conversation_for_response_stream(&stream_id)
+                // 已取消流的迟到事件不能重新写入历史或恢复动作。
+                let Some(conversation_id) = self
+                    .in_flight_response_streams
+                    .conversation_for_stream(&stream_id, ctx)
                 else {
-                    log::warn!("Could not find conversation for response stream: {stream_id:?}");
                     return;
                 };
+                if BlocklistAIHistoryModel::as_ref(ctx)
+                    .conversation_for_response_stream(&stream_id)
+                    .is_none()
+                {
+                    report_error!("Response stream lost its conversation history association");
+                    self.fail_conversation_due_to_update_error(conversation_id, &stream_id, ctx);
+                    return;
+                }
                 let Some(event) = event.consume() else {
                     debug_assert!(
                         false,
@@ -4163,9 +4250,20 @@ impl BlocklistAIController {
                                         )
                                     });
                                 if let Err(e) = apply_result {
-                                    log::error!(
-                                        "Failed to apply client actions to conversation: {e:?}"
+                                    report_error!(
+                                        anyhow::Error::new(e).context(
+                                            "Failed to apply client actions to conversation",
+                                        )
                                     );
+                                    // 同批动作可能先拆分会话再失败，以拆分后的流归属为准。
+                                    if let Some(owner) = self
+                                        .in_flight_response_streams
+                                        .conversation_for_stream(&stream_id, ctx)
+                                    {
+                                        self.fail_conversation_due_to_update_error(
+                                            owner, &stream_id, ctx,
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -4219,12 +4317,19 @@ impl BlocklistAIController {
                 let compaction_committed =
                     self.committed_byop_compaction_streams.remove(&stream_id);
                 let compact_after_stream = self.byop_compaction_after_stream.remove(&stream_id);
+                let registered_conversation_id = self
+                    .in_flight_response_streams
+                    .conversation_for_stream(&stream_id, ctx);
+                // 无论历史关联、会话或 exchange 是否仍存在，都必须先释放已结束的流。
+                self.in_flight_response_streams.cleanup_stream(&stream_id);
+                ctx.unsubscribe_from_model(response_stream);
                 // Cancellations provide conversation_id (survives truncation); otherwise use dynamic lookup.
                 let conversation_id = match &cancellation {
                     Some(stream_cancellation) => stream_cancellation.conversation_id,
                     None => {
                         let Some(id) = BlocklistAIHistoryModel::as_ref(ctx)
                             .conversation_for_response_stream(&stream_id)
+                            .or(registered_conversation_id)
                         else {
                             log::warn!(
                                 "Could not find conversation for response stream: {stream_id:?}"
@@ -4401,11 +4506,6 @@ impl BlocklistAIController {
                     }
                 }
 
-                // Cancelled streams will handle pending_response_stream updates synchronously.
-                if cancellation.is_none() {
-                    self.in_flight_response_streams.cleanup_stream(&stream_id);
-                }
-
                 // Before cleaning up the response stream, check if we should attempt to resume.
                 if response_stream
                     .as_ref(ctx)
@@ -4438,7 +4538,6 @@ impl BlocklistAIController {
                         conversation.cleanup_completed_response_stream(&stream_id);
                     }
                 });
-                ctx.unsubscribe_from_model(response_stream);
                 ctx.emit(BlocklistAIControllerEvent::FinishedReceivingOutput {
                     stream_id: stream_id.clone(),
                     conversation_id,
@@ -5005,3 +5104,7 @@ mod compaction_crash_tests;
 #[cfg(test)]
 #[path = "controller_skill_origin_tests.rs"]
 mod skill_origin_tests;
+
+#[cfg(test)]
+#[path = "controller_lrc_lifecycle_tests.rs"]
+mod lrc_lifecycle_tests;

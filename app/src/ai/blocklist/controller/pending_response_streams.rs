@@ -1,6 +1,6 @@
+use std::cell::Cell;
 use std::collections::HashMap;
 
-use itertools::Itertools;
 use warpui::{AppContext, ModelContext, ModelHandle, SingletonEntity};
 
 use super::BlocklistAIController;
@@ -10,7 +10,13 @@ use crate::ai::agent::CancellationReason;
 use crate::ai::agent::conversation::AIConversationId;
 
 pub(super) struct PendingResponseStreams {
-    streams: HashMap<ResponseStreamId, ModelHandle<ResponseStream>>,
+    streams: HashMap<ResponseStreamId, PendingResponseStream>,
+}
+
+struct PendingResponseStream {
+    stream: ModelHandle<ResponseStream>,
+    // 历史截断或任务异常会移除关联；取消必须仍能找到请求的最近所属会话。
+    conversation_id: Cell<AIConversationId>,
 }
 
 impl PendingResponseStreams {
@@ -25,13 +31,9 @@ impl PendingResponseStreams {
         conversation_id: AIConversationId,
         app: &AppContext,
     ) -> bool {
-        let history_model = BlocklistAIHistoryModel::as_ref(app);
-        let Some(conversation) = history_model.conversation(&conversation_id) else {
-            return false;
-        };
         self.streams
             .keys()
-            .any(|stream_id| conversation.is_processing_response_stream(stream_id))
+            .any(|stream_id| self.conversation_for_stream(stream_id, app) == Some(conversation_id))
     }
 
     /// Returns the IDs of all in-flight streams owned by the given conversation.
@@ -40,15 +42,28 @@ impl PendingResponseStreams {
         conversation_id: AIConversationId,
         app: &AppContext,
     ) -> Vec<ResponseStreamId> {
-        let history_model = BlocklistAIHistoryModel::as_ref(app);
-        let Some(conversation) = history_model.conversation(&conversation_id) else {
-            return Vec::new();
-        };
         self.streams
             .keys()
-            .filter(|stream_id| conversation.is_processing_response_stream(stream_id))
+            .filter(|stream_id| {
+                self.conversation_for_stream(stream_id, app) == Some(conversation_id)
+            })
             .cloned()
             .collect()
+    }
+
+    pub fn conversation_for_stream(
+        &self,
+        stream_id: &ResponseStreamId,
+        app: &AppContext,
+    ) -> Option<AIConversationId> {
+        let pending = self.streams.get(stream_id)?;
+        // 会话拆分后以最新历史关联为准，同时保存下来供后续取消使用。
+        if let Some(conversation_id) =
+            BlocklistAIHistoryModel::as_ref(app).conversation_for_response_stream(stream_id)
+        {
+            pending.conversation_id.set(conversation_id);
+        }
+        Some(pending.conversation_id.get())
     }
 
     pub fn register_new_stream(
@@ -60,7 +75,13 @@ impl PendingResponseStreams {
         ctx: &mut ModelContext<BlocklistAIController>,
     ) {
         self.try_cancel_streams_for_conversation(conversation_id, reason, ctx);
-        self.streams.insert(stream_id, stream);
+        self.streams.insert(
+            stream_id,
+            PendingResponseStream {
+                stream,
+                conversation_id: Cell::new(conversation_id),
+            },
+        );
     }
 
     pub fn cleanup_stream(&mut self, stream_id: &ResponseStreamId) {
@@ -73,17 +94,14 @@ impl PendingResponseStreams {
         reason: CancellationReason,
         ctx: &mut ModelContext<BlocklistAIController>,
     ) -> bool {
-        if let Some(stream) = self.streams.remove(stream_id) {
-            // Look up which conversation owns this stream
-            let Some(conversation_id) =
-                BlocklistAIHistoryModel::as_ref(ctx).conversation_for_response_stream(stream_id)
-            else {
-                log::warn!("Could not find conversation for stream {stream_id:?}, cannot cancel");
-                return false;
-            };
-
-            stream.update(ctx, |stream, ctx| {
-                stream.cancel(reason, conversation_id, ctx)
+        let conversation_id = self.conversation_for_stream(stream_id, ctx);
+        if let Some(pending) = self.streams.remove(stream_id) {
+            pending.stream.update(ctx, |stream, ctx| {
+                stream.cancel(
+                    reason,
+                    conversation_id.unwrap_or(pending.conversation_id.get()),
+                    ctx,
+                )
             });
             return true;
         }
@@ -97,31 +115,11 @@ impl PendingResponseStreams {
         reason: CancellationReason,
         ctx: &mut ModelContext<BlocklistAIController>,
     ) -> bool {
-        let history_model = BlocklistAIHistoryModel::as_ref(ctx);
-        let Some(conversation) = history_model.conversation(&conversation_id) else {
-            return false;
-        };
-
-        let streams_to_cancel = self
-            .streams
-            .extract_if(|stream_id, _| conversation.is_processing_response_stream(stream_id))
-            .map(|(_, stream)| stream)
-            .collect_vec();
-
-        if streams_to_cancel.is_empty() {
-            false
-        } else {
-            for response_stream in streams_to_cancel.into_iter() {
-                log::info!(
-                    "Canceling active stream for conversation_id={conversation_id:?}, \
-                     reason={reason}, backtrace=\n{}",
-                    std::backtrace::Backtrace::force_capture()
-                );
-                response_stream.update(ctx, |stream, ctx| {
-                    stream.cancel(reason, conversation_id, ctx)
-                });
-            }
-            true
+        let streams_to_cancel = self.stream_ids_for_conversation(conversation_id, ctx);
+        let did_cancel = !streams_to_cancel.is_empty();
+        for stream_id in streams_to_cancel {
+            self.try_cancel_stream(&stream_id, reason, ctx);
         }
+        did_cancel
     }
 }

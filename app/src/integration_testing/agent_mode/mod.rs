@@ -1,6 +1,7 @@
 mod assertions;
 pub mod llm_judge;
 mod step;
+mod stop_task;
 mod user_defaults;
 mod util;
 use std::collections::{BTreeMap, HashSet};
@@ -10,6 +11,7 @@ use std::sync::Mutex;
 
 pub use assertions::*;
 pub use step::*;
+pub use stop_task::*;
 pub use user_defaults::*;
 pub use util::*;
 use warp_errors::report_error;

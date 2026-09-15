@@ -4358,7 +4358,12 @@ pub async fn generate_byop_output(
                 ))));
                 return;
             };
-            let subtask_id = Uuid::new_v4().to_string();
+            // 请求已绑定 optimistic CLI 子任务时保持其 ID，后续轮仍写入同一任务。
+            let subtask_id = if target_task_id == task_id {
+                Uuid::new_v4().to_string()
+            } else {
+                target_task_id.clone()
+            };
             let tool_call_id = Uuid::new_v4().to_string();
             log::info!("[byop] LRC tag-in: spawning cli subagent");
 
@@ -8748,3 +8753,7 @@ mod live_tests;
 #[cfg(test)]
 #[path = "chat_stream_skill_tests.rs"]
 mod skill_tests;
+
+#[cfg(test)]
+#[path = "chat_stream_lrc_tests.rs"]
+mod lrc_tests;

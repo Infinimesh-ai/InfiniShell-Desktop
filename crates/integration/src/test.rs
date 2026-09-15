@@ -3,6 +3,7 @@
 //! to be run.
 
 mod agent_mode;
+mod agent_stop;
 mod ai_assistant;
 mod ai_document;
 mod block_filtering;
@@ -50,6 +51,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 pub use agent_mode::*;
+pub use agent_stop::*;
 pub use ai_assistant::*;
 pub use ai_document::*;
 use anyhow::{Result, anyhow};

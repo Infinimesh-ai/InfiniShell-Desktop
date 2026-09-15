@@ -21,6 +21,8 @@ integration_tests! {
     test_rc_files_only_sourced_once_during_bootstrapping,
     // Test ctrl-c terminates long-running commands.
     test_ctrl_c,
+    // POSIX 无限轮询必须能通过一次鼠标点击停止，并继续执行命令。
+    test_stop_task_interrupts_monitoring_loop,
     // Test copying a block's command gives us the expected command string.
     test_open_context_menu_and_execute_command,
     // Test we get the right metadata from a bootstrapped shell.

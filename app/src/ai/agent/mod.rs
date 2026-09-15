@@ -117,6 +117,8 @@ pub enum CancellationReason {
     /// finalized as a terminal `Error` (with a shell-exit message) by the
     /// controller rather than reported as a user cancellation.
     AgentExitedShell,
+    /// 会话状态写入失败，由控制器记录错误；取消仅用于停止后续流和动作。
+    ConversationUpdateFailed,
 }
 
 /// How a [`CancellationReason`] maps to the conversation's resulting status.
@@ -157,6 +159,9 @@ impl Display for CancellationReason {
             }
             CancellationReason::AgentExitedShell => {
                 write!(f, "agent command exited the shell")
+            }
+            CancellationReason::ConversationUpdateFailed => {
+                write!(f, "conversation update failed")
             }
         }
     }
@@ -203,7 +208,9 @@ impl CancellationReason {
             | CancellationReason::Reverted => CancellationOutcome::Succeeded,
             // The shell died under the agent; a dedicated path finalizes this as a
             // terminal `Error`, so the cancellation machinery must not stamp a status.
-            CancellationReason::AgentExitedShell => CancellationOutcome::FinalizedExternally,
+            CancellationReason::AgentExitedShell | CancellationReason::ConversationUpdateFailed => {
+                CancellationOutcome::FinalizedExternally
+            }
             CancellationReason::ManuallyCancelled
             | CancellationReason::AutomaticCloudHandoff
             | CancellationReason::UserCommandExecuted
@@ -609,11 +616,11 @@ impl AIAgentOutput {
                     last_was_action = false;
                 }
                 AIAgentOutputMessageType::Action(action) => {
-                    // Include action results from the action model if available
-                    if let Some(action_model) = action_model
-                        && let Some(action_result) = action_model.get_action_result(&action.id)
-                    {
-                        result.push(format!("{}", MarkdownActionResult(&action_result.result)));
+                    let action_result = action_model
+                        .and_then(|model| model.get_action_result(&action.id))
+                        .map(|result| &result.result);
+                    if let Some(markdown) = action.format_for_copy(action_result) {
+                        result.push(markdown);
                         // Add an extra newline after tool call results for readability
                         result.push(String::new());
                         last_was_action = true;
@@ -1128,6 +1135,31 @@ impl Display for AIAgentAction {
 }
 
 impl AIAgentAction {
+    fn format_for_copy(&self, result: Option<&AIAgentActionResultType>) -> Option<String> {
+        let request_cancelled = matches!(
+            result,
+            Some(AIAgentActionResultType::RequestCommandOutput(
+                RequestCommandOutputResult::CancelledBeforeExecution
+            ))
+        );
+        // 取消和恢复后可能没有完整结果，原始命令仍保存在 action 中。
+        // 这里仅说明请求状态，不把取消请求等同于进程已经退出。
+        if let AIAgentActionType::RequestCommandOutput { command, .. } = &self.action
+            && (request_cancelled || result.is_none())
+        {
+            let label = crate::t!("ai-export-requested-command");
+            let status = if request_cancelled {
+                crate::t!("ai-export-command-request-cancelled")
+            } else {
+                crate::t!("ai-export-command-result-unavailable")
+            };
+            return Some(format!(
+                "\n**{label}**\n```bash\n{command}\n```\n\n_{status}_"
+            ));
+        }
+        result.map(|result| format!("{}", MarkdownActionResult(result)))
+    }
+
     pub fn is_request_file_edit(&self) -> bool {
         matches!(self.action, AIAgentActionType::RequestFileEdits { .. })
     }

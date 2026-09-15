@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use warpui::App;
+
 use super::*;
 use crate::ai::agent::AIAgentActionResultType;
 use crate::ai::agent::task::TaskId;
+use crate::test_util::terminal::{add_window_with_terminal, initialize_app_for_terminal_view};
 
 fn make_action_result(id: &str) -> Arc<AIAgentActionResult> {
     Arc::new(AIAgentActionResult {
@@ -99,4 +102,101 @@ fn finished_results_stay_in_original_action_order() {
         finished_results[2].id,
         AIAgentActionId::from("third".to_owned())
     );
+}
+
+#[test]
+fn cancellation_drops_preprocessing_and_late_results_leave_new_batches_untouched() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |terminal, ctx| {
+            let action_model = ctx.add_model(|ctx| {
+                BlocklistAIActionModel::new(
+                    terminal.model.clone(),
+                    terminal.active_session().clone(),
+                    terminal.model_event_dispatcher(),
+                    terminal.id(),
+                    ctx,
+                )
+            });
+            action_model.update(ctx, |model, ctx| {
+                let conversation_id = AIConversationId::new();
+                let healthy_conversation_id = AIConversationId::new();
+                let action = AIAgentAction {
+                    id: AIAgentActionId::from("late-command".to_owned()),
+                    task_id: TaskId::new("task".to_owned()),
+                    action: AIAgentActionType::RequestCommandOutput {
+                        command: "true".to_owned(),
+                        is_read_only: Some(true),
+                        is_risky: Some(false),
+                        rationale: None,
+                        uses_pager: Some(false),
+                        wait_until_completion: false,
+                        citations: vec![],
+                    },
+                    requires_result: true,
+                };
+                let old_batch = model
+                    .pending_preprocessed_actions
+                    .entry(conversation_id)
+                    .or_default()
+                    .insert_preprocess_action_batch(HashSet::from([action.id.clone()]));
+                let healthy_action = AIAgentActionId::from("healthy-command".to_owned());
+                model
+                    .pending_preprocessed_actions
+                    .entry(healthy_conversation_id)
+                    .or_default()
+                    .insert_preprocess_action_batch(HashSet::from([healthy_action.clone()]));
+                assert!(matches!(
+                    model.get_action_status(&action.id),
+                    Some(AIActionStatus::Preprocessing)
+                ));
+                model.cancel_all_pending_actions(
+                    conversation_id,
+                    Some(CancellationReason::ManuallyCancelled),
+                    ctx,
+                );
+                assert!(model.get_action_status(&action.id).is_none());
+                assert!(matches!(
+                    model.get_action_status(&healthy_action),
+                    Some(AIActionStatus::Preprocessing)
+                ));
+
+                model.handle_preprocess_actions_results(
+                    conversation_id,
+                    old_batch.clone(),
+                    vec![action.clone()],
+                    true,
+                    ctx,
+                );
+                assert!(model.get_action_status(&action.id).is_none());
+                assert!(!model.has_unfinished_actions_for_conversation(conversation_id));
+
+                let new_action = AIAgentActionId::from("new-command".to_owned());
+                let new_batch = model
+                    .pending_preprocessed_actions
+                    .entry(conversation_id)
+                    .or_default()
+                    .insert_preprocess_action_batch(HashSet::from([new_action.clone()]));
+                // ID 由 UUID 生成，清空旧队列后也不能让旧回调匹配到新批次。
+                assert_ne!(old_batch, new_batch);
+                model.handle_preprocess_actions_results(
+                    conversation_id,
+                    old_batch,
+                    vec![action.clone()],
+                    true,
+                    ctx,
+                );
+                assert!(model.get_action_status(&action.id).is_none());
+                assert!(matches!(
+                    model.get_action_status(&new_action),
+                    Some(AIActionStatus::Preprocessing)
+                ));
+                assert!(matches!(
+                    model.get_action_status(&healthy_action),
+                    Some(AIActionStatus::Preprocessing)
+                ));
+            });
+        });
+    });
 }

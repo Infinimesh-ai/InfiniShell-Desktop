@@ -5,11 +5,13 @@ use anyhow::anyhow;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use warp_multi_agent_api::{FileContent, FileContentLineRange};
 
+use crate::ai::agent::task::TaskId;
 use crate::ai::agent::{
-    AIAgentContext, AIAgentOutput, AIAgentOutputMessage, AIAgentOutputMessageType, AIAgentText,
-    AIAgentTextSection, AgentOutputImage, AgentOutputImageLayout, AgentOutputMermaidDiagram,
-    AnyFileContent, FileContext, FormattedTextWrapper, MessageId, ProgrammingLanguage,
-    RenderableAIError, TransientNetworkErrorKind,
+    AIAgentAction, AIAgentActionId, AIAgentActionResultType, AIAgentActionType, AIAgentContext,
+    AIAgentOutput, AIAgentOutputMessage, AIAgentOutputMessageType, AIAgentText, AIAgentTextSection,
+    AgentOutputImage, AgentOutputImageLayout, AgentOutputMermaidDiagram, AnyFileContent,
+    FileContext, FormattedTextWrapper, MessageId, ProgrammingLanguage, RenderableAIError,
+    RequestCommandOutputResult, TransientNetworkErrorKind,
 };
 // Zap:`server::server_api` 云端网关已剥离,`AIApiError` 现居 `crate::ai::api_error`。
 use crate::ai::api_error::AIApiError;
@@ -352,3 +354,75 @@ fn format_for_copy_preserves_visual_markdown_sections() {
 
 #[path = "suggestions_tests.rs"]
 mod suggestions;
+
+fn monitoring_command_action() -> AIAgentAction {
+    AIAgentAction {
+        id: AIAgentActionId::from("monitor-command".to_owned()),
+        task_id: TaskId::new("monitor-task".to_owned()),
+        action: AIAgentActionType::RequestCommandOutput {
+            command: "while true; do\n  date\n  sleep 10\ndone".to_owned(),
+            is_read_only: Some(true),
+            is_risky: Some(false),
+            wait_until_completion: false,
+            uses_pager: Some(false),
+            rationale: None,
+            citations: Vec::new(),
+        },
+        requires_result: true,
+    }
+}
+
+#[test]
+fn format_for_copy_preserves_command_without_result() {
+    let output = AIAgentOutput {
+        messages: vec![AIAgentOutputMessage {
+            id: MessageId::new("monitor-message".to_owned()),
+            message: AIAgentOutputMessageType::Action(monitoring_command_action()),
+            citations: Vec::new(),
+        }],
+        ..Default::default()
+    };
+
+    assert!(
+        output
+            .format_for_copy(None)
+            .contains("while true; do\n  date\n  sleep 10\ndone")
+    );
+}
+
+#[test]
+fn format_for_copy_preserves_cancelled_command() {
+    let action = monitoring_command_action();
+    let result = AIAgentActionResultType::RequestCommandOutput(
+        RequestCommandOutputResult::CancelledBeforeExecution,
+    );
+    let markdown = action.format_for_copy(Some(&result)).unwrap();
+
+    assert!(markdown.contains("```bash\nwhile true; do\n  date\n  sleep 10\ndone\n```"));
+    assert!(markdown.contains(&crate::t!("ai-export-command-request-cancelled")));
+    assert!(!markdown.contains(&crate::t!("ai-export-command-result-unavailable")));
+}
+
+#[test]
+fn format_for_copy_keeps_completed_command_and_output_once() {
+    let action = monitoring_command_action();
+    let command = action.executable_command().unwrap();
+    let result =
+        AIAgentActionResultType::RequestCommandOutput(RequestCommandOutputResult::Completed {
+            block_id: "monitor-block".to_owned().into(),
+            command: command.clone(),
+            output: "monitor stopped".to_owned(),
+            exit_code: 130.into(),
+            start_ts: None,
+            completed_ts: None,
+        });
+    let markdown = action.format_for_copy(Some(&result)).unwrap();
+
+    assert_eq!(markdown.matches(&command).count(), 1);
+    assert!(markdown.contains("monitor stopped"));
+    assert!(!markdown.contains(&crate::t!("ai-export-command-result-unavailable")));
+    assert_eq!(
+        markdown,
+        format!("{}", super::MarkdownActionResult(&result))
+    );
+}

@@ -1041,11 +1041,13 @@ impl BlocklistAIActionModel {
         auto_accept: bool,
         ctx: &mut ModelContext<Self>,
     ) {
-        let actions_to_enqueue = self
-            .pending_preprocessed_actions
-            .entry(conversation_id)
-            .or_default()
-            .handle_preprocess_actions_result(preprocess_id, actions);
+        // 已取消批次的异步预处理仍可能返回，不能借此重新建立动作队列。
+        let Some(preprocessing) = self.pending_preprocessed_actions.get_mut(&conversation_id)
+        else {
+            return;
+        };
+        let actions_to_enqueue =
+            preprocessing.handle_preprocess_actions_result(preprocess_id, actions);
 
         let mut auto_accept_ids: Vec<AIAgentActionId> = Vec::new();
         for action in actions_to_enqueue {
@@ -1201,6 +1203,8 @@ impl BlocklistAIActionModel {
         reason: Option<CancellationReason>,
         ctx: &mut ModelContext<Self>,
     ) {
+        // 先撤销尚未进入执行队列的批次；迟到的预处理回调不再有派发资格。
+        self.pending_preprocessed_actions.remove(&conversation_id);
         self.executor.update(ctx, |executor, ctx| {
             executor.cancel_all_running_async_actions_for_conversation(conversation_id, reason, ctx)
         });

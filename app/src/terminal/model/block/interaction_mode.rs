@@ -141,7 +141,7 @@ impl Block {
         self.is_active_and_long_running()
             && self
                 .long_running_control_state()
-                .is_some_and(LongRunningCommandControlState::is_user_in_control)
+                .is_some_and(|state| state.is_user_in_control() && state.should_auto_resume())
     }
 
     pub fn update_is_agent_blocked(&mut self, new_value: bool) {
@@ -161,14 +161,12 @@ impl Block {
     /// stop) where the conversation has been cancelled and must not resume when the command
     /// completes.
     pub fn set_user_control_for_teardown(&mut self) {
-        if let InteractionMode::Agent(metadata) = &mut self.interaction_mode
-            && let Some(state) = &mut metadata.long_running_control_state
-        {
-            *state = LongRunningCommandControlState::User {
+        if let InteractionMode::Agent(metadata) = &mut self.interaction_mode {
+            metadata.long_running_control_state = Some(LongRunningCommandControlState::User {
                 reason: UserTakeOverReason::Stop {
                     should_auto_resume: false,
                 },
-            };
+            });
         }
     }
 

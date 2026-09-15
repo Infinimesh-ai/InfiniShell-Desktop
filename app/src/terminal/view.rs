@@ -3796,7 +3796,7 @@ impl TerminalView {
                 });
                 ctx.emit(Event::SummarizationCancelDialogToggled { is_open: *is_open });
             }
-            BlocklistAIStatusBarEvent::Stop => me.ctrl_c(ctx),
+            BlocklistAIStatusBarEvent::Stop => me.stop_active_agent_task(ctx),
         });
 
         let ai_render_context = Rc::new(RefCell::new(BlocklistAIRenderContext {
@@ -5262,6 +5262,22 @@ impl TerminalView {
         event: &BlocklistAIControllerEvent,
         ctx: &mut ViewContext<Self>,
     ) {
+        if let BlocklistAIControllerEvent::ConversationUpdateFailed { conversation_id } = event {
+            // 错误状态已由控制器记录；只停止对应命令，不覆盖为用户取消。
+            // 自动失败事件必须匹配命令归属，不能中断用户后来手动启动的命令。
+            let owns_active_command = self
+                .model
+                .lock()
+                .block_list()
+                .active_block()
+                .ai_conversation_id()
+                == Some(*conversation_id);
+            if owns_active_command
+                && self.prepare_command_for_conversation_stop(*conversation_id, ctx)
+            {
+                self.write_to_pty(vec![escape_sequences::C0::ETX], ctx);
+            }
+        }
         if let BlocklistAIControllerEvent::SentRequest { model_id, .. } = event {
             self.maybe_insert_aws_bedrock_login_banner(model_id, ctx);
         }
@@ -5578,6 +5594,18 @@ impl TerminalView {
         conversation_id: AIConversationId,
         ctx: &mut ViewContext<Self>,
     ) {
+        // 停止或失败后的命令完成事件不能自动发送排队追问并重新启动任务。
+        if BlocklistAIHistoryModel::as_ref(ctx)
+            .conversation(&conversation_id)
+            .is_none_or(|conversation| {
+                matches!(
+                    conversation.status(),
+                    ConversationStatus::Cancelled | ConversationStatus::Error
+                )
+            })
+        {
+            return;
+        }
         let has_active_subagent = BlocklistAIHistoryModel::as_ref(ctx)
             .conversation(&conversation_id)
             .is_some_and(|conversation| conversation.has_active_subagent());
@@ -7848,9 +7876,21 @@ impl TerminalView {
                 self.write_agent_bytes_to_pty(input.to_vec(), mode, ctx);
             }
             ShellCommandExecutorEvent::CancelExecution => {
-                // We need to manually invoke ctrl-c to terminate the running command because the
-                // user's ctrl-c was directed to the AIBlock instead of the command's shell block.
-                self.ctrl_c(ctx);
+                // 执行器取消必须直接中断命令，不能复用第一次仅接管的键盘逻辑。
+                // 显式停止已先设置 teardown，不能再重复发送中断。
+                let should_interrupt = {
+                    let mut model = self.model.lock();
+                    let block = model.block_list_mut().active_block_mut();
+                    if block.is_agent_driving_command() {
+                        block.set_user_control_for_teardown();
+                        true
+                    } else {
+                        false
+                    }
+                };
+                if should_interrupt {
+                    self.write_to_pty(vec![escape_sequences::C0::ETX], ctx);
+                }
             }
             ShellCommandExecutorEvent::TransferControlToUser {
                 block_id,
@@ -8846,41 +8886,45 @@ impl TerminalView {
         ctx.emit(Event::ShutdownPty);
     }
 
-    pub(crate) fn stop_local_agent_conversation(
+    /// 显式停止不复用键盘 Ctrl-C 的复制、清空输入和首次接管逻辑。
+    fn stop_active_agent_task(&mut self, ctx: &mut ViewContext<Self>) {
+        let conversation_id = self
+            .active_conversation_id(ctx)
+            .or_else(|| BlocklistAIHistoryModel::as_ref(ctx).active_conversation_id(self.view_id))
+            .or_else(|| {
+                self.model
+                    .lock()
+                    .block_list()
+                    .active_block()
+                    .ai_conversation_id()
+            });
+        if let Some(conversation_id) = conversation_id {
+            self.stop_local_agent_conversation(conversation_id, ctx);
+        }
+        ctx.notify();
+    }
+
+    fn prepare_command_for_conversation_stop(
         &mut self,
         conversation_id: AIConversationId,
         ctx: &mut ViewContext<Self>,
-    ) {
-        // 只有真的还有在飞的响应流时,取消流程才会自己把会话落成 Cancelled;否则要靠下面手动置位。
-        // 不能拿「会话状态是不是 InProgress」当等价判断 —— 刚建出来、还没发过请求的会话就是
-        // InProgress 但没有流,那样会漏掉状态写入(Stop 接管后再按一次 Ctrl-C 取消不了会话)。
-        let had_active_stream = self
-            .ai_controller
-            .as_ref(ctx)
-            .has_active_stream_for_conversation(conversation_id, ctx);
-
-        self.ai_controller.update(ctx, |controller, ctx| {
-            controller.cancel_conversation_progress(
-                conversation_id,
-                CancellationReason::ManuallyCancelled,
-                ctx,
-            );
-        });
-
-        let visible_conversation_id = self
-            .agent_view_controller
-            .as_ref(ctx)
-            .agent_view_state()
-            .active_conversation_id();
+    ) -> bool {
+        let visible_conversation_id = self.active_conversation_id(ctx);
         let history_active_conversation_id =
             BlocklistAIHistoryModel::as_ref(ctx).active_conversation_id(self.view_id);
 
-        let should_interrupt_active_command = {
+        // 先解除命令控制并禁止完成后恢复，再取消响应流，避免取消回调重新接管命令。
+        // 元数据缺失时使用当前会话兜底；已明确属于其他会话的命令不能被误停。
+        {
             let mut model = self.model.lock();
             let active_block = model.block_list_mut().active_block_mut();
-            let active_block_matches = active_block.ai_conversation_id() == Some(conversation_id)
-                || visible_conversation_id == Some(conversation_id)
-                || history_active_conversation_id == Some(conversation_id);
+            let active_block_matches = match active_block.ai_conversation_id() {
+                Some(active_conversation_id) => active_conversation_id == conversation_id,
+                None => {
+                    visible_conversation_id == Some(conversation_id)
+                        || history_active_conversation_id == Some(conversation_id)
+                }
+            };
             let command_is_running = active_block.is_executing()
                 || active_block.is_command_grid_active()
                 || active_block.is_active_and_long_running();
@@ -8891,22 +8935,39 @@ impl TerminalView {
             } else {
                 false
             }
-        };
+        }
+    }
+
+    pub(crate) fn stop_local_agent_conversation(
+        &mut self,
+        conversation_id: AIConversationId,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let should_interrupt_active_command =
+            self.prepare_command_for_conversation_stop(conversation_id, ctx);
+
+        self.ai_controller.update(ctx, |controller, ctx| {
+            controller.cancel_conversation_progress(
+                conversation_id,
+                CancellationReason::ManuallyCancelled,
+                ctx,
+            );
+        });
 
         if should_interrupt_active_command {
-            self.user_write_ctrl_c_to_pty(ctx);
+            // 按任务停止只中断本终端，不经由同步输入广播到其他终端。
+            self.write_to_pty(vec![escape_sequences::C0::ETX], ctx);
         }
 
-        if !had_active_stream {
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
-                history.update_conversation_status(
-                    self.view_id,
-                    conversation_id,
-                    ConversationStatus::Cancelled,
-                    ctx,
-                );
-            });
-        }
+        // 任务或响应流的关联异常不能妨碍停止状态落盘，也不能等待命令退出后才更新。
+        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+            history.update_conversation_status(
+                self.view_id,
+                conversation_id,
+                ConversationStatus::Cancelled,
+                ctx,
+            );
+        });
     }
 
     fn user_write_ctrl_c_to_pty(&mut self, ctx: &mut ViewContext<Self>) {

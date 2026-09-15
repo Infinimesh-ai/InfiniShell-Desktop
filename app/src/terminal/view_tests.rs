@@ -34,6 +34,7 @@ use crate::ai::blocklist::agent_view::{
 use crate::ai::blocklist::block::cli_controller::{
     LongRunningCommandControlState, UserTakeOverReason,
 };
+use crate::ai::blocklist::block::status_bar::BlocklistAIStatusBarAction;
 use crate::ai::blocklist::{
     BlocklistAIHistoryEvent, BlocklistAIHistoryModel, InputConfig, InputType, ResponseStream,
     ResponseStreamId, SerializedBlockListItem,
@@ -6666,6 +6667,478 @@ fn inline_agent_view_exits_when_tagged_in_long_running_command_is_tagged_out() {
 }
 
 #[test]
+fn stop_task_button_interrupts_agent_command_with_selection_and_no_stream() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _agent_view = FeatureFlag::AgentView.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let pty_writes = Rc::new(RefCell::new(Vec::new()));
+        let writes = pty_writes.clone();
+        let synced_interrupts = Rc::new(RefCell::new(Vec::new()));
+        let synced = synced_interrupts.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::WriteBytesToPty { bytes } = event {
+                    writes.borrow_mut().push(bytes.to_vec());
+                }
+                if let Event::SyncInput(SyncEvent {
+                    data: SyncInputType::NonEditorTyped { chars },
+                    ..
+                }) = event
+                {
+                    synced.borrow_mut().push(chars.clone());
+                }
+            });
+        });
+
+        let (conversation_id, block_id) = terminal.update(&mut app, |view, ctx| {
+            let conversation_id =
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    history.start_new_conversation(view.view_id, false, false, false, ctx)
+                });
+            let mut model = view.model.lock();
+            model.simulate_long_running_block("while true; do date; sleep 10; done", "running");
+            let block = model.block_list_mut().active_block_mut();
+            block.set_agent_interaction_mode_for_requested_command(
+                AIAgentActionId::from("poll-command".to_owned()),
+                None,
+                conversation_id,
+            );
+            block
+                .set_agent_interaction_mode_for_agent_monitored_command(
+                    &TaskId::new("missing-cli-task".to_owned()),
+                    conversation_id,
+                )
+                .expect("命令应由 Agent 控制");
+            let block_id = block.id().clone();
+            let offset = block.command_grid_offset();
+            model.block_list_mut().start_selection(
+                BlockListPoint::new(offset, 0),
+                SelectionType::Simple,
+                Side::Left,
+            );
+            model
+                .block_list_mut()
+                .update_selection(BlockListPoint::new(offset, 5), Side::Right);
+            (conversation_id, block_id)
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            assert!(view.model.lock().block_list().selection().is_some());
+            let status_bar = view.input.as_ref(ctx).agent_status_bar().clone();
+            status_bar.update(ctx, |bar, ctx| {
+                bar.handle_action(&BlocklistAIStatusBarAction::Stop, ctx)
+            });
+        });
+
+        assert_eq!(*pty_writes.borrow(), vec![vec![C0::ETX]]);
+        assert!(
+            synced_interrupts.borrow().is_empty(),
+            "显式停止不能中断其他同步终端"
+        );
+        terminal.update(&mut app, |view, ctx| {
+            assert_eq!(
+                BlocklistAIHistoryModel::as_ref(ctx)
+                    .conversation(&conversation_id)
+                    .expect("会话应存在")
+                    .status(),
+                &ConversationStatus::Cancelled
+            );
+            assert_eq!(
+                view.model
+                    .lock()
+                    .block_list()
+                    .active_block()
+                    .long_running_control_state(),
+                Some(&LongRunningCommandControlState::User {
+                    reason: UserTakeOverReason::Stop {
+                        should_auto_resume: false
+                    },
+                })
+            );
+            view.on_user_block_completed(&block_id, ctx);
+            assert!(
+                !view
+                    .ai_controller
+                    .as_ref(ctx)
+                    .has_active_stream_for_conversation(conversation_id, ctx)
+            );
+        });
+    })
+}
+
+#[test]
+fn stop_task_button_interrupts_command_with_missing_agent_metadata() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let pty_writes = Rc::new(RefCell::new(Vec::new()));
+        let writes = pty_writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::WriteBytesToPty { bytes } = event {
+                    writes.borrow_mut().push(bytes.to_vec());
+                }
+            });
+        });
+        let conversation_id = terminal.update(&mut app, |view, ctx| {
+            let conversation_id =
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    let id = history.start_new_conversation(view.view_id, false, false, false, ctx);
+                    history.set_active_conversation_id(id, view.view_id, ctx);
+                    id
+                });
+            view.model
+                .lock()
+                .simulate_long_running_block("while true; do date; sleep 10; done", "running");
+            conversation_id
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            let status_bar = view.input.as_ref(ctx).agent_status_bar().clone();
+            status_bar.update(ctx, |bar, ctx| {
+                bar.handle_action(&BlocklistAIStatusBarAction::Stop, ctx)
+            });
+        });
+
+        assert_eq!(*pty_writes.borrow(), vec![vec![C0::ETX]]);
+        terminal.read(&app, |_, ctx| {
+            assert_eq!(
+                BlocklistAIHistoryModel::as_ref(ctx)
+                    .conversation(&conversation_id)
+                    .expect("会话应存在")
+                    .status(),
+                &ConversationStatus::Cancelled
+            );
+        });
+    })
+}
+
+#[test]
+fn stop_task_does_not_interrupt_command_owned_by_another_conversation() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let pty_writes = Rc::new(RefCell::new(Vec::new()));
+        let writes = pty_writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::WriteBytesToPty { bytes } = event {
+                    writes.borrow_mut().push(bytes.to_vec());
+                }
+            });
+        });
+        let (visible_id, command_id) = terminal.update(&mut app, |view, ctx| {
+            let (visible_id, command_id) =
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    let visible_id =
+                        history.start_new_conversation(view.view_id, false, false, false, ctx);
+                    let command_id =
+                        history.start_new_conversation(view.view_id, false, false, false, ctx);
+                    history.set_active_conversation_id(visible_id, view.view_id, ctx);
+                    (visible_id, command_id)
+                });
+            view.model
+                .lock()
+                .simulate_long_running_block("sleep 20", "running");
+            set_active_block_agent_driving(view, command_id);
+            (visible_id, command_id)
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            view.stop_local_agent_conversation(visible_id, ctx);
+        });
+
+        assert!(pty_writes.borrow().is_empty());
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(
+                BlocklistAIHistoryModel::as_ref(ctx)
+                    .conversation(&visible_id)
+                    .expect("被停止的会话应存在")
+                    .status(),
+                &ConversationStatus::Cancelled
+            );
+            assert_eq!(
+                BlocklistAIHistoryModel::as_ref(ctx)
+                    .conversation(&command_id)
+                    .expect("命令所属会话应存在")
+                    .status(),
+                &ConversationStatus::InProgress
+            );
+            assert!(
+                view.model
+                    .lock()
+                    .block_list()
+                    .active_block()
+                    .is_agent_driving_command()
+            );
+        });
+    })
+}
+
+#[test]
+fn stop_task_before_cli_initialization_does_not_regain_agent_control() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let (conversation_id, block_id) = terminal.update(&mut app, |view, ctx| {
+            let conversation_id =
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    history.start_new_conversation(view.view_id, false, false, false, ctx)
+                });
+            view.model
+                .lock()
+                .simulate_long_running_block("while true; do date; sleep 10; done", "running");
+            set_active_block_agent_driving(view, conversation_id);
+            let block_id = view.model.lock().block_list().active_block_id().clone();
+            (conversation_id, block_id)
+        });
+        terminal.update(&mut app, |view, ctx| {
+            view.stop_local_agent_conversation(conversation_id, ctx);
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                history
+                    .create_cli_subagent_task_for_conversation(
+                        block_id.clone(),
+                        conversation_id,
+                        view.view_id,
+                        ctx,
+                    )
+                    .expect("模拟延迟到达的子任务创建");
+            });
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            assert_eq!(
+                view.model
+                    .lock()
+                    .block_list()
+                    .active_block()
+                    .long_running_control_state(),
+                Some(&LongRunningCommandControlState::User {
+                    reason: UserTakeOverReason::Stop {
+                        should_auto_resume: false
+                    },
+                })
+            );
+            assert!(
+                !view
+                    .model
+                    .lock()
+                    .block_list()
+                    .active_block()
+                    .is_eligible_for_agent_handoff()
+            );
+            view.cli_subagent_controller.update(ctx, |controller, ctx| {
+                controller.handoff_active_command_control_to_agent(ctx);
+            });
+            view.on_user_block_completed(&block_id, ctx);
+            assert!(
+                !view
+                    .ai_controller
+                    .as_ref(ctx)
+                    .has_active_stream_for_conversation(conversation_id, ctx)
+            );
+            assert_eq!(
+                BlocklistAIHistoryModel::as_ref(ctx)
+                    .conversation(&conversation_id)
+                    .expect("会话应存在")
+                    .status(),
+                &ConversationStatus::Cancelled
+            );
+        });
+    })
+}
+
+#[test]
+fn stop_task_inline_completion_preserves_cancelled_status() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _agent_view = FeatureFlag::AgentView.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let (finished_tx, finished_rx) = async_channel::bounded(1);
+        let (conversation_id, command_block_id) = terminal.update(&mut app, |view, ctx| {
+            bootstrap_with_long_running_block(view);
+            let conversation_id = view.agent_view_controller().update(ctx, |controller, ctx| {
+                controller
+                    .try_enter_inline_agent_view(
+                        None,
+                        AgentViewEntryOrigin::LongRunningCommand,
+                        ctx,
+                    )
+                    .expect("应进入内联 Agent 会话")
+            });
+            let block_id = {
+                let mut model = view.model.lock();
+                let block = model.block_list_mut().active_block_mut();
+                block.set_is_agent_tagged_in(true);
+                block.id().clone()
+            };
+            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                // 真实监控会话包含用户请求，退出时不能按误打开的空会话清理。
+                history
+                    .conversation_mut(&conversation_id)
+                    .expect("会话应存在")
+                    .append_reassigned_exchange(
+                        &ResponseStreamId::new_for_test(),
+                        exchange_with_inputs(vec![AIAgentInput::UserQuery {
+                            query: "每 10 秒检查一次运行状态".to_owned(),
+                            context: Default::default(),
+                            static_query_type: None,
+                            referenced_attachments: Default::default(),
+                            user_query_mode: UserQueryMode::Normal,
+                            running_command: None,
+                            intended_agent: None,
+                        }]),
+                        view.view_id,
+                        ctx,
+                    )
+                    .expect("监控请求应加入会话");
+                history
+                    .create_cli_subagent_task_for_conversation(
+                        block_id.clone(),
+                        conversation_id,
+                        view.view_id,
+                        ctx,
+                    )
+                    .expect("监控子任务应创建成功");
+            });
+            (conversation_id, block_id)
+        });
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::BlockCompleted { block, .. } = event
+                    && block.id == command_block_id
+                {
+                    let _ = finished_tx.try_send(());
+                }
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            assert!(
+                view.model
+                    .lock()
+                    .block_list()
+                    .active_block()
+                    .is_agent_in_control()
+            );
+            view.stop_local_agent_conversation(conversation_id, ctx);
+            view.model.lock().finish_block();
+        });
+        finished_rx.recv().await.expect("应收到命令结束事件");
+        terminal.read(&app, |_, ctx| {
+            assert_eq!(
+                BlocklistAIHistoryModel::as_ref(ctx)
+                    .conversation(&conversation_id)
+                    .expect("会话应存在")
+                    .status(),
+                &ConversationStatus::Cancelled,
+                "中断后的命令结束事件不能把已取消任务改为成功"
+            );
+        });
+    });
+}
+
+#[test]
+fn stop_task_keeps_queued_monitoring_prompts_pending() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |view, ctx| {
+            let conversation_id =
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    history.start_new_conversation(view.view_id, false, false, false, ctx)
+                });
+            let query_id = QueuedQueryModel::handle(ctx).update(ctx, |queue, ctx| {
+                queue.append(
+                    conversation_id,
+                    QueuedQuery::new(
+                        "继续检查运行状态".to_owned(),
+                        QueuedQueryOrigin::LrcAutoQueue,
+                    ),
+                    ctx,
+                )
+            });
+
+            view.stop_local_agent_conversation(conversation_id, ctx);
+            view.send_lrc_queued_prompts(conversation_id, ctx);
+
+            assert_eq!(
+                QueuedQueryModel::as_ref(ctx).queue(conversation_id).len(),
+                1
+            );
+            assert_eq!(
+                QueuedQueryModel::as_ref(ctx).queue(conversation_id)[0].id(),
+                query_id
+            );
+            assert!(
+                !view
+                    .ai_controller
+                    .as_ref(ctx)
+                    .has_active_stream_for_conversation(conversation_id, ctx)
+            );
+        });
+    });
+}
+
+#[test]
+fn failed_conversation_interrupts_command_without_overwriting_error() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let pty_writes = Rc::new(RefCell::new(Vec::new()));
+        let writes = pty_writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::WriteBytesToPty { bytes } = event {
+                    writes.borrow_mut().push(bytes.to_vec());
+                }
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            let conversation_id =
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    let id = history.start_new_conversation(view.view_id, false, false, false, ctx);
+                    history.update_conversation_status(
+                        view.view_id,
+                        id,
+                        ConversationStatus::Error,
+                        ctx,
+                    );
+                    id
+                });
+            {
+                let mut model = view.model.lock();
+                model.simulate_long_running_block("while true; do date; sleep 10; done", "running");
+                let block = model.block_list_mut().active_block_mut();
+                block.set_agent_interaction_mode_for_requested_command(
+                    AIAgentActionId::from("monitor".to_owned()),
+                    None,
+                    conversation_id,
+                );
+                // 模拟控制器已经封死自动恢复，但命令仍在等待终端中断。
+                block.set_user_control_for_teardown();
+            }
+            view.handle_ai_controller_event(
+                view.ai_controller.clone(),
+                &BlocklistAIControllerEvent::ConversationUpdateFailed { conversation_id },
+                ctx,
+            );
+            assert_eq!(
+                BlocklistAIHistoryModel::as_ref(ctx)
+                    .conversation(&conversation_id)
+                    .expect("会话应存在")
+                    .status(),
+                &ConversationStatus::Error
+            );
+        });
+        assert_eq!(*pty_writes.borrow(), vec![vec![C0::ETX]]);
+    });
+}
+
+#[test]
 fn ctrl_c_after_stop_takeover_cancels_conversation() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -6933,7 +7406,18 @@ fn inline_agent_view_persists_across_transfer_takeover_for_monitored_long_runnin
                 .active_block_mut()
                 .set_is_agent_tagged_in(true);
 
-            let task_id = TaskId::new("test-task".to_owned());
+            // 交回控制权会真实发送恢复请求，元数据中的任务必须存在于会话历史。
+            let block_id = view.model.lock().block_list().active_block_id().clone();
+            let task_id = BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                history
+                    .create_cli_subagent_task_for_conversation(
+                        block_id,
+                        conversation_id,
+                        view.view_id,
+                        ctx,
+                    )
+                    .expect("监控子任务应加入会话历史")
+            });
             view.model
                 .lock()
                 .block_list_mut()

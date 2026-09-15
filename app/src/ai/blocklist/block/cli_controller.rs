@@ -9,7 +9,7 @@ use warp_errors::report_error;
 use warpui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::BlocklistAIHistoryModel;
-use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::agent::task::TaskId;
 use crate::ai::agent::{
     AIAgentActionId, AIAgentActionResultType, AIAgentContext, CancellationReason,
@@ -301,6 +301,14 @@ impl CLISubagentController {
                 let requested_command_action_id = block.requested_command_action_id().cloned();
                 let was_agent_tagged_in = block.interaction_mode().is_agent_tagged_in();
                 let has_agent_metadata = block.agent_interaction_metadata().is_some();
+                let was_stopped = block.long_running_control_state().is_some_and(|state| {
+                    matches!(
+                        state.user_take_over_reason(),
+                        Some(UserTakeOverReason::Stop {
+                            should_auto_resume: false
+                        })
+                    )
+                });
                 drop(terminal_model);
                 let removed_subagent_state = me.active_subagents_by_block.remove(&block_id);
                 if removed_subagent_state
@@ -316,10 +324,18 @@ impl CLISubagentController {
                             controller.read(ctx, |controller, _| controller.is_inline())
                         });
 
-                    if is_inline_agent_view {
-                        // Mark conversation as successfully completed BEFORE exiting agent view.
-                        // The command finished naturally, so this is a successful completion.
-                        if let Some(conversation_id) = conversation_id {
+                    if is_inline_agent_view && !was_stopped {
+                        // 只有自然结束的命令才成功收尾；停止或错误中断必须保留终态。
+                        if let Some(conversation_id) = conversation_id.filter(|id| {
+                            BlocklistAIHistoryModel::as_ref(ctx)
+                                .conversation(id)
+                                .is_some_and(|conversation| {
+                                    !matches!(
+                                        conversation.status(),
+                                        ConversationStatus::Cancelled | ConversationStatus::Error
+                                    )
+                                })
+                        }) {
                             me.controller.update(ctx, |controller, ctx| {
                                 controller.cancel_conversation_progress(
                                     conversation_id,
@@ -540,6 +556,9 @@ impl CLISubagentController {
         let mut terminal_model = self.terminal_model.lock();
 
         let active_block = terminal_model.block_list_mut().active_block_mut();
+        if !active_block.is_eligible_for_agent_handoff() {
+            return;
+        }
         let conversation_id = active_block.ai_conversation_id();
         let block_id = active_block.id().clone();
         let lrc_state_debug = format!("{:?}", active_block.long_running_control_state());
@@ -672,6 +691,9 @@ impl CLISubagentController {
                 let Some(cli_subagent_block_id) = history_model
                     .as_ref(ctx)
                     .conversation(conversation_id)
+                    .filter(|conversation| {
+                        !matches!(conversation.status(), ConversationStatus::Cancelled)
+                    })
                     .and_then(|c| c.get_task(task_id))
                     .and_then(|task| task.cli_subagent_block_id())
                 else {
@@ -685,6 +707,17 @@ impl CLISubagentController {
                 else {
                     return;
                 };
+                // 停止可能先于异步的子任务创建事件，不能让迟到的事件重新交出控制权。
+                if block.long_running_control_state().is_some_and(|state| {
+                    matches!(
+                        state.user_take_over_reason(),
+                        Some(UserTakeOverReason::Stop {
+                            should_auto_resume: false
+                        })
+                    )
+                }) {
+                    return;
+                }
                 let block_id = block.id().clone();
                 if let Err(e) = block.set_agent_interaction_mode_for_agent_monitored_command(
                     task_id,

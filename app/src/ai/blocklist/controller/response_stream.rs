@@ -283,6 +283,7 @@ impl ResponseStream {
     }
 
     pub fn new(
+        id: ResponseStreamId,
         params: api::RequestParams,
         ai_identifiers: AIIdentifiers,
         can_attempt_resume_on_error: bool,
@@ -364,7 +365,7 @@ impl ResponseStream {
             },
         );
         Self {
-            id: ResponseStreamId(Uuid::new_v4().to_string()),
+            id,
             params: params.clone(),
             start_time,
             time_to_latest_event: TimeDelta::seconds(0),
@@ -510,6 +511,7 @@ impl ResponseStream {
         ctx: &mut ModelContext<Self>,
     ) {
         self.current_request_id = None;
+        self.should_resume_conversation_after_stream_finished = false;
         let Some(cancellation_tx) = self.cancellation_tx.take() else {
             return;
         };
@@ -704,7 +706,7 @@ pub struct Consumable<T> {
 }
 
 impl<T> Consumable<T> {
-    fn new(value: T) -> Self {
+    pub(super) fn new(value: T) -> Self {
         Consumable {
             value: Rc::new(RefCell::new(Some(value))),
         }

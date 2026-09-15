@@ -10,6 +10,7 @@ use std::marker::Send;
 use std::ops::DerefMut;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 use log::error;
 use mio::{self, Events, Interest};
@@ -360,22 +361,27 @@ where
                 let mut child_exited = false;
 
                 'event_loop: loop {
-                    // Clear the events so that we can reliably equate the absence of events
-                    // to the timeout being fired.
+                    // 清除上一轮事件；零超时轮询没有事件并不代表同步输出已经到期。
                     events.clear();
 
-                    // Wait for events, but only up to the remaining timeout for the synchronous output
-                    // update (if any).
-                    let sync_state_timeout = state.parser.sync_output_remaining_timeout();
-                    if let Err(err) = self.poll.poll(&mut events, sync_state_timeout) {
+                    // 保留尚未耗尽的边沿就绪状态，同时让控制消息和新的就绪事件及时进入循环。
+                    let poll_timeout = if can_read || (state.needs_write() && can_write) {
+                        Some(Duration::ZERO)
+                    } else {
+                        state.parser.sync_output_remaining_timeout()
+                    };
+                    if let Err(err) = self.poll.poll(&mut events, poll_timeout) {
                         match err.kind() {
                             ErrorKind::Interrupted => continue,
                             _ => panic!("EventLoop polling error: {err:?}"),
                         }
                     }
 
-                    // If there were no events but `poll` returned, that means we hit the timeout.
-                    if events.is_empty() {
+                    if state
+                        .parser
+                        .sync_output_remaining_timeout()
+                        .is_some_and(|timeout| timeout.is_zero())
+                    {
                         let mut terminal_response_sequences = Vec::new();
                         state.parser.finish_sync_output(
                             &mut *self.terminal.lock(),
@@ -440,11 +446,8 @@ where
                         }
                     }
 
-                    // As long as we have work to do, do it.  Once we need to
-                    // wait on some readiness (pty readability, pty writability,
-                    // or new data to write), go back to the start of the event
-                    // loop.
-                    while can_read || (state.needs_write() && can_write) {
+                    // 每轮只处理一批读写，避免持续输出阻塞取消消息或 WouldBlock 之后的可写通知。
+                    if can_read || (state.needs_write() && can_write) {
                         if can_read {
                             match self.pty_read(&mut state, &mut buf, &mut can_read) {
                                 Ok(_) => {}
@@ -492,3 +495,7 @@ where
             .expect("thread spawn works")
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "event_loop_tests.rs"]
+mod tests;

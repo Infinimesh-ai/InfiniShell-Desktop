@@ -63,11 +63,11 @@ jobs:
         shell: bash
         run: cargo check -p warp --lib
 
-      - name: Test BYOP context recovery and Responses integration
+      - name: Test agent lifecycle, terminal cancellation, and Responses integration
         shell: bash
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::action_model::execute::read_skill::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests)'
+          -E 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::cancellation_drops_preprocessing) | test(terminal::local_tty::event_loop::tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::action_model::execute::read_skill::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests)'
 
       - name: Test rust-genai
         shell: bash
@@ -151,11 +151,11 @@ jobs:
           .\script\windows\test_pwsh_ssh_worker.ps1
           -WorkerPath "$env:CARGO_TARGET_DIR\debug\infinishell-ssh.exe"
 
-      - name: Test BYOP context recovery and Responses integration
+      - name: Test agent lifecycle, terminal cancellation, and Responses integration
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::action_model::execute::read_skill::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests)'
+          -E 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::cancellation_drops_preprocessing) | test(terminal::local_tty::event_loop::tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::action_model::execute::read_skill::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests)'
 
       - name: Test rust-genai
         shell: pwsh
