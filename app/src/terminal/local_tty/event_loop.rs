@@ -11,6 +11,8 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+#[cfg(windows)]
+use std::time::Instant;
 
 use log::error;
 use mio::{self, Events, Interest};
@@ -29,6 +31,9 @@ const READ_BUFFER_SIZE: usize = 0x4_0000;
 /// Max bytes to process from the PTY while holding the lock before giving
 /// someone else an opportunity to lock it.
 const MAX_LOCKED_READ: usize = 0x1_0000;
+
+#[cfg(windows)]
+const CHILD_EXIT_DRAIN_TIMEOUT: Duration = Duration::from_secs(1);
 
 pub const CHANNEL_TOKEN: mio::Token = mio::Token(0);
 pub const PTY_TOKEN: mio::Token = mio::Token(1);
@@ -133,7 +138,7 @@ impl Writing {
 }
 
 enum ChannelResult {
-    Continue,
+    Continue { child_exited: bool },
     TerminateLoop { child_exited: bool },
 }
 
@@ -161,20 +166,20 @@ where
     ///
     /// Returns `false` when a shutdown message was received.
     fn drain_recv_channel(&mut self, state: &mut State) -> ChannelResult {
+        let mut child_exited = false;
         while let Ok(msg) = self.rx.try_recv() {
             match msg {
                 Message::Input(input) => state.write_list.push_back(input),
                 Message::Shutdown => {
-                    return ChannelResult::TerminateLoop {
-                        child_exited: false,
-                    };
+                    return ChannelResult::TerminateLoop { child_exited };
                 }
                 Message::Resize(size) => self.pty.on_resize(&size),
-                Message::ChildExited => return ChannelResult::TerminateLoop { child_exited: true },
+                // 退出后仍需接收已合并在同一次唤醒中的 Shutdown，避免排空尾部时饿死控制消息。
+                Message::ChildExited => child_exited = true,
             }
         }
 
-        ChannelResult::Continue
+        ChannelResult::Continue { child_exited }
     }
 
     /// Returns a `bool` indicating whether or not the event loop should continue running.
@@ -189,7 +194,7 @@ where
     /// If `writer` is `Some`, a copy of all bytes read will be written to that
     /// writer.
     ///
-    /// Returns the number of bytes read from the PTY.
+    /// 返回是否读到 EOF；WouldBlock 只表示等待下一次就绪通知。
     #[inline]
     #[allow(clippy::unwrap_in_result)]
     fn pty_read(
@@ -197,9 +202,11 @@ where
         state: &mut State,
         buf: &mut [u8],
         can_read: &mut bool,
-    ) -> io::Result<()> {
+    ) -> io::Result<bool> {
         let mut bytes_in_buffer = 0;
         let mut bytes_processed = 0;
+        let mut read_closed = false;
+        let mut read_error = None;
 
         let mut terminal = None;
 
@@ -208,14 +215,13 @@ where
         // has size [`MAX_READ`].
         loop {
             match self.pty.reader().read(&mut buf[bytes_in_buffer..]) {
-                Ok(0) if bytes_in_buffer == 0 => {
-                    // If we get 0 here with an empty buffer (guaranteed if
-                    // bytes_in_buffer == 0), it means the object is unable to
-                    // receive reads.
+                Ok(0) => {
+                    // EOF 后停止读取；若缓冲中已有字节，先解析最后一批再返回。
                     *can_read = false;
-                    // There is nothing to be processed in the buffer, so return
-                    // to the event loop.
-                    break;
+                    read_closed = true;
+                    if bytes_in_buffer == 0 {
+                        break;
+                    }
                 }
                 // Otherwise, track how many additional bytes we read and move
                 // on to byte processing.
@@ -229,15 +235,25 @@ where
                             break;
                         }
                     }
-                    _ => return Err(err),
+                    _ => read_error = Some(err),
                 },
+            }
+
+            if read_error.is_some() && bytes_in_buffer == 0 {
+                break;
             }
 
             let terminal = match &mut terminal {
                 Some(terminal) => terminal,
                 None => terminal.insert(match self.terminal.try_lock() {
                     // If we've filled up the buffer, block on locking the terminal.
-                    None if bytes_in_buffer >= READ_BUFFER_SIZE => self.terminal.lock(),
+                    None if bytes_in_buffer >= READ_BUFFER_SIZE
+                        || read_error.is_some()
+                        || read_closed =>
+                    {
+                        // 挂断后不能再读取，但先前已读入的尾部仍必须进入模型。
+                        self.terminal.lock()
+                    }
                     // Otherwise, if we failed to acquire the lock, try to read more
                     // data into the buffer.
                     None => continue,
@@ -262,7 +278,7 @@ where
             bytes_processed += bytes_in_buffer;
             bytes_in_buffer = 0;
 
-            if bytes_processed >= MAX_LOCKED_READ {
+            if bytes_processed >= MAX_LOCKED_READ || read_error.is_some() || read_closed {
                 break;
             }
 
@@ -277,7 +293,10 @@ where
             self.event_listener.send_wakeup_event();
         }
 
-        Ok(())
+        match read_error {
+            Some(err) => Err(err),
+            None => Ok(read_closed),
+        }
     }
 
     #[inline]
@@ -359,16 +378,28 @@ where
                 // True if the child exiting caused the event loop to wind down
                 // (e.g. CTRL D or `exit`) rather than the inverse.
                 let mut child_exited = false;
+                let mut read_closed = false;
+                #[cfg(windows)]
+                let mut child_exit_deadline: Option<Instant> = None;
 
                 'event_loop: loop {
                     // 清除上一轮事件；零超时轮询没有事件并不代表同步输出已经到期。
                     events.clear();
 
                     // 保留尚未耗尽的边沿就绪状态，同时让控制消息和新的就绪事件及时进入循环。
-                    let poll_timeout = if can_read || (state.needs_write() && can_write) {
-                        Some(Duration::ZERO)
-                    } else {
-                        state.parser.sync_output_remaining_timeout()
+                    let poll_timeout =
+                        if can_read || (!child_exited && state.needs_write() && can_write) {
+                            Some(Duration::ZERO)
+                        } else {
+                            state.parser.sync_output_remaining_timeout()
+                        };
+                    #[cfg(windows)]
+                    let poll_timeout = match child_exit_deadline {
+                        Some(deadline) => {
+                            let remaining = deadline.saturating_duration_since(Instant::now());
+                            Some(poll_timeout.map_or(remaining, |timeout| timeout.min(remaining)))
+                        }
+                        None => poll_timeout,
                     };
                     if let Err(err) = self.poll.poll(&mut events, poll_timeout) {
                         match err.kind() {
@@ -398,17 +429,18 @@ where
                         match event.token() {
                             token if token == CHANNEL_TOKEN => {
                                 match self.channel_event(&mut state) {
-                                    ChannelResult::Continue => {}
-                                    ChannelResult::TerminateLoop {
+                                    ChannelResult::Continue {
                                         child_exited: exited,
                                     } => {
                                         if exited {
-                                            self.terminal
-                                                .lock()
-                                                .exit(ExitReason::ShellProcessExited);
                                             child_exited = true;
-                                            self.event_listener.send_wakeup_event();
+                                            can_read = !read_closed;
                                         }
+                                    }
+                                    ChannelResult::TerminateLoop {
+                                        child_exited: exited,
+                                    } => {
+                                        child_exited |= exited;
                                         break 'event_loop;
                                     }
                                 }
@@ -418,10 +450,8 @@ where
                                 if let Some(local_tty::ChildEvent::Exited) =
                                     self.pty.next_child_event()
                                 {
-                                    self.terminal.lock().exit(ExitReason::ShellProcessExited);
                                     child_exited = true;
-                                    self.event_listener.send_wakeup_event();
-                                    break 'event_loop;
+                                    can_read = !read_closed;
                                 }
                             }
 
@@ -435,7 +465,7 @@ where
                                     continue;
                                 }
 
-                                if event.is_readable() {
+                                if event.is_readable() && !read_closed {
                                     can_read = true;
                                 }
                                 if event.is_writable() {
@@ -446,29 +476,39 @@ where
                         }
                     }
 
+                    #[cfg(windows)]
+                    if child_exited {
+                        // 总时限从首次退出通知开始，持续输出不能延后终止。
+                        child_exit_deadline
+                            .get_or_insert_with(|| Instant::now() + CHILD_EXIT_DRAIN_TIMEOUT);
+                    }
+
                     // 每轮只处理一批读写，避免持续输出阻塞取消消息或 WouldBlock 之后的可写通知。
                     if can_read || (state.needs_write() && can_write) {
                         if can_read {
                             match self.pty_read(&mut state, &mut buf, &mut can_read) {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    // On Linux, a `read` on the master side of a PTY can fail
-                                    // with `EIO` if the client side hangs up.  In that case,
-                                    // just loop back round for the inevitable `Exited` event.
-                                    // This sucks, but checking the process is either racy or
-                                    // blocking.
-                                    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-                                    if err.kind() == ErrorKind::Other {
+                                Ok(closed) => read_closed |= closed,
+                                // On Linux, a `read` on the master side of a PTY can fail
+                                // with `EIO` if the client side hangs up.  In that case,
+                                // just loop back round for the inevitable `Exited` event.
+                                // This sucks, but checking the process is either racy or
+                                // blocking.
+                                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+                                Err(err) if err.kind() == ErrorKind::Other => {
+                                    if !child_exited {
                                         continue;
                                     }
-
+                                    can_read = false;
+                                }
+                                Err(err) => {
                                     error!("Error reading from PTY in event loop: {err}");
                                     break 'event_loop;
                                 }
                             }
                         }
 
-                        if state.needs_write()
+                        if !child_exited
+                            && state.needs_write()
                             && can_write
                             && let Err(err) = self.pty_write(&mut state, &mut can_write)
                         {
@@ -476,6 +516,27 @@ where
                             break 'event_loop;
                         }
                     }
+
+                    // Unix 的非阻塞读取已经排空内核缓冲；Windows 的 WouldBlock 也可能是
+                    // IOCP 读取尚未完成，必须继续 poll 直到 EOF 或总时限，期间仍处理 Shutdown。
+                    #[cfg(not(windows))]
+                    let drain_finished = read_closed || !can_read;
+                    #[cfg(windows)]
+                    let drain_finished = read_closed
+                        || child_exit_deadline.is_some_and(|deadline| Instant::now() >= deadline);
+                    if child_exited && drain_finished {
+                        break;
+                    }
+                }
+
+                if child_exited {
+                    let mut terminal = self.terminal.lock();
+                    // 已退出的进程不会再发送同步帧结束标记，也不再接收终端响应。
+                    state
+                        .parser
+                        .finish_sync_output(&mut *terminal, &mut io::sink());
+                    terminal.exit(ExitReason::ShellProcessExited);
+                    self.event_listener.send_wakeup_event();
                 }
 
                 // The evented instances are not dropped here so deregister them explicitly.

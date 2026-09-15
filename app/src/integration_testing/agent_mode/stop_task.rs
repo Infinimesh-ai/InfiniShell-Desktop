@@ -193,4 +193,35 @@ impl MonitoringCommandFixture {
             })
         })
     }
+
+    /// 捕获 SIGINT 的 REPL 继续存活时，键盘应直接送达原命令。
+    pub fn stopped_running_assertion(
+        &self,
+        expected_output: Option<&'static str>,
+    ) -> AssertionCallback {
+        let fixture = self.clone();
+        Box::new(move |app, window_id| {
+            let target = fixture.target.borrow();
+            let (block_id, conversation_id) = target.as_ref().expect("监控夹具应已建立");
+            let terminal = single_terminal_view_for_tab(app, window_id, 0);
+            terminal.read(app, |view, ctx| {
+                let status = BlocklistAIHistoryModel::as_ref(ctx).conversation(conversation_id)
+                    .map(|conversation| conversation.status());
+                let focused = ctx.focused_view_id(window_id);
+                let model = view.model.lock();
+                let block = model.block_list().active_block();
+                let output = block.output_with_secrets_unobfuscated();
+                async_assert!(
+                    block.id() == block_id && block.is_executing()
+                        && !block.is_agent_in_control()
+                        && status == Some(&ConversationStatus::Cancelled)
+                        && fixture.interrupt_count.get() == 1 && !fixture.command_finished.get()
+                        && focused == Some(terminal.id())
+                        && expected_output.is_none_or(|expected| output.contains(expected)),
+                    "停止后 REPL 应保持原命令、接收键盘并产生预期输出：active={:?}, state={:?}, status={status:?}, focused={focused:?}, interrupts={}, output={output:?}",
+                    block.id(), block.state(), fixture.interrupt_count.get()
+                )
+            })
+        })
+    }
 }

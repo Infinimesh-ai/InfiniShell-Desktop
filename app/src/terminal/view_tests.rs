@@ -6768,6 +6768,134 @@ fn stop_task_button_interrupts_agent_command_with_selection_and_no_stream() {
 }
 
 #[test]
+fn stop_task_returns_focus_to_a_still_running_command() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _agent_view = FeatureFlag::AgentView.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |view, ctx| {
+            bootstrap_with_long_running_block(view);
+            let conversation_id =
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    let id = history.start_new_conversation(view.view_id, false, false, false, ctx);
+                    history.set_active_conversation_id(id, view.view_id, ctx);
+                    id
+                });
+            {
+                let mut model = view.model.lock();
+                model
+                    .block_list_mut()
+                    .active_block_mut()
+                    .set_agent_interaction_mode_for_agent_monitored_command(
+                        &TaskId::new("monitoring-repl".to_owned()),
+                        conversation_id,
+                    )
+                    .expect("测试命令应由 Agent 监控");
+            }
+        });
+        terminal.update(&mut app, |view, ctx| {
+            // 聚焦先排入 UI effect 队列，返回本轮 update 后才会转交到编辑器。
+            view.focus_input_box(ctx);
+        });
+        terminal.update(&mut app, |view, ctx| {
+            assert!(view.input().as_ref(ctx).editor().is_focused(ctx));
+            let status_bar = view.input.as_ref(ctx).agent_status_bar().clone();
+            status_bar.update(ctx, |bar, ctx| {
+                bar.handle_action(&BlocklistAIStatusBarAction::Stop, ctx);
+            });
+        });
+        terminal.read(&app, |view, ctx| {
+            let model = view.model.lock();
+            assert!(model.block_list().active_block().is_executing());
+            assert!(!view.is_input_box_visible(&model, ctx));
+            assert_eq!(
+                ctx.focused_view_id(terminal.window_id(ctx)),
+                Some(terminal.id()),
+                "停止后仍存活的命令应接收键盘，不能把焦点留在隐藏的 Agent 输入框"
+            );
+        });
+    });
+}
+
+#[test]
+fn stopped_command_resumes_only_from_explicit_user_handoff() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _agent_view = FeatureFlag::AgentView.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let conversation_id = terminal.update(&mut app, |view, ctx| {
+            bootstrap_with_long_running_block(view);
+            let conversation_id = view.agent_view_controller.update(ctx, |controller, ctx| {
+                controller
+                    .try_enter_inline_agent_view(
+                        None,
+                        AgentViewEntryOrigin::LongRunningCommand,
+                        ctx,
+                    )
+                    .expect("应进入内联监控会话")
+            });
+            let block_id = view.model.lock().block_list().active_block_id().clone();
+            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                history
+                    .create_cli_subagent_task_for_conversation(
+                        block_id,
+                        conversation_id,
+                        view.view_id,
+                        ctx,
+                    )
+                    .expect("监控子任务应存在");
+            });
+            conversation_id
+        });
+        terminal.update(&mut app, |view, ctx| {
+            view.stop_local_agent_conversation(conversation_id, ctx);
+        });
+        terminal.update(&mut app, |view, ctx| {
+            // 普通 handoff 也由共享状态和迟到事件调用，不能借此复活已停止任务。
+            view.cli_subagent_controller.update(ctx, |controller, ctx| {
+                controller.handoff_active_command_control_to_agent(ctx);
+            });
+            assert!(
+                !view
+                    .model
+                    .lock()
+                    .block_list()
+                    .active_block()
+                    .is_agent_in_control()
+            );
+            assert!(
+                !view
+                    .ai_controller
+                    .as_ref(ctx)
+                    .has_active_stream_for_conversation(conversation_id, ctx)
+            );
+            {
+                let model = view.model.lock();
+                assert!(
+                    view.should_render_use_agent_footer(&model, ctx),
+                    "停止后仍在运行的命令必须保留用户主动交回入口"
+                );
+            }
+            // 使用“交回 Agent”按钮的真实动作，而不是直接改控制状态。
+            view.handle_action(&TerminalAction::SetInputModeAgent, ctx);
+            assert!(
+                view.model
+                    .lock()
+                    .block_list()
+                    .active_block()
+                    .is_agent_in_control(),
+                "用户主动交回后应恢复同一命令的 CLI 控制"
+            );
+            assert!(
+                view.ai_controller
+                    .as_ref(ctx)
+                    .has_active_stream_for_conversation(conversation_id, ctx)
+            );
+        });
+    });
+}
+
+#[test]
 fn stop_task_button_interrupts_command_with_missing_agent_metadata() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -6929,7 +7057,7 @@ fn stop_task_before_cli_initialization_does_not_regain_agent_control() {
                     .lock()
                     .block_list()
                     .active_block()
-                    .is_eligible_for_agent_handoff()
+                    .is_agent_in_control()
             );
             view.cli_subagent_controller.update(ctx, |controller, ctx| {
                 controller.handoff_active_command_control_to_agent(ctx);

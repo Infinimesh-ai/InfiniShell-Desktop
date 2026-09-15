@@ -1,5 +1,8 @@
 use super::*;
-use crate::ai::agent::AIAgentActionId;
+use crate::ai::agent::{AIAgentAction, AIAgentActionId, AIAgentActionType};
+use crate::ai::blocklist::action_model::AIActionStatus;
+use crate::ai::execution_profiles::WriteToPtyPermission;
+use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::test_util::terminal::{add_window_with_terminal, initialize_app_for_terminal_view};
 use warpui::App;
 
@@ -212,7 +215,12 @@ fn invalid_request_task_does_not_start_response_stream() {
                 let model = controller.terminal_model.lock();
                 let block = model.block_list().active_block();
                 assert!(!block.is_agent_in_control());
-                assert!(!block.is_eligible_for_agent_handoff());
+                assert!(
+                    !block
+                        .long_running_control_state()
+                        .unwrap()
+                        .should_auto_resume()
+                );
             });
         });
     });
@@ -256,6 +264,192 @@ fn agent_started_long_command_follow_up_initializes_optimistic_cli_task() {
                 assert_eq!(params.lrc_command_id, Some(block_id.to_string()));
                 assert!(params.lrc_should_spawn_subagent);
                 assert_eq!(params.byop_target_task_id, Some(task_id.to_string()));
+            });
+        });
+    });
+}
+
+fn lrc_user_query() -> AIAgentInput {
+    AIAgentInput::UserQuery {
+        query: "检查轮询状态".to_owned(),
+        context: Default::default(),
+        static_query_type: None,
+        referenced_attachments: Default::default(),
+        user_query_mode: Default::default(),
+        running_command: None,
+        intended_agent: None,
+    }
+}
+
+fn assert_lrc_first_write_permission(user_tagged_in: bool) {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let action_id = AIAgentActionId::from("first-lrc-write".to_owned());
+        let (queued_tx, queued_rx) = futures::channel::oneshot::channel();
+        let (action_model, conversation_id) = terminal.update(&mut app, |terminal, ctx| {
+            AIExecutionProfilesModel::handle(ctx).update(ctx, |profiles, ctx| {
+                profiles.set_write_to_pty(
+                    profiles.active_profile(Some(terminal.id()), ctx).id(),
+                    &WriteToPtyPermission::AskOnFirstWrite,
+                    ctx,
+                );
+            });
+            let block_id = {
+                let mut model = terminal.model.lock();
+                model.simulate_long_running_block("while true; do date; sleep 10; done", "");
+                model.block_list().active_block().id().clone()
+            };
+            let (conversation_id, task_id) =
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    let id =
+                        history.start_new_conversation(terminal.id(), false, false, false, ctx);
+                    let task_id = history
+                        .conversation_mut(&id)
+                        .unwrap()
+                        .create_optimistic_cli_subagent_task_for_test(&block_id);
+                    (id, task_id)
+                });
+            {
+                let mut model = terminal.model.lock();
+                let block = model.block_list_mut().active_block_mut();
+                if user_tagged_in {
+                    block.set_is_agent_tagged_in(true);
+                } else {
+                    block.set_agent_interaction_mode_for_requested_command(
+                        AIAgentActionId::from("poll-command".to_owned()),
+                        None,
+                        conversation_id,
+                    );
+                }
+            }
+            let auto_accept = terminal.ai_controller().update(ctx, |controller, ctx| {
+                let mut params = api::RequestParams::new_for_test(vec![lrc_user_query()], vec![]);
+                params.byop_target_task_id = Some(task_id.to_string());
+                controller.populate_lrc_request_params(&mut params, conversation_id, ctx);
+                assert!(params.lrc_should_spawn_subagent);
+                ResponseStream::new_for_test_with_params(ResponseStreamId::new_local(), params)
+                    .is_lrc_tag_in_request()
+            });
+            let action_model = ctx.add_model(|ctx| {
+                BlocklistAIActionModel::new(
+                    terminal.model.clone(),
+                    terminal.active_session().clone(),
+                    terminal.model_event_dispatcher(),
+                    terminal.id(),
+                    ctx,
+                )
+            });
+            let mut queued_tx = Some(queued_tx);
+            ctx.subscribe_to_model(&action_model, move |_, _, event, _| {
+                if matches!(event, BlocklistAIActionEvent::QueuedAction(_))
+                    && let Some(tx) = queued_tx.take()
+                {
+                    let _ = tx.send(());
+                }
+            });
+            action_model.update(ctx, |model, ctx| {
+                model.queue_actions_with_options(
+                    vec![AIAgentAction {
+                        id: action_id.clone(),
+                        task_id,
+                        action: AIAgentActionType::WriteToLongRunningShellCommand {
+                            block_id,
+                            input: "status\n".into(),
+                            mode: Default::default(),
+                        },
+                        requires_result: true,
+                    }],
+                    conversation_id,
+                    auto_accept,
+                    ctx,
+                );
+            });
+            (action_model, conversation_id)
+        });
+        queued_rx.await.unwrap();
+        action_model.update(&mut app, |model, ctx| {
+            if user_tagged_in {
+                assert!(matches!(
+                    model.get_action_status(&action_id),
+                    Some(AIActionStatus::RunningAsync)
+                ));
+            } else {
+                assert!(
+                    matches!(
+                        model.get_action_status(&action_id),
+                        Some(AIActionStatus::Blocked)
+                    ),
+                    "普通追问初始化 CLI 子任务不能代替首次输入确认"
+                );
+            }
+            model.cancel_all_pending_actions(
+                conversation_id,
+                Some(CancellationReason::ManuallyCancelled),
+                ctx,
+            );
+        });
+    });
+}
+
+#[test]
+fn ordinary_lrc_follow_up_keeps_first_write_confirmation() {
+    assert_lrc_first_write_permission(false);
+}
+
+#[test]
+fn explicit_lrc_tag_in_preserves_first_write_authorization() {
+    assert_lrc_first_write_permission(true);
+}
+
+#[test]
+fn tagged_in_command_does_not_authorize_unrelated_or_automatic_requests() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |terminal, ctx| {
+            let block_id = {
+                let mut model = terminal.model.lock();
+                model.simulate_long_running_block("while true; do date; sleep 10; done", "");
+                let block = model.block_list_mut().active_block_mut();
+                block.set_is_agent_tagged_in(true);
+                assert!(block.is_agent_tagged_in());
+                block.id().clone()
+            };
+            let (conversation_id, cli_task_id, root_task_id) = BlocklistAIHistoryModel::handle(ctx)
+                .update(ctx, |history, ctx| {
+                    let id =
+                        history.start_new_conversation(terminal.id(), false, false, false, ctx);
+                    let conversation = history.conversation_mut(&id).unwrap();
+                    let cli_task =
+                        conversation.create_optimistic_cli_subagent_task_for_test(&block_id);
+                    (id, cli_task, conversation.get_root_task_id().clone())
+                });
+            terminal.ai_controller().update(ctx, |controller, ctx| {
+                let mut unrelated =
+                    api::RequestParams::new_for_test(vec![lrc_user_query()], vec![]);
+                unrelated.byop_target_task_id = Some(root_task_id.to_string());
+                controller.populate_lrc_request_params(&mut unrelated, conversation_id, ctx);
+                assert!(
+                    !ResponseStream::new_for_test_with_params(
+                        ResponseStreamId::new_local(),
+                        unrelated
+                    )
+                    .is_lrc_tag_in_request(),
+                    "其他任务不能借用当前终端的 tag-in 授权"
+                );
+
+                let mut automatic = api::RequestParams::new_for_test(vec![], vec![]);
+                automatic.byop_target_task_id = Some(cli_task_id.to_string());
+                controller.populate_lrc_request_params(&mut automatic, conversation_id, ctx);
+                assert!(
+                    !ResponseStream::new_for_test_with_params(
+                        ResponseStreamId::new_local(),
+                        automatic
+                    )
+                    .is_lrc_tag_in_request(),
+                    "自动请求不能借用尚未提交的 tag-in 授权"
+                );
             });
         });
     });
@@ -386,7 +580,9 @@ fn invalid_client_action_fails_only_its_conversation_and_blocks_late_events() {
                         .lock()
                         .block_list()
                         .active_block()
-                        .is_eligible_for_agent_handoff()
+                        .long_running_control_state()
+                        .unwrap()
+                        .should_auto_resume()
                 );
                 controller.handle_response_stream_event(false, &invalid_task_event(), &stream, ctx);
                 assert_eq!(

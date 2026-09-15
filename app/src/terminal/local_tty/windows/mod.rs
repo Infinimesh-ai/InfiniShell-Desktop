@@ -4,6 +4,10 @@ mod environment;
 mod pipes;
 mod proc_thread_attribute_list;
 
+#[cfg(test)]
+#[path = "event_loop_tests.rs"]
+mod event_loop_tests;
+
 use std::ffi::{OsStr, OsString};
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::io::FromRawHandle as _;

@@ -990,10 +990,8 @@ impl BlocklistAIActionModel {
                 .collect(),
         );
         let mut preprocess_future = Vec::with_capacity(actions.len());
-        let mut action_ids = HashSet::with_capacity(actions.len());
 
         for action in actions.iter() {
-            action_ids.insert(action.id.clone());
             preprocess_future.push(self.preprocess_action(action, conversation_id, ctx));
         }
 
@@ -1001,7 +999,7 @@ impl BlocklistAIActionModel {
             .pending_preprocessed_actions
             .entry(conversation_id)
             .or_default()
-            .insert_preprocess_action_batch(action_ids);
+            .insert_preprocess_action_batch(actions.clone());
 
         ctx.spawn(join_all(preprocess_future), move |me, _, ctx| {
             me.handle_preprocess_actions_results(
@@ -1203,16 +1201,30 @@ impl BlocklistAIActionModel {
         reason: Option<CancellationReason>,
         ctx: &mut ModelContext<Self>,
     ) {
-        // 先撤销尚未进入执行队列的批次；迟到的预处理回调不再有派发资格。
-        self.pending_preprocessed_actions.remove(&conversation_id);
+        // 先移走全部待执行动作，避免取消结果的收尾逻辑派发下一项。
+        // 预处理批次仍需生成取消结果；移走批次后，迟到回调也不再有派发资格。
+        let preprocessing = self.pending_preprocessed_actions.remove(&conversation_id);
+        let pending_actions = self
+            .pending_actions
+            .remove(&conversation_id)
+            .unwrap_or_default();
         self.executor.update(ctx, |executor, ctx| {
             executor.cancel_all_running_async_actions_for_conversation(conversation_id, reason, ctx)
         });
 
-        let Some(actions_to_cancel) = self.pending_actions.get_mut(&conversation_id) else {
-            return;
-        };
-        for action in actions_to_cancel.drain(..).collect_vec() {
+        for action in preprocessing
+            .into_iter()
+            .flat_map(PendingPreprocessedActions::into_actions)
+            .chain(pending_actions)
+        {
+            // 共享会话可能先收到执行结果，再收到预处理回调，不能重复结束同一动作。
+            if self
+                .finished_action_results
+                .get(&conversation_id)
+                .is_some_and(|results| results.iter().any(|result| result.id == action.id))
+            {
+                continue;
+            }
             log::info!(
                 "Canceling pending action of type {:?} conversation_id={conversation_id:?} action_id={:?}, reason={:?}, backtrace=\n{}",
                 AIAgentActionTypeDiscriminants::from(&action.action),
@@ -1460,6 +1472,20 @@ impl BlocklistAIActionModel {
 
         // The phase is fully drained — sort results back into original tool-call order.
         self.sort_finished_results(conversation_id);
+
+        // 取消/成功回调可能在整任务停止或失败后才到达。结果和执行器状态已收尾，
+        // 此时保留终态，不能因混合结果改回 InProgress 或派发后续动作。
+        if BlocklistAIHistoryModel::as_ref(ctx)
+            .conversation(&conversation_id)
+            .is_some_and(|conversation| {
+                matches!(
+                    conversation.status(),
+                    ConversationStatus::Cancelled | ConversationStatus::Error
+                )
+            })
+        {
+            return;
+        }
 
         if self
             .pending_actions

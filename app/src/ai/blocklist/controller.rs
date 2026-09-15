@@ -522,6 +522,19 @@ impl BlocklistAIController {
             ) {
                 return;
             }
+            // 整个任务已经停止或失败时，迟到的结果只保留供用户主动继续。
+            // 单动作取消仍可能留下 InProgress，会继续走下面的正常跟进逻辑。
+            if BlocklistAIHistoryModel::as_ref(ctx)
+                .conversation(conversation_id)
+                .is_some_and(|conversation| {
+                    matches!(
+                        conversation.status(),
+                        ConversationStatus::Cancelled | ConversationStatus::Error
+                    )
+                })
+            {
+                return;
+            }
             let action_model = me.action_model.as_ref(ctx);
             if action_model.has_unfinished_actions_for_conversation(*conversation_id) {
                 return;
@@ -2143,6 +2156,10 @@ impl BlocklistAIController {
             .is_some_and(|task| task.cli_subagent_block_id().as_ref() == Some(active_block.id()));
         let needs_cli_initialization =
             targets_cli_task && target_task.is_some_and(|task| task.source().is_none());
+        // 授权绑定本次用户输入及其 CLI 任务，不能由初始化状态或其他会话的界面状态推导。
+        request_params.lrc_is_user_tag_in = is_lrc_tagged_in
+            && targets_cli_task
+            && request_params.input.iter().any(AIAgentInput::is_user_query);
         if !is_lrc_tagged_in && !is_matching_lrc_agent && !needs_cli_initialization {
             return;
         }
@@ -3868,6 +3885,28 @@ impl BlocklistAIController {
         reason: CancellationReason,
         ctx: &mut ModelContext<Self>,
     ) {
+        if matches!(
+            reason.conversation_outcome(),
+            CancellationOutcome::Cancelled
+        ) {
+            // 所有整会话取消入口先确定终态，不能依赖某个 UI 调用方事后补写。
+            // 单动作取消不经过这里，正常接管/追问/回退仍沿用各自的结果语义。
+            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                if history
+                    .conversation(&conversation_id)
+                    .is_some_and(|conversation| {
+                        !matches!(conversation.status(), ConversationStatus::Error)
+                    })
+                {
+                    history.update_conversation_status(
+                        self.terminal_view_id,
+                        conversation_id,
+                        ConversationStatus::Cancelled,
+                        ctx,
+                    );
+                }
+            });
+        }
         // Cancel any pending auto-resume for this conversation.
         if let Some(handle) = self.pending_auto_resume_handles.remove(&conversation_id) {
             handle.abort();
@@ -3876,6 +3915,15 @@ impl BlocklistAIController {
         // Discard any queued passive suggestion results for this conversation.
         self.pending_passive_suggestion_results
             .remove(&conversation_id);
+
+        if matches!(
+            reason.conversation_outcome(),
+            CancellationOutcome::Cancelled | CancellationOutcome::FinalizedExternally
+        ) {
+            // 整任务结束后不能由旧工具结果重发暂存输入；正常接管和同会话追问仍保留。
+            self.pending_byop_requests.remove(&conversation_id);
+            self.pending_passive_follow_ups.remove(&conversation_id);
+        }
 
         QueuedQueryModel::handle(ctx).update(ctx, |model, ctx| {
             model.remove_pending_lrc_rows(conversation_id, ctx);
@@ -5108,3 +5156,7 @@ mod skill_origin_tests;
 #[cfg(test)]
 #[path = "controller_lrc_lifecycle_tests.rs"]
 mod lrc_lifecycle_tests;
+
+#[cfg(test)]
+#[path = "controller_stop_result_tests.rs"]
+mod stop_result_tests;

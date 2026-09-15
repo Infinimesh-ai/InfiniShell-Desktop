@@ -7,9 +7,12 @@ use futures::FutureExt;
 use warpui::{App, AppContext, EntityId};
 
 use super::*;
+use crate::ai::agent::CancellationReason;
 use crate::ai::agent::task::TaskId;
+use crate::ai::blocklist::action_model::BlocklistAIActionModel;
 use crate::terminal::model::session::Sessions;
 use crate::terminal::model_events::ModelEventDispatcher;
+use crate::test_util::terminal::{add_window_with_terminal, initialize_app_for_terminal_view};
 
 /// Shared observable state for a [`TestStorage`].
 struct TestStorageState {
@@ -217,5 +220,70 @@ fn discard_pending_drops_state_in_any_state() {
             executor.discard_pending(&failed_id);
             assert!(!executor.diff_application_failures.contains_key(&failed_id));
         });
+    });
+}
+
+#[test]
+fn cancelling_preprocessing_prevents_late_diff_storage_updates() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let action_model = terminal.update(&mut app, |terminal, ctx| {
+            ctx.add_model(|ctx| {
+                BlocklistAIActionModel::new(
+                    terminal.model.clone(),
+                    terminal.active_session().clone(),
+                    terminal.model_event_dispatcher(),
+                    terminal.id(),
+                    ctx,
+                )
+            })
+        });
+        let executor = action_model.read(&app, |model, ctx| model.request_file_edits_executor(ctx));
+        let action_id = AIAgentActionId::from("cancelled-preprocessing-diff".to_owned());
+        let storage = register_storage(&mut app, &executor, &action_id);
+        let conversation_id = AIConversationId::new();
+        action_model.update(&mut app, |model, ctx| {
+            model.queue_actions(vec![edit_action(&action_id)], conversation_id, ctx);
+            executor.update(ctx, |executor, _| {
+                executor
+                    .diff_application_failures
+                    .insert(action_id.clone(), vec1![DiffApplicationError::EmptyDiff]);
+            });
+
+            model.cancel_all_pending_actions(
+                conversation_id,
+                Some(CancellationReason::ManuallyCancelled),
+                ctx,
+            );
+        });
+        executor.update(&mut app, |executor, ctx| {
+            assert!(!executor.diff_storages.contains_key(&action_id));
+            assert!(!executor.diff_application_failures.contains_key(&action_id));
+
+            // 模拟取消之前已发出的文件读取/差异计算在取消后才完成。
+            let (tx, _rx) = oneshot::channel();
+            executor.on_diffs_applied(
+                Ok(vec![AIRequestedCodeDiff {
+                    file_name: "/tmp/cancelled.rs".to_owned(),
+                    diff_type: DiffType::creation("fn cancelled() {}\n".to_owned()),
+                    failures: None,
+                    original_content: String::new(),
+                }]),
+                action_id.clone(),
+                tx,
+                ctx,
+            );
+            let (tx, _rx) = oneshot::channel();
+            executor.on_diffs_applied(
+                Err(vec1![DiffApplicationError::EmptyDiff]),
+                action_id.clone(),
+                tx,
+                ctx,
+            );
+            assert!(!executor.diff_application_failures.contains_key(&action_id));
+        });
+        assert!(storage.diffs.borrow().is_none());
+        assert!(!storage.accepted.get());
     });
 }

@@ -7137,6 +7137,13 @@ impl TerminalView {
         conversation_id: &AIConversationId,
         ctx: &mut ViewContext<Self>,
     ) {
+        // 主动恢复仍存活的命令时，先交回同一会话的控制权，再由 CLI 路径恢复请求。
+        // 普通流结束、共享状态和迟到子任务事件不经过此用户入口。
+        if self.cli_subagent_controller.update(ctx, |controller, ctx| {
+            controller.resume_active_command_for_conversation(*conversation_id, ctx)
+        }) {
+            return;
+        }
         // If `AgentView` is enabled, this button is only rendered when the agent view is already
         // active for the selected conversation, so this call is redundant.
         if !FeatureFlag::AgentView.is_enabled() {
@@ -8968,6 +8975,10 @@ impl TerminalView {
                 ctx,
             );
         });
+        // REPL 等程序可能吞掉 SIGINT，输入框已隐藏时必须让原命令接收后续键盘。
+        // 侧栏停止其他任务时只修复目标终端已有的焦点，不抢走当前工作区的焦点。
+        self.redetermine_terminal_focus(ctx);
+        ctx.notify();
     }
 
     fn user_write_ctrl_c_to_pty(&mut self, ctx: &mut ViewContext<Self>) {
@@ -27204,9 +27215,15 @@ impl TypedActionView for TerminalView {
                     .active_block()
                     .is_eligible_for_agent_handoff()
                 {
-                    self.cli_subagent_controller.update(ctx, |controller, ctx| {
-                        controller.handoff_active_command_control_to_agent(ctx);
-                    });
+                    let conversation_id = self
+                        .model
+                        .lock()
+                        .block_list()
+                        .active_block()
+                        .ai_conversation_id();
+                    if let Some(conversation_id) = conversation_id {
+                        self.handle_resume_conversation(&conversation_id, ctx);
+                    }
                 } else if self
                     .model
                     .lock()
@@ -27694,10 +27711,11 @@ impl TypedActionView for TerminalView {
                         controller.switch_control_to_user(UserTakeOverReason::Manual, ctx);
                     });
                 } else if active_block.is_eligible_for_agent_handoff() {
+                    let conversation_id = active_block.ai_conversation_id();
                     drop(terminal_model);
-                    self.cli_subagent_controller.update(ctx, |controller, ctx| {
-                        controller.handoff_active_command_control_to_agent(ctx);
-                    });
+                    if let Some(conversation_id) = conversation_id {
+                        self.handle_resume_conversation(&conversation_id, ctx);
+                    }
                 }
                 ctx.notify();
             }

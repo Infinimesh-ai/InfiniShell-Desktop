@@ -15,6 +15,7 @@ use warp::integration_testing::terminal::{
 use warp::integration_testing::view_getters::single_input_view_for_tab;
 use warp::terminal::shell::ShellType;
 use warpui_core::Event;
+use warpui_core::async_assert;
 use warpui_core::integration::TestStep;
 
 use crate::Builder;
@@ -95,4 +96,43 @@ pub fn test_stop_task_interrupts_monitoring_loop() -> Builder {
             }),
         )
         .with_step(execute_echo_str(0, "monitor-stop-recovered"))
+}
+
+pub fn test_stop_task_keeps_surviving_repl_interactive() -> Builder {
+    FeatureFlag::AgentView.set_enabled(true);
+    let fixture = MonitoringCommandFixture::default();
+    let clicked_fixture = fixture.clone();
+    Builder::new()
+        .set_should_run_test(|| matches!(
+            current_shell_starter_and_version().0.shell_type(), ShellType::Bash | ShellType::Zsh
+        ))
+        .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
+        .with_step(clear_blocklist_to_remove_bootstrapped_blocks())
+        .with_step(execute_long_running_command(0,
+            r#"sh -c 'trap "" INT; while IFS= read -r line; do printf "ACK:%s\n" "$line"; [ "$line" = quit ] && break; done'"#.to_owned(),
+        ))
+        .with_step(fixture.attach_to_running_command())
+        .with_step(TestStep::new("将焦点留在监控输入框")
+            .with_action(|app, window_id, _| {
+                single_input_view_for_tab(app, window_id, 0).update(app, |input, ctx| {
+                    input.set_input_mode_agent(true, ctx);
+                });
+            })
+            .add_named_assertion("停止前 Agent 编辑器确实持有焦点", |app, window_id| {
+                single_input_view_for_tab(app, window_id, 0).read(app, |input, ctx| {
+                    async_assert!(input.editor().is_focused(ctx))
+                })
+            }))
+        .with_step(TestStep::new("停止忽略 SIGINT 的交互命令")
+            .with_click_on_saved_position_fn(move |app, window_id| {
+                clicked_fixture.stop_button_position(app, window_id)
+            })
+            .add_named_assertion("同一 REPL 仍存活且焦点回到终端", fixture.stopped_running_assertion(None)))
+        // 不重新点击终端或调用焦点 API，验证停止后的真实键盘路由。
+        .with_step(TestStep::new("直接向停止监控后的 REPL 键入文本")
+            .with_input_string("probe", Some(&["enter"]))
+            .add_named_assertion("原 REPL 收到真实 PTY 输入并回显", fixture.stopped_running_assertion(Some("ACK:probe"))))
+        .with_step(TestStep::new("正常退出交互命令")
+            .with_input_string("quit", Some(&["enter"]))
+            .add_named_assertion("REPL 退出后任务仍保持已取消", fixture.stopped_assertion()))
 }

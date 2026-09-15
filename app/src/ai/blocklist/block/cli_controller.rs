@@ -553,13 +553,41 @@ impl CLISubagentController {
     }
 
     pub fn handoff_active_command_control_to_agent(&self, ctx: &mut ModelContext<Self>) {
+        self.handoff_command_control_to_agent(None, ctx);
+    }
+
+    /// 只有用户明确恢复同一会话时，才允许解除停止留下的禁止自动恢复标记。
+    pub fn resume_active_command_for_conversation(
+        &self,
+        conversation_id: AIConversationId,
+        ctx: &mut ModelContext<Self>,
+    ) -> bool {
+        self.handoff_command_control_to_agent(Some(conversation_id), ctx)
+    }
+
+    fn handoff_command_control_to_agent(
+        &self,
+        explicitly_resumed_conversation: Option<AIConversationId>,
+        ctx: &mut ModelContext<Self>,
+    ) -> bool {
         let mut terminal_model = self.terminal_model.lock();
 
         let active_block = terminal_model.block_list_mut().active_block_mut();
         if !active_block.is_eligible_for_agent_handoff() {
-            return;
+            return false;
         }
         let conversation_id = active_block.ai_conversation_id();
+        if let Some(explicit_conversation_id) = explicitly_resumed_conversation {
+            if conversation_id != Some(explicit_conversation_id) {
+                return false;
+            }
+        } else if !active_block
+            .long_running_control_state()
+            .is_some_and(LongRunningCommandControlState::should_auto_resume)
+        {
+            // UI 可以展示主动恢复入口，普通或迟到的控制状态通知仍不能复活停止任务。
+            return false;
+        }
         let block_id = active_block.id().clone();
         let lrc_state_debug = format!("{:?}", active_block.long_running_control_state());
         // Check if control was transferred from agent before handoff.
@@ -572,7 +600,7 @@ impl CLISubagentController {
                 anyhow::Error::new(e).context("Failed to handoff control to agent"),
                 extra: { "block_id" => ?block_id, "lrc_state" => %lrc_state_debug }
             );
-            return;
+            return false;
         }
         log::info!(
             "handoff_active_command_control_to_agent: block_id={block_id:?}, \
@@ -643,6 +671,7 @@ impl CLISubagentController {
             },
             ctx
         );
+        true
     }
 
     pub fn toggle_hide_responses(&self, ctx: &mut ModelContext<Self>) {

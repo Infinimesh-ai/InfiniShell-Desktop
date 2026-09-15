@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use warpui::App;
@@ -105,7 +107,7 @@ fn finished_results_stay_in_original_action_order() {
 }
 
 #[test]
-fn cancellation_drops_preprocessing_and_late_results_leave_new_batches_untouched() {
+fn cancellation_finishes_preprocessing_and_late_results_leave_new_batches_untouched() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         let terminal = add_window_with_terminal(&mut app, None);
@@ -140,13 +142,16 @@ fn cancellation_drops_preprocessing_and_late_results_leave_new_batches_untouched
                     .pending_preprocessed_actions
                     .entry(conversation_id)
                     .or_default()
-                    .insert_preprocess_action_batch(HashSet::from([action.id.clone()]));
+                    .insert_preprocess_action_batch(vec![action.clone()]);
                 let healthy_action = AIAgentActionId::from("healthy-command".to_owned());
                 model
                     .pending_preprocessed_actions
                     .entry(healthy_conversation_id)
                     .or_default()
-                    .insert_preprocess_action_batch(HashSet::from([healthy_action.clone()]));
+                    .insert_preprocess_action_batch(vec![AIAgentAction {
+                        id: healthy_action.clone(),
+                        ..action.clone()
+                    }]);
                 assert!(matches!(
                     model.get_action_status(&action.id),
                     Some(AIActionStatus::Preprocessing)
@@ -156,7 +161,7 @@ fn cancellation_drops_preprocessing_and_late_results_leave_new_batches_untouched
                     Some(CancellationReason::ManuallyCancelled),
                     ctx,
                 );
-                assert!(model.get_action_status(&action.id).is_none());
+                assert!(model.get_action_status(&action.id).unwrap().is_cancelled());
                 assert!(matches!(
                     model.get_action_status(&healthy_action),
                     Some(AIActionStatus::Preprocessing)
@@ -169,7 +174,7 @@ fn cancellation_drops_preprocessing_and_late_results_leave_new_batches_untouched
                     true,
                     ctx,
                 );
-                assert!(model.get_action_status(&action.id).is_none());
+                assert!(model.get_action_status(&action.id).unwrap().is_cancelled());
                 assert!(!model.has_unfinished_actions_for_conversation(conversation_id));
 
                 let new_action = AIAgentActionId::from("new-command".to_owned());
@@ -177,7 +182,10 @@ fn cancellation_drops_preprocessing_and_late_results_leave_new_batches_untouched
                     .pending_preprocessed_actions
                     .entry(conversation_id)
                     .or_default()
-                    .insert_preprocess_action_batch(HashSet::from([new_action.clone()]));
+                    .insert_preprocess_action_batch(vec![AIAgentAction {
+                        id: new_action.clone(),
+                        ..action.clone()
+                    }]);
                 // ID 由 UUID 生成，清空旧队列后也不能让旧回调匹配到新批次。
                 assert_ne!(old_batch, new_batch);
                 model.handle_preprocess_actions_results(
@@ -187,7 +195,7 @@ fn cancellation_drops_preprocessing_and_late_results_leave_new_batches_untouched
                     true,
                     ctx,
                 );
-                assert!(model.get_action_status(&action.id).is_none());
+                assert!(model.get_action_status(&action.id).unwrap().is_cancelled());
                 assert!(matches!(
                     model.get_action_status(&new_action),
                     Some(AIActionStatus::Preprocessing)
@@ -196,7 +204,96 @@ fn cancellation_drops_preprocessing_and_late_results_leave_new_batches_untouched
                     model.get_action_status(&healthy_action),
                     Some(AIActionStatus::Preprocessing)
                 ));
+                let results = model.drain_finished_action_results(conversation_id);
+                assert_eq!(results.len(), 1);
+                assert_eq!(results[0].id, action.id);
+                assert!(results[0].result.is_cancelled());
             });
         });
+    });
+}
+
+#[test]
+fn cancelling_preprocessing_immediately_finishes_actions() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let action_model = terminal.update(&mut app, |terminal, ctx| {
+            ctx.add_model(|ctx| {
+                BlocklistAIActionModel::new(
+                    terminal.model.clone(),
+                    terminal.active_session().clone(),
+                    terminal.model_event_dispatcher(),
+                    terminal.id(),
+                    ctx,
+                )
+            })
+        });
+        let finished_events = Rc::new(RefCell::new(Vec::new()));
+        let recorded_events = finished_events.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&action_model, move |_, event, _| {
+                if let BlocklistAIActionEvent::FinishedAction {
+                    action_id,
+                    cancellation_reason,
+                    ..
+                } = event
+                {
+                    recorded_events
+                        .borrow_mut()
+                        .push((action_id.clone(), *cancellation_reason));
+                }
+            });
+        });
+        let conversation_id = AIConversationId::new();
+        let action_id = AIAgentActionId::from("cancel-preprocessing-edit".to_owned());
+        action_model.update(&mut app, |model, ctx| {
+            model.queue_actions(
+                vec![AIAgentAction {
+                    id: action_id.clone(),
+                    task_id: TaskId::new("task".to_owned()),
+                    action: AIAgentActionType::RequestFileEdits {
+                        file_edits: vec![],
+                        title: None,
+                    },
+                    requires_result: true,
+                }],
+                conversation_id,
+                ctx,
+            );
+            assert!(matches!(
+                model.get_action_status(&action_id),
+                Some(AIActionStatus::Preprocessing)
+            ));
+
+            // 不等待异步预处理返回；追问发送方会立即读取这些取消结果。
+            model.cancel_all_pending_actions(
+                conversation_id,
+                Some(CancellationReason::FollowUpSubmitted {
+                    is_for_same_conversation: true,
+                }),
+                ctx,
+            );
+            assert!(model.get_action_status(&action_id).unwrap().is_cancelled());
+            let results = model.drain_finished_action_results(conversation_id);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].id, action_id);
+            assert!(matches!(
+                results[0].result,
+                AIAgentActionResultType::RequestFileEdits(
+                    crate::ai::agent::RequestFileEditsResult::Cancelled
+                )
+            ));
+            assert!(!model.has_unfinished_actions_for_conversation(conversation_id));
+        });
+        assert_eq!(
+            *finished_events.borrow(),
+            vec![(
+                action_id,
+                Some(CancellationReason::FollowUpSubmitted {
+                    is_for_same_conversation: true,
+                }),
+            )]
+        );
     });
 }

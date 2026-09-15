@@ -1,4 +1,4 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 
 use uuid::Uuid;
 
@@ -27,6 +27,14 @@ impl PendingPreprocessedActions {
         self.0.iter().any(|action| action.contains(action_id))
     }
 
+    /// 取消时保留动作载荷，供调用方立即生成结果并释放执行器状态。
+    pub fn into_actions(self) -> impl Iterator<Item = AIAgentAction> {
+        self.0.into_iter().flat_map(|batch| match batch.status {
+            PreprocessActionStatus::Pending { actions }
+            | PreprocessActionStatus::Done { actions } => actions,
+        })
+    }
+
     /// Returns the actions that are ready to be queued now that the group of actions identified by [`PreprocessId`] have completed.
     /// NOTE this may return actions that have been completed earlier to maintain the invariant that actions are returned in the
     /// order they are added.
@@ -48,7 +56,7 @@ impl PendingPreprocessedActions {
             .0
             .iter()
             .take(current_index)
-            .any(|action| matches!(action.status, PreprocessActionStatus::Pending));
+            .any(|action| matches!(action.status, PreprocessActionStatus::Pending { .. }));
 
         if has_pending_before {
             // If there are pending actions before this one, just mark this one as done
@@ -61,7 +69,7 @@ impl PendingPreprocessedActions {
             // First, collect actions from all completed batches before this one
             for action in self.0.drain(..current_index) {
                 match action.status {
-                    PreprocessActionStatus::Pending => {
+                    PreprocessActionStatus::Pending { .. } => {
                         #[cfg(debug_assertions)]
                         panic!("Preprocess action batch should be completed but was pending")
                     }
@@ -80,7 +88,7 @@ impl PendingPreprocessedActions {
             // Process any subsequent completed batches.
             while let Some(action) = self.0.pop_front() {
                 match action.status {
-                    PreprocessActionStatus::Pending => {
+                    PreprocessActionStatus::Pending { .. } => {
                         self.0.push_front(action);
                         break;
                     }
@@ -96,22 +104,17 @@ impl PendingPreprocessedActions {
 
     /// Inserts a batch of actions that need to be preprocessed. Returns a [`PreprocessId`] that
     /// uniquely identifies the batch.
-    pub fn insert_preprocess_action_batch(
-        &mut self,
-        action_ids: HashSet<AIAgentActionId>,
-    ) -> PreprocessId {
+    pub fn insert_preprocess_action_batch(&mut self, actions: Vec<AIAgentAction>) -> PreprocessId {
         let preprocess_id = PreprocessId::new();
-        self.0.push_back(PreprocessActionBatch::new(
-            preprocess_id.clone(),
-            action_ids,
-        ));
+        self.0
+            .push_back(PreprocessActionBatch::new(preprocess_id.clone(), actions));
         preprocess_id
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 enum PreprocessActionStatus {
-    Pending,
+    Pending { actions: Vec<AIAgentAction> },
     Done { actions: Vec<AIAgentAction> },
 }
 
@@ -122,20 +125,22 @@ struct PreprocessActionBatch {
     id: PreprocessId,
     /// The current status of this batch.
     status: PreprocessActionStatus,
-    /// Action IDs associated with this batch.
-    action_ids: HashSet<AIAgentActionId>,
 }
 
 impl PreprocessActionBatch {
     fn contains(&self, action_id: &AIAgentActionId) -> bool {
-        self.action_ids.contains(action_id)
+        match &self.status {
+            PreprocessActionStatus::Pending { actions }
+            | PreprocessActionStatus::Done { actions } => {
+                actions.iter().any(|action| &action.id == action_id)
+            }
+        }
     }
 
-    fn new(preprocess_id: PreprocessId, action_ids: HashSet<AIAgentActionId>) -> Self {
+    fn new(preprocess_id: PreprocessId, actions: Vec<AIAgentAction>) -> Self {
         Self {
             id: preprocess_id,
-            status: PreprocessActionStatus::Pending,
-            action_ids,
+            status: PreprocessActionStatus::Pending { actions },
         }
     }
 }

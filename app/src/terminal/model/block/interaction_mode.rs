@@ -141,7 +141,7 @@ impl Block {
         self.is_active_and_long_running()
             && self
                 .long_running_control_state()
-                .is_some_and(|state| state.is_user_in_control() && state.should_auto_resume())
+                .is_some_and(LongRunningCommandControlState::is_user_in_control)
     }
 
     pub fn update_is_agent_blocked(&mut self, new_value: bool) {

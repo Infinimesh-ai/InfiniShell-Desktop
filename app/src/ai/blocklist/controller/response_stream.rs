@@ -262,10 +262,15 @@ impl ResponseStream {
     /// `controller.rs` 的 `register_mock_stream_for_test` 依赖它。
     #[cfg(test)]
     pub fn new_for_test(id: ResponseStreamId) -> Self {
+        Self::new_for_test_with_params(id, api::RequestParams::new_for_test(vec![], vec![]))
+    }
+
+    #[cfg(test)]
+    pub fn new_for_test_with_params(id: ResponseStreamId, params: api::RequestParams) -> Self {
         let (cancellation_tx, _rx) = oneshot::channel();
         Self {
             id,
-            params: api::RequestParams::new_for_test(vec![], vec![]),
+            params,
             retry_count: 0,
             start_time: Local::now(),
             time_to_latest_event: TimeDelta::seconds(0),
@@ -418,7 +423,7 @@ impl ResponseStream {
     }
 
     pub fn is_lrc_tag_in_request(&self) -> bool {
-        self.params.lrc_should_spawn_subagent
+        self.params.lrc_is_user_tag_in
     }
 
     /// Zap BYOP 本地会话压缩:返回本流是否在跑 SummarizeConversation,

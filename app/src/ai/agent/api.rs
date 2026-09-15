@@ -187,8 +187,10 @@ pub struct RequestParams {
     /// Zap BYOP repair sidecar 快照。serializer 只读使用,不在请求构造中反序列化持久化 JSON。
     pub byop_repair_state: crate::ai::byop_readiness::RepairStateStatus,
     /// Zap BYOP 专用:本轮是否需要模拟上游 CreateTask 流程来升级 optimistic CLI subtask。
-    /// 只有用户刚 tag-in 的首轮需要;已存在 CLI subagent 的后续轮只复用 task,不能重复 spawn。
+    /// 未初始化的 CLI 子任务需要补发；已初始化的后续轮只复用 task，不能重复 spawn。
     pub lrc_should_spawn_subagent: bool,
+    /// 本轮用户明确向当前命令提交了 tag-in 请求；初始化子任务本身不授予工具执行权限。
+    pub lrc_is_user_tag_in: bool,
     /// Zap BYOP 专用:本轮响应应该写入的 task。普通对话是 root task;
     /// CLI subagent 后续轮则是对应 subtask。
     pub byop_target_task_id: Option<String>,
@@ -291,6 +293,7 @@ impl RequestParams {
             compaction_plan: None,
             byop_repair_state: Default::default(),
             lrc_should_spawn_subagent: false,
+            lrc_is_user_tag_in: false,
         }
     }
 
@@ -509,6 +512,7 @@ impl RequestParams {
             lrc_command_id: None,
             lrc_running_command: None,
             lrc_should_spawn_subagent: false,
+            lrc_is_user_tag_in: false,
             byop_target_task_id,
             // BYOP-only:由 controller 在 dispatch 到 BYOP exec 前回填(setter 风格,
             // 避免穿过 ConversationRequestData / 非 BYOP 路径)。
