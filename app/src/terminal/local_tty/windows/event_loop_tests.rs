@@ -23,11 +23,15 @@ struct PipePty {
     exit_after_first_read: bool,
     dropped_tx: mpsc::Sender<()>,
     killed: Arc<AtomicBool>,
+    observed_eof: Arc<AtomicBool>,
 }
 
 impl Read for PipePty {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let bytes_read = self.pipe.read(buf)?;
+        if bytes_read == 0 {
+            self.observed_eof.store(true, Ordering::SeqCst);
+        }
         if bytes_read > 0 && std::mem::take(&mut self.exit_after_first_read) {
             // 用真实 NamedPipe 首次完成的读取触发退出，余下数据必须继续经 IOCP 接收。
             self.control_tx.send(Message::ChildExited).unwrap();
@@ -100,6 +104,7 @@ struct RunningPipe {
     dropped_rx: mpsc::Receiver<()>,
     terminal: Arc<FairMutex<TerminalModel>>,
     killed: Arc<AtomicBool>,
+    observed_eof: Arc<AtomicBool>,
 }
 
 fn spawn_pipe_reader() -> (RunningPipe, NamedPipe) {
@@ -110,12 +115,14 @@ fn spawn_pipe_reader() -> (RunningPipe, NamedPipe) {
     let (control_tx, control_rx) = mio_channel::channel();
     let (dropped_tx, dropped_rx) = mpsc::channel();
     let killed = Arc::new(AtomicBool::new(false));
+    let observed_eof = Arc::new(AtomicBool::new(false));
     let pty = PipePty {
         pipe: server,
         control_tx: control_tx.clone(),
         exit_after_first_read: true,
         dropped_tx,
         killed: killed.clone(),
+        observed_eof: observed_eof.clone(),
     };
     let listener = ChannelEventListener::new_for_test();
     let mut terminal = TerminalModel::mock(None, Some(listener.clone()));
@@ -131,6 +138,7 @@ fn spawn_pipe_reader() -> (RunningPipe, NamedPipe) {
             dropped_rx,
             terminal,
             killed,
+            observed_eof,
         },
         client,
     )
@@ -152,7 +160,7 @@ fn wait_for_writable(poll: &mut Poll) {
     }
 }
 
-fn write_pipe_output(mut pipe: NamedPipe, output: &[u8]) -> NamedPipe {
+fn write_pipe_output(mut pipe: NamedPipe, output: &[u8]) -> (NamedPipe, Poll) {
     let mut poll = Poll::new().unwrap();
     poll.registry()
         .register(&mut pipe, Token(4), Interest::READABLE | Interest::WRITABLE)
@@ -161,8 +169,27 @@ fn write_pipe_output(mut pipe: NamedPipe, output: &[u8]) -> NamedPipe {
     wait_for_writable(&mut poll);
     assert_eq!(pipe.write(output).unwrap(), output.len());
     wait_for_writable(&mut poll);
-    poll.registry().deregister(&mut pipe).unwrap();
-    pipe
+    // 保留注册和 Poll，让 drop 后的取消完成产生可读通知并释放写端句柄。
+    (pipe, poll)
+}
+
+fn close_pipe_writer(pipe: NamedPipe, mut poll: Poll) {
+    drop(pipe);
+    let mut events = Events::with_capacity(8);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        poll.poll(
+            &mut events,
+            Some(deadline.saturating_duration_since(Instant::now())),
+        )
+        .unwrap();
+        // 读端不会向写端发送数据；可读通知表示 pending read 已经取消或因对端关闭结束。
+        // read_done 已释放该读取持有的 Arc，无需等待读端测试线程再次处理 EOF。
+        if events.iter().any(|event| event.is_readable()) {
+            break;
+        }
+        assert!(Instant::now() < deadline, "写端的异步读取必须完成取消收尾");
+    }
 }
 
 fn finish_pipe_reader(running: RunningPipe) -> Arc<FairMutex<TerminalModel>> {
@@ -183,14 +210,23 @@ fn finish_pipe_reader(running: RunningPipe) -> Arc<FairMutex<TerminalModel>> {
 #[test]
 fn child_exit_drains_pending_named_pipe_reads_until_eof() {
     let (running, writer) = spawn_pipe_reader();
+    let observed_eof = running.observed_eof.clone();
     // 大于 mio 默认的 4 KiB 缓冲，确保尾标记需要后续 IOCP 完成通知。
     let mut output = vec![0; 64 * 1024];
     output.extend_from_slice(b"iocp-exit-tail-preserved");
-    let writer = thread::spawn(move || drop(write_pipe_output(writer, &output)));
+    let writer = thread::spawn(move || {
+        let (writer, poll) = write_pipe_output(writer, &output);
+        close_pipe_writer(writer, poll);
+    });
 
+    let writer_result = writer.join();
     let terminal = finish_pipe_reader(running);
-    writer.join().unwrap();
+    writer_result.unwrap();
 
+    assert!(
+        observed_eof.load(Ordering::SeqCst),
+        "读端必须收到真实 EOF，不能只依靠总时限结束"
+    );
     assert_eq!(
         terminal
             .lock()
@@ -204,11 +240,14 @@ fn child_exit_drains_pending_named_pipe_reads_until_eof() {
 #[test]
 fn child_exit_without_pipe_eof_has_bounded_drain() {
     let (running, writer) = spawn_pipe_reader();
-    let writer = write_pipe_output(writer, b"pipe-remains-open");
+    let observed_eof = running.observed_eof.clone();
+    let (writer, poll) = write_pipe_output(writer, b"pipe-remains-open");
 
     // 写端一直存活，不会产生 EOF；退出必须依靠总时限兜底。
     let terminal = finish_pipe_reader(running);
-    drop(writer);
+    let saw_eof_before_closing_writer = observed_eof.load(Ordering::SeqCst);
+    close_pipe_writer(writer, poll);
+    assert!(!saw_eof_before_closing_writer, "写端仍存活时不应收到 EOF");
 
     assert_eq!(
         terminal
