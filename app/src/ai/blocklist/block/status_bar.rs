@@ -873,14 +873,17 @@ impl BlocklistAIStatusBar {
                         ),
                     },
                 ),
-                stop_button: Some(ButtonProps {
-                    button_handle: &self.state_handles.stop_button,
-                    // 长命令的键盘 Ctrl-C 首次只接管，不能作为显式停止的快捷键提示。
-                    keystroke: (!active_block.is_active_and_long_running())
-                        .then_some(self.stop_keystroke.as_ref())
-                        .flatten(),
-                    is_active: false,
-                }),
+                stop_button: Some((
+                    ButtonProps {
+                        button_handle: &self.state_handles.stop_button,
+                        // 长命令的键盘 Ctrl-C 首次只接管，不能作为显式停止的快捷键提示。
+                        keystroke: (!active_block.is_active_and_long_running())
+                            .then_some(self.stop_keystroke.as_ref())
+                            .flatten(),
+                        is_active: false,
+                    },
+                    active_block.is_active_and_long_running(),
+                )),
                 take_over_lrc_control_button: is_agent_in_control.then_some(ButtonProps {
                     button_handle: &self.state_handles.take_over_button,
                     keystroke: self.set_terminal_input_keystroke.as_ref(),

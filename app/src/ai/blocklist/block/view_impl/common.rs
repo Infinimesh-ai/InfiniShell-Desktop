@@ -214,7 +214,7 @@ pub struct WarpingProps<'a, V> {
     pub take_over_lrc_control_button: Option<ButtonProps<'a>>,
     pub auto_execute_button: Option<AutoExecuteButtonProps<'a>>,
     pub queue_next_prompt_button: Option<ButtonProps<'a>>,
-    pub stop_button: Option<ButtonProps<'a>>,
+    pub stop_button: Option<(ButtonProps<'a>, bool)>,
     /// Inline `Check now` affordance displayed alongside `Last seen by agent ...`
     /// in the warping indicator. When set, the agent's pending poll future is
     /// short-circuited on click and a fresh snapshot is returned immediately.
@@ -516,10 +516,14 @@ pub fn render_warping_indicator<V: View>(
         ));
     }
 
-    if let Some(stop_button_props) = props.stop_button {
+    if let Some((stop_button_props, interrupts_command)) = props.stop_button {
         has_buttons = true;
         buttons_row = buttons_row
-            .with_child(render_stop_button(stop_button_props, appearance))
+            .with_child(render_stop_button(
+                stop_button_props,
+                interrupts_command,
+                appearance,
+            ))
             .with_spacing(4.);
     }
 
@@ -885,7 +889,11 @@ pub fn render_switch_control_to_user_button(
     )
 }
 
-fn render_stop_button(props: ButtonProps, appearance: &Appearance) -> Box<dyn Element> {
+fn render_stop_button(
+    props: ButtonProps,
+    interrupts_command: bool,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
     let icon_size = get_icon_size(appearance);
     let stop_icon = Container::new(
         ConstrainedBox::new(red_stop_icon(appearance).finish())
@@ -895,12 +903,17 @@ fn render_stop_button(props: ButtonProps, appearance: &Appearance) -> Box<dyn El
     )
     .finish();
 
+    let tooltip = if interrupts_command {
+        crate::t!("agent-stop-task-and-command")
+    } else {
+        crate::t!("agent-stop-task")
+    };
     let button = render_warping_indicator_button(
         props.button_handle.clone(),
         appearance,
         stop_icon,
         props.keystroke,
-        crate::t!("agent-stop-task-and-command"),
+        tooltip,
         props.is_active,
         false,
         |ctx: &mut EventContext<'_>| {
