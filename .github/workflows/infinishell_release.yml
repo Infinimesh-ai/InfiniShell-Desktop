@@ -4,7 +4,7 @@
 # - CI 桌面客户端仅构建 Windows x64 + Linux x86_64;macOS 桌面只支持
 #   Apple Silicon,由本地签名机使用 Developer ID 构建、公证后加入同一个 Draft Release。
 #   remote-server 仍构建 macOS/Linux/Windows 双架构;macOS x86_64 只作为 SSH
-#   扩展保留,并在 Apple Silicon runner 上交叉编译。
+#   扩展保留,默认在 Intel runner 上原生编译。
 # - 单 channel: oss(由 release_configurations.json 提供配置)
 # - 不签名:不传 --read-passwords-from-env(macOS) / 不设 SIGN_TOOL_CMD(Windows)
 # - 不上传 GCS / 第三方 crash 平台 / Slack / changelog,不调 channel-versions repository_dispatch
@@ -149,15 +149,17 @@ jobs:
 
   release_remote_server_macos:
     name: Build remote-server (macOS ${{ matrix.arch }})
-    runs-on: macos-26
+    runs-on: ${{ matrix.runner }}
     needs: prepare_metadata
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        arch:
-          - aarch64
-          - x86_64
+        include:
+          - arch: aarch64
+            runner: macos-26
+          - arch: x86_64
+            runner: macos-26-intel
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -178,8 +180,8 @@ jobs:
         id: bundle_cli
         run: |
           if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
-            # Intel 桌面已停止发布。SSH 扩展在 Apple Silicon runner 上交叉编译,
-            # 同时限制并发与单个 codegen 分组峰值。
+            # Intel 桌面已停止发布。SSH 扩展仍在 Intel runner 上原生编译,
+            # 并限制并发与单个 codegen 分组峰值。
             export CARGO_BUILD_JOBS=1
             export CARGO_PROFILE_RELEASE_CLI_CODEGEN_UNITS=4
             df -h .

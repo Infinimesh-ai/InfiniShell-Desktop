@@ -21,5 +21,6 @@ At some point, we may want to replace this document with a JSON schema file (whi
 InfiniShell OSS desktop releases support Apple Silicon (`arm64`) only. The release
 workflow publishes `InfiniShell-arm64.dmg` and does not build or publish an Intel
 desktop DMG. The macOS `x86_64` target remains in the remote-server matrix solely
-for the SSH extension; it is cross-compiled on an Apple Silicon runner and can be
-checked natively by the optional Intel SSH-extension preflight job.
+for the SSH extension; it is built natively on an Intel runner. An optional
+preflight job retains Apple Silicon cross-compilation plus Intel native acceptance
+as a fallback when a long-running Intel build is unavailable.
