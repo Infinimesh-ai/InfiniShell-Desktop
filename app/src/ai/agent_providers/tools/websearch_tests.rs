@@ -112,6 +112,32 @@ async fn all_optional_args_passthrough() {
 }
 
 #[tokio::test]
+async fn numeric_string_args_are_sent_as_integers() {
+    let mut server = Server::new_async().await;
+    let request = server
+        .mock("POST", "/")
+        .match_body(Matcher::PartialJsonString(
+            r#"{"params":{"arguments":{"query":"rust","numResults":8,"contextMaxCharacters":15000,"type":"deep","livecrawl":"preferred"}}}"#.into(),
+        ))
+        .with_status(200)
+        .with_body(sse_body("search result"))
+        .create_async()
+        .await;
+    let args = serde_json::from_str::<SearchToolArgs>(
+        r#"{"query":"rust","numResults":"8","contextMaxCharacters":"15000","type":"deep","livecrawl":"preferred"}"#,
+    )
+    .expect("数字字符串应能解析");
+
+    let out = run_websearch(&build_client(), args, None, Some(&server.url()))
+        .await
+        .expect("搜索应成功");
+
+    request.assert_async().await;
+    assert_eq!(out.query, "rust");
+    assert_eq!(out.results, "search result");
+}
+
+#[tokio::test]
 async fn sends_correct_accept_header() {
     let mut server = Server::new_async().await;
     let _m = server
@@ -205,6 +231,167 @@ async fn handles_multiple_data_lines() {
 // SearchToolArgs → SearchArgs 默认填充
 // ---------------------------------------------------------------------------
 
+#[test]
+fn search_tool_args_accepts_numeric_strings() {
+    let args = serde_json::from_str::<SearchToolArgs>(
+        r#"{"query":"rust","numResults":"8","contextMaxCharacters":"15000"}"#,
+    )
+    .expect("数字字符串应能解析");
+
+    assert_eq!(args.num_results, Some(8));
+    assert_eq!(args.context_max_characters, Some(15000));
+}
+
+#[test]
+fn search_tool_args_accepts_mixed_numeric_types() {
+    let args = serde_json::from_str::<SearchToolArgs>(
+        r#"{"query":"rust","numResults":8,"contextMaxCharacters":"15000"}"#,
+    )
+    .expect("整数和数字字符串应能混用");
+    let reversed = serde_json::from_str::<SearchToolArgs>(
+        r#"{"query":"rust","numResults":"8","contextMaxCharacters":15000}"#,
+    )
+    .expect("两个字段应各自兼容数字字符串");
+
+    assert_eq!(args.num_results, Some(8));
+    assert_eq!(args.context_max_characters, Some(15000));
+    assert_eq!(reversed.num_results, Some(8));
+    assert_eq!(reversed.context_max_characters, Some(15000));
+}
+
+#[test]
+fn search_tool_args_preserves_integer_boundaries() {
+    let args = serde_json::from_str::<SearchToolArgs>(
+        r#"{"query":"rust","numResults":0,"contextMaxCharacters":4294967295}"#,
+    )
+    .expect("保留原有 u32 范围");
+    let reversed = serde_json::from_str::<SearchToolArgs>(
+        r#"{"query":"rust","numResults":4294967295,"contextMaxCharacters":0}"#,
+    )
+    .expect("两个字段均保留原有 u32 范围");
+
+    assert_eq!(args.num_results, Some(0));
+    assert_eq!(args.context_max_characters, Some(u32::MAX));
+    assert_eq!(reversed.num_results, Some(u32::MAX));
+    assert_eq!(reversed.context_max_characters, Some(0));
+}
+
+#[test]
+fn search_tool_args_accepts_string_integer_boundaries() {
+    let args = serde_json::from_str::<SearchToolArgs>(
+        r#"{"query":"rust","numResults":"0","contextMaxCharacters":"4294967295"}"#,
+    )
+    .expect("数字字符串应保留 u32 范围");
+    let reversed = serde_json::from_str::<SearchToolArgs>(
+        r#"{"query":"rust","numResults":"4294967295","contextMaxCharacters":"0"}"#,
+    )
+    .expect("两个字段均兼容数字字符串边界");
+
+    assert_eq!(args.num_results, Some(0));
+    assert_eq!(args.context_max_characters, Some(u32::MAX));
+    assert_eq!(reversed.num_results, Some(u32::MAX));
+    assert_eq!(reversed.context_max_characters, Some(0));
+}
+
+#[test]
+fn search_tool_args_nulls_preserve_defaults() {
+    let args = serde_json::from_str::<SearchToolArgs>(
+        r#"{"query":"rust","numResults":null,"contextMaxCharacters":null}"#,
+    )
+    .expect("空值应继续兼容");
+
+    assert_eq!(args.num_results, None);
+    assert_eq!(args.context_max_characters, None);
+    assert_eq!(
+        args.into_exa_args(),
+        exa::SearchArgs::with_defaults("rust".into())
+    );
+}
+
+#[test]
+fn search_tool_args_rejects_invalid_num_results() {
+    assert!(serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":-1}"#).is_err());
+    assert!(serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":8.0}"#).is_err());
+    assert!(serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":8.5}"#).is_err());
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":4294967296}"#).is_err()
+    );
+    assert!(serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":"-1"}"#).is_err());
+    assert!(serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":"8.5"}"#).is_err());
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":"4294967296"}"#)
+            .is_err()
+    );
+    assert!(serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":""}"#).is_err());
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":"eight"}"#).is_err()
+    );
+    assert!(serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":" 8 "}"#).is_err());
+    assert!(serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":true}"#).is_err());
+    assert!(serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":[]}"#).is_err());
+    assert!(serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","numResults":{}}"#).is_err());
+}
+
+#[test]
+fn search_tool_args_rejects_invalid_context_max_characters() {
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","contextMaxCharacters":-1}"#)
+            .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","contextMaxCharacters":8.0}"#)
+            .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","contextMaxCharacters":8.5}"#)
+            .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(
+            r#"{"query":"q","contextMaxCharacters":4294967296}"#
+        )
+        .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","contextMaxCharacters":"-1"}"#)
+            .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","contextMaxCharacters":"8.5"}"#)
+            .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(
+            r#"{"query":"q","contextMaxCharacters":"4294967296"}"#
+        )
+        .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","contextMaxCharacters":""}"#)
+            .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","contextMaxCharacters":"eight"}"#)
+            .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","contextMaxCharacters":" 8 "}"#)
+            .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","contextMaxCharacters":true}"#)
+            .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","contextMaxCharacters":[]}"#)
+            .is_err()
+    );
+    assert!(
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"q","contextMaxCharacters":{}}"#)
+            .is_err()
+    );
+}
+
 // ---------------------------------------------------------------------------
 // 真实端点 smoke 测试默认忽略,需要时通过 ignored 测试显式运行。
 // ---------------------------------------------------------------------------
@@ -272,13 +459,8 @@ fn websearch_description_matches_opencode_verbatim() {
 
 #[test]
 fn search_tool_args_into_exa_uses_defaults() {
-    let a = SearchToolArgs {
-        query: "z".into(),
-        num_results: None,
-        livecrawl: None,
-        search_type: None,
-        context_max_characters: None,
-    };
+    let a =
+        serde_json::from_str::<SearchToolArgs>(r#"{"query":"z"}"#).expect("缺省参数应使用默认值");
     let exa = a.into_exa_args();
     assert_eq!(exa.query, "z");
     assert_eq!(exa.num_results, 8);
@@ -301,13 +483,10 @@ fn search_output_carries_byop_sentinel() {
 
 #[test]
 fn search_tool_args_overrides_defaults() {
-    let a = SearchToolArgs {
-        query: "z".into(),
-        num_results: Some(2),
-        livecrawl: Some("preferred".into()),
-        search_type: Some("fast".into()),
-        context_max_characters: Some(500),
-    };
+    let a = serde_json::from_str::<SearchToolArgs>(
+        r#"{"query":"z","numResults":2,"livecrawl":"preferred","type":"fast","contextMaxCharacters":500}"#,
+    )
+    .expect("整数参数应继续兼容");
     let exa = a.into_exa_args();
     assert_eq!(exa.num_results, 2);
     assert_eq!(exa.livecrawl, "preferred");
