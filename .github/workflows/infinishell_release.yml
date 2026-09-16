@@ -178,16 +178,7 @@ jobs:
 
       - name: Build CLI
         id: bundle_cli
-        run: |
-          if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
-            # Intel 桌面已停止发布。SSH 扩展仍在 Intel runner 上原生编译,
-            # 并限制并发与单个 codegen 分组峰值。
-            export CARGO_BUILD_JOBS=1
-            export CARGO_PROFILE_RELEASE_CLI_CODEGEN_UNITS=4
-            df -h .
-            sysctl -n hw.memsize
-          fi
-          script/bundle --channel "$CHANNEL" --arch ${{ matrix.arch }} --artifact cli --nosign
+        run: script/bundle --channel "$CHANNEL" --arch ${{ matrix.arch }} --artifact cli --nosign
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
