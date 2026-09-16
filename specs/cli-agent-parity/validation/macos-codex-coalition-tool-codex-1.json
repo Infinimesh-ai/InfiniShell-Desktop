@@ -1,0 +1,574 @@
+{
+  "platform": "darwin",
+  "scope": "real_codex_tool_via_supervisor_custom_host",
+  "crash_target": "codex",
+  "rust_adapter_tested": false,
+  "model_requested": true,
+  "credentials_isolated": true,
+  "supervisor_sha256": "7d71b20ada94a9da20294d52f51e03044d848159b8ffcc05fa7eb68baeaf06f0",
+  "codex_sha256": "19c4f144c5226a9f17c58e6f0fa854843b0f77a6eb420f40e2745a12f10f5d37",
+  "complete_tree_mechanism": "macos_resource_coalition",
+  "cli_version": "codex-cli 0.147.0",
+  "native": {
+    "thread_id": "01a0aadd-c37a-7310-afd8-c402ef774b4d",
+    "turn_id": "01a0aadd-c398-7893-9bf3-18ecc5f3d31c"
+  },
+  "generation": "6637ff35-46ca-4cff-9ab2-262e1f1b4214",
+  "tool_identity": {
+    "pid": 12028,
+    "ppid": 12017,
+    "pgid": 12028,
+    "sid": 12028,
+    "sleep_pid": 12030
+  },
+  "worker": {
+    "pid": 12012,
+    "host_pid": 12011
+  },
+  "launch_record_sha256": {
+    "manifest.json": "ebd3e6e67558dd35d55c1afc4219ff6ebfd0fc58a2b1e98eb9b7945b89f42047",
+    "macos-coalition.json": "61d4c64bd163347f5872c9d228a4142ebd00cf106f2000c39e3173ae9cabfb71",
+    "macos-native.json": "31e64a48e13dcb5e7131abaa03033a2b00adb9ff2b60fe8f7a627b52cac78f33"
+  },
+  "claim": {
+    "version": 1,
+    "generation": "6637ff35-46ca-4cff-9ab2-262e1f1b4214",
+    "manifest_sha256": "ebd3e6e67558dd35d55c1afc4219ff6ebfd0fc58a2b1e98eb9b7945b89f42047",
+    "label": "dev.infinishell.cli-agent.6637ff35-46ca-4cff-9ab2-262e1f1b4214",
+    "boot_session": "4D54C5E7-D704-40C0-AA48-FB59BC85AB96",
+    "wrapper": {
+      "pid": 12016,
+      "pid_version": 635172,
+      "unique_id": 309066,
+      "resource_cid": 24225
+    }
+  },
+  "native_claim": {
+    "generation": "6637ff35-46ca-4cff-9ab2-262e1f1b4214",
+    "claim_sha256": "61d4c64bd163347f5872c9d228a4142ebd00cf106f2000c39e3173ae9cabfb71",
+    "identity": {
+      "pid": 12017,
+      "pid_version": 635174,
+      "unique_id": 309067,
+      "resource_cid": 24225
+    }
+  },
+  "bound_processes": {
+    "host": {
+      "pid": 12011,
+      "pid_version": 635161,
+      "unique_id": 309061,
+      "resource_cid": 7944,
+      "parent_unique_id": 309059,
+      "ppid": 12009,
+      "image": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "argv": [
+        "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+        "<user-home>/Tools/github/InfiniShell-Desktop/script/cli-agent-parity/probe_codex_supervisor_tool_tree.py",
+        "--host",
+        "<probe-project>/host-config.json"
+      ],
+      "pgid": 11976,
+      "sid": 11976
+    },
+    "supervisor": {
+      "pid": 12012,
+      "pid_version": 635163,
+      "unique_id": 309062,
+      "resource_cid": 7944,
+      "parent_unique_id": 309061,
+      "ppid": 12011,
+      "image": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+      "argv": [
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+        "cli-agent-supervisor",
+        "<probe-project>/cli-agent-processes/6637ff35-46ca-4cff-9ab2-262e1f1b4214/manifest.json"
+      ],
+      "pgid": 11976,
+      "sid": 11976
+    },
+    "wrapper": {
+      "pid": 12016,
+      "pid_version": 635172,
+      "unique_id": 309066,
+      "resource_cid": 24225,
+      "parent_unique_id": 1,
+      "ppid": 1,
+      "image": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+      "argv": [
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+        "cli-agent-supervisor",
+        "<probe-project>/cli-agent-processes/6637ff35-46ca-4cff-9ab2-262e1f1b4214/manifest.json",
+        "--execute"
+      ],
+      "pgid": 12016,
+      "sid": 1
+    },
+    "codex": {
+      "pid": 12017,
+      "pid_version": 635175,
+      "unique_id": 309067,
+      "resource_cid": 24225,
+      "parent_unique_id": 309066,
+      "ppid": 12016,
+      "image": "/opt/homebrew/Caskroom/codex/0.147.0/bin/codex",
+      "argv": [
+        "/opt/homebrew/Caskroom/codex/0.147.0/bin/codex",
+        "app-server",
+        "--stdio",
+        "--disable",
+        "shell_snapshot"
+      ],
+      "pgid": 12016,
+      "sid": 1
+    },
+    "members": [
+      {
+        "pid": 12017,
+        "pid_version": 635175,
+        "unique_id": 309067,
+        "resource_cid": 24225,
+        "parent_unique_id": 309066,
+        "ppid": 12016,
+        "image": "/opt/homebrew/Caskroom/codex/0.147.0/bin/codex",
+        "argv": [
+          "/opt/homebrew/Caskroom/codex/0.147.0/bin/codex",
+          "app-server",
+          "--stdio",
+          "--disable",
+          "shell_snapshot"
+        ],
+        "pgid": 12016,
+        "sid": 1
+      },
+      {
+        "pid": 12016,
+        "pid_version": 635172,
+        "unique_id": 309066,
+        "resource_cid": 24225,
+        "parent_unique_id": 1,
+        "ppid": 1,
+        "image": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+        "argv": [
+          "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+          "cli-agent-supervisor",
+          "<probe-project>/cli-agent-processes/6637ff35-46ca-4cff-9ab2-262e1f1b4214/manifest.json",
+          "--execute"
+        ],
+        "pgid": 12016,
+        "sid": 1
+      },
+      {
+        "pid": 12028,
+        "pid_version": 635205,
+        "unique_id": 309078,
+        "resource_cid": 24225,
+        "parent_unique_id": 309067,
+        "ppid": 12017,
+        "image": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+        "argv": [
+          "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+          "heartbeat.py"
+        ],
+        "pgid": 12028,
+        "sid": 12028
+      },
+      {
+        "pid": 12030,
+        "pid_version": 635207,
+        "unique_id": 309080,
+        "resource_cid": 24225,
+        "parent_unique_id": 309078,
+        "ppid": 12028,
+        "image": "/bin/sleep",
+        "argv": [
+          "/bin/sleep",
+          "60"
+        ],
+        "pgid": 12028,
+        "sid": 12028
+      }
+    ],
+    "all": [
+      {
+        "pid": 12011,
+        "pid_version": 635161,
+        "unique_id": 309061,
+        "resource_cid": 7944,
+        "parent_unique_id": 309059,
+        "ppid": 12009,
+        "image": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+        "argv": [
+          "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+          "<user-home>/Tools/github/InfiniShell-Desktop/script/cli-agent-parity/probe_codex_supervisor_tool_tree.py",
+          "--host",
+          "<probe-project>/host-config.json"
+        ],
+        "pgid": 11976,
+        "sid": 11976
+      },
+      {
+        "pid": 12012,
+        "pid_version": 635163,
+        "unique_id": 309062,
+        "resource_cid": 7944,
+        "parent_unique_id": 309061,
+        "ppid": 12011,
+        "image": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+        "argv": [
+          "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+          "cli-agent-supervisor",
+          "<probe-project>/cli-agent-processes/6637ff35-46ca-4cff-9ab2-262e1f1b4214/manifest.json"
+        ],
+        "pgid": 11976,
+        "sid": 11976
+      },
+      {
+        "pid": 12017,
+        "pid_version": 635175,
+        "unique_id": 309067,
+        "resource_cid": 24225,
+        "parent_unique_id": 309066,
+        "ppid": 12016,
+        "image": "/opt/homebrew/Caskroom/codex/0.147.0/bin/codex",
+        "argv": [
+          "/opt/homebrew/Caskroom/codex/0.147.0/bin/codex",
+          "app-server",
+          "--stdio",
+          "--disable",
+          "shell_snapshot"
+        ],
+        "pgid": 12016,
+        "sid": 1
+      },
+      {
+        "pid": 12016,
+        "pid_version": 635172,
+        "unique_id": 309066,
+        "resource_cid": 24225,
+        "parent_unique_id": 1,
+        "ppid": 1,
+        "image": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+        "argv": [
+          "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+          "cli-agent-supervisor",
+          "<probe-project>/cli-agent-processes/6637ff35-46ca-4cff-9ab2-262e1f1b4214/manifest.json",
+          "--execute"
+        ],
+        "pgid": 12016,
+        "sid": 1
+      },
+      {
+        "pid": 12028,
+        "pid_version": 635205,
+        "unique_id": 309078,
+        "resource_cid": 24225,
+        "parent_unique_id": 309067,
+        "ppid": 12017,
+        "image": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+        "argv": [
+          "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+          "heartbeat.py"
+        ],
+        "pgid": 12028,
+        "sid": 12028
+      },
+      {
+        "pid": 12030,
+        "pid_version": 635207,
+        "unique_id": 309080,
+        "resource_cid": 24225,
+        "parent_unique_id": 309078,
+        "ppid": 12028,
+        "image": "/bin/sleep",
+        "argv": [
+          "/bin/sleep",
+          "60"
+        ],
+        "pgid": 12028,
+        "sid": 12028
+      }
+    ]
+  },
+  "approval": {
+    "accepted": 1,
+    "requested": 1,
+    "last_request_matched_exact_fixture": true
+  },
+  "exact_approval_verified": true,
+  "required_note_exit_pids": [
+    12012,
+    12017,
+    12016,
+    12028,
+    12030
+  ],
+  "note_exit_registered_before_signal": [
+    12011,
+    12012,
+    12017,
+    12016,
+    12028,
+    12030
+  ],
+  "heartbeat_before_kill": {
+    "bytes": 80,
+    "lines": 5,
+    "sha256": "5e732307bd11e7ed062889f347da5608ac0b4efc33b515bac26636ae73ff1b24"
+  },
+  "crash_target_verified": true,
+  "termination_mechanism": "darwin_proc_signal_with_audittoken",
+  "host_alive_at_cli_kill": true,
+  "receipt_observed_after_sec": 0.087,
+  "receipt": {
+    "version": 1,
+    "generation": "6637ff35-46ca-4cff-9ab2-262e1f1b4214",
+    "cleanup_confirmed": true,
+    "containment": "macos_resource_coalition",
+    "exit_reason": "native_exit",
+    "exit_code": null,
+    "manifest_sha256": "ebd3e6e67558dd35d55c1afc4219ff6ebfd0fc58a2b1e98eb9b7945b89f42047"
+  },
+  "heartbeat_at_receipt": {
+    "bytes": 80,
+    "lines": 5,
+    "sha256": "5e732307bd11e7ed062889f347da5608ac0b4efc33b515bac26636ae73ff1b24"
+  },
+  "host_alive_after_receipt": true,
+  "heartbeat_later": {
+    "bytes": 80,
+    "lines": 5,
+    "sha256": "5e732307bd11e7ed062889f347da5608ac0b4efc33b515bac26636ae73ff1b24"
+  },
+  "heartbeat_continued_after_receipt": false,
+  "note_exit_pids": [
+    12012,
+    12016,
+    12017,
+    12028,
+    12030
+  ],
+  "manifest_digest_matches": true,
+  "tool_has_distinct_group_from_cli": true,
+  "proof": {
+    "version": 1,
+    "generation": "6637ff35-46ca-4cff-9ab2-262e1f1b4214",
+    "claim_sha256": "61d4c64bd163347f5872c9d228a4142ebd00cf106f2000c39e3173ae9cabfb71",
+    "native_sha256": "31e64a48e13dcb5e7131abaa03033a2b00adb9ff2b60fe8f7a627b52cac78f33",
+    "job_removed": true,
+    "resource_cid_destroyed": true,
+    "native_wait_status": 9,
+    "execution_failed": false
+  },
+  "receipt_sha256": "329a72ec66d6bcaa4b944ac0291eb6dfa8d731bb65f1292f6918ef0586f43bf4",
+  "proof_sha256": "c66356f78b9931cd75b3c9a3183de1c21019d467518bde05913a4e32eec7e412",
+  "production_proof_verified": true,
+  "same_boot_cid_esrch": true,
+  "known_tool_processes_stopped": true,
+  "cleanup_failed": false,
+  "unsafe_recovery_prevented": false,
+  "recovery_verification_scope": "production_proof_schema_and_live_CID; Rust confirmed_exit entrypoint tested separately",
+  "passed": true,
+  "fixture_cleanup_note_exit_pids": [
+    12012,
+    12016,
+    12017,
+    12028,
+    12030
+  ],
+  "host_stderr": "",
+  "supervisor_unchanged_during_probe": true,
+  "codex_unchanged_during_probe": true,
+  "final_approval": {
+    "accepted": 1,
+    "requested": 1,
+    "last_request_matched_exact_fixture": true
+  },
+  "protocol_events": [
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "turn/started",
+        "params": {
+          "threadId": "01a0aadd-c37a-7310-afd8-c402ef774b4d",
+          "turn": {
+            "id": "01a0aadd-c398-7893-9bf3-18ecc5f3d31c",
+            "items": [],
+            "itemsView": "notLoaded",
+            "status": "inProgress",
+            "error": null,
+            "startedAt": 1789573055,
+            "completedAt": null,
+            "durationMs": null
+          }
+        },
+        "emittedAtMs": 1789573055388
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a0aadd-da31-7930-bda4-55e175e00e1e",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "这是隔离临时项目里的进程清理测试。必须只调用 exec_command 一次，原样执行以下固定命令，不改文件、不检查其他目录、不用其他工具；获准后保持进程运行，不主动停止或重试。拒绝则结束。命令：\n/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python heartbeat.py",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a0aadd-c37a-7310-afd8-c402ef774b4d",
+          "turnId": "01a0aadd-c398-7893-9bf3-18ecc5f3d31c",
+          "startedAtMs": 1789573061169
+        },
+        "emittedAtMs": 1789573061170
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a0aadd-da31-7930-bda4-55e175e00e1e",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "这是隔离临时项目里的进程清理测试。必须只调用 exec_command 一次，原样执行以下固定命令，不改文件、不检查其他目录、不用其他工具；获准后保持进程运行，不主动停止或重试。拒绝则结束。命令：\n/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python heartbeat.py",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a0aadd-c37a-7310-afd8-c402ef774b4d",
+          "turnId": "01a0aadd-c398-7893-9bf3-18ecc5f3d31c",
+          "completedAtMs": 1789573061169
+        },
+        "emittedAtMs": 1789573061170
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "agentMessage",
+            "id": "msg_0364424cdafccbbe016aaab7c68d0087d0bdc46d4165e14d6b",
+            "text": "",
+            "phase": "commentary",
+            "memoryCitation": null
+          },
+          "threadId": "01a0aadd-c37a-7310-afd8-c402ef774b4d",
+          "turnId": "01a0aadd-c398-7893-9bf3-18ecc5f3d31c",
+          "startedAtMs": 1789573062654
+        },
+        "emittedAtMs": 1789573062654
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "agentMessage",
+            "id": "msg_0364424cdafccbbe016aaab7c68d0087d0bdc46d4165e14d6b",
+            "text": "我将按要求只调用一次该命令；若需授权则请求授权，启动后不主动停止或重试。",
+            "phase": "commentary",
+            "memoryCitation": null
+          },
+          "threadId": "01a0aadd-c37a-7310-afd8-c402ef774b4d",
+          "turnId": "01a0aadd-c398-7893-9bf3-18ecc5f3d31c",
+          "completedAtMs": 1789573063398
+        },
+        "emittedAtMs": 1789573063398
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "commandExecution",
+            "id": "exec-e82aeb23-78dd-441d-bdbd-2bac2e6b2234",
+            "pluginId": null,
+            "scriptPath": null,
+            "command": "/bin/zsh -lc '/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python heartbeat.py'",
+            "cwd": "<probe-project>",
+            "processId": null,
+            "source": "agent",
+            "status": "inProgress",
+            "commandActions": [
+              {
+                "type": "unknown",
+                "command": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python heartbeat.py"
+              }
+            ],
+            "aggregatedOutput": null,
+            "exitCode": null,
+            "durationMs": null
+          },
+          "threadId": "01a0aadd-c37a-7310-afd8-c402ef774b4d",
+          "turnId": "01a0aadd-c398-7893-9bf3-18ecc5f3d31c",
+          "startedAtMs": 1789573065626
+        },
+        "emittedAtMs": 1789573065626
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/commandExecution/requestApproval",
+        "id": 0,
+        "params": {
+          "threadId": "01a0aadd-c37a-7310-afd8-c402ef774b4d",
+          "turnId": "01a0aadd-c398-7893-9bf3-18ecc5f3d31c",
+          "itemId": "exec-e82aeb23-78dd-441d-bdbd-2bac2e6b2234",
+          "startedAtMs": 1789573065625,
+          "environmentId": "local",
+          "command": "/bin/zsh -lc '/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python heartbeat.py'",
+          "cwd": "<probe-project>",
+          "commandActions": [
+            {
+              "type": "unknown",
+              "command": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python heartbeat.py"
+            }
+          ],
+          "proposedExecpolicyAmendment": [
+            "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+            "heartbeat.py"
+          ],
+          "availableDecisions": [
+            "accept",
+            {
+              "acceptWithExecpolicyAmendment": {
+                "execpolicy_amendment": [
+                  "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+                  "heartbeat.py"
+                ]
+              }
+            },
+            "cancel"
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "id": 0,
+        "result": {
+          "decision": "accept"
+        }
+      }
+    }
+  ]
+}

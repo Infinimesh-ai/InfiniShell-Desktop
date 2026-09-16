@@ -112,7 +112,9 @@ def verify_windows_argv(env):
                            "Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]), encoding='utf-8')\n", encoding="utf-8")
         (root / "input.json").write_text(json.dumps(values), encoding="utf-8")
         plain = source_text().split("# BEGIN_NOTIFICATION_LAUNCH")[0] + r'''
-$values = @(Get-Content -LiteralPath $env:PROBE_VALUES -Raw | ConvertFrom-Json)
+# PS 5.1 把 JSON 数组作为单个管道对象；额外 @() 会制造嵌套数组并合并 argv。
+$values = (Get-Content -LiteralPath $env:PROBE_VALUES -Raw | ConvertFrom-Json)
+if ($values.Count -ne 8 -or $values[0] -isnot [string]) { throw 'Unexpected argv fixture shape' }
 $arguments = @($env:PROBE_CAPTURE, $env:PROBE_OUTPUT) + $values
 $info = New-Object System.Diagnostics.ProcessStartInfo
 $info.FileName = $env:PROBE_PYTHON
@@ -124,7 +126,10 @@ exit $process.ExitCode
 '''
         run_powershell(plain, {**env, "PROBE_PYTHON": sys.executable, "PROBE_CAPTURE": str(capture),
                               "PROBE_OUTPUT": str(target), "PROBE_VALUES": str(root / "input.json")})
-        require(json.loads(target.read_text(encoding="utf-8")) == values, "原生 Windows argv 往返不一致")
+        actual = json.loads(target.read_text(encoding="utf-8"))
+        # 这里只记录本测试的固定参数；失败仍需保留原生收到的值，不能仅输出不匹配名称。
+        require(actual == values, "原生 Windows argv 往返不一致: " +
+                json.dumps({"expected": values, "actual": actual}, ensure_ascii=True))
 
 
 def verify_windows_bytes_and_boundary(env):

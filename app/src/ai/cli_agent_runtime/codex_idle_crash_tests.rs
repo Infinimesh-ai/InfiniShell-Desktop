@@ -8,6 +8,13 @@ use std::process;
 
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
+#[cfg(target_os = "macos")]
+use command::managed::{MacosProcessIdentity, macos_boot_session, macos_process_identity};
+#[cfg(target_os = "macos")]
+use serde::{Deserialize, Serialize};
+#[cfg(target_os = "macos")]
+use sha2::{Digest as _, Sha256};
+
 use super::*;
 
 #[path = "codex_idle_crash_identity_tests.rs"]
@@ -20,6 +27,21 @@ struct ProcessIdentity {
     start_time: u64,
     executable: PathBuf,
     arguments: Vec<OsString>,
+    #[cfg(target_os = "macos")]
+    kernel: MacosProcessIdentity,
+    #[cfg(target_os = "macos")]
+    coalition: Option<CoalitionBinding>,
+}
+
+#[cfg(target_os = "macos")]
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct CoalitionBinding {
+    generation: Uuid,
+    manifest_sha256: String,
+    claim_sha256: String,
+    native_sha256: String,
+    boot_session: String,
+    resource_cid: u64,
 }
 
 fn own_child(
@@ -59,6 +81,10 @@ fn own_child(
             start_time: child.start_time(),
             executable: path,
             arguments: command[1..].to_vec(),
+            #[cfg(target_os = "macos")]
+            kernel: macos_process_identity(pid.as_u32() as i32).unwrap(),
+            #[cfg(target_os = "macos")]
+            coalition: None,
         })
     });
     let child = matches
@@ -71,6 +97,7 @@ fn own_child(
     child
 }
 
+#[cfg(not(target_os = "macos"))]
 fn own_chain(supervisor: &Path, executable: &Path, manifest: &Path) -> Vec<ProcessIdentity> {
     let mut system = System::new();
     system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
@@ -104,6 +131,186 @@ fn own_chain(supervisor: &Path, executable: &Path, manifest: &Path) -> Vec<Proce
     );
     chain.push(native);
     chain
+}
+
+#[cfg(target_os = "macos")]
+#[derive(Deserialize)]
+struct SavedIdentity {
+    pid: i32,
+    pid_version: u32,
+    unique_id: u64,
+    resource_cid: u64,
+}
+
+#[cfg(target_os = "macos")]
+#[derive(Deserialize)]
+struct CoalitionClaim {
+    version: u32,
+    generation: Uuid,
+    manifest_sha256: String,
+    label: String,
+    boot_session: String,
+    wrapper: SavedIdentity,
+}
+
+#[cfg(target_os = "macos")]
+#[derive(Deserialize)]
+struct NativeClaim {
+    generation: Uuid,
+    claim_sha256: String,
+    identity: SavedIdentity,
+}
+
+#[cfg(target_os = "macos")]
+fn private_record(path: &Path) -> Vec<u8> {
+    use std::os::unix::fs::MetadataExt as _;
+
+    let metadata = fs::symlink_metadata(path).unwrap();
+    assert!(metadata.is_file());
+    assert_eq!(metadata.nlink(), 1);
+    assert_eq!(metadata.mode() & 0o077, 0);
+    assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
+    assert!(metadata.len() <= 64 * 1024);
+    fs::read(path).unwrap()
+}
+
+#[cfg(target_os = "macos")]
+fn assert_saved_identity(current: MacosProcessIdentity, saved: &SavedIdentity, may_exec: bool) {
+    assert_eq!(current.pid, saved.pid);
+    assert_eq!(current.unique_id, saved.unique_id, "PID 已被另一进程复用");
+    assert_eq!(current.resource_cid, saved.resource_cid);
+    assert!(saved.pid > 0 && saved.unique_id != 0 && saved.resource_cid != 0);
+    if !may_exec {
+        assert_eq!(current.pid_version, saved.pid_version);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn own_chain(supervisor: &Path, executable: &Path, manifest: &Path) -> Vec<ProcessIdentity> {
+    let mut system = System::new();
+    system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+    let arguments = [
+        OsString::from("cli-agent-supervisor"),
+        manifest.as_os_str().to_owned(),
+    ];
+    let worker = own_child(&mut system, process::id(), supervisor, &arguments);
+    let directory = manifest.parent().unwrap();
+    let generation: Uuid = directory
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .parse()
+        .unwrap();
+    let manifest_bytes = private_record(manifest);
+    let manifest_value: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+    assert_eq!(manifest_value["generation"], json!(generation));
+    assert_eq!(manifest_value["version"], 1);
+    assert_eq!(manifest_value["launch_allowed"], true);
+    assert_eq!(manifest_value["executable"], json!(executable));
+    assert_eq!(
+        serde_json::from_value::<Vec<OsString>>(manifest_value["arguments"].clone()).unwrap(),
+        [OsString::from("app-server"), OsString::from("--stdio")]
+    );
+    let claim_bytes = private_record(&directory.join("macos-coalition.json"));
+    let native_bytes = private_record(&directory.join("macos-native.json"));
+    let claim: CoalitionClaim = serde_json::from_slice(&claim_bytes).unwrap();
+    let native: NativeClaim = serde_json::from_slice(&native_bytes).unwrap();
+    let binding = CoalitionBinding {
+        generation,
+        manifest_sha256: format!("{:x}", Sha256::digest(&manifest_bytes)),
+        claim_sha256: format!("{:x}", Sha256::digest(&claim_bytes)),
+        native_sha256: format!("{:x}", Sha256::digest(&native_bytes)),
+        boot_session: macos_boot_session().unwrap(),
+        resource_cid: claim.wrapper.resource_cid,
+    };
+    assert_eq!(claim.version, 1);
+    assert_eq!(claim.generation, generation);
+    assert_eq!(native.generation, generation);
+    assert_eq!(
+        claim.label,
+        format!("dev.infinishell.cli-agent.{generation}")
+    );
+    assert_eq!(claim.manifest_sha256, binding.manifest_sha256);
+    assert_eq!(native.claim_sha256, binding.claim_sha256);
+    assert_eq!(claim.boot_session, binding.boot_session);
+    assert_ne!(worker.kernel.resource_cid, binding.resource_cid);
+
+    // claim 指向的 wrapper 由 launchd 管理；只读取这个已认证对象，不按名称搜索用户 job。
+    let wrapper_pid = Pid::from_u32(u32::try_from(claim.wrapper.pid).unwrap());
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[wrapper_pid]),
+        true,
+        ProcessRefreshKind::nothing()
+            .with_exe(UpdateKind::Always)
+            .with_cmd(UpdateKind::Always),
+    );
+    let wrapper_process = system
+        .process(wrapper_pid)
+        .expect("专属 job wrapper 已退出");
+    let wrapper_arguments = [
+        arguments[0].clone(),
+        arguments[1].clone(),
+        OsString::from("--execute"),
+    ];
+    assert_eq!(
+        wrapper_process.exe().unwrap().canonicalize().unwrap(),
+        supervisor
+    );
+    assert_eq!(wrapper_process.cmd().len(), wrapper_arguments.len() + 1);
+    assert_eq!(&wrapper_process.cmd()[1..], wrapper_arguments);
+    let wrapper = ProcessIdentity {
+        pid: wrapper_pid.as_u32(),
+        parent: wrapper_process.parent().unwrap().as_u32(),
+        start_time: wrapper_process.start_time(),
+        executable: supervisor.to_owned(),
+        arguments: wrapper_arguments.to_vec(),
+        kernel: macos_process_identity(claim.wrapper.pid).unwrap(),
+        coalition: Some(binding.clone()),
+    };
+    assert_saved_identity(wrapper.kernel, &claim.wrapper, false);
+    let mut native_process = own_child(
+        &mut system,
+        wrapper.pid,
+        executable,
+        &[OsString::from("app-server"), OsString::from("--stdio")],
+    );
+    // exec 改变 PID version，但内核 unique ID 与首次独占 CID 必须保持。
+    assert_saved_identity(native_process.kernel, &native.identity, true);
+    assert_eq!(native_process.kernel.resource_cid, binding.resource_cid);
+    native_process.coalition = Some(binding);
+    vec![worker, wrapper, native_process]
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn persisted_native_identity_allows_exec_but_rejects_pid_reuse_and_another_cid() {
+    let saved = SavedIdentity {
+        pid: 10,
+        pid_version: 20,
+        unique_id: 30,
+        resource_cid: 40,
+    };
+    let current = MacosProcessIdentity {
+        pid: 10,
+        pid_version: 21,
+        unique_id: 30,
+        resource_cid: 40,
+    };
+    assert_saved_identity(current, &saved, true);
+    for changed in [
+        MacosProcessIdentity {
+            unique_id: 31,
+            ..current
+        },
+        MacosProcessIdentity {
+            resource_cid: 41,
+            ..current
+        },
+    ] {
+        assert!(std::panic::catch_unwind(|| assert_saved_identity(changed, &saved, true)).is_err());
+    }
+    assert!(std::panic::catch_unwind(|| assert_saved_identity(current, &saved, false)).is_err());
 }
 
 fn record(evidence: Value) {
@@ -236,12 +443,11 @@ async fn live_codex_idle_crash_after_ready_disconnects_once() {
         assert_eq!(receipt.exit_code, Some(73), "必须保留被终止的真实 Codex 退出码");
         #[cfg(target_os = "macos")]
         {
-            assert_eq!(receipt.containment, "unix_process_group");
-            assert!(!receipt.cleanup_confirmed);
-            assert!(managed_process::confirmed_exit(&state_dir, generation).is_err());
-            assert!(matches!(error, RuntimeError::Io(ref cause)
-                if cause.kind() == std::io::ErrorKind::Other
-                    && cause.to_string() == "退出回执与此运行代次不匹配"));
+            assert_eq!(receipt.containment, "macos_resource_coalition");
+            assert!(receipt.cleanup_confirmed);
+            assert_eq!(managed_process::confirmed_exit(&state_dir, generation).unwrap(), Some(receipt.clone()));
+            assert!(matches!(error, RuntimeError::Protocol(ref text)
+                if text == "app-server stdout closed; delivery may be uncertain"));
         }
         #[cfg(any(target_os = "linux", windows))]
         {
@@ -255,10 +461,21 @@ async fn live_codex_idle_crash_after_ready_disconnects_once() {
                 if text == "app-server stdout closed; delivery may be uncertain"));
         }
         assert!(!codex_home.join("auth.json").exists());
-        let processes: Vec<_> = chain.iter().enumerate().map(|(index, child)| json!({
-            "depth": index, "pid": child.pid, "parent_pid": child.parent, "start_time": child.start_time,
-            "is_native_cli": child.pid == native.pid,
-        })).collect();
+        let processes: Vec<_> = chain.iter().enumerate().map(|(index, child)| {
+            let value = json!({
+                "depth": index, "pid": child.pid, "parent_pid": child.parent, "start_time": child.start_time,
+                "is_native_cli": child.pid == native.pid,
+            });
+            #[cfg(target_os = "macos")]
+            let value = {
+                let mut value = value;
+                value["kernel_identity"] = json!({"pid": child.kernel.pid, "pid_version": child.kernel.pid_version,
+                    "unique_id": child.kernel.unique_id, "resource_cid": child.kernel.resource_cid});
+                value["coalition_binding"] = json!(child.coalition);
+                value
+            };
+            value
+        }).collect();
         let evidence = json!({
             "event": "idle_crash_probe_finished", "passed": true,
             "phase": "after_session_ready", "generation": generation, "native_session_id": native_id,
@@ -270,6 +487,13 @@ async fn live_codex_idle_crash_after_ready_disconnects_once() {
             "before_ready_crash_verified": false, "running_tool_tree_cleanup_verified": false,
             "app_restart_and_ui_verified": false, "exit_receipt": receipt,
         });
+        #[cfg(target_os = "macos")]
+        let evidence = {
+            let mut evidence = evidence;
+            evidence["macos_coalition_ownership_verified"] = json!(true);
+            evidence["macos_cleanup_proof_verified"] = json!(true);
+            evidence
+        };
         record(evidence);
     }).catch_unwind().await;
     // 断言失败或超时也先关闭生产控制连接，让监督者完成自己的限时清理。

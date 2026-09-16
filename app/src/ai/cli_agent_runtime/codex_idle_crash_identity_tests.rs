@@ -197,24 +197,13 @@ mod platform {
 mod platform {
     use std::ffi::c_void;
     use std::io;
-    use std::mem::size_of;
     use std::os::fd::{AsRawFd as _, FromRawFd as _, OwnedFd};
     use std::path::{Path, PathBuf};
     use std::ptr;
 
-    pub const MECHANISM: &str = "darwin_audit_token_pidversion";
+    use command::managed::{MacosProcessIdentity, macos_process_identity};
 
-    #[repr(C)]
-    #[derive(Clone, Debug, Default, PartialEq)]
-    struct UniqueInfo {
-        uuid: [u8; 16],
-        unique_id: u64,
-        parent_unique_id: u64,
-        pid_version: i32,
-        original_parent_pid_version: i32,
-        reserved2: u64,
-        reserved3: u64,
-    }
+    pub const MECHANISM: &str = "darwin_audit_token_pidversion";
 
     struct Library(*mut c_void);
 
@@ -228,30 +217,9 @@ mod platform {
 
     pub struct BoundProcess {
         pid: u32,
-        unique: UniqueInfo,
+        unique: MacosProcessIdentity,
         watcher: OwnedFd,
         library: Library,
-    }
-
-    fn unique(pid: u32) -> UniqueInfo {
-        let mut info = UniqueInfo::default();
-        assert_eq!(size_of::<UniqueInfo>(), 56);
-        let count = unsafe {
-            libc::proc_pidinfo(
-                pid as i32,
-                17,
-                0,
-                ptr::from_mut(&mut info).cast(),
-                size_of::<UniqueInfo>() as i32,
-            )
-        };
-        assert_eq!(
-            count,
-            56,
-            "必须读取完整原生进程身份：{}",
-            io::Error::last_os_error()
-        );
-        info
     }
 
     impl BoundProcess {
@@ -264,7 +232,7 @@ mod platform {
             };
             assert!(!library.is_null(), "平台没有可验证的 libproc");
             let library = Library(library);
-            let unique = unique(pid);
+            let unique = macos_process_identity(pid as i32).expect("必须读取稳定的原生进程身份");
             let descriptor = unsafe { libc::kqueue() };
             assert!(descriptor >= 0, "无法观察真实根进程退出");
             let watcher = unsafe { OwnedFd::from_raw_fd(descriptor) };
@@ -302,7 +270,11 @@ mod platform {
         }
 
         pub fn assert_current(&self, executable: &Path) {
-            assert_eq!(unique(self.pid), self.unique, "原生进程 PID version 已变化");
+            assert_eq!(
+                macos_process_identity(self.pid as i32).unwrap(),
+                self.unique,
+                "原生进程 PID version、unique ID 或资源域已变化"
+            );
             let mut buffer = [0u8; 4096];
             let count = unsafe {
                 libc::proc_pidpath(
@@ -318,6 +290,11 @@ mod platform {
         }
 
         pub fn terminate_and_wait(&self) {
+            assert_eq!(
+                macos_process_identity(self.pid as i32).unwrap(),
+                self.unique,
+                "信号前原生进程身份改变，拒绝终止"
+            );
             let symbol =
                 unsafe { libc::dlsym(self.library.0, c"proc_signal_with_audittoken".as_ptr()) };
             assert!(
@@ -327,7 +304,7 @@ mod platform {
             let signal: SignalWithToken = unsafe { std::mem::transmute(symbol) };
             let mut token = [0u32; 8];
             token[5] = self.pid;
-            token[7] = self.unique.pid_version as u32;
+            token[7] = self.unique.pid_version;
             assert_eq!(
                 unsafe { signal(&token, libc::SIGKILL) },
                 0,

@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import json
 import os
 from pathlib import Path
 import sys
@@ -10,7 +11,8 @@ import unittest
 from unittest.mock import patch
 
 sys.dont_write_bytecode = True
-from codex_windows_hook_command import PREFIX, SCRIPTS, cmd_line, encode, source_text, verify_encoding
+from codex_windows_hook_command import (PREFIX, SCRIPTS, cmd_line, encode, source_text,
+                                       verify_encoding, verify_windows_argv)
 from codex_windows_hook_inputs import (CODEX_COMMIT, RELEASE_ASSETS, fetch_file, plugin_base,
                                        regular_file, sha256, verify_codex, verify_plugin)
 
@@ -54,6 +56,31 @@ class CommandTests(unittest.TestCase):
             command = encode(script)
             self.assertTrue(command.isascii())
             self.assertFalse(any(character in command for character in '%!$`&^()'))
+
+    def test_native_argv_failure_preserves_fixed_expected_and_actual_values(self):
+        observed = {}
+
+        def collapsed_result(plain, environment):
+            values = json.loads(Path(environment['PROBE_VALUES']).read_text(encoding='utf-8'))
+            observed['expected'] = values
+            observed['actual'] = [' '.join(values)]
+            Path(environment['PROBE_OUTPUT']).write_text(json.dumps(observed['actual']), encoding='utf-8')
+
+        # 模拟旧 PS 数组转换的合并结果，只验证失败证据；不冒充 Windows 进程实测。
+        with patch('codex_windows_hook_command.run_powershell', side_effect=collapsed_result):
+            with self.assertRaises(ValueError) as failure:
+                verify_windows_argv({})
+        self.assertEqual(json.loads(str(failure.exception).split(': ', 1)[1]), observed)
+        self.assertEqual(observed['expected'][0], '')
+        self.assertEqual(len(observed['expected']), 8)
+
+    def test_native_argv_validation_preserves_empty_and_quoted_fixture_values(self):
+        def unchanged_result(plain, environment):
+            values = json.loads(Path(environment['PROBE_VALUES']).read_text(encoding='utf-8'))
+            Path(environment['PROBE_OUTPUT']).write_text(json.dumps(values), encoding='utf-8')
+
+        with patch('codex_windows_hook_command.run_powershell', side_effect=unchanged_result):
+            verify_windows_argv({})
 
 
 class FixedInputTests(unittest.TestCase):

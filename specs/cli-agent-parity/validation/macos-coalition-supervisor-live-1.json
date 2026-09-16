@@ -1,0 +1,1994 @@
+{
+  "scope": "native_macos_supervisor_fixture_tests",
+  "real_codex_exercised": false,
+  "claude_or_grok_exercised": false,
+  "model_requests_sent": 0,
+  "credentials_copied": false,
+  "system": {
+    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "macos": "27.0"
+  },
+  "binary_and_source_identity": {
+    "worker": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "worker_sha256": "7d71b20ada94a9da20294d52f51e03044d848159b8ffcc05fa7eb68baeaf06f0",
+    "libtest": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "libtest_sha256": "c30658e5f94dee4b99b49905f97fe8a2118fed9d98901262c803e2d6de8dda39",
+    "source_manifest_sha256": "3a17f35ef5d87108a3de79c0b815804bbf862dbdba8d301e82b91fcfa873c1f9"
+  },
+  "groups": [
+    {
+      "group": "generic",
+      "argv": [
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+        "managed_process::live_tests::supervised_",
+        "--ignored",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/zhishi/Tools/github/InfiniShell-Desktop/.worktrees/cli-agent-parity-validation",
+      "passed": false,
+      "exit_code": 101,
+      "timeout": false,
+      "tests": [
+        {
+          "name": "ai::cli_agent_runtime::managed_process::live_tests::supervised_detachment_obeys_platform_containment_boundary",
+          "result": "FAILED"
+        },
+        {
+          "name": "ai::cli_agent_runtime::managed_process::live_tests::supervised_finish_stops_root_and_descendants_and_missing_receipt_blocks_resume",
+          "result": "FAILED"
+        },
+        {
+          "name": "ai::cli_agent_runtime::managed_process::live_tests::supervised_host_sigkill_stops_root_and_descendants_before_receipt",
+          "result": "FAILED"
+        },
+        {
+          "name": "ai::cli_agent_runtime::managed_process::live_tests::supervised_native_nonzero_exit_code_is_preserved",
+          "result": "FAILED"
+        }
+      ],
+      "tests_passed": false,
+      "required_positive_proofs_captured": false,
+      "private_directory": "/private/tmp/infinishell-coalition-live-ix5h890u",
+      "raw_log_path": "/private/tmp/infinishell-coalition-live-ix5h890u/generic.raw.log",
+      "raw_log_sha256": "37ce248dfb870e3c44f435c99f378180b46b9bacc716a5f6d2f36979cd6fa57d",
+      "raw_log": "23:18:07.584 [INFO] [i18n_embed] Selecting translations for domain \"warp\"\n23:18:07.606 [INFO] [warp::i18n] [i18n] initialized; current_languages=[LanguageIdentifier { language: Language(Some(\"en\")), script: None, region: None, variants: None }], fallback=en\n\nrunning 4 tests\ntest ai::cli_agent_runtime::managed_process::live_tests::supervised_detachment_obeys_platform_containment_boundary ... \nthread 'ai::cli_agent_runtime::managed_process::live_tests::supervised_detachment_obeys_platform_containment_boundary' (2313841) panicked at app/src/ai/cli_agent_runtime/managed_process_live_tests.rs:49:9:\n监督宿主与根进程没有就绪\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\nFAILED\ntest ai::cli_agent_runtime::managed_process::live_tests::supervised_finish_stops_root_and_descendants_and_missing_receipt_blocks_resume ... \nthread 'ai::cli_agent_runtime::managed_process::live_tests::supervised_finish_stops_root_and_descendants_and_missing_receipt_blocks_resume' (2314655) panicked at app/src/ai/cli_agent_runtime/managed_process_live_tests.rs:49:9:\n监督宿主与根进程没有就绪\nFAILED\ntest ai::cli_agent_runtime::managed_process::live_tests::supervised_host_sigkill_stops_root_and_descendants_before_receipt ... \nthread 'ai::cli_agent_runtime::managed_process::live_tests::supervised_host_sigkill_stops_root_and_descendants_before_receipt' (2315101) panicked at app/src/ai/cli_agent_runtime/managed_process_live_tests.rs:49:9:\n监督宿主与根进程没有就绪\nFAILED\ntest ai::cli_agent_runtime::managed_process::live_tests::supervised_native_nonzero_exit_code_is_preserved ... \nthread 'ai::cli_agent_runtime::managed_process::live_tests::supervised_native_nonzero_exit_code_is_preserved' (2315279) panicked at app/src/ai/cli_agent_runtime/managed_process_live_tests.rs:49:9:\n非零退出宿主夹具未结束\nFAILED\n\nfailures:\n\nfailures:\n    ai::cli_agent_runtime::managed_process::live_tests::supervised_detachment_obeys_platform_containment_boundary\n    ai::cli_agent_runtime::managed_process::live_tests::supervised_finish_stops_root_and_descendants_and_missing_receipt_blocks_resume\n    ai::cli_agent_runtime::managed_process::live_tests::supervised_host_sigkill_stops_root_and_descendants_before_receipt\n    ai::cli_agent_runtime::managed_process::live_tests::supervised_native_nonzero_exit_code_is_preserved\n\ntest result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 6455 filtered out; finished in 60.25s\n\n",
+      "source_before": {
+        "head": "328d5ed35227f67884013f8c403e2a692470151d",
+        "status": "M .github/workflows/cross-platform-preflight.yml\n M app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs\n M app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs\n M app/src/ai/cli_agent_runtime/managed_process.rs\n M app/src/ai/cli_agent_runtime/managed_process_live_tests.rs\n M crates/command/src/managed.rs\n M script/cli-agent-parity/codex_adapter_runner_tests.py\n M script/cli-agent-parity/codex_windows_hook_command.py\n M script/cli-agent-parity/codex_windows_hook_tests.py\n M script/cli-agent-parity/plugin_compatibility_tests.py\n M script/cli-agent-parity/run_codex_adapter_live.py\n?? app/src/ai/cli_agent_runtime/managed_process_macos.rs\n?? app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs\n?? app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs\n?? crates/command/src/managed_macos.rs\n?? crates/command/src/managed_macos_tests.rs\n?? script/cli-agent-parity/prepare_grok_cli.py\n?? script/cli-agent-parity/prepare_grok_cli_tests.py\n?? specs/cli-agent-parity/fixtures/grok-1.0.30-fixed-platform-inputs.json",
+        "files": [
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+            "sha256": "9356ba70f067b3250f025483621fd376cfe3590216b855b92ed3c4eb97e98b20"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+            "sha256": "d00906a1f408a88df960e862100c65526afb3260d9795762870c9cdf88f177e5"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+            "sha256": "c4fae296e6c3d9116bbb0f515e2d30493f7c25285b323408b3be13969ff061d5"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs",
+            "sha256": "020b5a3bd0c970024cc7f1da8181efb94ccb3155ae157180e5d493d042fd7726"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs",
+            "sha256": "33ff79ccf74f99e0b38223352539155e2bed04b4085f4ebfb846b145729ed6c8"
+          },
+          {
+            "path": "crates/command/src/managed.rs",
+            "sha256": "a8ffe4a2b3afa17b966bd99f458b391adddf5a08d0cd7272bc09e6efb1e19072"
+          },
+          {
+            "path": "crates/command/src/managed_macos.rs",
+            "sha256": "e3d7e7f5d185bfb451486db73c919614065cadb34dccb606b8fe7858e875282b"
+          },
+          {
+            "path": "crates/command/src/managed_macos_tests.rs",
+            "sha256": "58561b1f5015acbd4e1f6a3e4059878b0e63c32c43006b7e90813d0a42ef888c"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs",
+            "sha256": "13d656cd8032e6937e9bcecd1492f6e001b3620089562bf8ae47a0862d5aeff3"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+            "sha256": "89618cc72bc001ca3edb1d92ee44ca929429dcc04203fd958a86306a8ad23d68"
+          },
+          {
+            "path": "script/cli-agent-parity/run_codex_adapter_live.py",
+            "sha256": "adb2103dd3359723383e116cfd752d6bd1153b46e80f503e5bc671124d0e6c65"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_adapter_runner_tests.py",
+            "sha256": "fa9a7a94b22c3f29e9a21d5bf53c5ab9acfb4d16637d24bd190c52b557296fd7"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_windows_hook_command.py",
+            "sha256": "2c67c2078bc61ce489fc3a2db9630e72a6556d4e1cd28e5e688243a91ce66797"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+            "sha256": "35bd54ac6b3cc01d29d8b97ff3d2584d39035b955270e72afb2e15a5bd09bd52"
+          },
+          {
+            "path": "script/cli-agent-parity/plugin_compatibility_tests.py",
+            "sha256": "e590e77f171f65b61e057fcb15d96cf25f2ce4b99309a8cf508d1c31adf18617"
+          },
+          {
+            "path": "script/cli-agent-parity/prepare_grok_cli.py",
+            "sha256": "23d31c7834b68b336109690a5419d2ac18074bb40dee45909fcf13e2ab086404"
+          },
+          {
+            "path": "script/cli-agent-parity/prepare_grok_cli_tests.py",
+            "sha256": "de35dbf35b2399a206ce2e016dc9dcb3d3a97061a2c10c936aece9516ad4339b"
+          },
+          {
+            "path": ".github/workflows/cross-platform-preflight.yml",
+            "sha256": "214dc63861a56f42903ff2d1b23f50edfa2d5e2357a942bfff9aa2b2ae35d776"
+          }
+        ],
+        "manifest_sha256": "3a17f35ef5d87108a3de79c0b815804bbf862dbdba8d301e82b91fcfa873c1f9",
+        "manifest": {
+          "base_commit": "328d5ed35227f67884013f8c403e2a692470151d",
+          "files": [
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+              "sha256": "9356ba70f067b3250f025483621fd376cfe3590216b855b92ed3c4eb97e98b20"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+              "sha256": "d00906a1f408a88df960e862100c65526afb3260d9795762870c9cdf88f177e5"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+              "sha256": "c4fae296e6c3d9116bbb0f515e2d30493f7c25285b323408b3be13969ff061d5"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs",
+              "sha256": "020b5a3bd0c970024cc7f1da8181efb94ccb3155ae157180e5d493d042fd7726"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs",
+              "sha256": "33ff79ccf74f99e0b38223352539155e2bed04b4085f4ebfb846b145729ed6c8"
+            },
+            {
+              "path": "crates/command/src/managed.rs",
+              "sha256": "a8ffe4a2b3afa17b966bd99f458b391adddf5a08d0cd7272bc09e6efb1e19072"
+            },
+            {
+              "path": "crates/command/src/managed_macos.rs",
+              "sha256": "e3d7e7f5d185bfb451486db73c919614065cadb34dccb606b8fe7858e875282b"
+            },
+            {
+              "path": "crates/command/src/managed_macos_tests.rs",
+              "sha256": "58561b1f5015acbd4e1f6a3e4059878b0e63c32c43006b7e90813d0a42ef888c"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs",
+              "sha256": "13d656cd8032e6937e9bcecd1492f6e001b3620089562bf8ae47a0862d5aeff3"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+              "sha256": "89618cc72bc001ca3edb1d92ee44ca929429dcc04203fd958a86306a8ad23d68"
+            },
+            {
+              "path": "script/cli-agent-parity/run_codex_adapter_live.py",
+              "sha256": "adb2103dd3359723383e116cfd752d6bd1153b46e80f503e5bc671124d0e6c65"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_adapter_runner_tests.py",
+              "sha256": "fa9a7a94b22c3f29e9a21d5bf53c5ab9acfb4d16637d24bd190c52b557296fd7"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_windows_hook_command.py",
+              "sha256": "2c67c2078bc61ce489fc3a2db9630e72a6556d4e1cd28e5e688243a91ce66797"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+              "sha256": "35bd54ac6b3cc01d29d8b97ff3d2584d39035b955270e72afb2e15a5bd09bd52"
+            },
+            {
+              "path": "script/cli-agent-parity/plugin_compatibility_tests.py",
+              "sha256": "e590e77f171f65b61e057fcb15d96cf25f2ce4b99309a8cf508d1c31adf18617"
+            },
+            {
+              "path": "script/cli-agent-parity/prepare_grok_cli.py",
+              "sha256": "23d31c7834b68b336109690a5419d2ac18074bb40dee45909fcf13e2ab086404"
+            },
+            {
+              "path": "script/cli-agent-parity/prepare_grok_cli_tests.py",
+              "sha256": "de35dbf35b2399a206ce2e016dc9dcb3d3a97061a2c10c936aece9516ad4339b"
+            },
+            {
+              "path": ".github/workflows/cross-platform-preflight.yml",
+              "sha256": "214dc63861a56f42903ff2d1b23f50edfa2d5e2357a942bfff9aa2b2ae35d776"
+            }
+          ]
+        }
+      },
+      "source_after": {
+        "head": "328d5ed35227f67884013f8c403e2a692470151d",
+        "status": "M .github/workflows/cross-platform-preflight.yml\n M app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs\n M app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs\n M app/src/ai/cli_agent_runtime/managed_process.rs\n M app/src/ai/cli_agent_runtime/managed_process_live_tests.rs\n M crates/command/src/managed.rs\n M script/cli-agent-parity/codex_adapter_runner_tests.py\n M script/cli-agent-parity/codex_windows_hook_command.py\n M script/cli-agent-parity/codex_windows_hook_tests.py\n M script/cli-agent-parity/plugin_compatibility_tests.py\n M script/cli-agent-parity/run_codex_adapter_live.py\n?? app/src/ai/cli_agent_runtime/managed_process_macos.rs\n?? app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs\n?? app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs\n?? crates/command/src/managed_macos.rs\n?? crates/command/src/managed_macos_tests.rs\n?? script/cli-agent-parity/prepare_grok_cli.py\n?? script/cli-agent-parity/prepare_grok_cli_tests.py\n?? specs/cli-agent-parity/fixtures/grok-1.0.30-fixed-platform-inputs.json",
+        "files": [
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+            "sha256": "9356ba70f067b3250f025483621fd376cfe3590216b855b92ed3c4eb97e98b20"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+            "sha256": "d00906a1f408a88df960e862100c65526afb3260d9795762870c9cdf88f177e5"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+            "sha256": "c4fae296e6c3d9116bbb0f515e2d30493f7c25285b323408b3be13969ff061d5"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs",
+            "sha256": "020b5a3bd0c970024cc7f1da8181efb94ccb3155ae157180e5d493d042fd7726"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs",
+            "sha256": "33ff79ccf74f99e0b38223352539155e2bed04b4085f4ebfb846b145729ed6c8"
+          },
+          {
+            "path": "crates/command/src/managed.rs",
+            "sha256": "a8ffe4a2b3afa17b966bd99f458b391adddf5a08d0cd7272bc09e6efb1e19072"
+          },
+          {
+            "path": "crates/command/src/managed_macos.rs",
+            "sha256": "e3d7e7f5d185bfb451486db73c919614065cadb34dccb606b8fe7858e875282b"
+          },
+          {
+            "path": "crates/command/src/managed_macos_tests.rs",
+            "sha256": "58561b1f5015acbd4e1f6a3e4059878b0e63c32c43006b7e90813d0a42ef888c"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs",
+            "sha256": "13d656cd8032e6937e9bcecd1492f6e001b3620089562bf8ae47a0862d5aeff3"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+            "sha256": "89618cc72bc001ca3edb1d92ee44ca929429dcc04203fd958a86306a8ad23d68"
+          },
+          {
+            "path": "script/cli-agent-parity/run_codex_adapter_live.py",
+            "sha256": "adb2103dd3359723383e116cfd752d6bd1153b46e80f503e5bc671124d0e6c65"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_adapter_runner_tests.py",
+            "sha256": "fa9a7a94b22c3f29e9a21d5bf53c5ab9acfb4d16637d24bd190c52b557296fd7"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_windows_hook_command.py",
+            "sha256": "2c67c2078bc61ce489fc3a2db9630e72a6556d4e1cd28e5e688243a91ce66797"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+            "sha256": "35bd54ac6b3cc01d29d8b97ff3d2584d39035b955270e72afb2e15a5bd09bd52"
+          },
+          {
+            "path": "script/cli-agent-parity/plugin_compatibility_tests.py",
+            "sha256": "e590e77f171f65b61e057fcb15d96cf25f2ce4b99309a8cf508d1c31adf18617"
+          },
+          {
+            "path": "script/cli-agent-parity/prepare_grok_cli.py",
+            "sha256": "23d31c7834b68b336109690a5419d2ac18074bb40dee45909fcf13e2ab086404"
+          },
+          {
+            "path": "script/cli-agent-parity/prepare_grok_cli_tests.py",
+            "sha256": "de35dbf35b2399a206ce2e016dc9dcb3d3a97061a2c10c936aece9516ad4339b"
+          },
+          {
+            "path": ".github/workflows/cross-platform-preflight.yml",
+            "sha256": "214dc63861a56f42903ff2d1b23f50edfa2d5e2357a942bfff9aa2b2ae35d776"
+          }
+        ],
+        "manifest_sha256": "3a17f35ef5d87108a3de79c0b815804bbf862dbdba8d301e82b91fcfa873c1f9",
+        "manifest": {
+          "base_commit": "328d5ed35227f67884013f8c403e2a692470151d",
+          "files": [
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+              "sha256": "9356ba70f067b3250f025483621fd376cfe3590216b855b92ed3c4eb97e98b20"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+              "sha256": "d00906a1f408a88df960e862100c65526afb3260d9795762870c9cdf88f177e5"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+              "sha256": "c4fae296e6c3d9116bbb0f515e2d30493f7c25285b323408b3be13969ff061d5"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs",
+              "sha256": "020b5a3bd0c970024cc7f1da8181efb94ccb3155ae157180e5d493d042fd7726"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs",
+              "sha256": "33ff79ccf74f99e0b38223352539155e2bed04b4085f4ebfb846b145729ed6c8"
+            },
+            {
+              "path": "crates/command/src/managed.rs",
+              "sha256": "a8ffe4a2b3afa17b966bd99f458b391adddf5a08d0cd7272bc09e6efb1e19072"
+            },
+            {
+              "path": "crates/command/src/managed_macos.rs",
+              "sha256": "e3d7e7f5d185bfb451486db73c919614065cadb34dccb606b8fe7858e875282b"
+            },
+            {
+              "path": "crates/command/src/managed_macos_tests.rs",
+              "sha256": "58561b1f5015acbd4e1f6a3e4059878b0e63c32c43006b7e90813d0a42ef888c"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs",
+              "sha256": "13d656cd8032e6937e9bcecd1492f6e001b3620089562bf8ae47a0862d5aeff3"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+              "sha256": "89618cc72bc001ca3edb1d92ee44ca929429dcc04203fd958a86306a8ad23d68"
+            },
+            {
+              "path": "script/cli-agent-parity/run_codex_adapter_live.py",
+              "sha256": "adb2103dd3359723383e116cfd752d6bd1153b46e80f503e5bc671124d0e6c65"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_adapter_runner_tests.py",
+              "sha256": "fa9a7a94b22c3f29e9a21d5bf53c5ab9acfb4d16637d24bd190c52b557296fd7"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_windows_hook_command.py",
+              "sha256": "2c67c2078bc61ce489fc3a2db9630e72a6556d4e1cd28e5e688243a91ce66797"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+              "sha256": "35bd54ac6b3cc01d29d8b97ff3d2584d39035b955270e72afb2e15a5bd09bd52"
+            },
+            {
+              "path": "script/cli-agent-parity/plugin_compatibility_tests.py",
+              "sha256": "e590e77f171f65b61e057fcb15d96cf25f2ce4b99309a8cf508d1c31adf18617"
+            },
+            {
+              "path": "script/cli-agent-parity/prepare_grok_cli.py",
+              "sha256": "23d31c7834b68b336109690a5419d2ac18074bb40dee45909fcf13e2ab086404"
+            },
+            {
+              "path": "script/cli-agent-parity/prepare_grok_cli_tests.py",
+              "sha256": "de35dbf35b2399a206ce2e016dc9dcb3d3a97061a2c10c936aece9516ad4339b"
+            },
+            {
+              "path": ".github/workflows/cross-platform-preflight.yml",
+              "sha256": "214dc63861a56f42903ff2d1b23f50edfa2d5e2357a942bfff9aa2b2ae35d776"
+            }
+          ]
+        }
+      },
+      "source_and_binaries_unchanged": true,
+      "records": [
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpXEVU2f/cli-agent-processes/00330691-a8c4-4324-be63-5ecbca31e0bf/manifest.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpXEVU2f",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_detachment_obeys_platform_containment_boundary",
+          "file_sha256": "f352b05076615414acac586edd500b434df378424ffeecb39eb7132558935ce9",
+          "bytes": 763,
+          "captured_at_unix": 1789571887.6700978,
+          "record": {
+            "version": 1,
+            "launch_allowed": true,
+            "generation": "00330691-a8c4-4324-be63-5ecbca31e0bf",
+            "parent_control": "127.0.0.1:62683",
+            "executable": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+            "arguments": [
+              {
+                "Unix": [
+                  45,
+                  45,
+                  105,
+                  103,
+                  110,
+                  111,
+                  114,
+                  101,
+                  100
+                ]
+              },
+              {
+                "Unix": [
+                  45,
+                  45,
+                  101,
+                  120,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "Unix": [
+                  97,
+                  105,
+                  58,
+                  58,
+                  99,
+                  108,
+                  105,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  114,
+                  117,
+                  110,
+                  116,
+                  105,
+                  109,
+                  101,
+                  58,
+                  58,
+                  109,
+                  97,
+                  110,
+                  97,
+                  103,
+                  101,
+                  100,
+                  95,
+                  112,
+                  114,
+                  111,
+                  99,
+                  101,
+                  115,
+                  115,
+                  58,
+                  58,
+                  108,
+                  105,
+                  118,
+                  101,
+                  95,
+                  116,
+                  101,
+                  115,
+                  116,
+                  115,
+                  58,
+                  58,
+                  102,
+                  105,
+                  120,
+                  116,
+                  117,
+                  114,
+                  101,
+                  95,
+                  110,
+                  97,
+                  116,
+                  105,
+                  118,
+                  101
+                ]
+              },
+              {
+                "Unix": [
+                  45,
+                  45,
+                  110,
+                  111,
+                  99,
+                  97,
+                  112,
+                  116,
+                  117,
+                  114,
+                  101
+                ]
+              }
+            ],
+            "cwd": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpXEVU2f",
+            "token_redacted": true
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpXEVU2f/cli-agent-processes/00330691-a8c4-4324-be63-5ecbca31e0bf/macos-coalition.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpXEVU2f",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_detachment_obeys_platform_containment_boundary",
+          "file_sha256": "cbf6150897aa4ec61960b60f97fdeee495c40bd4e467e84f89884c8b3e215f4b",
+          "bytes": 361,
+          "captured_at_unix": 1789571894.417845,
+          "record": {
+            "version": 1,
+            "generation": "00330691-a8c4-4324-be63-5ecbca31e0bf",
+            "manifest_sha256": "f352b05076615414acac586edd500b434df378424ffeecb39eb7132558935ce9",
+            "label": "dev.infinishell.cli-agent.00330691-a8c4-4324-be63-5ecbca31e0bf",
+            "boot_session": "4D54C5E7-D704-40C0-AA48-FB59BC85AB96",
+            "wrapper": {
+              "pid": 9419,
+              "pid_version": 630104,
+              "unique_id": 306484,
+              "resource_cid": 24109
+            }
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpXEVU2f/cli-agent-processes/00330691-a8c4-4324-be63-5ecbca31e0bf/macos-native.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpXEVU2f",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_detachment_obeys_platform_containment_boundary",
+          "file_sha256": "2aa9627174426f6166398283461dc84ad0fbe203359d7e37a54aa33b0a6e7787",
+          "bytes": 220,
+          "captured_at_unix": 1789571894.433845,
+          "record": {
+            "generation": "00330691-a8c4-4324-be63-5ecbca31e0bf",
+            "claim_sha256": "cbf6150897aa4ec61960b60f97fdeee495c40bd4e467e84f89884c8b3e215f4b",
+            "identity": {
+              "pid": 9420,
+              "pid_version": 630106,
+              "unique_id": 306485,
+              "resource_cid": 24109
+            }
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpclRZWK/cli-agent-processes/67784c62-3d3b-4f40-a615-4ea5e73fa8b1/manifest.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpclRZWK",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_finish_stops_root_and_descendants_and_missing_receipt_blocks_resume",
+          "file_sha256": "419223dbd68d654802bdeac5fedfd074bb69863a26c9125d5bf009b4d4da457d",
+          "bytes": 763,
+          "captured_at_unix": 1789571902.778697,
+          "record": {
+            "version": 1,
+            "launch_allowed": true,
+            "generation": "67784c62-3d3b-4f40-a615-4ea5e73fa8b1",
+            "parent_control": "127.0.0.1:62702",
+            "executable": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+            "arguments": [
+              {
+                "Unix": [
+                  45,
+                  45,
+                  105,
+                  103,
+                  110,
+                  111,
+                  114,
+                  101,
+                  100
+                ]
+              },
+              {
+                "Unix": [
+                  45,
+                  45,
+                  101,
+                  120,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "Unix": [
+                  97,
+                  105,
+                  58,
+                  58,
+                  99,
+                  108,
+                  105,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  114,
+                  117,
+                  110,
+                  116,
+                  105,
+                  109,
+                  101,
+                  58,
+                  58,
+                  109,
+                  97,
+                  110,
+                  97,
+                  103,
+                  101,
+                  100,
+                  95,
+                  112,
+                  114,
+                  111,
+                  99,
+                  101,
+                  115,
+                  115,
+                  58,
+                  58,
+                  108,
+                  105,
+                  118,
+                  101,
+                  95,
+                  116,
+                  101,
+                  115,
+                  116,
+                  115,
+                  58,
+                  58,
+                  102,
+                  105,
+                  120,
+                  116,
+                  117,
+                  114,
+                  101,
+                  95,
+                  110,
+                  97,
+                  116,
+                  105,
+                  118,
+                  101
+                ]
+              },
+              {
+                "Unix": [
+                  45,
+                  45,
+                  110,
+                  111,
+                  99,
+                  97,
+                  112,
+                  116,
+                  117,
+                  114,
+                  101
+                ]
+              }
+            ],
+            "cwd": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpclRZWK",
+            "token_redacted": true
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpclRZWK/cli-agent-processes/67784c62-3d3b-4f40-a615-4ea5e73fa8b1/macos-coalition.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpclRZWK",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_finish_stops_root_and_descendants_and_missing_receipt_blocks_resume",
+          "file_sha256": "a0c6e9f33e2256a3a8d74a44f017cbd85da6c4e0dc5a74713a156d89ff9df2be",
+          "bytes": 361,
+          "captured_at_unix": 1789571903.056467,
+          "record": {
+            "version": 1,
+            "generation": "67784c62-3d3b-4f40-a615-4ea5e73fa8b1",
+            "manifest_sha256": "419223dbd68d654802bdeac5fedfd074bb69863a26c9125d5bf009b4d4da457d",
+            "label": "dev.infinishell.cli-agent.67784c62-3d3b-4f40-a615-4ea5e73fa8b1",
+            "boot_session": "4D54C5E7-D704-40C0-AA48-FB59BC85AB96",
+            "wrapper": {
+              "pid": 9461,
+              "pid_version": 630208,
+              "unique_id": 306526,
+              "resource_cid": 24115
+            }
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpclRZWK/cli-agent-processes/67784c62-3d3b-4f40-a615-4ea5e73fa8b1/macos-native.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpclRZWK",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_finish_stops_root_and_descendants_and_missing_receipt_blocks_resume",
+          "file_sha256": "7088d050a5f0700e850e65b81119fffe4d71df81f24743669ad7ee06b4c214f2",
+          "bytes": 220,
+          "captured_at_unix": 1789571903.072542,
+          "record": {
+            "generation": "67784c62-3d3b-4f40-a615-4ea5e73fa8b1",
+            "claim_sha256": "a0c6e9f33e2256a3a8d74a44f017cbd85da6c4e0dc5a74713a156d89ff9df2be",
+            "identity": {
+              "pid": 9465,
+              "pid_version": 630216,
+              "unique_id": 306530,
+              "resource_cid": 24115
+            }
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpOVYoXD/cli-agent-processes/589a1eb1-2f3d-45d8-99bf-27bef20060d6/manifest.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpOVYoXD",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_host_sigkill_stops_root_and_descendants_before_receipt",
+          "file_sha256": "cb868de5a6bb0d902932c8faa310f4632dd7802e9f7b7eeff73f0ff858067176",
+          "bytes": 763,
+          "captured_at_unix": 1789571917.821759,
+          "record": {
+            "version": 1,
+            "launch_allowed": true,
+            "generation": "589a1eb1-2f3d-45d8-99bf-27bef20060d6",
+            "parent_control": "127.0.0.1:62716",
+            "executable": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+            "arguments": [
+              {
+                "Unix": [
+                  45,
+                  45,
+                  105,
+                  103,
+                  110,
+                  111,
+                  114,
+                  101,
+                  100
+                ]
+              },
+              {
+                "Unix": [
+                  45,
+                  45,
+                  101,
+                  120,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "Unix": [
+                  97,
+                  105,
+                  58,
+                  58,
+                  99,
+                  108,
+                  105,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  114,
+                  117,
+                  110,
+                  116,
+                  105,
+                  109,
+                  101,
+                  58,
+                  58,
+                  109,
+                  97,
+                  110,
+                  97,
+                  103,
+                  101,
+                  100,
+                  95,
+                  112,
+                  114,
+                  111,
+                  99,
+                  101,
+                  115,
+                  115,
+                  58,
+                  58,
+                  108,
+                  105,
+                  118,
+                  101,
+                  95,
+                  116,
+                  101,
+                  115,
+                  116,
+                  115,
+                  58,
+                  58,
+                  102,
+                  105,
+                  120,
+                  116,
+                  117,
+                  114,
+                  101,
+                  95,
+                  110,
+                  97,
+                  116,
+                  105,
+                  118,
+                  101
+                ]
+              },
+              {
+                "Unix": [
+                  45,
+                  45,
+                  110,
+                  111,
+                  99,
+                  97,
+                  112,
+                  116,
+                  117,
+                  114,
+                  101
+                ]
+              }
+            ],
+            "cwd": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpOVYoXD",
+            "token_redacted": true
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpOVYoXD/cli-agent-processes/589a1eb1-2f3d-45d8-99bf-27bef20060d6/macos-coalition.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpOVYoXD",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_host_sigkill_stops_root_and_descendants_before_receipt",
+          "file_sha256": "2edd1c1127575f3449d2604f13714021b1d29b69e13e4419f9b0cc48b8359761",
+          "bytes": 361,
+          "captured_at_unix": 1789571918.102855,
+          "record": {
+            "version": 1,
+            "generation": "589a1eb1-2f3d-45d8-99bf-27bef20060d6",
+            "manifest_sha256": "cb868de5a6bb0d902932c8faa310f4632dd7802e9f7b7eeff73f0ff858067176",
+            "label": "dev.infinishell.cli-agent.589a1eb1-2f3d-45d8-99bf-27bef20060d6",
+            "boot_session": "4D54C5E7-D704-40C0-AA48-FB59BC85AB96",
+            "wrapper": {
+              "pid": 9517,
+              "pid_version": 630319,
+              "unique_id": 306582,
+              "resource_cid": 24121
+            }
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpOVYoXD/cli-agent-processes/589a1eb1-2f3d-45d8-99bf-27bef20060d6/macos-native.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmpOVYoXD",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_host_sigkill_stops_root_and_descendants_before_receipt",
+          "file_sha256": "c923c60e55bb9fc32c74d338e3d215f1d652142050e7e6477417c03b909c2d15",
+          "bytes": 220,
+          "captured_at_unix": 1789571918.1095932,
+          "record": {
+            "generation": "589a1eb1-2f3d-45d8-99bf-27bef20060d6",
+            "claim_sha256": "2edd1c1127575f3449d2604f13714021b1d29b69e13e4419f9b0cc48b8359761",
+            "identity": {
+              "pid": 9518,
+              "pid_version": 630321,
+              "unique_id": 306583,
+              "resource_cid": 24121
+            }
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmp4tjV8N/cli-agent-processes/cbf0be28-96ff-4faf-a210-bcdd4e60625c/manifest.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmp4tjV8N",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_native_nonzero_exit_code_is_preserved",
+          "file_sha256": "1aff92ac15c9500073c645e108e13b9e529b10e29ea4db3f5bd095130d98ac24",
+          "bytes": 782,
+          "captured_at_unix": 1789571932.8642108,
+          "record": {
+            "version": 1,
+            "launch_allowed": true,
+            "generation": "cbf0be28-96ff-4faf-a210-bcdd4e60625c",
+            "parent_control": "127.0.0.1:62724",
+            "executable": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+            "arguments": [
+              {
+                "Unix": [
+                  45,
+                  45,
+                  105,
+                  103,
+                  110,
+                  111,
+                  114,
+                  101,
+                  100
+                ]
+              },
+              {
+                "Unix": [
+                  45,
+                  45,
+                  101,
+                  120,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "Unix": [
+                  97,
+                  105,
+                  58,
+                  58,
+                  99,
+                  108,
+                  105,
+                  95,
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  114,
+                  117,
+                  110,
+                  116,
+                  105,
+                  109,
+                  101,
+                  58,
+                  58,
+                  109,
+                  97,
+                  110,
+                  97,
+                  103,
+                  101,
+                  100,
+                  95,
+                  112,
+                  114,
+                  111,
+                  99,
+                  101,
+                  115,
+                  115,
+                  58,
+                  58,
+                  108,
+                  105,
+                  118,
+                  101,
+                  95,
+                  116,
+                  101,
+                  115,
+                  116,
+                  115,
+                  58,
+                  58,
+                  102,
+                  105,
+                  120,
+                  116,
+                  117,
+                  114,
+                  101,
+                  95,
+                  110,
+                  97,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  101,
+                  120,
+                  105,
+                  116
+                ]
+              },
+              {
+                "Unix": [
+                  45,
+                  45,
+                  110,
+                  111,
+                  99,
+                  97,
+                  112,
+                  116,
+                  117,
+                  114,
+                  101
+                ]
+              }
+            ],
+            "cwd": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmp4tjV8N",
+            "token_redacted": true
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmp4tjV8N/cli-agent-processes/cbf0be28-96ff-4faf-a210-bcdd4e60625c/macos-coalition.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmp4tjV8N",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_native_nonzero_exit_code_is_preserved",
+          "file_sha256": "dd7f833db8c3911b808f3cf086e4814556b173495b992ac940505cb97c031646",
+          "bytes": 361,
+          "captured_at_unix": 1789571933.152523,
+          "record": {
+            "version": 1,
+            "generation": "cbf0be28-96ff-4faf-a210-bcdd4e60625c",
+            "manifest_sha256": "1aff92ac15c9500073c645e108e13b9e529b10e29ea4db3f5bd095130d98ac24",
+            "label": "dev.infinishell.cli-agent.cbf0be28-96ff-4faf-a210-bcdd4e60625c",
+            "boot_session": "4D54C5E7-D704-40C0-AA48-FB59BC85AB96",
+            "wrapper": {
+              "pid": 9540,
+              "pid_version": 630376,
+              "unique_id": 306605,
+              "resource_cid": 24123
+            }
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmp4tjV8N/cli-agent-processes/cbf0be28-96ff-4faf-a210-bcdd4e60625c/macos-native.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-ix5h890u/tmp/.tmp4tjV8N",
+          "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_native_nonzero_exit_code_is_preserved",
+          "file_sha256": "8976410b326daeac58cbb892938a0c87227d796ee2a7d39209643b7383805930",
+          "bytes": 220,
+          "captured_at_unix": 1789571933.168493,
+          "record": {
+            "generation": "cbf0be28-96ff-4faf-a210-bcdd4e60625c",
+            "claim_sha256": "dd7f833db8c3911b808f3cf086e4814556b173495b992ac940505cb97c031646",
+            "identity": {
+              "pid": 9541,
+              "pid_version": 630378,
+              "unique_id": 306606,
+              "resource_cid": 24123
+            }
+          }
+        }
+      ],
+      "saved_proof_checks": [
+        {
+          "generation": "00330691-a8c4-4324-be63-5ecbca31e0bf",
+          "captured_files": [
+            "macos-coalition.json",
+            "macos-native.json",
+            "manifest.json"
+          ],
+          "complete_saved_proof": false,
+          "readonly_final_job_query_exit_code": 113,
+          "label": "dev.infinishell.cli-agent.00330691-a8c4-4324-be63-5ecbca31e0bf"
+        },
+        {
+          "generation": "67784c62-3d3b-4f40-a615-4ea5e73fa8b1",
+          "captured_files": [
+            "macos-coalition.json",
+            "macos-native.json",
+            "manifest.json"
+          ],
+          "complete_saved_proof": false,
+          "readonly_final_job_query_exit_code": 113,
+          "label": "dev.infinishell.cli-agent.67784c62-3d3b-4f40-a615-4ea5e73fa8b1"
+        },
+        {
+          "generation": "589a1eb1-2f3d-45d8-99bf-27bef20060d6",
+          "captured_files": [
+            "macos-coalition.json",
+            "macos-native.json",
+            "manifest.json"
+          ],
+          "complete_saved_proof": false,
+          "readonly_final_job_query_exit_code": 113,
+          "label": "dev.infinishell.cli-agent.589a1eb1-2f3d-45d8-99bf-27bef20060d6"
+        },
+        {
+          "generation": "cbf0be28-96ff-4faf-a210-bcdd4e60625c",
+          "captured_files": [
+            "macos-coalition.json",
+            "macos-native.json",
+            "manifest.json"
+          ],
+          "complete_saved_proof": false,
+          "readonly_final_job_query_exit_code": 113,
+          "label": "dev.infinishell.cli-agent.cbf0be28-96ff-4faf-a210-bcdd4e60625c"
+        }
+      ],
+      "record_capture_is_opportunistic_not_a_cleanup_or_success_proof": true
+    },
+    {
+      "group": "macos",
+      "argv": [
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+        "managed_process::macos::live_tests::supervised_",
+        "--ignored",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/zhishi/Tools/github/InfiniShell-Desktop/.worktrees/cli-agent-parity-validation",
+      "passed": true,
+      "exit_code": 0,
+      "timeout": false,
+      "tests": [
+        {
+          "name": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_cli_sigkill_cleans_more_than_eighty_detached_descendants",
+          "result": "ok"
+        },
+        {
+          "name": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_job_removal_failure_still_stops_its_claimed_wrapper",
+          "result": "ok"
+        },
+        {
+          "name": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_live_domain_zero_timeout_never_writes_success",
+          "result": "ok"
+        },
+        {
+          "name": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_stdin_eof_preserves_output_environment_and_exit_37",
+          "result": "ok"
+        }
+      ],
+      "tests_passed": true,
+      "required_positive_proofs_captured": true,
+      "private_directory": "/private/tmp/infinishell-coalition-live-rpz805ig",
+      "raw_log_path": "/private/tmp/infinishell-coalition-live-rpz805ig/macos.raw.log",
+      "raw_log_sha256": "94dbfa0c3ebef71503cd6c3e5710e540515b0858de6de8b851c5de5887c195f8",
+      "raw_log": "23:20:15.283 [INFO] [i18n_embed] Selecting translations for domain \"warp\"\n23:20:15.305 [INFO] [warp::i18n] [i18n] initialized; current_languages=[LanguageIdentifier { language: Language(Some(\"en\")), script: None, region: None, variants: None }], fallback=en\n\nrunning 4 tests\ntest ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_cli_sigkill_cleans_more_than_eighty_detached_descendants ... macOS 监督夹具证据：/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy\nok\ntest ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_job_removal_failure_still_stops_its_claimed_wrapper ... macOS 监督夹具证据：/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-removal-gwwuDj\nok\ntest ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_live_domain_zero_timeout_never_writes_success ... macOS 监督夹具证据：/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-timeout-71igah\nok\ntest ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_stdin_eof_preserves_output_environment_and_exit_37 ... macOS 监督夹具证据：/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo\nok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 6455 filtered out; finished in 4.66s\n\n",
+      "source_before": {
+        "head": "328d5ed35227f67884013f8c403e2a692470151d",
+        "status": "M .github/workflows/cross-platform-preflight.yml\n M app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs\n M app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs\n M app/src/ai/cli_agent_runtime/managed_process.rs\n M app/src/ai/cli_agent_runtime/managed_process_live_tests.rs\n M crates/command/src/managed.rs\n M script/cli-agent-parity/codex_adapter_runner_tests.py\n M script/cli-agent-parity/codex_windows_hook_command.py\n M script/cli-agent-parity/codex_windows_hook_tests.py\n M script/cli-agent-parity/plugin_compatibility_tests.py\n M script/cli-agent-parity/run_codex_adapter_live.py\n?? app/src/ai/cli_agent_runtime/managed_process_macos.rs\n?? app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs\n?? app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs\n?? crates/command/src/managed_macos.rs\n?? crates/command/src/managed_macos_tests.rs\n?? script/cli-agent-parity/prepare_grok_cli.py\n?? script/cli-agent-parity/prepare_grok_cli_tests.py\n?? specs/cli-agent-parity/fixtures/grok-1.0.30-fixed-platform-inputs.json",
+        "files": [
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+            "sha256": "9356ba70f067b3250f025483621fd376cfe3590216b855b92ed3c4eb97e98b20"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+            "sha256": "d00906a1f408a88df960e862100c65526afb3260d9795762870c9cdf88f177e5"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+            "sha256": "c4fae296e6c3d9116bbb0f515e2d30493f7c25285b323408b3be13969ff061d5"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs",
+            "sha256": "020b5a3bd0c970024cc7f1da8181efb94ccb3155ae157180e5d493d042fd7726"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs",
+            "sha256": "33ff79ccf74f99e0b38223352539155e2bed04b4085f4ebfb846b145729ed6c8"
+          },
+          {
+            "path": "crates/command/src/managed.rs",
+            "sha256": "a8ffe4a2b3afa17b966bd99f458b391adddf5a08d0cd7272bc09e6efb1e19072"
+          },
+          {
+            "path": "crates/command/src/managed_macos.rs",
+            "sha256": "e3d7e7f5d185bfb451486db73c919614065cadb34dccb606b8fe7858e875282b"
+          },
+          {
+            "path": "crates/command/src/managed_macos_tests.rs",
+            "sha256": "58561b1f5015acbd4e1f6a3e4059878b0e63c32c43006b7e90813d0a42ef888c"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs",
+            "sha256": "13d656cd8032e6937e9bcecd1492f6e001b3620089562bf8ae47a0862d5aeff3"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+            "sha256": "89618cc72bc001ca3edb1d92ee44ca929429dcc04203fd958a86306a8ad23d68"
+          },
+          {
+            "path": "script/cli-agent-parity/run_codex_adapter_live.py",
+            "sha256": "adb2103dd3359723383e116cfd752d6bd1153b46e80f503e5bc671124d0e6c65"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_adapter_runner_tests.py",
+            "sha256": "fa9a7a94b22c3f29e9a21d5bf53c5ab9acfb4d16637d24bd190c52b557296fd7"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_windows_hook_command.py",
+            "sha256": "2c67c2078bc61ce489fc3a2db9630e72a6556d4e1cd28e5e688243a91ce66797"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+            "sha256": "35bd54ac6b3cc01d29d8b97ff3d2584d39035b955270e72afb2e15a5bd09bd52"
+          },
+          {
+            "path": "script/cli-agent-parity/plugin_compatibility_tests.py",
+            "sha256": "e590e77f171f65b61e057fcb15d96cf25f2ce4b99309a8cf508d1c31adf18617"
+          },
+          {
+            "path": "script/cli-agent-parity/prepare_grok_cli.py",
+            "sha256": "23d31c7834b68b336109690a5419d2ac18074bb40dee45909fcf13e2ab086404"
+          },
+          {
+            "path": "script/cli-agent-parity/prepare_grok_cli_tests.py",
+            "sha256": "de35dbf35b2399a206ce2e016dc9dcb3d3a97061a2c10c936aece9516ad4339b"
+          },
+          {
+            "path": ".github/workflows/cross-platform-preflight.yml",
+            "sha256": "214dc63861a56f42903ff2d1b23f50edfa2d5e2357a942bfff9aa2b2ae35d776"
+          }
+        ],
+        "manifest_sha256": "3a17f35ef5d87108a3de79c0b815804bbf862dbdba8d301e82b91fcfa873c1f9",
+        "manifest": {
+          "base_commit": "328d5ed35227f67884013f8c403e2a692470151d",
+          "files": [
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+              "sha256": "9356ba70f067b3250f025483621fd376cfe3590216b855b92ed3c4eb97e98b20"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+              "sha256": "d00906a1f408a88df960e862100c65526afb3260d9795762870c9cdf88f177e5"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+              "sha256": "c4fae296e6c3d9116bbb0f515e2d30493f7c25285b323408b3be13969ff061d5"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs",
+              "sha256": "020b5a3bd0c970024cc7f1da8181efb94ccb3155ae157180e5d493d042fd7726"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs",
+              "sha256": "33ff79ccf74f99e0b38223352539155e2bed04b4085f4ebfb846b145729ed6c8"
+            },
+            {
+              "path": "crates/command/src/managed.rs",
+              "sha256": "a8ffe4a2b3afa17b966bd99f458b391adddf5a08d0cd7272bc09e6efb1e19072"
+            },
+            {
+              "path": "crates/command/src/managed_macos.rs",
+              "sha256": "e3d7e7f5d185bfb451486db73c919614065cadb34dccb606b8fe7858e875282b"
+            },
+            {
+              "path": "crates/command/src/managed_macos_tests.rs",
+              "sha256": "58561b1f5015acbd4e1f6a3e4059878b0e63c32c43006b7e90813d0a42ef888c"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs",
+              "sha256": "13d656cd8032e6937e9bcecd1492f6e001b3620089562bf8ae47a0862d5aeff3"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+              "sha256": "89618cc72bc001ca3edb1d92ee44ca929429dcc04203fd958a86306a8ad23d68"
+            },
+            {
+              "path": "script/cli-agent-parity/run_codex_adapter_live.py",
+              "sha256": "adb2103dd3359723383e116cfd752d6bd1153b46e80f503e5bc671124d0e6c65"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_adapter_runner_tests.py",
+              "sha256": "fa9a7a94b22c3f29e9a21d5bf53c5ab9acfb4d16637d24bd190c52b557296fd7"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_windows_hook_command.py",
+              "sha256": "2c67c2078bc61ce489fc3a2db9630e72a6556d4e1cd28e5e688243a91ce66797"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+              "sha256": "35bd54ac6b3cc01d29d8b97ff3d2584d39035b955270e72afb2e15a5bd09bd52"
+            },
+            {
+              "path": "script/cli-agent-parity/plugin_compatibility_tests.py",
+              "sha256": "e590e77f171f65b61e057fcb15d96cf25f2ce4b99309a8cf508d1c31adf18617"
+            },
+            {
+              "path": "script/cli-agent-parity/prepare_grok_cli.py",
+              "sha256": "23d31c7834b68b336109690a5419d2ac18074bb40dee45909fcf13e2ab086404"
+            },
+            {
+              "path": "script/cli-agent-parity/prepare_grok_cli_tests.py",
+              "sha256": "de35dbf35b2399a206ce2e016dc9dcb3d3a97061a2c10c936aece9516ad4339b"
+            },
+            {
+              "path": ".github/workflows/cross-platform-preflight.yml",
+              "sha256": "214dc63861a56f42903ff2d1b23f50edfa2d5e2357a942bfff9aa2b2ae35d776"
+            }
+          ]
+        }
+      },
+      "source_after": {
+        "head": "328d5ed35227f67884013f8c403e2a692470151d",
+        "status": "M .github/workflows/cross-platform-preflight.yml\n M app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs\n M app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs\n M app/src/ai/cli_agent_runtime/managed_process.rs\n M app/src/ai/cli_agent_runtime/managed_process_live_tests.rs\n M crates/command/src/managed.rs\n M script/cli-agent-parity/codex_adapter_runner_tests.py\n M script/cli-agent-parity/codex_windows_hook_command.py\n M script/cli-agent-parity/codex_windows_hook_tests.py\n M script/cli-agent-parity/plugin_compatibility_tests.py\n M script/cli-agent-parity/run_codex_adapter_live.py\n?? app/src/ai/cli_agent_runtime/managed_process_macos.rs\n?? app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs\n?? app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs\n?? crates/command/src/managed_macos.rs\n?? crates/command/src/managed_macos_tests.rs\n?? script/cli-agent-parity/prepare_grok_cli.py\n?? script/cli-agent-parity/prepare_grok_cli_tests.py\n?? specs/cli-agent-parity/fixtures/grok-1.0.30-fixed-platform-inputs.json",
+        "files": [
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+            "sha256": "9356ba70f067b3250f025483621fd376cfe3590216b855b92ed3c4eb97e98b20"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+            "sha256": "d00906a1f408a88df960e862100c65526afb3260d9795762870c9cdf88f177e5"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+            "sha256": "c4fae296e6c3d9116bbb0f515e2d30493f7c25285b323408b3be13969ff061d5"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs",
+            "sha256": "020b5a3bd0c970024cc7f1da8181efb94ccb3155ae157180e5d493d042fd7726"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs",
+            "sha256": "33ff79ccf74f99e0b38223352539155e2bed04b4085f4ebfb846b145729ed6c8"
+          },
+          {
+            "path": "crates/command/src/managed.rs",
+            "sha256": "a8ffe4a2b3afa17b966bd99f458b391adddf5a08d0cd7272bc09e6efb1e19072"
+          },
+          {
+            "path": "crates/command/src/managed_macos.rs",
+            "sha256": "e3d7e7f5d185bfb451486db73c919614065cadb34dccb606b8fe7858e875282b"
+          },
+          {
+            "path": "crates/command/src/managed_macos_tests.rs",
+            "sha256": "58561b1f5015acbd4e1f6a3e4059878b0e63c32c43006b7e90813d0a42ef888c"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs",
+            "sha256": "13d656cd8032e6937e9bcecd1492f6e001b3620089562bf8ae47a0862d5aeff3"
+          },
+          {
+            "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+            "sha256": "89618cc72bc001ca3edb1d92ee44ca929429dcc04203fd958a86306a8ad23d68"
+          },
+          {
+            "path": "script/cli-agent-parity/run_codex_adapter_live.py",
+            "sha256": "adb2103dd3359723383e116cfd752d6bd1153b46e80f503e5bc671124d0e6c65"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_adapter_runner_tests.py",
+            "sha256": "fa9a7a94b22c3f29e9a21d5bf53c5ab9acfb4d16637d24bd190c52b557296fd7"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_windows_hook_command.py",
+            "sha256": "2c67c2078bc61ce489fc3a2db9630e72a6556d4e1cd28e5e688243a91ce66797"
+          },
+          {
+            "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+            "sha256": "35bd54ac6b3cc01d29d8b97ff3d2584d39035b955270e72afb2e15a5bd09bd52"
+          },
+          {
+            "path": "script/cli-agent-parity/plugin_compatibility_tests.py",
+            "sha256": "e590e77f171f65b61e057fcb15d96cf25f2ce4b99309a8cf508d1c31adf18617"
+          },
+          {
+            "path": "script/cli-agent-parity/prepare_grok_cli.py",
+            "sha256": "23d31c7834b68b336109690a5419d2ac18074bb40dee45909fcf13e2ab086404"
+          },
+          {
+            "path": "script/cli-agent-parity/prepare_grok_cli_tests.py",
+            "sha256": "de35dbf35b2399a206ce2e016dc9dcb3d3a97061a2c10c936aece9516ad4339b"
+          },
+          {
+            "path": ".github/workflows/cross-platform-preflight.yml",
+            "sha256": "214dc63861a56f42903ff2d1b23f50edfa2d5e2357a942bfff9aa2b2ae35d776"
+          }
+        ],
+        "manifest_sha256": "3a17f35ef5d87108a3de79c0b815804bbf862dbdba8d301e82b91fcfa873c1f9",
+        "manifest": {
+          "base_commit": "328d5ed35227f67884013f8c403e2a692470151d",
+          "files": [
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+              "sha256": "9356ba70f067b3250f025483621fd376cfe3590216b855b92ed3c4eb97e98b20"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+              "sha256": "d00906a1f408a88df960e862100c65526afb3260d9795762870c9cdf88f177e5"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+              "sha256": "c4fae296e6c3d9116bbb0f515e2d30493f7c25285b323408b3be13969ff061d5"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs",
+              "sha256": "020b5a3bd0c970024cc7f1da8181efb94ccb3155ae157180e5d493d042fd7726"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs",
+              "sha256": "33ff79ccf74f99e0b38223352539155e2bed04b4085f4ebfb846b145729ed6c8"
+            },
+            {
+              "path": "crates/command/src/managed.rs",
+              "sha256": "a8ffe4a2b3afa17b966bd99f458b391adddf5a08d0cd7272bc09e6efb1e19072"
+            },
+            {
+              "path": "crates/command/src/managed_macos.rs",
+              "sha256": "e3d7e7f5d185bfb451486db73c919614065cadb34dccb606b8fe7858e875282b"
+            },
+            {
+              "path": "crates/command/src/managed_macos_tests.rs",
+              "sha256": "58561b1f5015acbd4e1f6a3e4059878b0e63c32c43006b7e90813d0a42ef888c"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_tests.rs",
+              "sha256": "13d656cd8032e6937e9bcecd1492f6e001b3620089562bf8ae47a0862d5aeff3"
+            },
+            {
+              "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+              "sha256": "89618cc72bc001ca3edb1d92ee44ca929429dcc04203fd958a86306a8ad23d68"
+            },
+            {
+              "path": "script/cli-agent-parity/run_codex_adapter_live.py",
+              "sha256": "adb2103dd3359723383e116cfd752d6bd1153b46e80f503e5bc671124d0e6c65"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_adapter_runner_tests.py",
+              "sha256": "fa9a7a94b22c3f29e9a21d5bf53c5ab9acfb4d16637d24bd190c52b557296fd7"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_windows_hook_command.py",
+              "sha256": "2c67c2078bc61ce489fc3a2db9630e72a6556d4e1cd28e5e688243a91ce66797"
+            },
+            {
+              "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+              "sha256": "35bd54ac6b3cc01d29d8b97ff3d2584d39035b955270e72afb2e15a5bd09bd52"
+            },
+            {
+              "path": "script/cli-agent-parity/plugin_compatibility_tests.py",
+              "sha256": "e590e77f171f65b61e057fcb15d96cf25f2ce4b99309a8cf508d1c31adf18617"
+            },
+            {
+              "path": "script/cli-agent-parity/prepare_grok_cli.py",
+              "sha256": "23d31c7834b68b336109690a5419d2ac18074bb40dee45909fcf13e2ab086404"
+            },
+            {
+              "path": "script/cli-agent-parity/prepare_grok_cli_tests.py",
+              "sha256": "de35dbf35b2399a206ce2e016dc9dcb3d3a97061a2c10c936aece9516ad4339b"
+            },
+            {
+              "path": ".github/workflows/cross-platform-preflight.yml",
+              "sha256": "214dc63861a56f42903ff2d1b23f50edfa2d5e2357a942bfff9aa2b2ae35d776"
+            }
+          ]
+        }
+      },
+      "source_and_binaries_unchanged": true,
+      "records": [
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy/cli-agent-processes/d07eba85-fd61-4342-8bce-82d88006c5d3/manifest.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_cli_sigkill_cleans_more_than_eighty_detached_descendants",
+          "file_sha256": "34103895c39ce34ed03300a0d97a1ce8ef0058d13d1bb32aae176ef665a6c59b",
+          "bytes": 739,
+          "captured_at_unix": 1789572015.4674659,
+          "record": {
+            "version": 1,
+            "launch_allowed": true,
+            "generation": "d07eba85-fd61-4342-8bce-82d88006c5d3",
+            "parent_control": "127.0.0.1:62761",
+            "executable": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy/fixture",
+            "arguments": [
+              {
+                "Unix": [
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "Unix": [
+                  47,
+                  112,
+                  114,
+                  105,
+                  118,
+                  97,
+                  116,
+                  101,
+                  47,
+                  116,
+                  109,
+                  112,
+                  47,
+                  105,
+                  110,
+                  102,
+                  105,
+                  110,
+                  105,
+                  115,
+                  104,
+                  101,
+                  108,
+                  108,
+                  45,
+                  99,
+                  111,
+                  97,
+                  108,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  108,
+                  105,
+                  118,
+                  101,
+                  45,
+                  114,
+                  112,
+                  122,
+                  56,
+                  48,
+                  53,
+                  105,
+                  103,
+                  47,
+                  116,
+                  109,
+                  112,
+                  47,
+                  105,
+                  110,
+                  102,
+                  105,
+                  110,
+                  105,
+                  115,
+                  104,
+                  101,
+                  108,
+                  108,
+                  45,
+                  109,
+                  97,
+                  99,
+                  111,
+                  115,
+                  45,
+                  109,
+                  97,
+                  110,
+                  121,
+                  45,
+                  107,
+                  56,
+                  98,
+                  82,
+                  77,
+                  121
+                ]
+              },
+              {
+                "Unix": [
+                  57,
+                  48
+                ]
+              }
+            ],
+            "cwd": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy",
+            "token_redacted": true
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy/cli-agent-processes/d07eba85-fd61-4342-8bce-82d88006c5d3/macos-coalition.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_cli_sigkill_cleans_more_than_eighty_detached_descendants",
+          "file_sha256": "1d1ab846a1f175e7910503839c67f7b92bd3c6c7ab975de04e40e43be40a82ad",
+          "bytes": 361,
+          "captured_at_unix": 1789572015.763942,
+          "record": {
+            "version": 1,
+            "generation": "d07eba85-fd61-4342-8bce-82d88006c5d3",
+            "manifest_sha256": "34103895c39ce34ed03300a0d97a1ce8ef0058d13d1bb32aae176ef665a6c59b",
+            "label": "dev.infinishell.cli-agent.d07eba85-fd61-4342-8bce-82d88006c5d3",
+            "boot_session": "4D54C5E7-D704-40C0-AA48-FB59BC85AB96",
+            "wrapper": {
+              "pid": 9779,
+              "pid_version": 630866,
+              "unique_id": 306843,
+              "resource_cid": 24137
+            }
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy/cli-agent-processes/d07eba85-fd61-4342-8bce-82d88006c5d3/macos-native.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_cli_sigkill_cleans_more_than_eighty_detached_descendants",
+          "file_sha256": "c02cbda4d9e2d693c1645ac76e8fbf03664af500cefd650261f453ef2d4ad891",
+          "bytes": 220,
+          "captured_at_unix": 1789572015.7719822,
+          "record": {
+            "generation": "d07eba85-fd61-4342-8bce-82d88006c5d3",
+            "claim_sha256": "1d1ab846a1f175e7910503839c67f7b92bd3c6c7ab975de04e40e43be40a82ad",
+            "identity": {
+              "pid": 9780,
+              "pid_version": 630868,
+              "unique_id": 306844,
+              "resource_cid": 24137
+            }
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy/cli-agent-processes/d07eba85-fd61-4342-8bce-82d88006c5d3/macos-cleanup.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_cli_sigkill_cleans_more_than_eighty_detached_descendants",
+          "file_sha256": "8c67c1499a3451aad3eec3b9ce9f45e03ab8221511f6a16cec4ee377849218b2",
+          "bytes": 327,
+          "captured_at_unix": 1789572016.606426,
+          "record": {
+            "version": 1,
+            "generation": "d07eba85-fd61-4342-8bce-82d88006c5d3",
+            "claim_sha256": "1d1ab846a1f175e7910503839c67f7b92bd3c6c7ab975de04e40e43be40a82ad",
+            "native_sha256": "c02cbda4d9e2d693c1645ac76e8fbf03664af500cefd650261f453ef2d4ad891",
+            "job_removed": true,
+            "resource_cid_destroyed": true,
+            "native_wait_status": 9,
+            "execution_failed": false
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy/cli-agent-processes/d07eba85-fd61-4342-8bce-82d88006c5d3/exit.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_cli_sigkill_cleans_more_than_eighty_detached_descendants",
+          "file_sha256": "731f42c5640365327c6ee7d2e2566888c6a713d127c95ae73d49bb9241af545d",
+          "bytes": 262,
+          "captured_at_unix": 1789572016.61453,
+          "record": {
+            "version": 1,
+            "generation": "d07eba85-fd61-4342-8bce-82d88006c5d3",
+            "cleanup_confirmed": true,
+            "containment": "macos_resource_coalition",
+            "exit_reason": "stdio_closed",
+            "exit_code": null,
+            "manifest_sha256": "34103895c39ce34ed03300a0d97a1ce8ef0058d13d1bb32aae176ef665a6c59b"
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-removal-gwwuDj/cli-agent-processes/a1d5e963-0f94-4b88-a281-603274512b8e/manifest.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-removal-gwwuDj",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_job_removal_failure_still_stops_its_claimed_wrapper",
+          "file_sha256": "393f63e08f28a5a9ec1f0447e36b97b47df9a2c8c2de19ee4ad2e7273763c86f",
+          "bytes": 427,
+          "captured_at_unix": 1789572016.646713,
+          "record": {
+            "version": 1,
+            "launch_allowed": true,
+            "generation": "a1d5e963-0f94-4b88-a281-603274512b8e",
+            "parent_control": "127.0.0.1:12345",
+            "executable": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+            "arguments": [],
+            "cwd": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-removal-gwwuDj",
+            "token_redacted": true
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-timeout-71igah/cli-agent-processes/485748f2-a02d-413f-8e99-c8ab065b2587/manifest.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-timeout-71igah",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_live_domain_zero_timeout_never_writes_success",
+          "file_sha256": "07927a97995e935df773e516083f123aebc2ad3845e91dce694b1ccd3f40797a",
+          "bytes": 427,
+          "captured_at_unix": 1789572018.852546,
+          "record": {
+            "version": 1,
+            "launch_allowed": true,
+            "generation": "485748f2-a02d-413f-8e99-c8ab065b2587",
+            "parent_control": "127.0.0.1:12345",
+            "executable": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+            "arguments": [],
+            "cwd": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-timeout-71igah",
+            "token_redacted": true
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo/cli-agent-processes/a646b833-5252-4185-9350-6a7507ea29fb/manifest.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_stdin_eof_preserves_output_environment_and_exit_37",
+          "file_sha256": "f677acbca0c7da7f90d7eea28347e4ec602df225ae5ce222d5f931ae08f49056",
+          "bytes": 404,
+          "captured_at_unix": 1789572019.11201,
+          "record": {
+            "version": 1,
+            "launch_allowed": true,
+            "generation": "a646b833-5252-4185-9350-6a7507ea29fb",
+            "parent_control": "127.0.0.1:62769",
+            "executable": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo/fixture",
+            "arguments": [
+              {
+                "Unix": [
+                  101,
+                  99,
+                  104,
+                  111
+                ]
+              }
+            ],
+            "cwd": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo",
+            "token_redacted": true
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo/cli-agent-processes/a646b833-5252-4185-9350-6a7507ea29fb/macos-coalition.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_stdin_eof_preserves_output_environment_and_exit_37",
+          "file_sha256": "ec7fa3affda3569a6fba3f49597738fd7002d50396a21c5744b8eb9e25826e1b",
+          "bytes": 361,
+          "captured_at_unix": 1789572019.414835,
+          "record": {
+            "version": 1,
+            "generation": "a646b833-5252-4185-9350-6a7507ea29fb",
+            "manifest_sha256": "f677acbca0c7da7f90d7eea28347e4ec602df225ae5ce222d5f931ae08f49056",
+            "label": "dev.infinishell.cli-agent.a646b833-5252-4185-9350-6a7507ea29fb",
+            "boot_session": "4D54C5E7-D704-40C0-AA48-FB59BC85AB96",
+            "wrapper": {
+              "pid": 9941,
+              "pid_version": 631052,
+              "unique_id": 307001,
+              "resource_cid": 24143
+            }
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo/cli-agent-processes/a646b833-5252-4185-9350-6a7507ea29fb/macos-native.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_stdin_eof_preserves_output_environment_and_exit_37",
+          "file_sha256": "8291a251c5acd971c4e72408bc81a1861f0f164eb46caf3bf4d5b83b64a6176e",
+          "bytes": 220,
+          "captured_at_unix": 1789572019.4233742,
+          "record": {
+            "generation": "a646b833-5252-4185-9350-6a7507ea29fb",
+            "claim_sha256": "ec7fa3affda3569a6fba3f49597738fd7002d50396a21c5744b8eb9e25826e1b",
+            "identity": {
+              "pid": 9942,
+              "pid_version": 631054,
+              "unique_id": 307002,
+              "resource_cid": 24143
+            }
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo/cli-agent-processes/a646b833-5252-4185-9350-6a7507ea29fb/macos-cleanup.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_stdin_eof_preserves_output_environment_and_exit_37",
+          "file_sha256": "40a01b4a37e23e3c8df4f0281f5abfa2f045ba692bb9e70d9824d4923ca0d9c1",
+          "bytes": 330,
+          "captured_at_unix": 1789572019.939507,
+          "record": {
+            "version": 1,
+            "generation": "a646b833-5252-4185-9350-6a7507ea29fb",
+            "claim_sha256": "ec7fa3affda3569a6fba3f49597738fd7002d50396a21c5744b8eb9e25826e1b",
+            "native_sha256": "8291a251c5acd971c4e72408bc81a1861f0f164eb46caf3bf4d5b83b64a6176e",
+            "job_removed": true,
+            "resource_cid_destroyed": true,
+            "native_wait_status": 9472,
+            "execution_failed": false
+          }
+        },
+        {
+          "path": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo/cli-agent-processes/a646b833-5252-4185-9350-6a7507ea29fb/exit.json",
+          "private_fixture_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo",
+          "test": "ai::cli_agent_runtime::managed_process::macos::live_tests::supervised_macos_stdin_eof_preserves_output_environment_and_exit_37",
+          "file_sha256": "16a54f63c6f278fcd2e6d55c886fd36daa96600a4af791bf54ca1ecd27ed45c7",
+          "bytes": 260,
+          "captured_at_unix": 1789572019.947952,
+          "record": {
+            "version": 1,
+            "generation": "a646b833-5252-4185-9350-6a7507ea29fb",
+            "cleanup_confirmed": true,
+            "containment": "macos_resource_coalition",
+            "exit_reason": "stdio_closed",
+            "exit_code": 37,
+            "manifest_sha256": "f677acbca0c7da7f90d7eea28347e4ec602df225ae5ce222d5f931ae08f49056"
+          }
+        }
+      ],
+      "saved_proof_checks": [
+        {
+          "generation": "d07eba85-fd61-4342-8bce-82d88006c5d3",
+          "captured_files": [
+            "exit.json",
+            "macos-cleanup.json",
+            "macos-coalition.json",
+            "macos-native.json",
+            "manifest.json"
+          ],
+          "complete_saved_proof": true,
+          "binding_hashes_match": true,
+          "readonly_final_job_query_exit_code": 113,
+          "label": "dev.infinishell.cli-agent.d07eba85-fd61-4342-8bce-82d88006c5d3"
+        },
+        {
+          "generation": "a1d5e963-0f94-4b88-a281-603274512b8e",
+          "captured_files": [
+            "manifest.json"
+          ],
+          "complete_saved_proof": false,
+          "readonly_final_job_query_exit_code": 113,
+          "label": "dev.infinishell.cli-agent.a1d5e963-0f94-4b88-a281-603274512b8e"
+        },
+        {
+          "generation": "485748f2-a02d-413f-8e99-c8ab065b2587",
+          "captured_files": [
+            "manifest.json"
+          ],
+          "complete_saved_proof": false,
+          "readonly_final_job_query_exit_code": 113,
+          "label": "dev.infinishell.cli-agent.485748f2-a02d-413f-8e99-c8ab065b2587"
+        },
+        {
+          "generation": "a646b833-5252-4185-9350-6a7507ea29fb",
+          "captured_files": [
+            "exit.json",
+            "macos-cleanup.json",
+            "macos-coalition.json",
+            "macos-native.json",
+            "manifest.json"
+          ],
+          "complete_saved_proof": true,
+          "binding_hashes_match": true,
+          "readonly_final_job_query_exit_code": 113,
+          "label": "dev.infinishell.cli-agent.a646b833-5252-4185-9350-6a7507ea29fb"
+        }
+      ],
+      "record_capture_is_opportunistic_not_a_cleanup_or_success_proof": true,
+      "retained_fixture_artifacts": [
+        {
+          "private_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-eof-zesASo",
+          "files": [
+            {
+              "name": "fixture.c",
+              "bytes": 2625,
+              "sha256": "a2ed8d7a3cd903b33be7201899fa801a22588798c8a30784759b3901a0c88f62"
+            },
+            {
+              "name": "fixture",
+              "bytes": 34392,
+              "sha256": "b8fb5437f2d5b22049f754a5cc5d5023564c5486af1ef618301ed2b176dc95af"
+            },
+            {
+              "name": "supervisor.stderr",
+              "bytes": 2097170,
+              "sha256": "8bb37229d29996166b6439970e8e570dcb2b78ccb43512508f777f21bf2db4ae"
+            },
+            {
+              "name": "clang.stderr",
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ],
+          "fixture_reported_pids": {},
+          "pid_files_are_not_exit_proof": true
+        },
+        {
+          "private_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-many-k8bRMy",
+          "files": [
+            {
+              "name": "fixture.c",
+              "bytes": 2625,
+              "sha256": "a2ed8d7a3cd903b33be7201899fa801a22588798c8a30784759b3901a0c88f62"
+            },
+            {
+              "name": "fixture",
+              "bytes": 34392,
+              "sha256": "c02b20a34497e56c4d11e26deba8fb627c487bc14c5a77f3c2816f93bacd7401"
+            },
+            {
+              "name": "clang.stderr",
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ],
+          "fixture_reported_pids": {
+            "child-000": 9781,
+            "child-001": 9783,
+            "child-002": 9784,
+            "child-003": 9786,
+            "child-004": 9787,
+            "child-005": 9789,
+            "child-006": 9790,
+            "child-007": 9792,
+            "child-008": 9793,
+            "child-009": 9795,
+            "child-010": 9796,
+            "child-011": 9798,
+            "child-012": 9800,
+            "child-013": 9802,
+            "child-014": 9803,
+            "child-015": 9805,
+            "child-016": 9806,
+            "child-017": 9808,
+            "child-018": 9809,
+            "child-019": 9811,
+            "child-020": 9812,
+            "child-021": 9814,
+            "child-022": 9815,
+            "child-023": 9817,
+            "child-024": 9818,
+            "child-025": 9820,
+            "child-026": 9821,
+            "child-027": 9823,
+            "child-028": 9824,
+            "child-029": 9826,
+            "child-030": 9827,
+            "child-031": 9829,
+            "child-032": 9830,
+            "child-033": 9832,
+            "child-034": 9833,
+            "child-035": 9835,
+            "child-036": 9836,
+            "child-037": 9838,
+            "child-038": 9839,
+            "child-039": 9841,
+            "child-040": 9842,
+            "child-041": 9844,
+            "child-042": 9845,
+            "child-043": 9847,
+            "child-044": 9848,
+            "child-045": 9850,
+            "child-046": 9851,
+            "child-047": 9853,
+            "child-048": 9854,
+            "child-049": 9856,
+            "child-050": 9857,
+            "child-051": 9859,
+            "child-052": 9860,
+            "child-053": 9862,
+            "child-054": 9864,
+            "child-055": 9866,
+            "child-056": 9868,
+            "child-057": 9870,
+            "child-058": 9871,
+            "child-059": 9873,
+            "child-060": 9874,
+            "child-061": 9876,
+            "child-062": 9877,
+            "child-063": 9879,
+            "child-064": 9880,
+            "child-065": 9883,
+            "child-066": 9884,
+            "child-067": 9886,
+            "child-068": 9887,
+            "child-069": 9889,
+            "child-070": 9890,
+            "child-071": 9892,
+            "child-072": 9893,
+            "child-073": 9895,
+            "child-074": 9896,
+            "child-075": 9898,
+            "child-076": 9899,
+            "child-077": 9901,
+            "child-078": 9902,
+            "child-079": 9904,
+            "child-080": 9905,
+            "child-081": 9907,
+            "child-082": 9908,
+            "child-083": 9910,
+            "child-084": 9911,
+            "child-085": 9913,
+            "child-086": 9914,
+            "child-087": 9916,
+            "child-088": 9917,
+            "child-089": 9919,
+            "outside": 9774,
+            "root": 9780
+          },
+          "pid_files_are_not_exit_proof": true
+        },
+        {
+          "private_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-removal-gwwuDj",
+          "files": [],
+          "fixture_reported_pids": {},
+          "pid_files_are_not_exit_proof": true
+        },
+        {
+          "private_directory": "/private/tmp/infinishell-coalition-live-rpz805ig/tmp/infinishell-macos-timeout-71igah",
+          "files": [],
+          "fixture_reported_pids": {},
+          "pid_files_are_not_exit_proof": true
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "固定 C/libtest 夹具不等同真实 Codex 工具、Claude 或 Grok 生命周期",
+    "bootstrap 已受理但回报丢失的窗口没有真实注入",
+    "源码按冻结清单核对，不能把尚未提交的源快照冒称完整同提交跨平台验收",
+    "自动删除的通用夹具目录仅能在测试运行期间机会性归档；文件捕获不是终态依据"
+  ],
+  "passed": false,
+  "completed_tests": 8,
+  "updated_at_unix": 1789572020.963383,
+  "worker_build_metadata": {
+    "path": "/tmp/infinishell-cli-parity-coalition-build2.json",
+    "sha256": "29b8a2249de66094ababd9d846f3316ba70683963232cbe3ef1cb18fb91b8993"
+  }
+}

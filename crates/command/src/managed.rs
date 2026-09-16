@@ -5,6 +5,15 @@ use std::process::{Child, ExitStatus};
 use std::thread;
 use std::time::{Duration, Instant};
 
+#[cfg(target_os = "macos")]
+#[path = "managed_macos.rs"]
+mod macos;
+#[cfg(target_os = "macos")]
+pub use macos::{
+    MacosCoalition, MacosProcessIdentity, macos_boot_session, macos_peer_identity,
+    macos_process_identity,
+};
+
 #[cfg(target_os = "linux")]
 use std::os::unix::process::ExitStatusExt as _;
 

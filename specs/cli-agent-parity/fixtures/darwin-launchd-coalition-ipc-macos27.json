@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-09-16",
+  "platform": {
+    "macos": "27.0",
+    "build": "26A428",
+    "kernel": "xnu-13432.1.9~1/RELEASE_ARM64_T6000"
+  },
+  "script_path": "/private/tmp/infinishell-coalition-ipc-bzihxrfs/ipc_probe.py",
+  "script_sha256": "5a9fe584ec20d24754576113e3e6866384b4da9f0058a917410be18f898d13a8",
+  "raw_report_sha256": "68c0d83f77203a875457780e38fd7072a5bc8ae33ed1b8a77dc52cb663287585",
+  "production_worker_exercised": false,
+  "account_environment_copied": false,
+  "notes": [
+    "仅向夹具内存 IPC 发送三个无凭据合成环境变量。",
+    "Python/系统运行时自行增加 LC_CTYPE 和 __CF_USER_TEXT_ENCODING，未据此声称环境集合逐字相同。",
+    "控制 token 仅位于私有 0600 manifest，不复制进本证据。"
+  ],
+  "raw": {
+    "label": "dev.infinishell.parity.coalition.c71a6e87-8e7c-4c48-aa5c-6af372c705f4",
+    "scope": "仅固定夹具 IPC 与真实 wait 退出码，不是产品 supervisor",
+    "model_requests": 0,
+    "credentials_used": false,
+    "actions": [
+      {
+        "arguments": [
+          "bootstrap",
+          "gui/502",
+          "/private/tmp/infinishell-coalition-ipc-bzihxrfs/job.plist"
+        ],
+        "code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "arguments": [
+          "kickstart",
+          "gui/502/dev.infinishell.parity.coalition.c71a6e87-8e7c-4c48-aa5c-6af372c705f4"
+        ],
+        "code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "arguments": [
+          "bootout",
+          "gui/502/dev.infinishell.parity.coalition.c71a6e87-8e7c-4c48-aa5c-6af372c705f4"
+        ],
+        "code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "arguments": [
+          "print",
+          "gui/502/dev.infinishell.parity.coalition.c71a6e87-8e7c-4c48-aa5c-6af372c705f4"
+        ],
+        "code": 113,
+        "stdout": "",
+        "stderr": "Bad request.\nCould not find service \"dev.infinishell.parity.coalition.c71a6e87-8e7c-4c48-aa5c-6af372c705f4\" in domain for user gui: 502\n"
+      }
+    ],
+    "peers": [
+      {
+        "role": "c",
+        "identity": {
+          "pid": 92970,
+          "pid_version": 598890,
+          "unique_id": 290860,
+          "resource_cid": 23359,
+          "jetsam_cid": 23360
+        },
+        "peer_token_pid_matches": true,
+        "peer_token_pidversion_matches": true,
+        "peer_effective_uid_matches": true
+      },
+      {
+        "role": "i",
+        "identity": {
+          "pid": 92970,
+          "pid_version": 598890,
+          "unique_id": 290860,
+          "resource_cid": 23359,
+          "jetsam_cid": 23360
+        },
+        "peer_token_pid_matches": true,
+        "peer_token_pidversion_matches": true,
+        "peer_effective_uid_matches": true
+      },
+      {
+        "role": "e",
+        "identity": {
+          "pid": 92970,
+          "pid_version": 598890,
+          "unique_id": 290860,
+          "resource_cid": 23359,
+          "jetsam_cid": 23360
+        },
+        "peer_token_pid_matches": true,
+        "peer_token_pidversion_matches": true,
+        "peer_effective_uid_matches": true
+      }
+    ],
+    "environment_persisted": false,
+    "product_containment_verified": false,
+    "source_sha256": "5a9fe584ec20d24754576113e3e6866384b4da9f0058a917410be18f898d13a8",
+    "plist": {
+      "Label": "dev.infinishell.parity.coalition.c71a6e87-8e7c-4c48-aa5c-6af372c705f4",
+      "ProgramArguments": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-I",
+        "/private/tmp/infinishell-coalition-ipc-bzihxrfs/ipc_probe.py",
+        "--wrapper"
+      ],
+      "KeepAlive": false,
+      "ExitTimeOut": 2,
+      "AbandonProcessGroup": false,
+      "StandardOutPath": "/private/tmp/infinishell-coalition-ipc-bzihxrfs/wrapper.stdout",
+      "StandardErrorPath": "/private/tmp/infinishell-coalition-ipc-bzihxrfs/wrapper.stderr"
+    },
+    "before_authorization": {
+      "result": 0,
+      "errno": 0,
+      "started": 3,
+      "exited": 2
+    },
+    "authorization_sent": true,
+    "native_start": {
+      "event": "spawned",
+      "native": {
+        "pid": 92971,
+        "pid_version": 598892,
+        "unique_id": 290861,
+        "resource_cid": 23359,
+        "jetsam_cid": 23360
+      }
+    },
+    "stdio": {
+      "stdin_half_close_observed": true,
+      "stdout_complete": true,
+      "stderr_complete": true,
+      "stdout_bytes": 312,
+      "stderr_bytes": 14,
+      "fixture": {
+        "input_hex": "e4bda0e5a5bd0a7365636f6e64206c696e650a",
+        "value": "中文 空格 &",
+        "raw_hex": "76616c75652dff",
+        "cwd": "/private/tmp/infinishell-coalition-ipc-bzihxrfs/工作 目录 &",
+        "environment_keys": [
+          "HOME",
+          "INFINISHELL_FIXTURE_RAW",
+          "INFINISHELL_FIXTURE_VALUE",
+          "LC_CTYPE",
+          "__CF_USER_TEXT_ENCODING"
+        ]
+      }
+    },
+    "native_exit": {
+      "event": "native_exit",
+      "exit_code": 37,
+      "generation": "5018135782ce49f288178d17a4839199"
+    },
+    "ipc_checks_passed": true,
+    "bootout_exit_code": 0,
+    "wrapper_exit_observed": true,
+    "final_resource_cid": 23359,
+    "final_cid_query": {
+      "result": -1,
+      "errno": 3,
+      "started": null,
+      "exited": null
+    },
+    "job_final_print_exit_code": 113,
+    "passed": true
+  }
+}

@@ -100,6 +100,8 @@ jobs:
           python3 -B script/cli-agent-parity/codex_plugin_lifecycle_tests.py -v
           python3 -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
           python3 -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
+          python3 -B script/cli-agent-parity/prepare_grok_cli_tests.py -v
+          python3 -B script/cli-agent-parity/grok_fixed_acp_probe_tests.py -v
           python3 -B script/cli-agent-parity/probe_claude_no_credentials_tests.py -v
 
       - name: Prepare fixed native Codex without credentials
@@ -116,6 +118,21 @@ jobs:
           set -euo pipefail
           claude_executable="$(python3 -B script/cli-agent-parity/prepare_claude_cli.py --download-dir "$RUNNER_TEMP/claude-21273-inputs")"
           printf 'INFINISHELL_TEST_CLAUDE_EXE=%s\n' "$claude_executable" >> "$GITHUB_ENV"
+
+      - name: Prepare fixed native Grok without credentials
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          grok_executable="$(python3 -B script/cli-agent-parity/prepare_grok_cli.py --download-dir "$RUNNER_TEMP/grok-cli-fixed")"
+          printf 'INFINISHELL_TEST_GROK_EXE=%s\n' "$grok_executable" >> "$GITHUB_ENV"
+
+      - name: Verify fixed Grok unauthenticated ACP boundaries
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python3 -B script/cli-agent-parity/grok_fixed_acp_probe.py --executable "$INFINISHELL_TEST_GROK_EXE" --output "$RUNNER_TEMP/grok-fixed-acp.json"
 
       - name: Verify native Claude initialization and idle EOF
         shell: bash
@@ -221,6 +238,8 @@ jobs:
             ${{ runner.temp }}/codex-idle-crash.*
             ${{ runner.temp }}/claude-initialize-idle-eof.json
             ${{ runner.temp }}/claude-21273-inputs/claude-fixed-inputs.json
+            ${{ runner.temp }}/grok-cli-fixed/grok-fixed-inputs.json
+            ${{ runner.temp }}/grok-fixed-acp.json
           if-no-files-found: error
           retention-days: 14
 
@@ -342,6 +361,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Fixed CLI extraction validation failed' }
           python -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Claude preparation validation failed' }
+          python -B script/cli-agent-parity/prepare_grok_cli_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok preparation validation failed' }
+          python -B script/cli-agent-parity/grok_fixed_acp_probe_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok ACP evidence validation failed' }
           python -B script/cli-agent-parity/probe_claude_no_credentials_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Claude initialize and idle EOF evidence validation failed' }
 
@@ -361,6 +384,24 @@ jobs:
           $claudeExecutable = python -B script/cli-agent-parity/prepare_claude_cli.py --download-dir "$env:RUNNER_TEMP\claude-21273-inputs"
           if ($LASTEXITCODE -ne 0) { throw 'Fixed native Claude preparation failed' }
           "INFINISHELL_TEST_CLAUDE_EXE=$claudeExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Prepare fixed native Grok without credentials
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $grokExecutable = python -B script/cli-agent-parity/prepare_grok_cli.py --download-dir (Join-Path $env:RUNNER_TEMP 'grok-cli-fixed')
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed native Grok preparation failed' }
+          "INFINISHELL_TEST_GROK_EXE=$grokExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Verify fixed Grok unauthenticated ACP boundaries
+        shell: pwsh
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -B script/cli-agent-parity/grok_fixed_acp_probe.py --executable "$env:INFINISHELL_TEST_GROK_EXE" --output (Join-Path $env:RUNNER_TEMP 'grok-fixed-acp.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok unauthenticated ACP boundaries failed' }
 
       - name: Verify native Claude initialization and idle EOF
         shell: pwsh
@@ -484,6 +525,8 @@ jobs:
             ${{ runner.temp }}/codex-idle-crash.*
             ${{ runner.temp }}/claude-initialize-idle-eof.json
             ${{ runner.temp }}/claude-21273-inputs/claude-fixed-inputs.json
+            ${{ runner.temp }}/grok-cli-fixed/grok-fixed-inputs.json
+            ${{ runner.temp }}/grok-fixed-acp.json
           if-no-files-found: error
           retention-days: 14
 

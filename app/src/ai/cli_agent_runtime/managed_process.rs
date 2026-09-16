@@ -6,11 +6,13 @@ use std::io::{self, Read as _, Write as _};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+#[cfg(not(target_os = "macos"))]
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use command::r#async::{Child, ChildStdin, ChildStdout, Command};
+#[cfg(not(target_os = "macos"))]
 use command::managed::{Containment, ManagedTree, prepare_supervisor};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
@@ -296,10 +298,16 @@ pub(crate) fn confirmed_exit(
         || match (manifest.launch_allowed, receipt.containment.as_str()) {
             (true, "linux_subtree" | "windows_job" | "unix_process_group")
             | (false, "not_started") => false,
+            #[cfg(target_os = "macos")]
+            (true, "macos_resource_coalition") => false,
             (true, _) | (false, _) => true,
         }
     {
         return Err(io::Error::other("退出回执与此运行代次不匹配"));
+    }
+    #[cfg(target_os = "macos")]
+    if receipt.containment == macos::CONTAINMENT {
+        macos::verify_cleanup(&directory, &manifest, &manifest_bytes, &receipt)?;
     }
     Ok(Some(receipt))
 }
@@ -365,10 +373,24 @@ pub(crate) fn run_worker(path: &Path, execute: bool) -> io::Result<()> {
         return Err(io::Error::other("此运行代次已永久声明为未启动"));
     }
     if execute {
+        #[cfg(target_os = "macos")]
+        if std::env::var_os(EXEC_CONTROL_ENV)
+            .is_some_and(|value| value.as_encoded_bytes().starts_with(b"unix:"))
+        {
+            return macos::run_execute(path, &manifest);
+        }
         return run_exec_worker(&manifest);
     }
+    #[cfg(target_os = "macos")]
+    return macos::run_supervisor(path, &manifest, &bytes);
+    #[cfg(not(target_os = "macos"))]
+    run_process_tree_worker(path, &manifest, &bytes)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io::Result<()> {
     prepare_supervisor()?;
-    let mut control = connect_authorized(manifest.parent_control, &manifest)?;
+    let mut control = connect_authorized(manifest.parent_control, manifest)?;
     control.set_read_timeout(None)?;
     let child_listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))?;
     let mut command =
@@ -383,7 +405,7 @@ pub(crate) fn run_worker(path: &Path, execute: bool) -> io::Result<()> {
         .stderr(Stdio::null());
     let mut tree = ManagedTree::claim(command.spawn()?)?;
     // 严格 Job/进程组已经就绪后才发送授权，内部 worker 此前不能派生真实 CLI。
-    let execution_control = accept_authorized(&child_listener, &manifest)?;
+    let execution_control = accept_authorized(&child_listener, manifest)?;
     drop(execution_control);
     let mut child_input = tree
         .child_mut()
@@ -447,7 +469,7 @@ pub(crate) fn run_worker(path: &Path, execute: bool) -> io::Result<()> {
         containment: containment.to_owned(),
         exit_reason: reason,
         exit_code: status.code(),
-        manifest_sha256: sha256(&bytes),
+        manifest_sha256: sha256(bytes),
     };
     write_receipt(
         path.parent()
@@ -461,6 +483,10 @@ pub(crate) fn run_worker(path: &Path, execute: bool) -> io::Result<()> {
     }
     Ok(())
 }
+
+#[cfg(target_os = "macos")]
+#[path = "managed_process_macos.rs"]
+mod macos;
 
 fn write_receipt(directory: &Path, receipt: &ExitReceipt) -> io::Result<()> {
     let mut temporary = NamedTempFile::new_in(directory)?;

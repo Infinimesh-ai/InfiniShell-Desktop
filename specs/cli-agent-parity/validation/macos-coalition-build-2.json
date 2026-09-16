@@ -1,0 +1,25 @@
+{
+  "source_manifest": "/tmp/infinishell-cli-parity-coalition-inputs2.json",
+  "source_manifest_sha256": "3a17f35ef5d87108a3de79c0b815804bbf862dbdba8d301e82b91fcfa873c1f9",
+  "test_binary": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+  "test_binary_sha256": "c30658e5f94dee4b99b49905f97fe8a2118fed9d98901262c803e2d6de8dda39",
+  "test_gates": "/tmp/infinishell-cli-parity-coalition-gates2.json",
+  "bundle": {
+    "argv": [
+      "./script/run",
+      "--dont-open",
+      "--features",
+      "local_cli_managed_tasks"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 390.563,
+    "log": "/tmp/infinishell-cli-parity-coalition-bundle2.log",
+    "log_sha256": "918952829de7b448be7cf22054408cec9fa30f2e7bcc627f41a8e75aff69753f"
+  },
+  "worker": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+  "worker_sha256": "7d71b20ada94a9da20294d52f51e03044d848159b8ffcc05fa7eb68baeaf06f0",
+  "base_commit": "328d5ed35227f67884013f8c403e2a692470151d",
+  "worktree_dirty": true,
+  "final_same_commit_verification": false,
+  "gui_launched": false
+}

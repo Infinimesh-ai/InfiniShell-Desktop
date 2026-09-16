@@ -84,20 +84,11 @@ fn assert_abnormal_exit_receipt_boundary(
     receipt: &ExitReceipt,
 ) {
     assert_platform_containment(receipt);
-    #[cfg(target_os = "macos")]
-    {
-        assert_ne!(receipt.exit_code, Some(0));
-        assert!(!receipt.cleanup_confirmed);
-        assert!(confirmed_exit(directory, generation).is_err());
-    }
-    #[cfg(any(target_os = "linux", windows))]
-    {
-        assert!(receipt.cleanup_confirmed);
-        assert_eq!(
-            confirmed_exit(directory, generation).unwrap(),
-            Some(receipt.clone())
-        );
-    }
+    assert!(receipt.cleanup_confirmed);
+    assert_eq!(
+        confirmed_exit(directory, generation).unwrap(),
+        Some(receipt.clone())
+    );
 }
 
 fn assert_stopped(path: &Path) {
@@ -110,7 +101,7 @@ fn assert_platform_containment(receipt: &ExitReceipt) {
     #[cfg(target_os = "linux")]
     assert_eq!(receipt.containment, "linux_subtree");
     #[cfg(target_os = "macos")]
-    assert_eq!(receipt.containment, "unix_process_group");
+    assert_eq!(receipt.containment, "macos_resource_coalition");
     #[cfg(windows)]
     assert_eq!(receipt.containment, "windows_job");
 }
@@ -159,9 +150,6 @@ fn fixture_native_exit_host() {
     let receipt = wait_diagnostic_receipt(&directory, generation);
     assert_eq!(receipt.exit_code, Some(37));
     assert_abnormal_exit_receipt_boundary(&directory, generation, &receipt);
-    #[cfg(target_os = "macos")]
-    assert!(block_on(child.finish()).is_err());
-    #[cfg(any(target_os = "linux", windows))]
     assert_eq!(block_on(child.finish()).unwrap(), receipt);
 }
 
@@ -239,7 +227,7 @@ fn supervised_host_sigkill_stops_root_and_descendants_before_receipt() {
 }
 
 #[test]
-#[ignore = "需要已构建的真实监督 worker；macOS 明确检验主动脱组的覆盖限制"]
+#[ignore = "需要已构建的真实监督 worker；检验跨进程组后代的实际清理"]
 fn supervised_detachment_obeys_platform_containment_boundary() {
     let directory = tempfile::tempdir().unwrap();
     let generation = Uuid::new_v4();
@@ -257,20 +245,8 @@ fn supervised_detachment_obeys_platform_containment_boundary() {
     let receipt = wait_diagnostic_receipt(directory.path(), generation);
     assert_abnormal_exit_receipt_boundary(directory.path(), generation, &receipt);
     assert_stopped(&directory.path().join("root-heartbeat"));
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     assert_stopped(&directory.path().join("child-heartbeat"));
-    #[cfg(target_os = "macos")]
-    {
-        // 诊断不能确认整个任务退出；主动 setsid 后代仍写入，因此必须拒绝恢复。
-        let path = directory.path().join("child-heartbeat");
-        let before = fs::read(&path).unwrap();
-        thread::sleep(Duration::from_millis(200));
-        assert_ne!(before, fs::read(&path).unwrap());
-        fs::write(directory.path().join("detached-stop"), b"stop").unwrap();
-        wait_until("主动脱组的负向夹具未退出", || {
-            directory.path().join("child-finished").exists()
-        });
-    }
     #[cfg(windows)]
     assert!(!directory.path().join("child-heartbeat").exists());
 }
@@ -300,9 +276,6 @@ fn fixture_host() {
     let finished = block_on(child.finish());
     let receipt = wait_diagnostic_receipt(&directory, generation);
     assert_abnormal_exit_receipt_boundary(&directory, generation, &receipt);
-    #[cfg(target_os = "macos")]
-    assert!(finished.is_err());
-    #[cfg(any(target_os = "linux", windows))]
     assert_eq!(finished.unwrap(), receipt);
     fs::write(directory.join("host-finished"), b"finished").unwrap();
 }

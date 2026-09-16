@@ -4,14 +4,30 @@
 
 ## 当前提交验证
 
+- 插件事务与验证环境检查点 `328d5ed35227f67884013f8c403e2a692470151d` 已提交并推送；第三轮 [Actions 35110822335](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35110822335) 已核对相同 SHA。Linux 本轮已结束并通过：cargo check、warp 定向 1655 项、共享 CLI/技能、双语 TUI、4 项监督及两项原生 Codex 边界均成功；GUI integration/full workspace 按配置跳过。Windows 的新 Python 准备成功；测试环境键大小写、PowerShell 5.1 临时 argv 验证脚本和多行 Bash 夹具失败，后续 Rust 步骤跳过。三处夹具修复已在本机通过，尚未提交及原生复验；见 [Windows 专报](WINDOWS_VERIFICATION_FIXTURES.md) 和 [第三轮平台证据](THIRD_PLATFORM_RUN_328D5ED35.md)。本轮不计整体平台通过。
+
 - 后续检查点 `c55385a69a4cd50364a6464dfbec1c965db2ac92` 已提交并推送，干净独立工作树使用显式专属 target 再次通过 cargo check（1m25）、国际化 11 项（4.53s）及相关模块 617 项；见 [同提交本地快照](validation/macos-local-gates-c55385a69.json)。
-- 相同 SHA 的 [Actions 35106400715](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35106400715) 已完成但未通过：Linux Python 安装成功，传输夹具两项失败；Windows 下载/解压成功，Python 安装步骤失败。两平台 Rust 与原生 CLI 尚未执行；[失败快照](validation/cross-platform-c55385a69-35106400715.json)保留，不作为平台成功。Windows 作业私有 NuGet Python 准备脚本已通过本地静态验证，Linux 传输夹具已按解释器自身共享库目录修复、本机 9 项回归通过；两者都等待新提交实跑。
+- 相同 SHA 的 [Actions 35106400715](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35106400715) 已完成但未通过：Linux Python 安装成功，传输夹具两项失败；Windows 下载/解压成功，Python 安装步骤失败。两平台 Rust 与原生 CLI 尚未执行；[失败快照](validation/cross-platform-c55385a69-35106400715.json)保留，不作为平台成功。Windows 作业私有 NuGet Python 准备脚本已通过本地静态验证，Linux 传输夹具已按解释器自身共享库目录修复、本机 9 项回归通过；两者已纳入 328d5ed352 并在第三轮分别越过旧失败；后续状态见上方第三轮记录。
 
 - 干净 `.worktrees/cli-agent-parity-validation` 上的 `dbee1ecae` 已通过 `cargo check -p warp`（2m49）、Python 76 项（6.706s）和 Grok Node 11 项（235.97ms）；国际化 11 项也已通过（4.79s）；后续模块编译引用了另一工作树的旧 command 产物，退出 101、0 项执行。已创建专属 target 并清除其中的 76 个本地路径包；首次仅切换链接仍被上级 Cargo 配置覆盖而失败，随后显式指定并通过 metadata 核对实际目录，dbee1ecae 加历史选择框修复已通过 cargo check（2m28）、国际化 11 项（4.71s）、相关模块 617 项（8.722s，5803 项未在筛选内）。这是追加修复的提交前门禁，见 [提交快照](validation/macos-local-gates-dbee1ecae.json)。
 - [Actions 35100708171](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35100708171) 核对为相同 SHA；Linux 的 Python 低于 3.11，Windows 无 `python` 命令，均在前置环境阶段失败。Rust/原生 CLI 未验收，证据文件未生成导致上传失败；见 [完整状态与失败分类](validation/cross-platform-dbee1ecae-35100708171.json)。workflow 已补固定 action 提交与 Python 3.13.15，静态检查通过、目标平台安装待验；保留本次失败，不重跑原样配置。
 - 同提交的 [Codex 原生 SSH/tmux](fixtures/codex-0.147-native-ssh-tmux-macos-final-commit.json)（含最终 SetEnv）与 [Claude 无凭据初始化/EOF](fixtures/claude-2.1.273-no-credentials-initialize-eof-macos-same-commit.json)已分别实跑通过；不计模型、GUI 或完整生命周期。
 - [bundle8 GUI](validation/macos-gui-bundle8-report.md) 已确认冷启动提示、当前真实通知受理和英文 Unknown；Unconfirmed 任务行/详情/继续禁用的双语布局通过。该包仍是 dirty 中间构建；中文 Unknown 新事件、英文历史选择框裁切修复及最终同提交 GUI 待验。首轮输入受拼音源影响，固定输出断言未通过，未追加模型重试。
-- 历史选择框局部宽度修复已纳入 c55385a69 并通过本地门禁，复用原文案，无需本地化变更；双语布局由下一版包复核。Grok 同版本缓存完整性与显式修复、Claude 私有暂存安装与发布恢复已实现，正在隔离树执行新增门禁及真实生产安装器验证；两组插件变化尚未进入 c55385a69。
+- 历史选择框局部宽度修复已纳入 c55385a69 并通过本地门禁，复用原文案，无需本地化变更；双语布局由下一版包复核。Grok 同版本缓存完整性与显式修复、Claude 私有暂存安装与发布恢复及对应真实生产测试已纳入 328d5ed352，实际验证范围见下节。
+
+## macOS 资源域接入的当前验证
+
+328d5ed352 加冻结源码的独立验证树已通过 cargo check（62.881s）、国际化 11 项（4.55s）、运行时与信箱 173 项（2.998s）及 command 5 项（0.23s，另 3 项内部夹具忽略）。[门禁快照](validation/macos-coalition-local-gates-2.json)记录输入文件与测试二进制摘要；新 worker 已完整构建/签名（390.563s）。4 项专属 C 监督用例通过；通用 libtest 组首轮 4 项启动/等待失败完整保留，随后同字节本机副本重验 4 项通过（5.61s）。初次 dyld 加载停滞原因未确定，没有修改产品、签名或超时来取得重验结果。见[首轮记录](validation/macos-coalition-supervisor-live-1.json)及[重验与诊断](validation/macos-coalition-supervisor-live-2.json)。真实 Codex 缺失会话与空闲崩溃两项通过，身份与完整资源域证明已核对，见[边界记录](validation/macos-codex-coalition-boundaries-1.json)。
+
+真实 Codex 运行固定工具时，强杀宿主（17.017s）与强杀 Codex（16.078s）两项均通过：分别观测到 6/6、5/5 个必需退出事件，同一系统启动内已知资源域查询返回 ESRCH，生产清理证明有效，回执后没有继续心跳。两项各使用一次模型请求、一次精确命令审批。这修复了此前原生工具自建进程组后残留的路径；探针使用生产 supervisor、自定义 Python 宿主和真实 Codex，不替代 Rust 适配器、GUI 或其他 CLI 的完整生命周期。见[两项实证与输入摘要](validation/macos-codex-coalition-tool-gates-1.json)。当前仍为冻结源码中间构建，最终同提交验证待完成。
+
+本实现将真实 native wait 状态、任务结果和独占资源域销毁证明分别处理；stdin EOF 的两路输出尾部、bootout 失败仍清理已知域及 bootstrap 结果未知时的撤销路径均有回归入口。协议与未覆盖边界见[接入契约](DARWIN_COALITION_PRODUCT_CONTRACT.md)。没有新增主界面消息，复用已有本地化错误入口；技术诊断按 `app/i18n/PROGRESS.md` 的边界保留，无需本地化变更。最终双语布局仍单独验收。
+
+## Grok 固定平台输入与无凭据 ACP
+
+Linux/Windows 的 Grok 1.0.30 完整官方原生文件已固定大小和观测摘要，下载器及 10 项测试通过；本机没有执行异平台文件。新 ACP 探针复用显式私有 leader 与 stdio 两个自持进程，macOS 固定版本实测 initialize 成功、新建受认证阻断、缺失 load/resume 被明确拒绝。stdio EOF 自行退出；leader 等待 5 秒未退出，最终强制回收，不能计自然退出或运行中取消通过。[真实结果](validation/macos-grok-fixed-acp-1.json)及[输入记录](validation/macos-grok-fixed-acp-1-inputs.json)保留这些边界。
+
+下载器、探针、离线回归和产物上传已接入 Linux/Windows workflow，actionlint 通过，尚未在新提交派发。没有认证或模型输入，未测量系统全部 HTTP 流量；没有据此开放 Grok 托管任务。协议限制见[专报](GROK_FIXED_ACP_BOUNDARIES.md)。
 
 ## 插件事务追加验证
 
@@ -30,7 +46,7 @@ Grok 1.0.30 的真实 Rust 生产入口已通过安装、同版本损坏修复�
 | Grok hooks 的控制 PTY | macOS PTY 捕获 OSC；不等于在 InfiniShell 中完整交互通过 |
 | Codex 原生协议 | 新建、两轮、审批允许/拒绝、取消、同 ID 历史继续已有真实事件；实际 Rust 适配器与 macOS bundle4/5 GUI 已通过中间快照，其他平台及最终提交仍待验 |
 | Claude 原生控制与错误 | initialize、queued/replay 输入确认、interrupt 控制确认、未登录错误及缺失 resume；成功模型生命周期未通过 |
-| Claude 固定文件与无凭据原生控制 | 2.1.273 在 macOS 隔离环境通过无账号初始化及空闲 stdin EOF 后自行退出，退出码 0、无强制清理、无模型输入；固定 Linux/Windows 原生文件完整下载的大小、摘要及发布清单签名核验通过。获取和控制探针已接两平台 workflow，但目标平台尚未执行；不替代生产 Rust 适配器、PTY 或模型生命周期。见 [专门报告](CLAUDE_NO_CREDENTIALS_VERIFICATION.md) |
+| Claude 固定文件与无凭据原生控制 | 2.1.273 在 macOS 隔离环境通过无账号初始化及空闲 stdin EOF 后自行退出，退出码 0、无强制清理、无模型输入；固定 Linux/Windows 原生文件完整下载的大小、摘要及发布清单签名核验通过。获取和控制探针已在第三轮 Linux 原生通过，Windows 因前置夹具失败而跳过；不替代生产 Rust 适配器、PTY 或模型生命周期。见 [专门报告](CLAUDE_NO_CREDENTIALS_VERIFICATION.md) |
 | Grok ACP | initialize、cached_token、新建、空会话跨进程 load/resume 已验证；两轮模型请求为 HTTP 402，不能计成功 |
 | 无凭据原生缺失会话恢复 | build15 libtest + bundle5 真实监督 worker 通过精确随机会话 ID 的原生拒绝，只有同代 Disconnected、无原生替代会话、无模型输入；同时核验原生退出码 0 和清理回执。见 `validation/macos-codex-missing-session-supervised-1.ndjson`，不计为有历史恢复通过 |
 | 无凭据原生空闲崩溃 | build16 libtest + bundle6 监督 worker 在真实 SessionReady 后精准终止 Codex，恰好同代 Ready/Disconnected，无模型命令及成功事件，恢复 gate 拒绝异常回执；macOS cleanup=false，不计完整清理。见 `CODEX_IDLE_CRASH_VERIFICATION.md` 与 `validation/macos-codex-idle-crash-supervised-1.ndjson` |
@@ -66,7 +82,7 @@ Grok 1.0.30 的真实 Rust 生产入口已通过安装、同版本损坏修复�
 
 监督前生命周期与图片证据对应 libtest SHA-256 `3b275295d4de15f4b45f13c0eadab5398e6fb95e4baba065cc96618a1a9930c3`。监督版三项成功证据对应 build11 libtest `4f099c906a96f6a3f2e9a43dc2756c4e63326b95f2bbe39c43ee41f455be954d` 与 bundle3 worker `17a2dd3d147072681a52acc7cadc00c1a4880552ff81ede6e8c6c0d5832a41b2`。元数据均明确标记 dirty 工作树，且随后还在修复异常退出回执与技能索引，不能替代最终同提交跨平台证据。本地历史门禁快照见 `validation/macos-local-gates-build11.json`，build15/check18/TUI tests2 与脚本检查记录见 `validation/macos-local-gates-build15.json`；build16 的通过和失败记录见 `validation/macos-local-gates-build16.json`，修复后 build17 的 492 项回归见 `validation/macos-local-gates-build17.json`，此前双语/check19 见 `validation/macos-local-gates-build18.json`；Stop 降级后的 build19 成败见 [记录](validation/macos-local-gates-build19.json)。后续 build20 撤下、build21 夹具失败和 build22/23 通过分别见对应快照。build23 测试二进制 SHA-256 为 `9c41a9b34d98108fe031a878bf0714b5b9f5dd2670ae41d26223bb2f3507ee73`。本轮测试及 bundle8 构建时工作树还含另一任务的网页搜索数字字符串修改；这两文件已排除本目标暂存并保留工作区，最终提交须在独立工作树重新验证。bundle7/8 与原生探针也只证明各自的 dirty 中间快照，bundle8 GUI 的通过项和未通过项见当前提交验证；最终同 SHA GUI 尚未验证。
 
-进程监督验收未完成：独立控制连接断开后清理受管理进程并写退出回执，恢复在启动新进程前核对原运行代次；活跃任务仅重新关联已有协调器。Linux 使用子树回收，Windows 使用严格 Job。macOS 真实 Codex 自建工具进程组；宿主 SIGKILL 后 CLI 经 EOF 正常退出能清理工具，但直接 SIGKILL CLI 后工具继续运行，现有进程组监督仍错误写出清理确认。负向证据见 `fixtures/codex-0.147-supervised-cli-crash-macos.json`；这是正常原生工具路径的产品缺陷，不能归类为任意外部守护进程，也不能计入完整清理通过。bundle4 已实际将该回执写为 false，旧版异常 true 回执也由应用 gate 拒绝；恢复拒绝不等于已清理工具。新对照见 `fixtures/codex-0.147-supervised-cli-crash-macos-recovery-gated.json`，Darwin 系统能力与授权限制见 `DARWIN_PROCESS_CONTAINMENT.md`。前次 [coalition / launchd 只读审计](DARWIN_COALITION_LAUNCHD_AUDIT.md)之后，新增 [受控用户 job 原型](DARWIN_LAUNCHD_COALITION_PROTOTYPE.md)已实测专属 CID 覆盖 setsid/双重 fork 后代，身份绑定清理后两个查询返回 ESRCH。根 SIGKILL 和 bootout 后仍有后代存活的负向同样保留。旧 sysctl 在 RELEASE 不可用；新私有查询有内部 80 成员上限，公开源码与本机内核版本不同。该原型提供继续验证产品接入的依据，尚未改变生产监督或通过真实 CLI 清理。
+历史进程监督失败及后续修复：独立控制连接断开后清理受管理进程并写退出回执，恢复在启动新进程前核对原运行代次；活跃任务仅重新关联已有协调器。Linux 使用子树回收，Windows 使用严格 Job。macOS 真实 Codex 自建工具进程组；宿主 SIGKILL 后 CLI 经 EOF 正常退出能清理工具，但直接 SIGKILL CLI 后工具继续运行，现有进程组监督仍错误写出清理确认。负向证据见 `fixtures/codex-0.147-supervised-cli-crash-macos.json`；这是正常原生工具路径的产品缺陷，不能归类为任意外部守护进程，也不能计入完整清理通过。bundle4 已实际将该回执写为 false，旧版异常 true 回执也由应用 gate 拒绝；恢复拒绝不等于已清理工具。新对照见 `fixtures/codex-0.147-supervised-cli-crash-macos-recovery-gated.json`，Darwin 系统能力与授权限制见 `DARWIN_PROCESS_CONTAINMENT.md`。前次 [coalition / launchd 只读审计](DARWIN_COALITION_LAUNCHD_AUDIT.md)之后，新增 [受控用户 job 原型](DARWIN_LAUNCHD_COALITION_PROTOTYPE.md)已实测专属 CID 覆盖 setsid/双重 fork 后代，身份绑定清理后两个查询返回 ESRCH。根 SIGKILL 和 bootout 后仍有后代存活的负向同样保留。旧 sysctl 在 RELEASE 不可用；新私有查询有内部 80 成员上限，公开源码与本机内核版本不同。这些是当时的原型限制。后续产品已接入独占资源域，使用公开候选枚举后逐一核对身份，绕开 80 成员查询上限；真实 Codex 宿主/CLI 两种崩溃均已通过完整清理，见本报告开头的当前验证，旧失败证据保持不变。
 
 ## 完整验收矩阵
 
@@ -78,15 +94,15 @@ Grok 1.0.30 的真实 Rust 生产入口已通过安装、同版本损坏修复�
 | 允许/拒绝审批 | macOS GUI 已验证允许文件存在、拒绝文件不存在 | 缺测试登录 | 真实权限协议未通过 |
 | 运行中追加并验证模型应用 | macOS GUI 原生 Steer 接收与父→运行中子任务实际采用追加内容通过 | 缺测试登录 | 额度耗尽 |
 | 取消真实当前回合 | macOS GUI 取消运行中的真实 sleep 回合，记录 cancelled；下一轮可完成 | 缺测试登录 | 运行中取消未通过 |
-| 继续、应用重启、历史恢复 | macOS bundle4/5 GUI 已验证完成历史及活动任务正常退出后的同原生 ID 继续，未重复执行；CLI 崩溃后完整清理未通过 | 缺测试登录 | 仅空历史已有实证 |
+| 继续、应用重启、历史恢复 | macOS bundle4/5 GUI 已验证完成历史及活动任务正常退出后的同原生 ID 继续，未重复执行；资源域实现的真实 Codex 崩溃清理独立通过，最终同提交整链待验 | 缺测试登录 | 仅空历史已有实证 |
 | 父子消息 ACK 与结果回收 | macOS GUI 生产协调器派发、子→父进度、父→运行中子追加、双向原生接收确认、结果回执与父查询回收通过；对应隔离 bundle4，中间证据见 `validation/macos-gui-parent-child-and-resume.json` | 无模型登录，真实父任务派发的权限上限尚不能证明，未通过 | 尚未开放执行 |
-| 插件缺失/禁用/不兼容/失败恢复 | 原生隔离注册表生命周期部分通过；build16 两项事务失败已修，build17 回归通过；bundle7 GUI 持久来源及原生授权经重启保持，bundle8 已确认当前 GUI 富通知，完整负向组合与最终同提交 GUI 仍未通过 | 固定版本同版本保持及禁用已有原生实证；受控跨版本切换会失去修补，产品组合验收待完成 | 部分隔离实证，产品待验 |
-| 崩溃、重复/旧事件、消息重投 | build15 旧 listener 的真实 dispatcher 回归通过；CLI 崩溃后完整清理失败；跨进程 Sent/结果重投故障注入通过；真实空闲崩溃只通过恢复拒绝保护 | 共享状态回归通过，不替代原生模型进程崩溃验收 | 共享状态回归通过，不替代 ACP 执行验收 |
+| 插件缺失/禁用/不兼容/失败恢复 | 原生隔离注册表生命周期部分通过；build16 两项事务失败已修，build17 回归通过；bundle7 GUI 持久来源及原生授权经重启保持，bundle8 已确认当前 GUI 富通知，完整负向组合与最终同提交 GUI 仍未通过 | 固定版本同版本保持及禁用、生产升级与暂存失败/父进程强杀后重试已有实证；完整故障组合与最终同提交平台验收仍待完成 | 真实生产安装、同版本修复、禁用拒绝、文件事务回滚及恢复已通过；其他平台和完整故障组合待验 |
+| 崩溃、重复/旧事件、消息重投 | build15 旧 listener 的真实 dispatcher 回归通过；旧进程组清理失败保留，资源域实现的真实运行工具崩溃与空闲崩溃清理通过；跨进程 Sent/结果重投故障注入通过；最终同提交待验 | 共享状态回归通过，不替代原生模型进程崩溃验收 | 共享状态回归通过，不替代 ACP 执行验收 |
 
 ## 平台与布局
 
 - macOS：本机编译和协议探测已执行；1229×768 的中英文新增 GUI 控件、消息和历史布局已实测可读，真实拼音组合、图片/文件/技能/评审已有证据；bundle6 静态能力提示已复验，bundle7 授权/安装/更新六张双语说明布局通过。独立 Codex 原生 hook、原生 TUI 经回环 SSH/tmux 传输与 Claude 无凭据初始化/EOF 各自通过，不替代完整三方流程；bundle8 已确认当前 GUI 富通知与英文 Unknown，中文新事件及英文历史选择框修复仍待复核。输入法候选列表选择作为补充覆盖尚未验证，已完成的逐键组合与空格提交证据独立保留。
-- Linux x64 / Windows x64：已核对仓库对应 self-hosted runner 在线。已派发上述同 SHA workflow，但因 Python 前置环境失败，目前均未通过。预检已加入固定原生 CLI 获取、插件注册表失败恢复、持久来源重启对照、缺失会话恢复和证据上传；Claude 2.1.273 固定两平台文件已在 macOS 完整下载并核验字节，获取及无凭据原生初始化/EOF 探针已接 workflow，但目标平台执行仍待验。下载、原生 probe 与产品安装器验收分别记录。
+- Linux x64 / Windows x64：已核对仓库对应 self-hosted runner 在线。前两轮因 Python 前置环境失败而未通过；第三轮已越过环境准备，Linux 本轮配置的所有步骤通过，GUI integration/full workspace 跳过，Windows 因上述三处夹具问题失败。预检已加入固定原生 CLI 获取、插件注册表失败恢复、持久来源重启对照、缺失会话恢复和证据上传；Claude 2.1.273 固定两平台文件已在 macOS 完整下载并核验字节，获取及无凭据原生初始化/EOF 探针在第三轮 Linux 已通过，Windows 仍待修复前置夹具后复验。下载、原生 probe 与产品安装器验收分别记录。
 - Windows：PowerShell 参数转义、安装/派发路径统一与夹具已有实现；受控插件树已改为按正常路径组件生成清单键，本地回归通过不等于 Windows 实跑。非 UTF-8 文件名负向夹具因 macOS 文件系统前置拒绝，已限定 Linux，不能算 Windows 文件系统验证。预检已加入真实固定 Codex EXE 经中文/空格/`&` 路径中的 `.cmd` 包装、生产 Rust 适配器及监督 worker 的无模型缺失会话用例，尚未执行；此项不代替 NPM Node shim、ConPTY、多行和图片的独立实测。
 - SSH：隔离 macOS 回环连接的远端 HOME/工作区/三款真实 CLI 版本查询通过；新增固定 Codex 原生 TUI 经实际 SSH stdout 收到真实 hook 通知，见 [原生专报](CODEX_NATIVE_SSH_TMUX_VERIFICATION.md)。含最终 SetEnv 的版本已在干净 dbee1ecae 提交复跑通过；完整产品 SSH 交互仍未验。
 - tmux：既有构造通知的三方直连/on 到达与默认 off 阻断见 `SSH_TMUX_VERIFICATION.md`；新增真实 Codex 原生 TUI 在直连/on 各两条通知、off 零条且真实 hook 已执行，分别绑定原生 session/turn，模型 HTTP 为零。两种证据分开记录，原生探针没有完整 HookRunSummary，也不计逐键输入、GUI SSH 或完整模型生命周期。Claude 构造通知走兼容 TTY 分支，现代原生 JSON/UI 与完整 CLI 场景仍未验。

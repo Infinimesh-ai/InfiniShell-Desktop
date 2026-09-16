@@ -57,7 +57,9 @@ class AcceptanceEvidenceTests(unittest.TestCase):
             root = Path(temporary).resolve()
             environment = missing_session_environment(root)
             self.assertEqual(environment["PATH"], "fixture-bin")
-            self.assertEqual(environment["SystemRoot"], "fixture-system")
+            # Windows 会正规化环境变量键；核对系统目录值，不依赖键名大小写。
+            self.assertEqual({key.upper(): value for key, value in environment.items() if key.upper() == "SYSTEMROOT"},
+                             {"SYSTEMROOT": "fixture-system"})
             for key in ("OPENAI_API_KEY", "CODEX_CONFIG", "HTTPS_PROXY", "DYLD_INSERT_LIBRARIES"):
                 self.assertNotIn(key, environment)
             for key in ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "CODEX_HOME", "TMP", "TEMP", "TMPDIR"):
@@ -93,6 +95,42 @@ class AcceptanceEvidenceTests(unittest.TestCase):
                              b"isolated unauthenticated idle-crash verification\n")
             self.assertEqual((root / "codex/config.toml").read_bytes(), b'cli_auth_credentials_store = "file"\n')
             self.assertFalse((root / "codex/auth.json").exists())
+
+    def test_new_macos_idle_cleanup_requires_coalition_binding_and_completed_proof(self):
+        summary = "test result: ok. 1 passed; 0 failed; 0 ignored;"
+        valid = {"event": "idle_crash_probe_finished", "passed": True,
+                 "phase": "after_session_ready", "native_root_exit_observed": True,
+                 "credentials_provided": False, "model_commands_sent": 0,
+                 "exit_receipt": {"containment": "macos_resource_coalition", "cleanup_confirmed": True},
+                 "idle_process_cleanup_confirmed": True, "unsafe_recovery_prevented": False,
+                 "macos_coalition_ownership_verified": True, "macos_cleanup_proof_verified": True,
+                 "running_tool_tree_cleanup_verified": False}
+        self.assertTrue(verified_acceptance("idle-crash", 0, summary, [valid]))
+        for key in ("macos_coalition_ownership_verified", "macos_cleanup_proof_verified",
+                    "idle_process_cleanup_confirmed", "running_tool_tree_cleanup_verified"):
+            with self.subTest(key=key):
+                missing = dict(valid)
+                missing.pop(key)
+                self.assertFalse(verified_acceptance("idle-crash", 0, summary, [missing]))
+                self.assertFalse(verified_acceptance("idle-crash", 0, summary,
+                                                     [valid | {key: not valid[key]}]))
+        self.assertFalse(verified_acceptance("idle-crash", 0, summary, [valid | {
+            "exit_receipt": {"containment": "macos_resource_coalition", "cleanup_confirmed": False}}]))
+
+    def test_legacy_macos_process_group_crash_remains_a_negative_cleanup_result(self):
+        summary = "test result: ok. 1 passed; 0 failed; 0 ignored;"
+        legacy = {"event": "idle_crash_probe_finished", "passed": True,
+                  "phase": "after_session_ready", "native_root_exit_observed": True,
+                  "credentials_provided": False, "model_commands_sent": 0,
+                  "exit_receipt": {"containment": "unix_process_group", "cleanup_confirmed": False},
+                  "idle_process_cleanup_confirmed": False, "unsafe_recovery_prevented": True,
+                  "running_tool_tree_cleanup_verified": False}
+        self.assertTrue(verified_acceptance("idle-crash", 0, summary, [legacy]))
+        for patch in ({"exit_receipt": {"containment": "unix_process_group", "cleanup_confirmed": True}},
+                      {"idle_process_cleanup_confirmed": True}, {"unsafe_recovery_prevented": False},
+                      {"running_tool_tree_cleanup_verified": True}):
+            with self.subTest(patch=patch):
+                self.assertFalse(verified_acceptance("idle-crash", 0, summary, [legacy | patch]))
 
 
 if __name__ == "__main__":

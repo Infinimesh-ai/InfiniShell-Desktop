@@ -1,0 +1,156 @@
+{
+  "version": "1.0.30",
+  "recorded_at": "2026-09-16T14:44:55.276523+00:00",
+  "observed_on": "macOS arm64",
+  "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+  "source_commit_is_binary_build_commit": false,
+  "official_checksum_manifest_verified": false,
+  "checksum_origin": "observed_complete_official_download",
+  "credentials_provided": false,
+  "model_input_submitted": false,
+  "platforms": {
+    "linux-x64": {
+      "artifact": "grok-1.0.30-linux-x86_64",
+      "binary": "grok",
+      "url": "https://x.ai/cli/grok-1.0.30-linux-x86_64",
+      "bytes": 161725088,
+      "sha256": "504dd6546ab991b75d36698242875ce461489cd1f8cd84285873cb55bd5c7d54",
+      "response_headers": {
+        "Content-Length": "161725088",
+        "last-modified": "Fri, 11 Sep 2026 23:07:36 GMT",
+        "etag": "\"dacf7173be282b9e782cebe5976c4225\"",
+        "x-goog-generation": "1789168056614536"
+      },
+      "complete_download_seconds": 13.889,
+      "file_inspection": "ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), static-pie linked, BuildID[xxHash]=f77c3f6d8ad74065, stripped",
+      "format": "elf64-x86-64",
+      "archive": false,
+      "members": [],
+      "native_version_verified": false,
+      "target_executed": false,
+      "elf_pt_interp_present": false,
+      "elf_dt_needed": []
+    },
+    "win32-x64": {
+      "artifact": "grok-1.0.30-windows-x86_64.exe",
+      "binary": "grok.exe",
+      "url": "https://x.ai/cli/grok-1.0.30-windows-x86_64.exe",
+      "bytes": 150036808,
+      "sha256": "ca24ea63272ba7881261f4a52498d1f5bd884b01da25845990422a10dd315266",
+      "response_headers": {
+        "Content-Length": "150036808",
+        "last-modified": "Fri, 11 Sep 2026 23:14:02 GMT",
+        "etag": "\"dff827145c10648fed05dc94a747d1d0\"",
+        "x-goog-generation": "1789168442280334"
+      },
+      "complete_download_seconds": 13.212,
+      "file_inspection": "PE32+ executable (console) x86-64, for MS Windows",
+      "format": "pe32+-x86-64",
+      "archive": false,
+      "members": [],
+      "native_version_verified": false,
+      "target_executed": false,
+      "static_import_dlls": [
+        "kernel32.dll",
+        "ntdll.dll",
+        "oleaut32.dll",
+        "combase.dll",
+        "advapi32.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "bcryptprimitives.dll",
+        "user32.dll",
+        "ws2_32.dll",
+        "shlwapi.dll",
+        "bcrypt.dll",
+        "crypt32.dll",
+        "ole32.dll",
+        "shell32.dll",
+        "userenv.dll",
+        "psapi.dll",
+        "powrprof.dll",
+        "secur32.dll"
+      ],
+      "delay_import_directory_present": true
+    }
+  },
+  "official_source_snapshots": [
+    {
+      "path": "crates/codegen/xai-grok-pager/scripts/install.sh",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-pager/scripts/install.sh",
+      "bytes": 19501,
+      "sha256": "7fd6fdc75d9418b2e58356726fcbf1ae849416f773925da07d0ccc7a60d3e791"
+    },
+    {
+      "path": "crates/codegen/xai-grok-pager/scripts/install.ps1",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-pager/scripts/install.ps1",
+      "bytes": 20660,
+      "sha256": "bf436b7638042f93af10b074d6a66ce15712d4a1cdd35864fc373ef3e1f22764"
+    },
+    {
+      "path": "crates/codegen/xai-grok-update/src/version.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-update/src/version.rs",
+      "bytes": 32315,
+      "sha256": "0710544a30112232a73d1e923a931d7770a90105813a6bcef26224c12c066bff"
+    }
+  ],
+  "installer_executed": false,
+  "source_tree_read_only_during_download": true,
+  "windows_optional_payload_downloaded": false,
+  "boundary": "只有官方固定文件的完整字节与静态架构检查；Linux/Windows 原生 --version、ACP 和配套组件尚未运行验证。",
+  "preparer_validation": {
+    "script_sha256": "23d31c7834b68b336109690a5419d2ac18074bb40dee45909fcf13e2ab086404",
+    "source_state": "uncommitted implementation under review",
+    "mode": "download-only",
+    "cases": [
+      {
+        "target": "linux-x64",
+        "exit_code": 0,
+        "report": {
+          "platform": "linux-x64",
+          "artifact": "grok-1.0.30-linux-x86_64",
+          "binary": "grok",
+          "bytes": 161725088,
+          "sha256": "504dd6546ab991b75d36698242875ce461489cd1f8cd84285873cb55bd5c7d54",
+          "url": "https://x.ai/cli/grok-1.0.30-linux-x86_64",
+          "format": "elf64-x86-64",
+          "version": "1.0.30",
+          "version_output": null,
+          "native_version_verified": false,
+          "installed": false,
+          "credentials_provided": false,
+          "model_input_submitted": false,
+          "checksum_origin": "observed_complete_official_download",
+          "archive": false
+        }
+      },
+      {
+        "target": "win32-x64",
+        "exit_code": 0,
+        "report": {
+          "platform": "win32-x64",
+          "artifact": "grok-1.0.30-windows-x86_64.exe",
+          "binary": "grok.exe",
+          "bytes": 150036808,
+          "sha256": "ca24ea63272ba7881261f4a52498d1f5bd884b01da25845990422a10dd315266",
+          "url": "https://x.ai/cli/grok-1.0.30-windows-x86_64.exe",
+          "format": "pe32+-x86-64",
+          "version": "1.0.30",
+          "version_output": null,
+          "native_version_verified": false,
+          "installed": false,
+          "credentials_provided": false,
+          "model_input_submitted": false,
+          "checksum_origin": "observed_complete_official_download",
+          "archive": false
+        }
+      }
+    ],
+    "native_commands_executed": [],
+    "unit_tests": {
+      "command": "python3 -B -m unittest discover -s script/cli-agent-parity -p prepare_grok_cli_tests.py -v",
+      "passed": 10,
+      "failed": 0,
+      "seconds": 0.016
+    }
+  }
+}

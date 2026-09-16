@@ -1,0 +1,37 @@
+{
+  "base_commit": "328d5ed35227f67884013f8c403e2a692470151d",
+  "worktree_dirty": true,
+  "final_same_commit_verification": false,
+  "source_files": [
+    {
+      "path": "script/cli-agent-parity/grok_fixed_acp_probe.py",
+      "sha256": "b97fb6e7eeb6f1e59ab447704401672dab0f920f2ec50b2873cae4b000ad950d"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_fixed_acp_probe_tests.py",
+      "sha256": "ed13d6a3ffe619b753755484ad570b56288f3b504c70315c73593a1274469391"
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_grok_cli.py",
+      "sha256": "23d31c7834b68b336109690a5419d2ac18074bb40dee45909fcf13e2ab086404"
+    },
+    {
+      "path": "script/cli-agent-parity/probe_claude_no_credentials.py",
+      "sha256": "9c2bdbefecda02549ba911a5f82b37f99cc72d160c7255ea76840745f03503e5"
+    }
+  ],
+  "artifact": {
+    "path": "specs/cli-agent-parity/validation/macos-grok-fixed-acp-1.json",
+    "sha256": "814c97c02c9a0d5fad4d83bc7e8abc7039b42e0fd0e0143dc9381e630f0457a6"
+  },
+  "offline_tests": {
+    "passed": 10,
+    "seconds": 0.239
+  },
+  "workflow_integration": "新增 Linux 与 Windows 固定原生输入、ACP 无凭据边界和证据上传，尚未提交及远端执行。",
+  "limitations": [
+    "缺失会话 cancel 是通知，没有接收确认。",
+    "认证阻断新建，历史恢复和运行中审批/取消未验证。",
+    "leader 未随 stdio EOF 自行退出，最终使用自持句柄强制回收；不是自然 EOF 通过。"
+  ]
+}

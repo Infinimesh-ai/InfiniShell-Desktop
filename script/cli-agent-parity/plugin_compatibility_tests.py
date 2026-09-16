@@ -141,7 +141,16 @@ class CompatibilityTests(unittest.TestCase):
 
     def test_control_characters_cannot_escape_json_transport(self):
         text = "中文\nEnglish\x1b]0;injected\x07\x9c"
-        payload, raw = self.payload("codex", {"turn_id": "round"}, extras=("--arg", "response", text))
+        script = ASSETS / "codex/scripts/build-payload.sh"
+        # Windows Python 的 argv 编码不会引用只有换行的参数，MSYS 会把它拆开。
+        # 用固定脚本从 stdin 读取完整夹具，再测试实际 build_payload 的 JSON 转义。
+        command = 'source "$1"; IFS= read -r -d "" response; build_payload \'{"turn_id":"round"}\' stop --arg response "$response"'
+        result = subprocess.run(["bash", "-c", command, "probe", str(script)],
+                                input=text.encode("utf-8") + b"\0", env=self.environment(), capture_output=True)
+        self.assertEqual(result.returncode, 0, json.dumps({"stdout": result.stdout.decode("utf-8", errors="replace"),
+                                                        "stderr": result.stderr.decode("utf-8", errors="replace")}, ensure_ascii=True))
+        raw = result.stdout.decode("utf-8")
+        payload = json.loads(raw)
         self.assertEqual(payload["response"], text)
         self.assertNotIn("\x1b", raw)
         self.assertNotIn("\x9c", raw)

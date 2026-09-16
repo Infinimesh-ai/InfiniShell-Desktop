@@ -25,6 +25,26 @@ TEST_CASES = {
 UNAUTHENTICATED_CASES = {"missing-session", "idle-crash"}
 
 
+def verified_idle_macos_boundary(event):
+    receipt = event.get("exit_receipt", {})
+    if not isinstance(receipt, dict):
+        return False
+    if receipt.get("containment") == "macos_resource_coalition":
+        return (receipt.get("cleanup_confirmed") is True
+                and event.get("idle_process_cleanup_confirmed") is True
+                and event.get("unsafe_recovery_prevented") is False
+                and event.get("macos_coalition_ownership_verified") is True
+                and event.get("macos_cleanup_proof_verified") is True
+                and event.get("running_tool_tree_cleanup_verified") is False)
+    if receipt.get("containment") == "unix_process_group":
+        # 旧负向记录只能证明恢复被阻止，不能被新域验收升级为完整清理。
+        return (receipt.get("cleanup_confirmed") is False
+                and event.get("idle_process_cleanup_confirmed") is False
+                and event.get("unsafe_recovery_prevented") is True
+                and event.get("running_tool_tree_cleanup_verified") is False)
+    return True
+
+
 def verified_acceptance(test_case, exit_code, output, events):
     if exit_code != 0 or not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", output):
         return False
@@ -36,6 +56,7 @@ def verified_acceptance(test_case, exit_code, output, events):
         return any(event.get("event") == "idle_crash_probe_finished" and event.get("passed") is True
                    and event.get("phase") == "after_session_ready" and event.get("native_root_exit_observed") is True
                    and event.get("credentials_provided") is False and event.get("model_commands_sent") == 0
+                   and verified_idle_macos_boundary(event)
                    for event in events)
     if test_case == "image-input":
         return any(event.get("event") == "image_probe_finished" and event.get("passed") is True for event in events)

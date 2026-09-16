@@ -1,0 +1,87 @@
+{
+  "run_id": 35110822335,
+  "job_id": 104843754255,
+  "source_commit": "328d5ed35227f67884013f8c403e2a692470151d",
+  "job_status": "completed",
+  "job_conclusion": "failure",
+  "job_log_sha256": "d22e604c9410788e65e85ba04620196b24b80c8767c936943a639e9ef915bc74",
+  "first_failure": {
+    "step": 8,
+    "test": "test_missing_session_environment_has_no_user_credentials_or_configuration",
+    "exception": "KeyError: SystemRoot",
+    "notification_patch_tests_passed": 12,
+    "notification_patch_tests_skipped": 1,
+    "source_tests_passed": 9,
+    "source_tests_skipped": 1
+  },
+  "downstream_evidence_missing_is_consequence": true,
+  "git_bash_payload_failure": {
+    "step": 29,
+    "exit_code": 3,
+    "original_stderr_captured_in_job_log": false,
+    "diagnosis": "Windows Python argv quoting and MSYS newline separators are inconsistent; source-based diagnosis pending native rerun",
+    "local_comparison": {
+      "platform": "macOS",
+      "kind": "MSYS parser consequence and stdin fixture check, not Windows execution",
+      "predicted_split": {
+        "exit_code": 3,
+        "stderr": "jq: error: syntax error, unexpected INVALID_CHARACTER, expecting end of file at <top-level>, line 1, column 8:\n    English\u001b]0;injected\u0007\u009c\n           ^\njq: 1 compile error\n"
+      },
+      "stdin": {
+        "exit_code": 0,
+        "response_equal": true,
+        "raw_has_c0": false
+      }
+    }
+  },
+  "native_argv_failure": {
+    "step": 30,
+    "phase": "native_argv_roundtrip",
+    "original_expected_actual_captured": false,
+    "native_hook_cases_started": 0,
+    "checks_already_passed": [
+      "fixed_input_hashes",
+      "codex_version_0.147.0",
+      "encoding_roundtrip",
+      "powershell_51_syntax"
+    ],
+    "local_powershell_comparison": {
+      "legacy_count": 1,
+      "version": "7.7.0-preview.3",
+      "legacy_first_type": "System.Object[]",
+      "fixed_quoted": [
+        "\"\"",
+        "\"\u4e2d\u6587 English\"",
+        "\"a'b\"",
+        "\"a&b%PATH%!NAME!^()$()`\"",
+        "\"a\\\"b\"",
+        "\"trailing\\\\\"",
+        "\"two\\\\\\\\\\\"quoted\"",
+        "\"C:\\\u63d2\u4ef6 \u7a7a\u683c\\%PATH%!a!&b\\hook.sh\""
+      ],
+      "fixed_count": 8,
+      "legacy_quoted": [
+        "\" \u4e2d\u6587 English a'b a&b%PATH%!NAME!^()$()` a\\\"b trailing\\ two\\\\\\\\\\\"quoted C:\\\u63d2\u4ef6 \u7a7a\u683c\\%PATH%!a!&b\\hook.sh\""
+      ]
+    },
+    "comparison_boundary": "macOS PowerShell7 -NoEnumerate reenacts the documented old array output; this is not Windows PowerShell5.1 execution"
+  },
+  "local_regression": {
+    "plugin_compatibility_tests": {
+      "passed": 13,
+      "seconds": 4.33
+    },
+    "codex_windows_hook_tests": {
+      "passed": 14,
+      "seconds": 0.011
+    },
+    "codex_adapter_runner_tests": {
+      "passed": 8,
+      "seconds": 0.007
+    }
+  },
+  "windows_fixed_revision_rerun": false,
+  "product_resources_modified": false,
+  "workflow_modified": false,
+  "model_input_submitted": false
+}
