@@ -17,7 +17,7 @@ on:
         default: true
         type: boolean
       run_macos_intel:
-        description: 在标准 macOS runner 上验证 Intel CLI
+        description: 交叉构建并原生验证 macOS x86_64 SSH 扩展
         required: true
         default: false
         type: boolean
@@ -90,11 +90,13 @@ jobs:
         # integration 需要专用图形会话，此处完成跨平台编译后交由 GUI 测试流程执行。
         run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
 
-  macos_intel_cli:
-    name: macOS Intel CLI
+  macos_intel_ssh_extension_build:
+    name: macOS Intel SSH extension cross-build
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_intel }}
-    runs-on: macos-26-intel
+    runs-on: macos-26
     timeout-minutes: 360
+    outputs:
+      release_tag: ${{ steps.metadata.outputs.tag }}
     env:
       CHANNEL: oss
       CARGO_BUILD_JOBS: "1"
@@ -109,7 +111,7 @@ jobs:
       - uses: ./.github/actions/prepare_environment
         with:
           target_os: macos
-          cache_key: preflight-macos-x86_64-cli
+          cache_key: preflight-macos-x86_64-ssh-extension
           is_self_hosted: false
           install_release_deps: true
 
@@ -117,41 +119,74 @@ jobs:
         shell: bash
         run: rustup target add x86_64-apple-darwin
 
-      - name: Build Intel CLI
+      - name: Compute temporary extension version
+        id: metadata
+        shell: bash
+        run: |
+          tag="v0.$(date -u +%Y.%m.%d.%H.%M).oss_01"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Cross-build Intel SSH extension
         id: bundle_cli
         shell: bash
+        env:
+          GIT_RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
         run: |
           set -euo pipefail
           df -h .
           sysctl -n hw.memsize
-          # 诊断包使用当次运行的临时版本，不创建或移动正式发布 Tag。
-          export GIT_RELEASE_TAG="v0.$(date -u +%Y.%m.%d.%H.%M).oss_01"
-          echo "GIT_RELEASE_TAG=$GIT_RELEASE_TAG" >> "$GITHUB_ENV"
           script/bundle --channel "$CHANNEL" --arch x86_64 --artifact cli --nosign
 
-      - name: Verify Intel CLI tarball
+      - name: Verify Intel SSH extension tarball
         shell: bash
         run: |
           set -euo pipefail
           binary="${{ steps.bundle_cli.outputs.binary_path }}"
           resources="${{ steps.bundle_cli.outputs.bundled_resources_dir }}"
           file "$binary"
-          version=$("$binary" --version)
-          echo "$version"
-          [[ "$version" == *"$GIT_RELEASE_TAG"* ]]
+          [[ "$(lipo -archs "$binary")" == "x86_64" ]]
           cp "$binary" infinishell
-          tar czf infinishell-intel-cli-preflight.tar.gz infinishell \
+          tar czf infinishell-macos-x86_64.tar.gz infinishell \
             -C "$(dirname "$resources")" resources
-          shasum -a 256 infinishell-intel-cli-preflight.tar.gz
+          shasum -a 256 infinishell-macos-x86_64.tar.gz
           df -h .
 
-      - name: Upload Intel CLI preflight tarball
+      - name: Upload Intel SSH extension preflight tarball
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: infinishell-intel-cli-preflight
-          path: infinishell-intel-cli-preflight.tar.gz
+          name: infinishell-macos-x86_64-ssh-extension-preflight
+          path: infinishell-macos-x86_64.tar.gz
           if-no-files-found: error
           retention-days: 3
+
+  macos_intel_ssh_extension_native:
+    name: macOS Intel SSH extension native acceptance
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_intel }}
+    needs: macos_intel_ssh_extension_build
+    runs-on: macos-26-intel
+    timeout-minutes: 30
+    steps:
+      - name: Download Intel SSH extension preflight tarball
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: infinishell-macos-x86_64-ssh-extension-preflight
+          path: artifact
+
+      - name: Run Intel SSH extension natively
+        shell: bash
+        env:
+          EXPECTED_TAG: ${{ needs.macos_intel_ssh_extension_build.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/infinishell-intel-ssh-extension"
+          tar xzf artifact/infinishell-macos-x86_64.tar.gz \
+            -C "$RUNNER_TEMP/infinishell-intel-ssh-extension"
+          cd "$RUNNER_TEMP/infinishell-intel-ssh-extension"
+          [[ "$(lipo -archs infinishell)" == "x86_64" ]]
+          version=$(./infinishell --version)
+          echo "$version"
+          [[ "$version" == *"$EXPECTED_TAG"* ]]
+          test -d resources
 
   windows:
     name: Windows x64

@@ -103,6 +103,9 @@ Git 仓库地址和运维规则/习惯组织成一个**项目**(`Ctrl+7` / Linux
 
 ## 快速开始
 
+macOS 桌面正式版仅支持 Apple Silicon(`arm64`),不再为 Intel Mac 提供桌面
+DMG。macOS `x86_64` remote-server 归档仅作为 Intel 远端主机的 SSH 扩展保留。
+
 ### 从源码构建
 
 需要 [Rust](https://rustup.rs/)(工具链版本由

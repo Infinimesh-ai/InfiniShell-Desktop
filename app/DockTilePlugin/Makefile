@@ -1,8 +1,8 @@
 BUNDLE_NAME = InfiniShellDockTilePlugin.docktileplugin
 OBJC_FILES = InfiniShellDockTilePlugin.m
 FRAMEWORKS = -framework Cocoa -framework AppKit -framework Foundation
-# Compile a universal binary for both arm64 and x86_64.
-CFLAGS = -fobjc-arc -bundle -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET) -arch arm64 -arch x86_64
+# InfiniShell macOS desktop releases support Apple Silicon only.
+CFLAGS = -fobjc-arc -bundle -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET) -arch arm64
 LDFLAGS = -ObjC
 
 .PHONY: all clean

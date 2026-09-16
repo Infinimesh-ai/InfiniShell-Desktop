@@ -2,9 +2,9 @@
 
 InfiniShell Desktop is the open-source desktop app in the
 [InfiniShell product lineup](https://infinishell.dev/#lineup). It gives individual
-developers and terminal users a local-first AI terminal on Linux, macOS and
-Windows. Users bring their own models, CLI agents and SSH hosts, while credentials,
-history and agent state stay on their machines by default.
+developers and terminal users a local-first AI terminal on Linux, Apple Silicon
+macOS and Windows. Users bring their own models, CLI agents and SSH hosts, while
+credentials, history and agent state stay on their machines by default.
 
 This roadmap covers **InfiniShell Desktop only**. It no longer uses phases to
 describe the entire product lineup as the evolution of one shared runtime. Shipped
@@ -67,8 +67,10 @@ boundaries.
 
 ### 4. Cross-platform terminal quality
 
-- Maintain build, test, packaging and release gates for all three platforms,
-  prioritizing platform differences in the terminal, PTY, shell integration, input
+- Maintain build, test, packaging and release gates for Linux, Apple Silicon macOS
+  and Windows desktops, while retaining the macOS `x86_64` remote-server artifact
+  solely for SSH extension compatibility on Intel hosts.
+- Prioritize platform differences in the terminal, PTY, shell integration, input
   methods and remote sessions.
 - Continue improving the English and Simplified Chinese UI, CJK font and text
   layout, Markdown/code rendering, keyboard operation, performance and

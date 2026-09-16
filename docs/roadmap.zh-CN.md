@@ -1,9 +1,9 @@
 # InfiniShell Desktop 路线图
 
 InfiniShell Desktop 是 [InfiniShell 产品线](https://infinishell.dev/#lineup)中的
-开源桌面软件：面向个人开发者与终端用户，在 Linux、macOS 和 Windows 上提供
-本地优先的 AI 终端。用户可以接入自己的模型、CLI Agent 与 SSH 主机，密钥、历史
-和 Agent 状态默认保留在自己的机器上。
+开源桌面软件：面向个人开发者与终端用户，在 Linux、Apple Silicon macOS 和
+Windows 上提供本地优先的 AI 终端。用户可以接入自己的模型、CLI Agent 与 SSH
+主机，密钥、历史和 Agent 状态默认保留在自己的机器上。
 
 本路线图只描述 **InfiniShell Desktop**。它不再用 Phase 把整个产品线写成一个
 共享运行时的演进过程；具体功能的交付状态以代码、发布说明和对应 spec 为准。
@@ -56,8 +56,9 @@ InfiniShell Desktop 是 [InfiniShell 产品线](https://infinishell.dev/#lineup)
 
 ### 4. 跨平台终端质量
 
-- 维护三平台的构建、测试、打包与发布门禁，优先修复终端、PTY、shell integration、
-  输入法和远程会话中的平台差异。
+- 维护 Linux、Apple Silicon macOS 与 Windows 桌面端的构建、测试、打包和发布
+  门禁；macOS `x86_64` remote-server 产物仅为 Intel 主机的 SSH 扩展兼容而保留。
+- 优先修复终端、PTY、shell integration、输入法和远程会话中的平台差异。
 - 持续改善中英文界面、CJK 字体与文本布局、Markdown / 代码渲染、键盘操作、性能
   和可访问性。
 - 选择性吸收 Warp 上游的终端内核改进，并用回归验证防止已剥离的云端依赖重新

@@ -122,6 +122,10 @@ host) → have the agent inspect, reconfigure, or roll out across the fleet.
 
 ## Getting Started
 
+Official macOS desktop builds support Apple Silicon (`arm64`). Intel Macs no
+longer receive desktop DMGs. The macOS `x86_64` remote-server archive remains
+available solely as an SSH extension for Intel remote hosts.
+
 ### Build from source
 
 Requires [Rust](https://rustup.rs/) (the toolchain version is pinned by
