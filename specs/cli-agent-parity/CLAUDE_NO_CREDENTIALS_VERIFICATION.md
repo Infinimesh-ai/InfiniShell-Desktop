@@ -59,11 +59,22 @@
 
 ## 本机结果与待验证边界
 
-macOS arm64 已使用已有受测原生二进制的独立普通文件副本执行，未复制认证或 GUI 配置。最后一次真实结果保存在 `fixtures/claude-2.1.273-no-credentials-initialize-eof-macos.json`：无账号、默认权限、空闲初始化成功；stdin EOF 后 19 ms 自行退出，退出码 0，没有强制清理，执行前后摘要一致。
+macOS arm64 已使用已有受测原生二进制的独立普通文件副本执行，未复制认证或 GUI 配置。早期真实结果保留在 `fixtures/claude-2.1.273-no-credentials-initialize-eof-macos.json`：无账号、默认权限、空闲初始化成功；stdin EOF 后 19 ms 自行退出，退出码 0，没有强制清理，执行前后摘要一致。
 
 这份证据的 checkout HEAD 是 `6921a9925955a1955503e259cd935eaea4ac2ac0` 且 `worktree_dirty=true`，不属于最终同提交跨平台验收。新增两个 Python 测试文件各 6 项，本机共 12 项通过；其中用于验证 UTF-8/EOF 收集器的 Python 子进程是明确的传输夹具，不计为原生 CLI 验证。
 
-Linux/Windows 目前只有真实下载摘要证据，原生 `--version`、上述控制握手和 EOF 仍待对应 runner 执行。没有账号不是这项无模型探测的预期前置阻塞；平台依赖、固定版本行为差异或网络下载失败必须按实际失败报告，不允许跳过后算通过。Windows 不需要为此握手先配置 Git Bash；是否能在实际 runner 直接完成仍由该平台结果确认。
+2026-09-16 已从干净 `.worktrees/cli-agent-parity-validation` 复跑提交 `dbee1ecae81da54a1749de88a7caffb3099d7eb7` 的原生探针，新证据为 [claude-2.1.273-no-credentials-initialize-eof-macos-same-commit.json](fixtures/claude-2.1.273-no-credentials-initialize-eof-macos-same-commit.json)。唯一 initialize 响应确认精确 request ID/PID、`tokenSource=none`、默认权限和 idle；stdin EOF 后 **19 ms、退出码 0、无强制清理**。运行器退出码为 0，证据 `passed=true`。
+
+验证 worktree 在运行前后均为上述 HEAD，`git status --porcelain=v1` 均为空；两个实际执行/导入的脚本工作文件 blob 与 HEAD blob 一致，前后 SHA-256 也一致：
+
+| 脚本 | Git blob | SHA-256 |
+| --- | --- | --- |
+| `prepare_claude_cli.py` | `5db30b6657beaf27410c6bcc67938ecb84302fcb` | `ced10039d5fc70364c8a6caf1637a26ad25abaeadd9d32a4b57c57f896496e89` |
+| `probe_claude_no_credentials.py` | `ee74b1a78ea79905e68dd36ec63090eea0b9804d` | `9c2bdbefecda02549ba911a5f82b37f99cc72d160c7255ea76840745f03503e5` |
+
+复用既有受测原生文件，未下载或安装。原文件有两个硬链接，因此只将可执行字节复制到独立临时普通文件以满足探针的单链接检查；没有复制配置或凭据。原文件运行前后、探测副本运行前后的摘要均为固定 macOS arm64 发布摘要 `953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb`。完整前后核验保存在证据的 `same_commit_verification` 中，验证 worktree 未写入任何产物。
+
+Linux/Windows 的同提交预检已在 Actions run `35100708171` 排定，结果由对应平台产物确认；上述 macOS 成功不计为 Linux/Windows 已通过。没有账号不是这项无模型探测的预期前置阻塞；平台依赖、固定版本行为差异或网络下载失败必须按实际失败报告，不允许跳过后算通过。Windows 不需要为此握手先配置 Git Bash；是否能在实际 runner 直接完成仍由该平台结果确认。
 
 这项验证不覆盖：生产 Rust adapter/监督 worker、活跃回合 EOF、CLI 崩溃、工具子孙退出、权限允许/拒绝、追加指令、取消、同 session ID 继续、应用重启恢复、结果领取、真实 PTY/ConPTY 或 GUI/TUI。它不能替代 P0–P5 完整生命周期验收。无产品可见文案变化，无需本地化变更；本子任务未运行 Cargo 或远端任务。
 

@@ -1,0 +1,787 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-09-16T13:54:00.362036+00:00",
+  "scope": "仅 macOS 固定 helper、专属临时 launchd job、只读 coalition 查询与身份绑定清理；未接产品监督者。",
+  "repository_head_when_recorded": "dbee1ecae81da54a1749de88a7caffb3099d7eb7",
+  "product_source_modified_by_prototype": false,
+  "cargo_invocations": 0,
+  "model_requests": 0,
+  "credentials_used": false,
+  "platform": {
+    "macos_version": "27.0",
+    "macos_build": "26A428",
+    "kernel_release": "27.0.0",
+    "kernel_version": "Darwin Kernel Version 27.0.0: Tue Aug 11 21:22:49 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T6000",
+    "architecture": "arm64",
+    "boot_session_sha256": "6171a27de2b81dc06492cf23a954e9fdf832727126ad51b2f665b4e7d6870fc0",
+    "python_version": "3.14.6"
+  },
+  "checks": {
+    "dedicated_resource_cid_observed": true,
+    "detached_descendants_share_resource_cid": true,
+    "root_sigkill_did_not_stop_detached_descendants": true,
+    "bootout_did_not_stop_detached_descendants": true,
+    "removed_job_restart_rejected": true,
+    "control_alive_after_bootout": true,
+    "only_verified_fixture_identity_signals": true,
+    "all_registered_fixture_exits_observed": true,
+    "known_cid_both_queries_esrch_after_cleanup": true,
+    "second_run_reached_end_without_cleanup_error": true
+  },
+  "bounded_fixture_observation_checks_passed": true,
+  "production_containment_verified": false,
+  "arbitrary_descendant_cleanup_verified": false,
+  "root_or_bootout_automatic_cleanup_verified": false,
+  "source_derived_reap_inference": {
+    "fixed_commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+    "tag": "xnu-12377.121.6",
+    "matches_running_kernel_source_version": false,
+    "meaning": "此前已确证的专属非零 CID 在同一启动周期经合法查询返回 ESRCH；固定实现唯一移除路径先锁内确认 terminated 且 active_count=0，并禁止新加入。当前实测与该源码契约一致，不能替代实际内核同版源码或支持矩阵验证。"
+  },
+  "limits": {
+    "caller_pid_capacity": 100,
+    "fixed_source_public_private_header_pid_cap": 512,
+    "fixed_source_internal_pid_cap": 80,
+    "fixture_peak_live_members": 3,
+    "empty_pid_snapshot_not_accepted_as_terminal": true,
+    "other_errors_not_accepted_as_esrch": true,
+    "public_sdk_declaration_available": false,
+    "minimum_supported_macos_not_established": true,
+    "host_crash_not_exercised": true,
+    "real_codex_not_exercised": true,
+    "product_io_and_recovery_not_exercised": true
+  },
+  "read_only_preflight": {
+    "proc_pidcoalitioninfo_bytes": 40,
+    "caller_resource_cid": 7944,
+    "resource_counters_readable": true,
+    "gui_domain_available": true,
+    "gui_probe_exit": 0
+  },
+  "old_sysctl_audit": {
+    "sysctl_name_resolution": {
+      "result": -1,
+      "errno": 2,
+      "count": 24
+    },
+    "official_tags": [
+      {
+        "name": "xnu-12377.121.6",
+        "commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f"
+      },
+      {
+        "name": "xnu-12377.101.15",
+        "commit": "5c306bec31e314fa4d8bbdafb2f6f5a6b7e7b291"
+      },
+      {
+        "name": "xnu-12377.81.4",
+        "commit": "043036a2b3718f7f0be807e2870f8f47d3fa0796"
+      },
+      {
+        "name": "xnu-12377.61.12",
+        "commit": "4d495c6e23c53686cf65f45067f79024cf5dcee8"
+      },
+      {
+        "name": "xnu-12377.41.6",
+        "commit": "bbb1b6f9e71b8cdde6e5cd6f4841f207dee3d828"
+      },
+      {
+        "name": "xnu-12377.1.9",
+        "commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea"
+      },
+      {
+        "name": "xnu-11417.140.69",
+        "commit": "43a90889846e00bfb5cf1d255cdc0a701a1e05a4"
+      },
+      {
+        "name": "xnu-11417.121.6",
+        "commit": "a1e26a70f38d1d7daa7b49b258e2f8538ad81650"
+      }
+    ]
+  },
+  "new_pid_api_preflight": {
+    "api": "coalition_info_pid_list(uint64_t,pid_t*,size_t*)",
+    "official_commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+    "result": 0,
+    "errno": 0,
+    "returned_bytes": 320,
+    "caller_in_result": false,
+    "other_members_omitted": true
+  },
+  "release_source_boundary": [
+    {
+      "name": "xnu-12377.121.6",
+      "commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+      "url": "https://raw.githubusercontent.com/apple-oss-distributions/xnu/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/libsyscall/wrappers/coalition.c",
+      "sha256": "f9dddb8dd619667e99d9966515ee7060ea5019f6c2fd8bead263456617c46fed",
+      "has_pid_list_wrapper": true
+    },
+    {
+      "name": "xnu-12377.101.15",
+      "commit": "5c306bec31e314fa4d8bbdafb2f6f5a6b7e7b291",
+      "url": "https://raw.githubusercontent.com/apple-oss-distributions/xnu/5c306bec31e314fa4d8bbdafb2f6f5a6b7e7b291/libsyscall/wrappers/coalition.c",
+      "sha256": "f9dddb8dd619667e99d9966515ee7060ea5019f6c2fd8bead263456617c46fed",
+      "has_pid_list_wrapper": true
+    },
+    {
+      "name": "xnu-12377.81.4",
+      "commit": "043036a2b3718f7f0be807e2870f8f47d3fa0796",
+      "url": "https://raw.githubusercontent.com/apple-oss-distributions/xnu/043036a2b3718f7f0be807e2870f8f47d3fa0796/libsyscall/wrappers/coalition.c",
+      "sha256": "f9dddb8dd619667e99d9966515ee7060ea5019f6c2fd8bead263456617c46fed",
+      "has_pid_list_wrapper": true
+    },
+    {
+      "name": "xnu-12377.61.12",
+      "commit": "4d495c6e23c53686cf65f45067f79024cf5dcee8",
+      "url": "https://raw.githubusercontent.com/apple-oss-distributions/xnu/4d495c6e23c53686cf65f45067f79024cf5dcee8/libsyscall/wrappers/coalition.c",
+      "sha256": "f9dddb8dd619667e99d9966515ee7060ea5019f6c2fd8bead263456617c46fed",
+      "has_pid_list_wrapper": true
+    },
+    {
+      "name": "xnu-12377.41.6",
+      "commit": "bbb1b6f9e71b8cdde6e5cd6f4841f207dee3d828",
+      "url": "https://raw.githubusercontent.com/apple-oss-distributions/xnu/bbb1b6f9e71b8cdde6e5cd6f4841f207dee3d828/libsyscall/wrappers/coalition.c",
+      "sha256": "f9dddb8dd619667e99d9966515ee7060ea5019f6c2fd8bead263456617c46fed",
+      "has_pid_list_wrapper": true
+    },
+    {
+      "name": "xnu-12377.1.9",
+      "commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+      "url": "https://raw.githubusercontent.com/apple-oss-distributions/xnu/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/libsyscall/wrappers/coalition.c",
+      "sha256": "5ffb12265c7110d5a895a6f93bef02e04c5a5d48b63d00935f2fabc61d0acaf6",
+      "has_pid_list_wrapper": false
+    }
+  ],
+  "sources": [
+    {
+      "path": "bsd/kern/sys_coalition.c",
+      "sha256": "74f61434e8f9fd85fd4f753cf407422952da7d57fc669fb06e57a4eb4375cef3",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/sys_coalition.c"
+    },
+    {
+      "path": "bsd/sys/coalition.h",
+      "sha256": "fdc48e2310dee91a9281b0add7c520ffe8fe475f5bb926d8abfcb775ffb9b6f6",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/sys/coalition.h"
+    },
+    {
+      "path": "bsd/sys/coalition_private.h",
+      "sha256": "7e562172359d773a6d42cbd04ebb4179fe57b25f362825a71cba506a42f6b83c",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/sys/coalition_private.h"
+    },
+    {
+      "path": "libsyscall/wrappers/coalition.c",
+      "sha256": "f9dddb8dd619667e99d9966515ee7060ea5019f6c2fd8bead263456617c46fed",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/libsyscall/wrappers/coalition.c"
+    },
+    {
+      "path": "osfmk/kern/coalition.c",
+      "sha256": "e3e60c1ed8fee8d179635490d5188bf917995ed8665cb85537b881ba9376a9bc",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/kern/coalition.c"
+    },
+    {
+      "path": "osfmk/mach/coalition.h",
+      "sha256": "43676440c5d2c43556f59ec6af2d15de0742572f6c19910ba2921616f301697a",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/mach/coalition.h"
+    }
+  ],
+  "jobs_absent_final_read_only_checks": [
+    {
+      "arguments": [
+        "/bin/launchctl",
+        "print",
+        "gui/502/dev.infinishell.parity.coalition.6061b2c6-a6f3-4abd-b1a9-05d1dbe3c512"
+      ],
+      "exit_code": 113,
+      "stderr": "Bad request.\nCould not find service \"dev.infinishell.parity.coalition.6061b2c6-a6f3-4abd-b1a9-05d1dbe3c512\" in domain for user gui: 502\n"
+    },
+    {
+      "arguments": [
+        "/bin/launchctl",
+        "print",
+        "gui/502/dev.infinishell.parity.coalition.8eca8546-a2dd-413b-9d98-f492d872ab61"
+      ],
+      "exit_code": 113,
+      "stderr": "Bad request.\nCould not find service \"dev.infinishell.parity.coalition.8eca8546-a2dd-413b-9d98-f492d872ab61\" in domain for user gui: 502\n"
+    }
+  ],
+  "runs": [
+    {
+      "case": "old_sysctl_stopped",
+      "artifacts": {
+        "helper.c": {
+          "path": "/private/tmp/infinishell-coalition-launchd-prototype-4jqvb4zy/helper.c",
+          "sha256": "a5e3d5dc6727153d887c9b81e4edc60c952c978f3518c3bd5525b03bbff7ccde"
+        },
+        "helper": {
+          "path": "/private/tmp/infinishell-coalition-launchd-prototype-4jqvb4zy/helper",
+          "sha256": "b573a6f0a85cef5f0690d8eeb7c41a9a3c6db508e85ebc44f1148b77a7110fdc"
+        },
+        "prototype.py": {
+          "path": "/private/tmp/infinishell-coalition-launchd-prototype-4jqvb4zy/prototype.py",
+          "sha256": "f8a1fc778e6e4c10cd60ca11cc9935e48f53e4b0e94448af804a80a27a5d50a6"
+        },
+        "job.plist": {
+          "path": "/private/tmp/infinishell-coalition-launchd-prototype-4jqvb4zy/job.plist",
+          "sha256": "37ae26301412136932408e94f48100d2d02e2f34cadb0fc8f81a2f86cb9eda13"
+        },
+        "report.json": {
+          "path": "/private/tmp/infinishell-coalition-launchd-prototype-4jqvb4zy/report.json",
+          "sha256": "8d44672ef761be10145c24f25fffc1bacb7c454fe16145a74ef98cdb176e8894"
+        }
+      },
+      "raw": {
+        "label": "dev.infinishell.parity.coalition.6061b2c6-a6f3-4abd-b1a9-05d1dbe3c512",
+        "domain": "gui/502",
+        "model_requests": 0,
+        "credentials_used": false,
+        "actions": [
+          {
+            "arguments": [
+              "bootstrap",
+              "gui/502",
+              "/private/tmp/infinishell-coalition-launchd-prototype-4jqvb4zy/job.plist"
+            ],
+            "code": 0,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "arguments": [
+              "kickstart",
+              "gui/502/dev.infinishell.parity.coalition.6061b2c6-a6f3-4abd-b1a9-05d1dbe3c512"
+            ],
+            "code": 0,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "arguments": [
+              "bootout",
+              "gui/502/dev.infinishell.parity.coalition.6061b2c6-a6f3-4abd-b1a9-05d1dbe3c512"
+            ],
+            "code": 0,
+            "stdout": "",
+            "stderr": ""
+          }
+        ],
+        "identities": {
+          "control": {
+            "role": "control",
+            "pid": 89065,
+            "ppid": 89051,
+            "pgid": 89051,
+            "sid": 89051,
+            "pid_version": 591239,
+            "unique_id": 286968,
+            "resource_cid": 7944,
+            "jetsam_cid": 7945
+          },
+          "root": {
+            "role": "root",
+            "pid": 89068,
+            "ppid": 1,
+            "pgid": 89068,
+            "sid": 1,
+            "pid_version": 591246,
+            "unique_id": 286971,
+            "resource_cid": 22514,
+            "jetsam_cid": 22515
+          }
+        },
+        "observations": [
+          {
+            "stage": "after_known_fixture_cleanup",
+            "usage": {
+              "resource_cid": 22514,
+              "result": -1,
+              "errno": 3,
+              "tasks_started": null,
+              "tasks_exited": null,
+              "snapshot_live_tasks": null
+            },
+            "known_fixture_alive": {
+              "control": false,
+              "root": false
+            },
+            "heartbeats": {
+              "control": 17,
+              "root": 17
+            }
+          }
+        ],
+        "signal_receipts": [
+          {
+            "pid": 89065,
+            "pid_version": 591239,
+            "signal": 15,
+            "result": 0,
+            "errno": 0
+          }
+        ],
+        "exit_events": [
+          {
+            "pid": 89068,
+            "fflags": 2147483648,
+            "data": 0
+          },
+          {
+            "pid": 89065,
+            "fflags": 2147483648,
+            "data": 0
+          }
+        ],
+        "full_containment_proven": false,
+        "mutations_limited_to_unique_test_job": true,
+        "helper_source_sha256": "a5e3d5dc6727153d887c9b81e4edc60c952c978f3518c3bd5525b03bbff7ccde",
+        "helper_binary_sha256": "b573a6f0a85cef5f0690d8eeb7c41a9a3c6db508e85ebc44f1148b77a7110fdc",
+        "plist": {
+          "Label": "dev.infinishell.parity.coalition.6061b2c6-a6f3-4abd-b1a9-05d1dbe3c512",
+          "ProgramArguments": [
+            "/private/tmp/infinishell-coalition-launchd-prototype-4jqvb4zy/helper",
+            "root",
+            "/private/tmp/infinishell-coalition-launchd-prototype-4jqvb4zy"
+          ],
+          "WorkingDirectory": "/private/tmp/infinishell-coalition-launchd-prototype-4jqvb4zy",
+          "KeepAlive": false,
+          "AbandonProcessGroup": false,
+          "ExitTimeOut": 2,
+          "StandardOutPath": "/private/tmp/infinishell-coalition-launchd-prototype-4jqvb4zy/job.stdout",
+          "StandardErrorPath": "/private/tmp/infinishell-coalition-launchd-prototype-4jqvb4zy/job.stderr"
+        },
+        "failure": {
+          "type": "RuntimeError",
+          "message": "PID list unavailable or potentially truncated: -1/2/400"
+        },
+        "control_reaped_exit_code": 0,
+        "post_cleanup_cid_queries": [
+          {
+            "resource_cid": 22514,
+            "result": -1,
+            "errno": 3,
+            "tasks_started": null,
+            "tasks_exited": null,
+            "snapshot_live_tasks": null
+          }
+        ],
+        "all_registered_fixture_exits_observed": true
+      }
+    },
+    {
+      "case": "new_pid_api_completed",
+      "artifacts": {
+        "helper.c": {
+          "path": "/private/tmp/infinishell-coalition-launchd-prototype-v2-x4wx636w/helper.c",
+          "sha256": "a5e3d5dc6727153d887c9b81e4edc60c952c978f3518c3bd5525b03bbff7ccde"
+        },
+        "helper": {
+          "path": "/private/tmp/infinishell-coalition-launchd-prototype-v2-x4wx636w/helper",
+          "sha256": "ae88263b9913c3ab02b0836116f55a0a8e2b105c89f89a34735be127096e24fe"
+        },
+        "prototype.py": {
+          "path": "/private/tmp/infinishell-coalition-launchd-prototype-v2-x4wx636w/prototype.py",
+          "sha256": "009c81922d02165d543aa9f92bcb0cdacca234e6424e383e80eaf1369bc7b95b"
+        },
+        "job.plist": {
+          "path": "/private/tmp/infinishell-coalition-launchd-prototype-v2-x4wx636w/job.plist",
+          "sha256": "6e983b39091708cc40add60232ffb0a9fbf47664a534b717114a6efcb81913e7"
+        },
+        "report.json": {
+          "path": "/private/tmp/infinishell-coalition-launchd-prototype-v2-x4wx636w/report.json",
+          "sha256": "48beaafab0e29db8241ed110ce2013b00bf07bea027aaa5ae6e827bcd4278f27"
+        }
+      },
+      "raw": {
+        "label": "dev.infinishell.parity.coalition.8eca8546-a2dd-413b-9d98-f492d872ab61",
+        "domain": "gui/502",
+        "model_requests": 0,
+        "credentials_used": false,
+        "actions": [
+          {
+            "arguments": [
+              "bootstrap",
+              "gui/502",
+              "/private/tmp/infinishell-coalition-launchd-prototype-v2-x4wx636w/job.plist"
+            ],
+            "code": 0,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "arguments": [
+              "kickstart",
+              "gui/502/dev.infinishell.parity.coalition.8eca8546-a2dd-413b-9d98-f492d872ab61"
+            ],
+            "code": 0,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "arguments": [
+              "bootout",
+              "gui/502/dev.infinishell.parity.coalition.8eca8546-a2dd-413b-9d98-f492d872ab61"
+            ],
+            "code": 0,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "arguments": [
+              "kickstart",
+              "gui/502/dev.infinishell.parity.coalition.8eca8546-a2dd-413b-9d98-f492d872ab61"
+            ],
+            "code": 113,
+            "stdout": "",
+            "stderr": "Could not find service \"dev.infinishell.parity.coalition.8eca8546-a2dd-413b-9d98-f492d872ab61\" in domain for user gui: 502\n"
+          }
+        ],
+        "identities": {
+          "control": {
+            "role": "control",
+            "pid": 89534,
+            "ppid": 89523,
+            "pgid": 89523,
+            "sid": 89523,
+            "pid_version": 592187,
+            "unique_id": 287437,
+            "resource_cid": 7944,
+            "jetsam_cid": 7945
+          },
+          "root": {
+            "role": "root",
+            "pid": 89539,
+            "ppid": 1,
+            "pgid": 89539,
+            "sid": 1,
+            "pid_version": 592199,
+            "unique_id": 287442,
+            "resource_cid": 22612,
+            "jetsam_cid": 22613
+          },
+          "setsid-child": {
+            "role": "setsid-child",
+            "pid": 89540,
+            "ppid": 89539,
+            "pgid": 89540,
+            "sid": 89540,
+            "pid_version": 592200,
+            "unique_id": 287443,
+            "resource_cid": 22612,
+            "jetsam_cid": 22613
+          },
+          "doublefork-child": {
+            "role": "doublefork-child",
+            "pid": 89542,
+            "ppid": 89541,
+            "pgid": 89541,
+            "sid": 89541,
+            "pid_version": 592202,
+            "unique_id": 287445,
+            "resource_cid": 22612,
+            "jetsam_cid": 22613
+          }
+        },
+        "observations": [
+          {
+            "stage": "before_root_sigkill",
+            "usage": {
+              "resource_cid": 22612,
+              "result": 0,
+              "errno": 0,
+              "tasks_started": 5,
+              "tasks_exited": 2,
+              "snapshot_live_tasks": 3
+            },
+            "pid_query": {
+              "resource_cid": 22612,
+              "result": 0,
+              "errno": 0,
+              "returned_bytes": 12,
+              "pids": [
+                89539,
+                89540,
+                89542
+              ]
+            },
+            "known_fixture_alive": {
+              "control": true,
+              "root": true,
+              "setsid-child": true,
+              "doublefork-child": true
+            },
+            "heartbeats": {
+              "control": 51,
+              "root": 34,
+              "setsid-child": 17,
+              "doublefork-child": 17
+            }
+          },
+          {
+            "stage": "after_root_sigkill",
+            "usage": {
+              "resource_cid": 22612,
+              "result": 0,
+              "errno": 0,
+              "tasks_started": 5,
+              "tasks_exited": 3,
+              "snapshot_live_tasks": 2
+            },
+            "pid_query": {
+              "resource_cid": 22612,
+              "result": 0,
+              "errno": 0,
+              "returned_bytes": 8,
+              "pids": [
+                89540,
+                89542
+              ]
+            },
+            "known_fixture_alive": {
+              "control": true,
+              "root": false,
+              "setsid-child": true,
+              "doublefork-child": true
+            },
+            "heartbeats": {
+              "control": 51,
+              "root": 34,
+              "setsid-child": 17,
+              "doublefork-child": 17
+            }
+          },
+          {
+            "stage": "after_root_sigkill_heartbeat_window",
+            "usage": {
+              "resource_cid": 22612,
+              "result": 0,
+              "errno": 0,
+              "tasks_started": 5,
+              "tasks_exited": 3,
+              "snapshot_live_tasks": 2
+            },
+            "pid_query": {
+              "resource_cid": 22612,
+              "result": 0,
+              "errno": 0,
+              "returned_bytes": 8,
+              "pids": [
+                89540,
+                89542
+              ]
+            },
+            "known_fixture_alive": {
+              "control": true,
+              "root": false,
+              "setsid-child": true,
+              "doublefork-child": true
+            },
+            "heartbeats": {
+              "control": 119,
+              "root": 34,
+              "setsid-child": 34,
+              "doublefork-child": 34
+            }
+          },
+          {
+            "stage": "after_bootout_return",
+            "usage": {
+              "resource_cid": 22612,
+              "result": 0,
+              "errno": 0,
+              "tasks_started": 5,
+              "tasks_exited": 3,
+              "snapshot_live_tasks": 2
+            },
+            "pid_query": {
+              "resource_cid": 22612,
+              "result": 0,
+              "errno": 0,
+              "returned_bytes": 8,
+              "pids": [
+                89540,
+                89542
+              ]
+            },
+            "known_fixture_alive": {
+              "control": true,
+              "root": false,
+              "setsid-child": true,
+              "doublefork-child": true
+            },
+            "heartbeats": {
+              "control": 119,
+              "root": 34,
+              "setsid-child": 34,
+              "doublefork-child": 34
+            }
+          },
+          {
+            "stage": "after_bootout_heartbeat_window",
+            "usage": {
+              "resource_cid": 22612,
+              "result": 0,
+              "errno": 0,
+              "tasks_started": 5,
+              "tasks_exited": 3,
+              "snapshot_live_tasks": 2
+            },
+            "pid_query": {
+              "resource_cid": 22612,
+              "result": 0,
+              "errno": 0,
+              "returned_bytes": 8,
+              "pids": [
+                89540,
+                89542
+              ]
+            },
+            "known_fixture_alive": {
+              "control": true,
+              "root": false,
+              "setsid-child": true,
+              "doublefork-child": true
+            },
+            "heartbeats": {
+              "control": 170,
+              "root": 34,
+              "setsid-child": 68,
+              "doublefork-child": 68
+            }
+          },
+          {
+            "stage": "after_known_fixture_cleanup",
+            "usage": {
+              "resource_cid": 22612,
+              "result": -1,
+              "errno": 3,
+              "tasks_started": null,
+              "tasks_exited": null,
+              "snapshot_live_tasks": null
+            },
+            "pid_query": {
+              "resource_cid": 22612,
+              "result": -1,
+              "errno": 3,
+              "returned_bytes": 400,
+              "pids": null
+            },
+            "known_fixture_alive": {
+              "control": false,
+              "root": false,
+              "setsid-child": false,
+              "doublefork-child": false
+            },
+            "heartbeats": {
+              "control": 170,
+              "root": 34,
+              "setsid-child": 68,
+              "doublefork-child": 68
+            }
+          }
+        ],
+        "signal_receipts": [
+          {
+            "pid": 89539,
+            "pid_version": 592199,
+            "signal": 9,
+            "result": 0,
+            "errno": 0
+          },
+          {
+            "pid": 89540,
+            "pid_version": 592200,
+            "signal": 15,
+            "result": 0,
+            "errno": 0
+          },
+          {
+            "pid": 89542,
+            "pid_version": 592202,
+            "signal": 15,
+            "result": 0,
+            "errno": 0
+          },
+          {
+            "pid": 89534,
+            "pid_version": 592187,
+            "signal": 15,
+            "result": 0,
+            "errno": 0
+          }
+        ],
+        "exit_events": [
+          {
+            "pid": 89539,
+            "fflags": 2147483648,
+            "data": 0
+          },
+          {
+            "pid": 89540,
+            "fflags": 2147483648,
+            "data": 0
+          },
+          {
+            "pid": 89542,
+            "fflags": 2147483648,
+            "data": 0
+          },
+          {
+            "pid": 89534,
+            "fflags": 2147483648,
+            "data": 0
+          }
+        ],
+        "full_containment_proven": false,
+        "mutations_limited_to_unique_test_job": true,
+        "helper_source_sha256": "a5e3d5dc6727153d887c9b81e4edc60c952c978f3518c3bd5525b03bbff7ccde",
+        "helper_binary_sha256": "ae88263b9913c3ab02b0836116f55a0a8e2b105c89f89a34735be127096e24fe",
+        "plist": {
+          "Label": "dev.infinishell.parity.coalition.8eca8546-a2dd-413b-9d98-f492d872ab61",
+          "ProgramArguments": [
+            "/private/tmp/infinishell-coalition-launchd-prototype-v2-x4wx636w/helper",
+            "root",
+            "/private/tmp/infinishell-coalition-launchd-prototype-v2-x4wx636w"
+          ],
+          "WorkingDirectory": "/private/tmp/infinishell-coalition-launchd-prototype-v2-x4wx636w",
+          "KeepAlive": false,
+          "AbandonProcessGroup": false,
+          "ExitTimeOut": 2,
+          "StandardOutPath": "/private/tmp/infinishell-coalition-launchd-prototype-v2-x4wx636w/job.stdout",
+          "StandardErrorPath": "/private/tmp/infinishell-coalition-launchd-prototype-v2-x4wx636w/job.stderr"
+        },
+        "exclusive_resource_coalition_before_fork": true,
+        "intermediate_identity": {
+          "role": "doublefork-intermediate",
+          "pid": 89541,
+          "ppid": 89539,
+          "pgid": 89541,
+          "sid": 89541,
+          "pid_version": 592201,
+          "unique_id": 287444,
+          "resource_cid": 22612,
+          "jetsam_cid": 22613
+        },
+        "initial_members": [
+          89539,
+          89540,
+          89542
+        ],
+        "query_api": "coalition_info_pid_list(uint64_t,pid_t*,size_t*)",
+        "query_api_official_commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+        "removed_job_restart_rejected": true,
+        "experiment_reached_end": true,
+        "control_reaped_exit_code": 0,
+        "post_cleanup_cid_queries": [
+          {
+            "resource_cid": 22612,
+            "result": -1,
+            "errno": 3,
+            "tasks_started": null,
+            "tasks_exited": null,
+            "snapshot_live_tasks": null
+          }
+        ],
+        "all_registered_fixture_exits_observed": true
+      }
+    }
+  ]
+}

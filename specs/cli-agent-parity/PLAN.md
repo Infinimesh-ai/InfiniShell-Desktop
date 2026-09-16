@@ -261,19 +261,23 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 
 ## 10. 执行看板（2026-09-16，持续更新）
 
-当前工作分支 `codex/cli-agent-parity`，起点 `6921a9925955a1955503e259cd935eaea4ac2ac0`。原有未跟踪计划已保留，无用户代码改动被覆盖。尚未提交、推送或发布；跨平台必须验证包含实际修改的提交。
+当前工作分支 `codex/cli-agent-parity`，起点 `6921a9925955a1955503e259cd935eaea4ac2ac0`。原有未跟踪计划已保留，无用户代码改动被覆盖。实现检查点 `dbee1ecae81da54a1749de88a7caffb3099d7eb7` 已提交并推送；尚未发布。独立验证工作树保持该提交，另一任务网页搜索改动未纳入。
 
 | 阶段 | 当前进展 | 尚未满足 |
 | --- | --- | --- |
 | P0 | Codex 0.147.0 已实测双轮、允许/拒绝、steer 接收、取消及新进程 resume；Claude 2.1.273 与 Grok 1.0.30 已采集真实控制和错误事件；Claude macOS 无凭据初始化及空闲 EOF 自行退出通过，固定 Linux/Windows 原生文件完整下载与摘要核验通过 | Claude 缺测试登录；Linux/Windows 原生执行尚未运行，下载不计平台通过；Grok 真实请求 402 额度耗尽；最低版本范围未完成 |
 | P1 | Grok 身份、发现、版本探测、技能源已实现；管理命令排除、输入代次隔离已有回归 | 附件失败/连续提交/语音旧回调保护、托管图片/文件/技能/评审入口均已接入并新增回归；最终测试、三方真实 PTY 与双语布局未完成 |
-| P2 | OSC 9 不再推断成功；三款普通 PTY Stop 保留响应并显示 Unknown，同回合有效事件仍可处理；Codex bundle7 持久来源、五项原生授权和六张双语说明布局通过；授权冷缓存及按平台正常路径组件核对清单的修复已有本地回归；独立控制 PTY 和原生 Codex TUI 经回环 SSH/tmux 通知传输已有实证 | bundle7 GUI 富通知仍未确认，bundle8 已打包签名、GUI 待验；旧来源回退、build16/19/21 失败保留，build20 相关测试撤下未跑，后续 build23 617 项通过；插件完整组合、其他平台及产品 SSH 交互仍待验；SSH 探针最终 SetEnv 补充尚未实跑 |
+| P2 | OSC 9 不再推断成功；三款普通 PTY Stop 保留响应并显示 Unknown，同回合有效事件仍可处理；Codex bundle7 持久来源、五项原生授权和六张双语说明布局通过；授权冷缓存及按平台正常路径组件核对清单的修复已有本地回归；独立控制 PTY 和原生 Codex TUI 经回环 SSH/tmux 通知传输已有实证 | bundle8 已验证当前通知与英文 Unknown、Unconfirmed 双语布局；中文 Unknown 新事件、英文历史选择框裁切修复及最终同提交 GUI 待验；旧来源回退、build16/19/21 失败保留，build20 相关测试撤下未跑，后续 build23 617 项通过；插件完整组合、其他平台及产品 SSH 交互仍待验；SSH 探针最终 SetEnv 已在干净 dbee1ecae 实跑通过，完整产品 SSH 仍待验 |
 | P3 | Claude/Codex 不再强制越权；本地 Claude 不再改全局配置或自动安装插件；派发前展示原生终端 | Grok/Windows 本地任务扩展、审批全流程实测 |
-| P4 | 已实现 SQLite 提交后确认、输入与新代原子写入、原生会话/历史/父代、消息接收来源、结果原子领取及工具协调器；兼容 PTY 的 Unconfirmed 活动占用与独立索引迁移已实现，真实 SQLite/Diesel 回归进入 build23 并通过；Codex/Claude 已接托管面板，Codex 工具跨进程恢复、两轮/审批/追加/取消/恢复与读图已有 Rust 适配器真实证据；独立进程监督、恢复退出回执与未启动 CAS 已接入，macOS 4 项监督夹具已验证诊断与恢复拒绝；真实 GUI 已完成 Codex 父子双向消息、结果回收和应用重启继续，历史完整结果新增分页查询；跨进程 Sent 故障注入、结果唯一性及无凭据空闲崩溃的恢复拒绝已通过 | Grok 关键执行仍门控；macOS 真实 CLI 崩溃后另组工具残留，现已保守阻断恢复，完整清理未通过；Oz 父历史桥、三方完整流程及新增状态的 GUI 验收仍未完成 |
-| P5 | macOS build23 相关 617/617、i18n 11 项、check20 及 Python gate5 76 项通过（gate6 再验 76 项、5.142s）；Linux/Windows workflow 已接固定 Claude 获取及无凭据探针；SSH/tmux 独立记录 | bundle8 待验，远端尚未执行；最终发布门禁、同提交跨平台、完整三方图形与端到端验收 |
+| P4 | 已实现 SQLite 提交后确认、输入与新代原子写入、原生会话/历史/父代、消息接收来源、结果原子领取及工具协调器；兼容 PTY 的 Unconfirmed 活动占用与独立索引迁移已实现，真实 SQLite/Diesel 回归进入 build23 并通过；Codex/Claude 已接托管面板，Codex 工具跨进程恢复、两轮/审批/追加/取消/恢复与读图已有 Rust 适配器真实证据；独立进程监督、恢复退出回执与未启动 CAS 已接入，macOS 4 项监督夹具已验证诊断与恢复拒绝；真实 GUI 已完成 Codex 父子双向消息、结果回收和应用重启继续，历史完整结果新增分页查询；跨进程 Sent 故障注入、结果唯一性及无凭据空闲崩溃的恢复拒绝已通过 | Grok 关键执行仍门控；macOS 真实 CLI 崩溃后另组工具残留，现已保守阻断恢复，完整清理未通过；Oz 父历史桥、三方完整流程及最终同提交 GUI 验收仍未完成；Unconfirmed 双语任务详情已在 bundle8 验证，英文历史选择框修复待复验 |
+| P5 | macOS build23 相关 617/617、i18n 11 项、check20 及 Python gate5 76 项通过（gate6 再验 76 项、5.142s）；Linux/Windows workflow 已接固定 Claude 获取及无凭据探针；SSH/tmux 独立记录 | dbee1ecae 同 SHA 远端预检因 Python 前置环境失败，正补固定工具链；历史选择框及中文 Unknown 待验，最终发布门禁、完整三方图形与端到端验收 |
 
 原生 CLI 协议探测与产品集成验收分别记录，前者不能替代后者。未登录、额度耗尽、未运行或失败的验证均不计为完成；独立实现和确定性测试继续推进。
 
-新增证据分别见 [Stop 契约审计](STOP_HOOK_COMPLETION_AUDIT.md)、[Unconfirmed 与独立迁移](UNCONFIRMED_TASK_STATE.md)、[Codex 原生 hook 传输](CODEX_HOOK_TRANSPORT_VERIFICATION.md)、[原生 SSH/tmux](CODEX_NATIVE_SSH_TMUX_VERIFICATION.md)、[bundle7 插件与双语布局](validation/macos-gui-bundle7-plugin-report.md)及 [Claude 无凭据验证](CLAUDE_NO_CREDENTIALS_VERIFICATION.md)。build20 只有 i18n 通过，相关测试在编译前主动撤下；build21 的非 UTF-8 文件名夹具被 macOS 文件系统拒绝，未进入产品校验，现限定 Linux 待验。后续 build23 的本地门禁通过仍是 dirty 中间工作树证据，不能替代最终同 SHA。bundle8 已打包签名、GUI 待验；独立传输成功不证明 GUI 接收，初始化/下载不证明模型生命周期。
+新增证据分别见 [Stop 契约审计](STOP_HOOK_COMPLETION_AUDIT.md)、[Unconfirmed 与独立迁移](UNCONFIRMED_TASK_STATE.md)、[Codex 原生 hook 传输](CODEX_HOOK_TRANSPORT_VERIFICATION.md)、[原生 SSH/tmux](CODEX_NATIVE_SSH_TMUX_VERIFICATION.md)、[bundle7 插件与双语布局](validation/macos-gui-bundle7-plugin-report.md)及 [Claude 无凭据验证](CLAUDE_NO_CREDENTIALS_VERIFICATION.md)。build20 只有 i18n 通过，相关测试在编译前主动撤下；build21 的非 UTF-8 文件名夹具被 macOS 文件系统拒绝，未进入产品校验，现限定 Linux 待验。后续 build23 的本地门禁通过仍是 dirty 中间工作树证据，不能替代最终同 SHA。bundle8 已确认当前 GUI 通知、英文 Unknown 与 Unconfirmed 双语任务详情；中文新事件、历史选择框裁切修复及最终同提交 GUI 仍待验。独立传输、初始化或下载不能替代模型生命周期。
 
 本轮 [build23 门禁快照](validation/macos-local-gates-build23.json)与 [bundle8 构建快照](validation/macos-gui-bundle8-build.json)保留实际摘要及 dirty 标记；构建时含另一任务的网页搜索修改，该组文件已排除本目标暂存，最终提交须在独立工作树重验。[Darwin coalition / launchd 审计](DARWIN_COALITION_LAUNCHD_AUDIT.md)尚未证明可在普通应用权限下取得专属清理域与可靠空域回执，不能消除已记录的真实工具残留失败。
+
+当前提交的详细进展见 [验证记录](VALIDATION_REPORT.md#当前提交验证)：dbee1ecae 的干净 macOS cargo check、脚本门禁、无模型 SSH/tmux 与 Claude 控制边界已通过；Linux/Windows Actions 的前置环境失败被单独保留，不能算平台通过。bundle8 已闭合当前真实通知链并确认 Unknown 未误报成功，其输入偏差和英文历史选择框裁切也保留为未通过项。
+
+新增 [macOS 受控 launchd / coalition 原型](DARWIN_LAUNCHD_COALITION_PROTOTYPE.md)已验证专属域跨 setsid/双重 fork 保持、仅按已知身份清理后 CID 查询返回 ESRCH；根 SIGKILL 与 bootout 均不能单独证明完成。当前仍是原型，私有接口/内核版本与枚举上限的边界单列，生产接入与真实 CLI 清理尚未完成。插件验收继续补 Grok 同版本内容损坏检测与 Claude 升级/中断后的失败恢复，不把版本号或原生命令退出码当成完整成功。

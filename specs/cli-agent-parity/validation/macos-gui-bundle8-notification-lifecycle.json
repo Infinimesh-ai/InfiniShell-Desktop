@@ -84,6 +84,121 @@
         "codex-warp-0.4.0-rev3/source/plugins/warp/scripts/warp-notify.sh": "144f0ce32c629c920ee6d6c164f1fcbd36aaac0429c5348087a33a382d75a050",
         "codex-warp-0.4.0-rev3/source/tests/test-hooks.sh": "cfd7b359b09f4008ab989e477d7190631631b892d596f77d73cd67c67ae4c601"
       }
+    },
+    {
+      "stage": "after_one_current_turn",
+      "time_utc": "2026-09-16T13:17:40.854412+00:00",
+      "config_sha256": "af9b4bfcb3b72284b531cb4cbdca79faca4d28082239d4a8c5a918e55c15f7f0",
+      "trusted_hash_occurrences": 5,
+      "marketplace": {
+        "last_updated": "2026-09-16T11:53:03Z",
+        "source_type": "local",
+        "source": "<private-pty-root>/home/.codex/plugins/infinishell-sources/codex-warp-0.4.0-rev3/source"
+      },
+      "hooks": {
+        "state": {
+          "warp@codex-warp:hooks/hooks.json:permission_request:0:0": {
+            "trusted_hash": "sha256:60f3f1de21f20eb4f54007342338e7000b9dca06a111e776a37dcd62fdd7b215"
+          },
+          "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0": {
+            "trusted_hash": "sha256:4ff952d5bac454272cc8d3eec507954c8bab421066aaa2e60026e09920d20ed6"
+          },
+          "warp@codex-warp:hooks/hooks.json:session_start:0:0": {
+            "trusted_hash": "sha256:4524bbc6e5a9e4b2528f06432e7aa9829b42d7e7aa24d66b0c30aada912baf34"
+          },
+          "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0": {
+            "trusted_hash": "sha256:122190ef9554a17967255480c31b7beb36e69e08353840c7ef947c145186ad91"
+          },
+          "warp@codex-warp:hooks/hooks.json:stop:0:0": {
+            "trusted_hash": "sha256:e206bdb01c8e380c7b5a4fa4ee1473c1f20338b9762bcfe0d0832ac7f99eb46c"
+          }
+        }
+      },
+      "cache_tree": {
+        ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+        "hooks/hooks.json": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+        "scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+        "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+        "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+        "scripts/on-prompt-submit.sh": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+        "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+        "scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+        "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+        "scripts/warp-notify.sh": "144f0ce32c629c920ee6d6c164f1fcbd36aaac0429c5348087a33a382d75a050"
+      },
+      "persistent_source_tree": {
+        "codex-warp-0.4.0-rev3/SOURCE_METADATA.json": "79381a9ba48ff2f2a8d2da795851e1cdc9bcce4d59a2974f69c690dafee2373b",
+        "codex-warp-0.4.0-rev3/source/.agents/plugins/marketplace.json": "9a051e04663470d26cac04a50eaa29c3bca830697f93c7fe261329514db2e5ce",
+        "codex-warp-0.4.0-rev3/source/.github/workflows/test.yml": "20204501cdb85f00a6c8f20130602a616e0a790016a62a8f20629fe99fa3a06a",
+        "codex-warp-0.4.0-rev3/source/LICENSE": "b6686c85488c50963919885a98bb86ad7e10fe1b60139b98149fe9fad488c7c8",
+        "codex-warp-0.4.0-rev3/source/README.md": "e0b2cb724fee2c3ecec7fe3c1e09018b787d8fa53c230d4257edd109e8b751e6",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/.codex-plugin/plugin.json": "f009943a7794e7764d7d71c5c7ece7cf8baab42b103d4e2dbf2191ef9616a51e",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/hooks/hooks.json": "758d851b5d916fd5d2d75795b1f6d41cc827a51e0b6608be0bf43031ab5a0113",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/scripts/drain-mailbox.sh": "3647d900f161beb247d406f3c5f41c735b59f8b888551ad29aea561b56478e7a",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/scripts/on-post-tool-use.sh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/scripts/on-prompt-submit.sh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/scripts/on-session-end.sh": "d693a293622158a95c7c18bbd153dffd8c041b3b13cf83d91feb175fc9076ec7",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/scripts/on-session-start.sh": "436a73ee08f44aa87febf4397aeecc409592e028bf95070e8e981855f68d88bb",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/scripts/on-stop.sh": "bccbaabdb87e59d86648092af0fa0ce1485268faa40e3091da20ec769cac515c",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/scripts/oz-parent-common.sh": "51cd1833e4cc1d5a2072f0d73392cfaaaf711ebd03710d50facd4dcc1fd80a66",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/scripts/oz-parent-listener.sh": "ad3b870d1719ea8eba527a4a7a273fb9bf533e3599455f22e02efa87253bf62e",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/skills/factory-files/SKILL.md": "219664b416c5591af2471c8930224eb0e6a35916ec900492b1dd98b9fcf49a66",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/skills/factory-files/references/examples.md": "9fd905c3b08b440c8f40a5d42e9efff868c820b4b129f40c08ddefe587b1280d",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/skills/factory-files/references/scorers.md": "8a18d06091e01b332e2751836f8e3616583de48fe7ea2bb76aacdb6017f2bb25",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/skills/factory-files/references/validation.md": "5c53ceea4c9d7dac1a4b237f09abca6b846d4219e76241fac8dbf1279cc8ae95",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/skills/factory-files/scripts/validate_factory_files.py": "3e9faa9f43dc5c2eb2b9f10bb3716cc53e251d8c59d685989548a1a85cd1f29b",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/skills/oz-child-agent-orchestration/SKILL.md": "70cda0056e96d30b11283e23495e3ff23e03a9e0e9bb2a1a2df39073242fa52d",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/skills/oz-finish-task/SKILL.md": "5b6d83f467b105c8a74e8f937501e026683e9171c7bfb4d8153e611e60e38590",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/skills/oz-notify-user/SKILL.md": "dd8a74b320cd90081f1bd729fba1faca9bb13f58744c3d82a15dddd12a8cffc3",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/skills/oz-report-pr/SKILL.md": "fad6c455cdae4a0a019793be24afb28e024ac8fee6ef97a4bf8689517dc58b13",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/skills/oz-upload-file/SKILL.md": "83007bcc06df76fceef9564a72e91d062293d3318f8344f33f08a3c839ae9b5e",
+        "codex-warp-0.4.0-rev3/source/plugins/orchestration/tests/test-factory-files.sh": "d20fa0c689189e8ed0ac54444edcee9d48ced83588a5d616a25839e2030f545b",
+        "codex-warp-0.4.0-rev3/source/plugins/warp/.codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+        "codex-warp-0.4.0-rev3/source/plugins/warp/hooks/hooks.json": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+        "codex-warp-0.4.0-rev3/source/plugins/warp/scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+        "codex-warp-0.4.0-rev3/source/plugins/warp/scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+        "codex-warp-0.4.0-rev3/source/plugins/warp/scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+        "codex-warp-0.4.0-rev3/source/plugins/warp/scripts/on-prompt-submit.sh": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+        "codex-warp-0.4.0-rev3/source/plugins/warp/scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+        "codex-warp-0.4.0-rev3/source/plugins/warp/scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+        "codex-warp-0.4.0-rev3/source/plugins/warp/scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+        "codex-warp-0.4.0-rev3/source/plugins/warp/scripts/warp-notify.sh": "144f0ce32c629c920ee6d6c164f1fcbd36aaac0429c5348087a33a382d75a050",
+        "codex-warp-0.4.0-rev3/source/tests/test-hooks.sh": "cfd7b359b09f4008ab989e477d7190631631b892d596f77d73cd67c67ae4c601"
+      }
     }
-  ]
+  ],
+  "current_turn": {
+    "session_id": "01a0aa54-55ed-7882-a1ef-50642e4c3161",
+    "turn_id": "01a0aa54-971a-7a51-8ded-017eea64b37f",
+    "model_turn_count": 1,
+    "intended_prompt": "只回复 GUI_BUNDLE8_NOTIFY_ONE，不调用任何工具。",
+    "actual_native_user_input": [
+      "GUIBUNDLE8NOTIFYONE，。"
+    ],
+    "actual_native_events": [
+      {
+        "type": "task_started",
+        "turn_id": "01a0aa54-971a-7a51-8ded-017eea64b37f"
+      },
+      {
+        "type": "task_complete",
+        "turn_id": "01a0aa54-971a-7a51-8ded-017eea64b37f",
+        "last_agent_message": "请问你希望我对“GUIBUNDLE8NOTIFYONE”做什么？例如查找代码、修复问题、运行测试，还是解释含义？"
+      }
+    ],
+    "model_tool_calls": [],
+    "input_transport": "CUA typeText; actual input differs under current Pinyin source, fixed-response assertion not passed",
+    "before": "Verify notifications",
+    "after": "notification verification chip hidden; current inbox shows Codex needs attention and Status unknown. Check the terminal to confirm the task outcome.",
+    "native_five_hooks_all_verified": false,
+    "current_rich_notification_accepted": "passed by current-session verification-chip transition plus associated Unknown inbox item",
+    "stop_unconfirmed_outcome": "passed in product inbox; not marked success",
+    "zh_unknown_notification": "not verified in this build; inbox strings are localized when generated and no second model turn was requested"
+  },
+  "screenshots": {
+    "macos-gui-bundle8-cold-verify-notifications-en.png": "b9e54f5da6b87a5c73d82422d2edaa8c3aff5cec114b86b4b2e54aa00a3a4e9d",
+    "macos-gui-bundle8-after-current-notification-en.png": "d005119b8659e401b3c2d9acc74497ed618160152d45ade062104b5ba5b7ba89",
+    "macos-gui-bundle8-unknown-notification-en.png": "1b91e1524c60d0d18ab58999b7531c7ece0c1a2aaab98d445e1b02944de89963"
+  },
+  "source_trust_unchanged": true
 }

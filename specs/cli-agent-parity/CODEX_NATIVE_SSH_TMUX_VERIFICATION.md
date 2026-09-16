@@ -1,6 +1,6 @@
 # Codex 原生 TUI 经 SSH/tmux 的无模型通知验证
 
-2026-09-16，macOS arm64，Codex 0.147.0、tmux 3.7c。此次由真实原生 TUI 触发 SessionStart/UserPromptSubmit，未修改的受控通知脚本通过远端 PTY、tmux 和 SSH 客户端传回 OSC。三种模式均已得到对应的正向或负向结果；这比旧 [SSH/tmux 脚本回放](SSH_TMUX_VERIFICATION.md)多验证了原生触发，但仍不是 InfiniShell GUI SSH 完整验收。
+2026-09-16，macOS arm64，Codex 0.147.0、tmux 3.7c。真实原生 TUI 触发 SessionStart/UserPromptSubmit，未修改的受控通知脚本通过远端 PTY、tmux 和 SSH 客户端传回 OSC。第四轮中间版本与后续干净提交 `dbee1ecae81da54a1749de88a7caffb3099d7eb7` 的最终版探针分别通过三种模式；后一次实际包含 SetEnv 防护。它们比旧 [SSH/tmux 脚本回放](SSH_TMUX_VERIFICATION.md)多验证了原生触发，但仍不是 InfiniShell GUI SSH 完整验收。
 
 ## 实际结果
 
@@ -13,6 +13,22 @@
 透传 off 的通过含义是确认阻断，不能描述为通知到达。三种模式的参考脚本都返回 0，stdout/stderr 为空；实际通知只从控制终端发送。原生 TUI 都正常关闭，没有因超时强杀；已记录的测试启动器、Codex 和 hook PID 在结束后均不存在，独立 sshd 已退出，独立 tmux 服务已关闭。
 
 完整脱敏证据见 [原生 SSH/tmux 记录](fixtures/codex-0.147-native-ssh-tmux-macos.json)。每个模式保存不同的原生 session/turn、hook 原始字段、插件根目录、SID/PGID、控制终端及 SSH stdout 摘录。SSH 原始字节长度依次为 13818、37071、38276；fixture 保留原始 SHA256/长度，但文字明确是脱敏版本，未保留含私有路径的 Base64。原始报告留在源树外 `/tmp/infinishell-codex-native-ssh-fourth.json`。
+
+## 干净提交的最终版探针复跑
+
+从只读验证 worktree 执行提交 `dbee1ecae81da54a1749de88a7caffb3099d7eb7` 中的脚本，运行前后 `git status --porcelain` 均为空；探针及两个导入 helper 的工作区内容与该提交 blob 逐字相等。实际运行脚本 SHA256 为 `ef476a61fb084060ae61bc56b16e107a1eb3ff864caadc792363da42443cee05`。没有改脚本后重试、运行 Cargo 或更改产品，固定 Codex/tmux 摘要仍与复跑命令一致。
+
+| 模式 | 收到 OSC | SSH 原始字节数 | 原生结果与退出 |
+|---|---|---|---|
+| direct | 2 | 14033 | 本次唯一阻断说明、session/turn 关联均通过；SSH/Codex 0/0 |
+| tmux-on | 2 | 39396 | 同上，通知实际经 tmux 和 SSH stdout 到达 |
+| tmux-off | 0 | 38362 | 两个原生 hook 实际执行，原生阻断成立，透传确实关闭；SSH/Codex 0/0 |
+
+每模式只提交一次固定 argv 提示。三次原生 session/turn 不同，各自的 hook 输入、阻断说明、继续提示及应收到的通知对应；模型 HTTP 总数为零。没有强制清理，记录中的测试 PID 全部退出，独立 sshd 退出码为 0。最终版 `SetEnv` 配置和所有会话/阻断断言都参与此次真实运行，先前“仅通过配置解析、未实跑”的缺口在本提交的 macOS 回环场景得到补证。
+
+新增 [同提交脱敏证据](fixtures/codex-0.147-native-ssh-tmux-macos-final-commit.json)保留完整原生安装/授权记录、三 case 身份、真实 SSH 字节摘要/长度、脚本与 helper 摘要及清理结果；其文本经过脱敏，不是原始字节的替代。源树外原始报告为 `/tmp/infinishell-codex-native-ssh-dbee1ec-final.json`，SHA256 `7f9f4c3885978ce1abd9179ff981565257b21abb20a854d3be074afc956e09ab`。第四轮及前三轮失败证据没有覆盖或删除。
+
+这次只将**最终版探针的 macOS 原生 SSH/tmux 传输**绑定到实际实现提交；不声称整个 Goal、跨平台、应用 GUI、逐键输入或模型生命周期完成。仍未取得完整 HookRunSummary，off 仍只计阻断负向。证据文件与本文在主工作树增量保存，没有修改被验证的干净 worktree。
 
 ## 证据链与边界
 
@@ -33,7 +49,7 @@
 - 第二轮尝试将完整目录移至系统 `/tmp`，原生 SSH 公钥认证拒绝。恢复既有私有密钥目录，只有 tmux socket 使用短目录；未到达原生 TUI。
 - 第三轮已明确选择信任空目录，随后停在原生 GPT-5.4 模型迁移提示。探针现只对该已观察页面选择“Use existing model”，保留绑定本机拒绝 provider 的原模型；没有接受替换或改变审批策略。
 
-三轮的模型 HTTP 计数均为零，已记录的测试 PID 均不再存活。第四轮才取得表中的原生传输结果。之后新增的阻断状态、唯一 stopReason 和会话断言已对第四轮原始字节离线复验，没有再次提交提示。收尾还把既有 SSH 探针的私有 HOME `SetEnv` 防护补入新配置生成器，使 sshd 调用 ForceCommand 前也使用私有 HOME；该机械补充通过独立 `sshd -t` 配置解析，未重跑第四轮原生输入。fixture 的脚本摘要记录导出时版本，不冒称每项后续断言都在第四轮启动前存在。
+三轮的模型 HTTP 计数均为零，已记录的测试 PID 均不再存活。第四轮才取得表中的原生传输结果。之后新增的阻断状态、唯一 stopReason 和会话断言已对第四轮原始字节离线复验，没有再次提交提示。收尾还把既有 SSH 探针的私有 HOME `SetEnv` 防护补入新配置生成器，使 sshd 调用 ForceCommand 前也使用私有 HOME；该机械补充当时仅通过独立 `sshd -t` 配置解析，未重跑第四轮原生输入；随后干净提交复跑的实际结果单列于上节。第四轮 fixture 的脚本摘要仍记录导出时版本，不冒称每项后续断言都在第四轮启动前存在。
 
 ## 复跑与范围
 
@@ -52,4 +68,4 @@ python3 -B script/cli-agent-parity/probe_codex_ssh_tmux.py \
 
 固定官方提交 `be6e8eac029b183056b7e4402879f15d2c85f61b` 的 [TUI 初始提示参数](https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/tui/src/cli.rs#L13)、[无认证 provider 登录分支](https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/tui/src/lib.rs#L1872)及 [模型循环前的 hook 阻断](https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/core/src/session/turn.rs#L233)与此次真实行为一致。
 
-仍未验证：不同物理主机/操作系统、Windows/ConPTY、现代 Claude 原生 JSON 传输、Grok 原生触发、InfiniShell GUI SSH 的工具栏/富输入/审批/取消/恢复/结果回收、多层 tmux、不可见 pane、断线重连，以及成功模型生命周期。本次仍是 dirty 工作树中间证据，不替代最终同提交跨平台验收。无产品文案变化，无需本地化变更。
+仍未验证：不同物理主机/操作系统、Windows/ConPTY、现代 Claude 原生 JSON 传输、Grok 原生触发、InfiniShell GUI SSH 的工具栏/富输入/审批/取消/恢复/结果回收、多层 tmux、不可见 pane、断线重连，以及成功模型生命周期。第四轮保留 dirty 中间证据属性；后续复跑证明该脚本在干净实现提交上的限定场景，仍不替代最终同提交跨平台及完整产品验收。无产品文案变化，无需本地化变更。

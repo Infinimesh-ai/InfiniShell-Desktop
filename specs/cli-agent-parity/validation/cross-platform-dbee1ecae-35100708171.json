@@ -1,0 +1,548 @@
+{
+  "recorded_at": "2026-09-16T13:20:45.759958+00:00",
+  "source_commit": "dbee1ecae81da54a1749de88a7caffb3099d7eb7",
+  "workflow": "cross-platform-preflight.yml",
+  "full_workspace_tests": false,
+  "api_result": {
+    "conclusion": "failure",
+    "headSha": "dbee1ecae81da54a1749de88a7caffb3099d7eb7",
+    "jobs": [
+      {
+        "completedAt": "2026-09-16T13:16:09Z",
+        "conclusion": "failure",
+        "databaseId": 104809126282,
+        "name": "Linux x64",
+        "startedAt": "2026-09-16T13:15:09Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-16T13:15:20Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-16T13:15:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:15:47Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "number": 2,
+            "startedAt": "2026-09-16T13:15:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:15:47Z",
+            "conclusion": "success",
+            "name": "Verify provisioned toolchain",
+            "number": 3,
+            "startedAt": "2026-09-16T13:15:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "success",
+            "name": "Install Node for CLI plugin verification",
+            "number": 4,
+            "startedAt": "2026-09-16T13:15:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "success",
+            "name": "Test Grok notification plugin scripts",
+            "number": 5,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "failure",
+            "name": "Test notification patch file transactions",
+            "number": 6,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Prepare fixed native Codex without credentials",
+            "number": 7,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Prepare fixed native Claude without credentials",
+            "number": 8,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Verify native Claude initialization and idle EOF",
+            "number": 9,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Verify native Codex plugin registry failure recovery",
+            "number": 10,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Verify native Codex persistent plugin source",
+            "number": 11,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Test Claude and Codex Bash notification payloads",
+            "number": 12,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Test Unix PTY notification framing",
+            "number": 13,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Check InfiniShell-Desktop",
+            "number": 14,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+            "number": 15,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Test shared CLI action contracts and skills",
+            "number": 16,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Test CLI harness arguments",
+            "number": 17,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Test bilingual TUI task message states",
+            "number": 18,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Test managed command process ownership",
+            "number": 19,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Build CLI process supervisor",
+            "number": 20,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Test supervisor cleanup after host crash",
+            "number": 21,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Verify native recovery and idle-crash boundaries without credentials",
+            "number": 22,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "failure",
+            "name": "Preserve Linux native CLI boundary evidence",
+            "number": 23,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Test rust-genai",
+            "number": 24,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Compile GUI integration tests",
+            "number": 25,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Run desktop workspace unit tests",
+            "number": 26,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "skipped",
+            "name": "Post Install Node for CLI plugin verification",
+            "number": 51,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:00Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "number": 52,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:01Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 53,
+            "startedAt": "2026-09-16T13:16:00Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35100708171/job/104809126282"
+      },
+      {
+        "completedAt": "2026-09-16T13:16:23Z",
+        "conclusion": "failure",
+        "databaseId": 104809126608,
+        "name": "Windows x64",
+        "startedAt": "2026-09-16T13:15:09Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-16T13:15:20Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-16T13:15:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:15:35Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "number": 2,
+            "startedAt": "2026-09-16T13:15:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:15:36Z",
+            "conclusion": "success",
+            "name": "Configure Windows build environment",
+            "number": 3,
+            "startedAt": "2026-09-16T13:15:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:15:39Z",
+            "conclusion": "success",
+            "name": "Verify provisioned toolchain",
+            "number": 4,
+            "startedAt": "2026-09-16T13:15:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:05Z",
+            "conclusion": "success",
+            "name": "Install Node for CLI plugin verification",
+            "number": 5,
+            "startedAt": "2026-09-16T13:15:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:06Z",
+            "conclusion": "success",
+            "name": "Test Grok notification plugin scripts",
+            "number": 6,
+            "startedAt": "2026-09-16T13:16:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "failure",
+            "name": "Test notification patch file transactions",
+            "number": 7,
+            "startedAt": "2026-09-16T13:16:06Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Prepare fixed native Codex without credentials",
+            "number": 8,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Prepare fixed native Claude without credentials",
+            "number": 9,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Verify native Claude initialization and idle EOF",
+            "number": 10,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Verify native Codex plugin registry failure recovery",
+            "number": 11,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Verify native Codex persistent plugin source",
+            "number": 12,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Check InfiniShell-Desktop",
+            "number": 13,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Build InfiniShell SSH worker",
+            "number": 14,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Test Windows PowerShell SSH worker arguments",
+            "number": 15,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+            "number": 16,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Test shared CLI action contracts and skills",
+            "number": 17,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Test CLI harness arguments",
+            "number": 18,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Test bilingual TUI task message states",
+            "number": 19,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Test managed command process ownership",
+            "number": 20,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Build CLI process supervisor",
+            "number": 21,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Test supervisor cleanup after host crash",
+            "number": 22,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:07Z",
+            "conclusion": "skipped",
+            "name": "Verify native recovery and idle-crash boundaries without credentials",
+            "number": 23,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:08Z",
+            "conclusion": "failure",
+            "name": "Preserve Windows native CLI boundary evidence",
+            "number": 24,
+            "startedAt": "2026-09-16T13:16:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:08Z",
+            "conclusion": "skipped",
+            "name": "Test rust-genai",
+            "number": 25,
+            "startedAt": "2026-09-16T13:16:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:08Z",
+            "conclusion": "skipped",
+            "name": "Compile GUI integration tests",
+            "number": 26,
+            "startedAt": "2026-09-16T13:16:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:08Z",
+            "conclusion": "skipped",
+            "name": "Run desktop workspace unit tests",
+            "number": 27,
+            "startedAt": "2026-09-16T13:16:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:10Z",
+            "conclusion": "failure",
+            "name": "Test Windows Git Bash notification payloads",
+            "number": 28,
+            "startedAt": "2026-09-16T13:16:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:11Z",
+            "conclusion": "failure",
+            "name": "Verify Codex Windows native hooks without model requests",
+            "number": 29,
+            "startedAt": "2026-09-16T13:16:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:12Z",
+            "conclusion": "failure",
+            "name": "Preserve Codex Windows native hook evidence",
+            "number": 30,
+            "startedAt": "2026-09-16T13:16:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:12Z",
+            "conclusion": "success",
+            "name": "Report sccache statistics",
+            "number": 31,
+            "startedAt": "2026-09-16T13:16:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:12Z",
+            "conclusion": "skipped",
+            "name": "Post Install Node for CLI plugin verification",
+            "number": 61,
+            "startedAt": "2026-09-16T13:16:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:15Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "number": 62,
+            "startedAt": "2026-09-16T13:16:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T13:16:15Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 63,
+            "startedAt": "2026-09-16T13:16:15Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35100708171/job/104809126608"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35100708171"
+  },
+  "classification": "verification_environment_incomplete",
+  "linux_root_cause": "/usr/bin/python3 低于必需的 Python 3.11；未进入 Rust 与原生 CLI 验证。",
+  "windows_root_cause": "PATH 中没有可用 python 命令；事务、Git Bash payload 与原生 hook 探针均未执行。",
+  "artifact_failure": "前置步骤失败，未生成原生证据文件；上传步骤按 if-no-files-found:error 正确失败。",
+  "failed_log_sha256": "845dba9db98bc00740e447a818889b9af95a6ae8a0b1413e4fcbadb57989e409",
+  "retry_plan": "在 workflow 中准备已核验的固定 Python 工具链后，以包含修复的新提交重新验证；不跳过失败门禁。",
+  "dispatch_note": "首次不带 --repo 的 gh 命令默认指向 upstream warpdotdev/warp 并返回404，未创建运行；本记录属于随后显式指定 origin 仓库的唯一实际运行。",
+  "complete": false
+}

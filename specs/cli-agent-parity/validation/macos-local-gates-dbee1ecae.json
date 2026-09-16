@@ -1,0 +1,124 @@
+{
+  "recorded_at": "2026-09-16T13:20:45.760693+00:00",
+  "source_commit": "dbee1ecae81da54a1749de88a7caffb3099d7eb7",
+  "platform": "macOS arm64",
+  "worktree": ".worktrees/cli-agent-parity-validation",
+  "worktree_dirty": false,
+  "checks": [
+    {
+      "command": "cargo check -p warp",
+      "log_sha256": "06073807077d51021d49cc71e43cd05b44b89230cd573b280e169ba4c19252c7",
+      "summary": [
+        "Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 49s"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -B -m unittest discover -s script/cli-agent-parity -p '*_tests.py'",
+      "log_sha256": "c07011f98a169b5dbf0a901dd4d710ca4d1083a74ea118e95f749c0dd149075e",
+      "summary": [
+        "Ran 76 tests in 6.706s",
+        "OK"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": "node --test script/cli-agent-parity/grok_plugin_tests.cjs",
+      "log_sha256": "ae9e2231fb187e06bb69454218935d2950a05a06b8cc8479f36b6e814e1bee9c",
+      "summary": [
+        "ℹ tests 11",
+        "ℹ pass 11",
+        "ℹ fail 0",
+        "ℹ duration_ms 235.970625"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test -p warp --lib i18n::tests",
+      "exit_code": 0,
+      "summary": [
+        "Finished `test` profile [unoptimized + debuginfo] target(s) in 7m 53s",
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 6409 filtered out; finished in 4.79s"
+      ],
+      "log_sha256": "577c898e9a0d12d6c482ae624db17e50faeec6358dad6a7c89bf23a64a29347f",
+      "test_binary_sha256": "d5f3da1cb6f32392b59725b70ddb91ec18116accc3f968a2279598b2bb28d312"
+    },
+    {
+      "command": "cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::)'",
+      "exit_code": 101,
+      "tests_executed": 0,
+      "log_sha256": "71de69067bc28e2a758d12cc6030bb06c880f43428bd3900b1c38ea626fb2257",
+      "failure_codes": [
+        "E0432",
+        "E0603",
+        "E0282",
+        "E0599"
+      ],
+      "diagnostic_dependency_source": ".worktrees/remove-mac-intel/crates/command/src/async.rs",
+      "note": "编译器引用另工作树的旧 command 声明，缺少本提交已有的公开 Child 管道、managed 模块和托管派生方法。共享 target 产物干扰；本轮相关模块未执行，需独立构建目录重新验证。"
+    }
+  ],
+  "i18n_and_focused_rust": "i18n 11 项通过；后续模块构建发生共享产物干扰，0 项执行，不能计模块通过。",
+  "gui": "bundle8 为提交前中间产物，不计同提交GUI验收",
+  "complete": false,
+  "isolation_followup": "将验证工作树改用任务专属 target；仅克隆共享缓存，并清除克隆中的全部 workspace 产物后重建，不修改原共享目录。",
+  "validation_target_isolation": {
+    "owned_target": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+    "source_target": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop",
+    "clone": "APFS clone；独立文件 inode，不修改共享源缓存",
+    "clean": {
+      "command": "cargo clean --target-dir <owned_target> -p <76 个本地路径包>",
+      "result": "passed",
+      "removed_files": 436571,
+      "logical_size_removed": "260.8GiB",
+      "log": "/tmp/infinishell-cli-parity-owned-target-clean.log",
+      "log_sha256": "ab6137d9646687cb07638a6515318bc53a5d78d8f0304ba3d78457754ddc642b"
+    },
+    "initial_check": {
+      "command": "cargo check -p warp",
+      "exit_code": 101,
+      "result": "failed",
+      "tests_executed": 0,
+      "log": "/tmp/infinishell-cli-parity-owned-target-check1.log",
+      "log_sha256": "ad83c532317b393a797c7ff90b857609d7483718dfab45a1ab49460ae541f5c9",
+      "reason": "仅切换 target 链接未覆盖 .worktrees/.cargo/config.toml 的 build.target-dir，编译继续引用共享目标中的另一工作树旧 command 产物"
+    },
+    "correction": "每条构建命令显式 --target-dir 或 CARGO_TARGET_DIR；先用 cargo metadata 确认实际 target_directory，保留现有上级配置",
+    "current_check": {
+      "command": "CARGO_TARGET_DIR=<owned_target> cargo check --target-dir <owned_target> -p warp",
+      "result": "passed",
+      "log": "/tmp/infinishell-cli-parity-owned-target-check2.log",
+      "source_commit": "dbee1ecae81da54a1749de88a7caffb3099d7eb7",
+      "working_tree_patch": "app/src/ai/cli_agent_runtime/task_manager_history.rs 的历史选择框宽度修复",
+      "counts_as_clean_commit_verification": false,
+      "exit_code": 0,
+      "duration": "2m28s",
+      "log_sha256": "bd5289265a369da498fa0b4b502509c5e62c8c1530a64b4be9a58ccd2dd1696c",
+      "i18n": {
+        "result": "passed",
+        "log": "/tmp/infinishell-cli-parity-owned-target-i18n1.log",
+        "actual_target_directory": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "exit_code": 0,
+        "passed": 11,
+        "filtered_out": 6409,
+        "duration_seconds": 4.71,
+        "test_binary": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+        "test_binary_sha256": "a407c6450b659238f4e55bf5257d977dd7be18e1446307b73bf63bb94142708c",
+        "log_sha256": "14356d824e0dbb1c2b55d84a4a66090901f986bc917cfd8534b02c3e05e427be"
+      },
+      "focused": {
+        "command": "CARGO_TARGET_DIR=<owned_target> cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::)'",
+        "result": "passed",
+        "exit_code": 0,
+        "passed": 617,
+        "skipped": 5803,
+        "duration_seconds": 8.722,
+        "log": "/tmp/infinishell-cli-parity-owned-target-focused1.log",
+        "log_sha256": "39af0e9bf91b3dd8afdb9815786f3b4dcb38e95f95997738425b69f297d36705",
+        "test_binary": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+        "test_binary_sha256": "a407c6450b659238f4e55bf5257d977dd7be18e1446307b73bf63bb94142708c"
+      },
+      "source_patch_sha256": "495bbae512503eef09f140d9fc27a8f96d2534d4ae41f6f84e2c4cf33c6c91a5"
+    }
+  }
+}

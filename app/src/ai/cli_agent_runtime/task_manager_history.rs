@@ -33,7 +33,12 @@ impl ResultHistory {
             selected: None,
             loading: false,
             reload_pending: false,
-            selector: ctx.add_typed_action_view(Dropdown::new),
+            selector: ctx.add_typed_action_view(|ctx| {
+                let mut selector = Dropdown::new(ctx);
+                selector.set_top_bar_max_width(320.);
+                selector.set_match_menu_width_to_top_bar(true, ctx);
+                selector
+            }),
             copy: ctx.add_typed_action_view(|_| {
                 ActionButton::new(
                     crate::t!("cli-task-manager-copy-history-result"),
