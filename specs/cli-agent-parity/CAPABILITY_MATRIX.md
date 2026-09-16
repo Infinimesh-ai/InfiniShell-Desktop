@@ -72,3 +72,7 @@
 bundle8 当前通知受理、英文 Unknown 和 Unconfirmed 双语任务详情通过；其输入法造成的固定输出偏差仍未通过，英文历史选择框裁切已作局部修复、等待新包，中文 Unknown 新事件和最终同提交 GUI 仍待验。上述独立结果均不替代三方完整生命周期或 macOS 异常子树清理。
 
 新增 [macOS 受控 launchd / coalition 原型](DARWIN_LAUNCHD_COALITION_PROTOTYPE.md)已验证专属域跨 setsid/双重 fork 保持、仅按已知身份清理后 CID 查询返回 ESRCH；根 SIGKILL 与 bootout 均不能单独证明完成。当前仍是原型，私有接口/内核版本与枚举上限的边界单列，生产接入与真实 CLI 清理尚未完成。插件验收继续补 Grok 同版本内容损坏检测与 Claude 升级/中断后的失败恢复，不把版本号或原生命令退出码当成完整成功。
+
+后续检查点 `c55385a69` 的干净 macOS 构建、国际化 11 项及相关模块 617 项已通过。同 SHA 第二轮预检仍失败：Linux 已解决 Python 安装，传输夹具失败；Windows 下载解压后安装失败。两平台 Rust/原生验收未开始。后续 Windows 使用官方固定 NuGet 包作为作业私有解释器，Linux 夹具修复独立推进，详见 [当前验证记录](VALIDATION_REPORT.md#当前提交验证)。
+
+插件追加验证已在隔离树通过编译、国际化 11 项与插件回归 163 项。Grok 1.0.30 真实生产安装器五阶段通过（安装、同版本修复、禁用拒绝、受控文件失败回滚、更新恢复），0 模型；见 [记录](validation/macos-grok-production-installer-1.json)。Claude 2.1.273 的生产升级、暂存修补失败保持旧版本、安装父进程强杀后新目录重试三场景各 1 项通过，边界见 [事务报告](CLAUDE_PLUGIN_UPGRADE_TRANSACTION.md)。两组代码尚未纳入 c55385a69，不替代最终同提交平台验收。

@@ -261,7 +261,7 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 
 ## 10. 执行看板（2026-09-16，持续更新）
 
-当前工作分支 `codex/cli-agent-parity`，起点 `6921a9925955a1955503e259cd935eaea4ac2ac0`。原有未跟踪计划已保留，无用户代码改动被覆盖。实现检查点 `dbee1ecae81da54a1749de88a7caffb3099d7eb7` 已提交并推送；尚未发布。独立验证工作树保持该提交，另一任务网页搜索改动未纳入。
+当前工作分支 `codex/cli-agent-parity`，起点 `6921a9925955a1955503e259cd935eaea4ac2ac0`。原有未跟踪计划已保留，无用户代码改动被覆盖。实现检查点 `dbee1ecae81da54a1749de88a7caffb3099d7eb7` 已提交并推送；尚未发布。后续检查点 c55385a69 已通过独立工作树门禁；验证树现以它为基线同步冻结的插件改动，另一任务网页搜索改动未纳入。
 
 | 阶段 | 当前进展 | 尚未满足 |
 | --- | --- | --- |
@@ -278,6 +278,10 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 
 本轮 [build23 门禁快照](validation/macos-local-gates-build23.json)与 [bundle8 构建快照](validation/macos-gui-bundle8-build.json)保留实际摘要及 dirty 标记；构建时含另一任务的网页搜索修改，该组文件已排除本目标暂存，最终提交须在独立工作树重验。[Darwin coalition / launchd 审计](DARWIN_COALITION_LAUNCHD_AUDIT.md)尚未证明可在普通应用权限下取得专属清理域与可靠空域回执，不能消除已记录的真实工具残留失败。
 
-当前提交的详细进展见 [验证记录](VALIDATION_REPORT.md#当前提交验证)：dbee1ecae 的干净 macOS cargo check、脚本门禁、无模型 SSH/tmux 与 Claude 控制边界已通过；Linux/Windows Actions 的前置环境失败被单独保留，不能算平台通过。bundle8 已闭合当前真实通知链并确认 Unknown 未误报成功，其输入偏差和英文历史选择框裁切也保留为未通过项。
+当前提交的详细进展见 [验证记录](VALIDATION_REPORT.md#当前提交验证)：dbee1ecae 的干净 macOS cargo check、脚本门禁、无模型 SSH/tmux 与 Claude 控制边界已通过；Linux/Windows 两轮 Actions 的前置失败被单独保留，不能算平台通过。bundle8 已闭合当前真实通知链并确认 Unknown 未误报成功，其输入偏差和英文历史选择框裁切也保留为未通过项。
 
 新增 [macOS 受控 launchd / coalition 原型](DARWIN_LAUNCHD_COALITION_PROTOTYPE.md)已验证专属域跨 setsid/双重 fork 保持、仅按已知身份清理后 CID 查询返回 ESRCH；根 SIGKILL 与 bootout 均不能单独证明完成。当前仍是原型，私有接口/内核版本与枚举上限的边界单列，生产接入与真实 CLI 清理尚未完成。插件验收继续补 Grok 同版本内容损坏检测与 Claude 升级/中断后的失败恢复，不把版本号或原生命令退出码当成完整成功。
+
+后续检查点 `c55385a69` 的干净 macOS 构建、国际化 11 项及相关模块 617 项已通过。同 SHA 第二轮预检仍失败：Linux 已解决 Python 安装，传输夹具失败；Windows 下载解压后安装失败。两平台 Rust/原生验收未开始。后续 Windows 使用官方固定 NuGet 包作为作业私有解释器，Linux 夹具修复独立推进，详见 [当前验证记录](VALIDATION_REPORT.md#当前提交验证)。
+
+插件事务新增门禁已通过：隔离树 cargo check、国际化 11 项、插件回归 163 项；Grok 真实生产安装器五阶段 1 项通过，Claude 真实升级/修补失败/安装父进程强杀后重试各 1 项通过，均未提交模型输入。失败注入与强杀覆盖范围、代码摘要和原始记录见 [验证报告](VALIDATION_REPORT.md#插件事务追加验证)。这些中间结果不替代最终同提交与三方完整生命周期。

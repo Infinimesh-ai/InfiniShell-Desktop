@@ -1,0 +1,45 @@
+{
+  "credentials_provided": false,
+  "grok_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "grok_version": "1.0.30",
+  "model_input_submitted": false,
+  "node_sha256": "a46ed02589ca3af795237111ff854262064f8ff5c5b58d75c1509f37311eb15e",
+  "node_version": "v25.9.0",
+  "passed": true,
+  "steps": [
+    {
+      "passed": true,
+      "step": "production_install"
+    },
+    {
+      "config_and_registry_unchanged": true,
+      "passed": true,
+      "step": "production_same_version_update"
+    },
+    {
+      "config_and_files_unchanged": true,
+      "passed": true,
+      "step": "production_disabled_update_rejected"
+    },
+    {
+      "fault_after_first_replacement": true,
+      "passed": true,
+      "production_apply_call": false,
+      "step": "file_transaction_failure_rollback"
+    },
+    {
+      "passed": true,
+      "step": "production_update_after_rollback"
+    }
+  ],
+  "test_binary_sha256": "b4d872e41fc96930b16df1b42ed492fed2647b2b5bd612855950b499dced506d",
+  "source_base_commit": "c55385a69a4cd50364a6464dfbec1c965db2ac92",
+  "source_gate_report": "macos-plugin-transactions-local-gates.json",
+  "source_dirty": true,
+  "test_count": 1,
+  "test_seconds": 27.17,
+  "runner_exit_code": 0,
+  "output_log_sha256": "724d22cd67b0860e64fdc427832fd510ae6fb580c3fdf5297952dd9100483ddd",
+  "native_artifact_sha256": "53105cd1aef49389cf9387844ee46687bf0a811a6e8d8b0e8e2d1725a881311d",
+  "test_output": "{\"private_root\": \"<private-root>\", \"artifact\": \"<private-root>/grok-production-installer.json\"}\n22:39:09.277 [INFO] [i18n_embed] Selecting translations for domain \"warp\"\n22:39:09.299 [INFO] [warp::i18n] [i18n] initialized; current_languages=[LanguageIdentifier { language: Language(Some(\"en\")), script: None, region: None, variants: None }], fallback=en\n\nrunning 1 test\ntest terminal::cli_agent_sessions::plugin_manager::grok::tests::live_grok_production_installer_repairs_and_preserves_disable ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6440 filtered out; finished in 27.17s\n"
+}

@@ -197,6 +197,7 @@ pub(super) struct VerifiedRuntime {
     kind: PatchKind,
     home: PathBuf,
     search_path: OsString,
+    isolated_home: bool,
 }
 
 impl VerifiedRuntime {
@@ -207,6 +208,7 @@ impl VerifiedRuntime {
             kind: self.kind,
             home: home.to_owned(),
             search_path: self.search_path.clone(),
+            isolated_home: true,
         }
     }
 
@@ -232,6 +234,7 @@ impl VerifiedRuntime {
                 kind,
                 home: home.to_owned(),
                 search_path,
+                isolated_home: false,
             };
             let version = runtime
                 .run_with_timeout(&["--version"], Duration::from_secs(5), log)
@@ -283,6 +286,13 @@ impl VerifiedRuntime {
                 .env("PATH", &self.search_path)
                 .env(self.kind.home_variable(), &self.home)
                 .kill_on_drop(true);
+            if self.kind == PatchKind::Claude && self.isolated_home {
+                // 暂存原生安装不能通过 HOME 回退读取或改写用户真实配置。
+                command
+                    .env("HOME", &self.home)
+                    .env("USERPROFILE", &self.home)
+                    .current_dir(&self.home);
+            }
             let output = command
                 .output()
                 .with_timeout(timeout)
@@ -501,6 +511,28 @@ pub(super) fn preflight(home: &Path, kind: PatchKind) -> Result<bool, PluginInst
         return Ok(installation.version == kind.version());
     }
     Ok(false)
+}
+
+/// 发布注册指针前核对尚未激活的 Claude 缓存；不依赖真实配置中的安装记录。
+pub(super) fn verify_staged_claude_cache(path: &Path) -> io::Result<()> {
+    if !fs::symlink_metadata(path)?.file_type().is_dir() {
+        return Err(invalid_state());
+    }
+    let installation = Installation {
+        path: path.to_owned(),
+        version: PatchKind::Claude.version().to_owned(),
+    };
+    let manifest: Value = serde_json::from_slice(&fs::read(checked_file(
+        path,
+        PatchKind::Claude.manifest(),
+    )?)?)?;
+    if manifest.get("name").and_then(Value::as_str) != Some("warp")
+        || manifest.get("version").and_then(Value::as_str) != Some(PatchKind::Claude.version())
+        || !ready(&installation, PatchKind::Claude)?
+    {
+        return Err(invalid_state());
+    }
+    validate_tree(&installation, PatchKind::Claude)
 }
 
 pub(super) fn apply(home: &Path, kind: PatchKind, log: &str) -> Result<(), PluginInstallError> {

@@ -1,5 +1,7 @@
+use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
-use std::path::{Path, PathBuf};
+use std::io::Write as _;
+use std::path::{Component, Path, PathBuf};
 use std::sync::LazyLock;
 use std::{env, fs, io};
 
@@ -42,7 +44,7 @@ pub(super) struct GrokPluginManager {
     path_env_var: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct InstalledPlugin {
     path: PathBuf,
     source: PathBuf,
@@ -170,7 +172,7 @@ impl GrokPluginManager {
         }
         // 在创建目录或修改注册表前确认真实 CLI 和 hook 运行时。
         let executable = self.verify_runtime(&mut log).await?;
-        let previous = installed_plugin(&grok_home).map_err(|_| invalid_state_error(&log))?;
+        let previous = registered_plugin(&grok_home).map_err(|_| invalid_state_error(&log))?;
         let source_root = bundled_source_root().map_err(|error| file_error(error, &log))?;
         let source = write_bundle(&source_root).map_err(|error| file_error(error, &log))?;
         self.run(
@@ -189,18 +191,19 @@ impl GrokPluginManager {
             self.install_source(&executable, &source, &mut log).await?;
             return verify_installed(&grok_home, PLUGIN_VERSION, &log);
         };
-        if !updating || previous.version == PLUGIN_VERSION {
+        if previous.version == PLUGIN_VERSION {
+            // 同版本修复不重装原生插件，避免安装命令重新启用用户禁用的配置。
+            repair_current_plugin(&grok_home, &previous, &source_root, |_, _| Ok(()))
+                .map_err(|error| file_error(error, &log))?;
             return verify_installed(&grok_home, PLUGIN_VERSION, &log);
         }
-        // 不接管同名的自定义来源，也不允许多插件仓库进入单插件恢复事务。
-        if !previous.source.canonicalize().ok().is_some_and(|source| {
-            source_root
-                .canonicalize()
-                .ok()
-                .is_some_and(|root| source.starts_with(root))
-        }) {
+        if !updating {
             return Err(invalid_state_error(&log));
         }
+        // 旧来源必须仍是应用拥有的完整已知配方，不备份或覆盖未知脚本。
+        validate_owned_source(&previous, &source_root).map_err(|_| invalid_state_error(&log))?;
+        validate_expected_tree(&previous.path, &previous.version)
+            .map_err(|_| invalid_state_error(&log))?;
         let recovery =
             backup_plugin(&previous.path, &source_root).map_err(|error| file_error(error, &log))?;
         let removed = self
@@ -293,7 +296,16 @@ impl CliAgentPluginManager for GrokPluginManager {
         !self.is_disabled()
             && env::var_os("GROK_CONFIG_PATH").is_none()
             && env::var_os("GROK_CONFIG").is_none()
-            && grok_home_dir().is_ok_and(|root| installed_plugin(&root).is_ok())
+            && grok_home_dir().is_ok_and(|root| {
+                registered_plugin(&root).is_ok_and(|plugin| match plugin {
+                    Some(plugin) => {
+                        plugin_tree(&plugin.path, true).is_ok()
+                            && bundled_source_root()
+                                .is_ok_and(|source| validate_owned_source(&plugin, &source).is_ok())
+                    }
+                    None => true,
+                })
+            })
             && self.executable("grok").is_some()
             && self.executable("node").is_some()
     }
@@ -312,10 +324,15 @@ impl CliAgentPluginManager for GrokPluginManager {
     }
 
     fn needs_update(&self) -> bool {
-        grok_home_dir()
-            .ok()
-            .and_then(|root| installed_plugin(&root).ok().flatten())
-            .is_some_and(|plugin| parse_version(&plugin.version) < parse_version(PLUGIN_VERSION))
+        grok_home_dir().ok().is_some_and(|root| {
+            registered_plugin(&root)
+                .ok()
+                .flatten()
+                .is_some_and(|plugin| {
+                    parse_version(&plugin.version) < parse_version(PLUGIN_VERSION)
+                        || installed_plugin(&root).is_err()
+                })
+        })
     }
 
     async fn install(&self) -> Result<(), PluginInstallError> {
@@ -442,7 +459,7 @@ fn plugin_enabled(root: &Path) -> io::Result<bool> {
     Ok(!includes_plugin(&config, "disabled")? && includes_plugin(&config, "enabled")?)
 }
 
-fn installed_plugin(root: &Path) -> io::Result<Option<InstalledPlugin>> {
+fn registered_plugin(root: &Path) -> io::Result<Option<InstalledPlugin>> {
     let contents = match fs::read_to_string(root.join("installed-plugins/registry.json")) {
         Ok(contents) => contents,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
@@ -463,7 +480,7 @@ fn installed_plugin(root: &Path) -> io::Result<Option<InstalledPlugin>> {
         .and_then(Value::as_object)
         .ok_or_else(invalid)?;
     let mut installed = None;
-    for repo in repos.values() {
+    for (repo_key, repo) in repos {
         let Some(plugins) = repo.get("plugins").and_then(Value::as_object) else {
             return Err(invalid());
         };
@@ -495,14 +512,15 @@ fn installed_plugin(root: &Path) -> io::Result<Option<InstalledPlugin>> {
         if !source.is_absolute() || !path.is_absolute() || parse_version(&version).is_none() {
             return Err(invalid());
         }
-        let manifest: Value =
-            serde_json::from_str(&fs::read_to_string(path.join(".grok-plugin/plugin.json"))?)?;
-        if manifest.get("name").and_then(Value::as_str) != Some(PLUGIN_NAME)
-            || manifest.get("version").and_then(Value::as_str) != Some(version.as_str())
-            || BUNDLED_FILES
-                .iter()
-                .any(|(relative, _)| !path.join(relative).is_file())
-        {
+        // 原生缓存只能属于当前配置目录中的这一条注册记录，不能据 JSON 路径改写外部文件。
+        let mut components = Path::new(repo_key).components();
+        if !matches!(components.next(), Some(Component::Normal(_))) || components.next().is_some() {
+            return Err(invalid());
+        }
+        let cache_root = root.canonicalize()?.join("installed-plugins");
+        plain_directory(&cache_root)?;
+        plain_directory(&path)?;
+        if path.canonicalize()? != cache_root.join(repo_key) {
             return Err(invalid());
         }
         installed = Some(InstalledPlugin {
@@ -512,6 +530,226 @@ fn installed_plugin(root: &Path) -> io::Result<Option<InstalledPlugin>> {
         });
     }
     Ok(installed)
+}
+
+fn installed_plugin(root: &Path) -> io::Result<Option<InstalledPlugin>> {
+    let plugin = registered_plugin(root)?;
+    if let Some(plugin) = &plugin {
+        validate_expected_tree(&plugin.path, &plugin.version)?;
+    }
+    Ok(plugin)
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct PluginFile {
+    contents: Vec<u8>,
+    permissions: fs::Permissions,
+}
+
+type PluginTree = BTreeMap<String, PluginFile>;
+
+fn invalid_tree() -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, "Grok 受控插件目录不匹配")
+}
+
+fn plain_directory(path: &Path) -> io::Result<()> {
+    let metadata = fs::symlink_metadata(path)?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(invalid_tree());
+    }
+    Ok(())
+}
+
+fn plugin_tree(root: &Path, allow_missing: bool) -> io::Result<PluginTree> {
+    plain_directory(root)?;
+    let mut pending = vec![root.to_path_buf()];
+    let mut files = BTreeMap::new();
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(directory)? {
+            let entry = entry?;
+            let path = entry.path();
+            let relative = path
+                .strip_prefix(root)
+                .map_err(|_| invalid_tree())?
+                .components()
+                .map(|part| match part {
+                    Component::Normal(name) => name.to_str().ok_or_else(invalid_tree),
+                    Component::Prefix(_)
+                    | Component::RootDir
+                    | Component::CurDir
+                    | Component::ParentDir => Err(invalid_tree()),
+                })
+                .collect::<io::Result<Vec<_>>>()?
+                .join("/");
+            let metadata = fs::symlink_metadata(&path)?;
+            if metadata.file_type().is_symlink() {
+                return Err(invalid_tree());
+            }
+            if metadata.is_dir() {
+                if !matches!(relative.as_str(), ".grok-plugin" | "hooks") {
+                    return Err(invalid_tree());
+                }
+                pending.push(path);
+                continue;
+            }
+            if !metadata.is_file()
+                || metadata.len() > 1024 * 1024
+                || !BUNDLED_FILES.iter().any(|(name, _)| *name == relative)
+            {
+                return Err(invalid_tree());
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt as _;
+                if metadata.nlink() != 1 {
+                    return Err(invalid_tree());
+                }
+            }
+            files.insert(
+                relative,
+                PluginFile {
+                    contents: fs::read(path)?,
+                    permissions: metadata.permissions(),
+                },
+            );
+        }
+    }
+    if !allow_missing && files.len() != BUNDLED_FILES.len() {
+        return Err(invalid_tree());
+    }
+    Ok(files)
+}
+
+fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> {
+    let tree = plugin_tree(root, false)?;
+    if !parse_version(version).is_some_and(|version| {
+        parse_version(PLUGIN_VERSION).is_some_and(|current| version <= current)
+    }) {
+        return Err(invalid_tree());
+    }
+    for (name, expected) in BUNDLED_FILES {
+        let contents = &tree.get(*name).ok_or_else(invalid_tree)?.contents;
+        if version != PLUGIN_VERSION && *name == ".grok-plugin/plugin.json" {
+            // 尚无其他脚本配方的兼容证据；旧版仅允许同配方、不同版本号的完整来源。
+            let mut manifest: Value = serde_json::from_str(expected)?;
+            manifest["version"] = Value::String(version.to_owned());
+            if serde_json::from_slice::<Value>(contents)? != manifest {
+                return Err(invalid_tree());
+            }
+        } else if contents.as_slice() != expected.as_bytes() {
+            return Err(invalid_tree());
+        }
+    }
+    Ok(tree)
+}
+
+fn validate_owned_source(plugin: &InstalledPlugin, source_root: &Path) -> io::Result<()> {
+    plain_directory(source_root)?;
+    plain_directory(&plugin.source)?;
+    if !plugin
+        .source
+        .canonicalize()?
+        .starts_with(source_root.canonicalize()?)
+    {
+        return Err(invalid_tree());
+    }
+    validate_expected_tree(&plugin.source, &plugin.version)?;
+    Ok(())
+}
+
+fn replace_plugin_file(path: &Path, file: &PluginFile) -> io::Result<()> {
+    let parent = path.parent().ok_or_else(invalid_tree)?;
+    fs::create_dir_all(parent)?;
+    plain_directory(parent)?;
+    let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
+    temporary
+        .as_file()
+        .set_permissions(file.permissions.clone())?;
+    temporary.write_all(&file.contents)?;
+    temporary.as_file().sync_all()?;
+    temporary.persist(path).map_err(|error| error.error)?;
+    Ok(())
+}
+
+fn repair_current_plugin(
+    home: &Path,
+    plugin: &InstalledPlugin,
+    source_root: &Path,
+    mut before_replace: impl FnMut(usize, &Path) -> io::Result<()>,
+) -> io::Result<()> {
+    if plugin.version != PLUGIN_VERSION || !plugin_enabled(home)? {
+        return Err(invalid_tree());
+    }
+    validate_owned_source(plugin, source_root)?;
+    let source = validate_expected_tree(&plugin.source, PLUGIN_VERSION)?;
+    let original = plugin_tree(&plugin.path, true)?;
+    let registry_path = home.join("installed-plugins/registry.json");
+    let registry = fs::read(&registry_path)?;
+    if registered_plugin(home)?.as_ref() != Some(plugin) || fs::read(&registry_path)? != registry {
+        return Err(invalid_tree());
+    }
+    let mut expected = original.clone();
+    let mut changed = Vec::new();
+    let outcome = (|| {
+        for (index, (name, _)) in BUNDLED_FILES.iter().enumerate() {
+            let mut replacement = source.get(*name).ok_or_else(invalid_tree)?.clone();
+            if let Some(previous) = original.get(*name) {
+                replacement.permissions = previous.permissions.clone();
+                if replacement.contents == previous.contents {
+                    continue;
+                }
+            }
+            let path = plugin.path.join(name);
+            before_replace(index, &path)?;
+            // 每次写前重读禁用、注册及完整目录，不能拿开始时的授权覆盖后续变化。
+            if !plugin_enabled(home)?
+                || fs::read(&registry_path)? != registry
+                || plugin_tree(&plugin.path, true)? != expected
+            {
+                return Err(invalid_tree());
+            }
+            replace_plugin_file(&path, &replacement)?;
+            expected.insert((*name).to_owned(), replacement);
+            changed.push(*name);
+        }
+        if !plugin_enabled(home)?
+            || fs::read(&registry_path)? != registry
+            || plugin_tree(&plugin.path, false)? != expected
+        {
+            return Err(invalid_tree());
+        }
+        validate_expected_tree(&plugin.path, PLUGIN_VERSION)?;
+        validate_owned_source(plugin, source_root)?;
+        Ok(())
+    })();
+    if let Err(error) = outcome {
+        let mut recovery_failed = false;
+        for name in changed.into_iter().rev() {
+            let current = plugin_tree(&plugin.path, true);
+            if fs::read(&registry_path).ok().as_deref() != Some(registry.as_slice())
+                || current.as_ref().ok().and_then(|tree| tree.get(name)) != expected.get(name)
+            {
+                recovery_failed = true;
+                continue;
+            }
+            let path = plugin.path.join(name);
+            let restored = match original.get(name) {
+                Some(file) => replace_plugin_file(&path, file),
+                None => fs::remove_file(&path),
+            };
+            if restored.is_err() {
+                recovery_failed = true;
+            }
+        }
+        return if recovery_failed {
+            Err(io::Error::other(format!(
+                "{error}; 部分文件未恢复，已保留并发修改"
+            )))
+        } else {
+            Err(error)
+        };
+    }
+    Ok(())
 }
 
 fn registered_source(root: &Path) -> io::Result<Option<PathBuf>> {
@@ -561,16 +799,10 @@ fn registered_source(root: &Path) -> io::Result<Option<PathBuf>> {
 
 fn write_bundle(root: &Path) -> io::Result<PathBuf> {
     fs::create_dir_all(root)?;
+    plain_directory(root)?;
     let destination = root.join(PLUGIN_VERSION);
     if destination.exists() {
-        for (relative, contents) in BUNDLED_FILES {
-            if fs::read_to_string(destination.join(relative))? != *contents {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Bundled Grok source was modified",
-                ));
-            }
-        }
+        validate_expected_tree(&destination, PLUGIN_VERSION)?;
         return Ok(destination);
     }
     let staging = tempfile::tempdir_in(root)?;
@@ -584,6 +816,7 @@ fn write_bundle(root: &Path) -> io::Result<PathBuf> {
 }
 
 fn backup_plugin(installed: &Path, root: &Path) -> io::Result<PathBuf> {
+    plugin_tree(installed, false)?;
     let recovery_root = root.join("recovery");
     fs::create_dir_all(&recovery_root)?;
     let recovery = tempfile::tempdir_in(recovery_root)?;

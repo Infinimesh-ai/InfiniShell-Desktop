@@ -259,15 +259,11 @@ jobs:
           persist-credentials: false
           clean: true
 
-      # 固定完整 action 提交和 Python 补丁版本，只更新当前作业的工具链环境。
-      - name: Install Python for CLI parity verification
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        timeout-minutes: 10
-        with:
-          python-version: '3.13.15'
-          architecture: x64
-          check-latest: false
-          update-environment: true
+      # 直接解压固定摘要的官方 CI 包，保持当前作业以外的 Python 安装配置。
+      - name: Prepare job-local Python for CLI parity verification
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./script/cli-agent-parity/prepare_windows_python.ps1
 
       - name: Configure Windows build environment
         shell: pwsh

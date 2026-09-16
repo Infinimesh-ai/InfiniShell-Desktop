@@ -1,0 +1,148 @@
+{
+  "source_commit": "dbee1ecae81da54a1749de88a7caffb3099d7eb7",
+  "executable_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "platform": "macOS arm64",
+  "credentials_provided": false,
+  "model_input_submitted": false,
+  "native_command_allowlist": [
+    "--version",
+    "plugin install --trust",
+    "plugin list --json",
+    "plugin disable"
+  ],
+  "rust_installer_execution_verified": false,
+  "steps": [
+    {
+      "args": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "grok 1.0.30 (04b7ffed98c6)\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "plugin",
+        "install",
+        "--trust",
+        "<isolated-probe>/application-sources/0.1.0"
+      ],
+      "exit_code": 0,
+      "stdout": "Installed 1 plugin(s) from <isolated-probe>/application-sources/0.1.0: infinishell-grok\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "plugin",
+        "list",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "[\n  {\n    \"status\": \"installed\",\n    \"name\": \"infinishell-grok\",\n    \"repo_key\": \"0-1-0-8ee50534\",\n    \"version\": \"0.1.0\",\n    \"path\": \"<isolated-probe>/home/.grok/installed-plugins/0-1-0-8ee50534\",\n    \"source\": \"<isolated-probe>/application-sources/0.1.0\",\n    \"marketplace\": null\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "plugin",
+        "list",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "[\n  {\n    \"status\": \"installed\",\n    \"name\": \"infinishell-grok\",\n    \"repo_key\": \"0-1-0-8ee50534\",\n    \"version\": \"0.1.0\",\n    \"path\": \"<isolated-probe>/home/.grok/installed-plugins/0-1-0-8ee50534\",\n    \"source\": \"<isolated-probe>/application-sources/0.1.0\",\n    \"marketplace\": null\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "plugin",
+        "disable",
+        "infinishell-grok"
+      ],
+      "exit_code": 0,
+      "stdout": "Disabled plugin: infinishell-grok\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "plugin",
+        "list",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "[\n  {\n    \"status\": \"installed\",\n    \"name\": \"infinishell-grok\",\n    \"repo_key\": \"0-1-0-8ee50534\",\n    \"version\": \"0.1.0\",\n    \"path\": \"<isolated-probe>/home/.grok/installed-plugins/0-1-0-8ee50534\",\n    \"source\": \"<isolated-probe>/application-sources/0.1.0\",\n    \"marketplace\": null\n  }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "cli_version": "grok 1.0.30 (04b7ffed98c6)",
+  "healthy_tree": {
+    "README.md": "2db65e9c54c35725ba1164edb39daf9645bfdf7f1d3cd2689b8e338853c2e8b7",
+    "hooks/notify.cjs": "134fd490e7396157c80c2a33bd9d8a88397881e6f926743319fafe6c0df5ccd8",
+    "hooks/hooks.json": "2ec75e0fc4daf1da6e649d7b11cfb2e3d836973455ad4b14852366f1392d6326",
+    ".grok-plugin/plugin.json": "ebb5980c4b89880b269bb9ccb0ce1e0fe539828f9a58b76fd088b9ec3b64c41c"
+  },
+  "healthy_native_list": [
+    {
+      "status": "installed",
+      "name": "infinishell-grok",
+      "repo_key": "0-1-0-8ee50534",
+      "version": "0.1.0",
+      "path": "<isolated-probe>/home/.grok/installed-plugins/0-1-0-8ee50534",
+      "source": "<isolated-probe>/application-sources/0.1.0",
+      "marketplace": null
+    }
+  ],
+  "damaged_tree": {
+    "README.md": "2db65e9c54c35725ba1164edb39daf9645bfdf7f1d3cd2689b8e338853c2e8b7",
+    "hooks/notify.cjs": "4f28491d8bb3823dce5fb44f2dfbb927d84666b6454569c8421206c9bbda00a1",
+    "hooks/hooks.json": "2ec75e0fc4daf1da6e649d7b11cfb2e3d836973455ad4b14852366f1392d6326",
+    ".grok-plugin/plugin.json": "ebb5980c4b89880b269bb9ccb0ce1e0fe539828f9a58b76fd088b9ec3b64c41c"
+  },
+  "damaged_native_list": [
+    {
+      "status": "installed",
+      "name": "infinishell-grok",
+      "repo_key": "0-1-0-8ee50534",
+      "version": "0.1.0",
+      "path": "<isolated-probe>/home/.grok/installed-plugins/0-1-0-8ee50534",
+      "source": "<isolated-probe>/application-sources/0.1.0",
+      "marketplace": null
+    }
+  ],
+  "known_old_checks_still_true": {
+    "registry_version_matches_manifest": true,
+    "four_files_exist": true,
+    "native_reports_installed": true
+  },
+  "disabled_config": "[plugins]\nenabled = []\ndisabled = [\"infinishell-grok\"]\n",
+  "disabled_native_list": [
+    {
+      "status": "installed",
+      "name": "infinishell-grok",
+      "repo_key": "0-1-0-8ee50534",
+      "version": "0.1.0",
+      "path": "<isolated-probe>/home/.grok/installed-plugins/0-1-0-8ee50534",
+      "source": "<isolated-probe>/application-sources/0.1.0",
+      "marketplace": null
+    }
+  ],
+  "reproduced": true,
+  "note": "原生安装后损坏已安装脚本，原生列表与旧生产检查依赖字段仍不变；未执行旧或新Rust安装器，未调用模型或ACP会话。",
+  "native_registry_after_disable": {
+    "version": 1,
+    "repos": {
+      "0-1-0-8ee50534": {
+        "kind": {
+          "type": "Local",
+          "source_path": "<isolated-probe>/application-sources/0.1.0"
+        },
+        "installed_at": "2026-09-16T13:53:56.579904+00:00",
+        "updated_at": "2026-09-16T13:53:56.579904+00:00",
+        "path": "<isolated-probe>/home/.grok/installed-plugins/0-1-0-8ee50534",
+        "plugins": {
+          "infinishell-grok": {
+            "version": "0.1.0"
+          }
+        }
+      }
+    }
+  }
+}

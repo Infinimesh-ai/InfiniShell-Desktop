@@ -4,11 +4,20 @@
 
 ## 当前提交验证
 
+- 后续检查点 `c55385a69a4cd50364a6464dfbec1c965db2ac92` 已提交并推送，干净独立工作树使用显式专属 target 再次通过 cargo check（1m25）、国际化 11 项（4.53s）及相关模块 617 项；见 [同提交本地快照](validation/macos-local-gates-c55385a69.json)。
+- 相同 SHA 的 [Actions 35106400715](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35106400715) 已完成但未通过：Linux Python 安装成功，传输夹具两项失败；Windows 下载/解压成功，Python 安装步骤失败。两平台 Rust 与原生 CLI 尚未执行；[失败快照](validation/cross-platform-c55385a69-35106400715.json)保留，不作为平台成功。Windows 作业私有 NuGet Python 准备脚本已通过本地静态验证，Linux 传输夹具已按解释器自身共享库目录修复、本机 9 项回归通过；两者都等待新提交实跑。
+
 - 干净 `.worktrees/cli-agent-parity-validation` 上的 `dbee1ecae` 已通过 `cargo check -p warp`（2m49）、Python 76 项（6.706s）和 Grok Node 11 项（235.97ms）；国际化 11 项也已通过（4.79s）；后续模块编译引用了另一工作树的旧 command 产物，退出 101、0 项执行。已创建专属 target 并清除其中的 76 个本地路径包；首次仅切换链接仍被上级 Cargo 配置覆盖而失败，随后显式指定并通过 metadata 核对实际目录，dbee1ecae 加历史选择框修复已通过 cargo check（2m28）、国际化 11 项（4.71s）、相关模块 617 项（8.722s，5803 项未在筛选内）。这是追加修复的提交前门禁，见 [提交快照](validation/macos-local-gates-dbee1ecae.json)。
 - [Actions 35100708171](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35100708171) 核对为相同 SHA；Linux 的 Python 低于 3.11，Windows 无 `python` 命令，均在前置环境阶段失败。Rust/原生 CLI 未验收，证据文件未生成导致上传失败；见 [完整状态与失败分类](validation/cross-platform-dbee1ecae-35100708171.json)。workflow 已补固定 action 提交与 Python 3.13.15，静态检查通过、目标平台安装待验；保留本次失败，不重跑原样配置。
 - 同提交的 [Codex 原生 SSH/tmux](fixtures/codex-0.147-native-ssh-tmux-macos-final-commit.json)（含最终 SetEnv）与 [Claude 无凭据初始化/EOF](fixtures/claude-2.1.273-no-credentials-initialize-eof-macos-same-commit.json)已分别实跑通过；不计模型、GUI 或完整生命周期。
 - [bundle8 GUI](validation/macos-gui-bundle8-report.md) 已确认冷启动提示、当前真实通知受理和英文 Unknown；Unconfirmed 任务行/详情/继续禁用的双语布局通过。该包仍是 dirty 中间构建；中文 Unknown 新事件、英文历史选择框裁切修复及最终同提交 GUI 待验。首轮输入受拼音源影响，固定输出断言未通过，未追加模型重试。
-- 历史选择框局部宽度修复复用原文案，无需本地化变更；正在上述专属目录验证，双语布局由下一版包复核。新增插件审计发现 Grok 同版本已安装文件内容损坏可能被误判正常，正在修复；Claude 原生升级后通知修补失败及安装进程中断的恢复边界正在进一步核验。三者均尚未进入 dbee1ecae。
+- 历史选择框局部宽度修复已纳入 c55385a69 并通过本地门禁，复用原文案，无需本地化变更；双语布局由下一版包复核。Grok 同版本缓存完整性与显式修复、Claude 私有暂存安装与发布恢复已实现，正在隔离树执行新增门禁及真实生产安装器验证；两组插件变化尚未进入 c55385a69。
+
+## 插件事务追加验证
+
+冻结的 Grok 缓存完整性修复与 Claude 暂存发布代码已在隔离树通过 `cargo check -p warp`（1m47）、国际化 11 项和插件相关 163 项（2.021s）；见 [本地快照](validation/macos-plugin-transactions-local-gates.json)。新增实现复用现有插件提示，无需本地化变更。
+
+Grok 1.0.30 的真实 Rust 生产入口已通过安装、同版本损坏修复、禁用后拒绝更新、文件事务失败回滚和再次更新恢复，1 项测试、27.17s，未提交模型输入。故障注入段仅为生产文件事务，不计完整 manager 强杀；见 [五阶段记录](validation/macos-grok-production-installer-1.json)。Claude 2.1.273 的真实升级、暂存修补失败和安装父进程强杀后重试也分别通过 1 项测试。升级直接执行完整 manager，修补失败验证生产文件事务及旧版本保持，强杀仅覆盖暂存 marketplace clone 阶段；旧 HTTP 请求阻塞不作为旧原生进程仍存活的证据。详见 [Claude 事务报告](CLAUDE_PLUGIN_UPGRADE_TRANSACTION.md)。此组是 c55385a69 加冻结代码的中间快照，最终同提交平台验收仍未完成。
 
 ## 已执行的中间验证
 

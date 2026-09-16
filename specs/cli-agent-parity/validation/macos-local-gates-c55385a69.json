@@ -1,0 +1,75 @@
+{
+  "source_commit": "c55385a69a4cd50364a6464dfbec1c965db2ac92",
+  "worktree_clean_before": true,
+  "worktree": "/Users/zhishi/Tools/github/InfiniShell-Desktop/.worktrees/cli-agent-parity-validation",
+  "target_directory": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 85.454,
+      "log": "/tmp/infinishell-cli-parity-c55385a69-check.log",
+      "log_sha256": "b0e5b1f0ded71de26aef43e7a0d1c4b10a5aa1fc7697a7a33fba4231e74a4b80"
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 146.979,
+      "log": "/tmp/infinishell-cli-parity-c55385a69-i18n.log",
+      "log_sha256": "81a5635a955db1268cd56ce3caadbfb467332e4f63c1241940211569f638e59e"
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 10.676,
+      "log": "/tmp/infinishell-cli-parity-c55385a69-focused.log",
+      "log_sha256": "fff54062bfc1e7fc5f00f0544301e4bf53f02d087531dd86dc829aedafce41c5"
+    }
+  ],
+  "worktree_clean_after": true,
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "a4b0397d354e9cbf36293f49bc56655b4c30c1e567c1889fe51bb12e311c18aa"
+  },
+  "i18n": {
+    "passed": 11,
+    "failed": 0,
+    "filtered_out": 6409,
+    "duration_seconds": 4.53
+  },
+  "focused": {
+    "duration_seconds": 8.692,
+    "run": 617,
+    "passed": 617,
+    "skipped": 5803
+  }
+}
