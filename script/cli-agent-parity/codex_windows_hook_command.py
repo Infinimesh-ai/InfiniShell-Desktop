@@ -132,6 +132,18 @@ exit $process.ExitCode
                 json.dumps({"expected": values, "actual": actual}, ensure_ascii=True))
 
 
+def require_original_bytes(completed, captured, payload, case):
+    expected_stdout = b"native-bytes-ok"
+    if completed.stdout == expected_stdout and captured == payload:
+        return
+    # 这里只保存探针固定输入和占位脚本输出，不采集用户或真实模型内容。
+    encoded = lambda value: None if value is None else base64.b64encode(value).decode("ascii")
+    evidence = {"case": case, "expected_stdin_base64": encoded(payload),
+                "actual_stdin_base64": encoded(captured), "expected_stdout_base64": encoded(expected_stdout),
+                "actual_stdout_base64": encoded(completed.stdout), "stderr_base64": encoded(completed.stderr)}
+    raise ValueError("cmd/PowerShell/Bash 原始 stdin 或 stdout 字节发生改变: " + json.dumps(evidence, ensure_ascii=True))
+
+
 def verify_windows_bytes_and_boundary(env):
     payload = (json.dumps({"prompt": "中文\nEnglish ' $() ` % ! & ^", "extra": "反斜杠\\和空格"},
                           ensure_ascii=False) + "\r\n").encode("utf-8")
@@ -148,13 +160,13 @@ def verify_windows_bytes_and_boundary(env):
         # 真正执行 8191 单元的边界命令，而不只检查 Python 字符串长度。
         padding = 8191 - len(cmd_line(maximum, env["COMSPEC"]).encode("utf-16le")) // 2
         boundary = maximum + " " * padding
-        for command in [*(encode(script) for script in SCRIPTS), boundary]:
+        for case, command in [*((script, encode(script)) for script in SCRIPTS), ("cmd_8191_boundary", boundary)]:
             target.unlink(missing_ok=True)
             completed = subprocess.run(cmd_line(command, env["COMSPEC"]), executable=env["COMSPEC"],
                                        env=local_env, cwd=root, input=payload, capture_output=True,
                                        check=True, timeout=20)
-            require(completed.stdout == b"native-bytes-ok" and target.read_bytes() == payload,
-                    "cmd/PowerShell/Bash 原始 stdin 或 stdout 字节发生改变")
+            captured = target.read_bytes() if target.exists() else None
+            require_original_bytes(completed, captured, payload, case)
             require(not (root / "INJECTED").exists(), "路径数据被作为 shell 源码执行")
         try:
             cmd_line(boundary + " ", env["COMSPEC"])

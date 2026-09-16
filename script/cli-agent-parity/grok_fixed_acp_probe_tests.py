@@ -3,7 +3,7 @@
 
 import copy
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import sys
 import tempfile
 import unittest
@@ -152,14 +152,18 @@ class GrokFixedAcpTests(unittest.TestCase):
             self.assertIn('fixture early exit', [row['message'] for row in child.records if row['direction'] == 'stderr'])
 
     def test_report_redacts_identity_and_private_paths_but_keeps_protocol_ids(self):
-        root = Path('/isolated')
-        value = {'id': 'request-id', 'hostname': 'host', 'agentInstanceId': 'instance',
-                 'cwd': '/isolated/project', 'access_token': 'fixture-only', 'version': '1.0.30'}
-        cleaned = probe.clean(value, root)
-        self.assertEqual(cleaned['id'], 'request-id')
-        self.assertEqual(cleaned['cwd'], '<isolated-probe>/project')
-        for key in ('hostname', 'agentInstanceId', 'access_token'):
-            self.assertEqual(cleaned[key], '<redacted>')
+        # 原生请求始终用 str(project)；不能把 Windows Path 与手写 POSIX 路径混用。
+        for root, suffix in [(Path('/isolated'), '\\project' if sys.platform == 'win32' else '/project'),
+                             (PurePosixPath('/isolated'), '/project'),
+                             (PureWindowsPath(r'C:\isolated'), r'\project')]:
+            with self.subTest(root=root):
+                value = {'id': 'request-id', 'hostname': 'host', 'agentInstanceId': 'instance',
+                         'cwd': str(root / 'project'), 'access_token': 'fixture-only', 'version': '1.0.30'}
+                cleaned = probe.clean(value, root)
+                self.assertEqual(cleaned['id'], 'request-id')
+                self.assertEqual(cleaned['cwd'], '<isolated-probe>' + suffix)
+                for key in ('hostname', 'agentInstanceId', 'access_token'):
+                    self.assertEqual(cleaned[key], '<redacted>')
 
 
 if __name__ == '__main__':

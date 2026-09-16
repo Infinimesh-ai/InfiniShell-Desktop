@@ -49,7 +49,8 @@ try {
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $bash[0].Source
     $info.UseShellExecute = $false
-    $info.RedirectStandardInput = $true
+    # 直接继承原始句柄；PS 5.1 的重定向 StreamWriter 会按控制台编码预先写入 BOM。
+    $info.RedirectStandardInput = $false
     $info.RedirectStandardOutput = $false
     $info.RedirectStandardError = $false
     $info.CreateNoWindow = $false
@@ -59,13 +60,6 @@ try {
     $process.StartInfo = $info
     if (-not $process.Start()) { throw 'Git Bash did not start' }
     try {
-        try {
-            [Console]::OpenStandardInput().CopyTo($process.StandardInput.BaseStream)
-        } catch {
-            if (-not $process.HasExited) { throw }
-        } finally {
-            $process.StandardInput.Close()
-        }
         $process.WaitForExit()
         $code = $process.ExitCode
     } finally {

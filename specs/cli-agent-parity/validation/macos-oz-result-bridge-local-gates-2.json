@@ -1,0 +1,145 @@
+{
+  "base_commit": "6635f98690a6cbd3c117f9d313cb19de83016418",
+  "worktree_dirty": true,
+  "source_manifest": "/tmp/infinishell-cli-parity-followup-inputs2.json",
+  "source_manifest_sha256": "931da1600bbdb2dc4517ce0c3761f7c96ea0ce1882f7faf036fae4b36791e7ab",
+  "target_directory": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+  "gates": [
+    {
+      "name": "bridge",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "ai::cli_agent_runtime::conversation_bridge::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 278.199,
+      "log": "/tmp/infinishell-cli-parity-followup-bridge2.log",
+      "log_sha256": "f1d21ae8b8d574c11dac3dd0f33e4444fdeb7f700a9d762a57003465bc985e15"
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 6.7,
+      "log": "/tmp/infinishell-cli-parity-followup-i18n2.log",
+      "log_sha256": "11a02a6abd69e2d2da24aa85ffd5991dd491162191e6b0337608873c2d17029c"
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 11.264,
+      "log": "/tmp/infinishell-cli-parity-followup-focused2.log",
+      "log_sha256": "efc9a7a7072024ac20e2f1cac6bd8a2c4103aa10c753aae38364f280951f9da3"
+    },
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 93.141,
+      "log": "/tmp/infinishell-cli-parity-followup-check2.log",
+      "log_sha256": "cca78b11a722ae07c049440231ca458eb03a22fbc444c74ee6f9ab92ff9f282b"
+    }
+  ],
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "2205e9a4a4512a736695e6f8a9b70179461f8cf59a8c8a0374badf3e9b35e8b0"
+  },
+  "frozen_inputs": {
+    "base_commit": "6635f98690a6cbd3c117f9d313cb19de83016418",
+    "files": [
+      {
+        "path": "app/src/ai/cli_agent_runtime/conversation_bridge_tests.rs",
+        "sha256": "e740242aa4434b092b157def09390a1f17efe9809591696ff045ebf6dd1247a3"
+      },
+      {
+        "path": "script/cli-agent-parity/codex_windows_hook_command.ps1",
+        "sha256": "327603d72b007e9ea68a3902cee3f8b4cda4ebd70c6729826f58de79651d8952"
+      },
+      {
+        "path": "script/cli-agent-parity/codex_windows_hook_command.py",
+        "sha256": "edf6272e8ebc734de1a39b484a162465034f0c19069743bd0da8b93652702e5f"
+      },
+      {
+        "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+        "sha256": "83b9a00f370b2f294799ce001134c52b2758d4e5d061225c9833fc67dccc6318"
+      },
+      {
+        "path": "script/cli-agent-parity/grok_fixed_acp_probe_tests.py",
+        "sha256": "04aba99f40a398a077c39ce59004dda62f0339e452b19bdb6b07923245aee400"
+      }
+    ]
+  },
+  "previous_compile_failure": {
+    "gates": [
+      {
+        "name": "bridge",
+        "argv": [
+          "cargo",
+          "test",
+          "--target-dir",
+          "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+          "-p",
+          "warp",
+          "--lib",
+          "ai::cli_agent_runtime::conversation_bridge::tests"
+        ],
+        "exit_code": 101,
+        "wall_seconds": 92.289,
+        "log": "/tmp/infinishell-cli-parity-followup-bridge1.log",
+        "log_sha256": "b69f40981501aea70c2cd481dcf9ac9c48aaa0e3dfe34efcfa17c9887494a3da"
+      }
+    ],
+    "tests_run": 0,
+    "cause": "测试夹具将 Timer::after 的 Instant 输出匹配为 ()，E0308；第二轮仅修正该匹配模式。",
+    "source_manifest_sha256": "bce58fe2034990c0994277047fae902703501dedeeb3838b320fa08ccb73f9bf"
+  },
+  "bridge": {
+    "passed": 7,
+    "failed": 0,
+    "ignored": 0,
+    "duration_seconds": 0.76
+  },
+  "i18n": {
+    "passed": 11,
+    "failed": 0,
+    "ignored": 0,
+    "duration_seconds": 4.52
+  },
+  "focused_summary": [
+    "     Summary [   9.071s] 653 tests run: 653 passed, 5809 skipped"
+  ],
+  "scope": "6635f98690 加五个冻结文件的中间快照。3组新增 Oz 最终结果桥生产订阅与私有SQLite回归通过；不包含其后正在实现的普通消息投递或provider请求序列化，不计真实父模型已读取。"
+}

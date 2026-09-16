@@ -1,0 +1,27 @@
+{
+  "source_commit": "6635f98690a6cbd3c117f9d313cb19de83016418",
+  "worktree_clean_before": true,
+  "previous_attempt": {
+    "log": "/tmp/infinishell-cli-parity-6635f9869-bundle.log",
+    "log_sha256": "27ea2a6ee507fe988130910770cd148fe2e87a72f8b95e0c25b41469ac3a10fa",
+    "exit_code": null,
+    "metadata_missing": true,
+    "observation": "此前会话句柄失效，无活跃编译或签名进程；日志止于打包后rpath处理，未取得完整脚本退出确认。"
+  },
+  "argv": [
+    "./script/run",
+    "--dont-open",
+    "--features",
+    "local_cli_managed_tasks"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 85.663,
+  "log": "/tmp/infinishell-cli-parity-6635f9869-bundle-2.log",
+  "log_sha256": "1be16dce332065cd5ef5e0783691407caec26f2ee7eac6855b4d9a5d411ad471",
+  "worktree_clean_after": true,
+  "worker": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "sha256": "49d25f9a37eaa937f2f02395bd0073f8e4704fbec2b948019ac17b4644af4d95"
+  },
+  "scope": "6635f98690 干净验证树的新包构建、资源处理与签名完成；未打开 GUI，不计三方生命周期通过。"
+}

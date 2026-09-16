@@ -1,0 +1,92 @@
+{
+  "source_commit": "6635f98690a6cbd3c117f9d313cb19de83016418",
+  "worktree_clean_before": true,
+  "worktree": "/Users/zhishi/Tools/github/InfiniShell-Desktop/.worktrees/cli-agent-parity-validation",
+  "target_directory": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 105.332,
+      "log": "/tmp/infinishell-cli-parity-6635f9869-check.log",
+      "log_sha256": "2c23de9fe3ab0fddd6daee023e9d78534b5bf7f8b71567b0e68aaff92f7a1d8d"
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 346.392,
+      "log": "/tmp/infinishell-cli-parity-6635f9869-i18n.log",
+      "log_sha256": "68f34f461b627b8fd68b10559525d540e4243b5b6119161969df6dfaf8062c39"
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 13.93,
+      "log": "/tmp/infinishell-cli-parity-6635f9869-focused.log",
+      "log_sha256": "62212ee905453c7f94d4e1d134574e4927d5ad20c6cdacca49567a7d69dbed1a"
+    },
+    {
+      "name": "command",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "command",
+        "managed::"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 2.001,
+      "log": "/tmp/infinishell-cli-parity-6635f9869-command.log",
+      "log_sha256": "c73f35e2a62cc0c253f5a1abb478240d52d9befd79a1e7b252965957928524d5"
+    }
+  ],
+  "worktree_clean_after": true,
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "a180c7c63bc9e893a8bd9b4541aac2b9c896a283bd405de55a57dd251a22077e"
+  },
+  "i18n": {
+    "passed": 11,
+    "failed": 0,
+    "ignored": 0,
+    "duration_seconds": 4.6
+  },
+  "focused_summary": [
+    "     Summary [  10.015s] 650 tests run: 650 passed, 5809 skipped"
+  ],
+  "command_summaries": [
+    "test result: ok. 5 passed; 0 failed; 3 ignored; 0 measured; 11 filtered out; finished in 0.23s"
+  ],
+  "scope": "同提交本地构建、国际化与相关模块门禁，不替代真实三方GUI生命周期或未运行平台。"
+}

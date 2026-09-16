@@ -6,13 +6,14 @@ import json
 import os
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 from codex_windows_hook_command import (PREFIX, SCRIPTS, cmd_line, encode, source_text,
-                                       verify_encoding, verify_windows_argv)
+                                       verify_encoding, verify_windows_argv, require_original_bytes)
 from codex_windows_hook_inputs import (CODEX_COMMIT, RELEASE_ASSETS, fetch_file, plugin_base,
                                        regular_file, sha256, verify_codex, verify_plugin)
 
@@ -81,6 +82,22 @@ class CommandTests(unittest.TestCase):
 
         with patch('codex_windows_hook_command.run_powershell', side_effect=unchanged_result):
             verify_windows_argv({})
+
+    def test_raw_bytes_failure_keeps_both_streams_and_missing_capture_distinct(self):
+        payload = '中文\\nEnglish\r\n'.encode('utf-8')
+        for captured, stdout in [(b'\xef\xbb\xbf' + payload, b'native-bytes-ok'),
+                                 (payload, b'native-bytes-ok\r\n'), (None, b'')]:
+            with self.subTest(captured=captured, stdout=stdout):
+                completed = subprocess.CompletedProcess([], 0, stdout=stdout, stderr=b'fixture stderr')
+                with self.assertRaises(ValueError) as failure:
+                    require_original_bytes(completed, captured, payload, 'fixture-entry')
+                evidence = json.loads(str(failure.exception).split(': ', 1)[1])
+                self.assertEqual(evidence['case'], 'fixture-entry')
+                self.assertEqual(base64.b64decode(evidence['expected_stdin_base64']), payload)
+                self.assertEqual(base64.b64decode(evidence['actual_stdout_base64']), stdout)
+                self.assertEqual(base64.b64decode(evidence['stderr_base64']), b'fixture stderr')
+                self.assertEqual(None if captured is None else base64.b64decode(evidence['actual_stdin_base64']), captured)
+        require_original_bytes(subprocess.CompletedProcess([], 0, stdout=b'native-bytes-ok', stderr=b''), payload, payload, 'fixture-entry')
 
 
 class FixedInputTests(unittest.TestCase):

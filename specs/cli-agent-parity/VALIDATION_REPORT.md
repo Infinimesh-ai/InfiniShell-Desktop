@@ -4,6 +4,8 @@
 
 ## 当前提交验证
 
+- 最新资源域与固定协议检查点 `6635f98690a6cbd3c117f9d313cb19de83016418` 已推送并核对远端相同 SHA。干净 macOS 验证树通过 cargo check（1m45）、国际化 11 项（4.60s）、相关模块 650 项（10.015s）、command 5 项及脚本 75 项；见[本地门禁](validation/macos-local-gates-6635f9869.json)和[脚本门禁](validation/macos-python-gates-6635f9869.json)。[新包](validation/macos-build-6635f9869.json)已完成构建、资源处理与签名（复跑 85.663s、退出 0）；首轮观察句柄失效且没有脚本退出确认的记录独立保留，未打开 GUI。[第四轮 Actions](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35117735097)核对相同 SHA，尚未整体完成；Windows 已确认 Grok 路径夹具与候选启动器字节边界失败，前三处旧夹具修复已通过各自实跑，不能因此计为 Windows 平台通过。
+
 - 插件事务与验证环境检查点 `328d5ed35227f67884013f8c403e2a692470151d` 已提交并推送；第三轮 [Actions 35110822335](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35110822335) 已核对相同 SHA。Linux 本轮已结束并通过：cargo check、warp 定向 1655 项、共享 CLI/技能、双语 TUI、4 项监督及两项原生 Codex 边界均成功；GUI integration/full workspace 按配置跳过。Windows 的新 Python 准备成功；测试环境键大小写、PowerShell 5.1 临时 argv 验证脚本和多行 Bash 夹具失败，后续 Rust 步骤跳过。三处夹具修复已在本机通过，尚未提交及原生复验；见 [Windows 专报](WINDOWS_VERIFICATION_FIXTURES.md) 和 [第三轮平台证据](THIRD_PLATFORM_RUN_328D5ED35.md)。本轮不计整体平台通过。
 
 - 后续检查点 `c55385a69a4cd50364a6464dfbec1c965db2ac92` 已提交并推送，干净独立工作树使用显式专属 target 再次通过 cargo check（1m25）、国际化 11 项（4.53s）及相关模块 617 项；见 [同提交本地快照](validation/macos-local-gates-c55385a69.json)。
@@ -22,6 +24,12 @@
 真实 Codex 运行固定工具时，强杀宿主（17.017s）与强杀 Codex（16.078s）两项均通过：分别观测到 6/6、5/5 个必需退出事件，同一系统启动内已知资源域查询返回 ESRCH，生产清理证明有效，回执后没有继续心跳。两项各使用一次模型请求、一次精确命令审批。这修复了此前原生工具自建进程组后残留的路径；探针使用生产 supervisor、自定义 Python 宿主和真实 Codex，不替代 Rust 适配器、GUI 或其他 CLI 的完整生命周期。见[两项实证与输入摘要](validation/macos-codex-coalition-tool-gates-1.json)。当前仍为冻结源码中间构建，最终同提交验证待完成。
 
 本实现将真实 native wait 状态、任务结果和独占资源域销毁证明分别处理；stdin EOF 的两路输出尾部、bootout 失败仍清理已知域及 bootstrap 结果未知时的撤销路径均有回归入口。协议与未覆盖边界见[接入契约](DARWIN_COALITION_PRODUCT_CONTRACT.md)。没有新增主界面消息，复用已有本地化错误入口；技术诊断按 `app/i18n/PROGRESS.md` 的边界保留，无需本地化变更。最终双语布局仍单独验收。
+
+## Oz 父任务结果桥与普通消息接入
+
+新增 3 组生产 `ResultReady` 订阅及私有 SQLite 回归通过，桥模块 7 项（0.76s）、相关模块 653 项（9.071s）、国际化 11 项及 cargo check 通过。当前父结果仅一次入历史、重复和旧父代/用户轮被拒绝；关闭历史持久化后保持 Sent 未确认。首次测试编译的 Timer 类型错误及第二轮修正分别保留，见[冻结快照](validation/macos-oz-result-bridge-local-gates-2.json)。
+
+进一步审计发现，BYOP 请求构造器会忽略历史和当前 `MessagesReceivedFromAgents`。所以既有 `application_history` 回执仅证明本地历史已提交，尚不能证明下一次请求已包含正文。请求序列化、现有 Responses 上下文指纹，以及 Oz 与托管 CLI 的普通消息授权/投递正在补齐；这部分新实现尚未进入上述冻结快照，不计已通过。CLI 父任务的原生双向消息证据保持独立。
 
 ## Grok 固定平台输入与无凭据 ACP
 

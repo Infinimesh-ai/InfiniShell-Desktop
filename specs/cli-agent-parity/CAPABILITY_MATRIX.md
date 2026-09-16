@@ -1,6 +1,6 @@
 # CLI 能力矩阵
 
-更新日期：2026-09-16。此表区分代码实现、真实接口证据与产品验收；任何“待验”项均不计入 Goal 完成。
+更新日期：2026-09-17。此表区分代码实现、真实接口证据与产品验收；任何“待验”项均不计入 Goal 完成。
 
 受测接口为 Codex CLI 0.147.0、Claude Code 2.1.273、Grok Build 1.0.30。原始协议、隔离方法和官方来源见 [PROTOCOL_EVIDENCE.md](PROTOCOL_EVIDENCE.md)。不根据较新网页推定其他 CLI 版本兼容。
 
@@ -80,3 +80,5 @@ bundle8 当前通知受理、英文 Unknown 和 Unconfirmed 双语任务详情�
 328d5ed352 的[第三轮平台记录](THIRD_PLATFORM_RUN_328D5ED35.md)已越过旧 Python 环境失败：Linux 本轮所有步骤通过，GUI integration/full workspace 跳过；Windows 失败限定为当前记录的验证夹具，修复后必须原生复验。后续 macOS [专属资源域接入](DARWIN_COALITION_PRODUCT_CONTRACT.md)已通过本地 check、国际化与相关测试，新 worker 的 C 夹具组和 Codex 空闲崩溃通过，通用组同字节副本重验 4 项通过，首轮加载失败保留且原因未明；真实 Codex 运行工具的宿主/CLI 两种崩溃也已通过生产监督清理证明；没有据此开放 Grok 托管执行。
 
 Grok 1.0.30 新增[固定 ACP 无凭据边界](GROK_FIXED_ACP_BOUNDARIES.md)：macOS initialize 通过，新建受认证阻断，load/resume 明确拒绝缺失历史；缺失会话 cancel 只有通知发送。stdio EOF 自行退出，leader 需使用自持句柄强制回收，不能计自然退出或运行中取消通过。固定 Linux/Windows 输入与相同探针已接 workflow，待新提交实跑。
+
+最新资源域检查点 `6635f98690` 已推送；干净 macOS [同提交门禁](validation/macos-local-gates-6635f9869.json)通过 check、国际化 11 项、相关模块 650 项与 command 5 项，[脚本 75 项](validation/macos-python-gates-6635f9869.json)也通过。第四轮两平台与新包验证仍在进行；Windows 新路径夹具和候选启动器字节边界失败保留，不能将此前各处修复的通过合并为完整平台通过。
