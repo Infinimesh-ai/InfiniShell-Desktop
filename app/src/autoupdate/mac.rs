@@ -877,22 +877,17 @@ fn versioned_app_name(channel: Channel, version: &str) -> String {
 }
 
 fn dmg_name(channel: Channel) -> String {
+    // InfiniShell OSS 桌面版只发布 Apple Silicon 安装包。macOS x86_64 仅保留
+    // SSH/remote-server 扩展,不再提供可自动更新的桌面 App。
+    if matches!(channel, Channel::Oss) {
+        return "InfiniShell-arm64.dmg".to_string();
+    }
+
     // If the user is on an Apple Silicon Mac, download an arm64-only bundle.
     let is_arm64 = command::blocking::Command::new("uname")
         .arg("-m")
         .output()
         .is_ok_and(|output| output.stdout.starts_with(b"arm64"));
-
-    // openWarp GitHub Release 资产名固定使用 `InfiniShell-arm64.dmg` /
-    // `InfiniShell-intel.dmg`(来自 .github/workflows 的命名约定):x86_64 上是
-    // `-intel` 而不是官方 channel 的 universal 命名。这里只对 OSS 写死。
-    if matches!(channel, Channel::Oss) {
-        return if is_arm64 {
-            "InfiniShell-arm64.dmg".to_string()
-        } else {
-            "InfiniShell-intel.dmg".to_string()
-        };
-    }
 
     if is_arm64 {
         return format!("{}-arm64.dmg", app_name_prefix(channel));
