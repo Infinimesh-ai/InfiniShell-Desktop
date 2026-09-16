@@ -16,6 +16,11 @@ on:
         required: true
         default: true
         type: boolean
+      run_macos_intel:
+        description: 在标准 macOS runner 上验证 Intel CLI
+        required: true
+        default: false
+        type: boolean
       full_workspace_tests:
         description: Compile GUI integration tests and run the desktop workspace unit suite
         required: true
@@ -84,6 +89,69 @@ jobs:
         # warp_tui 仍依赖已移除的 Warp 云 API，也不属于桌面版发布产物。
         # integration 需要专用图形会话，此处完成跨平台编译后交由 GUI 测试流程执行。
         run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
+
+  macos_intel_cli:
+    name: macOS Intel CLI
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_intel }}
+    runs-on: macos-26-intel
+    timeout-minutes: 360
+    env:
+      CHANNEL: oss
+      CARGO_BUILD_JOBS: "1"
+      CARGO_PROFILE_RELEASE_CLI_CODEGEN_UNITS: "4"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      - uses: ./.github/actions/prepare_environment
+        with:
+          target_os: macos
+          cache_key: preflight-macos-x86_64-cli
+          is_self_hosted: false
+          install_release_deps: true
+
+      - name: Ensure Intel rust target is installed
+        shell: bash
+        run: rustup target add x86_64-apple-darwin
+
+      - name: Build Intel CLI
+        id: bundle_cli
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h .
+          sysctl -n hw.memsize
+          # 诊断包使用当次运行的临时版本，不创建或移动正式发布 Tag。
+          export GIT_RELEASE_TAG="v0.$(date -u +%Y.%m.%d.%H.%M).oss_01"
+          echo "GIT_RELEASE_TAG=$GIT_RELEASE_TAG" >> "$GITHUB_ENV"
+          script/bundle --channel "$CHANNEL" --arch x86_64 --artifact cli --nosign
+
+      - name: Verify Intel CLI tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="${{ steps.bundle_cli.outputs.binary_path }}"
+          resources="${{ steps.bundle_cli.outputs.bundled_resources_dir }}"
+          file "$binary"
+          version=$("$binary" --version)
+          echo "$version"
+          [[ "$version" == *"$GIT_RELEASE_TAG"* ]]
+          cp "$binary" infinishell
+          tar czf infinishell-intel-cli-preflight.tar.gz infinishell \
+            -C "$(dirname "$resources")" resources
+          shasum -a 256 infinishell-intel-cli-preflight.tar.gz
+          df -h .
+
+      - name: Upload Intel CLI preflight tarball
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: infinishell-intel-cli-preflight
+          path: infinishell-intel-cli-preflight.tar.gz
+          if-no-files-found: error
+          retention-days: 3
 
   windows:
     name: Windows x64

@@ -177,7 +177,15 @@ jobs:
 
       - name: Build CLI
         id: bundle_cli
-        run: script/bundle --channel "$CHANNEL" --arch ${{ matrix.arch }} --artifact cli --nosign
+        run: |
+          if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
+            # 标准 Intel runner 只有 14 GB 内存，限制并发与单个 codegen 分组峰值。
+            export CARGO_BUILD_JOBS=1
+            export CARGO_PROFILE_RELEASE_CLI_CODEGEN_UNITS=4
+            df -h .
+            sysctl -n hw.memsize
+          fi
+          script/bundle --channel "$CHANNEL" --arch ${{ matrix.arch }} --artifact cli --nosign
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
@@ -405,6 +413,7 @@ jobs:
       - bundle_remote_server_resources
     env:
       WARP_BUNDLED_REMOTE_SERVER_DIR: ${{ github.workspace }}/_bundled_remote_server/remote-server
+      CARGO_BUILD_JOBS: "1"
     # macos-26-intel(Pro standard)无 sccache,full cargo build + bundle + create-dmg
     # 耗时高;Intel 构建历史上超过 180min,这里放宽到 GitHub-hosted job 6h 执行上限。
     timeout-minutes: 360
