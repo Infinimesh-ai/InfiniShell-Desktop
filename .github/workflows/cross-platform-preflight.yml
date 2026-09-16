@@ -99,8 +99,6 @@ jobs:
       release_tag: ${{ steps.metadata.outputs.tag }}
     env:
       CHANNEL: oss
-      CARGO_BUILD_JOBS: "1"
-      CARGO_PROFILE_RELEASE_CLI_CODEGEN_UNITS: "4"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
