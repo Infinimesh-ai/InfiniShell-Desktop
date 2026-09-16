@@ -4537,6 +4537,7 @@ ai-orchestration-badge-connected = Connected
 ai-orchestration-badge-disconnected = Disconnected
 
 run-agents-title = Can I start additional agents for this task?
+cli-agent-child-message-permission = Local CLI child tasks can report progress to this conversation. Messages are read on the next normal request.
 run-agents-accept-without-orchestration = Accept without orchestration
 run-agents-cancelled = Spawning agents cancelled
 run-agents-configuring = Configuring agents…

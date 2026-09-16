@@ -1097,3 +1097,127 @@ fn local_cli_application_history_receipt_is_distinct_from_native_protocol() {
         Some(stored)
     );
 }
+
+#[test]
+fn ordinary_parent_history_message_requires_authorization_and_one_atomic_claim() {
+    let mut connection = connection();
+    let mut parent = task("parent", None);
+    parent.harness = "oz".into();
+    parent.config_json = serde_json::json!({"execution_kind":"local_parent",
+        "history_identity":{"root_task_id":"root","user_exchange_id":"exchange"}})
+    .to_string();
+    checkpoint(&mut connection, parent, None).unwrap();
+    let mut child = task("child", Some("parent"));
+    checkpoint(&mut connection, child.clone(), None).unwrap();
+    let progress = LocalCliMessage {
+        sender_task_id: "child".into(),
+        recipient_task_id: "parent".into(),
+        subject: "progress".into(),
+        body: "进度 中文\nEnglish 🧪".into(),
+        ..message()
+    };
+    insert_message(&mut connection, progress.clone()).unwrap();
+    assert!(claim_parent_message(&mut connection, progress.clone()).is_err());
+    assert_eq!(
+        read_message(&mut connection, &progress.message_id).unwrap(),
+        Some(progress.clone())
+    );
+    child.revision += 1;
+    child.config_json =
+        serde_json::json!({"local_tools":{"allow_spawn":false,"allow_message":true}}).to_string();
+    checkpoint(&mut connection, child, Some(1)).unwrap();
+    assert!(
+        update_message_state_with_receipt(
+            &mut connection,
+            &progress.message_id,
+            "parent",
+            1,
+            LocalCliMessageState::Acknowledged,
+            Some(LocalCliReceiptKind::ApplicationHistory)
+        )
+        .is_err()
+    );
+    let mut altered = progress.clone();
+    altered.body.push_str(" altered");
+    assert!(claim_parent_message(&mut connection, altered).is_err());
+    let claimed = claim_parent_message(&mut connection, progress.clone())
+        .unwrap()
+        .unwrap();
+    assert_eq!(claimed.state, LocalCliMessageState::Sent);
+    assert_eq!(claimed.receipt_kind, None);
+    assert_eq!(
+        claim_parent_message(&mut connection, progress).unwrap(),
+        None
+    );
+    update_message_state_with_receipt(
+        &mut connection,
+        &claimed.message_id,
+        "parent",
+        1,
+        LocalCliMessageState::Acknowledged,
+        Some(LocalCliReceiptKind::ApplicationHistory),
+    )
+    .unwrap();
+    let acknowledged = read_message(&mut connection, &claimed.message_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        acknowledged.receipt_kind,
+        Some(LocalCliReceiptKind::ApplicationHistory)
+    );
+    assert!(
+        update_message_state(
+            &mut connection,
+            &claimed.message_id,
+            "parent",
+            1,
+            LocalCliMessageState::Acknowledged
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn ordinary_child_progress_cannot_follow_its_parent_into_a_new_generation() {
+    let mut connection = connection();
+    let mut parent = task("parent", None);
+    parent.harness = "oz".into();
+    parent.config_json = serde_json::json!({"execution_kind":"local_parent",
+        "history_identity":{"root_task_id":"root","user_exchange_id":"exchange"}})
+    .to_string();
+    checkpoint(&mut connection, parent.clone(), None).unwrap();
+    let mut child = task("child", Some("parent"));
+    child.config_json =
+        serde_json::json!({"local_tools":{"allow_spawn":false,"allow_message":true}}).to_string();
+    checkpoint(&mut connection, child, None).unwrap();
+    parent.revision += 1;
+    parent.state = LocalCliTaskState::Disconnected;
+    checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+    parent.generation = 2;
+    parent.revision = 0;
+    parent.state = LocalCliTaskState::Queued;
+    checkpoint(&mut connection, parent, Some(1)).unwrap();
+    let progress = LocalCliMessage {
+        sender_task_id: "child".into(),
+        recipient_task_id: "parent".into(),
+        recipient_generation: 2,
+        subject: "progress".into(),
+        ..message()
+    };
+    insert_message(&mut connection, progress.clone()).unwrap();
+    assert!(claim_parent_message(&mut connection, progress.clone()).is_err());
+    assert_eq!(
+        read_message(&mut connection, &progress.message_id).unwrap(),
+        Some(progress)
+    );
+    // 新父代的明确指令仍可发给原有子任务，不全局改变普通信箱规则。
+    let instruction = LocalCliMessage {
+        message_id: "new-instruction".into(),
+        sender_generation: 2,
+        ..message()
+    };
+    assert_eq!(
+        insert_message(&mut connection, instruction).unwrap(),
+        LocalCliEnqueueOutcome::Created
+    );
+}

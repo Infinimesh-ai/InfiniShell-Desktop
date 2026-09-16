@@ -46,6 +46,10 @@ pub enum LocalCliPersistenceRequest {
         message: LocalCliMessage,
         completion: oneshot::Sender<Result<Option<LocalCliMessage>, String>>,
     },
+    ClaimParentHistoryMessage {
+        message: LocalCliMessage,
+        completion: oneshot::Sender<Result<Option<LocalCliMessage>, String>>,
+    },
     EnqueueMessage {
         message: LocalCliMessage,
         completion: oneshot::Sender<Result<LocalCliEnqueueOutcome, String>>,
@@ -169,6 +173,22 @@ pub(crate) fn claim_task_result(
     Ok(receiver)
 }
 
+/// 普通子任务消息只允许一个历史投递者领取；Sent 不会重新入队。
+pub(crate) fn claim_parent_history_message(
+    sender: &SyncSender<ModelEvent>,
+    message: LocalCliMessage,
+) -> Result<oneshot::Receiver<Result<Option<LocalCliMessage>, String>>, String> {
+    let (completion, receiver) = oneshot::channel();
+    enqueue_request(
+        sender,
+        LocalCliPersistenceRequest::ClaimParentHistoryMessage {
+            message,
+            completion,
+        },
+    )?;
+    Ok(receiver)
+}
+
 /// 传输写入只标为 Sent；仅接收方的真实回执可标为 Acknowledged。
 pub(crate) fn acknowledge_message(
     sender: &SyncSender<ModelEvent>,
@@ -191,7 +211,7 @@ pub(crate) fn acknowledge_message(
     Ok(receiver)
 }
 
-/// 仅用于父 Oz 会话历史已提交的结果，不代表外部 CLI 接收或模型已处理。
+/// 仅用于父 Oz 会话历史已提交的结果或授权消息，不代表 CLI 接收或模型已处理。
 pub(crate) fn acknowledge_application_history(
     sender: &SyncSender<ModelEvent>,
     message_id: String,
@@ -324,6 +344,10 @@ pub(super) fn handle_request(
             message,
             completion,
         } => complete(claim_result(connection, message), completion),
+        LocalCliPersistenceRequest::ClaimParentHistoryMessage {
+            message,
+            completion,
+        } => complete(claim_parent_message(connection, message), completion),
         LocalCliPersistenceRequest::AcknowledgeMessage {
             message_id,
             task_id,
@@ -379,6 +403,7 @@ pub(super) fn reject_request(request: LocalCliPersistenceRequest) {
             let _ = completion.send(Err(error));
         }
         LocalCliPersistenceRequest::EnqueueTaskResult { completion, .. }
+        | LocalCliPersistenceRequest::ClaimParentHistoryMessage { completion, .. }
         | LocalCliPersistenceRequest::ClaimTaskResult { completion, .. } => {
             let _ = completion.send(Err(error));
         }
@@ -882,6 +907,73 @@ fn claim_result(
     })
 }
 
+fn validate_parent_message(
+    message: &LocalCliMessage,
+    source: &LocalCliTask,
+    parent: &LocalCliTask,
+) -> Result<()> {
+    let permissions: serde_json::Value = serde_json::from_str(&source.config_json)?;
+    let parent_config: serde_json::Value = serde_json::from_str(&parent.config_json)?;
+    if message.subject == TASK_RESULT_SUBJECT
+        || matches!(
+            message.subject.as_str(),
+            "native_tool_call" | "native_tool_result"
+        )
+        || source.version != 1
+        || parent.version != 1
+        || source.generation != message.sender_generation
+        || parent.generation != message.recipient_generation
+        || source.parent_task_id.as_deref() != Some(parent.task_id.as_str())
+        || source.parent_generation != Some(parent.generation)
+        || parent.harness != "oz"
+        || !parent.state.is_active()
+        || parent_config["execution_kind"] != "local_parent"
+        || !parent_config["history_identity"].is_object()
+        || permissions["local_tools"]["allow_message"] != true
+    {
+        bail!("普通消息未获授权或不属于创建时的活动父运行");
+    }
+    Ok(())
+}
+
+fn claim_parent_message(
+    connection: &mut SqliteConnection,
+    message: LocalCliMessage,
+) -> Result<Option<LocalCliMessage>> {
+    connection.transaction(|connection| {
+        if message.state != LocalCliMessageState::Queued {
+            bail!("只能领取待派发的普通父消息");
+        }
+        let mut stored =
+            read_message(connection, &message.message_id)?.context("普通父消息尚未入队")?;
+        let state = stored.state;
+        stored.state = LocalCliMessageState::Queued;
+        stored.receipt_kind = None;
+        if stored != message {
+            bail!("普通父消息内容与持久化记录不一致");
+        }
+        if state != LocalCliMessageState::Queued {
+            return Ok(None);
+        }
+        let source = read_task(connection, &message.sender_task_id)?.context("消息子任务不存在")?;
+        let parent =
+            read_task(connection, &message.recipient_task_id)?.context("消息父任务不存在")?;
+        validate_parent_message(&message, &source, &parent)?;
+        if !source.state.is_active() {
+            bail!("消息子任务已停止，不能开始新的历史投递");
+        }
+        update_message_state(
+            connection,
+            &message.message_id,
+            &message.recipient_task_id,
+            message.recipient_generation,
+            LocalCliMessageState::Sent,
+        )?;
+        stored.state = LocalCliMessageState::Sent;
+        Ok(Some(stored))
+    })
+}
+
 fn utf8_excerpt(text: &str, maximum_bytes: usize) -> &str {
     let mut end = text.len().min(maximum_bytes);
     while !text.is_char_boundary(end) {
@@ -960,10 +1052,16 @@ fn update_message_state_with_receipt(
             }
             return Ok(());
         }
-        if receipt == Some(LocalCliReceiptKind::ApplicationHistory)
-            && (message.subject != TASK_RESULT_SUBJECT || recipient.harness != "oz")
-        {
-            bail!("应用历史只能确认已生成的任务结果");
+        if receipt == Some(LocalCliReceiptKind::ApplicationHistory) {
+            if recipient.harness != "oz" {
+                bail!("应用历史只能确认 Oz 父会话消息");
+            }
+            if message.subject != TASK_RESULT_SUBJECT {
+                validate_parent_message(&message, &sender, &recipient)?;
+                if message.state != LocalCliMessageState::Sent {
+                    bail!("普通父消息必须先领取再确认历史提交");
+                }
+            }
         }
         let is_late_delivery_outcome =
             is_delivery_outcome && message.state == LocalCliMessageState::Sent;

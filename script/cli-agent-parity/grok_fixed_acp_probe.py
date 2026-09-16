@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import mmap
 import os
 from pathlib import Path
 import platform
@@ -27,6 +28,10 @@ MISSING_SESSION = "00000000-0000-4000-8000-000000000000"
 METHODS = ("initialize", "session/new", "session/cancel", "session/load", "session/resume")
 MACOS_BINARY_BYTES = 141869568
 MACOS_BINARY_SHA256 = "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
+
+
+class EmptyLeaderPid(ValueError):
+    """原生先创建并加锁，再写 PID；仅启动等待阶段允许此短暂空文件。"""
 
 
 def fixed_binary(executable):
@@ -126,24 +131,52 @@ def clean(value, root):
     return value
 
 
+def read_leader_pid(lock, *, mapped=None):
+    mapped = os.name == "nt" if mapped is None else mapped
+    try:
+        regular_file(lock)
+        with lock.open("rb", buffering=0) as handle:
+            size = os.fstat(handle.fileno()).st_size
+            if size == 0:
+                raise EmptyLeaderPid("私有 leader PID 尚未写入")
+            require(size <= 32, "私有 leader PID 文件超过诊断上限")
+            if mapped:
+                # Windows 的 LockFileEx 排他范围禁止普通读；只读映射不解锁、不改权限或内容。
+                with mmap.mmap(handle.fileno(), size, access=mmap.ACCESS_READ) as view:
+                    value = view[:]
+            else:
+                value = handle.read(size + 1)
+            require(len(value) == size, "读取期间私有 leader PID 文件发生变化")
+        text = value.decode("ascii").strip()
+        require(re.fullmatch(r"[1-9][0-9]{0,9}", text) is not None and int(text) <= 0xFFFFFFFF,
+                "私有 leader PID 文件不是有效原生进程身份")
+        return int(text)
+    except OSError as error:
+        # 只记录自有临时文件的操作类别；由报告统一脱敏路径，保留原始 errno/winerror。
+        error.probe_operation = "leader_lock_pid_read"
+        error.probe_file_category = "private_leader_lock"
+        error.probe_read_mode = "read_only_mmap" if mapped else "regular_read"
+        raise
+
+
 def owned_leader(leader, endpoint):
     require(leader.process.poll() is None, "自持 leader 已退出，禁止继续连接或接受其他 leader")
-    lock = endpoint.with_suffix(".lock")
-    regular_file(lock)
-    require(lock.read_text(encoding="ascii").strip() == str(leader.process.pid),
+    require(read_leader_pid(endpoint.with_suffix(".lock")) == leader.process.pid,
             "私有 leader 锁不是本探针实际持有的进程")
+    require(leader.process.poll() is None, "读取私有身份期间自持 leader 已退出")
 
 
 def wait_leader(leader, endpoint):
     deadline = time.monotonic() + LEADER_TIMEOUT
     while time.monotonic() < deadline:
         require(leader.process.poll() is None, "leader 在建立私有连接前退出")
-        if endpoint.with_suffix(".lock").exists() and (os.name == "nt" or endpoint.exists()):
-            try:
-                owned_leader(leader, endpoint)
+        try:
+            owned_leader(leader, endpoint)
+        except (EmptyLeaderPid, FileNotFoundError):
+            pass
+        else:
+            if os.name == "nt" or endpoint.exists():
                 return
-            except (ValueError, FileNotFoundError):
-                pass
         time.sleep(0.05)
     raise ValueError("私有 leader 没有在期限内建立本进程的锁与端点")
 
@@ -209,14 +242,19 @@ def run(executable, root, report):
     expected = requests(project, str(uuid.uuid4()))
     cleanup = {}
     try:
+        report["phase"] = "wait_for_private_leader"
         wait_leader(leader, endpoint)
+        report["leader_identity_read_mode"] = "read_only_mmap" if os.name == "nt" else "regular_read"
+        report["phase"] = "start_private_stdio"
         client = Recorder([str(executable), "agent", "stdio", "--leader-socket", str(endpoint)], env, project)
         report["stdio_pid"] = client.process.pid
         for request in expected:
+            report["phase"] = request["method"]
             result = exchange(client, leader, endpoint, request)
             report["cases"].append({"method": request["method"], "request_id": request.get("id"), **result})
         owned_leader(leader, endpoint)
         report["private_leader_pid_confirmed"] = True
+        report["phase"] = "stdio_eof_and_owned_cleanup"
         report["stdio_eof"] = client.finish_eof()
         report["leader_after_stdio_eof"] = wait_idle_exit(leader)
     finally:
@@ -236,8 +274,7 @@ def run(executable, root, report):
         report["cleanup"] = cleanup
         lock = endpoint.with_suffix(".lock")
         if lock.exists():
-            regular_file(lock)
-            require(lock.read_text(encoding="ascii").strip() == str(leader.process.pid),
+            require(read_leader_pid(lock) == leader.process.pid,
                     "收尾检测到替换 leader；不能宣称私有连接已清理")
         report["endpoint_file_remaining"] = endpoint.exists()
         report["leader_lock_file_remaining"] = lock.exists()
@@ -254,6 +291,7 @@ def run(executable, root, report):
     require(not (root / "grok/auth.json").exists(), "无凭据探针意外产生 auth.json")
     require(fixed_binary(executable) == report["binary"], "原生文件在探测期间发生变化")
     report["binary_unchanged"] = True
+    report["phase"] = "complete"
 
 
 def main():
@@ -283,6 +321,9 @@ def main():
         report["passed"] = True
     except Exception as error:
         report["failure"] = {"type": type(error).__name__, "message": clean(str(error), root)}
+        for field in ("errno", "winerror", "probe_operation", "probe_file_category", "probe_read_mode"):
+            if getattr(error, field, None) is not None:
+                report["failure"][field] = getattr(error, field)
     finally:
         report["private_directory_removed"] = root is not None and not root.exists()
         with output.open("x", encoding="utf-8", newline="\n") as target:

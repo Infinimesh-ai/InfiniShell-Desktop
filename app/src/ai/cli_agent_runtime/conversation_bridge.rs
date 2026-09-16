@@ -13,7 +13,8 @@ use crate::ai::agent::conversation::{AIConversation, AIConversationId, Conversat
 use crate::ai::agent::{AIAgentInput, RenderableAIError};
 use crate::ai::blocklist::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use crate::persistence::local_cli_tasks::{
-    acknowledge_application_history, checkpoint_task, claim_task_result, load_tasks,
+    acknowledge_application_history, checkpoint_task, claim_parent_history_message,
+    claim_task_result, load_tasks,
 };
 use crate::persistence::model::{
     LocalCliMessage, LocalCliMessageState, LocalCliTask, LocalCliTaskState,
@@ -86,14 +87,29 @@ impl LocalCLIConversationBridge {
                 {
                     return;
                 }
-                self.deliver_result(message.clone(), ctx);
+                self.deliver_message(message.clone(), true, ctx);
+            }
+            LocalCLITaskCoordinatorEvent::ParentMessageReady { task, message } => {
+                if message.sender_task_id == task.task_id
+                    && message.sender_generation == task.generation
+                    && task.parent_task_id.as_ref() == Some(&message.recipient_task_id)
+                    && task.parent_generation == Some(message.recipient_generation)
+                    && message.subject != "local_task_result"
+                {
+                    self.deliver_message(message.clone(), false, ctx);
+                }
             }
             LocalCLITaskCoordinatorEvent::Changed
             | LocalCLITaskCoordinatorEvent::MessagesChanged { .. } => {}
         }
     }
 
-    fn deliver_result(&mut self, message: LocalCliMessage, ctx: &mut ModelContext<Self>) {
+    fn deliver_message(
+        &mut self,
+        message: LocalCliMessage,
+        is_result: bool,
+        ctx: &mut ModelContext<Self>,
+    ) {
         if !matches!(
             message.state,
             LocalCliMessageState::Queued | LocalCliMessageState::Sent
@@ -135,7 +151,12 @@ impl LocalCLIConversationBridge {
                     return Err("父会话已经结束或进入另一轮，结果仅保留在任务历史".to_owned());
                 }
                 let claimed = if message.state == LocalCliMessageState::Queued {
-                    claim_task_result(&sender, message.clone())?
+                    let claim = if is_result {
+                        claim_task_result(&sender, message.clone())?
+                    } else {
+                        claim_parent_history_message(&sender, message.clone())?
+                    };
+                    claim
                         .await
                         .map_err(|_| "父结果领取确认已关闭".to_owned())??
                         .is_some()
@@ -395,10 +416,15 @@ fn current_result_destination(
 }
 
 fn history_result_message(task_id: &str, message: &LocalCliMessage) -> api::Message {
+    let is_result = message.subject == "local_task_result";
     api::Message {
         id: message.message_id.clone(),
         task_id: task_id.to_owned(),
-        request_id: format!("local-task-result:{}", message.message_id),
+        request_id: format!(
+            "local-task-{}:{}",
+            if is_result { "result" } else { "message" },
+            message.message_id
+        ),
         server_message_data: String::new(),
         citations: Vec::new(),
         timestamp: None,
@@ -410,7 +436,11 @@ fn history_result_message(task_id: &str, message: &LocalCliMessage) -> api::Mess
                         message_id: message.message_id.clone(),
                         sender_agent_id: message.sender_task_id.clone(),
                         addresses: vec![message.recipient_task_id.clone()],
-                        subject: crate::t!("cli-agent-task-result-subject"),
+                        subject: if is_result {
+                            crate::t!("cli-agent-task-result-subject")
+                        } else {
+                            message.subject.clone()
+                        },
                         message_body: message.body.clone(),
                     },
                 ],
@@ -466,3 +496,7 @@ fn status_for_task(task: &LocalCliTask) -> (ConversationStatus, Option<String>) 
 #[cfg(test)]
 #[path = "conversation_bridge_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "conversation_bridge_message_tests.rs"]
+mod message_tests;

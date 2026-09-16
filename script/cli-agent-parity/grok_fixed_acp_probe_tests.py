@@ -109,6 +109,161 @@ class GrokFixedAcpTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 probe.owned_leader(leader, endpoint)
 
+    def test_mapped_pid_is_bounded_read_only_and_rejects_invalid_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            lock = Path(temporary) / 'leader.lock'
+            lock.write_bytes(b'42\n')
+            before = lock.stat()
+            self.assertEqual(probe.read_leader_pid(lock, mapped=True), 42)
+            self.assertEqual(lock.read_bytes(), b'42\n')
+            self.assertEqual(lock.stat().st_mtime_ns, before.st_mtime_ns)
+            for value in (b'', b'0', b'-42', b'42\x0043', b'\xff', b'4294967296', b'4' * 33):
+                lock.write_bytes(value)
+                with self.subTest(value=value), self.assertRaises(ValueError):
+                    probe.read_leader_pid(lock, mapped=True)
+                self.assertEqual(lock.read_bytes(), value)
+
+    def test_lock_read_failure_keeps_operation_and_native_error_without_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            lock = Path(temporary) / 'leader.lock'
+            lock.write_bytes(b'42')
+            for mapped in (False, True):
+                failure = PermissionError(13, 'fixture denied')
+                with self.subTest(mapped=mapped), mock.patch.object(Path, 'open', side_effect=failure):
+                    with self.assertRaises(PermissionError) as caught:
+                        probe.read_leader_pid(lock, mapped=mapped)
+                self.assertIs(caught.exception, failure)
+                self.assertEqual(failure.errno, 13)
+                self.assertEqual(failure.probe_operation, 'leader_lock_pid_read')
+                self.assertEqual(failure.probe_file_category, 'private_leader_lock')
+                self.assertEqual(failure.probe_read_mode, 'read_only_mmap' if mapped else 'regular_read')
+
+    def test_startup_empty_pid_waits_for_same_live_leader_within_original_deadline(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            endpoint = Path(temporary) / 'leader.sock'
+            endpoint.touch()
+            lock = endpoint.with_suffix('.lock')
+            lock.touch()
+            leader = mock.Mock()
+            leader.process.pid = 42
+            leader.process.poll.return_value = None
+            clock = [0.0]
+
+            def complete_pid(delay):
+                clock[0] += delay
+                lock.write_bytes(b'42')
+
+            with mock.patch.object(probe.time, 'monotonic', side_effect=lambda: clock[0]), \
+                    mock.patch.object(probe.time, 'sleep', side_effect=complete_pid) as sleep:
+                probe.wait_leader(leader, endpoint)
+            sleep.assert_called_once_with(0.05)
+            self.assertEqual(lock.read_bytes(), b'42')
+            self.assertIsNone(leader.process.poll())
+
+    def test_startup_empty_pid_times_out_without_becoming_an_accepted_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            endpoint = Path(temporary) / 'leader.sock'
+            endpoint.touch()
+            lock = endpoint.with_suffix('.lock')
+            lock.touch()
+            leader = mock.Mock()
+            leader.process.pid = 42
+            leader.process.poll.return_value = None
+            clock = [0.0]
+
+            def advance(delay):
+                clock[0] += delay
+
+            with mock.patch.object(probe, 'LEADER_TIMEOUT', 0.1), \
+                    mock.patch.object(probe.time, 'monotonic', side_effect=lambda: clock[0]), \
+                    mock.patch.object(probe.time, 'sleep', side_effect=advance) as sleep:
+                with self.assertRaisesRegex(ValueError, '期限'):
+                    probe.wait_leader(leader, endpoint)
+            self.assertEqual(sleep.call_count, 2)
+            self.assertEqual(clock[0], 0.1)
+            self.assertEqual(lock.read_bytes(), b'')
+            with self.assertRaises(probe.EmptyLeaderPid):
+                probe.owned_leader(leader, endpoint)
+
+    def test_startup_nonempty_wrong_pid_or_nonregular_file_is_rejected_without_retry(self):
+        for value in (b'43', b'invalid', b'4' * 33, None):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as temporary:
+                endpoint = Path(temporary) / 'leader.sock'
+                lock = endpoint.with_suffix('.lock')
+                if value is None:
+                    lock.mkdir()
+                else:
+                    lock.write_bytes(value)
+                leader = mock.Mock()
+                leader.process.pid = 42
+                leader.process.poll.return_value = None
+                with mock.patch.object(probe.time, 'sleep') as sleep, self.assertRaises(ValueError):
+                    probe.wait_leader(leader, endpoint)
+                sleep.assert_not_called()
+
+    def test_startup_empty_pid_cannot_hide_the_owned_leader_exit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            endpoint = Path(temporary) / 'leader.sock'
+            endpoint.with_suffix('.lock').touch()
+            leader = mock.Mock()
+            leader.process.pid = 42
+            leader.process.poll.return_value = None
+
+            def exit_leader(delay):
+                self.assertEqual(delay, 0.05)
+                leader.process.poll.return_value = 37
+
+            with mock.patch.object(probe.time, 'sleep', side_effect=exit_leader) as sleep:
+                with self.assertRaisesRegex(ValueError, '退出'):
+                    probe.wait_leader(leader, endpoint)
+            sleep.assert_called_once_with(0.05)
+
+    @unittest.skipUnless(sys.platform == 'win32', '真实 LockFileEx 跨进程契约仅在 Windows 运行')
+    def test_windows_exclusive_lock_allows_only_mapped_pid_from_owned_live_child(self):
+        # 使用原生字节范围排他锁复现 fs2 行为；不冒充 Grok 的 ACP 或认证接口。
+        source = r'''
+import ctypes, json, msvcrt, os, sys
+from ctypes import wintypes
+class OVERLAPPED(ctypes.Structure):
+    _fields_ = [('Internal', ctypes.c_size_t), ('InternalHigh', ctypes.c_size_t),
+                ('Offset', wintypes.DWORD), ('OffsetHigh', wintypes.DWORD), ('hEvent', wintypes.HANDLE)]
+kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+kernel.LockFileEx.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.DWORD,
+                             wintypes.DWORD, wintypes.DWORD, ctypes.POINTER(OVERLAPPED)]
+kernel.LockFileEx.restype = wintypes.BOOL
+with open(sys.argv[1], 'w+b', buffering=0) as lock:
+    lock.write(str(os.getpid()).encode('ascii'))
+    state = OVERLAPPED()
+    if not kernel.LockFileEx(msvcrt.get_osfhandle(lock.fileno()), 3, 0, 0xffffffff, 0xffffffff, ctypes.byref(state)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    print(json.dumps({'pid': os.getpid(), 'exclusive_lock': True}), flush=True)
+    sys.stdin.readline()
+'''
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            endpoint = root / 'leader.sock'
+            lock = endpoint.with_suffix('.lock')
+            child = probe.Recorder([sys.executable, '-c', source, str(lock)],
+                                   python_fixture_environment(root), root)
+            try:
+                ready = child.messages.get(timeout=5)
+                self.assertEqual(ready, {'pid': child.process.pid, 'exclusive_lock': True})
+                with self.assertRaises(PermissionError):
+                    lock.read_bytes()
+                before = lock.stat()
+                self.assertEqual(probe.read_leader_pid(lock), child.process.pid)
+                probe.owned_leader(child, endpoint)
+                self.assertEqual(lock.stat().st_mtime_ns, before.st_mtime_ns)
+                result = child.finish_eof()
+                self.assertTrue(result['stdin_eof_exited_within_5s'])
+                self.assertEqual(result['exit_code_before_cleanup'], 0)
+                self.assertEqual(lock.read_text(), str(child.process.pid))
+                with self.assertRaises(ValueError):
+                    probe.owned_leader(child, endpoint)
+            finally:
+                child.close()
+            self.assertIsNotNone(child.process.poll())
+
     def test_real_transport_retains_utf8_and_native_nonzero_exit(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()

@@ -53,6 +53,8 @@ use crate::ai::cli_agent_runtime::local_skills::{
     collect_local_child_skills, prepare_local_cli_skill_inputs,
 };
 #[cfg(not(target_family = "wasm"))]
+use crate::ai::cli_agent_runtime::local_tools::LocalToolPermissions;
+#[cfg(not(target_family = "wasm"))]
 use crate::ai::cli_agent_runtime::{InputContent, PermissionPolicy, SessionOptions, SessionTarget};
 use crate::ai::conversation_utils;
 use crate::ai::llms::LLMPreferences;
@@ -1711,6 +1713,7 @@ fn launch_local_harness_child(
     });
     let managed_model = model_id.clone();
     let initial_prompt = prompt.clone();
+    let allow_local_child_messages = request.allow_local_child_messages;
     let prepared_skills = collect_local_child_skills(&skill_references, ctx);
     let shell_type = group
         .terminal_view_from_pane_id(parent_pane_id, ctx)
@@ -1783,7 +1786,11 @@ fn launch_local_harness_child(
                     permission_policy: PermissionPolicy::Inherit,
                     permission_ceiling: None,
                     model: managed_model,
-                    local_tools: None,
+                    local_tools: (allow_local_child_messages && parent_harness == Harness::Oz)
+                        .then_some(LocalToolPermissions {
+                            allow_spawn: false,
+                            allow_message: true,
+                        }),
                     selected_skills: Vec::new(),
                 })
             } else {

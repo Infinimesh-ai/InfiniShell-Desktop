@@ -210,6 +210,156 @@ fn parallel_children_reuse_one_committed_parent_without_duplicate_generations() 
     writer.handle.join().unwrap();
 }
 
+#[cfg(feature = "local_fs")]
+#[test]
+fn explicit_parent_message_starts_only_the_new_parent_generation_and_preserves_sent() {
+    use crate::persistence::local_cli_tasks::{
+        acknowledge_message, checkpoint_task, enqueue_message, load_messages, load_tasks,
+    };
+    use crate::persistence::model::{LocalCliMessage, LocalCliMessageState};
+    use std::cell::Cell;
+
+    let directory = TempDir::new().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("follow-up.sqlite")).unwrap();
+    block_on(async {
+        let parent = LocalCliTask {
+            version: 1,
+            task_id: "parent".into(),
+            parent_task_id: None,
+            parent_generation: None,
+            harness: "oz".into(),
+            working_directory: directory.path().to_string_lossy().into_owned(),
+            config_json: serde_json::json!({"execution_kind":"local_parent", "history_identity":{
+                "root_task_id":"root", "user_exchange_id":"first",
+            }})
+            .to_string(),
+            native_session_id: None,
+            generation: 1,
+            revision: 0,
+            state: LocalCliTaskState::Queued,
+            result: None,
+            terminal_evidence: None,
+        };
+        let child = LocalCliTask {
+            task_id: "existing-child".into(),
+            parent_task_id: Some(parent.task_id.clone()),
+            parent_generation: Some(1),
+            harness: "codex".into(),
+            config_json: "{}".into(),
+            ..parent.clone()
+        };
+        let child = super::persist_local_harness_child_launch(
+            &writer.sender,
+            parent.clone(),
+            child,
+            || async { Ok(()) },
+        )
+        .await
+        .unwrap();
+        let old_message = LocalCliMessage {
+            version: 1,
+            message_id: "old-message".into(),
+            sender_task_id: parent.task_id.clone(),
+            recipient_task_id: child.task_id.clone(),
+            sender_generation: 1,
+            recipient_generation: 1,
+            subject: "follow-up".into(),
+            body: "已经派发，尚未确认".into(),
+            state: LocalCliMessageState::Queued,
+            receipt_kind: None,
+        };
+        enqueue_message(&writer.sender, old_message.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        acknowledge_message(
+            &writer.sender,
+            old_message.message_id.clone(),
+            child.task_id.clone(),
+            1,
+            LocalCliMessageState::Sent,
+        )
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+        let mut next = parent;
+        next.config_json = serde_json::json!({"execution_kind":"local_parent", "history_identity":{
+            "root_task_id":"root", "user_exchange_id":"second",
+        }})
+        .to_string();
+        let source = super::persist_local_harness_parent(&writer.sender, next, || async { Ok(()) })
+            .await
+            .unwrap();
+        assert_eq!(source.generation, 2);
+        assert_eq!(source.state, LocalCliTaskState::Running);
+        let tasks = load_tasks(&writer.sender, false)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(tasks.len(), 2, "追加指令不能生成替代子任务");
+        assert_eq!(
+            tasks.iter().find(|task| task.task_id == child.task_id),
+            Some(&child)
+        );
+        let saved = load_messages(&writer.sender, child.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].message_id, old_message.message_id);
+        assert_eq!(saved[0].sender_generation, 1);
+        assert_eq!(saved[0].state, LocalCliMessageState::Sent);
+        assert_eq!(saved[0].receipt_kind, None);
+        let new_message = LocalCliMessage {
+            message_id: "new-message".into(),
+            sender_generation: 2,
+            ..old_message
+        };
+        enqueue_message(&writer.sender, new_message)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+
+        // 登记的最后一次 await 后仍要校验当前用户轮，不能返回已失效的发送资格。
+        let checks = Cell::new(0);
+        let rejected = super::persist_local_harness_parent(&writer.sender, source.clone(), || {
+            checks.set(checks.get() + 1);
+            let current = checks.get() == 1;
+            async move {
+                current
+                    .then_some(())
+                    .ok_or_else(|| "用户轮已切换".to_owned())
+            }
+        })
+        .await;
+        assert!(rejected.is_err());
+        assert_eq!(checks.get(), 2);
+        let mut disconnected = source;
+        disconnected.state = LocalCliTaskState::Disconnected;
+        disconnected.revision += 1;
+        checkpoint_task(&writer.sender, disconnected.clone(), Some(2))
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let same_turn =
+            super::persist_local_harness_parent(&writer.sender, disconnected.clone(), || async {
+                Ok(())
+            })
+            .await
+            .unwrap();
+        assert_eq!(same_turn, disconnected, "同一用户轮不能复活已断开的父任务");
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
 impl EnvVarGuard {
     fn set(key: &'static str, value: impl Into<OsString>) -> Self {
         let original = std::env::var_os(key);

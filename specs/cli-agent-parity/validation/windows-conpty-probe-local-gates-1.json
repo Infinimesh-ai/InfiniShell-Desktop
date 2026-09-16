@@ -1,0 +1,32 @@
+{
+  "base_commit": "94a412eb89a4de57977072e6c45f4a692955d970",
+  "worktree_dirty": true,
+  "source_files": {
+    "script/cli-agent-parity/probe_codex_windows_conpty.py": "e503c5ffcf4bb22d2c32945862b50f8547c0581403a61017fef5b4b8d3b09535",
+    "script/cli-agent-parity/codex_windows_conpty_tests.py": "feb9de20dad23ef15af8076dc8898560c537f17587b51b88cbe9337c4531a4d3",
+    "specs/cli-agent-parity/WINDOWS_CONPTY_NOTIFICATION_PROBE.md": "a83046c0b4c40f9e92d7d987d20d0ba8b49576d9dc02fc39ee17e555a2906270",
+    ".github/workflows/cross-platform-preflight.yml": "13f4e129191df9a40c5aeb06f378edcba53fbe1213d37c9c324044951e24ad9a"
+  },
+  "unit_tests": {
+    "command": "python3 -B script/cli-agent-parity/codex_windows_conpty_tests.py -v",
+    "passed": 9,
+    "failed": 0,
+    "execution_seconds": 0.001
+  },
+  "workflow_validation": [
+    {
+      "command": "actionlint .github/workflows/cross-platform-preflight.yml",
+      "exit_code": 1,
+      "reason": "已有自托管 infinishell-ci 标签未在本机 actionlint 配置声明；没有发现新增步骤语法错误"
+    },
+    {
+      "command": "actionlint -config-file /tmp/infinishell-cli-parity-actionlint.yaml .github/workflows/cross-platform-preflight.yml",
+      "exit_code": 0,
+      "config": "self-hosted-runner:\n  labels:\n    - infinishell-ci\n"
+    }
+  ],
+  "native_windows_executed": false,
+  "native_conpty_notifications_verified": false,
+  "product_ui_verified": false,
+  "review": "独立只读交叉复核未发现可证明的假阳性；实际控制台附着和通知运输待同提交 Windows 执行"
+}

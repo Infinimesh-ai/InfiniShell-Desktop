@@ -38,6 +38,8 @@ pub struct StartAgentRequest {
     pub lifecycle_subscription: Option<Vec<LifecycleEventType>>,
     pub parent_conversation_id: AIConversationId,
     pub parent_run_id: Option<String>,
+    /// 仅由已批准的本地派发入口设置，模型参数和远端请求不能授予此权限。
+    pub allow_local_child_messages: bool,
 }
 
 struct PendingStartAgent {
@@ -250,6 +252,7 @@ impl StartAgentExecutor {
         lifecycle_subscription: Option<Vec<LifecycleEventType>>,
         parent_conversation_id: AIConversationId,
         parent_run_id: Option<String>,
+        allow_local_child_messages: bool,
         ctx: &mut ModelContext<Self>,
     ) -> async_channel::Receiver<StartAgentOutcome> {
         let (sender, receiver) = async_channel::bounded(1);
@@ -271,6 +274,7 @@ impl StartAgentExecutor {
                 lifecycle_subscription,
                 parent_conversation_id,
                 parent_run_id,
+                allow_local_child_messages,
             },
         )));
         receiver

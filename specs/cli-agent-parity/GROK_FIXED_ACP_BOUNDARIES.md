@@ -83,3 +83,19 @@ python3 -B script/cli-agent-parity/grok_fixed_acp_probe_tests.py -v
 本地 10 项通过：消费已有真实 Grok 握手形状并验证版本/认证/缺失历史；拒绝重复/过期/提前响应和模型事件；拒绝替换 leader PID；真实 Python 子进程验证 UTF-8、exit 37、响应前提前退出与 stderr、超时强制清理区别，以及报告脱敏。Python 子进程仅用于 I/O 和收尾夹具，不冒充真实 Grok。
 
 未运行 Cargo，未改 workflow、Rust、插件、能力开关或主计划文档。新增内容是独立验证入口与技术证据，无需本地化变更。后续平台执行由根代理依照跨平台验证技能统一安排。
+
+## 第五轮 Windows 排他锁读取失败与窄修
+
+以上“目标平台未运行”是探针初次冻结时的历史状态。[第四轮 6635f9869](FOURTH_PLATFORM_RUN_6635F9869.md) 已在 Linux 真实通过五个有限边界；[第五轮 94a412eb](FIFTH_PLATFORM_RUN_94A412EB.md) 的 Windows 固定文件和 `--version` 通过，但首次 ACP 探测在自持 leader 启动后、stdio 创建前失败。原证据只保留 `PermissionError`/errno 13，没有操作栈，不能把推断补写成原生已记录的错误位置；没有发送 ACP 请求，也没有模型输入。
+
+固定 [Grok `lock.rs`](https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/leader/lock.rs#L149) 用 `try_lock_exclusive` 在整个 leader 生命周期持锁，再写 PID。[同提交 Cargo.lock](https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/Cargo.lock) 固定 `fs2=0.4.3`，其发布包 SHA-256 `9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213` 已下载核对。该实现 `src/windows.rs:93–114` 调用 `LockFileEx`，排他范围低/高 DWORD 均为 `0xffffffff`。[微软契约](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex#remarks) 明确其他句柄不能普通读写排他范围，但只读映射不受该字节锁限制。这解释了旧探针 `Path.read_text` 与 Windows 原生锁冲突；不是缺少认证或取消接口失败。
+
+后续探针窄修仅把 Windows 自有 PID 诊断改为 `mmap.ACCESS_READ`：文件必须为普通私有文件，长度 1–32 字节，ASCII 正整数且不超过原生 DWORD PID；读前后检查自持 `Popen` 存活，PID 必须精确匹配。映射和文件句柄立即关闭，不释放原生锁、不修改文件、ACL 或用户配置，不读取不属于探针的路径，也不增加命名管道连接或 ACP 操作。Unix 仍普通读取。错误不降级放行，报告新增 `phase` 及原始 `errno`/`winerror`、安全操作类别 `leader_lock_pid_read` 和读取方式，供下一 Windows 结果定位。
+
+`app/src/ai/cli_agent_runtime/grok.rs` 只将私有 `--leader-socket` 交给原生 stdio，没有上述 PID 文件读取；本次不改产品适配器或 Grok 执行 gate，也不以它未读取锁推定产品托管生命周期已通过。
+
+新增 `test_windows_exclusive_lock_allows_only_mapped_pid_from_owned_live_child` 在 Windows 启动真实独立 Python 子进程，以原生 `LockFileEx` 持有整个范围：父普通读必须得到 `PermissionError`，只读映射必须取得实际子 PID，文件 mtime 不变；子进程 EOF 自行退出 0 后普通读恢复、旧进程身份必须拒绝。它属于现有 `grok_fixed_acp_probe_tests.py` 套件，下一 workflow 无需新步骤。另有真实文件映射的非法/超限 PID 拒绝、内容及 mtime 保留，错误操作与 errno 保留回归。
+
+启动还有合法空文件窗口：固定 [`agent/app.rs:704–706`](https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/app.rs#L704) 在创建并取得锁后单独调用 `write_pid`，后者先 `set_len(0)` 再写入。旧 `wait_leader` 实际捕获了所有 `ValueError`，所以会等待空文件，但也把错误 PID 和非法文件类型拖到超时。现只对“文件尚未创建”或专门的 `EmptyLeaderPid` 在原总 deadline 内重试；每轮继续核对自持进程存活，非空错误身份/非规则文件立即失败，正常协议阶段的空 PID 不可放行。没有重启或重新关联 leader。
+
+确定性真实文件回归覆盖空→同一正确 PID、持续空到原 deadline、空时原进程退出，以及错误 PID/非法非空内容/目录立即拒绝。最终本机 macOS 定向结果为 17 项中 16 通过、上述 Windows 原生用例 1 项明确 skipped（0.267 秒）。这证明可本地运行的转换与隔离断言，不是 Windows 映射或 ACP 复验。新代码尚不属于第五轮 SHA，须后续同提交 Windows 运行；旧 errno 13 失败完整保留。

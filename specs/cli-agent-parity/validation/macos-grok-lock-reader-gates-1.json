@@ -1,0 +1,47 @@
+{
+  "base_commit": "94a412eb89a4de57977072e6c45f4a692955d970",
+  "worktree_dirty": true,
+  "source_files": {
+    "script/cli-agent-parity/grok_fixed_acp_probe.py": "407989c1dac24ca1d81f4c6eb8643fda6b91ccbc7ca2a7bf8ad649b43d9d0041",
+    "script/cli-agent-parity/grok_fixed_acp_probe_tests.py": "6d41ecf007f798fa4df6a3313699930e7ead5d88de72e643d9790ac857d51b7e"
+  },
+  "gates": [
+    {
+      "name": "unit",
+      "argv": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "script/cli-agent-parity/grok_fixed_acp_probe_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.383,
+      "log": "/tmp/infinishell-cli-parity-grok-lock-macos-1/unit.log",
+      "log_sha256": "903cdd80cea3e7d42c9df4a168d19ef2e1bed503ee7db5666b58b93fcf07a543"
+    },
+    {
+      "name": "native",
+      "argv": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "script/cli-agent-parity/grok_fixed_acp_probe.py",
+        "--executable",
+        "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+        "--output",
+        "/tmp/infinishell-cli-parity-grok-lock-macos-1/native.json"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 8.653,
+      "log": "/tmp/infinishell-cli-parity-grok-lock-macos-1/native.log",
+      "log_sha256": "91f050290b6936fbc5463ea49eb7dce41d7e43a01ac0ceff77978c50eb4f1fa0"
+    }
+  ],
+  "unit_results": {
+    "passed": 16,
+    "skipped": 1,
+    "skip_reason": "真实 Windows LockFileEx 跨进程用例只在 Windows 运行"
+  },
+  "native_report": "macos-grok-lock-reader-native-1.json",
+  "native_report_sha256": "4d0e5aec6f3a2e9b37fb629dd10be4ee099c9230117eaa0d9d053953947b2ee4",
+  "scope": "macOS 固定 Grok 无凭据边界与新 PID 等待逻辑；不代替 Windows mmap/LockFileEx 实跑"
+}

@@ -254,8 +254,28 @@ pub(super) async fn prepare_local_harness_child_launch(
 #[cfg(feature = "local_fs")]
 pub(super) async fn persist_local_harness_child_launch<F, Fut>(
     sender: &SyncSender<ModelEvent>,
-    mut parent: LocalCliTask,
+    parent: LocalCliTask,
     mut child: LocalCliTask,
+    validate_parent: F,
+) -> Result<LocalCliTask, String>
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<(), String>>,
+{
+    let parent = persist_local_harness_parent(sender, parent, &validate_parent).await?;
+    child.parent_generation = Some(parent.generation);
+    validate_parent().await?;
+    checkpoint_task(sender, child.clone(), None)?
+        .await
+        .map_err(|_| "子任务检查点通道已关闭".to_owned())??;
+    Ok(child)
+}
+
+/// 复用当前用户轮的父记录；显式追加消息不会派生子任务或改写既有父子关系。
+#[cfg(feature = "local_fs")]
+pub(crate) async fn persist_local_harness_parent<F, Fut>(
+    sender: &SyncSender<ModelEvent>,
+    mut parent: LocalCliTask,
     validate_parent: F,
 ) -> Result<LocalCliTask, String>
 where
@@ -342,7 +362,6 @@ where
                 .map_err(|_| "父新运行确认已关闭".to_owned())??;
         }
     }
-    child.parent_generation = Some(existing.generation);
     if existing.state == LocalCliTaskState::Queued
         && serde_json::from_str::<serde_json::Value>(&existing.config_json)
             .ok()
@@ -357,7 +376,7 @@ where
             .ok_or_else(|| "父任务 revision 溢出".to_owned())?;
         let generation = existing.generation;
         let expected_parent = existing.clone();
-        let result = checkpoint_task(sender, existing, Some(generation))?
+        let result = checkpoint_task(sender, existing.clone(), Some(generation))?
             .await
             .map_err(|_| "父任务检查点通道已关闭".to_owned())?;
         if let Err(error) = result {
@@ -365,18 +384,14 @@ where
             let tasks = load_tasks(sender, false)?
                 .await
                 .map_err(|_| "并行父任务读取确认已关闭".to_owned())??;
-            if !tasks
-                .iter()
-                .any(|task| parent_launch_can_reuse(&expected_parent, task))
-            {
-                return Err(error);
-            }
+            existing = tasks
+                .into_iter()
+                .find(|task| parent_launch_can_reuse(&expected_parent, task))
+                .ok_or(error)?;
         }
     }
-    checkpoint_task(sender, child.clone(), None)?
-        .await
-        .map_err(|_| "子任务检查点通道已关闭".to_owned())??;
-    Ok(child)
+    validate_parent().await?;
+    Ok(existing)
 }
 
 #[cfg(feature = "local_fs")]

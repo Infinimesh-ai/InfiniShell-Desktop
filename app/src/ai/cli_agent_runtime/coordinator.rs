@@ -44,23 +44,52 @@ pub(crate) struct ManagedTaskEndpoint {
 impl ManagedTaskEndpoint {
     /// 邮箱落盘期间任务可能已经换代；必须在协议写入前重新核对。
     pub(crate) async fn send(&self, command: RuntimeCommand) -> Result<(), String> {
+        self.prepare_send(command)
+            .await?
+            .commit()
+            .await
+            .map_err(|_| crate::t!("cli-agent-status-disconnected"))?
+    }
+
+    /// 先保留队列容量，调用方可以在同一应用回调中验证父轮并同步提交。
+    pub(crate) async fn prepare_send(
+        &self,
+        command: RuntimeCommand,
+    ) -> Result<PreparedManagedSend, String> {
         if command.generation != self.runtime_generation {
             return Err(crate::t!("cli-agent-task-invalid-launch"));
         }
         let (reply, receiver) = oneshot::channel();
-        self.commands
-            .send(ManagedRequest {
+        let permit = self
+            .commands
+            .clone()
+            .reserve_owned()
+            .await
+            .map_err(|_| crate::t!("cli-agent-status-disconnected"))?;
+        Ok(PreparedManagedSend {
+            permit,
+            receiver,
+            request: ManagedRequest {
                 expected_generation: self.generation,
                 from_mailbox: true,
                 message_id: command.message_id,
                 action: command.action,
                 reply,
-            })
-            .await
-            .map_err(|_| crate::t!("cli-agent-status-disconnected"))?;
-        receiver
-            .await
-            .map_err(|_| crate::t!("cli-agent-status-disconnected"))?
+            },
+        })
+    }
+}
+
+pub(crate) struct PreparedManagedSend {
+    permit: mpsc::OwnedPermit<ManagedRequest>,
+    request: ManagedRequest,
+    receiver: oneshot::Receiver<Result<(), String>>,
+}
+
+impl PreparedManagedSend {
+    pub(crate) fn commit(self) -> oneshot::Receiver<Result<(), String>> {
+        self.permit.send(self.request);
+        self.receiver
     }
 }
 
@@ -96,6 +125,11 @@ pub(crate) enum LocalCLITaskCoordinatorEvent {
         event: RuntimeEvent,
     },
     ResultReady {
+        task: LocalCliTask,
+        message: LocalCliMessage,
+    },
+    /// 已入队的普通子任务消息；Oz 历史桥自行领取，不能冒充原生接收。
+    ParentMessageReady {
         task: LocalCliTask,
         message: LocalCliMessage,
     },

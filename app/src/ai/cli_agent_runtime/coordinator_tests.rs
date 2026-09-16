@@ -1,10 +1,191 @@
+use std::time::Duration;
+
 use futures::executor::block_on;
 use serde_json::json;
 use uuid::Uuid;
+use warpui::App;
+use warpui::r#async::Timer;
 
 use super::*;
+use crate::ai::agent::{AIAgentExchange, AIAgentExchangeId, AIAgentInput, AIAgentOutputStatus};
+use crate::ai::blocklist::BlocklistAIHistoryModel;
+use crate::ai::cli_agent_runtime::conversation_bridge::local_parent_history_identity;
 use crate::ai::cli_agent_runtime::{InputContent, channels};
+use crate::ai::llms::LLMId;
+use crate::ai::local_cli_mailbox::send_local_message_if_current;
 use crate::persistence::local_cli_tasks::load_task_generations;
+use crate::test_util::terminal::{add_window_with_terminal, initialize_app_for_terminal_view};
+
+#[test]
+fn parent_message_validation_after_sent_and_capacity_wait_cannot_enqueue_an_old_action() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let history = BlocklistAIHistoryModel::handle(&app);
+        let (conversation_id, identity, spawner) = terminal.update(&mut app, |terminal, ctx| {
+            history.update(ctx, |history, ctx| {
+                let conversation_id =
+                    history.start_new_conversation(terminal.id(), false, false, false, ctx);
+                let conversation = history.conversation_mut(&conversation_id).unwrap();
+                conversation.append_root_exchange_for_test(parent_message_user_exchange());
+                (
+                    conversation_id,
+                    local_parent_history_identity(conversation).unwrap(),
+                    ctx.spawner(),
+                )
+            })
+        });
+        let directory = tempfile::tempdir().unwrap();
+        let writer =
+            crate::persistence::start_test_writer(&directory.path().join("messages.sqlite"))
+                .unwrap();
+        let mut parent = snapshot().task;
+        parent.task_id = "parent".into();
+        parent.parent_task_id = None;
+        parent.parent_generation = None;
+        parent.harness = "oz".into();
+        parent.native_session_id = None;
+        let child = LocalCliTask {
+            task_id: "child".into(),
+            parent_task_id: Some("parent".into()),
+            parent_generation: Some(1),
+            harness: "codex".into(),
+            native_session_id: Some("child-native-session".into()),
+            ..parent.clone()
+        };
+        for task in [parent, child] {
+            checkpoint_task(&writer.sender, task, None)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+        }
+        let token = Uuid::new_v4();
+        let (commands, mut receiver) = mpsc::channel(1);
+        let (reply, _reply) = oneshot::channel();
+        commands
+            .try_send(ManagedRequest {
+                expected_generation: 1,
+                from_mailbox: false,
+                message_id: Uuid::new_v4(),
+                action: RuntimeAction::Shutdown,
+                reply,
+            })
+            .unwrap();
+        let endpoint = ManagedTaskEndpoint {
+            task_id: "child".into(),
+            generation: 1,
+            harness: Harness::Codex,
+            runtime_generation: token,
+            active_turn_id: None,
+            commands,
+        };
+        let message = LocalCliMessage {
+            version: 1,
+            message_id: Uuid::new_v4().to_string(),
+            sender_task_id: "parent".into(),
+            recipient_task_id: "child".into(),
+            sender_generation: 1,
+            recipient_generation: 1,
+            subject: "follow-up".into(),
+            body: "旧轮指令不得入队".into(),
+            state: LocalCliMessageState::Queued,
+            receipt_kind: None,
+        };
+        let attempted = send_local_message_if_current(
+            &writer.sender,
+            endpoint.clone(),
+            message.clone(),
+            |prepared| async {
+                spawner
+                    .spawn(move |history, _| {
+                        if history
+                            .conversation(&conversation_id)
+                            .and_then(local_parent_history_identity)
+                            .as_ref()
+                            != Some(&identity)
+                        {
+                            return Err("父用户轮已变化".into());
+                        }
+                        // 与生产路径一致，校验与提交之间没有 await。
+                        Ok(prepared.commit())
+                    })
+                    .await
+                    .map_err(|_| "父模型已关闭".to_owned())?
+            },
+        );
+        let change_while_waiting = async {
+            let mut sent = false;
+            for _ in 0..250 {
+                let saved = load_messages(&writer.sender, "child".into(), 1)
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap();
+                if saved
+                    .first()
+                    .is_some_and(|message| message.state == LocalCliMessageState::Sent)
+                {
+                    sent = true;
+                    break;
+                }
+                Timer::after(Duration::from_millis(10)).await;
+            }
+            assert!(sent, "消息必须先提交 Sent");
+            history.update(&mut app, |history, _| {
+                history
+                    .conversation_mut(&conversation_id)
+                    .unwrap()
+                    .append_root_exchange_for_test(parent_message_user_exchange());
+            });
+            // 队列仍由先前请求占满，释放后才允许新消息取得容量。
+            let previous = receiver.recv().await.unwrap();
+            assert!(matches!(previous.action, RuntimeAction::Shutdown));
+        };
+        let (result, ()) = futures::join!(attempted, change_while_waiting);
+        assert!(result.is_err());
+        assert!(receiver.try_recv().is_err(), "旧用户轮的消息不能进入队列");
+        let saved = load_messages(&writer.sender, "child".into(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].state, LocalCliMessageState::Sent);
+        assert_eq!(saved[0].receipt_kind, None);
+        let duplicate =
+            send_local_message_if_current(&writer.sender, endpoint, message, |_| async {
+                panic!("Sent 消息不得再次保留容量或调用派发闭包")
+            })
+            .await
+            .unwrap();
+        assert_eq!(duplicate, LocalCliMessageState::Sent);
+        assert!(receiver.try_recv().is_err());
+        writer.sender.send(ModelEvent::Terminate).unwrap();
+        writer.handle.join().unwrap();
+    });
+}
+
+fn parent_message_user_exchange() -> AIAgentExchange {
+    AIAgentExchange {
+        id: AIAgentExchangeId::new(),
+        input: vec![AIAgentInput::ResumeConversation {
+            context: Vec::new().into(),
+        }],
+        output_status: AIAgentOutputStatus::Streaming { output: None },
+        added_message_ids: Default::default(),
+        start_time: chrono::Local::now(),
+        finish_time: None,
+        time_to_first_token_ms: None,
+        working_directory: None,
+        model_id: LLMId::from("test-model"),
+        request_cost: None,
+        coding_model_id: LLMId::from("test-model"),
+        cli_agent_model_id: LLMId::from("test-model"),
+        computer_use_model_id: LLMId::from("test-model"),
+        response_initiator: None,
+    }
+}
 
 #[test]
 fn resume_claims_unstarted_generation_but_rejects_incomplete_process_records() {

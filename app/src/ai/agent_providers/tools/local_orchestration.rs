@@ -187,7 +187,7 @@ pub static RUN_AGENTS: OpenAiTool = OpenAiTool {
 
 pub static SEND_MESSAGE: OpenAiTool = OpenAiTool {
     name: "send_message_to_agent",
-    description: "Send instructions to an active managed local parent or child task. The saved receipt distinguishes dispatch from native acceptance. Do not resend unconfirmed messages or create replacement children. Unrelated tasks and cloud recipients are rejected.",
+    description: "Send messages to an active managed local parent or child task. A native_protocol receipt confirms native acceptance; an application_history receipt confirms the Oz parent saved the message for its next normal request, not that its model has read or processed it. Do not resend unconfirmed messages or create replacement children. Unrelated tasks and cloud recipients are rejected.",
     parameters: message_parameters,
     from_args: message_from_args,
     result_to_json: message_result,

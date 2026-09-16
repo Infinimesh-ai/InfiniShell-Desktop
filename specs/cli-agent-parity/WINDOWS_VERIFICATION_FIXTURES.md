@@ -45,3 +45,21 @@ python3 -B script/cli-agent-parity/codex_windows_hook_tests.py -v
 分别 8 项（0.007 秒）、13 项（4.330 秒）、14 项（0.011 秒）通过，另有实际 Bash stdin / 拆分对照和 PowerShell 7 数组对照。摘要证据见 [windows-328d5ed352-verification-fixtures.json](fixtures/windows-328d5ed352-verification-fixtures.json)，其中保留原失败与未执行边界。
 
 修复提交尚未在 Windows 运行。下一轮必须重新执行原有全部门禁，确认 argv、原始字节、cmd 边界与真实 hook；不能只凭这三个本地套件通过就声称 Windows 通知支持。未运行 Cargo、SSH 或模型请求；无需本地化变更。
+
+## 第四轮：6635f9869 新增字节边界
+
+以上“尚未在 Windows 运行”是第三轮修复时的历史状态。[第四轮 35117735097](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35117735097) 已在 `6635f98690a6cbd3c117f9d313cb19de83016418` 原生 Windows 执行：旧环境键断言通过、Git Bash payload 13 项通过、PowerShell 5.1 语法和原生 argv 往返通过。第四轮仍失败，不能被这些局部正向结果覆盖。
+
+步骤 8 新的首因是 Grok 脱敏纯夹具混用了 `Path('/isolated')` 与手写 POSIX 字符串。在 Windows 上前者的字符串形式使用反斜杠；原生 probe 本来用 `str(project)`，生产 `clean()` 无需改变。修复测试使用实际路径字符串，同时分别用 `PurePosixPath` 和 `PureWindowsPath` 保留两类精确脱敏断言。其余 9 项原生 Python I/O/ACP 形状回归在本次 Windows 已通过；修后本机 10 项通过。
+
+步骤 32 独立停止在 `native_bytes_and_cmd_boundary`，提示原始 stdin 或 stdout 字节变化，`cases=[]`。这次 artifact 未包含实际字节，不能把 BOM 当作已经从 runner 文件中测得的差异。原 artifact 和[补充 JSON](fixtures/windows-6635f9869-stdio-boundary.json)保留这一限制。
+
+固定微软 referencesource 提交 `ec9fa9ae770d522a5b5f0607898044b7478574a3` 的 [Process.cs](https://github.com/microsoft/referencesource/blob/ec9fa9ae770d522a5b5f0607898044b7478574a3/System/services/monitoring/system/diagnosticts/Process.cs#L2153) 显示：`RedirectStandardInput=true` 会以 `Console.InputEncoding` 建立 StreamWriter，并立即设置 AutoFlush。[StreamWriter.Flush](https://github.com/microsoft/referencesource/blob/ec9fa9ae770d522a5b5f0607898044b7478574a3/mscorlib/system/io/streamwriter.cs#L306) 即使尚未写入文本，也可能写编码前导。原候选 launcher 随后直接 CopyTo BaseStream，并不能撤销已经写入的 BOM。这是该重定向路径的具体源码风险，仍不等于第四轮实际差异已定位。
+
+最窄修复仅候选 `codex_windows_hook_command.ps1`：直接继承 stdin、stdout、stderr 的原始句柄，删除 StreamWriter 输入转发。没有修改用户/全局编码，没有剥除输入 BOM 或放宽预期字节。Python 验证器现在在失败时记录固定 case、期望/实际 stdin 与 stdout、stderr 的 Base64，区分前导字节、多余 CRLF 和未生成捕获文件。
+
+本机 PowerShell 7.7.0-preview.3 原理对照确认：有 BOM 编码的 StreamWriter 在仅设置 AutoFlush 时已输出 `EF BB BF`；BaseStream 写入后该前导仍保留。直接继承句柄的本机原生 `cat` 则逐字保留 UTF-8、CRLF、NUL。它不是 Windows PowerShell 5.1 运行证据，补充 JSON 中 `native_windows_or_ps51_verified=false`。
+
+候选新明文 LF UTF-8 SHA-256 为 `327603d72b007e9ea68a3902cee3f8b4cda4ebd70c6729826f58de79651d8952`，最长生成命令 7250 字符；编码与 8191/8192 静态边界回归保留。Windows helper 本机 15 项通过（0.022 秒），Grok 10 项通过（0.244 秒）。真实 cmd 边界、双向字节及原生 hook 必须由下一 Windows 提交继续验证。
+
+这些修复已进入 `94a412eb89a4de57977072e6c45f4a692955d970`，第五轮只选择 Windows；本段不预报其结果。候选脚本仍在验证目录，未改产品安装门禁、随附插件、Rust 或 workflow；无需本地化变更。

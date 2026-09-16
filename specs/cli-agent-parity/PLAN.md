@@ -259,9 +259,9 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 - [Claude CLI 参考](https://code.claude.com/docs/en/cli-reference)、[程序化运行](https://code.claude.com/docs/en/headless)：结构化输出、会话恢复和权限选项；P0 固定受测版本。
 - [Claude hooks](https://code.claude.com/docs/en/hooks)：审批及失败事件；事件通知与审批决定回传是不同能力。
 
-## 10. 执行看板（2026-09-16，持续更新）
+## 10. 执行看板（2026-09-17，持续更新）
 
-当前工作分支 `codex/cli-agent-parity`，起点 `6921a9925955a1955503e259cd935eaea4ac2ac0`。原有未跟踪计划已保留，无用户代码改动被覆盖。实现检查点 `dbee1ecae81da54a1749de88a7caffb3099d7eb7` 已提交并推送；尚未发布。插件检查点 328d5ed352 与资源域检查点 6635f98690 已推送；6635f98690 的干净验证树已通过 check、国际化 11 项、相关模块 650 项、command 5 项与脚本 75 项。第四轮两平台验证及新包验收继续进行，另一任务网页搜索改动未纳入。
+当前工作分支 `codex/cli-agent-parity`，起点 `6921a9925955a1955503e259cd935eaea4ac2ac0`。原有未跟踪计划已保留，无用户代码改动被覆盖。实现检查点 `dbee1ecae81da54a1749de88a7caffb3099d7eb7` 已提交并推送；尚未发布。插件检查点 328d5ed352 与资源域检查点 6635f98690 已推送；6635f98690 的干净验证树已通过 check、国际化 11 项、相关模块 650 项、command 5 项与脚本 75 项。第四轮 Linux 通过、Windows 失败；第五轮 Windows 的候选 Codex hook 通过、Grok 锁读取失败。后续消息实现和锁修复已通过对应本地门禁，最终同提交平台与新包验收继续推进，另一任务网页搜索改动未纳入。
 
 | 阶段 | 当前进展 | 尚未满足 |
 | --- | --- | --- |
@@ -273,6 +273,8 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 | P5 | macOS build23 相关 617/617、i18n 11 项、check20 及 Python gate5 76 项通过（gate6 再验 76 项、5.142s）；Linux/Windows workflow 已接固定 Claude 获取及无凭据探针；SSH/tmux 独立记录 | 328d5ed352 第三轮 Linux 已通过本轮全部步骤，GUI integration/full workspace 按配置跳过；Windows 三处夹具修复本机通过、原生复验待新提交；历史选择框及中文 Unknown、最终发布门禁与三方图形/端到端验收仍待完成 |
 
 原生 CLI 协议探测与产品集成验收分别记录，前者不能替代后者。未登录、额度耗尽、未运行或失败的验证均不计为完成；独立实现和确定性测试继续推进。
+
+检查点 `94a412eb89` 已保存 Windows 候选启动器字节保留修复和 Oz 最终结果桥回归。[第五轮 Windows 定向验证](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35122575386)已结束：Codex 候选原生 hook 通过，Grok 锁读取失败，整体未通过；第四轮 Linux 成功与 Windows 失败分别保留。P4 新增的 Oz 普通消息授权、投递、出站正文及历史 ID 冲突修复已在第三个 25 文件冻结快照通过 check、提供商 18 项、国际化 11 项及相关 965 项，见 [消息交付说明](OZ_LOCAL_MESSAGE_DELIVERY.md)。最终同提交平台、真实 Oz 模型请求和新包双语布局尚未验收；Windows ConPTY 新探针已通过离线门禁，待下轮原生运行。
 
 新增证据分别见 [Stop 契约审计](STOP_HOOK_COMPLETION_AUDIT.md)、[Unconfirmed 与独立迁移](UNCONFIRMED_TASK_STATE.md)、[Codex 原生 hook 传输](CODEX_HOOK_TRANSPORT_VERIFICATION.md)、[原生 SSH/tmux](CODEX_NATIVE_SSH_TMUX_VERIFICATION.md)、[bundle7 插件与双语布局](validation/macos-gui-bundle7-plugin-report.md)及 [Claude 无凭据验证](CLAUDE_NO_CREDENTIALS_VERIFICATION.md)。build20 只有 i18n 通过，相关测试在编译前主动撤下；build21 的非 UTF-8 文件名夹具被 macOS 文件系统拒绝，未进入产品校验，现限定 Linux 待验。后续 build23 的本地门禁通过仍是 dirty 中间工作树证据，不能替代最终同 SHA。bundle8 已确认当前 GUI 通知、英文 Unknown 与 Unconfirmed 双语任务详情；中文新事件、历史选择框裁切修复及最终同提交 GUI 仍待验。独立传输、初始化或下载不能替代模型生命周期。
 

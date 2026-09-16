@@ -12,6 +12,7 @@ use warpui::r#async::Timer;
 
 use super::*;
 use crate::ai::cli_agent_runtime::PermissionPolicy;
+use crate::ai::cli_agent_runtime::conversation_bridge::recorded_history_identity;
 use crate::ai::cli_agent_runtime::local_skills::{
     collect_local_child_skills, prepare_local_cli_skill_inputs,
 };
@@ -364,15 +365,47 @@ async fn send(
     if request.addresses.contains(&call.sender_task_id) {
         return Err("父子消息不能发给当前任务自身".into());
     }
+    if matches!(
+        request.subject.as_str(),
+        "local_task_result" | "native_tool_call" | "native_tool_result"
+    ) {
+        return Err("普通消息不能使用内部结果或工具记录主题".into());
+    }
     let mut dispatched = Vec::new();
     for recipient in &request.addresses {
         ensure_current(spawner, call).await?;
+        let saved = records(sender).await?;
+        let source = saved
+            .iter()
+            .find(|task| task.task_id == call.sender_task_id)
+            .ok_or("消息子任务不存在")?
+            .clone();
+        let target = saved
+            .iter()
+            .find(|task| &task.task_id == recipient)
+            .ok_or("消息接收任务不存在")?;
+        let application_history = target.harness == "oz";
+        if application_history
+            && (source.generation != call.generation
+                || source.parent_task_id.as_ref() != Some(recipient)
+                || source.parent_generation != Some(target.generation)
+                || !target.state.is_active()
+                || recorded_history_identity(target).is_none())
+        {
+            return Err("普通进度只能发送到创建时的活动 Oz 父运行".into());
+        }
         let address = recipient.clone();
-        let endpoint = spawner
-            .spawn(move |model, _| model.endpoint(&address))
-            .await
-            .map_err(|_| "本地任务应用已关闭")?
-            .ok_or("接收任务没有活跃托管连接")?;
+        let endpoint = if application_history {
+            None
+        } else {
+            Some(
+                spawner
+                    .spawn(move |model, _| model.endpoint(&address))
+                    .await
+                    .map_err(|_| "本地任务应用已关闭")?
+                    .ok_or("接收任务没有活跃托管连接")?,
+            )
+        };
         ensure_current(spawner, call).await?;
         let message = LocalCliMessage {
             version: 1,
@@ -380,22 +413,61 @@ async fn send(
             sender_task_id: call.sender_task_id.clone(),
             recipient_task_id: recipient.clone(),
             sender_generation: call.generation,
-            recipient_generation: endpoint.generation,
+            recipient_generation: endpoint
+                .as_ref()
+                .map_or(target.generation, |endpoint| endpoint.generation),
             subject: request.subject.clone(),
             body: request.message.clone(),
             state: LocalCliMessageState::Queued,
             receipt_kind: None,
         };
-        let status = send_local_message(sender, endpoint, message.clone()).await;
+        let status = if let Some(endpoint) = endpoint {
+            send_local_message(sender, endpoint, message.clone())
+                .await
+                .map(|_| ())
+        } else {
+            let outcome = enqueue_message(sender, message.clone())?
+                .await
+                .map_err(|_| "普通父消息入队确认已关闭")??;
+            // 已发送而未入历史的消息不能重投；重复 Queued 仍由 SQLite 原子领取。
+            if matches!(
+                outcome,
+                LocalCliEnqueueOutcome::Created
+                    | LocalCliEnqueueOutcome::Existing(LocalCliMessageState::Queued)
+            ) {
+                let call = call.clone();
+                let message = message.clone();
+                spawner
+                    .spawn(move |model, ctx| {
+                        check_current(
+                            model,
+                            &call.sender_task_id,
+                            call.runtime_generation,
+                            call.generation,
+                            &call.request.turn_id,
+                            &call.request.call_id,
+                        )?;
+                        ctx.emit(LocalCLITaskCoordinatorEvent::ParentMessageReady {
+                            task: source,
+                            message,
+                        });
+                        Ok::<_, String>(())
+                    })
+                    .await
+                    .map_err(|_| "本地任务应用已关闭")?
+            } else {
+                Ok(())
+            }
+        };
         publish_message_change(spawner, &message).await;
-        dispatched.push((message, LocalCliMessageState::Sent));
+        dispatched.push(message);
         if let Err(error) = status {
-            return Err(json!({"error":error,"attempted_messages":dispatched.iter().map(|(message,_)| &message.message_id).collect::<Vec<_>>()}).to_string());
+            return Err(json!({"error":error,"attempted_messages":dispatched.iter().map(|message| &message.message_id).collect::<Vec<_>>()}).to_string());
         }
     }
     for attempt in 0..31 {
         let mut confirmed = true;
-        for (message, state) in &mut dispatched {
+        for message in &mut dispatched {
             let stored = load_messages(
                 sender,
                 message.recipient_task_id.clone(),
@@ -403,23 +475,26 @@ async fn send(
             )?
             .await
             .map_err(|_| "消息回执读取确认已关闭")??;
-            *state = stored
+            *message = stored
                 .iter()
                 .find(|item| item.message_id == message.message_id)
                 .ok_or("已提交消息丢失")?
-                .state;
-            confirmed &= *state == LocalCliMessageState::Acknowledged;
+                .clone();
+            confirmed &= message.state == LocalCliMessageState::Acknowledged
+                && message.receipt_kind.is_some();
         }
         if confirmed {
             return Ok(
-                json!({"status":"acknowledged","message_ids":dispatched.iter().map(|(message,_)| &message.message_id).collect::<Vec<_>>()}),
+                json!({"status":"acknowledged","message_ids":dispatched.iter().map(|message| &message.message_id).collect::<Vec<_>>(),
+                    "receipts":dispatched.iter().map(|message|json!({"message_id":message.message_id,"receipt_kind":message.receipt_kind})).collect::<Vec<_>>(),
+                    "delivery_note":"application_history means saved context for the parent's next normal request, not immediate execution; native_protocol means the CLI accepted the input."}),
             );
         }
         if attempt < 30 {
             Timer::after(Duration::from_millis(100)).await;
         }
     }
-    Err(json!({"status":"unconfirmed","messages":dispatched.iter().map(|(message,state)|json!({"message_id":message.message_id,"state":state})).collect::<Vec<_>>(),"retry":"inspect existing message IDs; do not resend automatically"}).to_string())
+    Err(json!({"status":"unconfirmed","messages":dispatched.iter().map(|message|json!({"message_id":message.message_id,"state":message.state,"receipt_kind":message.receipt_kind})).collect::<Vec<_>>(),"retry":"inspect existing message IDs; do not resend automatically"}).to_string())
 }
 
 async fn spawn_children(

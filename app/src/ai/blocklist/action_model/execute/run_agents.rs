@@ -87,6 +87,21 @@ impl Entity for RunAgentsExecutor {
 }
 
 impl RunAgentsExecutor {
+    /// 派发入口和确认卡共用此边界；实际授予仍在已批准请求的派发阶段。
+    pub(crate) fn allows_local_child_messages(
+        is_local: bool,
+        harness: &str,
+        parent: Option<Harness>,
+    ) -> bool {
+        FeatureFlag::LocalCLIManagedTasks.is_enabled()
+            && is_local
+            && matches!(
+                Harness::parse_orchestration_harness(harness),
+                Some(Harness::Codex | Harness::Claude)
+            )
+            && parent == Some(Harness::Oz)
+    }
+
     pub fn new(
         start_agent_executor: ModelHandle<StartAgentExecutor>,
         terminal_view_id: EntityId,
@@ -269,6 +284,17 @@ impl RunAgentsExecutor {
                 continue;
             }
             let recv = self.start_agent_executor.update(ctx, |executor, exec_ctx| {
+                // 此处已经通过派发审批；只授权本地子任务向创建父任务发送消息。
+                let parent_harness = BlocklistAIHistoryModel::as_ref(exec_ctx)
+                    .conversation(&parent_conversation_id)
+                    .map(|conversation| {
+                        conversation.orchestration_harness().unwrap_or(Harness::Oz)
+                    });
+                let allow_local_child_messages = Self::allows_local_child_messages(
+                    matches!(run_execution_mode, RunAgentsExecutionMode::Local),
+                    &harness_type,
+                    parent_harness,
+                );
                 executor.dispatch(
                     cfg.name.clone(),
                     prompt,
@@ -276,6 +302,7 @@ impl RunAgentsExecutor {
                     None, /* lifecycle_subscription */
                     parent_conversation_id,
                     parent_run_id.clone(),
+                    allow_local_child_messages,
                     exec_ctx,
                 )
             });

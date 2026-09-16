@@ -4391,6 +4391,7 @@ ai-orchestration-badge-connected = 已连接
 ai-orchestration-badge-disconnected = 未连接
 
 run-agents-title = 可以为此任务启动其他智能体吗？
+cli-agent-child-message-permission = 本地 CLI 子任务可向此会话报告进度。消息会在下一次正常请求中读取。
 run-agents-accept-without-orchestration = 接受但不启用编排
 run-agents-cancelled = 已取消启动智能体
 run-agents-configuring = 正在配置智能体…

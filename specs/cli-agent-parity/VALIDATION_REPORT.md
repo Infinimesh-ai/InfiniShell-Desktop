@@ -4,7 +4,11 @@
 
 ## 当前提交验证
 
-- 最新资源域与固定协议检查点 `6635f98690a6cbd3c117f9d313cb19de83016418` 已推送并核对远端相同 SHA。干净 macOS 验证树通过 cargo check（1m45）、国际化 11 项（4.60s）、相关模块 650 项（10.015s）、command 5 项及脚本 75 项；见[本地门禁](validation/macos-local-gates-6635f9869.json)和[脚本门禁](validation/macos-python-gates-6635f9869.json)。[新包](validation/macos-build-6635f9869.json)已完成构建、资源处理与签名（复跑 85.663s、退出 0）；首轮观察句柄失效且没有脚本退出确认的记录独立保留，未打开 GUI。[第四轮 Actions](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35117735097)核对相同 SHA，尚未整体完成；Windows 已确认 Grok 路径夹具与候选启动器字节边界失败，前三处旧夹具修复已通过各自实跑，不能因此计为 Windows 平台通过。
+- Windows 字节保留与 Oz 最终结果桥检查点 `94a412eb89a4de57977072e6c45f4a692955d970` 已推送，远端 SHA 已核对一致。[第五轮 Actions](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35122575386)仅选择 Windows，已结束且失败，Linux 按参数跳过。候选 Codex 启动器的原始字节、命令长度、PS5、原生 argv 和两组真实阻断 hook 均通过，模型请求 0；ConPTY 通知未验证。Grok 在 ACP 初始化前遇到锁读取权限错误，后续默认 Rust 门禁跳过，详见 [第五轮专报](FIFTH_PLATFORM_RUN_94A412EB.md)。新只读锁诊断和等待修复在本机通过 16 项、另 1 项 Windows 原生测试跳过；macOS 固定 Grok 无凭据协议边界也通过（8.653s），leader 仍需自持句柄强制收尾。[独立证据](validation/macos-grok-lock-reader-gates-1.json)不代替 Windows 复验。
+
+- Oz 普通消息与提供商序列化第一冻结快照通过 check 和国际化 11 项；提供商新回归 10 通过、3 失败，消息相关 803 通过、1 失败。[首轮记录](validation/macos-oz-messages-local-gates-1.json)保留夹具错误和合法进度顺序缺口。第二快照因测试缺少 `RepairRecord` 导入而编译失败，0 项执行，见[第二轮记录](validation/macos-oz-messages-local-gates-2.json)。修正后的第三个 25 文件冻结快照通过 check（57.587s）、提供商回归 18 项、国际化 11 项和相关模块 965 项；[第三轮记录](validation/macos-oz-messages-local-gates-3.json)固定源文件摘要。范围与回执边界见 [消息交付说明](OZ_LOCAL_MESSAGE_DELIVERY.md)，真实模型、GUI 和最终同提交平台仍待验。
+
+- 最新资源域与固定协议检查点 `6635f98690a6cbd3c117f9d313cb19de83016418` 已推送并核对远端相同 SHA。干净 macOS 验证树通过 cargo check（1m45）、国际化 11 项（4.60s）、相关模块 650 项（10.015s）、command 5 项及脚本 75 项；见[本地门禁](validation/macos-local-gates-6635f9869.json)和[脚本门禁](validation/macos-python-gates-6635f9869.json)。[新包](validation/macos-build-6635f9869.json)已完成构建、资源处理与签名（复跑 85.663s、退出 0）；首轮观察句柄失效且没有脚本退出确认的记录独立保留，未打开 GUI。[第四轮 Actions](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35117735097)核对相同 SHA，已结束：Linux 本轮全部通过，Windows 失败；Windows 已确认 Grok 路径夹具与候选启动器字节边界失败，前三处旧夹具修复已通过各自实跑，不能因此计为 Windows 平台通过。
 
 - 插件事务与验证环境检查点 `328d5ed35227f67884013f8c403e2a692470151d` 已提交并推送；第三轮 [Actions 35110822335](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35110822335) 已核对相同 SHA。Linux 本轮已结束并通过：cargo check、warp 定向 1655 项、共享 CLI/技能、双语 TUI、4 项监督及两项原生 Codex 边界均成功；GUI integration/full workspace 按配置跳过。Windows 的新 Python 准备成功；测试环境键大小写、PowerShell 5.1 临时 argv 验证脚本和多行 Bash 夹具失败，后续 Rust 步骤跳过。三处夹具修复已在本机通过，尚未提交及原生复验；见 [Windows 专报](WINDOWS_VERIFICATION_FIXTURES.md) 和 [第三轮平台证据](THIRD_PLATFORM_RUN_328D5ED35.md)。本轮不计整体平台通过。
 
@@ -29,7 +33,7 @@
 
 新增 3 组生产 `ResultReady` 订阅及私有 SQLite 回归通过，桥模块 7 项（0.76s）、相关模块 653 项（9.071s）、国际化 11 项及 cargo check 通过。当前父结果仅一次入历史、重复和旧父代/用户轮被拒绝；关闭历史持久化后保持 Sent 未确认。首次测试编译的 Timer 类型错误及第二轮修正分别保留，见[冻结快照](validation/macos-oz-result-bridge-local-gates-2.json)。
 
-进一步审计发现，BYOP 请求构造器会忽略历史和当前 `MessagesReceivedFromAgents`。所以既有 `application_history` 回执仅证明本地历史已提交，尚不能证明下一次请求已包含正文。请求序列化、现有 Responses 上下文指纹，以及 Oz 与托管 CLI 的普通消息授权/投递正在补齐；这部分新实现尚未进入上述冻结快照，不计已通过。CLI 父任务的原生双向消息证据保持独立。
+进一步审计发现，BYOP 请求构造器会忽略历史和当前 `MessagesReceivedFromAgents`。所以既有 `application_history` 回执仅证明本地历史已提交，尚不能证明下一次请求已包含正文。现已接入请求序列化、既有 Responses 上下文指纹，以及 Oz 与托管 CLI 的普通消息授权/投递；合法工具调用期间到达的子任务进度会在相应工具结果之后进入请求，真实用户输入的顺序约束保持严格。第三个冻结快照已通过 18 项提供商请求回归、965 项相关测试、11 项国际化和 check，见[消息交付说明](OZ_LOCAL_MESSAGE_DELIVERY.md)。这些本地测试不能证明真实模型已读取或执行消息，CLI 父任务的原生双向消息证据保持独立。
 
 ## Grok 固定平台输入与无凭据 ACP
 

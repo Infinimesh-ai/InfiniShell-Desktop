@@ -1047,7 +1047,8 @@ impl LocalCLITaskManagerView {
                 self.selected_task.as_ref() == Some(sender_task_id)
                     || self.selected_task.as_ref() == Some(recipient_task_id)
             }
-            LocalCLITaskCoordinatorEvent::ResultReady { message, .. } => {
+            LocalCLITaskCoordinatorEvent::ResultReady { message, .. }
+            | LocalCLITaskCoordinatorEvent::ParentMessageReady { message, .. } => {
                 self.selected_task.as_ref() == Some(&message.sender_task_id)
                     || self.selected_task.as_ref() == Some(&message.recipient_task_id)
             }
@@ -1102,7 +1103,8 @@ impl LocalCLITaskManagerView {
                 self.selected_task.as_ref() == Some(&task.task_id)
             }
             LocalCLITaskCoordinatorEvent::Changed
-            | LocalCLITaskCoordinatorEvent::MessagesChanged { .. } => false,
+            | LocalCLITaskCoordinatorEvent::MessagesChanged { .. }
+            | LocalCLITaskCoordinatorEvent::ParentMessageReady { .. } => false,
         };
         if self.result_history.scope != selected_scope || history_changed || committed_changed {
             self.refresh_result_history(ctx);

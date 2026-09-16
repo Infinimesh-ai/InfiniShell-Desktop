@@ -35,6 +35,97 @@ struct RunAgentsTestState {
     start_agent_executor: ModelHandle<StartAgentExecutor>,
 }
 
+#[test]
+fn local_child_message_permission_matches_managed_oz_dispatch_only() {
+    let managed = FeatureFlag::LocalCLIManagedTasks.override_enabled(true);
+    for harness in ["claude", "codex"] {
+        assert!(RunAgentsExecutor::allows_local_child_messages(
+            true,
+            harness,
+            Some(Harness::Oz)
+        ));
+        assert!(!RunAgentsExecutor::allows_local_child_messages(
+            false,
+            harness,
+            Some(Harness::Oz)
+        ));
+        assert!(!RunAgentsExecutor::allows_local_child_messages(
+            true,
+            harness,
+            Some(Harness::Claude)
+        ));
+        assert!(!RunAgentsExecutor::allows_local_child_messages(
+            true, harness, None
+        ));
+    }
+    for harness in ["grok", "oz", "opencode", "unknown"] {
+        assert!(!RunAgentsExecutor::allows_local_child_messages(
+            true,
+            harness,
+            Some(Harness::Oz)
+        ));
+    }
+    drop(managed);
+    let _disabled = FeatureFlag::LocalCLIManagedTasks.override_enabled(false);
+    assert!(!RunAgentsExecutor::allows_local_child_messages(
+        true,
+        "codex",
+        Some(Harness::Oz)
+    ));
+}
+
+#[test]
+fn approved_local_dispatch_carries_message_permission_but_denied_dispatch_emits_nothing() {
+    let _harness = FeatureFlag::LocalClaudeCodexChildHarnesses.override_enabled(true);
+    let _managed = FeatureFlag::LocalCLIManagedTasks.override_enabled(true);
+    for allow in [true, false] {
+        App::test((), move |mut app| async move {
+            let state = initialize_run_agents_test(&mut app, ExecutionMode::App);
+            set_run_agents_permission(
+                &mut app,
+                if allow {
+                    RunAgentsPermission::AlwaysAllow
+                } else {
+                    RunAgentsPermission::NeverAllow
+                },
+            );
+            let captured = subscribe_to_start_agent_requests(&mut app, &state.start_agent_executor);
+            let mut action = remote_run_agents_action("codex");
+            let AIAgentActionType::RunAgents(request) = &mut action.action else {
+                unreachable!()
+            };
+            request.execution_mode = RunAgentsExecutionMode::Local;
+            let execution: AnyActionExecution = state.executor.update(&mut app, |executor, ctx| {
+                executor
+                    .execute(
+                        ExecuteActionInput {
+                            action: &action,
+                            conversation_id: state.conversation_id,
+                        },
+                        ctx,
+                    )
+                    .into()
+            });
+            if allow {
+                assert!(matches!(execution, AnyActionExecution::Async { .. }));
+                for _ in 0..250 {
+                    if captured.read(&app, |requests, _| !requests.0.is_empty()) {
+                        break;
+                    }
+                    warpui::r#async::Timer::after(Duration::from_millis(10)).await;
+                }
+                captured.read(&app, |requests, _| {
+                    assert_eq!(requests.0.len(), 1);
+                    assert!(requests.0[0].allow_local_child_messages);
+                });
+            } else {
+                assert!(matches!(execution, AnyActionExecution::Sync(_)));
+                captured.read(&app, |requests, _| assert!(requests.0.is_empty()));
+            }
+        });
+    }
+}
+
 #[derive(Default)]
 struct CapturedStartAgentRequests(Vec<StartAgentRequest>);
 

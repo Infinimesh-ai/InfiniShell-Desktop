@@ -1,0 +1,99 @@
+{
+  "run_id": 35117735097,
+  "head_sha": "6635f98690a6cbd3c117f9d313cb19de83016418",
+  "windows_job_id": 104867353676,
+  "windows_result": "failure",
+  "first_failure": {
+    "step": 8,
+    "first_direct_failure": true,
+    "test": "GrokFixedAcpTests.test_report_redacts_identity_and_private_paths_but_keeps_protocol_ids",
+    "exception": "AssertionError: '/isolated/project' != '<isolated-probe>/project'",
+    "log_lines": [
+      483,
+      504
+    ],
+    "later_fix_changes_run_result": false
+  },
+  "native_hooks": {
+    "passed": false,
+    "official_commit": "be6e8eac029b183056b7e4402879f15d2c85f61b",
+    "cases": [],
+    "checks": {
+      "encoding": {
+        "source_sha256_lf_utf8": "9f189b022b609c547a11e6b6ba56be8dceef37161dcbac40e4141ef7238ed8b3",
+        "command_characters": {
+          "on-session-start.sh": 7726,
+          "on-prompt-submit.sh": 7726,
+          "on-stop.sh": 7702,
+          "on-permission-request.sh": 7738,
+          "on-post-tool-use.sh": 7726
+        },
+        "encoding_roundtrip": true
+      },
+      "powershell_51_syntax": true,
+      "native_argv_roundtrip": true
+    },
+    "scope": "native_cmd_powershell_bash_hooks_and_blocking_only",
+    "credentials_provided": false,
+    "native_conpty_notifications_verified": false,
+    "full_lifecycle_verified": false,
+    "model_generation_verified": false,
+    "fixed_inputs": {
+      "codex": {
+        "asset": "codex-x86_64-pc-windows-msvc.exe",
+        "bytes": 298668336,
+        "sha256": "935a1911ed2556e4ffcec995f4886ac2ac425863ba26fed264df62e30272ad9d",
+        "url": "https://github.com/openai/codex/releases/download/rust-v0.147.0/codex-x86_64-pc-windows-msvc.exe"
+      },
+      "plugin_commit": "31ce59d9011cfb1d78f265649a228dac5de58d76",
+      "plugin_tree_sha256": {
+        ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+        "hooks/hooks.json": "79b5f2bc55848ba1bc3cb7ddb9a4979249681b9b3719420752a512bb95881cdc",
+        "scripts/build-payload.sh": "2e34b5874724234c14222b2c271efdf4dbfd33ad993bfb411d963a2eb468f24e",
+        "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+        "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+        "scripts/on-prompt-submit.sh": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+        "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+        "scripts/on-stop.sh": "a2de778f79114c32bc64e4a8a8697b566c0a1fe22faac5010cfccdefa05406ec",
+        "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+        "scripts/warp-notify.sh": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366"
+      }
+    },
+    "cli": "codex-cli 0.147.0",
+    "failure": {
+      "phase": "native_bytes_and_cmd_boundary",
+      "type": "ValueError",
+      "message": "cmd/PowerShell/Bash 原始 stdin 或 stdout 字节发生改变"
+    },
+    "model_http_requests": []
+  },
+  "local_principle": {
+    "scope": "macos_dotnet_streamwriter_and_inherited_stdio_principle_only",
+    "native_windows_or_ps51_verified": false,
+    "writer": {
+      "afterBaseStream": "77u/Zml4dHVyZQ==",
+      "psVersion": "7.7.0-preview.3",
+      "afterAutoFlush": "77u/"
+    },
+    "inherited_stdin_stdout_exact": true,
+    "payload_base64": "5Lit5paHDQpFbmdsaXNoAMOvwrvCvw==",
+    "actual_base64": "5Lit5paHDQpFbmdsaXNoAMOvwrvCvw==",
+    "encoding": {
+      "source_sha256_lf_utf8": "327603d72b007e9ea68a3902cee3f8b4cda4ebd70c6729826f58de79651d8952",
+      "command_characters": {
+        "on-session-start.sh": 7238,
+        "on-prompt-submit.sh": 7238,
+        "on-stop.sh": 7214,
+        "on-permission-request.sh": 7250,
+        "on-post-tool-use.sh": 7238
+      },
+      "encoding_roundtrip": true
+    }
+  },
+  "fixed_reference_source_commit": "ec9fa9ae770d522a5b5f0607898044b7478574a3",
+  "windows_byte_difference_known": false,
+  "bom_mechanism_is_source_supported_candidate": true,
+  "next_checkpoint": "94a412eb89a4de57977072e6c45f4a692955d970",
+  "next_windows_run_id": 35122575386,
+  "next_run_result": "not_claimed_by_this_fixture"
+}

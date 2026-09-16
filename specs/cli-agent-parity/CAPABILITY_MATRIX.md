@@ -81,4 +81,4 @@ bundle8 当前通知受理、英文 Unknown 和 Unconfirmed 双语任务详情�
 
 Grok 1.0.30 新增[固定 ACP 无凭据边界](GROK_FIXED_ACP_BOUNDARIES.md)：macOS initialize 通过，新建受认证阻断，load/resume 明确拒绝缺失历史；缺失会话 cancel 只有通知发送。stdio EOF 自行退出，leader 需使用自持句柄强制回收，不能计自然退出或运行中取消通过。固定 Linux/Windows 输入与相同探针已接 workflow，待新提交实跑。
 
-最新资源域检查点 `6635f98690` 已推送；干净 macOS [同提交门禁](validation/macos-local-gates-6635f9869.json)通过 check、国际化 11 项、相关模块 650 项与 command 5 项，[脚本 75 项](validation/macos-python-gates-6635f9869.json)也通过。第四轮两平台与新包验证仍在进行；Windows 新路径夹具和候选启动器字节边界失败保留，不能将此前各处修复的通过合并为完整平台通过。
+最新资源域检查点 `6635f98690` 已推送；干净 macOS [同提交门禁](validation/macos-local-gates-6635f9869.json)通过 check、国际化 11 项、相关模块 650 项与 command 5 项，[脚本 75 项](validation/macos-python-gates-6635f9869.json)也通过。第四轮已完成：Linux 本轮全部通过，Windows 新路径夹具和候选启动器字节边界失败保留；新包已构建签名，GUI 待验。修复检查点 `94a412eb89` 的第五轮仅 Windows 已结束且失败：真实 Codex 候选 hook 的字节、参数和两组阻断路径通过，Grok 在 ACP 初始化前遇到锁读取权限错误，后续默认门禁跳过；不能合并为完整平台通过。后续 Grok 只读锁修复在 macOS 通过离线与无凭据边界，Windows 待复验。Oz 普通消息投递与请求正文接入已在第三个 25 文件冻结快照通过 check、18 项提供商回归、11 项国际化及 965 项相关测试，见 [消息交付说明](OZ_LOCAL_MESSAGE_DELIVERY.md)；真实 Oz 请求、GUI 双语布局及最终同提交平台仍待验。新增 Windows ConPTY 探针仅通过 9 项离线回归及工作流静态检查，尚未原生运行。

@@ -10,6 +10,7 @@ use ai::agent::action_result::{RunAgentsAgentOutcomeKind, RunAgentsResult};
 use ai::agent::orchestration_config::{OrchestrationConfig, OrchestrationConfigStatus};
 use ai::skills::SkillReference;
 use pathfinder_geometry::vector::vec2f;
+use warp_cli::agent::Harness;
 use warp_core::send_telemetry_from_ctx;
 use warp_errors::report_error;
 // Zap:`warp_graphql`(云端 GraphQL 客户端)已删除,runner 列表拉取随之下线。
@@ -25,6 +26,7 @@ use warpui::{
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{AIAgentActionId, AIAgentActionResultType, icons};
+use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::ai::blocklist::action_model::{
     AIActionStatus, BlocklistAIActionEvent, BlocklistAIActionModel, RunAgentsExecutor,
     RunAgentsExecutorEvent, RunAgentsSpawningSnapshot,
@@ -1248,11 +1250,23 @@ impl View for RunAgentsCardView {
         }
 
         let is_blocked = matches!(status, Some(AIActionStatus::Blocked));
+        let parent_harness = self
+            .block_model
+            .conversation_id(app)
+            .and_then(|id| BlocklistAIHistoryModel::as_ref(app).conversation(&id))
+            .map(|conversation| conversation.orchestration_harness().unwrap_or(Harness::Oz));
+        let state = &self.orchestration_edit_state.orchestration_config_state;
+        let message_permission = RunAgentsExecutor::allows_local_child_messages(
+            !state.execution_mode.is_remote(),
+            &state.harness_type,
+            parent_harness,
+        );
         let card = render_confirmation_card(
             &self.orchestration_edit_state.orchestration_config_state,
             &self.card,
             &self.handles,
             is_blocked,
+            message_permission,
             app,
         );
 
@@ -1422,13 +1436,14 @@ fn render_confirmation_card(
     card: &RunAgentsCardFields,
     handles: &RunAgentsCardHandles,
     is_blocked: bool,
+    message_permission: bool,
     app: &AppContext,
 ) -> Box<dyn Element> {
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
 
     let header = render_header(handles, app);
-    let body = render_body(card, app);
+    let body = render_body(card, message_permission, app);
 
     let mut content = Flex::column()
         .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
@@ -1472,12 +1487,16 @@ fn render_header(handles: &RunAgentsCardHandles, app: &AppContext) -> Box<dyn El
     config.render(app)
 }
 
-fn render_body(card: &RunAgentsCardFields, app: &AppContext) -> Box<dyn Element> {
+fn render_body(
+    card: &RunAgentsCardFields,
+    message_permission: bool,
+    app: &AppContext,
+) -> Box<dyn Element> {
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
     let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
 
-    column.add_child(render_summary(card, appearance));
+    column.add_child(render_summary(card, message_permission, appearance));
     column.add_child(render_agents_section(card, app));
 
     Container::new(column.finish())
@@ -1488,7 +1507,11 @@ fn render_body(card: &RunAgentsCardFields, app: &AppContext) -> Box<dyn Element>
         .finish()
 }
 
-fn render_summary(card: &RunAgentsCardFields, appearance: &Appearance) -> Box<dyn Element> {
+fn render_summary(
+    card: &RunAgentsCardFields,
+    message_permission: bool,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
     let theme = appearance.theme();
     let summary = if card.summary.trim().is_empty() {
         crate::t!("run-agents-summary", count = card.agent_run_configs.len())
@@ -1507,6 +1530,21 @@ fn render_summary(card: &RunAgentsCardFields, appearance: &Appearance) -> Box<dy
     let mut column = Flex::column()
         .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
         .with_child(summary_text);
+    if message_permission {
+        column = column.with_child(
+            Container::new(
+                Text::new(
+                    crate::t!("cli-agent-child-message-permission"),
+                    appearance.ui_font_family(),
+                    appearance.monospace_font_size() - 1.,
+                )
+                .with_color(blended_colors::text_disabled(theme, theme.background()))
+                .finish(),
+            )
+            .with_margin_top(4.)
+            .finish(),
+        );
+    }
     // Multi-level orchestration: the server may grant launched children the
     // run_agents tool, so tell the approver up front. The client cannot
     // cheaply know the server-side depth budget, so this line is gated on

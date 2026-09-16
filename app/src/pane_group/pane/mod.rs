@@ -47,6 +47,8 @@ use warpui::{
     View, ViewContext, ViewHandle, WeakModelHandle,
 };
 
+#[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+pub(crate) use self::local_harness_launch::persist_local_harness_parent;
 pub use self::view::{PaneHeaderAction, PaneHeaderCustomAction, PaneView, PaneViewEvent};
 use super::{ActivationReason, LeafContents, PaneGroup, PaneGroupAction};
 use crate::ai::ai_document_view::AIDocumentView;

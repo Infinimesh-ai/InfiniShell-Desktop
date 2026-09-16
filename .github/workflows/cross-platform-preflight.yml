@@ -609,6 +609,39 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # 单独读取真实 ConPTY 字节；hook 完成或独立 CONOUT$ 标记均不能代替通知到达。
+      - name: Verify Codex Windows ConPTY notification transport
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -B "$env:GITHUB_WORKSPACE\script\cli-agent-parity\codex_windows_conpty_tests.py" -v
+          if ($LASTEXITCODE -ne 0) { throw 'ConPTY probe contract tests failed' }
+          $gitBashCandidates = @(
+            "$env:PROGRAMFILES\Git\usr\bin\bash.exe",
+            "$env:LOCALAPPDATA\Programs\Git\usr\bin\bash.exe"
+          )
+          $gitBash = $gitBashCandidates | Where-Object { Test-Path -PathType Leaf $_ } | Select-Object -First 1
+          if (-not $gitBash) { throw 'Native Git Bash with msys-2.0.dll is required for ConPTY verification' }
+          $jqExecutable = (Get-Command jq.exe -ErrorAction Stop).Source
+          python -B "$env:GITHUB_WORKSPACE\script\cli-agent-parity\probe_codex_windows_conpty.py" --repo "$env:GITHUB_WORKSPACE" --download-dir "$env:RUNNER_TEMP\codex-0147-hook-inputs" --bash-executable "$gitBash" --jq-executable "$jqExecutable" --output "$env:RUNNER_TEMP\codex-windows-conpty.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Native Codex ConPTY transport failed; product notifications remain unverified' }
+
+      - name: Preserve Codex Windows ConPTY evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codex-windows-conpty-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/codex-windows-conpty.json
+            ${{ runner.temp }}/codex-windows-conpty.native.json
+            ${{ runner.temp }}/codex-windows-conpty.pty.bin
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Report sccache statistics
         if: ${{ always() }}
         shell: pwsh

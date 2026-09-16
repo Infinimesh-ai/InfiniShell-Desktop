@@ -6,7 +6,7 @@ use std::sync::mpsc::SyncSender;
 use uuid::Uuid;
 use warp_cli::agent::Harness;
 
-use crate::ai::cli_agent_runtime::coordinator::ManagedTaskEndpoint;
+use crate::ai::cli_agent_runtime::coordinator::{ManagedTaskEndpoint, PreparedManagedSend};
 use crate::ai::cli_agent_runtime::{InputContent, RuntimeAction, RuntimeCommand, RuntimeEventKind};
 use crate::persistence::ModelEvent;
 use crate::persistence::local_cli_tasks::{
@@ -20,12 +20,30 @@ pub(crate) async fn send_local_message(
     endpoint: ManagedTaskEndpoint,
     message: LocalCliMessage,
 ) -> Result<LocalCliMessageState, String> {
+    send_local_message_if_current(sender, endpoint, message, |prepared| async {
+        Ok(prepared.commit())
+    })
+    .await
+}
+
+/// SQLite 已记下交付尝试后再次验证动作身份，旧父轮不能跨异步窗口发出追加指令。
+pub(crate) async fn send_local_message_if_current<F, Fut>(
+    sender: &SyncSender<ModelEvent>,
+    endpoint: ManagedTaskEndpoint,
+    message: LocalCliMessage,
+    validate: F,
+) -> Result<LocalCliMessageState, String>
+where
+    F: FnOnce(PreparedManagedSend) -> Fut,
+    Fut: Future<Output = Result<futures::channel::oneshot::Receiver<Result<(), String>>, String>>,
+{
     let command = message_command(&endpoint, &message)?;
     dispatch_once(sender, message, || async move {
-        endpoint
-            .send(command)
+        let prepared = endpoint.prepare_send(command).await?;
+        let receiver = validate(prepared).await?;
+        receiver
             .await
-            .map_err(|error| error.to_string())
+            .map_err(|_| crate::t!("cli-agent-status-disconnected"))?
     })
     .await
 }
