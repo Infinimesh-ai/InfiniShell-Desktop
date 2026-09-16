@@ -17,7 +17,7 @@ on:
         default: true
         type: boolean
       run_macos_intel:
-        description: 交叉构建并原生验证 macOS x86_64 SSH 扩展
+        description: 备用：交叉构建并原生验证 macOS x86_64 SSH 扩展
         required: true
         default: false
         type: boolean
@@ -91,7 +91,7 @@ jobs:
         run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
 
   macos_intel_ssh_extension_build:
-    name: macOS Intel SSH extension cross-build
+    name: macOS Intel SSH extension fallback cross-build
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_intel }}
     runs-on: macos-26
     timeout-minutes: 360
