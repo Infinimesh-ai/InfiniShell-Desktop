@@ -1,3 +1,4 @@
+use uuid::Uuid;
 pub(super) mod chips;
 pub mod editor;
 // Zap Wave 7-3:`environment_selector` was removed with the hosted-mode footer.
@@ -111,8 +112,8 @@ use crate::server::telemetry::PluginChipTelemetryAction;
 use crate::terminal::ShellLaunchData;
 #[cfg(not(target_family = "wasm"))]
 use crate::terminal::cli_agent_sessions::plugin_manager::{
-    CliAgentPluginManager, PluginInstallError, PluginModalKind, compare_versions,
-    plugin_manager_for, plugin_manager_for_with_shell,
+    CliAgentPluginManager, NativeAuthorizationStatus, PluginInstallError, PluginModalKind,
+    compare_versions, plugin_manager_for, plugin_manager_for_with_shell,
 };
 #[cfg(not(target_family = "wasm"))]
 use crate::terminal::local_shell::LocalShellState;
@@ -147,15 +148,8 @@ const PLUGIN_CHIP_DEBOUNCE: Duration = Duration::from_secs(3);
 enum PluginChipKind {
     Install,
     Update,
-}
-
-impl From<PluginChipKind> for PluginChipTelemetryKind {
-    fn from(kind: PluginChipKind) -> Self {
-        match kind {
-            PluginChipKind::Install => PluginChipTelemetryKind::Install,
-            PluginChipKind::Update => PluginChipTelemetryKind::Update,
-        }
-    }
+    NativeAuthorization,
+    VerifyNotifications,
 }
 
 /// Builds a composite key for per-agent, per-host plugin chip dismissal.
@@ -211,6 +205,8 @@ pub struct AgentInputFooter {
     plugin_instructions_button: ViewHandle<ActionButton>,
     update_plugin_button: ViewHandle<ActionButton>,
     update_instructions_button: ViewHandle<ActionButton>,
+    authorize_notifications_button: ViewHandle<ActionButton>,
+    verify_notifications_button: ViewHandle<ActionButton>,
     dismiss_plugin_chip_button: ViewHandle<ActionButton>,
     plugin_operation_in_progress: bool,
     /// When `true`, the install chip is allowed to render.
@@ -432,6 +428,37 @@ impl AgentInputFooter {
             })
         });
 
+        let authorize_notifications_button = ctx.add_typed_action_view(|_| {
+            ActionButton::new(
+                crate::t!("ai-footer-authorize-notifications"),
+                InstallPluginButtonTheme,
+            )
+            .with_icon(Icon::Info)
+            .with_tooltip(crate::t!("ai-footer-authorize-notifications-tooltip"))
+            .with_size(cli_button_size)
+            .with_tooltip_alignment(TooltipAlignment::Left)
+            .on_click(|ctx| {
+                ctx.dispatch_typed_action(
+                    AgentInputFooterAction::OpenNativeAuthorizationInstructions,
+                )
+            })
+        });
+        let verify_notifications_button = ctx.add_typed_action_view(|_| {
+            ActionButton::new(
+                crate::t!("ai-footer-verify-notifications"),
+                InstallPluginButtonTheme,
+            )
+            .with_icon(Icon::Info)
+            .with_tooltip(crate::t!("ai-footer-verify-notifications-tooltip"))
+            .with_size(cli_button_size)
+            .with_tooltip_alignment(TooltipAlignment::Left)
+            .on_click(|ctx| {
+                ctx.dispatch_typed_action(
+                    AgentInputFooterAction::OpenNativeAuthorizationInstructions,
+                )
+            })
+        });
+
         let dismiss_plugin_chip_button = ctx.add_typed_action_view(|_ctx| {
             ActionButton::new("", InstallPluginButtonTheme)
                 .with_icon(Icon::X)
@@ -461,12 +488,12 @@ impl AgentInputFooter {
                     me.plugin_chip_ready = false;
                 }
 
-                // When a listener connects for an agent with rich status,
-                // the plugin is verified installed — hide the chip.
-                // (Codex always has a listener but no actual plugin to install.)
+                // 监听器存在不证明原生通知已启用；只有本次会话的可信通知解除提示。
                 if CLIAgentSessionsModel::as_ref(ctx)
                     .session(me.terminal_view_id)
-                    .is_some_and(|s| s.listener.is_some() && session_supports_rich_status(s))
+                    .is_some_and(|s| {
+                        s.received_rich_notification && session_supports_rich_status(s)
+                    })
                 {
                     me.plugin_chip_ready = false;
                 }
@@ -491,7 +518,7 @@ impl AgentInputFooter {
                                         let suppress = CLIAgentSessionsModel::as_ref(ctx)
                                             .session(me.terminal_view_id)
                                             .is_some_and(|s| {
-                                                s.listener.is_some()
+                                                s.received_rich_notification
                                                     && session_supports_rich_status(s)
                                             });
                                         if !suppress {
@@ -691,6 +718,8 @@ impl AgentInputFooter {
             plugin_instructions_button,
             update_plugin_button,
             update_instructions_button,
+            authorize_notifications_button,
+            verify_notifications_button,
             dismiss_plugin_chip_button,
             plugin_operation_in_progress: false,
             plugin_chip_ready: false,
@@ -804,6 +833,11 @@ impl AgentInputFooter {
     }
 
     fn select_cli_file(&mut self, ctx: &mut ViewContext<Self>) {
+        let Some(generation) =
+            CLIAgentSessionsModel::as_ref(ctx).input_generation(self.terminal_view_id)
+        else {
+            return;
+        };
         let window_id = ctx.window_id();
         let view_id = ctx.view_id();
         let file_picker_config = warpui::platform::FilePickerConfiguration::new();
@@ -815,7 +849,10 @@ impl AgentInputFooter {
                         ctx.dispatch_typed_action_for_view(
                             window_id,
                             view_id,
-                            &AgentInputFooterAction::InsertFilePath(path.clone()),
+                            &AgentInputFooterAction::InsertFilePath {
+                                path: path.clone(),
+                                generation,
+                            },
                         );
                     }
                 }
@@ -863,15 +900,30 @@ impl AgentInputFooter {
             let manager = plugin_manager_for(session.agent)?;
             let min_version = manager.minimum_plugin_version();
             let chip_key = plugin_chip_key(session.agent.command_prefix(), &session.remote_host);
+            if !session.is_remote() && manager.is_disabled() {
+                return (!ai_settings.is_plugin_install_chip_dismissed(&chip_key))
+                    .then_some(PluginChipKind::Install);
+            }
 
-            // If the plugin is connected (listener present) and this agent supports
-            // version-based updates, check the reported version.
-            if session.listener.is_some() && manager.supports_update() {
-                let needs_update = match &session.plugin_version {
-                    // No version reported = pre-versioning plugin, definitely outdated.
-                    None => true,
-                    Some(v) => compare_versions(v, min_version).is_lt(),
-                };
+            // 更新 hook 后旧会话仍可能留有通知标记；失效的原生信任必须优先显示。
+            if !session.is_remote() && manager.is_installed() && !manager.needs_update() {
+                match manager.native_authorization_status() {
+                    NativeAuthorizationStatus::Required | NativeAuthorizationStatus::Unknown => {
+                        return Some(PluginChipKind::NativeAuthorization);
+                    }
+                    NativeAuthorizationStatus::NotApplicable
+                    | NativeAuthorizationStatus::Configured => {}
+                }
+            }
+
+            // 已收到可信富通知且 CLI 支持版本更新时，再检查上报版本。
+            if session.received_rich_notification && manager.supports_update() {
+                let needs_update = (!session.is_remote() && manager.needs_update())
+                    || match &session.plugin_version {
+                        // 未上报版本的是引入版本协议前的旧插件，需要更新。
+                        None => true,
+                        Some(v) => compare_versions(v, min_version).is_lt(),
+                    };
                 if !needs_update {
                     return None;
                 }
@@ -911,8 +963,16 @@ impl AgentInputFooter {
                     }
                     return Some(PluginChipKind::Update);
                 }
-                // Up to date on disk — wait for the listener to connect.
-                return None;
+                // 文件安装和用户授权均不能替代当前 CLI 的真实通知。
+                return match manager.native_authorization_status() {
+                    NativeAuthorizationStatus::NotApplicable => None,
+                    NativeAuthorizationStatus::Required | NativeAuthorizationStatus::Unknown => {
+                        Some(PluginChipKind::NativeAuthorization)
+                    }
+                    NativeAuthorizationStatus::Configured => {
+                        Some(PluginChipKind::VerifyNotifications)
+                    }
+                };
             }
 
             // Not installed locally.
@@ -936,7 +996,7 @@ impl AgentInputFooter {
 
         #[cfg(not(target_family = "wasm"))]
         if let Some(manager) = plugin_manager_for(session.agent) {
-            if !manager.can_auto_install() {
+            if !manager.can_auto_install() || manager.is_disabled() {
                 return true;
             }
         }
@@ -1315,13 +1375,20 @@ impl AgentInputFooter {
                 (PluginChipKind::Update, true) => {
                     ChildView::new(&self.update_instructions_button).finish()
                 }
+                (PluginChipKind::NativeAuthorization, true | false) => {
+                    ChildView::new(&self.authorize_notifications_button).finish()
+                }
+                (PluginChipKind::VerifyNotifications, true | false) => {
+                    ChildView::new(&self.verify_notifications_button).finish()
+                }
             };
-            let chip_with_dismiss = Flex::row()
+            let mut row = Flex::row()
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(chip)
-                .with_child(ChildView::new(&self.dismiss_plugin_chip_button).finish())
-                .finish();
-            left_buttons.add_child(chip_with_dismiss);
+                .with_child(chip);
+            if matches!(chip_kind, PluginChipKind::Install | PluginChipKind::Update) {
+                row.add_child(ChildView::new(&self.dismiss_plugin_chip_button).finish());
+            }
+            left_buttons.add_child(row.finish());
         }
 
         for item in &left_items {
@@ -1500,6 +1567,11 @@ impl AgentInputFooter {
 
         match &self.cli_voice_input_state {
             CLIVoiceInputState::Stopped => {
+                let Some(generation) =
+                    CLIAgentSessionsModel::as_ref(ctx).input_generation(self.terminal_view_id)
+                else {
+                    return;
+                };
                 // Zap(Phase 3c A1):删除 `AIRequestUsageModel::can_request_voice`
                 // 额度闸。本地化后语音输入不受云端额度限制，统一可发送。
 
@@ -1528,7 +1600,9 @@ impl AgentInputFooter {
 
                         ctx.spawn(
                             async move { session.await_result().await },
-                            Self::handle_cli_voice_session_result,
+                            move |me, result, ctx| {
+                                me.handle_cli_voice_session_result(result, generation, ctx)
+                            },
                         );
                     }
                     Err(StartListeningError::AccessDenied) => {
@@ -1557,10 +1631,19 @@ impl AgentInputFooter {
     fn handle_cli_voice_session_result(
         &mut self,
         result: VoiceSessionResult,
+        generation: Uuid,
         ctx: &mut ViewContext<Self>,
     ) {
         use crate::editor::VoiceTranscriber;
 
+        if CLIAgentSessionsModel::as_ref(ctx).input_generation(self.terminal_view_id)
+            != Some(generation)
+        {
+            self.cli_voice_input_state = CLIVoiceInputState::Stopped;
+            self.update_cli_mic_button_state(ctx);
+            ctx.notify();
+            return;
+        }
         match result {
             VoiceSessionResult::Audio {
                 wav_base64,
@@ -1580,7 +1663,9 @@ impl AgentInputFooter {
 
                     self.cli_transcription_handle = Some(ctx.spawn(
                         async move { transcriber.transcribe(wav_base64, language).await },
-                        Self::apply_cli_transcribed_voice_input,
+                        move |me, result, ctx| {
+                            me.apply_cli_transcribed_voice_input(result, generation, ctx)
+                        },
                     ));
                 } else {
                     self.cli_voice_input_state = CLIVoiceInputState::Stopped;
@@ -1595,9 +1680,10 @@ impl AgentInputFooter {
     }
 
     #[cfg(feature = "voice_input")]
-    fn apply_cli_transcribed_voice_input(
+    pub(crate) fn apply_cli_transcribed_voice_input(
         &mut self,
         result: Result<String, TranscribeError>,
+        generation: Uuid,
         ctx: &mut ViewContext<Self>,
     ) {
         voice_input::VoiceInput::handle(ctx).update(ctx, |voice, _| {
@@ -1607,13 +1693,10 @@ impl AgentInputFooter {
         match result {
             Ok(transcribed_text) => {
                 if !transcribed_text.is_empty() {
-                    if self.has_active_cli_agent_input_session(ctx) {
-                        ctx.emit(AgentInputFooterEvent::InsertIntoCLIRichInput(
-                            transcribed_text,
-                        ));
-                    } else {
-                        ctx.emit(AgentInputFooterEvent::WriteToPty(transcribed_text));
-                    }
+                    ctx.emit(AgentInputFooterEvent::InsertIntoCLI {
+                        text: transcribed_text,
+                        generation,
+                    });
                 }
             }
             Err(e) => match e {
@@ -2027,7 +2110,10 @@ pub enum AgentInputFooterAction {
     #[cfg(feature = "voice_input")]
     ToggleVoiceInput,
     SelectFile,
-    InsertFilePath(String),
+    InsertFilePath {
+        path: String,
+        generation: Uuid,
+    },
     ToggleCodeReview,
     ToggleFileExplorer,
     ToggleRichInput,
@@ -2037,6 +2123,7 @@ pub enum AgentInputFooterAction {
     UpdatePlugin,
     OpenPluginInstallInstructionsPane,
     OpenPluginUpdateInstructionsPane,
+    OpenNativeAuthorizationInstructions,
     DismissPluginChip,
     OpenCodingAgentSettings,
     ShowContextMenu {
@@ -2071,7 +2158,7 @@ impl TypedActionView for AgentInputFooter {
                     ctx.emit(AgentInputFooterEvent::SelectFile);
                 }
             }
-            AgentInputFooterAction::InsertFilePath(path) => {
+            AgentInputFooterAction::InsertFilePath { path, generation } => {
                 if let Some(agent) = self.cli_agent(ctx) {
                     send_telemetry_from_ctx!(
                         TelemetryEvent::CLIAgentToolbarImageAttached {
@@ -2080,14 +2167,10 @@ impl TypedActionView for AgentInputFooter {
                         ctx
                     );
                 }
-                let path_with_space = format!("{path} ");
-                if self.has_active_cli_agent_input_session(ctx) {
-                    ctx.emit(AgentInputFooterEvent::InsertIntoCLIRichInput(
-                        path_with_space,
-                    ));
-                } else {
-                    ctx.emit(AgentInputFooterEvent::WriteToPty(path_with_space));
-                }
+                ctx.emit(AgentInputFooterEvent::InsertIntoCLI {
+                    text: format!("{path} "),
+                    generation: *generation,
+                });
             }
             AgentInputFooterAction::ToggleCodeReview => {
                 if let Some(agent) = self.cli_agent(ctx) {
@@ -2188,15 +2271,33 @@ impl TypedActionView for AgentInputFooter {
                     ));
                 }
             }
+            AgentInputFooterAction::OpenNativeAuthorizationInstructions => {
+                #[cfg(not(target_family = "wasm"))]
+                if let Some(agent) = self.cli_agent(ctx) {
+                    ctx.emit(AgentInputFooterEvent::OpenPluginInstructionsPane(
+                        agent,
+                        PluginModalKind::NativeAuthorization,
+                    ));
+                }
+            }
             AgentInputFooterAction::DismissPluginChip => {
                 let chip_kind = self.plugin_chip_kind(ctx);
                 let is_update = matches!(chip_kind, Some(PluginChipKind::Update));
                 if let Some(agent) = self.cli_agent(ctx) {
-                    if let Some(kind) = chip_kind {
+                    let kind = match chip_kind {
+                        Some(PluginChipKind::Install) => PluginChipTelemetryKind::Install,
+                        Some(PluginChipKind::Update) => PluginChipTelemetryKind::Update,
+                        Some(
+                            PluginChipKind::NativeAuthorization
+                            | PluginChipKind::VerifyNotifications,
+                        )
+                        | None => return,
+                    };
+                    {
                         send_telemetry_from_ctx!(
                             TelemetryEvent::CLIAgentPluginChipDismissed {
                                 cli_agent: agent.into(),
-                                chip_kind: kind.into(),
+                                chip_kind: kind,
                             },
                             ctx
                         );
@@ -2244,9 +2345,11 @@ pub enum AgentInputFooterEvent {
     #[cfg(feature = "voice_input")]
     ToggleVoiceInput(voice_input::VoiceInputToggledFrom),
     SelectFile,
-    WriteToPty(String),
-    /// Insert text into the CLI agent rich input.
-    InsertIntoCLIRichInput(String),
+    /// 异步输入携带发起代际，消费者不能重新猜测其目标会话。
+    InsertIntoCLI {
+        text: String,
+        generation: Uuid,
+    },
     ToggleCodeReviewPane(CLIAgent),
     ToggleFileExplorer(CLIAgent),
     OpenRichInput,

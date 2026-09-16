@@ -1,0 +1,116 @@
+{
+  "enabled": "1",
+  "projectTrusted": true,
+  "hooks": [
+    {
+      "event": "session_start",
+      "hookType": "command",
+      "target": "python3 <probe-project>/hook.py claude",
+      "source": {
+        "type": "project",
+        "path": "<probe-project>/.claude"
+      },
+      "matcher": null,
+      "vendor": "claude",
+      "compatibilityStatus": "enabled"
+    },
+    {
+      "event": "session_start",
+      "hookType": "command",
+      "target": "python3 <probe-project>/hook.py grok",
+      "source": {
+        "type": "project",
+        "path": "<probe-project>/.grok/hooks"
+      },
+      "matcher": null
+    },
+    {
+      "event": "user_prompt_submit",
+      "hookType": "command",
+      "target": "python3 <probe-project>/hook.py claude",
+      "source": {
+        "type": "project",
+        "path": "<probe-project>/.claude"
+      },
+      "matcher": null,
+      "vendor": "claude",
+      "compatibilityStatus": "enabled"
+    },
+    {
+      "event": "user_prompt_submit",
+      "hookType": "command",
+      "target": "python3 <probe-project>/hook.py grok",
+      "source": {
+        "type": "project",
+        "path": "<probe-project>/.grok/hooks"
+      },
+      "matcher": null
+    },
+    {
+      "event": "stop",
+      "hookType": "command",
+      "target": "python3 <probe-project>/hook.py claude",
+      "source": {
+        "type": "project",
+        "path": "<probe-project>/.claude"
+      },
+      "matcher": null,
+      "vendor": "claude",
+      "compatibilityStatus": "enabled"
+    },
+    {
+      "event": "stop",
+      "hookType": "command",
+      "target": "python3 <probe-project>/hook.py grok",
+      "source": {
+        "type": "project",
+        "path": "<probe-project>/.grok/hooks"
+      },
+      "matcher": null
+    },
+    {
+      "event": "stop_failure",
+      "hookType": "command",
+      "target": "python3 <probe-project>/hook.py claude",
+      "source": {
+        "type": "project",
+        "path": "<probe-project>/.claude"
+      },
+      "matcher": null,
+      "vendor": "claude",
+      "compatibilityStatus": "enabled"
+    },
+    {
+      "event": "stop_failure",
+      "hookType": "command",
+      "target": "python3 <probe-project>/hook.py grok",
+      "source": {
+        "type": "project",
+        "path": "<probe-project>/.grok/hooks"
+      },
+      "matcher": null
+    },
+    {
+      "event": "session_end",
+      "hookType": "command",
+      "target": "python3 <probe-project>/hook.py claude",
+      "source": {
+        "type": "project",
+        "path": "<probe-project>/.claude"
+      },
+      "matcher": null,
+      "vendor": "claude",
+      "compatibilityStatus": "enabled"
+    },
+    {
+      "event": "session_end",
+      "hookType": "command",
+      "target": "python3 <probe-project>/hook.py grok",
+      "source": {
+        "type": "project",
+        "path": "<probe-project>/.grok/hooks"
+      },
+      "matcher": null
+    }
+  ]
+}

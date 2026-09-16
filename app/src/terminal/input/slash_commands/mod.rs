@@ -421,9 +421,14 @@ impl Input {
                 );
             }
             SlashCommandsEvent::SelectedSkill { name, reference: _ } => {
-                // Insert /{skill-name} into the buffer
+                // 与行内技能选择器保持一致，使用当前 CLI 的原生调用前缀。
+                let prefix =
+                    crate::terminal::cli_agent_sessions::CLIAgentSessionsModel::as_ref(ctx)
+                        .session(self.terminal_view_id)
+                        .map(|session| session.agent.skill_command_prefix())
+                        .unwrap_or("/");
                 self.editor.update(ctx, |editor, ctx| {
-                    editor.set_buffer_text(format!("/{name} ").as_str(), ctx);
+                    editor.set_buffer_text(format!("{prefix}{name} ").as_str(), ctx);
                 });
                 self.close_slash_commands_menu(ctx);
             }

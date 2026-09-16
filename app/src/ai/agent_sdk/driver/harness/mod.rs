@@ -138,6 +138,7 @@ pub(crate) fn harness_kind(harness: Harness) -> Result<HarnessKind, AgentDriverE
         // 第三方 harness runner——上游的 CodexHarness 依赖已剥离的服务端
         // 会话上传/恢复链路,这里按 OpenCode 的方式标记为 driver 不支持。
         Harness::Codex => Ok(HarnessKind::Unsupported(Harness::Codex)),
+        Harness::Grok => Ok(HarnessKind::Unsupported(Harness::Grok)),
         Harness::OpenCode => Ok(HarnessKind::Unsupported(Harness::OpenCode)),
         Harness::Gemini => Ok(HarnessKind::ThirdParty(Box::new(GeminiHarness))),
         Harness::Unknown => Err(AgentDriverError::InvalidRuntimeState),
@@ -307,7 +308,12 @@ pub(crate) fn harness_model_env_vars(
         Harness::Claude => {
             env_vars.insert(OsString::from("ANTHROPIC_MODEL"), OsString::from(model_id));
         }
-        Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Codex | Harness::Unknown => {}
+        Harness::Oz
+        | Harness::OpenCode
+        | Harness::Gemini
+        | Harness::Codex
+        | Harness::Grok
+        | Harness::Unknown => {}
     }
 
     env_vars

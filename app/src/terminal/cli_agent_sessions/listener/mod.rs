@@ -52,7 +52,7 @@ pub fn agent_supports_rich_status(agent: &CLIAgent) -> bool {
 /// Returns whether this concrete session has enough event context to render
 /// fine-grained status in UI surfaces.
 pub fn session_supports_rich_status(session: &CLIAgentSession) -> bool {
-    if !agent_supports_rich_status(&session.agent) {
+    if !session.supports_rich_status() || !agent_supports_rich_status(&session.agent) {
         return false;
     }
 
@@ -73,6 +73,7 @@ pub fn is_agent_supported(agent: &CLIAgent) -> bool {
     matches!(
         agent,
         CLIAgent::Claude
+            | CLIAgent::Grok
             | CLIAgent::OpenCode
             | CLIAgent::Codex
             | CLIAgent::Gemini
@@ -97,6 +98,7 @@ fn create_handler(agent: &CLIAgent) -> Option<Box<dyn CLIAgentSessionHandler>> {
         // install flows for these agents here — we just listen.
         // WarpTui emits OSC 777 events directly (no external plugin needed).
         CLIAgent::Claude
+        | CLIAgent::Grok
         | CLIAgent::OpenCode
         | CLIAgent::Gemini
         | CLIAgent::Auggie
@@ -137,7 +139,7 @@ impl CLIAgentSessionHandler for DefaultSessionListener {
 ///
 /// Codex sends notifications via OSC 9 (`\x1b]9;message\x07`) with
 /// human-readable text. Since there's no way to distinguish notification types from the raw text,
-/// OSC 9 fallback notifications are treated as `Stop` (success).
+/// 普通通知仅提示用户检查终端，不能证明任务完成。
 struct CodexSessionHandler;
 
 impl CodexSessionHandler {
@@ -152,12 +154,12 @@ impl CodexSessionHandler {
         Some(CLIAgentEvent {
             v: 1,
             agent: CLIAgent::Codex,
-            event: CLIAgentEventType::Stop,
+            event: CLIAgentEventType::Notification,
             session_id: None,
             cwd: None,
             project: None,
             payload: CLIAgentEventPayload {
-                query: Some(body.to_owned()),
+                summary: Some(body.to_owned()),
                 ..Default::default()
             },
             source: CLIAgentEventSource::CodexOsc9Fallback,
@@ -301,6 +303,14 @@ impl CLIAgentSessionListener {
         ctx.subscribe_to_model(model_event_dispatcher, move |me, _, event, ctx| {
             if let ModelEvent::PluggableNotification { title, body } = event {
                 let view_id = me.terminal_view_id;
+                // 已被替换的 listener 仍可能有排队回调，不能更新新会话。
+                let current_listener = CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view_id)
+                    .and_then(|session| session.listener.as_ref())
+                    .map(|listener| listener.id());
+                if current_listener != Some(ctx.model_id()) {
+                    return;
+                }
                 let plugin_already_active = CLIAgentSessionsModel::as_ref(ctx)
                     .session(view_id)
                     .is_some_and(|session| session.received_rich_notification);
@@ -335,33 +345,36 @@ mod infinishell_tests {
     use crate::terminal::cli_agent_sessions::event::CLIAgentEventType;
 
     #[test]
-    fn codex_parses_any_text_as_stop() {
+    fn codex_parses_text_without_inferring_completion() {
         let event = CodexSessionHandler::parse_osc9_text("Agent turn complete").unwrap();
-        assert_eq!(event.event, CLIAgentEventType::Stop);
+        assert_eq!(event.event, CLIAgentEventType::Notification);
         assert_eq!(event.agent, CLIAgent::Codex);
-        assert_eq!(event.payload.query.as_deref(), Some("Agent turn complete"));
+        assert_eq!(
+            event.payload.summary.as_deref(),
+            Some("Agent turn complete")
+        );
     }
 
     #[test]
-    fn codex_body_becomes_query() {
+    fn codex_body_becomes_notification_summary() {
         let event = CodexSessionHandler::parse_osc9_text(
             "I've updated the README with the new instructions.",
         )
         .unwrap();
-        assert_eq!(event.event, CLIAgentEventType::Stop);
+        assert_eq!(event.event, CLIAgentEventType::Notification);
         assert_eq!(
-            event.payload.query.as_deref(),
+            event.payload.summary.as_deref(),
             Some("I've updated the README with the new instructions.")
         );
     }
 
     #[test]
-    fn codex_approval_text_still_becomes_stop() {
+    fn codex_approval_text_is_not_a_completion() {
         let event =
             CodexSessionHandler::parse_osc9_text("Approval requested: rm -rf /tmp/foo").unwrap();
-        assert_eq!(event.event, CLIAgentEventType::Stop);
+        assert_eq!(event.event, CLIAgentEventType::Notification);
         assert_eq!(
-            event.payload.query.as_deref(),
+            event.payload.summary.as_deref(),
             Some("Approval requested: rm -rf /tmp/foo")
         );
     }
@@ -388,7 +401,7 @@ mod infinishell_tests {
         let event = handler
             .try_parse(None, "Agent turn complete", false)
             .unwrap();
-        assert_eq!(event.event, CLIAgentEventType::Stop);
+        assert_eq!(event.event, CLIAgentEventType::Notification);
     }
 
     #[test]
@@ -603,7 +616,7 @@ mod infinishell_tests {
             plugin_version: None,
             draft_text: None,
             custom_command_prefix: None,
-            received_rich_notification: false,
+            received_rich_notification: true,
         };
 
         assert!(session_supports_rich_status(&session));

@@ -6,6 +6,7 @@ use std::{env, fs, io};
 use async_trait::async_trait;
 use serde_json::Value;
 
+use super::notification_patch::{self, PatchKind, VerifiedRuntime};
 use super::{
     CliAgentPluginManager, PluginInstallError, PluginInstructionStep, PluginInstructions,
     compare_versions, run_cli_command_logged,
@@ -21,7 +22,7 @@ const MARKETPLACE_NAME: &str = "claude-code-warp";
 
 // Keep in sync with the plugin version in warpdotdev/claude-code-warp.
 // (See the Versioning section of that repo's README.)
-const MINIMUM_PLUGIN_VERSION: &str = "2.1.0";
+const MINIMUM_PLUGIN_VERSION: &str = "2.2.0";
 // Keep in sync with the oz-harness-support plugin version in warpdotdev/claude-code-warp.
 const MINIMUM_PLATFORM_PLUGIN_VERSION: &str = "1.1.2";
 
@@ -43,6 +44,61 @@ impl ClaudeCodePluginManager {
         }
     }
 
+    async fn notification_operation(&self, updating: bool) -> Result<(), PluginInstallError> {
+        if self.is_disabled() {
+            return Err(PluginInstallError {
+                message: crate::t!("cli-agent-plugin-disabled"),
+                log: String::new(),
+            });
+        }
+        if self.has_local_marketplace_override() {
+            return Err(notification_patch::modified());
+        }
+        let home = claude_home_dir()?;
+        let mut log = String::new();
+        let runtime = VerifiedRuntime::probe(
+            PatchKind::Claude,
+            &home,
+            self.path_env_var.as_deref(),
+            &mut log,
+        )
+        .await?;
+        let current = notification_patch::preflight(&home, PatchKind::Claude)?;
+        // 已处于受测版本时只补关联脚本，避免重新安装覆盖仍在使用的缓存。
+        if !current {
+            if updating {
+                // 保留既有 marketplace 和配置，原生更新失败时不删除旧插件。
+                runtime
+                    .run(
+                        &["plugin", "marketplace", "update", MARKETPLACE_NAME],
+                        &mut log,
+                    )
+                    .await?;
+                runtime
+                    .run(&["plugin", "update", PLUGIN_KEY], &mut log)
+                    .await?;
+            } else {
+                runtime
+                    .run(
+                        &["plugin", "marketplace", "add", MARKETPLACE_REPO],
+                        &mut log,
+                    )
+                    .await?;
+                runtime
+                    .run(&["plugin", "install", PLUGIN_KEY], &mut log)
+                    .await?;
+            }
+        }
+        // 原生 CLI 可能拒绝操作、留下旧版本或遇到禁用配置；不能仅凭退出码报告成功。
+        if self.is_disabled() || !self.is_installed() {
+            return Err(PluginInstallError {
+                message: crate::t!("cli-agent-plugin-update-not-effective"),
+                log,
+            });
+        }
+        notification_patch::apply(&home, PatchKind::Claude, &log)
+    }
+
     async fn run_logged(&self, args: &[&str], log: &mut String) -> Result<(), PluginInstallError> {
         let env_vars = self
             .path_env_var
@@ -59,7 +115,15 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
     }
 
     fn can_auto_install(&self) -> bool {
-        true
+        notification_patch::auto_install_supported()
+            && !self.is_disabled()
+            && !self.has_local_marketplace_override()
+    }
+
+    fn is_disabled(&self) -> bool {
+        claude_home_dir()
+            .ok()
+            .is_some_and(|dir| check_plugin_disabled(&dir, PLUGIN_KEY))
     }
 
     fn is_installed(&self) -> bool {
@@ -96,52 +160,11 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
 
     /// Runs `claude plugin` CLI commands via the session shell.
     async fn install(&self) -> Result<(), PluginInstallError> {
-        let mut log = String::new();
-        self.run_logged(
-            &["plugin", "marketplace", "add", MARKETPLACE_REPO],
-            &mut log,
-        )
-        .await?;
-        self.run_logged(&["plugin", "install", PLUGIN_KEY], &mut log)
-            .await?;
-        Ok(())
+        self.notification_operation(false).await
     }
 
     async fn update(&self) -> Result<(), PluginInstallError> {
-        let mut log = String::new();
-        // Remove/re-add the marketplace to ensure the local clone is fresh, then
-        // reinstall the plugin.
-        // We use `plugin install` (not `plugin update`) because `marketplace
-        // remove` unlinks the plugin, so `plugin update` would fail with
-        // "Plugin is not installed".
-        let _ = self
-            .run_logged(
-                &["plugin", "marketplace", "remove", MARKETPLACE_NAME],
-                &mut log,
-            )
-            .await;
-        self.run_logged(
-            &["plugin", "marketplace", "add", MARKETPLACE_REPO],
-            &mut log,
-        )
-        .await?;
-        self.run_logged(&["plugin", "install", PLUGIN_KEY], &mut log)
-            .await?;
-
-        // Sanity check: verify the on-disk version actually changed.
-        let still_outdated = claude_home_dir()
-            .ok()
-            .and_then(|dir| installed_version(&dir))
-            .map(|v| compare_versions(&v, MINIMUM_PLUGIN_VERSION).is_lt())
-            .unwrap_or(true);
-        if still_outdated {
-            log.push_str("Post-update version check: plugin is still outdated\n");
-            return Err(PluginInstallError {
-                message: crate::t!("cli-agent-plugin-update-not-effective"),
-                log,
-            });
-        }
-        Ok(())
+        self.notification_operation(true).await
     }
 
     fn install_success_message(&self) -> &'static str {
@@ -153,22 +176,27 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
     }
 
     fn install_instructions(&self) -> &'static PluginInstructions {
-        &INSTALL_INSTRUCTIONS
+        if self.is_disabled() {
+            &ENABLE_INSTRUCTIONS
+        } else {
+            &INSTALL_INSTRUCTIONS
+        }
     }
 
     fn update_instructions(&self) -> &'static PluginInstructions {
         &UPDATE_INSTRUCTIONS
     }
 
+    fn remote_install_instructions(&self) -> &'static PluginInstructions {
+        &INSTALL_INSTRUCTIONS
+    }
+
     fn needs_update(&self) -> bool {
         let Ok(claude_dir) = claude_home_dir() else {
             return false;
         };
-        match installed_version(&claude_dir) {
-            Some(v) => compare_versions(&v, MINIMUM_PLUGIN_VERSION).is_lt(),
-            // No version field means very old plugin.
-            None => check_installed(&claude_dir),
-        }
+        check_installed(&claude_dir)
+            && !notification_patch::is_applied(&claude_dir, PatchKind::Claude)
     }
 
     async fn install_platform_plugin(&self) -> Result<(), PluginInstallError> {
@@ -229,6 +257,7 @@ static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plu
     post_install_notes: vec![
         crate::t_static!("cli-agent-plugin-claude-restart-note"),
         crate::t_static!("cli-agent-plugin-claude-known-issues-note"),
+        crate::t_static!("cli-agent-plugin-patch-manual-note"),
     ],
 });
 
@@ -237,27 +266,22 @@ static UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plug
     subtitle: crate::t_static!("cli-agent-plugin-run-following-commands"),
     steps: vec![
         PluginInstructionStep {
-            description: crate::t_static!("cli-agent-plugin-remove-existing-marketplace-step"),
-            command: "claude plugin marketplace remove claude-code-warp",
-            executable: true,
-            link: None,
-        },
-        PluginInstructionStep {
-            description: crate::t_static!("cli-agent-plugin-readd-marketplace-step"),
-            command: "claude plugin marketplace add warpdotdev/claude-code-warp",
+            description: crate::t_static!("cli-agent-plugin-refresh-marketplace-step"),
+            command: "claude plugin marketplace update claude-code-warp",
             executable: true,
             link: None,
         },
         PluginInstructionStep {
             description: crate::t_static!("cli-agent-plugin-install-latest-version-step"),
-            command: "claude plugin install warp@claude-code-warp",
+            command: "claude plugin update warp@claude-code-warp",
             executable: true,
             link: None,
         },
     ],
-    post_install_notes: vec![crate::t_static!(
-        "cli-agent-plugin-claude-restart-update-note"
-    )],
+    post_install_notes: vec![
+        crate::t_static!("cli-agent-plugin-claude-restart-update-note"),
+        crate::t_static!("cli-agent-plugin-patch-manual-note"),
+    ],
 });
 
 fn check_installed(claude_dir: &Path) -> bool {
@@ -269,6 +293,9 @@ fn check_platform_plugin_installed(claude_dir: &Path) -> bool {
 }
 
 fn check_plugin_installed(claude_dir: &Path, plugin_key: &str) -> bool {
+    if check_plugin_disabled(claude_dir, plugin_key) {
+        return false;
+    }
     let plugins_path = claude_dir.join("plugins").join("installed_plugins.json");
     let Ok(contents) = fs::read_to_string(plugins_path) else {
         return false;
@@ -284,7 +311,30 @@ fn check_plugin_installed(claude_dir: &Path, plugin_key: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn check_plugin_disabled(claude_dir: &Path, plugin_key: &str) -> bool {
+    fs::read_to_string(claude_dir.join("settings.json"))
+        .ok()
+        .and_then(|contents| serde_json::from_str::<Value>(&contents).ok())
+        .and_then(|settings| settings.get("enabledPlugins")?.get(plugin_key)?.as_bool())
+        == Some(false)
+}
+
+static ENABLE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| PluginInstructions {
+    title: crate::t_static!("cli-agent-plugin-claude-install-title"),
+    subtitle: crate::t_static!("cli-agent-plugin-disabled"),
+    steps: vec![PluginInstructionStep {
+        description: crate::t_static!("cli-agent-plugin-enable-step"),
+        command: "claude plugin enable warp@claude-code-warp",
+        executable: true,
+        link: None,
+    }],
+    post_install_notes: vec![crate::t_static!(
+        "cli-agent-plugin-installed-restart-session"
+    )],
+});
+
 /// Reads the installed version string for the Zap plugin, if present.
+#[cfg(test)]
 fn installed_version(claude_dir: &Path) -> Option<String> {
     installed_plugin_version(claude_dir, PLUGIN_KEY)
 }

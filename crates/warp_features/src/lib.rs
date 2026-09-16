@@ -657,6 +657,8 @@ pub enum FeatureFlag {
     /// Re-enables local Claude Code and Codex child harnesses in orchestration
     /// flows while the default behavior temporarily keeps them disabled.
     LocalClaudeCodexChildHarnesses,
+    /// 本地 CLI 托管任务的验证入口；完整生命周期通过前保持默认关闭。
+    LocalCLIManagedTasks,
 
     /// On `wait_for_events`, confirms parent status against the server and
     /// registers an orchestrator for the owner-side ancestor stream so it
@@ -1026,7 +1028,10 @@ pub const RELEASE_FLAGS: &[FeatureFlag] = &[
 ];
 
 /// Flags that we want to allow to switch at runtime (assuming RuntimeFeatureFlags is set)
-pub const RUNTIME_FEATURE_FLAGS: &[FeatureFlag] = &[FeatureFlag::LocalClaudeCodexChildHarnesses];
+pub const RUNTIME_FEATURE_FLAGS: &[FeatureFlag] = &[
+    FeatureFlag::LocalClaudeCodexChildHarnesses,
+    FeatureFlag::LocalCLIManagedTasks,
+];
 
 impl FeatureFlag {
     pub fn is_enabled(&self) -> bool {

@@ -2062,3 +2062,102 @@ pub struct NewSyncMeta<'a> {
     pub key: &'a str,
     pub value: &'a str,
 }
+
+/// 本地 CLI 任务的持久状态；未知版本状态不能被解释为成功。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalCliTaskState {
+    Queued,
+    Running,
+    WaitingForUser,
+    /// 结果尚未确认，当前运行仍占用原生会话；不能据此认定完成或启动新运行。
+    Unconfirmed,
+    Completed,
+    Failed,
+    Cancelled,
+    Disconnected,
+    #[serde(other)]
+    Unknown,
+}
+
+impl LocalCliTaskState {
+    pub fn is_active(self) -> bool {
+        matches!(
+            self,
+            Self::Queued | Self::Running | Self::WaitingForUser | Self::Unconfirmed
+        )
+    }
+
+    pub fn is_terminal(self) -> bool {
+        matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
+    }
+}
+
+/// 应用任务与原生会话的映射，不包含认证信息或自动重放指令。
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocalCliTask {
+    #[serde(default = "local_cli_record_version")]
+    pub version: u32,
+    pub task_id: String,
+    #[serde(default)]
+    pub parent_task_id: Option<String>,
+    /// 固定创建时的父运行，旧回调不能把结果投递到后来继续的父任务。
+    #[serde(default)]
+    pub parent_generation: Option<i64>,
+    pub harness: String,
+    pub working_directory: String,
+    pub config_json: String,
+    #[serde(default)]
+    pub native_session_id: Option<String>,
+    pub generation: i64,
+    pub revision: i64,
+    pub state: LocalCliTaskState,
+    #[serde(default)]
+    pub result: Option<String>,
+    /// 只有原生结果或可信完成事件能够填充此字段，进程正常退出本身不构成完成证据。
+    #[serde(default)]
+    pub terminal_evidence: Option<String>,
+}
+
+/// Sent 只表示已交给传输层；Acknowledged 必须来自接收方确认。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalCliMessageState {
+    Queued,
+    Sent,
+    Acknowledged,
+    Failed,
+    Cancelled,
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocalCliMessage {
+    #[serde(default = "local_cli_record_version")]
+    pub version: u32,
+    pub message_id: String,
+    pub sender_task_id: String,
+    pub recipient_task_id: String,
+    pub sender_generation: i64,
+    pub recipient_generation: i64,
+    pub subject: String,
+    pub body: String,
+    pub state: LocalCliMessageState,
+    #[serde(default)]
+    pub receipt_kind: Option<LocalCliReceiptKind>,
+}
+
+/// 应用历史接收与外部 CLI 原生接收是不同证据，不能相互替代。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalCliReceiptKind {
+    NativeProtocol,
+    ApplicationHistory,
+    #[serde(other)]
+    Unknown,
+}
+
+fn local_cli_record_version() -> u32 {
+    1
+}

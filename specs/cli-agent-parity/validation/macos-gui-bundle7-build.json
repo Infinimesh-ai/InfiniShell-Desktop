@@ -1,0 +1,16 @@
+{
+  "recorded_at": "2026-09-16T11:49:03.044166+00:00",
+  "baseline_commit": "6921a9925955a1955503e259cd935eaea4ac2ac0",
+  "worktree_dirty": true,
+  "platform": "macOS arm64",
+  "command": "./script/run --dont-open --features local_cli_managed_tasks",
+  "exit_code": 0,
+  "binary_sha256": "56e3ce6d304c7c2bb040222c8ca7ddd5ba7c978820c49765d2a757fbb8b48b68",
+  "log_sha256": "391a0e4c8370605f0c2a32e96cd7d48a06720bd0f63da55ef5b955a6bdc304d3",
+  "build_summary": [
+    "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3m 33s"
+  ],
+  "bundled_and_signed": true,
+  "gui_verification": "正在由独立新物理副本验证 Codex 持久来源/重启/hook授权与双语说明",
+  "final_commit_verification": false
+}

@@ -207,7 +207,7 @@ pub(super) fn convert_input(
                     context: Some(convert_context(context.as_ref())),
                     r#type: Some(api::request::input::Type::InvokeSkill(
                         api::request::input::InvokeSkill {
-                            skill: Some(skill.into()),
+                            skill: Some(api::Skill::try_from(skill).map_err(anyhow::Error::from)?),
                             user_query: user_query.map(|user_query| {
                                 api::request::input::UserQuery {
                                     query: user_query.query,
@@ -238,7 +238,10 @@ pub(super) fn convert_input(
                             // Deprecated, we always resolve base_prompt from the stored task config.
                             runtime_base_prompt: String::new(),
 
-                            runtime_skill: runtime_skill.map(|skill| skill.into()),
+                            runtime_skill: runtime_skill
+                                .map(api::Skill::try_from)
+                                .transpose()
+                                .map_err(anyhow::Error::from)?,
                             attachments_dir: attachments_dir.unwrap_or_default(),
                         },
                     )),
@@ -659,6 +662,7 @@ impl TryFrom<AIAgentActionResult> for api::request::input::user_inputs::user_inp
             AIAgentActionResultType::AskUserQuestion(ask_user_question_result) => {
                 Some(ask_user_question_result.into())
             }
+            AIAgentActionResultType::SendMessageToAgent(result) => Some(result.try_into()?),
             AIAgentActionResultType::RunAgents(orchestrate_result) => {
                 Some(orchestrate_result.try_into()?)
             }
@@ -804,12 +808,16 @@ fn convert_context(context: &[AIAgentContext]) -> api::InputContext {
                 api_context.updated_skills_context = Some(api::input_context::SkillsContext {
                     available_skills: skills
                         .into_iter()
-                        .map(|skill| api::SkillDescriptor {
-                            skill_reference: Some(skill.reference.into()),
-                            name: skill.name,
-                            description: skill.description,
-                            provider: Some(skill.provider.into()),
-                            scope: Some(skill.scope.into()),
+                        .filter_map(|skill| {
+                            // 远端协议没有 Grok 来源类型，不能冒充其它提供方发送。
+                            let provider = skill.provider.try_into().ok()?;
+                            Some(api::SkillDescriptor {
+                                skill_reference: Some(skill.reference.into()),
+                                name: skill.name,
+                                description: skill.description,
+                                provider: Some(provider),
+                                scope: Some(skill.scope.into()),
+                            })
                         })
                         .collect(),
                 });

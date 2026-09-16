@@ -108,6 +108,17 @@ pub fn init(app: &mut AppContext) {
     view::infinishell_launch_modal::init(app);
     view::orchestration_launch_modal::init(app);
     view::agent_cli_launch_modal::init(app);
+    #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+    {
+        crate::ai::cli_agent_runtime::task_manager_view::init(app);
+        app.register_editable_bindings([EditableBinding::new(
+            "workspace:local_cli_tasks",
+            crate::t!("cli-agent-task-manager-title"),
+            WorkspaceAction::OpenLocalCLITaskManager,
+        )
+        .with_enabled(|| FeatureFlag::LocalCLIManagedTasks.is_enabled())
+        .with_context_predicate(id!("Workspace"))]);
+    }
     view::feature_intro_modal::init(app);
     view::auto_handoff_sleep_modal::init(app);
     view::codex_modal::init(app);

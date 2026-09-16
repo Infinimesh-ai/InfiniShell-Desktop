@@ -2,21 +2,24 @@ use std::sync::Arc;
 
 use ai::agent::action_result::{
     RunAgentsAgentOutcome, RunAgentsAgentOutcomeKind, RunAgentsLaunchedExecutionMode,
-    RunAgentsResult,
+    RunAgentsResult, SendMessageToAgentResult,
 };
+use command::blocking::Command;
 use warp::tui_export::{
     AIActionStatus, AIAgentAction, AIAgentActionId, AIAgentActionResult, AIAgentActionResultType,
     AIAgentActionType, Appearance, BlockId, RequestCommandOutputResult, TaskId,
 };
 use warp_core::command::ExitCode;
 use warpui::App;
-use warpui_core::elements::tui::Modifier;
+use warpui_core::elements::tui::{Modifier, TuiBufferExt, TuiRect};
+use warpui_core::presenter::tui::TuiPresenter;
 
 use super::{
     CommandBlockState, ResolvedCommandBlock, ToolCallDisplayState, launched_agents_label,
     styled_tool_call_label_spans, tool_call_display_state, tool_call_label,
     tool_call_label_with_server,
 };
+use crate::agent_block_sections::render_fallback_tool_call_section;
 use crate::tui_builder::TuiUiBuilder;
 
 /// Builds a `Finished` status wrapping the given result.
@@ -394,6 +397,117 @@ fn tool_call_label_spans_bold_only_the_first_word() {
             );
             assert!(subject_first[0].1.add_modifier.contains(Modifier::BOLD));
             assert_eq!(subject_first[1].1.fg, builder.neutral_7_text_style().fg);
+        });
+    });
+}
+
+#[test]
+fn unconfirmed_local_message_never_uses_success_glyph() {
+    let status = finished(AIAgentActionResultType::SendMessageToAgent(
+        SendMessageToAgentResult::Unconfirmed {
+            message_id: "message".to_owned(),
+        },
+    ));
+    assert_eq!(
+        tool_call_display_state(Some(&status), false, None),
+        ToolCallDisplayState::Blocked
+    );
+    let status = finished(AIAgentActionResultType::SendMessageToAgent(
+        SendMessageToAgentResult::Acknowledged {
+            message_id: "message".to_owned(),
+        },
+    ));
+    assert_eq!(
+        tool_call_display_state(Some(&status), false, None),
+        ToolCallDisplayState::Succeeded
+    );
+}
+
+#[test]
+fn local_message_delivery_renders_in_both_languages_without_false_success() {
+    const LOCALE_ENV: &str = "INFINISHELL_TUI_MESSAGE_RENDER_LOCALE";
+    const TEST_NAME: &str = "tool_call_labels::tests::local_message_delivery_renders_in_both_languages_without_false_success";
+
+    let Ok(locale) = std::env::var(LOCALE_ENV) else {
+        // Fluent 使用进程级语言设置，隔离子测试防止中文污染其他英文快照。
+        for locale in ["en", "zh-CN"] {
+            let output = Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", TEST_NAME, "--nocapture"])
+                .env(LOCALE_ENV, locale)
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                output.status.success() && stdout.contains("1 passed"),
+                "{locale} 消息状态渲染失败或未实际运行：\n{stdout}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        return;
+    };
+    assert!(["en", "zh-CN"].contains(&locale.as_str()));
+    warp::i18n::set_locale(&locale);
+
+    App::test((), |app| async move {
+        app.add_singleton_model(|_| Appearance::mock());
+        app.read(|ctx| {
+            let builder = TuiUiBuilder::from_app(ctx);
+            let action = AIAgentAction {
+                id: AIAgentActionId::from("message-action".to_owned()),
+                task_id: TaskId::new("parent-task".to_owned()),
+                action: AIAgentActionType::SendMessageToAgent {
+                    addresses: vec!["child-task".to_owned()],
+                    subject: "两轮交互 / two turns".to_owned(),
+                    message: "继续验证\nContinue verification".to_owned(),
+                },
+                requires_result: true,
+            };
+            let (unconfirmed_label, acknowledged_label) = if locale == "en" {
+                ("Task message delivery unconfirmed", "Task message received")
+            } else {
+                ("任务消息接收尚未确认", "任务消息已接收")
+            };
+            for (result, glyph, label, glyph_style) in [
+                (
+                    SendMessageToAgentResult::Unconfirmed {
+                        message_id: "message-1".to_owned(),
+                    },
+                    "■",
+                    unconfirmed_label,
+                    builder.attention_glyph_style(),
+                ),
+                (
+                    SendMessageToAgentResult::Acknowledged {
+                        message_id: "message-1".to_owned(),
+                    },
+                    "✓",
+                    acknowledged_label,
+                    builder.success_glyph_style(),
+                ),
+            ] {
+                let status = finished(AIAgentActionResultType::SendMessageToAgent(result));
+                for width in [36, 80] {
+                    // 走生产工具行和真实布局/绘制路径，核对单元格而非拼接预期文本。
+                    let frame = TuiPresenter::new().present_element(
+                        render_fallback_tool_call_section(&action, Some(&status), false, None, ctx),
+                        TuiRect::new(0, 0, width, 1),
+                        ctx,
+                    );
+                    let lines = frame.buffer.to_lines();
+                    assert_eq!(lines[0].trim_end(), format!("{glyph} {label}"));
+                    assert_eq!(frame.buffer[(0, 0)].symbol(), glyph);
+                    assert_eq!(Some(frame.buffer[(0, 0)].fg), glyph_style.fg);
+                    if glyph == "■" {
+                        assert!(!lines[0].contains('✓'));
+                        assert!(!lines[0].contains("awaiting approval"));
+                        assert!(!lines[0].contains("等待审批"));
+                        assert_ne!(
+                            Some(frame.buffer[(0, 0)].fg),
+                            builder.success_glyph_style().fg
+                        );
+                    }
+                }
+            }
         });
     });
 }

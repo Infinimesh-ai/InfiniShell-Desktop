@@ -244,6 +244,29 @@ impl NotificationsModel {
                         ctx,
                     );
                 }
+                CLIAgentSessionStatus::Unknown | CLIAgentSessionStatus::Disconnected => {
+                    let title = crate::t!(
+                        "notifications-agent-needs-attention-title",
+                        agent = agent.display_name()
+                    );
+                    let description = if matches!(status, CLIAgentSessionStatus::Disconnected) {
+                        crate::t!("cli-agent-status-disconnected")
+                    } else {
+                        crate::t!("cli-agent-status-unknown")
+                    };
+                    let metadata = TerminalViewMetadata::lookup(*terminal_view_id, ctx);
+                    self.add_notification(
+                        title,
+                        description,
+                        NotificationCategory::Request,
+                        NotificationSourceAgent::CLI { agent: *agent, is_ambient: metadata.is_ambient },
+                        NotificationOrigin::CLISession(*terminal_view_id),
+                        *terminal_view_id,
+                        vec![],
+                        metadata.branch,
+                        ctx,
+                    );
+                }
             },
         }
     }

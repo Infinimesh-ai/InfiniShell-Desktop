@@ -410,6 +410,15 @@ impl Args {
 /// These subcommands run those worker processes, which are bundled into the Zap binary.
 #[derive(Debug, Clone, Subcommand)]
 pub enum WorkerCommand {
+    /// 管理本地 CLI 的独立生命周期；此入口不用于普通终端命令。
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+    #[clap(hide = true)]
+    CliAgentSupervisor {
+        manifest: std::path::PathBuf,
+        #[arg(long, hide = true)]
+        execute: bool,
+    },
+
     /// Run the terminal server.
     #[clap(hide = true)]
     #[cfg(unix)]

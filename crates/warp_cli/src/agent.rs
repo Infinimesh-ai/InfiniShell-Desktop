@@ -122,12 +122,13 @@ impl HiddenComputerUseArgs {
         }
     }
 }
-const HARNESS_VALUE_VARIANTS: [Harness; 5] = [
+const HARNESS_VALUE_VARIANTS: [Harness; 6] = [
     Harness::Oz,
     Harness::Claude,
     Harness::OpenCode,
     Harness::Gemini,
     Harness::Codex,
+    Harness::Grok,
 ];
 
 /// The execution harness for an agent run.
@@ -145,6 +146,8 @@ pub enum Harness {
     Gemini,
     /// Delegate to the `codex` CLI.
     Codex,
+    /// 使用 Grok Build CLI；具体执行模式由客户端验证后开放。
+    Grok,
     /// A harness produced by a newer client/server that this client doesn't
     /// recognize. Surfaced via deserialization fallbacks (e.g. unknown serialized
     /// enum values, unknown `harness_type` strings); never selectable from the
@@ -171,6 +174,7 @@ impl ValueEnum for Harness {
                 .help("Delegate to the `opencode` CLI"),
             Harness::Gemini => PossibleValue::new("gemini").help("Delegate to the `gemini` CLI"),
             Harness::Codex => PossibleValue::new("codex").help("Delegate to the `codex` CLI"),
+            Harness::Grok => PossibleValue::new("grok"),
             Harness::Unknown => return None,
         };
         if !self.should_display_in_help_text() {
@@ -189,7 +193,9 @@ impl Harness {
     pub fn parse_local_child_harness(value: &str) -> Option<Self> {
         match Self::parse_orchestration_harness(value) {
             Some(harness @ (Self::Claude | Self::OpenCode | Self::Codex)) => Some(harness),
-            Some(Self::Oz) | Some(Self::Gemini) | Some(Self::Unknown) | None => None,
+            Some(Self::Oz) | Some(Self::Gemini) | Some(Self::Grok) | Some(Self::Unknown) | None => {
+                None
+            }
         }
     }
 
@@ -206,7 +212,7 @@ impl Harness {
     pub fn should_display_in_help_text(self) -> bool {
         match self {
             Self::Oz | Self::Claude | Self::Codex => true,
-            Self::OpenCode | Self::Gemini | Self::Unknown => false,
+            Self::OpenCode | Self::Gemini | Self::Grok | Self::Unknown => false,
         }
     }
 
@@ -217,6 +223,7 @@ impl Harness {
             Self::OpenCode => "OpenCode",
             Self::Gemini => "Gemini CLI",
             Self::Codex => "Codex",
+            Self::Grok => "Grok Build",
             Self::Unknown => "Unknown",
         }
     }
@@ -235,6 +242,7 @@ impl Harness {
             "opencode" => Some(Harness::OpenCode),
             "gemini" => Some(Harness::Gemini),
             "codex" => Some(Harness::Codex),
+            "grok" => Some(Harness::Grok),
             "unknown" => Some(Harness::Unknown),
             _ => None,
         }
@@ -252,6 +260,7 @@ impl Harness {
             Harness::OpenCode => "opencode",
             Harness::Gemini => "gemini",
             Harness::Codex => "codex",
+            Harness::Grok => "grok",
             Harness::Unknown => "unknown",
         }
     }

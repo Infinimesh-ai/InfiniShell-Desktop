@@ -1,0 +1,177 @@
+//! 子任务权限只接受原生完整快照的等价证明，不将 CLI 模式名称映射成沙箱。
+
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+
+use super::RuntimeError;
+#[cfg(feature = "local_fs")]
+use crate::persistence::model::LocalCliTask;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ParentPermissionCeiling {
+    parent_task_id: String,
+    parent_generation: i64,
+    parent_native_session_id: String,
+    working_directory: PathBuf,
+    permissions: CodexPermissions,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct CodexPermissions {
+    approval_policy: String,
+    approvals_reviewer: String,
+    sandbox: CodexSandbox,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", deny_unknown_fields, rename_all = "camelCase")]
+enum CodexSandbox {
+    ReadOnly {
+        #[serde(rename = "networkAccess")]
+        network_access: bool,
+    },
+    WorkspaceWrite {
+        #[serde(rename = "writableRoots")]
+        writable_roots: Vec<PathBuf>,
+        #[serde(rename = "networkAccess")]
+        network_access: bool,
+        #[serde(rename = "excludeTmpdirEnvVar")]
+        exclude_tmpdir_env_var: bool,
+        #[serde(rename = "excludeSlashTmp")]
+        exclude_slash_tmp: bool,
+    },
+}
+
+fn parse_permissions(value: &Value) -> Option<CodexPermissions> {
+    let permissions: CodexPermissions = serde_json::from_value(value.clone()).ok()?;
+    if !matches!(
+        permissions.approval_policy.as_str(),
+        "never" | "untrusted" | "on-request"
+    ) || permissions.approvals_reviewer != "user"
+        || matches!(&permissions.sandbox, CodexSandbox::WorkspaceWrite { writable_roots, .. }
+            if writable_roots.iter().any(|path| !path.is_absolute()))
+    {
+        return None;
+    }
+    Some(permissions)
+}
+
+/// 调用方必须传入 SQLite 已提交的父记录；恢复时读取创建子任务时的固定父代。
+#[cfg(feature = "local_fs")]
+pub(crate) fn ceiling_from_parent(
+    parent: &LocalCliTask,
+    child_harness: &str,
+) -> Result<ParentPermissionCeiling, RuntimeError> {
+    let config: Value = serde_json::from_str(&parent.config_json).unwrap_or(Value::Null);
+    let observed = config
+        .get("effective_permissions")
+        .cloned()
+        .unwrap_or(Value::Null);
+    let reject = || rejected(None, &observed, "parent_permissions_unverifiable", false);
+    // Claude 的 permissionMode 不含完整允许/拒绝规则，不能证明同名模式具有同一上限。
+    if parent.harness != "codex"
+        || child_harness != "codex"
+        || parent.generation < 1
+        || parent.task_id.is_empty()
+        || config.get("cli_version").and_then(Value::as_str) != Some("0.147.0")
+        || !Path::new(&parent.working_directory).is_absolute()
+    {
+        return Err(reject());
+    }
+    let native_id = parent
+        .native_session_id
+        .as_ref()
+        .filter(|id| !id.is_empty())
+        .ok_or_else(reject)?;
+    let permissions = parse_permissions(&observed).ok_or_else(reject)?;
+    Ok(ParentPermissionCeiling {
+        parent_task_id: parent.task_id.clone(),
+        parent_generation: parent.generation,
+        parent_native_session_id: native_id.clone(),
+        working_directory: parent.working_directory.clone().into(),
+        permissions,
+    })
+}
+
+#[cfg(feature = "local_fs")]
+pub(crate) fn verify_parent_binding(
+    ceiling: Option<&ParentPermissionCeiling>,
+    parent: &LocalCliTask,
+    child: &LocalCliTask,
+) -> Result<(), RuntimeError> {
+    let expected = ceiling_from_parent(parent, &child.harness)?;
+    if child.parent_task_id.as_deref() != Some(parent.task_id.as_str())
+        || child.parent_generation != Some(parent.generation)
+        || ceiling != Some(&expected)
+    {
+        return Err(rejected(
+            ceiling,
+            &json!(expected),
+            "parent_binding_mismatch",
+            false,
+        ));
+    }
+    Ok(())
+}
+
+/// 在 SessionReady 前核验；尚未发送初始输入，配置漂移不会触发模型或工具执行。
+pub(crate) fn verify_effective_permissions(
+    ceiling: Option<&ParentPermissionCeiling>,
+    harness: &str,
+    cwd: &Path,
+    actual: &Value,
+) -> Result<(), RuntimeError> {
+    let Some(ceiling) = ceiling else {
+        return Ok(());
+    };
+    if harness != "codex" || cwd != ceiling.working_directory {
+        return Err(rejected(
+            Some(ceiling),
+            actual,
+            "harness_or_directory_mismatch",
+            false,
+        ));
+    }
+    let Some(actual_permissions) = parse_permissions(actual) else {
+        return Err(rejected(
+            Some(ceiling),
+            actual,
+            "child_permissions_unverifiable",
+            false,
+        ));
+    };
+    if actual_permissions != ceiling.permissions {
+        return Err(rejected(
+            Some(ceiling),
+            actual,
+            "effective_permissions_changed",
+            true,
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn rejected(
+    ceiling: Option<&ParentPermissionCeiling>,
+    actual: &Value,
+    reason: &str,
+    mismatch: bool,
+) -> RuntimeError {
+    RuntimeError::PermissionCeilingRejected {
+        message: if mismatch {
+            crate::t!("cli-agent-task-permission-ceiling-mismatch")
+        } else {
+            crate::t!("cli-agent-task-permission-ceiling-unavailable")
+        },
+        details: json!({"source":"parent_permission_ceiling","reason":reason,
+            "expected":ceiling,"actual":actual,"task_input_sent":false}),
+    }
+}
+
+#[cfg(test)]
+#[path = "permissions_tests.rs"]
+mod tests;

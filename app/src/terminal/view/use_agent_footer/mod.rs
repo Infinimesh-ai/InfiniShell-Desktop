@@ -5,6 +5,7 @@
 //! Gemini CLI, Codex), it displays a specialized footer with additional functionality.
 
 use base64::Engine;
+use uuid::Uuid;
 use warpui::clipboard::{ClipboardContent, ImageData};
 
 use crate::ai::agent::ImageContext;
@@ -18,7 +19,9 @@ use crate::terminal::cli_agent_sessions::{CLIAgentInputEntrypoint, CLIAgentSessi
 use crate::util::image::{MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT, MIME_SNIFF_BYTES, infer_mime_type};
 mod warpify_footer;
 
+use crate::editor::EditorBufferRevision;
 use std::path::Path;
+use std::rc::Rc;
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
@@ -86,16 +89,25 @@ const CLI_AGENT_IMAGE_PASTE_DELAY: Duration = Duration::from_millis(300);
 #[allow(clippy::byte_char_slices)]
 const CLI_AGENT_MODE_SWITCH_PREFIXES: &[u8] = &[b'!', b'&'];
 
-/// Bytes that simulate a "paste image from clipboard" keystroke for the
-/// foreground CLI agent. `0x16` is `Ctrl+V` (SYN); on Windows Claude Code
-/// listens for `Alt+V` (`ESC` + `'v'`) instead. Mirrored from the equivalent
-/// branch in `TerminalView::paste`.
-fn cli_agent_paste_keystroke_bytes() -> Vec<u8> {
-    if cfg!(windows) {
-        vec![0x1b, b'v']
+/// 普通粘贴、拖放和富输入附件共用平台策略；Grok 图片尚未通过真实验证。
+fn cli_agent_paste_keystroke_bytes(agent: CLIAgent, windows: bool) -> Option<Vec<u8>> {
+    if agent == CLIAgent::Grok {
+        None
+    } else if !windows {
+        Some(vec![0x16])
+    } else if agent == CLIAgent::Claude {
+        Some(vec![0x1b, b'v'])
     } else {
-        vec![0x16]
+        Some([BRACKETED_PASTE_START, BRACKETED_PASTE_END].concat())
     }
+}
+
+/// 提交期间保留草稿和附件，只有同一编辑版本才允许清空。
+struct CliInputSubmission {
+    agent: CLIAgent,
+    query: String,
+    editor_revision: EditorBufferRevision,
+    attachments_revision: u64,
 }
 
 /// How rich input delivers text + Enter to the CLI agent's PTY.
@@ -122,7 +134,9 @@ enum RichInputSubmitStrategy {
 /// Returns the strategy for submitting rich input text to a CLI agent's PTY.
 fn rich_input_submit_strategy(agent: CLIAgent) -> RichInputSubmitStrategy {
     match agent {
-        CLIAgent::Codex | CLIAgent::DeepSeek => RichInputSubmitStrategy::BracketedPaste,
+        CLIAgent::Codex | CLIAgent::Grok | CLIAgent::DeepSeek => {
+            RichInputSubmitStrategy::BracketedPaste
+        }
         CLIAgent::OhMyPi => RichInputSubmitStrategy::BracketedPaste,
         CLIAgent::Copilot => RichInputSubmitStrategy::BracketedPasteDelayedEnter,
         // Zap:Antigravity 沿用我方 DelayedEnter 策略(上游为 Inline)。
@@ -219,19 +233,31 @@ impl TerminalView {
                 send_telemetry_from_ctx!(TelemetryEvent::AgentToolbarDismissed, ctx);
                 ctx.notify();
             }
-            UseAgentToolbarEvent::WriteToPty(text) => {
-                // Route like user-typed terminal input so shared-session viewers
-                // forward the write request to the sharer instead of only
-                // emitting a local PTY write event.
-                self.write_user_bytes_to_pty(text.as_bytes().to_vec(), ctx);
-            }
-            UseAgentToolbarEvent::InsertIntoCLIPty(text) => {
-                self.insert_text_into_cli_agent_pty(text, ctx);
-            }
-            UseAgentToolbarEvent::InsertIntoRichInput(text) => {
-                self.input.update(ctx, |input, ctx| {
-                    input.insert_into_cli_agent_rich_input(text, ctx);
-                });
+            UseAgentToolbarEvent::InsertIntoCLI { text, generation } => {
+                if !self.cli_agent_input_target_matches(*generation, ctx) {
+                    self.show_error_toast(crate::t!("cli-agent-input-target-changed"), ctx);
+                    return;
+                }
+                if self.has_active_cli_agent_input_session(ctx) {
+                    self.input.update(ctx, |input, ctx| {
+                        input.insert_into_cli_agent_rich_input(text, ctx);
+                    });
+                } else if !self.insert_text_into_cli_agent_pty(text, *generation, ctx) {
+                    // 转写与文件选择没有可恢复的编辑器源，将未送达内容保留到原会话草稿。
+                    let view_id = self.view_id;
+                    CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                        let previous = sessions
+                            .session(view_id)
+                            .and_then(|s| s.draft_text.clone())
+                            .unwrap_or_default();
+                        let draft = if previous.is_empty() {
+                            text.clone()
+                        } else {
+                            format!("{previous}\n{text}")
+                        };
+                        sessions.set_draft(view_id, draft);
+                    });
+                }
             }
             UseAgentToolbarEvent::ToggleCodeReviewPane(cli_agent) => {
                 self.toggle_code_review_pane(
@@ -358,6 +384,17 @@ impl TerminalView {
         if !active_block.is_active_and_long_running() {
             return None;
         }
+
+        self.detect_cli_agent_command_from_model(model, ctx)
+    }
+
+    /// 首个 hook 可能早于长运行阈值；身份校验必须立即使用当前命令。
+    pub(super) fn detect_cli_agent_command_from_model(
+        &self,
+        model: &TerminalModel,
+        ctx: &AppContext,
+    ) -> Option<(CLIAgent, Option<String>)> {
+        let active_block = model.block_list().active_block();
 
         let command = active_block.command_with_secrets_obfuscated(false);
 
@@ -625,10 +662,6 @@ impl TerminalView {
 
         if should_close {
             self.close_cli_agent_rich_input(CLIAgentRichInputCloseReason::Submit, ctx);
-        } else {
-            self.input.update(ctx, |input, ctx| {
-                input.clear_buffer_and_reset_undo_stack(ctx);
-            });
         }
     }
 
@@ -640,70 +673,6 @@ impl TerminalView {
         if !self.has_active_cli_agent_input_session(ctx) {
             return;
         }
-        if text.trim().is_empty() {
-            return;
-        }
-
-        let prompt_length = text.chars().count();
-        let session_agent = CLIAgentSessionsModel::as_ref(ctx)
-            .session(self.view_id)
-            .map(|s| s.agent);
-        if let Some(cli_agent) = session_agent.map(CLIAgentType::from) {
-            send_telemetry_from_ctx!(
-                TelemetryEvent::CLIAgentRichInputSubmitted {
-                    cli_agent,
-                    prompt_length,
-                },
-                ctx
-            );
-        }
-
-        if let Some(agent) = session_agent {
-            let view_id = self.view_id;
-            let event = CLIAgentEvent {
-                v: 1,
-                agent,
-                event: CLIAgentEventType::PromptSubmit,
-                session_id: None,
-                cwd: None,
-                project: None,
-                payload: CLIAgentEventPayload {
-                    query: Some(text.clone()),
-                    ..Default::default()
-                },
-                // 这是富输入框本地合成的结构化事件,形状等同于 rich plugin 上报,
-                // 但来源必须如实标注:标成 `RichPlugin` 会让
-                // `received_rich_notification` 被误latch,从而使
-                // `auto_dismiss_rich_input_after_submit` 失效。
-                source: CLIAgentEventSource::LocalRichInput,
-            };
-            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions_model, ctx| {
-                sessions_model.update_from_event(view_id, &event, ctx);
-            });
-        }
-
-        // Clear any saved draft so submitted text isn't restored on the next open.
-        let view_id = self.view_id;
-        CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions_model, _| {
-            sessions_model.clear_draft(view_id);
-        });
-
-        let strategy = CLIAgentSessionsModel::as_ref(ctx)
-            .session(self.view_id)
-            .map(|s| rich_input_submit_strategy(s.agent))
-            .unwrap_or(RichInputSubmitStrategy::Inline);
-
-        let text_bytes = text.into_bytes();
-
-        // Clear the buffer eagerly so that any close path (auto-dismiss,
-        // auto-toggle, or a deferred timer) sees an empty buffer and doesn't
-        // re-save the submitted text as a draft.
-        self.input.update(ctx, |input, ctx| {
-            input.clear_buffer_and_reset_undo_stack(ctx);
-        });
-
-        // Extract pending image attachments and clear them from the context
-        // model before submission.
         let images: Vec<_> = self
             .ai_context_model
             .as_ref(ctx)
@@ -711,32 +680,58 @@ impl TerminalView {
             .into_iter()
             .cloned()
             .collect();
-        if !images.is_empty() {
-            self.ai_context_model.update(ctx, |model, ctx| {
-                model.clear_pending_images(ctx);
-            });
+        if text.trim().is_empty() && images.is_empty() {
+            return;
         }
-
-        // When the input starts with a known mode-switch prefix (e.g. `!` for
-        // bash mode, `&` for background mode), write the prefix byte separately
-        // with a small delay before the rest of the command. This gives CLI
-        // agents like Claude Code time to recognise the prefix and switch modes
-        // before the command text arrives.
-        //
-        // Only applied to known ASCII prefixes to avoid splitting multi-byte
-        // UTF-8 characters.
-        if text_bytes.len() > 1 && CLI_AGENT_MODE_SWITCH_PREFIXES.contains(&text_bytes[0]) {
-            self.write_user_bytes_to_pty(vec![text_bytes[0]], ctx);
-            let rest = text_bytes[1..].to_vec();
-            ctx.spawn(
-                Timer::after(CLI_AGENT_PTY_WRITE_DELAY),
-                move |me, _, ctx| {
-                    me.paste_images_then_submit_text(images, rest, strategy, ctx);
-                },
+        if self.input.as_ref(ctx).cli_input_is_processing_images() {
+            self.show_error_toast(crate::t!("cli-agent-input-images-processing"), ctx);
+            return;
+        }
+        if !self.ai_context_model.as_ref(ctx).pending_files().is_empty() {
+            self.show_error_toast(
+                crate::t!("cli-agent-input-file-attachment-unavailable"),
+                ctx,
             );
-        } else {
-            self.paste_images_then_submit_text(images, text_bytes, strategy, ctx);
+            return;
         }
+        let Some(generation) = CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
+        else {
+            return;
+        };
+        let Some(agent) = CLIAgentSessionsModel::as_ref(ctx)
+            .session(self.view_id)
+            .map(|s| s.agent)
+        else {
+            return;
+        };
+        if !images.is_empty() && self.cli_agent_image_paste_bytes(ctx).is_none() {
+            return;
+        }
+        if !self.begin_cli_agent_text_submit(generation, ctx) {
+            return;
+        }
+        let snapshot = Rc::new(CliInputSubmission {
+            agent,
+            query: text.clone(),
+            editor_revision: self
+                .input
+                .as_ref(ctx)
+                .editor()
+                .as_ref(ctx)
+                .buffer_revision(ctx),
+            attachments_revision: self
+                .ai_context_model
+                .as_ref(ctx)
+                .pending_attachments_revision(),
+        });
+        self.paste_images_then_submit_text(
+            images,
+            text.into_bytes(),
+            rich_input_submit_strategy(agent),
+            generation,
+            Some(snapshot),
+            ctx,
+        );
     }
 
     /// Submits `text` as a prompt to the active CLI agent on this terminal by
@@ -766,27 +761,55 @@ impl TerminalView {
         }
 
         let strategy = rich_input_submit_strategy(agent);
-        self.write_cli_agent_text_then_submit(text_bytes, strategy, ctx);
-    }
-
-    /// Inserts `text` into the active CLI agent's input without submitting it.
-    ///
-    /// Voice transcription uses this when rich input is closed. Agents that
-    /// require bracketed paste receive one complete paste payload so embedded
-    /// newlines are inserted rather than interpreted as separate submissions.
-    fn insert_text_into_cli_agent_pty(&mut self, text: &str, ctx: &mut ViewContext<Self>) {
-        let Some(agent) = CLIAgentSessionsModel::as_ref(ctx)
-            .session(self.view_id)
-            .map(|s| s.agent)
+        let Some(generation) = CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
         else {
             return;
         };
-
-        if text.is_empty() {
+        if !self.begin_cli_agent_text_submit(generation, ctx) {
             return;
         }
+        self.write_cli_agent_text_then_submit(text_bytes, strategy, generation, None, ctx);
+    }
 
-        self.write_cli_agent_text(text.as_bytes(), rich_input_submit_strategy(agent), ctx);
+    /// 插入只修改原生输入框，不发送 Enter；多行必须由已启用的粘贴模式保护。
+    pub(super) fn insert_text_into_cli_agent_pty(
+        &mut self,
+        text: &str,
+        generation: Uuid,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        if text.is_empty() || !self.begin_cli_agent_text_submit(generation, ctx) {
+            return false;
+        }
+        let agent = CLIAgentSessionsModel::as_ref(ctx)
+            .session(self.view_id)
+            .unwrap()
+            .agent;
+        let mut strategy = rich_input_submit_strategy(agent);
+        if text.contains(['\n', '\r'])
+            && !matches!(
+                strategy,
+                RichInputSubmitStrategy::BracketedPaste
+                    | RichInputSubmitStrategy::BracketedPasteDelayedEnter
+            )
+        {
+            if self.model.lock().needs_bracketed_paste() {
+                strategy = RichInputSubmitStrategy::BracketedPaste;
+            } else {
+                self.fail_cli_agent_text_submit(
+                    generation,
+                    crate::t!("cli-agent-input-multiline-paste-unavailable"),
+                    ctx,
+                );
+                return false;
+            }
+        }
+        let accepted = self.write_cli_agent_text(text.as_bytes(), strategy, ctx);
+        self.release_cli_agent_input_submission(generation, ctx);
+        if !accepted {
+            self.show_error_toast(crate::t!("cli-agent-input-delivery-failed"), ctx);
+        }
+        accepted
     }
 
     fn write_cli_agent_text(
@@ -794,113 +817,174 @@ impl TerminalView {
         text_bytes: &[u8],
         strategy: RichInputSubmitStrategy,
         ctx: &mut ViewContext<Self>,
-    ) {
+    ) -> bool {
         let bytes = match strategy {
             RichInputSubmitStrategy::BracketedPaste
             | RichInputSubmitStrategy::BracketedPasteDelayedEnter => {
-                let mut bytes = Vec::with_capacity(
-                    BRACKETED_PASTE_START.len() + text_bytes.len() + BRACKETED_PASTE_END.len(),
-                );
-                bytes.extend_from_slice(BRACKETED_PASTE_START);
-                bytes.extend_from_slice(text_bytes);
-                bytes.extend_from_slice(BRACKETED_PASTE_END);
-                bytes
+                [BRACKETED_PASTE_START, text_bytes, BRACKETED_PASTE_END].concat()
             }
             RichInputSubmitStrategy::Inline | RichInputSubmitStrategy::DelayedEnter => {
                 text_bytes.to_vec()
             }
         };
-        self.write_user_bytes_to_pty(bytes, ctx);
+        self.write_user_bytes_to_pty(bytes, ctx)
     }
-    /// Simulates clipboard image paste for each pending image attachment by
-    /// writing the image to the system clipboard and sending Ctrl+V to the PTY.
-    /// After all images are pasted, the text prompt is sent via the normal
-    /// submission strategy.
-    ///
-    /// Uses a single async task that hops back to the view context via
-    /// [`ViewSpawner`] for each image, rather than chaining per-image timers.
-    /// If the rich input session closes mid-paste, the loop exits early so we
-    /// don't leak Ctrl+V bytes into an unrelated PTY context.
+
+    /// 先验证整批附件，任一失败均保留完整草稿，禁止悄悄跳过图片后发送文本。
     fn paste_images_then_submit_text(
         &mut self,
         images: Vec<ImageContext>,
         text_bytes: Vec<u8>,
         strategy: RichInputSubmitStrategy,
+        generation: Uuid,
+        snapshot: Option<Rc<CliInputSubmission>>,
         ctx: &mut ViewContext<Self>,
     ) {
-        // Bail if the rich input session was closed before we got here.
-        if !self.has_active_cli_agent_input_session(ctx) {
+        if !self.cli_agent_input_target_matches(generation, ctx)
+            || !CLIAgentSessionsModel::as_ref(ctx)
+                .is_input_submission_current(self.view_id, generation)
+        {
+            self.release_cli_agent_input_submission(generation, ctx);
             return;
         }
-
         if images.is_empty() {
-            self.write_cli_agent_text_then_submit(text_bytes, strategy, ctx);
+            self.write_cli_agent_mode_text_then_submit(
+                text_bytes, strategy, generation, snapshot, ctx,
+            );
             return;
         }
-
+        let Some(paste_bytes) = self.cli_agent_image_paste_bytes(ctx) else {
+            self.release_cli_agent_input_submission(generation, ctx);
+            return;
+        };
         let spawner = ctx.spawner();
         ctx.spawn(
             async move {
-                for image in images {
-                    // Decode off the main thread; log and skip on failure.
-                    let raw_bytes =
-                        match base64::engine::general_purpose::STANDARD.decode(&image.data) {
-                            Ok(bytes) => bytes,
-                            Err(_) => {
-                                report_error!(
-                                    "Failed to decode base64 image data",
-                                    extra: { "file_name" => %image.file_name }
-                                );
-                                continue;
-                            }
-                        };
-
-                    // Hop back to the view to write the clipboard + Ctrl+V.
-                    // Returns false if the input session has closed, in which
-                    // case we stop pasting and skip the final text submit.
-                    let should_continue = spawner
+                let decoded = images
+                    .into_iter()
+                    .map(|image| {
+                        base64::engine::general_purpose::STANDARD
+                            .decode(&image.data)
+                            .map(|data| ImageData {
+                                data,
+                                mime_type: image.mime_type,
+                                filename: Some(image.file_name),
+                            })
+                    })
+                    .collect::<Result<Vec<_>, _>>();
+                let Ok(decoded) = decoded else {
+                    return false;
+                };
+                for image in decoded {
+                    let paste_bytes = paste_bytes.clone();
+                    let accepted = spawner
                         .spawn(move |me, ctx| {
-                            if !me.has_active_cli_agent_input_session(ctx) {
+                            if !me.cli_agent_input_target_matches(generation, ctx) {
                                 return false;
                             }
                             ctx.clipboard().write(ClipboardContent {
-                                images: Some(vec![ImageData {
-                                    data: raw_bytes,
-                                    mime_type: image.mime_type,
-                                    filename: Some(image.file_name),
-                                }]),
+                                images: Some(vec![image]),
                                 ..Default::default()
                             });
-                            me.write_user_bytes_to_pty(cli_agent_paste_keystroke_bytes(), ctx);
-                            true
+                            me.write_user_bytes_to_pty(paste_bytes, ctx)
                         })
                         .await;
-
-                    if !matches!(should_continue, Ok(true)) {
+                    if !matches!(accepted, Ok(true)) {
                         return false;
                     }
-
-                    // Give the CLI agent time to read from the clipboard before
-                    // we overwrite it with the next image (or send the text).
                     Timer::after(CLI_AGENT_IMAGE_PASTE_DELAY).await;
                 }
                 true
             },
-            move |me, ok, ctx| {
-                if !ok || !me.has_active_cli_agent_input_session(ctx) {
+            move |me, accepted, ctx| {
+                if !accepted {
+                    me.fail_cli_agent_text_submit(
+                        generation,
+                        crate::t!("cli-agent-input-image-delivery-failed"),
+                        ctx,
+                    );
                     return;
                 }
-                me.write_cli_agent_text_then_submit(text_bytes, strategy, ctx);
+                me.write_cli_agent_mode_text_then_submit(
+                    text_bytes, strategy, generation, snapshot, ctx,
+                );
             },
         );
     }
 
-    /// Mirrors the CLI-agent Cmd+V image-paste path in `TerminalView::paste`
-    /// for dropped image files: reads each file, writes its bytes to the
-    /// system clipboard as image data, and sends the agent's paste keystroke
-    /// to the PTY so the agent reads the image directly. This produces the
-    /// same outcome as if the user had copied the image to their clipboard
-    /// and pressed Cmd+V over the agent's TUI.
+    fn write_cli_agent_mode_text_then_submit(
+        &mut self,
+        text_bytes: Vec<u8>,
+        strategy: RichInputSubmitStrategy,
+        generation: Uuid,
+        snapshot: Option<Rc<CliInputSubmission>>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if !self.cli_agent_input_target_matches(generation, ctx)
+            || !CLIAgentSessionsModel::as_ref(ctx)
+                .is_input_submission_current(self.view_id, generation)
+        {
+            self.release_cli_agent_input_submission(generation, ctx);
+            return;
+        }
+        if text_bytes.len() > 1 && CLI_AGENT_MODE_SWITCH_PREFIXES.contains(&text_bytes[0]) {
+            if !self.write_user_bytes_to_pty(vec![text_bytes[0]], ctx) {
+                self.fail_cli_agent_text_submit(
+                    generation,
+                    crate::t!("cli-agent-input-delivery-failed"),
+                    ctx,
+                );
+                return;
+            }
+            let rest = text_bytes[1..].to_vec();
+            ctx.spawn(
+                Timer::after(CLI_AGENT_PTY_WRITE_DELAY),
+                move |me, _, ctx| {
+                    me.write_cli_agent_text_then_submit(rest, strategy, generation, snapshot, ctx);
+                },
+            );
+        } else {
+            self.write_cli_agent_text_then_submit(text_bytes, strategy, generation, snapshot, ctx);
+        }
+    }
+
+    fn cli_agent_image_paste_bytes(&mut self, ctx: &mut ViewContext<Self>) -> Option<Vec<u8>> {
+        let session = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id)?;
+        if session.remote_host.is_some() {
+            self.show_error_toast(crate::t!("cli-agent-input-remote-image-unavailable"), ctx);
+            return None;
+        }
+        let bytes = cli_agent_paste_keystroke_bytes(session.agent, cfg!(windows));
+        if bytes.is_none() {
+            self.show_error_toast(crate::t!("cli-agent-grok-image-paste-unavailable"), ctx);
+        }
+        bytes
+    }
+
+    /// 普通剪贴板图片粘贴同样遵守输入租约与 CLI 平台策略。
+    pub(super) fn paste_clipboard_image_to_cli_agent(
+        &mut self,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let Some(generation) = CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
+        else {
+            return false;
+        };
+        let Some(bytes) = self.cli_agent_image_paste_bytes(ctx) else {
+            return false;
+        };
+        if !self.begin_cli_agent_text_submit(generation, ctx) {
+            return false;
+        }
+        let accepted = self.write_user_bytes_to_pty(bytes, ctx);
+        self.release_cli_agent_input_submission(generation, ctx);
+        if !accepted {
+            self.show_error_toast(crate::t!("cli-agent-input-delivery-failed"), ctx);
+        }
+        accepted
+    }
+
+    /// 拖放图片使用同一输入租约，失败立即终止并保留源文件供重试。
     pub(super) fn paste_dropped_images_to_cli_agent(
         &mut self,
         image_filepaths: Vec<String>,
@@ -909,144 +993,299 @@ impl TerminalView {
         if image_filepaths.is_empty() {
             return;
         }
+        let Some(generation) = CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
+        else {
+            return;
+        };
+        let Some(paste_bytes) = self.cli_agent_image_paste_bytes(ctx) else {
+            return;
+        };
+        if !self.begin_cli_agent_text_submit(generation, ctx) {
+            return;
+        }
         let spawner = ctx.spawner();
         ctx.spawn(
             async move {
-                for path_str in image_filepaths {
-                    // Stat first so a multi-GB drop doesn't load into memory
-                    // before we reject it. CLI agents handle their own
-                    // compression, so the cap only exists to bound memory use.
-                    match async_fs::metadata(&path_str).await {
-                        Ok(meta) if (meta.len() as usize) > MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT => {
-                            let filename = Path::new(&path_str)
-                                .file_name()
-                                .map(|n| n.to_string_lossy().into_owned())
-                                .unwrap_or_else(|| path_str.clone());
-                            let limit_mb = MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT / 1_000_000;
-                            let msg = format!(
-                                "{filename} is too large to send to the agent (limit {limit_mb}MB)."
-                            );
-                            let _ = spawner
-                                .spawn(move |me, ctx| {
-                                    me.show_error_toast(msg, ctx);
-                                })
-                                .await;
-                            continue;
-                        }
-                        Ok(_) => {}
-                        Err(e) => {
-                            report_error!(
-                                anyhow::Error::new(e).context("Failed to stat dropped image"),
-                                extra: { "path" => %path_str }
-                            );
-                            continue;
-                        }
+                // 在首张图片写入前检查全部文件，避免超限文件导致部分批次静默发送。
+                for path in &image_filepaths {
+                    let metadata = async_fs::metadata(path)
+                        .await
+                        .map_err(|_| crate::t!("cli-agent-input-image-delivery-failed"))?;
+                    if !metadata.is_file()
+                        || metadata.len() > MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT as u64
+                    {
+                        return Err(crate::t!(
+                            "cli-agent-image-too-large",
+                            filename = path.clone(),
+                            limit_mb = (MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT / 1_000_000)
+                        ));
                     }
-
-                    let bytes = match async_fs::read(&path_str).await {
-                        Ok(b) => b,
-                        Err(e) => {
-                            report_error!(
-                                anyhow::Error::new(e).context("Failed to read dropped image"),
-                                extra: { "path" => %path_str }
-                            );
-                            continue;
-                        }
-                    };
-                    let path = Path::new(&path_str);
-                    let filename = path.file_name().map(|n| n.to_string_lossy().into_owned());
-                    let sniff_len = bytes.len().min(MIME_SNIFF_BYTES);
-                    let mime_type = infer_mime_type(path, &bytes[..sniff_len]);
-
-                    // Hop back to the view to write the clipboard + paste
-                    // keystroke. Bail if the CLI agent session disappeared,
-                    // OR if the agent's long-running block exited while we
-                    // were reading off-thread — without that second check
-                    // the paste byte would leak into the shell after the
-                    // agent quit, since the session entry can outlive its
-                    // foreground block.
-                    let should_continue = spawner
+                }
+                for path in image_filepaths {
+                    let data = async_fs::read(&path)
+                        .await
+                        .map_err(|_| crate::t!("cli-agent-input-image-delivery-failed"))?;
+                    if data.len() > MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT {
+                        return Err(crate::t!("cli-agent-input-image-delivery-failed"));
+                    }
+                    let path = Path::new(&path);
+                    let mime_type =
+                        infer_mime_type(path, &data[..data.len().min(MIME_SNIFF_BYTES)]);
+                    let filename = path
+                        .file_name()
+                        .map(|name| name.to_string_lossy().into_owned());
+                    let paste_bytes = paste_bytes.clone();
+                    let accepted = spawner
                         .spawn(move |me, ctx| {
-                            if !me.has_active_cli_agent_session(ctx) {
-                                return false;
-                            }
-                            let still_long_running = me
-                                .model
-                                .lock()
-                                .block_list()
-                                .active_block()
-                                .is_active_and_long_running();
-                            if !still_long_running {
+                            if !me.cli_agent_input_target_matches(generation, ctx) {
                                 return false;
                             }
                             ctx.clipboard().write(ClipboardContent {
                                 images: Some(vec![ImageData {
-                                    data: bytes,
+                                    data,
                                     mime_type,
                                     filename,
                                 }]),
                                 ..Default::default()
                             });
-                            me.write_user_bytes_to_pty(cli_agent_paste_keystroke_bytes(), ctx);
-                            true
+                            me.write_user_bytes_to_pty(paste_bytes, ctx)
                         })
                         .await;
-
-                    if !matches!(should_continue, Ok(true)) {
-                        return;
+                    if !matches!(accepted, Ok(true)) {
+                        return Err(crate::t!("cli-agent-input-image-delivery-failed"));
                     }
-
-                    // Give the CLI agent time to read from the clipboard
-                    // before we overwrite it with the next image.
                     Timer::after(CLI_AGENT_IMAGE_PASTE_DELAY).await;
                 }
+                Ok::<(), String>(())
             },
-            |_, _, _| {},
+            move |me, result, ctx| match result {
+                Ok(()) => me.release_cli_agent_input_submission(generation, ctx),
+                Err(message) => me.fail_cli_agent_text_submit(generation, message, ctx),
+            },
         );
     }
 
-    /// Writes the input text to the PTY and then sends a carriage return to
-    /// submit it, using the agent-specific strategy. After the submission is
-    /// complete (synchronously for the inline strategies, after a timer for
-    /// the delayed strategies), closes the rich input if the user's settings
-    /// request auto-dismissal.
+    fn cli_agent_input_generation_matches(&self, generation: Uuid, ctx: &AppContext) -> bool {
+        CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id) == Some(generation)
+    }
+
+    pub(super) fn cli_agent_input_target_matches(
+        &self,
+        generation: Uuid,
+        ctx: &AppContext,
+    ) -> bool {
+        if !self.cli_agent_input_generation_matches(generation, ctx) {
+            return false;
+        }
+        let Some(session) = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id) else {
+            return false;
+        };
+        let model = self.model.lock();
+        self.detect_cli_agent_from_model(&model, ctx)
+            .is_some_and(|(agent, _)| agent == session.agent)
+            || (model
+                .block_list()
+                .active_block()
+                .is_active_and_long_running()
+                && session.agent.matches_command(
+                    &model
+                        .block_list()
+                        .active_block()
+                        .command_with_secrets_obfuscated(false),
+                    None,
+                ))
+    }
+
+    fn begin_cli_agent_text_submit(
+        &mut self,
+        generation: Uuid,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        if !self.cli_agent_input_target_matches(generation, ctx) {
+            self.show_error_toast(crate::t!("cli-agent-input-delivery-failed"), ctx);
+            return false;
+        }
+        let accepted = CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+            sessions.begin_input_submission(self.view_id, generation)
+        });
+        if !accepted {
+            self.show_error_toast(crate::t!("cli-agent-input-still-sending"), ctx);
+        }
+        accepted
+    }
+
+    fn release_cli_agent_input_submission(&self, generation: Uuid, ctx: &mut ViewContext<Self>) {
+        CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+            sessions.finish_input_submission(self.view_id, generation);
+        });
+    }
+
+    fn fail_cli_agent_text_submit(
+        &mut self,
+        generation: Uuid,
+        message: String,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.release_cli_agent_input_submission(generation, ctx);
+        if self.cli_agent_input_generation_matches(generation, ctx) {
+            self.show_error_toast(message, ctx);
+        }
+    }
+
+    fn complete_cli_agent_text_submit(
+        &mut self,
+        generation: Uuid,
+        snapshot: Option<Rc<CliInputSubmission>>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.release_cli_agent_input_submission(generation, ctx);
+        if !self.cli_agent_input_generation_matches(generation, ctx) {
+            return;
+        }
+        let Some(snapshot) = snapshot else {
+            return;
+        };
+        let attachments_unchanged = self
+            .ai_context_model
+            .as_ref(ctx)
+            .pending_attachments_revision()
+            == snapshot.attachments_revision;
+        let editor_unchanged = self.input.update(ctx, |input, ctx| {
+            input.acknowledge_cli_input_submission(&snapshot.editor_revision, ctx)
+        });
+        if attachments_unchanged {
+            self.ai_context_model.update(ctx, |model, ctx| {
+                model.clear_pending_images(ctx);
+            });
+        }
+        let draft = self.input.as_ref(ctx).buffer_text(ctx);
+        let event = CLIAgentEvent {
+            v: 1,
+            agent: snapshot.agent,
+            event: CLIAgentEventType::PromptSubmit,
+            session_id: None,
+            cwd: None,
+            project: None,
+            payload: CLIAgentEventPayload {
+                query: Some(snapshot.query.clone()),
+                ..Default::default()
+            },
+            // 仅确认向 PTY 转交输入，不伪装成插件 ACK 或真实任务完成。
+            source: CLIAgentEventSource::LocalRichInput,
+        };
+        CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+            sessions.set_draft(self.view_id, draft);
+            sessions.update_from_event(self.view_id, &event, ctx);
+        });
+        send_telemetry_from_ctx!(
+            TelemetryEvent::CLIAgentRichInputSubmitted {
+                cli_agent: snapshot.agent.into(),
+                prompt_length: snapshot.query.chars().count(),
+            },
+            ctx
+        );
+        // 发送过程中有新编辑或新附件时，保留当前输入框以供用户继续处理。
+        if editor_unchanged && attachments_unchanged {
+            self.maybe_close_rich_input_after_submit(ctx);
+        }
+    }
+
+    /// 延迟 Enter 只对原输入代际及仍运行的同一 CLI 生效。
+    fn finish_cli_agent_text_submit(
+        &mut self,
+        generation: Uuid,
+        snapshot: Option<Rc<CliInputSubmission>>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if !self.cli_agent_input_target_matches(generation, ctx)
+            || !CLIAgentSessionsModel::as_ref(ctx)
+                .is_input_submission_current(self.view_id, generation)
+        {
+            self.release_cli_agent_input_submission(generation, ctx);
+            return;
+        }
+        if self.write_user_bytes_to_pty(b"\r".to_vec(), ctx) {
+            self.complete_cli_agent_text_submit(generation, snapshot, ctx);
+        } else {
+            self.fail_cli_agent_text_submit(
+                generation,
+                crate::t!("cli-agent-input-delivery-failed"),
+                ctx,
+            );
+        }
+    }
+
     fn write_cli_agent_text_then_submit(
         &mut self,
         text_bytes: Vec<u8>,
         strategy: RichInputSubmitStrategy,
+        generation: Uuid,
+        snapshot: Option<Rc<CliInputSubmission>>,
         ctx: &mut ViewContext<Self>,
     ) {
+        if !self.cli_agent_input_target_matches(generation, ctx)
+            || !CLIAgentSessionsModel::as_ref(ctx)
+                .is_input_submission_current(self.view_id, generation)
+        {
+            self.release_cli_agent_input_submission(generation, ctx);
+            return;
+        }
+        let strategy = if text_bytes.contains(&b'\n') || text_bytes.contains(&b'\r') {
+            match strategy {
+                RichInputSubmitStrategy::Inline | RichInputSubmitStrategy::DelayedEnter => {
+                    if !self.model.lock().needs_bracketed_paste() {
+                        self.fail_cli_agent_text_submit(
+                            generation,
+                            crate::t!("cli-agent-input-multiline-paste-unavailable"),
+                            ctx,
+                        );
+                        return;
+                    }
+                    RichInputSubmitStrategy::BracketedPasteDelayedEnter
+                }
+                RichInputSubmitStrategy::BracketedPaste
+                | RichInputSubmitStrategy::BracketedPasteDelayedEnter => strategy,
+            }
+        } else {
+            strategy
+        };
+        if strategy == RichInputSubmitStrategy::Inline {
+            let mut bytes = text_bytes;
+            bytes.push(b'\r');
+            if self.write_user_bytes_to_pty(bytes, ctx) {
+                self.complete_cli_agent_text_submit(generation, snapshot, ctx);
+            } else {
+                self.fail_cli_agent_text_submit(
+                    generation,
+                    crate::t!("cli-agent-input-delivery-failed"),
+                    ctx,
+                );
+            }
+            return;
+        }
+        if !self.write_cli_agent_text(&text_bytes, strategy, ctx) {
+            self.fail_cli_agent_text_submit(
+                generation,
+                crate::t!("cli-agent-input-delivery-failed"),
+                ctx,
+            );
+            return;
+        }
         match strategy {
-            RichInputSubmitStrategy::Inline => {
-                let mut bytes = text_bytes;
-                bytes.extend_from_slice(b"\r");
-                self.write_user_bytes_to_pty(bytes, ctx);
-                self.maybe_close_rich_input_after_submit(ctx);
-            }
+            RichInputSubmitStrategy::Inline => unreachable!("inline submission already handled"),
             RichInputSubmitStrategy::BracketedPaste => {
-                self.write_cli_agent_text(&text_bytes, strategy, ctx);
-                self.write_user_bytes_to_pty(b"\r".to_vec(), ctx);
-                self.maybe_close_rich_input_after_submit(ctx);
+                self.finish_cli_agent_text_submit(generation, snapshot, ctx)
             }
-            RichInputSubmitStrategy::DelayedEnter => {
-                self.write_user_bytes_to_pty(text_bytes, ctx);
-                ctx.spawn(
-                    Timer::after(CLI_AGENT_PTY_WRITE_DELAY),
-                    move |me, _, ctx| {
-                        me.write_user_bytes_to_pty(b"\r".to_vec(), ctx);
-                        me.maybe_close_rich_input_after_submit(ctx);
-                    },
-                );
-            }
-            RichInputSubmitStrategy::BracketedPasteDelayedEnter => {
-                self.write_cli_agent_text(&text_bytes, strategy, ctx);
-                ctx.spawn(
-                    Timer::after(CLI_AGENT_BRACKETED_PASTE_ENTER_DELAY),
-                    move |me, _, ctx| {
-                        me.write_user_bytes_to_pty(b"\r".to_vec(), ctx);
-                        me.maybe_close_rich_input_after_submit(ctx);
-                    },
-                );
+            RichInputSubmitStrategy::DelayedEnter
+            | RichInputSubmitStrategy::BracketedPasteDelayedEnter => {
+                let delay = if strategy == RichInputSubmitStrategy::DelayedEnter {
+                    CLI_AGENT_PTY_WRITE_DELAY
+                } else {
+                    CLI_AGENT_BRACKETED_PASTE_ENTER_DELAY
+                };
+                ctx.spawn(Timer::after(delay), move |me, _, ctx| {
+                    me.finish_cli_agent_text_submit(generation, snapshot, ctx);
+                });
             }
         }
     }
@@ -1238,13 +1477,11 @@ impl UseAgentToolbar {
     ) {
         // Forward CLI-relevant events from the shared agent input footer.
         match event {
-            AgentInputFooterEvent::WriteToPty(text) => {
-                ctx.emit(UseAgentToolbarEvent::WriteToPty(text.clone()));
-            }
-            // 上游的 `AgentInputFooterEvent::InsertIntoCLIPty` 我方未采用:语音转写在没有
-            // rich input 会话时直接走 `WriteToPty`,故这里没有对应的转发分支。
-            AgentInputFooterEvent::InsertIntoCLIRichInput(text) => {
-                ctx.emit(UseAgentToolbarEvent::InsertIntoRichInput(text.clone()));
+            AgentInputFooterEvent::InsertIntoCLI { text, generation } => {
+                ctx.emit(UseAgentToolbarEvent::InsertIntoCLI {
+                    text: text.clone(),
+                    generation: *generation,
+                });
             }
             AgentInputFooterEvent::ToggleCodeReviewPane(agent) => {
                 ctx.emit(UseAgentToolbarEvent::ToggleCodeReviewPane(*agent));
@@ -1337,12 +1574,8 @@ impl UseAgentToolbar {
 pub enum UseAgentToolbarEvent {
     /// The footer was dismissed.
     Dismiss,
-    /// Write text to the PTY (from CLI agent view).
-    WriteToPty(String),
-    /// Insert text into the CLI agent's PTY input using its paste strategy.
-    InsertIntoCLIPty(String),
-    /// Insert text into CLI agent rich input.
-    InsertIntoRichInput(String),
+    /// 带发起代际的语音或文件选择结果，由终端统一校验并插入。
+    InsertIntoCLI { text: String, generation: Uuid },
     /// Toggle the code review pane (from CLI agent view).
     ToggleCodeReviewPane(CLIAgent),
     /// Toggle the file explorer (from CLI agent view).

@@ -212,8 +212,17 @@ impl TuiOrchestrationModel {
     ) {
         match request.execution_mode.clone() {
             StartAgentExecutionMode::Local {
+                ref skill_references,
+                ..
+            } if !skill_references.is_empty() => self.fail_child_request(
+                &request,
+                warp::t!("tui-cli-agent-task-skills-require-managed"),
+                ctx,
+            ),
+            StartAgentExecutionMode::Local {
                 harness_type: None,
                 model_id,
+                ..
             } => self.begin_local_oz_child_launch(
                 parent_session_id,
                 request,
@@ -446,6 +455,7 @@ impl TuiOrchestrationModel {
                 | Harness::OpenCode
                 | Harness::Gemini
                 | Harness::Codex
+                | Harness::Grok
                 | Harness::Unknown,
             ) => {
                 log::debug!("TUI restore: skipping local non-Oz child {conversation_id:?}.");

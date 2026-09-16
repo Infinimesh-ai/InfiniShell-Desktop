@@ -1,0 +1,97 @@
+{
+  "stage": "after_codex_restart_before_native_trust",
+  "controlled_tree": [
+    {
+      "file": ".codex-plugin/plugin.json",
+      "sha256": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+      "expected": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+      "upstream_sha256": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+      "matches_patch": true,
+      "matches_upstream": true,
+      "mtime_utc": "2026-09-16T10:44:24.233586+00:00"
+    },
+    {
+      "file": "hooks/hooks.json",
+      "sha256": "79b5f2bc55848ba1bc3cb7ddb9a4979249681b9b3719420752a512bb95881cdc",
+      "expected": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+      "upstream_sha256": "79b5f2bc55848ba1bc3cb7ddb9a4979249681b9b3719420752a512bb95881cdc",
+      "matches_patch": false,
+      "matches_upstream": true,
+      "mtime_utc": "2026-09-16T10:44:24.233741+00:00"
+    },
+    {
+      "file": "scripts/build-payload.sh",
+      "sha256": "2e34b5874724234c14222b2c271efdf4dbfd33ad993bfb411d963a2eb468f24e",
+      "expected": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+      "upstream_sha256": "2e34b5874724234c14222b2c271efdf4dbfd33ad993bfb411d963a2eb468f24e",
+      "matches_patch": false,
+      "matches_upstream": true,
+      "mtime_utc": "2026-09-16T10:44:24.233919+00:00"
+    },
+    {
+      "file": "scripts/on-permission-request.sh",
+      "sha256": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+      "expected": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+      "upstream_sha256": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+      "matches_patch": true,
+      "matches_upstream": true,
+      "mtime_utc": "2026-09-16T10:44:24.234024+00:00"
+    },
+    {
+      "file": "scripts/on-post-tool-use.sh",
+      "sha256": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+      "expected": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+      "upstream_sha256": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+      "matches_patch": true,
+      "matches_upstream": true,
+      "mtime_utc": "2026-09-16T10:44:24.234141+00:00"
+    },
+    {
+      "file": "scripts/on-prompt-submit.sh",
+      "sha256": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+      "expected": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+      "upstream_sha256": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+      "matches_patch": true,
+      "matches_upstream": true,
+      "mtime_utc": "2026-09-16T10:44:24.234241+00:00"
+    },
+    {
+      "file": "scripts/on-session-start.sh",
+      "sha256": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+      "expected": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+      "upstream_sha256": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+      "matches_patch": true,
+      "matches_upstream": true,
+      "mtime_utc": "2026-09-16T10:44:24.234344+00:00"
+    },
+    {
+      "file": "scripts/on-stop.sh",
+      "sha256": "a2de778f79114c32bc64e4a8a8697b566c0a1fe22faac5010cfccdefa05406ec",
+      "expected": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+      "upstream_sha256": "a2de778f79114c32bc64e4a8a8697b566c0a1fe22faac5010cfccdefa05406ec",
+      "matches_patch": false,
+      "matches_upstream": true,
+      "mtime_utc": "2026-09-16T10:44:24.234438+00:00"
+    },
+    {
+      "file": "scripts/should-use-structured.sh",
+      "sha256": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+      "expected": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+      "upstream_sha256": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+      "matches_patch": true,
+      "matches_upstream": true,
+      "mtime_utc": "2026-09-16T10:44:24.234547+00:00"
+    },
+    {
+      "file": "scripts/warp-notify.sh",
+      "sha256": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366",
+      "expected": "144f0ce32c629c920ee6d6c164f1fcbd36aaac0429c5348087a33a382d75a050",
+      "upstream_sha256": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366",
+      "matches_patch": false,
+      "matches_upstream": true,
+      "mtime_utc": "2026-09-16T10:44:24.234656+00:00"
+    }
+  ],
+  "config_has_trusted_hash": false,
+  "config_sanitized": "[projects.\"<pty-root>/project\"]\ntrust_level = \"trusted\"\n\n[marketplaces.codex-warp]\nlast_updated = \"2026-09-16T10:44:24Z\"\nlast_revision = \"31ce59d9011cfb1d78f265649a228dac5de58d76\"\nsource_type = \"git\"\nsource = \"https://github.com/warpdotdev/codex-warp.git\"\n\n[plugins.\"warp@codex-warp\"]\nenabled = true\n"
+}

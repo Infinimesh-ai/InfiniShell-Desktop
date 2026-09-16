@@ -1,0 +1,374 @@
+use super::*;
+
+fn private_home() -> (TempDir, PathBuf) {
+    let directory = tempfile::tempdir().unwrap();
+    let home = directory.path().canonicalize().unwrap();
+    (directory, home)
+}
+
+fn config(home: &Path) -> DocumentMut {
+    read_config(home).unwrap().1
+}
+
+fn save(home: &Path, document: &DocumentMut) {
+    fs::write(home.join("config.toml"), document.to_string()).unwrap();
+}
+
+fn owned_scope(home: &Path, key: &str) -> Scope {
+    let mut document = DocumentMut::new();
+    document["marketplaces"][MARKETPLACE]["source_type"] = toml_edit::value("local");
+    document["marketplaces"][MARKETPLACE]["source"] =
+        toml_edit::value(source_path(home).to_str().unwrap());
+    document["plugins"][key]["enabled"] = toml_edit::value(true);
+    let mut scope = Scope::read(&document, key);
+    // 原生 marketplace add 生成普通 TOML 表，与纯索引构造的内联表不同。
+    scope.marketplace = Item::Table(scope.marketplace.into_table().unwrap());
+    scope
+}
+
+fn copy_plugin(home: &Path, name: &str, destination: &Path) {
+    let prefix = format!("plugins/{name}/");
+    for (path, _) in FILES {
+        if let Some(relative) = path.strip_prefix(&prefix) {
+            let target = destination.join("0.4.0").join(relative);
+            fs::create_dir_all(target.parent().unwrap()).unwrap();
+            fs::copy(source_path(home).join(path), target).unwrap();
+        }
+    }
+}
+
+fn prepared(home: &Path) -> (TempDir, PathBuf, Scope, Scope) {
+    materialize(home).unwrap();
+    let transaction = TempDir::new_in(home).unwrap();
+    let staged = transaction.path().join("staged-warp");
+    copy_plugin(home, "warp", &staged);
+    let original = Scope::read(&config(home), "warp@codex-warp");
+    let installed = owned_scope(home, "warp@codex-warp");
+    (transaction, staged, original, installed)
+}
+
+#[test]
+fn missing_target_is_distinct_from_concurrently_created_empty_table() {
+    let absent = Scope::read(&DocumentMut::new(), "warp@codex-warp");
+    let placeholder = "[marketplaces.codex-warp]\n"
+        .parse::<DocumentMut>()
+        .unwrap();
+    let empty_marketplace = Scope::read(&placeholder, "warp@codex-warp");
+    // toml_edit 对 None 和空表都输出空串，必须额外比较项目类型。
+    assert_eq!(
+        absent.marketplace.to_string(),
+        empty_marketplace.marketplace.to_string()
+    );
+    assert!(!absent.matches(&empty_marketplace));
+    let empty_enabled = "[plugins.'warp@codex-warp'.enabled]\n"
+        .parse::<DocumentMut>()
+        .unwrap();
+    assert!(!absent.matches(&Scope::read(&empty_enabled, "warp@codex-warp")));
+    assert!(absent.matches(&Scope::read(&DocumentMut::new(), "warp@codex-warp")));
+}
+
+#[test]
+fn valid_toml_with_invalid_target_shape_returns_error_without_writes_or_panic() {
+    for bytes in [
+        "plugins = 'x'\n",
+        "marketplaces = 'x'\n",
+        "[plugins]\n'warp@codex-warp' = true\n",
+        "plugins = { 'orchestration@codex-warp' = 7 }\n",
+        "[marketplaces]\ncodex-warp = true\n",
+        "[plugins.'warp@codex-warp']\nenabled = 'false'\n",
+    ] {
+        let (_directory, home) = private_home();
+        let (transaction, staged, original, installed) = prepared(&home);
+        fs::write(home.join("config.toml"), bytes).unwrap();
+        assert!(read_config(&home).is_err(), "{bytes}");
+        assert!(
+            write_scoped(&home, "warp@codex-warp", &original, &installed).is_err(),
+            "{bytes}"
+        );
+        assert!(
+            commit_install(
+                &home,
+                "warp",
+                &original,
+                &installed,
+                &staged,
+                transaction.path(),
+                |_, _| Ok(())
+            )
+            .is_err(),
+            "{bytes}"
+        );
+        assert_eq!(fs::read_to_string(home.join("config.toml")).unwrap(), bytes);
+        assert!(!cache_root(&home, "warp").exists());
+    }
+}
+
+#[test]
+fn valid_inline_user_tables_remain_supported_by_scoped_write() {
+    let (_directory, home) = private_home();
+    materialize(&home).unwrap();
+    let initial = "plugins = { 'warp@codex-warp' = { enabled = true, user_note = '保留' } }\nmarketplaces = { other = { source_type = 'local', source = '/user' } }\n";
+    fs::write(home.join("config.toml"), initial).unwrap();
+    let before = Scope::read(&config(&home), "warp@codex-warp");
+    let mut installed = owned_scope(&home, "warp@codex-warp");
+    // 原生暂存的 marketplace 使用普通表，真实配置的父表仍可为内联表。
+    installed.marketplace = Item::Table(installed.marketplace.into_table().unwrap());
+    write_scoped(&home, "warp@codex-warp", &before, &installed).unwrap();
+    assert!(installed.matches(&Scope::read(&config(&home), "warp@codex-warp")));
+    let updated = config(&home);
+    assert_eq!(
+        updated["plugins"]["warp@codex-warp"]["user_note"].as_str(),
+        Some("保留")
+    );
+    assert_eq!(
+        updated["marketplaces"]["other"]["source"].as_str(),
+        Some("/user")
+    );
+}
+
+#[test]
+fn full_source_keeps_fixed_upstream_files_and_only_four_reviewed_changes() {
+    let (_directory, home) = private_home();
+    materialize(&home).unwrap();
+    assert_eq!(FILES.len(), 36);
+    assert_eq!(
+        tree(&source_path(&home), false).unwrap(),
+        expected_tree("", false)
+    );
+    let changed = BUNDLE
+        .files
+        .iter()
+        .filter(|(_, file)| file.sha256 != file.upstream_sha256)
+        .map(|(name, _)| name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        changed,
+        [
+            "plugins/warp/hooks/hooks.json",
+            "plugins/warp/scripts/build-payload.sh",
+            "plugins/warp/scripts/on-stop.sh",
+            "plugins/warp/scripts/warp-notify.sh"
+        ]
+    );
+    assert!(
+        BUNDLE
+            .files
+            .contains_key("plugins/orchestration/.codex-plugin/plugin.json")
+    );
+    assert!(BUNDLE.files.contains_key("LICENSE"));
+    materialize(&home).unwrap();
+    assert_eq!(
+        fs::read_dir(source_parent(&home).parent().unwrap())
+            .unwrap()
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn owned_metadata_alone_never_authorizes_modified_or_missing_source() {
+    let (_directory, home) = private_home();
+    materialize(&home).unwrap();
+    let mut document = config(&home);
+    owned_scope(&home, "warp@codex-warp").apply(&mut document, "warp@codex-warp");
+    save(&home, &document);
+    assert!(is_current(&home));
+    fs::write(
+        source_path(&home).join("plugins/orchestration/scripts/on-stop.sh"),
+        "用户内容",
+    )
+    .unwrap();
+    invalidate(&home);
+    assert!(!is_current(&home));
+    assert!(has_custom_source(&home));
+    assert!(materialize(&home).is_err());
+    assert_eq!(
+        fs::read_to_string(source_path(&home).join("plugins/orchestration/scripts/on-stop.sh"))
+            .unwrap(),
+        "用户内容"
+    );
+}
+
+#[test]
+fn arbitrary_local_source_and_unknown_git_revision_are_rejected() {
+    let (_directory, home) = private_home();
+    let mut document = DocumentMut::new();
+    document["marketplaces"][MARKETPLACE]["source_type"] = toml_edit::value("local");
+    document["marketplaces"][MARKETPLACE]["source"] = toml_edit::value("/user/plugin");
+    save(&home, &document);
+    assert!(has_custom_source(&home));
+    assert!(validate_existing(&home, &document).is_err());
+    document["marketplaces"][MARKETPLACE]["source_type"] = toml_edit::value("git");
+    document["marketplaces"][MARKETPLACE]["source"] =
+        toml_edit::value("https://github.com/warpdotdev/codex-warp.git");
+    document["marketplaces"][MARKETPLACE]["ref"] = toml_edit::value("user-branch");
+    assert!(validate_existing(&home, &document).is_err());
+}
+
+#[test]
+fn migration_keeps_disabled_orchestration_other_marketplace_and_hook_trust() {
+    let (_directory, home) = private_home();
+    let initial = "# 用户配置注释\napproval_policy = 'on-request'\n[plugins.'orchestration@codex-warp']\nenabled = false\n[marketplaces.other]\nsource_type = 'local'\nsource = '/用户来源'\n[hooks.state.reviewed]\ntrusted_hash = 'user-owned-trust'\n";
+    fs::write(home.join("config.toml"), initial).unwrap();
+    let (transaction, staged, original, installed) = prepared(&home);
+    let orchestration = cache_root(&home, "orchestration");
+    copy_plugin(&home, "orchestration", &orchestration);
+    let old_orchestration = tree(&orchestration, false).unwrap();
+    commit_install(
+        &home,
+        "warp",
+        &original,
+        &installed,
+        &staged,
+        transaction.path(),
+        |_, _| Ok(()),
+    )
+    .unwrap();
+    let current = config(&home);
+    assert_eq!(
+        current["plugins"]["orchestration@codex-warp"]["enabled"].as_bool(),
+        Some(false)
+    );
+    assert_eq!(
+        current["marketplaces"]["other"]["source"].as_str(),
+        Some("/用户来源")
+    );
+    assert_eq!(
+        current["hooks"]["state"]["reviewed"]["trusted_hash"].as_str(),
+        Some("user-owned-trust")
+    );
+    assert!(current.to_string().starts_with("# 用户配置注释"));
+    assert_eq!(tree(&orchestration, false).unwrap(), old_orchestration);
+    assert!(notification_patch::full_tree_is_applied(
+        &home,
+        PatchKind::Codex
+    ));
+    assert!(is_current(&home));
+}
+
+#[test]
+fn concurrent_disable_before_final_configuration_write_restores_cache_and_stays_disabled() {
+    let (_directory, home) = private_home();
+    let (transaction, staged, original, installed) = prepared(&home);
+    let result = commit_install(
+        &home,
+        "warp",
+        &original,
+        &installed,
+        &staged,
+        transaction.path(),
+        |step, home| {
+            if step == 1 {
+                let mut document = config(home);
+                document["plugins"]["warp@codex-warp"]["enabled"] = toml_edit::value(false);
+                save(home, &document);
+            }
+            Ok(())
+        },
+    );
+    assert!(result.is_err());
+    assert!(!cache_root(&home, "warp").exists());
+    assert_eq!(
+        config(&home)["plugins"]["warp@codex-warp"]["enabled"].as_bool(),
+        Some(false)
+    );
+    assert!(marketplace(&config(&home)).is_none());
+}
+
+#[test]
+fn failure_after_config_commit_restores_only_changed_keys_and_keeps_concurrent_unrelated_write() {
+    let (_directory, home) = private_home();
+    let (transaction, staged, original, installed) = prepared(&home);
+    let result = commit_install(
+        &home,
+        "warp",
+        &original,
+        &installed,
+        &staged,
+        transaction.path(),
+        |step, home| {
+            if step == 2 {
+                let mut document = config(home);
+                document["model"] = toml_edit::value("concurrent-user-model");
+                save(home, &document);
+                return Err(io::Error::other("注入提交后失败"));
+            }
+            Ok(())
+        },
+    );
+    assert!(result.is_err());
+    assert_eq!(
+        config(&home)["model"].as_str(),
+        Some("concurrent-user-model")
+    );
+    assert!(marketplace(&config(&home)).is_none());
+    assert!(!cache_root(&home, "warp").exists());
+}
+
+#[test]
+fn unknown_concurrent_cache_edit_is_kept_and_old_backup_remains_recoverable() {
+    let (_directory, home) = private_home();
+    let (transaction, staged, original, installed) = prepared(&home);
+    let target = cache_root(&home, "warp");
+    copy_plugin(&home, "warp", &target);
+    let previous = tree(&target, false).unwrap();
+    let result = commit_install(
+        &home,
+        "warp",
+        &original,
+        &installed,
+        &staged,
+        transaction.path(),
+        |step, home| {
+            if step == 2 {
+                fs::write(
+                    cache_root(home, "warp").join("0.4.0/scripts/on-stop.sh"),
+                    "并发新内容",
+                )?;
+                return Err(io::Error::other("注入缓存并发修改"));
+            }
+            Ok(())
+        },
+    );
+    assert!(result.is_err());
+    assert_eq!(
+        fs::read_to_string(target.join("0.4.0/scripts/on-stop.sh")).unwrap(),
+        "并发新内容"
+    );
+    assert_eq!(
+        tree(&transaction.path().join("previous-cache"), false).unwrap(),
+        previous
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn source_mode_change_is_rejected_without_resetting_user_permissions() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let (_directory, home) = private_home();
+    materialize(&home).unwrap();
+    let target = source_path(&home).join("plugins/orchestration/scripts/on-stop.sh");
+    fs::set_permissions(&target, fs::Permissions::from_mode(0o600)).unwrap();
+    assert!(verify_owned(&home).is_err());
+    assert!(materialize(&home).is_err());
+    assert_eq!(
+        fs::metadata(target).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn source_symlink_is_rejected_without_changing_referenced_file() {
+    use std::os::unix::fs::symlink;
+    let (_directory, home) = private_home();
+    materialize(&home).unwrap();
+    let external = home.join("external");
+    fs::write(&external, "原始外部文件").unwrap();
+    let target = source_path(&home).join("plugins/warp/scripts/on-stop.sh");
+    fs::remove_file(&target).unwrap();
+    symlink(&external, &target).unwrap();
+    assert!(verify_owned(&home).is_err());
+    assert!(materialize(&home).is_err());
+    assert_eq!(fs::read_to_string(external).unwrap(), "原始外部文件");
+}

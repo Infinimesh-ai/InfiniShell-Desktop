@@ -424,6 +424,7 @@ pub enum CodePanelsFileOpenEntrypoint {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum CLIAgentType {
     Claude,
+    Grok,
     Gemini,
     Codex,
     Amp,

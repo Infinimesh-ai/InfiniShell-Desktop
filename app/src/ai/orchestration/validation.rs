@@ -107,9 +107,11 @@ pub fn accept_disabled_reason_with_auth(
                 let tooltip = match harness {
                     Harness::Claude => crate::t!("ai-orchestration-install-claude"),
                     Harness::Codex => crate::t!("ai-orchestration-install-codex"),
-                    Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Unknown => {
-                        tooltip.to_string()
-                    }
+                    Harness::Oz
+                    | Harness::OpenCode
+                    | Harness::Gemini
+                    | Harness::Grok
+                    | Harness::Unknown => tooltip.to_string(),
                 };
                 return Some(tooltip);
             }
@@ -120,6 +122,7 @@ pub fn accept_disabled_reason_with_auth(
                     | Harness::Claude
                     | Harness::OpenCode
                     | Harness::Gemini
+                    | Harness::Grok
                     | Harness::Unknown => message.to_string(),
                 };
                 return Some(message);

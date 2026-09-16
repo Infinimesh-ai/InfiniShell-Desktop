@@ -1138,3 +1138,26 @@ impl TryFrom<WaitForEventsResult> for api::request::input::tool_call_result::Res
 #[cfg(test)]
 #[path = "convert_tests.rs"]
 mod tests;
+
+impl TryFrom<SendMessageToAgentResult> for api::request::input::tool_call_result::Result {
+    type Error = ConvertToAPITypeError;
+
+    fn try_from(result: SendMessageToAgentResult) -> Result<Self, Self::Error> {
+        use api::send_message_to_agent_result::{Error, Result as WireResult, Success};
+        let result = match result {
+            SendMessageToAgentResult::Acknowledged { message_id } => {
+                WireResult::Success(Success { message_id })
+            }
+            SendMessageToAgentResult::Unconfirmed { message_id } => WireResult::Error(Error {
+                message: format!(
+                    "Delivery is unconfirmed for {message_id}. Do not resend; check the local task mailbox."
+                ),
+            }),
+            SendMessageToAgentResult::Error(message) => WireResult::Error(Error { message }),
+            SendMessageToAgentResult::Cancelled => return Err(ConvertToAPITypeError::Ignore),
+        };
+        Ok(Self::SendMessageToAgent(api::SendMessageToAgentResult {
+            result: Some(result),
+        }))
+    }
+}

@@ -1,0 +1,67 @@
+{
+  "patch_revision": 3,
+  "plugin_version": "0.4.0",
+  "controlled_tree": [
+    {
+      "file": ".codex-plugin/plugin.json",
+      "sha256": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+      "expected": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+      "matches": true
+    },
+    {
+      "file": "hooks/hooks.json",
+      "sha256": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+      "expected": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+      "matches": true
+    },
+    {
+      "file": "scripts/build-payload.sh",
+      "sha256": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+      "expected": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+      "matches": true
+    },
+    {
+      "file": "scripts/on-permission-request.sh",
+      "sha256": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+      "expected": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+      "matches": true
+    },
+    {
+      "file": "scripts/on-post-tool-use.sh",
+      "sha256": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+      "expected": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+      "matches": true
+    },
+    {
+      "file": "scripts/on-prompt-submit.sh",
+      "sha256": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+      "expected": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+      "matches": true
+    },
+    {
+      "file": "scripts/on-session-start.sh",
+      "sha256": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+      "expected": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+      "matches": true
+    },
+    {
+      "file": "scripts/on-stop.sh",
+      "sha256": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+      "expected": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+      "matches": true
+    },
+    {
+      "file": "scripts/should-use-structured.sh",
+      "sha256": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+      "expected": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+      "matches": true
+    },
+    {
+      "file": "scripts/warp-notify.sh",
+      "sha256": "144f0ce32c629c920ee6d6c164f1fcbd36aaac0429c5348087a33a382d75a050",
+      "expected": "144f0ce32c629c920ee6d6c164f1fcbd36aaac0429c5348087a33a382d75a050",
+      "matches": true
+    }
+  ],
+  "config_has_trusted_hash_before_ui": false
+}

@@ -461,61 +461,555 @@ fn test_rich_input_submit_strategy_for_hermes_uses_bracketed_paste() {
     );
 }
 
-#[test]
-fn insert_cli_agent_voice_text_hermes_multiline_uses_bracketed_paste_without_submitting() {
-    App::test((), |mut app| async move {
-        initialize_app_for_terminal_view(&mut app);
+fn register_cli_input_test_session(
+    view: &mut TerminalView,
+    agent: CLIAgent,
+    ctx: &mut ViewContext<TerminalView>,
+) -> Uuid {
+    {
+        let mut model = view.model.lock();
+        // 更换 CLI 必须先结束前一命令，否则夹具会把两条命令拼进同一活动 block。
+        if model
+            .block_list()
+            .active_block()
+            .is_active_and_long_running()
+        {
+            model.finish_block();
+        }
+        model.simulate_long_running_block(agent.command_prefix(), "");
+        assert!(
+            agent.matches_command(
+                &model
+                    .block_list()
+                    .active_block()
+                    .command_with_secrets_obfuscated(false),
+                None
+            )
+        );
+    }
+    let view_id = view.view_id;
+    CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+        sessions.set_session(
+            view_id,
+            CLIAgentSession {
+                agent,
+                status: CLIAgentSessionStatus::InProgress,
+                session_context: CLIAgentSessionContext::default(),
+                input_state: CLIAgentInputState::Closed,
+                should_auto_toggle_input: false,
+                listener: None,
+                remote_host: None,
+                plugin_version: None,
+                draft_text: None,
+                custom_command_prefix: None,
+                received_rich_notification: false,
+            },
+            ctx,
+        );
+        sessions.input_generation(view_id).unwrap()
+    })
+}
 
-        let terminal = add_window_with_terminal(&mut app, None);
-        let pty_writes = Rc::new(RefCell::new(Vec::new()));
-        let writes = pty_writes.clone();
-        app.update(|ctx| {
-            ctx.subscribe_to_view(&terminal, move |_, event, _| {
-                if let Event::WriteBytesToPty { bytes } = event {
-                    writes.borrow_mut().push(bytes.to_vec());
-                }
+fn prepare_rich_cli_test(app: &mut App, agent: CLIAgent) -> ViewHandle<TerminalView> {
+    initialize_app_for_terminal_view(app);
+    app.add_singleton_model(|_| crate::workspace::ToastStack);
+    FeatureFlag::CLIAgentRichInput.set_enabled(true);
+    AISettings::handle(app).update(app, |settings, ctx| {
+        settings
+            .auto_dismiss_rich_input_after_submit
+            .set_value(false, ctx)
+            .unwrap();
+        settings.submit_on_ctrl_enter.set_value(true, ctx).unwrap();
+    });
+    let terminal = add_window_with_terminal(app, None);
+    terminal.update(app, |view, ctx| {
+        register_cli_input_test_session(view, agent, ctx);
+        view.open_cli_agent_rich_input(CLIAgentInputEntrypoint::FooterButton, ctx);
+    });
+    terminal
+}
+
+fn collect_cli_test_writes(
+    app: &mut App,
+    terminal: &ViewHandle<TerminalView>,
+) -> Rc<RefCell<Vec<Vec<u8>>>> {
+    let writes = Rc::new(RefCell::new(Vec::new()));
+    let collected = writes.clone();
+    app.update(|ctx| {
+        ctx.subscribe_to_view(terminal, move |_, event, _| {
+            if let Event::WriteBytesToPty { bytes } = event {
+                collected.borrow_mut().push(bytes.to_vec());
+            }
+        });
+    });
+    writes
+}
+
+fn submit_cli_test_input(terminal: &ViewHandle<TerminalView>, app: &mut App, text: &str) {
+    terminal.update(app, |view, ctx| {
+        view.input.update(ctx, |input, ctx| {
+            input.replace_buffer_content(text, ctx);
+        });
+    });
+    terminal.update(app, |view, ctx| {
+        view.input.update(ctx, |input, ctx| {
+            input.input_ctrl_enter(ctx);
+        });
+    });
+}
+
+fn test_image(data: &str, filename: &str) -> ImageContext {
+    ImageContext {
+        data: data.to_owned(),
+        mime_type: "image/png".to_owned(),
+        file_name: filename.to_owned(),
+        is_figma: false,
+    }
+}
+
+#[test]
+fn grok_rich_input_real_enter_preserves_multiline_utf8() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Grok);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        submit_cli_test_input(&terminal, &mut app, "第一行：修复 bug\n第二行：添加测试 🦀");
+        assert_eq!(
+            *writes.borrow(),
+            vec![
+                "\x1b[200~第一行：修复 bug\n第二行：添加测试 🦀\x1b[201~"
+                    .as_bytes()
+                    .to_vec(),
+                b"\r".to_vec()
+            ]
+        );
+        terminal.read(&app, |view, ctx| {
+            assert!(view.input.as_ref(ctx).buffer_text(ctx).is_empty())
+        });
+    });
+}
+
+#[test]
+fn malformed_image_keeps_rich_draft_and_entire_attachment_batch() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Codex);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            view.ai_context_model.update(ctx, |model, ctx| {
+                model.append_pending_images(
+                    vec![
+                        test_image("aGVsbG8=", "first.png"),
+                        test_image("%%%", "bad.png"),
+                    ],
+                    ctx,
+                )
             });
         });
+        submit_cli_test_input(&terminal, &mut app, "保留完整草稿");
+        Timer::after(Duration::from_millis(100)).await;
+        assert!(writes.borrow().is_empty());
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "保留完整草稿");
+            assert_eq!(view.ai_context_model.as_ref(ctx).pending_images().len(), 2);
+            assert!(
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .unwrap()
+                    .session_context
+                    .query
+                    .is_none()
+            );
+        });
+    });
+}
 
+#[test]
+fn delayed_submit_does_not_clear_a_reedited_identical_draft() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Claude);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        submit_cli_test_input(&terminal, &mut app, "same draft 中文");
+        terminal.update(&mut app, |view, ctx| {
+            view.input.update(ctx, |input, ctx| {
+                input.replace_buffer_content("new draft", ctx);
+                input.replace_buffer_content("same draft 中文", ctx);
+                input.input_ctrl_enter(ctx);
+            });
+        });
+        Timer::after(Duration::from_millis(100)).await;
+        assert_eq!(
+            *writes.borrow(),
+            vec!["same draft 中文".as_bytes().to_vec(), b"\r".to_vec()]
+        );
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "same draft 中文")
+        });
+    });
+}
+
+#[test]
+fn delayed_submit_keeps_new_attachments_and_new_text() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Claude);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        submit_cli_test_input(&terminal, &mut app, "first");
+        terminal.update(&mut app, |view, ctx| {
+            view.input.update(ctx, |input, ctx| {
+                input.replace_buffer_content("second", ctx)
+            });
+            view.ai_context_model.update(ctx, |model, ctx| {
+                model.append_pending_images(vec![test_image("aGVsbG8=", "second.png")], ctx)
+            });
+        });
+        Timer::after(Duration::from_millis(100)).await;
+        assert_eq!(*writes.borrow(), vec![b"first".to_vec(), b"\r".to_vec()]);
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "second");
+            assert_eq!(view.ai_context_model.as_ref(ctx).pending_images().len(), 1);
+        });
+    });
+}
+
+#[test]
+fn cancellation_prevents_the_real_delayed_enter_and_keeps_draft() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Claude);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        submit_cli_test_input(&terminal, &mut app, "取消后不得提交");
         terminal.update(&mut app, |view, ctx| {
             CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
-                sessions.set_session(
-                    view.view_id,
-                    CLIAgentSession {
-                        agent: CLIAgent::Hermes,
-                        status: CLIAgentSessionStatus::InProgress,
-                        session_context: CLIAgentSessionContext::default(),
-                        input_state: CLIAgentInputState::Closed,
-                        should_auto_toggle_input: false,
-                        listener: None,
-                        remote_host: None,
-                        plugin_version: None,
-                        draft_text: None,
-                        custom_command_prefix: None,
-                        received_rich_notification: false,
+                sessions.observe_ctrl_c_write(view.view_id, ctx)
+            });
+        });
+        Timer::after(Duration::from_millis(100)).await;
+        assert_eq!(*writes.borrow(), vec!["取消后不得提交".as_bytes().to_vec()]);
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "取消后不得提交")
+        });
+    });
+}
+
+#[test]
+fn replacement_session_prevents_old_delayed_enter() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Claude);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        submit_cli_test_input(&terminal, &mut app, "old");
+        terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Codex, ctx);
+        });
+        Timer::after(Duration::from_millis(100)).await;
+        assert_eq!(*writes.borrow(), vec![b"old".to_vec()]);
+    });
+}
+
+#[test]
+fn pty_control_rejection_keeps_draft_and_does_not_emit_prompt_submit() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Codex);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, _| {
+            view.model.lock().block_list_mut().active_block_mut().set_agent_interaction_mode(
+                crate::terminal::model::block::AgentInteractionMetadata::new(None, AIConversationId::new(), None,
+                    Some(crate::ai::blocklist::block::cli_controller::LongRunningCommandControlState::Agent { is_blocked: false, should_hide_responses: false }), false, false));
+        });
+        submit_cli_test_input(&terminal, &mut app, "must remain");
+        assert!(writes.borrow().is_empty());
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "must remain");
+            assert!(
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .unwrap()
+                    .session_context
+                    .query
+                    .is_none()
+            );
+        });
+    });
+}
+
+#[test]
+fn rejected_second_shell_submit_keeps_explicit_shell_mode() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Claude);
+        submit_cli_test_input(&terminal, &mut app, "first");
+        terminal.update(&mut app, |view, ctx| {
+            view.input.update(ctx, |input, ctx| {
+                input.replace_buffer_content("echo 中文", ctx);
+                input.ai_input_model().update(ctx, |model, ctx| {
+                    model.set_input_config(
+                        crate::ai::blocklist::InputConfig {
+                            input_type: crate::ai::blocklist::InputType::Shell,
+                            is_locked: true,
+                        },
+                        false,
+                        None,
+                        ctx,
+                    );
+                });
+                input.input_ctrl_enter(ctx);
+            });
+        });
+        Timer::after(Duration::from_millis(100)).await;
+        terminal.read(&app, |view, ctx| {
+            let input = view.input.as_ref(ctx);
+            assert_eq!(input.buffer_text(ctx), "echo 中文");
+            assert!(!input.ai_input_model().as_ref(ctx).input_type().is_ai());
+            assert!(input.ai_input_model().as_ref(ctx).is_input_type_locked());
+        });
+    });
+}
+
+#[test]
+fn file_picker_producer_uses_original_generation_and_preserves_failed_insert() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| crate::workspace::ToastStack);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        let original = terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Codex, ctx)
+        });
+        terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Claude, ctx);
+            let footer = view.use_agent_footer.as_ref(ctx).agent_input_footer.clone();
+            footer.update(ctx, |footer, ctx| footer.handle_action(&crate::ai::blocklist::agent_view::agent_input_footer::AgentInputFooterAction::InsertFilePath { path: "/tmp/old.txt".to_owned(), generation: original }, ctx));
+        });
+        assert!(writes.borrow().is_empty());
+        terminal.update(&mut app, |view, ctx| {
+            let generation = CLIAgentSessionsModel::as_ref(ctx).input_generation(view.view_id).unwrap();
+            assert!(view.begin_cli_agent_text_submit(generation, ctx));
+            let footer = view.use_agent_footer.as_ref(ctx).agent_input_footer.clone();
+            footer.update(ctx, |footer, ctx| footer.handle_action(&crate::ai::blocklist::agent_view::agent_input_footer::AgentInputFooterAction::InsertFilePath { path: "/tmp/kept.txt".to_owned(), generation }, ctx));
+        });
+        assert!(writes.borrow().is_empty());
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .unwrap()
+                    .draft_text
+                    .as_deref(),
+                Some("/tmp/kept.txt ")
+            )
+        });
+    });
+}
+
+#[cfg(feature = "voice_input")]
+#[test]
+fn voice_transcription_producer_preserves_multiline_and_drops_stale_results() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| crate::workspace::ToastStack);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        let original = terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Codex, ctx)
+        });
+        terminal.update(&mut app, |view, ctx| {
+            let footer = view.use_agent_footer.as_ref(ctx).agent_input_footer.clone();
+            footer.update(ctx, |footer, ctx| {
+                footer.apply_cli_transcribed_voice_input(
+                    Ok("中文第一行\nEnglish second line".to_owned()),
+                    original,
+                    ctx,
+                )
+            });
+        });
+        assert_eq!(
+            *writes.borrow(),
+            vec![
+                "\x1b[200~中文第一行\nEnglish second line\x1b[201~"
+                    .as_bytes()
+                    .to_vec()
+            ]
+        );
+        terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Claude, ctx);
+            let footer = view.use_agent_footer.as_ref(ctx).agent_input_footer.clone();
+            footer.update(ctx, |footer, ctx| {
+                footer.apply_cli_transcribed_voice_input(Ok("stale".to_owned()), original, ctx)
+            });
+        });
+        assert_eq!(writes.borrow().len(), 1);
+    });
+}
+
+#[test]
+fn grok_clipboard_and_rich_images_are_gated_without_clearing_draft() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Grok);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            view.ai_context_model.update(ctx, |model, ctx| {
+                model.append_pending_images(vec![test_image("aGVsbG8=", "grok.png")], ctx)
+            });
+            assert!(!view.paste_clipboard_image_to_cli_agent(ctx));
+        });
+        submit_cli_test_input(&terminal, &mut app, "keep Grok draft");
+        assert!(writes.borrow().is_empty());
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "keep Grok draft");
+            assert_eq!(view.ai_context_model.as_ref(ctx).pending_images().len(), 1);
+        });
+    });
+}
+
+#[test]
+fn windows_image_policy_distinguishes_claude_codex_and_grok() {
+    assert_eq!(
+        cli_agent_paste_keystroke_bytes(CLIAgent::Claude, true),
+        Some(vec![0x1b, b'v'])
+    );
+    assert_eq!(
+        cli_agent_paste_keystroke_bytes(CLIAgent::Codex, true),
+        Some([BRACKETED_PASTE_START, BRACKETED_PASTE_END].concat())
+    );
+    assert_eq!(cli_agent_paste_keystroke_bytes(CLIAgent::Grok, true), None);
+    assert_eq!(cli_agent_paste_keystroke_bytes(CLIAgent::Grok, false), None);
+}
+
+#[test]
+fn input_submission_lease_survives_old_callbacks_without_blocking_a_new_session() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| crate::workspace::ToastStack);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |view, ctx| {
+            let first = register_cli_input_test_session(view, CLIAgent::Claude, ctx);
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                assert!(sessions.begin_input_submission(view.view_id, first));
+                assert!(!sessions.begin_input_submission(view.view_id, first));
+            });
+            let second = register_cli_input_test_session(view, CLIAgent::Claude, ctx);
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                assert!(sessions.begin_input_submission(view.view_id, second));
+                sessions.finish_input_submission(view.view_id, first);
+                assert!(!sessions.begin_input_submission(view.view_id, second));
+                sessions.finish_input_submission(view.view_id, second);
+                assert!(sessions.begin_input_submission(view.view_id, second));
+            });
+        });
+    });
+}
+
+#[test]
+fn review_delivery_rejects_busy_or_unavailable_pty_and_preserves_batch() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| crate::workspace::ToastStack);
+        let _review = FeatureFlag::HoaCodeReview.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        let review = crate::ai::agent::AgentReviewCommentBatch {
+            comments: Vec::new(),
+            diff_set: Default::default(),
+        };
+        terminal.update(&mut app, |view, ctx| {
+            assert!(
+                view.send_review_to_cli_agent_or_rich_input(&review, ctx)
+                    .is_err()
+            );
+            let generation = register_cli_input_test_session(view, CLIAgent::Codex, ctx);
+            assert!(view.begin_cli_agent_text_submit(generation, ctx));
+            assert!(
+                view.send_review_to_cli_agent_or_rich_input(&review, ctx)
+                    .is_err()
+            );
+            assert!(
+                view.try_send_text_to_cli_agent_or_rich_input("file context\n中文".to_owned(), ctx)
+                    .is_none()
+            );
+        });
+        assert!(writes.borrow().is_empty());
+    });
+}
+
+#[test]
+fn closed_rich_input_file_context_is_one_literal_paste_without_enter() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| crate::workspace::ToastStack);
+        let _review = FeatureFlag::HoaCodeReview.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Codex, ctx);
+            assert!(
+                view.try_send_text_to_cli_agent_or_rich_input(
+                    "中文文件\n`rm -rf` is literal".to_owned(),
+                    ctx
+                )
+                .is_some()
+            );
+        });
+        assert_eq!(
+            *writes.borrow(),
+            vec![
+                "\x1b[200~中文文件\n`rm -rf` is literal\x1b[201~"
+                    .as_bytes()
+                    .to_vec()
+            ]
+        );
+    });
+}
+
+#[test]
+fn slash_skill_selection_uses_the_active_cli_native_prefix() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Codex);
+        terminal.update(&mut app, |view, ctx| {
+            view.input.update(ctx, |input, ctx| {
+                input.handle_slash_commands_menu_event(
+                    &crate::terminal::input::slash_commands::SlashCommandsEvent::SelectedSkill {
+                        name: "review-local".to_owned(),
+                        reference: ai::skills::SkillReference::BundledSkillId(
+                            "review-local".to_owned(),
+                        ),
                     },
                     ctx,
                 );
             });
-
-            view.handle_use_agent_footer_event(
-                &UseAgentToolbarEvent::InsertIntoCLIPty("line1\nline2".to_owned()),
-                ctx,
-            );
         });
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "$review-local ")
+        });
+    });
+}
 
-        let writes = pty_writes.borrow();
+#[test]
+fn native_notification_authorization_opens_manual_steps_without_writing_to_cli() {
+    use crate::ai::blocklist::agent_view::agent_input_footer::AgentInputFooterAction;
+    use crate::terminal::cli_agent_sessions::plugin_manager::PluginModalKind;
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| crate::workspace::ToastStack);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        let opened = Rc::new(RefCell::new(Vec::new()));
+        let captured = opened.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::OpenPluginInstructionsPane(agent, kind) = event {
+                    captured.borrow_mut().push((*agent, *kind));
+                }
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Codex, ctx);
+            let footer = view.use_agent_footer.as_ref(ctx).agent_input_footer.clone();
+            footer.update(ctx, |footer, ctx| {
+                footer.handle_action(
+                    &AgentInputFooterAction::OpenNativeAuthorizationInstructions,
+                    ctx,
+                );
+            });
+        });
         assert_eq!(
-            writes.len(),
-            1,
-            "voice transcription should be inserted without a separate submit"
+            *opened.borrow(),
+            vec![(CLIAgent::Codex, PluginModalKind::NativeAuthorization)]
         );
-
-        let mut expected_paste =
-            Vec::with_capacity(BRACKETED_PASTE_START.len() + 11 + BRACKETED_PASTE_END.len());
-        expected_paste.extend_from_slice(BRACKETED_PASTE_START);
-        expected_paste.extend_from_slice(b"line1\nline2");
-        expected_paste.extend_from_slice(BRACKETED_PASTE_END);
-        assert_eq!(writes[0], expected_paste);
-    })
+        assert!(writes.borrow().is_empty());
+    });
 }

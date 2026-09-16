@@ -238,6 +238,40 @@ diesel::table! {
 }
 
 diesel::table! {
+    local_cli_messages (sequence) {
+        sequence -> Integer,
+        message_id -> Text,
+        sender_task_id -> Text,
+        recipient_task_id -> Text,
+        sender_generation -> BigInt,
+        recipient_generation -> BigInt,
+        state -> Text,
+        data -> Text,
+    }
+}
+
+diesel::table! {
+    local_cli_task_generations (task_id, generation) {
+        task_id -> Text,
+        generation -> BigInt,
+        data -> Text,
+    }
+}
+
+diesel::table! {
+    local_cli_tasks (task_id) {
+        task_id -> Text,
+        parent_task_id -> Nullable<Text>,
+        harness -> Text,
+        native_session_id -> Nullable<Text>,
+        generation -> BigInt,
+        revision -> BigInt,
+        state -> Text,
+        data -> Text,
+    }
+}
+
+diesel::table! {
     mcp_environment_variables (mcp_server_uuid) {
         mcp_server_uuid -> Binary,
         environment_variables -> Text,
@@ -619,6 +653,7 @@ diesel::joinable!(code_pane_tabs -> code_panes (code_pane_id));
 diesel::joinable!(infinishell_project_repositories -> infinishell_projects (project_id));
 diesel::joinable!(infinishell_project_repository_servers -> infinishell_project_repositories (repository_id));
 diesel::joinable!(infinishell_project_servers -> infinishell_projects (project_id));
+diesel::joinable!(local_cli_task_generations -> local_cli_tasks (task_id));
 diesel::joinable!(object_permissions -> object_metadata (object_metadata_id));
 diesel::joinable!(pane_branches -> pane_nodes (pane_node_id));
 diesel::joinable!(pane_leaves -> pane_nodes (pane_node_id));
@@ -653,6 +688,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     infinishell_project_servers,
     infinishell_projects,
 );
+diesel::allow_tables_to_appear_in_same_query!(local_cli_task_generations, local_cli_tasks,);
 diesel::allow_tables_to_appear_in_same_query!(object_metadata, object_permissions,);
 diesel::allow_tables_to_appear_in_same_query!(
     ssh_nodes,

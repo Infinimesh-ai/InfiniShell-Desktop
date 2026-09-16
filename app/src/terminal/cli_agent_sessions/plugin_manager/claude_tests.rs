@@ -44,6 +44,44 @@ fn installed_when_plugin_present() {
 }
 
 #[test]
+fn explicitly_disabled_plugin_is_not_active() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("plugins")).unwrap();
+    fs::write(
+        dir.path().join("plugins/installed_plugins.json"),
+        r#"{"plugins":{"warp@claude-code-warp":[{"version":"2.1.0"}]}}"#,
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("settings.json"),
+        r#"{"enabledPlugins":{"warp@claude-code-warp":false},"theme":"dark"}"#,
+    )
+    .unwrap();
+    assert!(!check_installed(dir.path()));
+    assert!(super::check_plugin_disabled(
+        dir.path(),
+        "warp@claude-code-warp"
+    ));
+    assert_eq!(
+        fs::read_to_string(dir.path().join("settings.json")).unwrap(),
+        r#"{"enabledPlugins":{"warp@claude-code-warp":false},"theme":"dark"}"#
+    );
+}
+
+#[test]
+fn update_instructions_preserve_marketplace_registration() {
+    let instructions = &super::UPDATE_INSTRUCTIONS;
+    assert_eq!(
+        instructions.steps[0].command,
+        "claude plugin marketplace update claude-code-warp"
+    );
+    assert_eq!(
+        instructions.steps[1].command,
+        "claude plugin update warp@claude-code-warp"
+    );
+}
+
+#[test]
 fn local_marketplace_override_detects_directory_source() {
     let dir = tempfile::tempdir().unwrap();
     let settings = serde_json::json!({
@@ -416,4 +454,26 @@ fn installed_version_returns_none_when_no_version_field() {
 fn installed_version_returns_none_when_file_missing() {
     let dir = tempfile::tempdir().unwrap();
     assert_eq!(installed_version(dir.path()), None);
+}
+
+#[test]
+fn remote_install_instructions_include_installation_instead_of_local_enable_only() {
+    let instructions = ClaudeCodePluginManager::new(None, None, None).remote_install_instructions();
+    assert!(std::ptr::eq(instructions, &*super::INSTALL_INSTRUCTIONS));
+    assert_eq!(
+        instructions.steps[0].command,
+        "claude plugin marketplace add warpdotdev/claude-code-warp"
+    );
+    assert!(
+        instructions
+            .steps
+            .iter()
+            .any(|step| step.command == "claude plugin install warp@claude-code-warp")
+    );
+    assert!(
+        !instructions
+            .steps
+            .iter()
+            .any(|step| step.command == "claude plugin enable warp@claude-code-warp")
+    );
 }

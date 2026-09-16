@@ -82,9 +82,12 @@ fn harness_snapshot_marks_missing_local_cli_disabled_and_sorts_last() {
         Harness::Claude => LocalHarnessSetupState::MissingHarness {
             tooltip: "Install Claude Code to use this local harness.",
         },
-        Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Codex | Harness::Unknown => {
-            LocalHarnessSetupState::Ready
-        }
+        Harness::Oz
+        | Harness::OpenCode
+        | Harness::Gemini
+        | Harness::Codex
+        | Harness::Grok
+        | Harness::Unknown => LocalHarnessSetupState::Ready,
     };
 
     let snapshot = build_harness_snapshot(entries, "oz", None, true, &setup);

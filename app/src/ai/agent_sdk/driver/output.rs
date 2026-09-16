@@ -250,7 +250,8 @@ pub mod text {
                 AIAgentActionResultType::TransferShellCommandControlToUser { .. } => Ok(()),
                 AIAgentActionResultType::AskUserQuestion(_) => Ok(()),
                 // 子 agent 编排的结果由 orchestration 侧自行呈现,SDK 输出不重复展开。
-                AIAgentActionResultType::RunAgents(_)
+                AIAgentActionResultType::SendMessageToAgent(_)
+                | AIAgentActionResultType::RunAgents(_)
                 | AIAgentActionResultType::WaitForEvents(_) => Ok(()),
             },
         }
@@ -344,7 +345,9 @@ pub mod text {
                     }
                     AIAgentActionType::AskUserQuestion { .. } => (),
                     // 多智能体编排动作在无头 SDK 输出流里不做人类可读呈现。
-                    AIAgentActionType::RunAgents(_) | AIAgentActionType::WaitForEvents { .. } => (),
+                    AIAgentActionType::SendMessageToAgent { .. }
+                    | AIAgentActionType::RunAgents(_)
+                    | AIAgentActionType::WaitForEvents { .. } => (),
                 },
                 AIAgentOutputMessageType::TodoOperation(operation) => match operation {
                     TodoOperation::UpdateTodos { todos } => {
@@ -950,9 +953,9 @@ pub mod json {
                     | AIAgentActionType::TransferShellCommandControlToUser { .. } => None,
                     AIAgentActionType::AskUserQuestion { .. } => None,
                     // 多智能体编排动作不映射为 SDK JSON 工具调用。
-                    AIAgentActionType::RunAgents(_) | AIAgentActionType::WaitForEvents { .. } => {
-                        None
-                    }
+                    AIAgentActionType::SendMessageToAgent { .. }
+                    | AIAgentActionType::RunAgents(_)
+                    | AIAgentActionType::WaitForEvents { .. } => None,
                 },
                 AIAgentOutputMessageType::TodoOperation(operation) => match operation {
                     TodoOperation::UpdateTodos { todos } => Some(JsonMessage::UpdateTodos {

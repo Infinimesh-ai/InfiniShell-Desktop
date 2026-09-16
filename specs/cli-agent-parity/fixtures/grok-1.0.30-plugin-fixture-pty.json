@@ -1,0 +1,18 @@
+{
+  "platform": "macOS arm64",
+  "method": "在真实控制 PTY 内运行随附 Node 插件，回放已采集的 Grok 原生 hook；不运行模型。",
+  "exit_code": 0,
+  "notifications": [
+    {
+      "v": 1,
+      "agent": "grok",
+      "event": "session_start",
+      "session_id": "01a0a8cc-e60f-7423-9884-797ba1f9a0fe",
+      "cwd": "<probe-project>",
+      "project": "<probe-project>/",
+      "plugin_version": "0.1.0",
+      "event_id": "grok:107a7bdad4cdaa440d9fb195a7915f092845116c9c657dbb31a5bc7cae863bdc"
+    }
+  ],
+  "fixture_cli_version": "1.0.30"
+}

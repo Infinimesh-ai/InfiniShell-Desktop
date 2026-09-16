@@ -773,6 +773,11 @@ pub fn run() -> Result<()> {
 /// Runs a parsed Warp worker command.
 fn run_worker_command(worker: &warp_cli::WorkerCommand) -> Result<()> {
     match worker {
+        #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+        warp_cli::WorkerCommand::CliAgentSupervisor { manifest, execute } => {
+            crate::ai::cli_agent_runtime::managed_process::run_worker(manifest, *execute)
+                .map_err(Into::into)
+        }
         #[cfg(all(feature = "local_tty", unix))]
         warp_cli::WorkerCommand::TerminalServer(args) => {
             crate::terminal::local_tty::server::run_terminal_server(args);
@@ -2067,8 +2072,24 @@ pub(crate) fn initialize_app(
     // loads metadata.
     ctx.add_singleton_model(|_| RestoredAgentConversations::new());
     ctx.add_singleton_model(|_| CLIAgentSessionsModel::new());
+    #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+    {
+        // 写线程已创建，但其单例稍后才注册；这里复用当前初始化持有的发送端。
+        let sender = persistence_writer.sender();
+        ctx.add_singleton_model(|_| {
+            ai::cli_agent_runtime::coordinator::LocalCLITaskCoordinator::new(sender)
+        });
+    }
+    #[cfg(feature = "local_fs")]
+    if let Some(sender) = persistence_writer.sender() {
+        CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+            sessions.restore_local_tasks(sender, ctx);
+        });
+    }
     ctx.add_singleton_model(BlocklistAIPermissions::new);
     ctx.add_singleton_model(ai::blocklist::orchestration_events::OrchestrationEventService::new);
+    #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+    ctx.add_singleton_model(ai::cli_agent_runtime::conversation_bridge::LocalCLIConversationBridge::new);
     // Zap:上游在这里还注册 `LocalAgentTaskSyncModel` 与 `OrchestrationEventStreamer`
     // 两个单例。它们分别依赖已删除的 `warp_graphql` 与云端 `server_api`
     // (`ServerApiProvider`),在本地优先形态下整条链路已下线,故不再注册。

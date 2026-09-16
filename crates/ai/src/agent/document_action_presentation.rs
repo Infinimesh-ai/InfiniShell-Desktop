@@ -116,6 +116,7 @@ impl DocumentActionPresentation {
                 | AIAgentActionType::ReadSkill(_)
                 | AIAgentActionType::TransferShellCommandControlToUser { .. }
                 | AIAgentActionType::AskUserQuestion { .. }
+                | AIAgentActionType::SendMessageToAgent { .. }
                 | AIAgentActionType::RunAgents(_)
                 | AIAgentActionType::WaitForEvents { .. },
                 _,

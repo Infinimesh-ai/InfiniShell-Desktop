@@ -1,0 +1,62 @@
+{
+  "kind": "upstream_script_replay",
+  "native_cli_hook_capture": false,
+  "records": [
+    {
+      "agent": "claude",
+      "plugin_version": "2.2.0",
+      "upstream_commit": "8c28e936ae51cbb23a1a5657fca2bfd30cf06f12",
+      "source": "actual upstream Bash builder with schema-constructed fixture input; not a captured CLI hook",
+      "input": {
+        "session_id": "fixture-session",
+        "prompt_id": "fixture-native-round",
+        "cwd": "/fixture/project"
+      },
+      "upstream_output": {
+        "v": 1,
+        "agent": "claude",
+        "event": "stop",
+        "session_id": "fixture-session",
+        "cwd": "/fixture/project",
+        "project": "project"
+      },
+      "patched_output": {
+        "v": 1,
+        "agent": "claude",
+        "event": "stop",
+        "session_id": "fixture-session",
+        "cwd": "/fixture/project",
+        "project": "project",
+        "prompt_id": "fixture-native-round"
+      }
+    },
+    {
+      "agent": "codex",
+      "plugin_version": "0.4.0",
+      "upstream_commit": "31ce59d9011cfb1d78f265649a228dac5de58d76",
+      "source": "actual upstream Bash builder with schema-constructed fixture input; not a captured CLI hook",
+      "input": {
+        "session_id": "fixture-session",
+        "turn_id": "fixture-native-round",
+        "cwd": "/fixture/project"
+      },
+      "upstream_output": {
+        "v": 1,
+        "agent": "codex",
+        "event": "stop",
+        "session_id": "fixture-session",
+        "cwd": "/fixture/project",
+        "project": "project"
+      },
+      "patched_output": {
+        "v": 1,
+        "agent": "codex",
+        "event": "stop",
+        "session_id": "fixture-session",
+        "cwd": "/fixture/project",
+        "project": "project",
+        "turn_id": "fixture-native-round"
+      }
+    }
+  ]
+}

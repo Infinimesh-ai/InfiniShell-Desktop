@@ -20,7 +20,6 @@ use diesel::{
 use diesel_migrations::MigrationHarness;
 use instant::Instant;
 use itertools::Itertools;
-use libsqlite3_sys as sqlite3;
 use num_traits::FromPrimitive;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
@@ -29,10 +28,10 @@ use prost::Message;
 use uuid::Uuid;
 use warp_core::features::FeatureFlag;
 use warp_errors::{report_error, report_if_error};
-use warp_multi_agent_api as api;
 use warpui::platform::FullscreenState;
 use warpui::windowing::{MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH};
 use warpui::{AppContext, SingletonEntity};
+use {libsqlite3_sys as sqlite3, warp_multi_agent_api as api};
 
 use super::agent::{
     MAX_TASK_BLOB_BYTES, backfill_conversation_summaries, delete_agent_conversations,
@@ -874,12 +873,18 @@ fn start_writer(conn: SqliteConnection, database_path: PathBuf) -> Result<Writer
                         }
                         event => {
                             if paused {
-                                if let ModelEvent::CheckpointMultiAgentConversation {
-                                    completion,
-                                    ..
-                                } = event
-                                {
-                                    let _ = completion.send(Err("SQLite 写入器已暂停".to_owned()));
+                                match event {
+                                    ModelEvent::CheckpointMultiAgentConversation {
+                                        completion,
+                                        ..
+                                    } => {
+                                        let _ =
+                                            completion.send(Err("SQLite 写入器已暂停".to_owned()));
+                                    }
+                                    ModelEvent::LocalCliPersistence(request) => {
+                                        super::local_cli_tasks::reject_request(request);
+                                    }
+                                    _ => {}
                                 }
                                 log::info!("Ignoring event as SQLite Writer is on pause");
                                 continue;
@@ -962,6 +967,9 @@ fn handle_model_event_with_conversation_revisions(
 
 fn handle_model_event(event: ModelEvent, connection: &mut SqliteConnection) -> anyhow::Result<()> {
     match event {
+        ModelEvent::LocalCliPersistence(request) => {
+            super::local_cli_tasks::handle_request(request, connection)
+        }
         ModelEvent::PauseAndRemoveDatabase
         | ModelEvent::ReconstructAndResume
         | ModelEvent::Terminate => {

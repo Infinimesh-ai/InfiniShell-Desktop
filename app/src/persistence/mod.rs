@@ -3,6 +3,7 @@
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {
         pub mod agent;
+        pub(crate) mod local_cli_tasks;
         mod block_list;
         mod cloud_objects;
         mod sqlite;
@@ -445,6 +446,8 @@ pub enum ModelEvent {
         conversation_data: AgentConversationData,
         completion: oneshot::Sender<Result<(), String>>,
     },
+    #[cfg(feature = "local_fs")]
+    LocalCliPersistence(local_cli_tasks::LocalCliPersistenceRequest),
     /// Persists read-time-derived conversation summaries for rows written
     /// before the `summary` column existed.
     BackfillConversationSummaries {

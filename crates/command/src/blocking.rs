@@ -94,6 +94,35 @@ impl Command {
         }
     }
 
+    /// 只供托管监督者派生等待授权的 worker；普通命令保持原有行为。
+    pub fn new_with_managed_process_group<S: AsRef<OsStr>>(program: S) -> Command {
+        let mut command = Self::new(program);
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt as _;
+            command.inner.process_group(0);
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt as _;
+            // worker 随后在授权执行之前赋予专属 Job，不能继承应用的退出时机。
+            command.inner.creation_flags(
+                windows::Win32::System::Threading::CREATE_NO_WINDOW.0
+                    | windows::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB.0,
+            );
+        }
+        command
+    }
+
+    /// 已被专属 Job 管理的 worker 派生真实 CLI 时禁止脱离该 Job。
+    #[cfg(windows)]
+    pub fn inherit_managed_job(&mut self) -> &mut Self {
+        use std::os::windows::process::CommandExt as _;
+        self.inner
+            .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
+        self
+    }
+
     #[cfg(windows)]
     /// Sets the [process creation flags][1] to be passed to `CreateProcess`.
     ///

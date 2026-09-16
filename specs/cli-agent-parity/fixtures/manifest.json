@@ -1,0 +1,75 @@
+{
+  "captured_at": "2026-09-16",
+  "platform": "macOS arm64",
+  "provenance": "真实 CLI 协议证据及标明来源的随附插件回放；个人路径、主机、账户和临时目录已脱敏；模型错误未模拟。",
+  "files": {
+    "claude-2.1.273-authentication-error.ndjson": {
+      "sha256": "682cc7ade45cdca6126052db97ff040c3e0c39cc1399b8e339a68c825b442d56",
+      "bytes": 22489
+    },
+    "claude-2.1.273-missing-resume.ndjson": {
+      "sha256": "af0dbfd9e3be77df8da125d2001275aa42fdfb0ae3400e56e315ac23939b3b23",
+      "bytes": 1168
+    },
+    "codex-0.147.0-approvals-race-resume.ndjson": {
+      "sha256": "0dfabea17ec05adc3ad4fa116687c7cf0b2a2fb6c8ec975d65cf59c34743f348",
+      "bytes": 59702
+    },
+    "codex-0.147.0-handshake.ndjson": {
+      "sha256": "7bbbef1084f16e2ff84af42083a7a8caa555f11ba79df4932e7fbe04ad289b25",
+      "bytes": 3541
+    },
+    "codex-0.147.0-schema-contract.json": {
+      "sha256": "7e95d7cca03d8ff18544d164a8e6ec37af26d998fce3bc111b441ffddab50ebf",
+      "bytes": 12640
+    },
+    "codex-0.147.0-steer-cancel-resume.ndjson": {
+      "sha256": "471ba07a0088930791b4f571be9bd43c03342a5f085b2c3d5795af0860934024",
+      "bytes": 16488
+    },
+    "codex-0.147.0-two-turns.ndjson": {
+      "sha256": "894cf5c269b736d0cd1d9e56bdacafab7aeb26439d1a27da92b250eb1cac6816",
+      "bytes": 15093
+    },
+    "grok-1.0.30-authenticated-quota-error.ndjson": {
+      "sha256": "0c62a817e60feed5ce31b363903afd64ab9852c869a3284d11d6d532459ceb06",
+      "bytes": 36945
+    },
+    "grok-1.0.30-bundled-plugin-pty.json": {
+      "sha256": "71e69f28b4f320ca3c2ee4c20e99db3aaa02e327315af4a8fd9cf6fa477826fa",
+      "bytes": 244
+    },
+    "grok-1.0.30-empty-session-recovery.ndjson": {
+      "sha256": "b6152ef9cc1eac7b05918e7b5d6fa8beaabe8002926cc0bcf81533ffb9180398",
+      "bytes": 55736
+    },
+    "grok-1.0.30-handshake.ndjson": {
+      "sha256": "9562e9cc6283c369b5619515f6ff5d60646fcf1cd7117e1bceffbe6141fc87d9",
+      "bytes": 6887
+    },
+    "grok-1.0.30-hook-inheritance-0.json": {
+      "sha256": "515c23bbb38ce53b3371a43bd0c241365d306e886962a282bcbaff4e984e792b",
+      "bytes": 3015
+    },
+    "grok-1.0.30-hook-inheritance-1.json": {
+      "sha256": "bf0cb5a786eced0858abb3c2329e8a30a8c6c8bc0ab94c48192ee22393b0e22a",
+      "bytes": 2890
+    },
+    "grok-1.0.30-hooks.ndjson": {
+      "sha256": "87f2e3f3092f2079fae0f425a92e043045660a218ad6aed7530991192cddb763",
+      "bytes": 9095
+    },
+    "grok-1.0.30-plugin-fixture-pty.json": {
+      "sha256": "23578d72cb3d1ca9bc3e5bbc81d6a3c3cd70aad61b65e7343b32a851863f35f1",
+      "bytes": 566
+    },
+    "grok-1.0.30-plugin-install-update.json": {
+      "sha256": "b035440dd18a95c1a0e920802e95688df674dc8f0847bf51f2b769ae791a8c31",
+      "bytes": 7333
+    },
+    "grok-1.0.30-plugin-transaction.json": {
+      "sha256": "67eec6ff6d16282d56918eae5b86a89f20d3f9b7da30cf4a0a70f040c02e45d0",
+      "bytes": 4190
+    }
+  }
+}

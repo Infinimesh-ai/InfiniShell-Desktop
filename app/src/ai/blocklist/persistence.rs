@@ -358,7 +358,9 @@ impl From<&AIAgentActionType> for PersistedAIAgentActionType {
             },
             // RunAgents 由历史里的 tool call message 渲染,没有需要本地持久化的
             // per-action 状态。
-            AIAgentActionType::RunAgents(_) => Self::NotPersisted,
+            AIAgentActionType::RunAgents(_) | AIAgentActionType::SendMessageToAgent { .. } => {
+                Self::NotPersisted
+            }
             // 重启后等待被丢弃;未决的 tool call 会以孤儿形式留在 transcript 里,
             // 直到下一次出站请求触发服务端 supersede。
             AIAgentActionType::WaitForEvents { .. } => Self::NotPersisted,

@@ -281,7 +281,11 @@ pub fn prepare_remote_child_launch(
                 claude_auth_secret_name: None,
                 codex_auth_secret_name: Some(name),
             }),
-            Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Unknown => None,
+            Harness::Oz
+            | Harness::OpenCode
+            | Harness::Gemini
+            | Harness::Grok
+            | Harness::Unknown => None,
         });
     // Zap:本地 `SpawnAgentRequest` 不带云端字段(mode / conversation_id /
     // initial_snapshot_token / agent_identity_uid / snapshot_disabled /
@@ -383,18 +387,18 @@ fn resolve_runtime_skills(
     let mut unresolved_references = Vec::new();
     for reference in skill_references {
         if let Some(skill) = skill_manager.active_skill_by_reference(reference, ctx) {
-            runtime_skills.push(
-                BASE64_STANDARD.encode(multi_agent_api::Skill::from(skill.clone()).encode_to_vec()),
-            );
+            match multi_agent_api::Skill::try_from(skill.clone()) {
+                Ok(skill) => runtime_skills.push(BASE64_STANDARD.encode(skill.encode_to_vec())),
+                Err(error) => unresolved_references.push(format!("{reference} ({error})")),
+            }
             continue;
         }
 
         match resolve_repo_qualified_skill(reference, working_dir, ctx) {
-            Some(Ok(skill)) => {
-                runtime_skills.push(
-                    BASE64_STANDARD.encode(multi_agent_api::Skill::from(skill).encode_to_vec()),
-                );
-            }
+            Some(Ok(skill)) => match multi_agent_api::Skill::try_from(skill) {
+                Ok(skill) => runtime_skills.push(BASE64_STANDARD.encode(skill.encode_to_vec())),
+                Err(error) => unresolved_references.push(format!("{reference} ({error})")),
+            },
             Some(Err(error)) => {
                 unresolved_references.push(format!("{reference} ({error})"));
             }

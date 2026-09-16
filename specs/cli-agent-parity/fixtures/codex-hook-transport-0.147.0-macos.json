@@ -1,0 +1,1327 @@
+{
+  "passed": true,
+  "codex_version": "0.147.0",
+  "codex_source_commit": "be6e8eac029b183056b7e4402879f15d2c85f61b",
+  "executable_sha256": "19c4f144c5226a9f17c58e6f0fa854843b0f77a6eb420f40e2745a12f10f5d37",
+  "host_os": "darwin",
+  "credentials_provided": false,
+  "model_input_submitted": true,
+  "model_generation_verified": false,
+  "full_lifecycle_verified": false,
+  "gui_receiver_verified": false,
+  "commands": [
+    {
+      "arguments": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "codex-cli 0.147.0\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "<PROBE_ROOT>/marketplace",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"infinishell-transport-probe\",\n  \"installedRoot\": \"<PROBE_ROOT>/marketplace\",\n  \"alreadyAdded\": false\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "transport-probe@infinishell-transport-probe",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"transport-probe@infinishell-transport-probe\",\n  \"name\": \"transport-probe\",\n  \"marketplaceName\": \"infinishell-transport-probe\",\n  \"version\": \"0.1.0\",\n  \"installedPath\": \"<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "traces": [
+    {
+      "phase": "native_authorization",
+      "events": [
+        {
+          "channel": "request",
+          "value": {
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "clientInfo": {
+                "name": "infinishell_hook_transport_probe",
+                "version": "0.1.0"
+              },
+              "capabilities": {
+                "experimentalApi": true
+              }
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_hook_transport_probe/0.147.0 (Mac OS 27.0.0; arm64) WarpTerminal (infinishell_hook_transport_probe; 0.1.0)",
+              "codexHome": "<PROBE_ROOT>/codex",
+              "platformFamily": "unix",
+              "platformOs": "macos"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "MacBookPro16",
+              "installationId": "cee88762-d783-4020-b6e3-a4451e5c3306",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789561039050
+          }
+        },
+        {
+          "channel": "request",
+          "value": {
+            "method": "initialized"
+          }
+        },
+        {
+          "channel": "request",
+          "value": {
+            "id": 2,
+            "method": "hooks/list",
+            "params": {
+              "cwds": [
+                "<PROBE_ROOT>"
+              ]
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 2,
+            "result": {
+              "data": [
+                {
+                  "cwd": "<PROBE_ROOT>",
+                  "hooks": [
+                    {
+                      "key": "transport-probe@infinishell-transport-probe:hooks/hooks.json:session_start:0:0",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_HOOK_TRANSPORT_PYTHON\" \"$PLUGIN_ROOT/transport_probe.py\" diagnostic",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "transport-probe@infinishell-transport-probe",
+                      "displayOrder": 0,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:6fd14e44bdb8911097e305e99b63b20358d0251188b6cc7f8448d3f3bff3611b",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "transport-probe@infinishell-transport-probe:hooks/hooks.json:session_start:0:1",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_HOOK_TRANSPORT_PYTHON\" \"$PLUGIN_ROOT/transport_probe.py\" reference",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "transport-probe@infinishell-transport-probe",
+                      "displayOrder": 1,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:cbccb0d7c2558f0ac9874544e87459f8fbb7d6b93812eabada2a8a3a960039e5",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "transport-probe@infinishell-transport-probe:hooks/hooks.json:user_prompt_submit:0:0",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_HOOK_TRANSPORT_PYTHON\" \"$PLUGIN_ROOT/transport_probe.py\" diagnostic",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "transport-probe@infinishell-transport-probe",
+                      "displayOrder": 2,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:ebdc90a43ad1d64fba4aa8df1f429bb6b9794430880648102c9935025be0de35",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "transport-probe@infinishell-transport-probe:hooks/hooks.json:user_prompt_submit:0:1",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_HOOK_TRANSPORT_PYTHON\" \"$PLUGIN_ROOT/transport_probe.py\" reference",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "transport-probe@infinishell-transport-probe",
+                      "displayOrder": 3,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:723c6dd2dc67adf3a298abd90a5ca5140a40b8a92829eb0826320a06b426cec5",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "transport-probe@infinishell-transport-probe:hooks/hooks.json:user_prompt_submit:0:2",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_HOOK_TRANSPORT_PYTHON\" \"$PLUGIN_ROOT/transport_probe.py\" block",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "transport-probe@infinishell-transport-probe",
+                      "displayOrder": 4,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:7d0e8a18dd3d5fedaf270f3568e95b0d41e63870dda9208649de0ad0d6d7d8c5",
+                      "trustStatus": "untrusted"
+                    }
+                  ],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "channel": "request",
+          "value": {
+            "id": 10,
+            "method": "config/value/write",
+            "params": {
+              "keyPath": "hooks.state.\"transport-probe@infinishell-transport-probe:hooks/hooks.json:session_start:0:0\"",
+              "value": {
+                "enabled": true,
+                "trusted_hash": "sha256:6fd14e44bdb8911097e305e99b63b20358d0251188b6cc7f8448d3f3bff3611b"
+              },
+              "mergeStrategy": "upsert",
+              "filePath": "<PROBE_ROOT>/codex/config.toml"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 10,
+            "result": {
+              "status": "ok",
+              "version": "sha256:7a3f7f735d2333060f09f323bb00fe96858e48879e2fa85e5465069af1f399ae",
+              "filePath": "<PROBE_ROOT>/codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        },
+        {
+          "channel": "request",
+          "value": {
+            "id": 11,
+            "method": "config/value/write",
+            "params": {
+              "keyPath": "hooks.state.\"transport-probe@infinishell-transport-probe:hooks/hooks.json:session_start:0:1\"",
+              "value": {
+                "enabled": true,
+                "trusted_hash": "sha256:cbccb0d7c2558f0ac9874544e87459f8fbb7d6b93812eabada2a8a3a960039e5"
+              },
+              "mergeStrategy": "upsert",
+              "filePath": "<PROBE_ROOT>/codex/config.toml"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 11,
+            "result": {
+              "status": "ok",
+              "version": "sha256:b9d218338f348033c0ac43ab832740409722aedde4c18a544456239b88f49bde",
+              "filePath": "<PROBE_ROOT>/codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        },
+        {
+          "channel": "request",
+          "value": {
+            "id": 12,
+            "method": "config/value/write",
+            "params": {
+              "keyPath": "hooks.state.\"transport-probe@infinishell-transport-probe:hooks/hooks.json:user_prompt_submit:0:0\"",
+              "value": {
+                "enabled": true,
+                "trusted_hash": "sha256:ebdc90a43ad1d64fba4aa8df1f429bb6b9794430880648102c9935025be0de35"
+              },
+              "mergeStrategy": "upsert",
+              "filePath": "<PROBE_ROOT>/codex/config.toml"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 12,
+            "result": {
+              "status": "ok",
+              "version": "sha256:913f9e073408e9de7b55fc63e57f090f155ba5f7f0308e8f459d9cd704f6330f",
+              "filePath": "<PROBE_ROOT>/codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        },
+        {
+          "channel": "request",
+          "value": {
+            "id": 13,
+            "method": "config/value/write",
+            "params": {
+              "keyPath": "hooks.state.\"transport-probe@infinishell-transport-probe:hooks/hooks.json:user_prompt_submit:0:1\"",
+              "value": {
+                "enabled": true,
+                "trusted_hash": "sha256:723c6dd2dc67adf3a298abd90a5ca5140a40b8a92829eb0826320a06b426cec5"
+              },
+              "mergeStrategy": "upsert",
+              "filePath": "<PROBE_ROOT>/codex/config.toml"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 13,
+            "result": {
+              "status": "ok",
+              "version": "sha256:8444c97aa5f602bd57067c6050bba98e964e74a8d092aafd3096a6092ccf5fa9",
+              "filePath": "<PROBE_ROOT>/codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        },
+        {
+          "channel": "request",
+          "value": {
+            "id": 14,
+            "method": "config/value/write",
+            "params": {
+              "keyPath": "hooks.state.\"transport-probe@infinishell-transport-probe:hooks/hooks.json:user_prompt_submit:0:2\"",
+              "value": {
+                "enabled": true,
+                "trusted_hash": "sha256:7d0e8a18dd3d5fedaf270f3568e95b0d41e63870dda9208649de0ad0d6d7d8c5"
+              },
+              "mergeStrategy": "upsert",
+              "filePath": "<PROBE_ROOT>/codex/config.toml"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 14,
+            "result": {
+              "status": "ok",
+              "version": "sha256:18b81dd193232d4718c001dd1fe5aba097aad4e998d572790af950b04db90b19",
+              "filePath": "<PROBE_ROOT>/codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "phase": "native_controlled_pty",
+      "events": [
+        {
+          "channel": "request",
+          "value": {
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "clientInfo": {
+                "name": "infinishell_hook_transport_probe",
+                "version": "0.1.0"
+              },
+              "capabilities": {
+                "experimentalApi": true
+              }
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_hook_transport_probe/0.147.0 (Mac OS 27.0.0; arm64) WarpTerminal (infinishell_hook_transport_probe; 0.1.0)",
+              "codexHome": "<PROBE_ROOT>/codex",
+              "platformFamily": "unix",
+              "platformOs": "macos"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "MacBookPro16",
+              "installationId": "cee88762-d783-4020-b6e3-a4451e5c3306",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789561039123
+          }
+        },
+        {
+          "channel": "request",
+          "value": {
+            "method": "initialized"
+          }
+        },
+        {
+          "channel": "request",
+          "value": {
+            "id": 2,
+            "method": "hooks/list",
+            "params": {
+              "cwds": [
+                "<PROBE_ROOT>"
+              ]
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 2,
+            "result": {
+              "data": [
+                {
+                  "cwd": "<PROBE_ROOT>",
+                  "hooks": [
+                    {
+                      "key": "transport-probe@infinishell-transport-probe:hooks/hooks.json:session_start:0:0",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_HOOK_TRANSPORT_PYTHON\" \"$PLUGIN_ROOT/transport_probe.py\" diagnostic",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "transport-probe@infinishell-transport-probe",
+                      "displayOrder": 0,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:6fd14e44bdb8911097e305e99b63b20358d0251188b6cc7f8448d3f3bff3611b",
+                      "trustStatus": "trusted"
+                    },
+                    {
+                      "key": "transport-probe@infinishell-transport-probe:hooks/hooks.json:session_start:0:1",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_HOOK_TRANSPORT_PYTHON\" \"$PLUGIN_ROOT/transport_probe.py\" reference",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "transport-probe@infinishell-transport-probe",
+                      "displayOrder": 1,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:cbccb0d7c2558f0ac9874544e87459f8fbb7d6b93812eabada2a8a3a960039e5",
+                      "trustStatus": "trusted"
+                    },
+                    {
+                      "key": "transport-probe@infinishell-transport-probe:hooks/hooks.json:user_prompt_submit:0:0",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_HOOK_TRANSPORT_PYTHON\" \"$PLUGIN_ROOT/transport_probe.py\" diagnostic",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "transport-probe@infinishell-transport-probe",
+                      "displayOrder": 2,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:ebdc90a43ad1d64fba4aa8df1f429bb6b9794430880648102c9935025be0de35",
+                      "trustStatus": "trusted"
+                    },
+                    {
+                      "key": "transport-probe@infinishell-transport-probe:hooks/hooks.json:user_prompt_submit:0:1",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_HOOK_TRANSPORT_PYTHON\" \"$PLUGIN_ROOT/transport_probe.py\" reference",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "transport-probe@infinishell-transport-probe",
+                      "displayOrder": 3,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:723c6dd2dc67adf3a298abd90a5ca5140a40b8a92829eb0826320a06b426cec5",
+                      "trustStatus": "trusted"
+                    },
+                    {
+                      "key": "transport-probe@infinishell-transport-probe:hooks/hooks.json:user_prompt_submit:0:2",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_HOOK_TRANSPORT_PYTHON\" \"$PLUGIN_ROOT/transport_probe.py\" block",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "transport-probe@infinishell-transport-probe",
+                      "displayOrder": 4,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:7d0e8a18dd3d5fedaf270f3568e95b0d41e63870dda9208649de0ad0d6d7d8c5",
+                      "trustStatus": "trusted"
+                    }
+                  ],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "channel": "request",
+          "value": {
+            "id": 3,
+            "method": "thread/start",
+            "params": {
+              "cwd": "<PROBE_ROOT>",
+              "ephemeral": false,
+              "sessionStartSource": "startup",
+              "sandbox": "read-only",
+              "approvalPolicy": "on-request",
+              "modelProvider": "local_hook_transport_probe"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 3,
+            "result": {
+              "thread": {
+                "id": "01a0aa26-691d-7353-be78-afcd8dadad04",
+                "extra": null,
+                "sessionId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+                "forkedFromId": null,
+                "parentThreadId": null,
+                "preview": "",
+                "ephemeral": false,
+                "section": null,
+                "sectionEnteredAt": null,
+                "historyMode": "legacy",
+                "modelProvider": "local_hook_transport_probe",
+                "createdAt": 1789561039,
+                "updatedAt": 1789561039,
+                "recencyAt": 1789561039,
+                "status": {
+                  "type": "idle"
+                },
+                "path": "<PROBE_ROOT>/codex/sessions/2026/09/16/rollout-2026-09-16T20-17-19-01a0aa26-691d-7353-be78-afcd8dadad04.jsonl",
+                "cwd": "<PROBE_ROOT>",
+                "cliVersion": "0.147.0",
+                "source": "vscode",
+                "canAcceptDirectInput": true,
+                "threadSource": null,
+                "agentNickname": null,
+                "agentRole": null,
+                "gitInfo": null,
+                "name": null,
+                "turns": []
+              },
+              "model": "gpt-5.4",
+              "modelProvider": "local_hook_transport_probe",
+              "serviceTier": null,
+              "cwd": "<PROBE_ROOT>",
+              "runtimeWorkspaceRoots": [
+                "<PROBE_ROOT>"
+              ],
+              "instructionSources": [],
+              "approvalPolicy": "on-request",
+              "approvalsReviewer": "user",
+              "sandbox": {
+                "type": "readOnly",
+                "networkAccess": false
+              },
+              "activePermissionProfile": null,
+              "reasoningEffort": null,
+              "multiAgentMode": "explicitRequestOnly"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "thread/started",
+            "params": {
+              "thread": {
+                "id": "01a0aa26-691d-7353-be78-afcd8dadad04",
+                "extra": null,
+                "sessionId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+                "forkedFromId": null,
+                "parentThreadId": null,
+                "preview": "",
+                "ephemeral": false,
+                "section": null,
+                "sectionEnteredAt": null,
+                "historyMode": "legacy",
+                "modelProvider": "local_hook_transport_probe",
+                "createdAt": 1789561039,
+                "updatedAt": 1789561039,
+                "recencyAt": 1789561039,
+                "status": {
+                  "type": "idle"
+                },
+                "path": "<PROBE_ROOT>/codex/sessions/2026/09/16/rollout-2026-09-16T20-17-19-01a0aa26-691d-7353-be78-afcd8dadad04.jsonl",
+                "cwd": "<PROBE_ROOT>",
+                "cliVersion": "0.147.0",
+                "source": "vscode",
+                "canAcceptDirectInput": true,
+                "threadSource": null,
+                "agentNickname": null,
+                "agentRole": null,
+                "gitInfo": null,
+                "name": null,
+                "turns": []
+              }
+            },
+            "emittedAtMs": 1789561039148
+          }
+        },
+        {
+          "channel": "request",
+          "value": {
+            "id": 4,
+            "method": "turn/start",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "input": [
+                {
+                  "type": "text",
+                  "text": "INFINISHELL_HOOK_TRANSPORT_PROBE_DO_NOT_RUN_MODEL",
+                  "text_elements": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 4,
+            "result": {
+              "turn": {
+                "id": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+                "items": [],
+                "itemsView": "notLoaded",
+                "status": "inProgress",
+                "error": null,
+                "startedAt": null,
+                "completedAt": null,
+                "durationMs": null
+              }
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "thread/status/changed",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "status": {
+                "type": "active",
+                "activeFlags": []
+              }
+            },
+            "emittedAtMs": 1789561040155
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "turn/started",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turn": {
+                "id": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+                "items": [],
+                "itemsView": "notLoaded",
+                "status": "inProgress",
+                "error": null,
+                "startedAt": 1789561040,
+                "completedAt": null,
+                "durationMs": null
+              }
+            },
+            "emittedAtMs": 1789561040155
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "hook/started",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turnId": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+              "run": {
+                "id": "session-start:0:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "eventName": "sessionStart",
+                "handlerType": "command",
+                "executionMode": "sync",
+                "scope": "thread",
+                "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "source": "plugin",
+                "displayOrder": 0,
+                "status": "running",
+                "statusMessage": null,
+                "startedAt": 1789561040,
+                "completedAt": null,
+                "durationMs": null,
+                "entries": []
+              }
+            },
+            "emittedAtMs": 1789561040161
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "hook/started",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turnId": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+              "run": {
+                "id": "session-start:1:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "eventName": "sessionStart",
+                "handlerType": "command",
+                "executionMode": "sync",
+                "scope": "thread",
+                "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "source": "plugin",
+                "displayOrder": 1,
+                "status": "running",
+                "statusMessage": null,
+                "startedAt": 1789561040,
+                "completedAt": null,
+                "durationMs": null,
+                "entries": []
+              }
+            },
+            "emittedAtMs": 1789561040161
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "hook/completed",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turnId": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+              "run": {
+                "id": "session-start:0:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "eventName": "sessionStart",
+                "handlerType": "command",
+                "executionMode": "sync",
+                "scope": "thread",
+                "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "source": "plugin",
+                "displayOrder": 0,
+                "status": "completed",
+                "statusMessage": null,
+                "startedAt": 1789561040,
+                "completedAt": 1789561040,
+                "durationMs": 42,
+                "entries": []
+              }
+            },
+            "emittedAtMs": 1789561040439
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "hook/completed",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turnId": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+              "run": {
+                "id": "session-start:1:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "eventName": "sessionStart",
+                "handlerType": "command",
+                "executionMode": "sync",
+                "scope": "thread",
+                "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "source": "plugin",
+                "displayOrder": 1,
+                "status": "completed",
+                "statusMessage": null,
+                "startedAt": 1789561040,
+                "completedAt": 1789561040,
+                "durationMs": 278,
+                "entries": []
+              }
+            },
+            "emittedAtMs": 1789561040439
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "hook/started",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turnId": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+              "run": {
+                "id": "user-prompt-submit:2:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "executionMode": "sync",
+                "scope": "turn",
+                "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "source": "plugin",
+                "displayOrder": 2,
+                "status": "running",
+                "statusMessage": null,
+                "startedAt": 1789561040,
+                "completedAt": null,
+                "durationMs": null,
+                "entries": []
+              }
+            },
+            "emittedAtMs": 1789561040440
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "hook/started",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turnId": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+              "run": {
+                "id": "user-prompt-submit:3:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "executionMode": "sync",
+                "scope": "turn",
+                "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "source": "plugin",
+                "displayOrder": 3,
+                "status": "running",
+                "statusMessage": null,
+                "startedAt": 1789561040,
+                "completedAt": null,
+                "durationMs": null,
+                "entries": []
+              }
+            },
+            "emittedAtMs": 1789561040440
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "hook/started",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turnId": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+              "run": {
+                "id": "user-prompt-submit:4:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "executionMode": "sync",
+                "scope": "turn",
+                "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "source": "plugin",
+                "displayOrder": 4,
+                "status": "running",
+                "statusMessage": null,
+                "startedAt": 1789561040,
+                "completedAt": null,
+                "durationMs": null,
+                "entries": []
+              }
+            },
+            "emittedAtMs": 1789561040440
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "hook/completed",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turnId": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+              "run": {
+                "id": "user-prompt-submit:2:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "executionMode": "sync",
+                "scope": "turn",
+                "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "source": "plugin",
+                "displayOrder": 2,
+                "status": "completed",
+                "statusMessage": null,
+                "startedAt": 1789561040,
+                "completedAt": 1789561040,
+                "durationMs": 43,
+                "entries": []
+              }
+            },
+            "emittedAtMs": 1789561040548
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "hook/completed",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turnId": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+              "run": {
+                "id": "user-prompt-submit:3:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "executionMode": "sync",
+                "scope": "turn",
+                "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "source": "plugin",
+                "displayOrder": 3,
+                "status": "completed",
+                "statusMessage": null,
+                "startedAt": 1789561040,
+                "completedAt": 1789561040,
+                "durationMs": 107,
+                "entries": []
+              }
+            },
+            "emittedAtMs": 1789561040548
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "hook/completed",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turnId": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+              "run": {
+                "id": "user-prompt-submit:4:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "executionMode": "sync",
+                "scope": "turn",
+                "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+                "source": "plugin",
+                "displayOrder": 4,
+                "status": "stopped",
+                "statusMessage": null,
+                "startedAt": 1789561040,
+                "completedAt": 1789561040,
+                "durationMs": 42,
+                "entries": [
+                  {
+                    "kind": "stop",
+                    "text": "isolated hook transport probe"
+                  }
+                ]
+              }
+            },
+            "emittedAtMs": 1789561040548
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "thread/status/changed",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "status": {
+                "type": "idle"
+              }
+            },
+            "emittedAtMs": 1789561040548
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "turn/completed",
+            "params": {
+              "threadId": "01a0aa26-691d-7353-be78-afcd8dadad04",
+              "turn": {
+                "id": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+                "items": [],
+                "itemsView": "notLoaded",
+                "status": "completed",
+                "error": null,
+                "startedAt": 1789561040,
+                "completedAt": 1789561040,
+                "durationMs": 396
+              }
+            },
+            "emittedAtMs": 1789561040548
+          }
+        }
+      ]
+    }
+  ],
+  "reference_tree_sha256": {
+    ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+    "hooks/hooks.json": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+    "scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+    "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+    "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+    "scripts/on-prompt-submit.sh": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+    "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+    "scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+    "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+    "scripts/warp-notify.sh": "144f0ce32c629c920ee6d6c164f1fcbd36aaac0429c5348087a33a382d75a050"
+  },
+  "diagnostic_source_sha256": "528fa9a9e6ce6c90b12942e14cefc34bd31c2ba4a43c013d95dd992b927d5653",
+  "hooks_after_thread_start_before_input": [],
+  "completed_hooks": [
+    {
+      "id": "session-start:0:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+      "eventName": "sessionStart",
+      "handlerType": "command",
+      "executionMode": "sync",
+      "scope": "thread",
+      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+      "source": "plugin",
+      "displayOrder": 0,
+      "status": "completed",
+      "statusMessage": null,
+      "startedAt": 1789561040,
+      "completedAt": 1789561040,
+      "durationMs": 42,
+      "entries": []
+    },
+    {
+      "id": "session-start:1:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+      "eventName": "sessionStart",
+      "handlerType": "command",
+      "executionMode": "sync",
+      "scope": "thread",
+      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+      "source": "plugin",
+      "displayOrder": 1,
+      "status": "completed",
+      "statusMessage": null,
+      "startedAt": 1789561040,
+      "completedAt": 1789561040,
+      "durationMs": 278,
+      "entries": []
+    },
+    {
+      "id": "user-prompt-submit:2:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+      "eventName": "userPromptSubmit",
+      "handlerType": "command",
+      "executionMode": "sync",
+      "scope": "turn",
+      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+      "source": "plugin",
+      "displayOrder": 2,
+      "status": "completed",
+      "statusMessage": null,
+      "startedAt": 1789561040,
+      "completedAt": 1789561040,
+      "durationMs": 43,
+      "entries": []
+    },
+    {
+      "id": "user-prompt-submit:3:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+      "eventName": "userPromptSubmit",
+      "handlerType": "command",
+      "executionMode": "sync",
+      "scope": "turn",
+      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+      "source": "plugin",
+      "displayOrder": 3,
+      "status": "completed",
+      "statusMessage": null,
+      "startedAt": 1789561040,
+      "completedAt": 1789561040,
+      "durationMs": 107,
+      "entries": []
+    },
+    {
+      "id": "user-prompt-submit:4:<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+      "eventName": "userPromptSubmit",
+      "handlerType": "command",
+      "executionMode": "sync",
+      "scope": "turn",
+      "sourcePath": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0/hooks/hooks.json",
+      "source": "plugin",
+      "displayOrder": 4,
+      "status": "stopped",
+      "statusMessage": null,
+      "startedAt": 1789561040,
+      "completedAt": 1789561040,
+      "durationMs": 42,
+      "entries": [
+        {
+          "kind": "stop",
+          "text": "isolated hook transport probe"
+        }
+      ]
+    }
+  ],
+  "hook_reports": {
+    "SessionStart-diagnostic": {
+      "event": "SessionStart",
+      "mode": "diagnostic",
+      "pid": 40425,
+      "ppid": 40415,
+      "pgid": 40415,
+      "sid": 40415,
+      "isatty": {
+        "0": false,
+        "1": false,
+        "2": false
+      },
+      "environment": {
+        "SHELL": "/bin/zsh",
+        "PATH": "<PROBE_ROOT>/codex/tmp/arg0/codex-arg0RTTXDC:/opt/homebrew/Caskroom/codex/0.147.0/codex-path:<HOST_HOME>/.grok/bin:<HOST_HOME>/.antigravity/antigravity/bin:<HOST_HOME>/Library/Python/3.9/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/Little Snitch.app/Contents/Components:/Applications/VMware Fusion.app/Contents/Public:/usr/local/go/bin:<HOST_HOME>/.codex/tmp/arg0/codex-arg0DnE87r:<HOST_HOME>/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:<HOST_HOME>/.grok/bin:<HOST_HOME>/.antigravity/antigravity/bin:<HOST_HOME>/Library/Python/3.9/bin:/opt/homebrew/bin:/opt/homebrew/sbin:<HOST_HOME>/.cargo/bin:<HOST_HOME>/.docker/bin:<HOST_HOME>/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:<HOST_HOME>/.docker/bin",
+        "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+        "WARP_CLIENT_VERSION": "local",
+        "TERM_PROGRAM": "WarpTerminal",
+        "TMUX": null,
+        "PLUGIN_ROOT": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0",
+        "PLUGIN_DATA": "<PROBE_ROOT>/codex/plugins/data/transport-probe-infinishell-transport-probe",
+        "CLAUDE_PLUGIN_ROOT": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0"
+      },
+      "input": {
+        "session_id": "01a0aa26-691d-7353-be78-afcd8dadad04",
+        "transcript_path": "<PROBE_ROOT>/codex/sessions/2026/09/16/rollout-2026-09-16T20-17-19-01a0aa26-691d-7353-be78-afcd8dadad04.jsonl",
+        "cwd": "<PROBE_ROOT>",
+        "hook_event_name": "SessionStart",
+        "model": "gpt-5.4",
+        "permission_mode": "default",
+        "source": "startup"
+      },
+      "tty": {
+        "opened": true,
+        "isatty": true,
+        "foreground_pgid": 40415,
+        "written_bytes": 87
+      }
+    },
+    "SessionStart-reference": {
+      "event": "SessionStart",
+      "mode": "reference",
+      "pid": 40426,
+      "ppid": 40415,
+      "pgid": 40415,
+      "sid": 40415,
+      "isatty": {
+        "0": false,
+        "1": false,
+        "2": false
+      },
+      "environment": {
+        "SHELL": "/bin/zsh",
+        "PATH": "<PROBE_ROOT>/codex/tmp/arg0/codex-arg0RTTXDC:/opt/homebrew/Caskroom/codex/0.147.0/codex-path:<HOST_HOME>/.grok/bin:<HOST_HOME>/.antigravity/antigravity/bin:<HOST_HOME>/Library/Python/3.9/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/Little Snitch.app/Contents/Components:/Applications/VMware Fusion.app/Contents/Public:/usr/local/go/bin:<HOST_HOME>/.codex/tmp/arg0/codex-arg0DnE87r:<HOST_HOME>/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:<HOST_HOME>/.grok/bin:<HOST_HOME>/.antigravity/antigravity/bin:<HOST_HOME>/Library/Python/3.9/bin:/opt/homebrew/bin:/opt/homebrew/sbin:<HOST_HOME>/.cargo/bin:<HOST_HOME>/.docker/bin:<HOST_HOME>/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:<HOST_HOME>/.docker/bin",
+        "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+        "WARP_CLIENT_VERSION": "local",
+        "TERM_PROGRAM": "WarpTerminal",
+        "TMUX": null,
+        "PLUGIN_ROOT": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0",
+        "PLUGIN_DATA": "<PROBE_ROOT>/codex/plugins/data/transport-probe-infinishell-transport-probe",
+        "CLAUDE_PLUGIN_ROOT": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0"
+      },
+      "input": {
+        "session_id": "01a0aa26-691d-7353-be78-afcd8dadad04",
+        "transcript_path": "<PROBE_ROOT>/codex/sessions/2026/09/16/rollout-2026-09-16T20-17-19-01a0aa26-691d-7353-be78-afcd8dadad04.jsonl",
+        "cwd": "<PROBE_ROOT>",
+        "hook_event_name": "SessionStart",
+        "model": "gpt-5.4",
+        "permission_mode": "default",
+        "source": "startup"
+      },
+      "tty": {
+        "opened": true,
+        "isatty": true,
+        "foreground_pgid": 40415
+      },
+      "reference": {
+        "script": "on-session-start.sh",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    "UserPromptSubmit-diagnostic": {
+      "event": "UserPromptSubmit",
+      "mode": "diagnostic",
+      "pid": 40449,
+      "ppid": 40415,
+      "pgid": 40415,
+      "sid": 40415,
+      "isatty": {
+        "0": false,
+        "1": false,
+        "2": false
+      },
+      "environment": {
+        "SHELL": "/bin/zsh",
+        "PATH": "<PROBE_ROOT>/codex/tmp/arg0/codex-arg0RTTXDC:/opt/homebrew/Caskroom/codex/0.147.0/codex-path:<HOST_HOME>/.grok/bin:<HOST_HOME>/.antigravity/antigravity/bin:<HOST_HOME>/Library/Python/3.9/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/Little Snitch.app/Contents/Components:/Applications/VMware Fusion.app/Contents/Public:/usr/local/go/bin:<HOST_HOME>/.codex/tmp/arg0/codex-arg0DnE87r:<HOST_HOME>/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:<HOST_HOME>/.grok/bin:<HOST_HOME>/.antigravity/antigravity/bin:<HOST_HOME>/Library/Python/3.9/bin:/opt/homebrew/bin:/opt/homebrew/sbin:<HOST_HOME>/.cargo/bin:<HOST_HOME>/.docker/bin:<HOST_HOME>/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:<HOST_HOME>/.docker/bin",
+        "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+        "WARP_CLIENT_VERSION": "local",
+        "TERM_PROGRAM": "WarpTerminal",
+        "TMUX": null,
+        "PLUGIN_ROOT": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0",
+        "PLUGIN_DATA": "<PROBE_ROOT>/codex/plugins/data/transport-probe-infinishell-transport-probe",
+        "CLAUDE_PLUGIN_ROOT": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0"
+      },
+      "input": {
+        "session_id": "01a0aa26-691d-7353-be78-afcd8dadad04",
+        "turn_id": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+        "transcript_path": "<PROBE_ROOT>/codex/sessions/2026/09/16/rollout-2026-09-16T20-17-19-01a0aa26-691d-7353-be78-afcd8dadad04.jsonl",
+        "cwd": "<PROBE_ROOT>",
+        "hook_event_name": "UserPromptSubmit",
+        "model": "gpt-5.4",
+        "permission_mode": "default",
+        "prompt": "INFINISHELL_HOOK_TRANSPORT_PROBE_DO_NOT_RUN_MODEL"
+      },
+      "tty": {
+        "opened": true,
+        "isatty": true,
+        "foreground_pgid": 40415,
+        "written_bytes": 91
+      }
+    },
+    "UserPromptSubmit-reference": {
+      "event": "UserPromptSubmit",
+      "mode": "reference",
+      "pid": 40450,
+      "ppid": 40415,
+      "pgid": 40415,
+      "sid": 40415,
+      "isatty": {
+        "0": false,
+        "1": false,
+        "2": false
+      },
+      "environment": {
+        "SHELL": "/bin/zsh",
+        "PATH": "<PROBE_ROOT>/codex/tmp/arg0/codex-arg0RTTXDC:/opt/homebrew/Caskroom/codex/0.147.0/codex-path:<HOST_HOME>/.grok/bin:<HOST_HOME>/.antigravity/antigravity/bin:<HOST_HOME>/Library/Python/3.9/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/Little Snitch.app/Contents/Components:/Applications/VMware Fusion.app/Contents/Public:/usr/local/go/bin:<HOST_HOME>/.codex/tmp/arg0/codex-arg0DnE87r:<HOST_HOME>/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:<HOST_HOME>/.grok/bin:<HOST_HOME>/.antigravity/antigravity/bin:<HOST_HOME>/Library/Python/3.9/bin:/opt/homebrew/bin:/opt/homebrew/sbin:<HOST_HOME>/.cargo/bin:<HOST_HOME>/.docker/bin:<HOST_HOME>/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:<HOST_HOME>/.docker/bin",
+        "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+        "WARP_CLIENT_VERSION": "local",
+        "TERM_PROGRAM": "WarpTerminal",
+        "TMUX": null,
+        "PLUGIN_ROOT": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0",
+        "PLUGIN_DATA": "<PROBE_ROOT>/codex/plugins/data/transport-probe-infinishell-transport-probe",
+        "CLAUDE_PLUGIN_ROOT": "<PROBE_ROOT>/codex/plugins/cache/infinishell-transport-probe/transport-probe/0.1.0"
+      },
+      "input": {
+        "session_id": "01a0aa26-691d-7353-be78-afcd8dadad04",
+        "turn_id": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+        "transcript_path": "<PROBE_ROOT>/codex/sessions/2026/09/16/rollout-2026-09-16T20-17-19-01a0aa26-691d-7353-be78-afcd8dadad04.jsonl",
+        "cwd": "<PROBE_ROOT>",
+        "hook_event_name": "UserPromptSubmit",
+        "model": "gpt-5.4",
+        "permission_mode": "default",
+        "prompt": "INFINISHELL_HOOK_TRANSPORT_PROBE_DO_NOT_RUN_MODEL"
+      },
+      "tty": {
+        "opened": true,
+        "isatty": true,
+        "foreground_pgid": 40415
+      },
+      "reference": {
+        "script": "on-prompt-submit.sh",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    }
+  },
+  "native_process": {
+    "pid": 40415,
+    "sid": 40415,
+    "pgid": 40415,
+    "tty": "/dev/ttys007"
+  },
+  "native_turn_id": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+  "pty_bytes_sha256": "a58b3b1dfb414e9a763b3ed8066a6799853ac07b46666e43881ac93292e11bc6",
+  "pty_byte_count": 870,
+  "native_exit_code": 0,
+  "reference_notifications": [
+    {
+      "v": 1,
+      "agent": "codex",
+      "event": "session_start",
+      "session_id": "01a0aa26-691d-7353-be78-afcd8dadad04",
+      "cwd": "<PROBE_ROOT>",
+      "project": "infinishell-hook-transport-u3c2f9yo",
+      "plugin_version": "0.4.0"
+    },
+    {
+      "v": 1,
+      "agent": "codex",
+      "event": "prompt_submit",
+      "session_id": "01a0aa26-691d-7353-be78-afcd8dadad04",
+      "cwd": "<PROBE_ROOT>",
+      "project": "infinishell-hook-transport-u3c2f9yo",
+      "turn_id": "01a0aa26-6d16-71f3-8191-31d8c4923aa3",
+      "query": "INFINISHELL_HOOK_TRANSPORT_PROBE_DO_NOT_RUN_MODEL"
+    }
+  ],
+  "model_http_requests": [],
+  "model_http_request_count": 0,
+  "pty_redacted_text": "\u001b]777;notify;infinishell-transport-probe;275582b3cd554697827f07c55e69a7e8:SessionStart\u0007\u001b]777;notify;warp://cli-agent;{\"v\":1,\"agent\":\"codex\",\"event\":\"session_start\",\"session_id\":\"01a0aa26-691d-7353-be78-afcd8dadad04\",\"cwd\":\"<PROBE_ROOT>\",\"project\":\"infinishell-hook-transport-u3c2f9yo\",\"plugin_version\":\"0.4.0\"}\u0007\u001b]777;notify;infinishell-transport-probe;275582b3cd554697827f07c55e69a7e8:UserPromptSubmit\u0007\u001b]777;notify;warp://cli-agent;{\"v\":1,\"agent\":\"codex\",\"event\":\"prompt_submit\",\"session_id\":\"01a0aa26-691d-7353-be78-afcd8dadad04\",\"cwd\":\"<PROBE_ROOT>\",\"project\":\"infinishell-hook-transport-u3c2f9yo\",\"turn_id\":\"01a0aa26-6d16-71f3-8191-31d8c4923aa3\",\"query\":\"INFINISHELL_HOOK_TRANSPORT_PROBE_DO_NOT_RUN_MODEL\"}\u0007",
+  "fixture_redactions": {
+    "probe_directory": "<PROBE_ROOT>",
+    "host_home": "<HOST_HOME>",
+    "original_pty_bytes_omitted": true,
+    "pty_digest_and_count_are_original": true
+  },
+  "probe_script_sha256": "56660b646154ce932dfbb4f71508a3b0b3874ebac482b3f7cb636e2c2098c0bf"
+}

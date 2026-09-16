@@ -1,0 +1,243 @@
+[
+  {
+    "args": [
+      "plugin",
+      "install",
+      "--trust",
+      "<probe-root>/source"
+    ],
+    "returncode": 0,
+    "stdout": "Installed 1 plugin(s) from <probe-root>/source: infinishell-grok\n",
+    "stderr": "",
+    "registry": {
+      "version": 1,
+      "repos": {
+        "source-a5edffb3": {
+          "kind": {
+            "type": "Local",
+            "source_path": "<probe-root>/source"
+          },
+          "installed_at": "2026-09-16T06:09:43.307499+00:00",
+          "updated_at": "2026-09-16T06:09:43.307499+00:00",
+          "path": "<probe-root>/grok/installed-plugins/source-a5edffb3",
+          "plugins": {
+            "infinishell-grok": {
+              "version": "0.1.0"
+            }
+          }
+        }
+      }
+    },
+    "config": "[plugins]\nenabled = [\"infinishell-grok\"]\n"
+  },
+  {
+    "args": [
+      "plugin",
+      "update",
+      "infinishell-grok"
+    ],
+    "returncode": 0,
+    "stdout": "source-a5edffb3: local symlink, already live\n",
+    "stderr": "",
+    "registry": {
+      "version": 1,
+      "repos": {
+        "source-a5edffb3": {
+          "kind": {
+            "type": "Local",
+            "source_path": "<probe-root>/source"
+          },
+          "installed_at": "2026-09-16T06:09:43.307499+00:00",
+          "updated_at": "2026-09-16T06:09:43.307499+00:00",
+          "path": "<probe-root>/grok/installed-plugins/source-a5edffb3",
+          "plugins": {
+            "infinishell-grok": {
+              "version": "0.1.0"
+            }
+          }
+        }
+      }
+    },
+    "config": "[plugins]\nenabled = [\"infinishell-grok\"]\n"
+  },
+  {
+    "args": [
+      "plugin",
+      "list",
+      "--json"
+    ],
+    "returncode": 0,
+    "stdout": "[\n  {\n    \"status\": \"installed\",\n    \"name\": \"infinishell-grok\",\n    \"repo_key\": \"source-a5edffb3\",\n    \"version\": \"0.1.0\",\n    \"path\": \"<probe-root>/grok/installed-plugins/source-a5edffb3\",\n    \"source\": \"<probe-root>/source\",\n    \"marketplace\": null\n  }\n]\n",
+    "stderr": "",
+    "registry": {
+      "version": 1,
+      "repos": {
+        "source-a5edffb3": {
+          "kind": {
+            "type": "Local",
+            "source_path": "<probe-root>/source"
+          },
+          "installed_at": "2026-09-16T06:09:43.307499+00:00",
+          "updated_at": "2026-09-16T06:09:43.307499+00:00",
+          "path": "<probe-root>/grok/installed-plugins/source-a5edffb3",
+          "plugins": {
+            "infinishell-grok": {
+              "version": "0.1.0"
+            }
+          }
+        }
+      }
+    },
+    "config": "[plugins]\nenabled = [\"infinishell-grok\"]\n"
+  },
+  {
+    "args": [
+      "plugin",
+      "update",
+      "infinishell-grok"
+    ],
+    "returncode": 0,
+    "stdout": "source-a5edffb3: local symlink, already live\n",
+    "stderr": "",
+    "registry": {
+      "version": 1,
+      "repos": {
+        "source-a5edffb3": {
+          "kind": {
+            "type": "Local",
+            "source_path": "<probe-root>/source"
+          },
+          "installed_at": "2026-09-16T06:09:43.307499+00:00",
+          "updated_at": "2026-09-16T06:09:43.307499+00:00",
+          "path": "<probe-root>/grok/installed-plugins/source-a5edffb3",
+          "plugins": {
+            "infinishell-grok": {
+              "version": "0.1.0"
+            }
+          }
+        }
+      }
+    },
+    "config": "[plugins]\nenabled = [\"infinishell-grok\"]\n"
+  },
+  {
+    "args": [
+      "plugin",
+      "install",
+      "--trust",
+      "<probe-root>/source"
+    ],
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "Error: repo 'source-a5edffb3' already installed\n",
+    "registry": {
+      "version": 1,
+      "repos": {
+        "source-a5edffb3": {
+          "kind": {
+            "type": "Local",
+            "source_path": "<probe-root>/source"
+          },
+          "installed_at": "2026-09-16T06:09:43.307499+00:00",
+          "updated_at": "2026-09-16T06:09:43.307499+00:00",
+          "path": "<probe-root>/grok/installed-plugins/source-a5edffb3",
+          "plugins": {
+            "infinishell-grok": {
+              "version": "0.1.0"
+            }
+          }
+        }
+      }
+    },
+    "config": "[plugins]\nenabled = [\"infinishell-grok\"]\n"
+  },
+  {
+    "args": [
+      "plugin",
+      "install",
+      "--trust",
+      "<probe-root>/source-next"
+    ],
+    "returncode": 0,
+    "stdout": "Installed 1 plugin(s) from <probe-root>/source-next: infinishell-grok\n",
+    "stderr": "",
+    "registry": {
+      "version": 1,
+      "repos": {
+        "source-a5edffb3": {
+          "kind": {
+            "type": "Local",
+            "source_path": "<probe-root>/source"
+          },
+          "installed_at": "2026-09-16T06:09:43.307499+00:00",
+          "updated_at": "2026-09-16T06:09:43.307499+00:00",
+          "path": "<probe-root>/grok/installed-plugins/source-a5edffb3",
+          "plugins": {
+            "infinishell-grok": {
+              "version": "0.1.0"
+            }
+          }
+        },
+        "source-next-2de01230": {
+          "kind": {
+            "type": "Local",
+            "source_path": "<probe-root>/source-next"
+          },
+          "installed_at": "2026-09-16T06:09:44.559127+00:00",
+          "updated_at": "2026-09-16T06:09:44.559127+00:00",
+          "path": "<probe-root>/grok/installed-plugins/source-next-2de01230",
+          "plugins": {
+            "infinishell-grok": {
+              "version": "0.3.0"
+            }
+          }
+        }
+      }
+    },
+    "config": "[plugins]\nenabled = [\"infinishell-grok\"]\n"
+  },
+  {
+    "args": [
+      "plugin",
+      "list",
+      "--json"
+    ],
+    "returncode": 0,
+    "stdout": "[\n  {\n    \"status\": \"installed\",\n    \"name\": \"infinishell-grok\",\n    \"repo_key\": \"source-a5edffb3\",\n    \"version\": \"0.1.0\",\n    \"path\": \"<probe-root>/grok/installed-plugins/source-a5edffb3\",\n    \"source\": \"<probe-root>/source\",\n    \"marketplace\": null\n  },\n  {\n    \"status\": \"installed\",\n    \"name\": \"infinishell-grok\",\n    \"repo_key\": \"source-next-2de01230\",\n    \"version\": \"0.3.0\",\n    \"path\": \"<probe-root>/grok/installed-plugins/source-next-2de01230\",\n    \"source\": \"<probe-root>/source-next\",\n    \"marketplace\": null\n  }\n]\n",
+    "stderr": "",
+    "registry": {
+      "version": 1,
+      "repos": {
+        "source-a5edffb3": {
+          "kind": {
+            "type": "Local",
+            "source_path": "<probe-root>/source"
+          },
+          "installed_at": "2026-09-16T06:09:43.307499+00:00",
+          "updated_at": "2026-09-16T06:09:43.307499+00:00",
+          "path": "<probe-root>/grok/installed-plugins/source-a5edffb3",
+          "plugins": {
+            "infinishell-grok": {
+              "version": "0.1.0"
+            }
+          }
+        },
+        "source-next-2de01230": {
+          "kind": {
+            "type": "Local",
+            "source_path": "<probe-root>/source-next"
+          },
+          "installed_at": "2026-09-16T06:09:44.559127+00:00",
+          "updated_at": "2026-09-16T06:09:44.559127+00:00",
+          "path": "<probe-root>/grok/installed-plugins/source-next-2de01230",
+          "plugins": {
+            "infinishell-grok": {
+              "version": "0.3.0"
+            }
+          }
+        }
+      }
+    },
+    "config": "[plugins]\nenabled = [\"infinishell-grok\"]\n"
+  }
+]

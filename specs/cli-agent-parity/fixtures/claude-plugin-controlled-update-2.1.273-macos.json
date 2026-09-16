@@ -1,0 +1,762 @@
+{
+  "commands": [
+    {
+      "arguments": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "2.1.273 (Claude Code)\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "http://127.0.0.1:55859/fixture.git"
+      ],
+      "exit_code": 0,
+      "stdout": "Adding marketplace…Refreshing marketplace cache (timeout: 120s)…\nCloning repository (timeout: 120s): http://127.0.0.1:55859/fixture.git\nClone complete, validating marketplace…\nCleaning up old marketplace cache…\n✔ Successfully added marketplace: infinishell-claude-update-fixture (declared in user settings)\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "install",
+        "warp@infinishell-claude-update-fixture"
+      ],
+      "exit_code": 0,
+      "stdout": "Installing plugin \"warp@infinishell-claude-update-fixture\"...✔ Successfully installed plugin: warp@infinishell-claude-update-fixture (scope: user)\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "update",
+        "infinishell-claude-update-fixture"
+      ],
+      "exit_code": 0,
+      "stdout": "Updating marketplace: infinishell-claude-update-fixture...Refreshing marketplace cache (timeout: 120s)…\n✔ Successfully updated marketplace: infinishell-claude-update-fixture\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "update",
+        "warp@infinishell-claude-update-fixture",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"command\":\"update\",\"outcome\":\"ok\",\"plugin\":\"warp@infinishell-claude-update-fixture\",\"pluginId\":\"warp@infinishell-claude-update-fixture\",\"scope\":\"user\",\"message\":\"Plugin \\\"warp\\\" updated from 2.2.0 to 2.2.1-fixture for scope user. Restart to apply changes.\",\"updateOutcome\":\"updated\",\"oldVersion\":\"2.2.0\",\"newVersion\":\"2.2.1-fixture\"}\n",
+      "stderr": ""
+    }
+  ],
+  "sessions": [
+    {
+      "stage": "fixture_auto_update_startup",
+      "wait_seconds": 60,
+      "events": [
+        {
+          "direction": "stdin",
+          "message": {
+            "type": "control_request",
+            "request_id": "fixture_auto_update_startup",
+            "request": {
+              "subtype": "initialize"
+            }
+          }
+        },
+        {
+          "direction": "stdout",
+          "message": {
+            "type": "system",
+            "subtype": "hook_started",
+            "hook_id": "1065322d-530d-4d15-91cc-1ab9f0db28e7",
+            "hook_name": "SessionStart:startup",
+            "hook_event": "SessionStart",
+            "uuid": "625c16b4-1059-43ac-823e-dba49b97cc31",
+            "session_id": "871c6f70-2bf4-403d-9e7c-00d466c42a6f"
+          }
+        },
+        {
+          "direction": "stdout",
+          "message": {
+            "type": "system",
+            "subtype": "hook_response",
+            "hook_id": "1065322d-530d-4d15-91cc-1ab9f0db28e7",
+            "hook_name": "SessionStart:startup",
+            "hook_event": "SessionStart",
+            "output": "",
+            "stdout": "",
+            "stderr": "",
+            "exit_code": 0,
+            "outcome": "success",
+            "uuid": "2ab5ae2b-96af-4836-a009-cc92078524f0",
+            "session_id": "871c6f70-2bf4-403d-9e7c-00d466c42a6f"
+          }
+        },
+        {
+          "direction": "stdout",
+          "message": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "fixture_auto_update_startup",
+              "response": {
+                "commands": [
+                  {
+                    "name": "deep-research",
+                    "description": "Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report. (dynamic workflow)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "design",
+                    "description": "Grant or revoke Claude agent access to your Design projects",
+                    "argumentHint": "consent | revoke"
+                  },
+                  {
+                    "name": "design-sync",
+                    "description": "Push a React design system to claude.ai/design. This runs a converter that bundles the real component code (from Storybook or a bare package) and uploads it. Use when the user runs /design-sync or says \"sync my design system to Claude Design\".",
+                    "argumentHint": "[<project hint, e.g. \"Acme DS\">]"
+                  },
+                  {
+                    "name": "dataviz",
+                    "description": "Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "update-config",
+                    "description": "Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "verify",
+                    "description": "Verify that a code change actually does what it's supposed to by exercising it end-to-end and observing behavior — drive the affected flow, not just tests or typecheck. Run before committing nontrivial changes; bootstraps this repo's project verify skill if none exists yet. Don't invoke it on a diff that only touches tests, docs, or other code with no runtime surface to drive (a change to product source always has one) — there's nothing to observe.",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "debug",
+                    "description": "Enable debug logging for this session and help diagnose issues",
+                    "argumentHint": "[issue description]"
+                  },
+                  {
+                    "name": "code-review",
+                    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs and reuse/simplification/efficiency cleanups at the given effort level (low/medium: fewer, high-confidence findings; high→max: broader coverage, may include uncertain findings); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review.",
+                    "argumentHint": "[low|medium|high|xhigh|max] [--fix] [--comment] [<pr#>|<branch>|<path>]",
+                    "aliases": [
+                      "review"
+                    ]
+                  },
+                  {
+                    "name": "simplify",
+                    "description": "Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.",
+                    "argumentHint": "[<target>]"
+                  },
+                  {
+                    "name": "batch",
+                    "description": "Research and plan a large-scale change, then execute it in parallel across 5–30 isolated worktree agents that each open a PR.",
+                    "argumentHint": "<instruction>"
+                  },
+                  {
+                    "name": "fewer-permission-prompts",
+                    "description": "Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "doctor",
+                    "description": "Health-check the user's Claude Code setup and fix issues: diagnose installation health — what the `claude doctor` terminal diagnostics cover — from local data (duplicate or leftover installs, PATH, unparseable settings files, broken or colliding agent definitions, skills whose frontmatter fails to parse); find unused skills, MCP servers, and plugins versus their context cost and disable dead weight; deduplicate local CLAUDE.md files against checked-in ones; trim checked-in CLAUDE.md files by cutting content a session could derive from the codebase (directory layouts, tech-stack lists, architecture overviews) while keeping gotchas, rationale, and non-standard conventions; migrate always-loaded CLAUDE.md guidance into lazy skills and nested CLAUDE.md files; flag slow hooks and context-heavy extensions; check the installed version is current; make auto mode the default permission mode; and pre-approve frequently denied read-only commands. Use when the user asks for a doctor run, checkup, audit, tune-up, or cleanup of their Claude Code setup or configuration.",
+                    "argumentHint": "",
+                    "aliases": [
+                      "checkup"
+                    ]
+                  },
+                  {
+                    "name": "loop",
+                    "description": "Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace.",
+                    "argumentHint": "[interval] [prompt]",
+                    "aliases": [
+                      "proactive"
+                    ]
+                  },
+                  {
+                    "name": "claude-api",
+                    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "workflow-authoring",
+                    "description": "Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "run",
+                    "description": "Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "run-skill-generator",
+                    "description": "Author or improve the run-<unit> skill - a per-project skill that tells agents how to build, launch, and drive this project's app. Use when the user asks to set up the project, get it running, write run instructions, or verify build/run steps work from a clean environment.",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "agents",
+                    "description": "(removed) Ask Claude to create/manage subagents, or edit .claude/agents/",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "auto-mode-setup",
+                    "description": "Teach auto mode about your environment, plus optional rule tweaks",
+                    "argumentHint": "[--request-id <uuid>] (--wizard posture=… scope=… depth=… --propose | --expect-sha256 <64-hex> --apply-file <path>)"
+                  },
+                  {
+                    "name": "autocompact",
+                    "description": "Configure the auto-compact window size",
+                    "argumentHint": "[auto|<tokens>]"
+                  },
+                  {
+                    "name": "clear",
+                    "description": "Start a new session with empty context; previous session stays on disk (resumable with /resume)",
+                    "argumentHint": "[name]",
+                    "aliases": [
+                      "reset",
+                      "new"
+                    ]
+                  },
+                  {
+                    "name": "color",
+                    "description": "Set the prompt bar color for this session",
+                    "argumentHint": "[red|blue|green|yellow|purple|orange|pink|cyan|default]"
+                  },
+                  {
+                    "name": "compact",
+                    "description": "Free up context by summarizing the conversation so far",
+                    "argumentHint": "<optional custom summarization instructions>"
+                  },
+                  {
+                    "name": "config",
+                    "description": "Set a setting by key",
+                    "argumentHint": "key=value",
+                    "aliases": [
+                      "settings"
+                    ]
+                  },
+                  {
+                    "name": "output-style",
+                    "description": "List output styles or switch to one",
+                    "argumentHint": "[style]"
+                  },
+                  {
+                    "name": "context",
+                    "description": "Show current context usage",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "effort",
+                    "description": "Set effort level for model usage",
+                    "argumentHint": "<low|medium|high|xhigh|max|ultracode|auto>"
+                  },
+                  {
+                    "name": "fast",
+                    "description": "Toggle fast mode (Opus 5)",
+                    "argumentHint": "[on|off]"
+                  },
+                  {
+                    "name": "heapdump",
+                    "description": "Dump the JS heap to ~/Desktop",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "init",
+                    "description": "Initialize a new CLAUDE.md file with codebase documentation",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "mcp",
+                    "description": "Manage MCP servers",
+                    "argumentHint": "[reconnect|enable|disable [<server>|all]]"
+                  },
+                  {
+                    "name": "model",
+                    "description": "Set the AI model for Claude Code",
+                    "argumentHint": "<model>"
+                  },
+                  {
+                    "name": "__remote-workflow",
+                    "description": "Run the workflow script delivered in this session environment (server-launched sessions only)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "workflow-launch-exec",
+                    "description": "Execute a server-launched workflow handoff (workflow_launch event sessions only)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "reload-plugins",
+                    "description": "Activate pending plugin changes in the current session",
+                    "argumentHint": "[--force]"
+                  },
+                  {
+                    "name": "reload-skills",
+                    "description": "Pick up skills added or changed on disk during this session",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "rename",
+                    "description": "Rename the current conversation",
+                    "argumentHint": "[name]",
+                    "aliases": [
+                      "name"
+                    ]
+                  },
+                  {
+                    "name": "security-review",
+                    "description": "Complete a security review of the pending changes on the current branch",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "usage",
+                    "description": "Show session cost, plan usage, and what's contributing to your limits",
+                    "argumentHint": "",
+                    "aliases": [
+                      "cost",
+                      "stats"
+                    ]
+                  },
+                  {
+                    "name": "insights",
+                    "description": "Generate a report analyzing your Claude Code sessions",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "recap",
+                    "description": "Generate a one-line session recap now",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "goal",
+                    "description": "Set a goal — keep working until the condition is met",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "design-consent",
+                    "description": "Grant Claude agent access to your Design projects",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "design-revoke",
+                    "description": "Revoke Claude agent access to your Design projects",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "list-agents",
+                    "description": "List subagents, teammates, and other Claude sessions you can message",
+                    "argumentHint": "",
+                    "aliases": [
+                      "peers"
+                    ]
+                  },
+                  {
+                    "name": "team-onboarding",
+                    "description": "Help teammates ramp on Claude Code with a guide from your usage",
+                    "argumentHint": ""
+                  }
+                ],
+                "agents": [
+                  {
+                    "name": "claude",
+                    "description": "Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed."
+                  },
+                  {
+                    "name": "Explore",
+                    "description": "Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions.",
+                    "model": "inherit"
+                  },
+                  {
+                    "name": "general-purpose",
+                    "description": "General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you."
+                  },
+                  {
+                    "name": "Plan",
+                    "description": "Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.",
+                    "model": "inherit"
+                  },
+                  {
+                    "name": "statusline-setup",
+                    "description": "Use this agent to configure the user's Claude Code status line setting.",
+                    "model": "sonnet"
+                  }
+                ],
+                "output_style": "default",
+                "available_output_styles": [
+                  "default",
+                  "Proactive",
+                  "Concise",
+                  "Explanatory",
+                  "Learning"
+                ],
+                "user_output_styles_dir": "<isolated-probe>/home/.claude/output-styles",
+                "models": [
+                  {
+                    "value": "default",
+                    "resolvedModel": "claude-opus-5[1m]",
+                    "displayName": "Default (recommended)",
+                    "description": "Use the default model (currently Opus 5 (1M context)) · $5/$25 per Mtok",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": [
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ],
+                    "supportsAdaptiveThinking": true,
+                    "supportsFastMode": true,
+                    "supportsAutoMode": true
+                  },
+                  {
+                    "value": "opus[1m]",
+                    "resolvedModel": "claude-opus-5[1m]",
+                    "displayName": "Opus (1M context)",
+                    "description": "Opus 5 with 1M context · Best for everyday, complex tasks · $5/$25 per Mtok",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": [
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ],
+                    "supportsAdaptiveThinking": true,
+                    "supportsFastMode": true,
+                    "supportsAutoMode": true
+                  },
+                  {
+                    "value": "sonnet",
+                    "resolvedModel": "claude-sonnet-5",
+                    "displayName": "Sonnet",
+                    "description": "Sonnet 5 · Efficient for routine tasks · $2/$10 per Mtok",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": [
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ],
+                    "supportsAdaptiveThinking": true,
+                    "supportsAutoMode": true
+                  },
+                  {
+                    "value": "haiku",
+                    "resolvedModel": "claude-haiku-4-5-20251001",
+                    "displayName": "Haiku",
+                    "description": "Haiku 4.5 · Fastest for quick answers · $1/$5 per Mtok"
+                  }
+                ],
+                "account": {
+                  "tokenSource": "none",
+                  "apiProvider": "firstParty"
+                },
+                "pid": 21463,
+                "current_permission_mode": "default",
+                "analytics_disabled": false,
+                "remote_control_auto_enable": false,
+                "remote_control_auto_connect_default": false,
+                "remote_control_available": true,
+                "remote_control_auto_on_by_default": false,
+                "ide_rc_auto_enable_gate": false,
+                "fast_mode_state": "off",
+                "fast_mode_disabled_reason": "sdk_opt_in_required",
+                "session_state": "idle"
+              },
+              "pending_permission_requests": [],
+              "pending_user_dialog_requests": []
+            }
+          }
+        },
+        {
+          "direction": "process",
+          "message": {
+            "exit_code": 0
+          }
+        }
+      ],
+      "plugin_debug_lines": [
+        "2026-09-16T11:20:54.876Z [DEBUG] Loaded 1 installed plugins from <isolated-probe>/home/.claude/plugins/installed_plugins.json",
+        "2026-09-16T11:20:54.881Z [DEBUG] Read hooks.json for plugin warp (enabled=true): <isolated-probe>/home/.claude/plugins/cache/infinishell-claude-update-fixture/warp/2.2.0/hooks/hooks.json",
+        "2026-09-16T11:20:54.882Z [DEBUG] Found 1 plugins (1 enabled, 0 disabled)",
+        "2026-09-16T11:20:54.882Z [DEBUG] getPluginSkills: Processing 1 enabled plugins",
+        "2026-09-16T11:20:54.882Z [DEBUG] Checking plugin warp: skillsPath=none, skillsPaths=0 paths",
+        "2026-09-16T11:20:54.882Z [DEBUG] Total plugin workflows loaded: 0",
+        "2026-09-16T11:20:54.882Z [DEBUG] Total plugin commands loaded: 0",
+        "2026-09-16T11:20:54.882Z [DEBUG] Total plugin agents loaded: 0",
+        "2026-09-16T11:20:54.883Z [DEBUG] Total plugin skills loaded: 0 (0 duplicate/user-owned entries skipped)",
+        "2026-09-16T11:20:54.890Z [DEBUG] hooks modules not loaded: rollout flag (tengu_plugin_hooks_modules) is off, from the default (a cold GrowthBook cache, no payload yet)",
+        "2026-09-16T11:20:54.890Z [DEBUG] Loading hooks from plugin: warp",
+        "2026-09-16T11:20:54.916Z [DEBUG] Registered 7 hooks from 1 plugins",
+        "2026-09-16T11:20:54.920Z [DEBUG] getSkills returning: 0 skill dir commands, 0 plugin skills, 40 bundled skills, 0 builtin plugin skills",
+        "2026-09-16T11:20:54.927Z [DEBUG] All plugins already exist, skipping migration",
+        "2026-09-16T11:20:54.928Z [DEBUG] Initialized versioned plugins system with 1 plugins",
+        "2026-09-16T11:20:54.951Z [DEBUG] Keeping <isolated-probe>/home/.claude/plugins/cache/infinishell-claude-update-fixture/warp: it still holds a directory, a symlink, a versioned archive or an entry of unknown type",
+        "2026-09-16T11:20:54.952Z [DEBUG] Keeping <isolated-probe>/home/.claude/plugins/cache/infinishell-claude-update-fixture: it still holds a directory, a symlink, a versioned archive or an entry of unknown type",
+        "2026-09-16T11:20:55.830Z [DEBUG] installPluginsForHeadless: starting",
+        "2026-09-16T11:20:55.831Z [DEBUG] Total plugin output styles loaded: 0"
+      ]
+    }
+  ],
+  "scope": "无账号、无模型，真实原生命令与缓存文件",
+  "cli_version": "2.1.273 (Claude Code)",
+  "fixture_base_commit": "8c28e936ae51cbb23a1a5657fca2bfd30cf06f12",
+  "fixture_initial_commit": "ce193c868c99773fef59648d5e381f41f097f5a7",
+  "fixture_http_requests": [
+    "\"GET /fixture.git/info/refs?service=git-upload-pack HTTP/1.1\" 200 -",
+    "\"POST /fixture.git/git-upload-pack HTTP/1.1\" 200 -",
+    "\"POST /fixture.git/git-upload-pack HTTP/1.1\" 200 -",
+    "\"GET /fixture.git/info/refs?service=git-upload-pack HTTP/1.1\" 200 -",
+    "\"POST /fixture.git/git-upload-pack HTTP/1.1\" 200 -"
+  ],
+  "fixture_patched_before_update": {
+    "tree_sha256": {
+      ".claude-plugin/plugin.json": "50c3aa9299fa465386062f35c395c0c690d8541f312b047584ad6f217cd7f1ee",
+      "hooks/hooks.json": "cbea2d15f3793688a5aa1b9ee459097db88f9446cb5c7d7cb2fe11fa2f39907c",
+      "scripts/build-payload.sh": "5b90e57a52d0f2efbce6c9648ffe6d470ef9cb903fa2d3b1d45a12005f045c36",
+      "scripts/emit-terminal-sequence.sh": "c461961b191ceb56cbd33f010a89f4c10d8927628c5aca4da3d79f4a881b3b9f",
+      "scripts/legacy/on-notification.sh": "ce184c59f210189eda2105d49cbb85e5e346b8190320ae000f0e31bc01af3a4d",
+      "scripts/legacy/on-session-start.sh": "e33036ff07a277d2403053e4b60610ac15a53d3e2eb36cf88d68efbf7bf54f0a",
+      "scripts/legacy/on-stop.sh": "0456cc984d9323f74ed0aa16c1758ad375f233d5a7d2ade777f21ec47c678d18",
+      "scripts/legacy/warp-notify.sh": "2e05721b486a376923d4efb290723937660892c3decc25e3329267e2509a5fc4",
+      "scripts/on-notification.sh": "dfe593f0b4e535335b9923b9bab597a35220e22085cd31e4a3eb833ece7d67f9",
+      "scripts/on-permission-request.sh": "4ccb832b300b67375c640e5b2fc2d08024e3c14256c92fa0cc96042c158bcfd6",
+      "scripts/on-post-tool-use.sh": "94f60981fcdaf0004e0ae94f0c780f8be32ee404ddf395b92a1378912df743d4",
+      "scripts/on-prompt-submit.sh": "58986635076f5b85a06e4d8f4e0baea061756543bd30e667a76f5a31423aa834",
+      "scripts/on-session-start.sh": "712123ece1a0fbb67d6a1d0db303712230ce424ab4fa6ceda3e202796449d582",
+      "scripts/on-stop-failure.sh": "71519423d039bc7d59c5af45f29ff1cd13ac3522aae6b57f5dc244cede76fa0e",
+      "scripts/on-stop.sh": "3f44cf96f0028fc15333f9ff6f6af5c7bceb545e445a49328a0a0e133bc248f4",
+      "scripts/should-use-structured.sh": "6460753a80c1fb6a39bba772a569644cc50bcc7b529a0f5f43b8944852410954",
+      "scripts/warp-notify.sh": "3bd4102f7b537535a35ea69c0437ee38d3bed8e9b8734acaec7ff4d04565fbb9",
+      "tests/test-hooks.sh": "56a82d0750475e79cce2aeb01097207007e7d7e58b2f982c3c15548da24a65fb"
+    },
+    "configuration": {
+      "settings.json": {
+        "extraKnownMarketplaces": {
+          "infinishell-claude-update-fixture": {
+            "source": {
+              "source": "git",
+              "url": "http://127.0.0.1:55859/fixture.git"
+            }
+          }
+        },
+        "enabledPlugins": {
+          "warp@infinishell-claude-update-fixture": true
+        }
+      },
+      "plugins/known_marketplaces.json": {
+        "infinishell-claude-update-fixture": {
+          "source": {
+            "source": "git",
+            "url": "http://127.0.0.1:55859/fixture.git"
+          },
+          "installLocation": "<isolated-probe>/home/.claude/plugins/marketplaces/infinishell-claude-update-fixture",
+          "lastUpdated": "2026-09-16T11:20:53.239Z"
+        }
+      },
+      "plugins/installed_plugins.json": {
+        "version": 2,
+        "plugins": {
+          "warp@infinishell-claude-update-fixture": [
+            {
+              "scope": "user",
+              "installPath": "<isolated-probe>/home/.claude/plugins/cache/infinishell-claude-update-fixture/warp/2.2.0",
+              "version": "2.2.0",
+              "installedAt": "2026-09-16T11:20:53.970Z",
+              "lastUpdated": "2026-09-16T11:20:53.970Z",
+              "gitCommitSha": "ce193c868c99773fef59648d5e381f41f097f5a7"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "fixture_changed_commit": "3f7c2c08f0a29c2746056cc1e543f499176a02df",
+  "fixture_new_source_tree": {
+    ".claude-plugin/plugin.json": "b3b4b883e141b3754cf845482be5293c140d123c8c28098680707b74dbebe822",
+    "hooks/hooks.json": "58df57ff9e94cc59a4e7f038b067614ed7a047fd71f352c84a34252d037f66ee",
+    "scripts/build-payload.sh": "0ebf0734250d70d7c34a6948d550aeb140b785bcdeaa36e96f0fbac27850e881",
+    "scripts/emit-terminal-sequence.sh": "c461961b191ceb56cbd33f010a89f4c10d8927628c5aca4da3d79f4a881b3b9f",
+    "scripts/legacy/on-notification.sh": "ce184c59f210189eda2105d49cbb85e5e346b8190320ae000f0e31bc01af3a4d",
+    "scripts/legacy/on-session-start.sh": "e33036ff07a277d2403053e4b60610ac15a53d3e2eb36cf88d68efbf7bf54f0a",
+    "scripts/legacy/on-stop.sh": "0456cc984d9323f74ed0aa16c1758ad375f233d5a7d2ade777f21ec47c678d18",
+    "scripts/legacy/warp-notify.sh": "2e05721b486a376923d4efb290723937660892c3decc25e3329267e2509a5fc4",
+    "scripts/on-notification.sh": "dfe593f0b4e535335b9923b9bab597a35220e22085cd31e4a3eb833ece7d67f9",
+    "scripts/on-permission-request.sh": "4ccb832b300b67375c640e5b2fc2d08024e3c14256c92fa0cc96042c158bcfd6",
+    "scripts/on-post-tool-use.sh": "94f60981fcdaf0004e0ae94f0c780f8be32ee404ddf395b92a1378912df743d4",
+    "scripts/on-prompt-submit.sh": "58986635076f5b85a06e4d8f4e0baea061756543bd30e667a76f5a31423aa834",
+    "scripts/on-session-start.sh": "712123ece1a0fbb67d6a1d0db303712230ce424ab4fa6ceda3e202796449d582",
+    "scripts/on-stop-failure.sh": "71519423d039bc7d59c5af45f29ff1cd13ac3522aae6b57f5dc244cede76fa0e",
+    "scripts/on-stop.sh": "249852062f8659a265e8b55b887fd5384bc0027ac31c296f3ac9fb13e4341d6c",
+    "scripts/should-use-structured.sh": "f34b95caf2959dcb321d00eb72dc736c85d8f96958b03472380725ea950588bb",
+    "scripts/warp-notify.sh": "13c0200fb79b666eacfec87fd33fdd36ec29f0f8b836b2e26009b2848d7696fe",
+    "tests/test-hooks.sh": "56a82d0750475e79cce2aeb01097207007e7d7e58b2f982c3c15548da24a65fb"
+  },
+  "fixture_after_auto_update_window": {
+    "tree_sha256": {
+      ".claude-plugin/plugin.json": "50c3aa9299fa465386062f35c395c0c690d8541f312b047584ad6f217cd7f1ee",
+      "hooks/hooks.json": "cbea2d15f3793688a5aa1b9ee459097db88f9446cb5c7d7cb2fe11fa2f39907c",
+      "scripts/build-payload.sh": "5b90e57a52d0f2efbce6c9648ffe6d470ef9cb903fa2d3b1d45a12005f045c36",
+      "scripts/emit-terminal-sequence.sh": "c461961b191ceb56cbd33f010a89f4c10d8927628c5aca4da3d79f4a881b3b9f",
+      "scripts/legacy/on-notification.sh": "ce184c59f210189eda2105d49cbb85e5e346b8190320ae000f0e31bc01af3a4d",
+      "scripts/legacy/on-session-start.sh": "e33036ff07a277d2403053e4b60610ac15a53d3e2eb36cf88d68efbf7bf54f0a",
+      "scripts/legacy/on-stop.sh": "0456cc984d9323f74ed0aa16c1758ad375f233d5a7d2ade777f21ec47c678d18",
+      "scripts/legacy/warp-notify.sh": "2e05721b486a376923d4efb290723937660892c3decc25e3329267e2509a5fc4",
+      "scripts/on-notification.sh": "dfe593f0b4e535335b9923b9bab597a35220e22085cd31e4a3eb833ece7d67f9",
+      "scripts/on-permission-request.sh": "4ccb832b300b67375c640e5b2fc2d08024e3c14256c92fa0cc96042c158bcfd6",
+      "scripts/on-post-tool-use.sh": "94f60981fcdaf0004e0ae94f0c780f8be32ee404ddf395b92a1378912df743d4",
+      "scripts/on-prompt-submit.sh": "58986635076f5b85a06e4d8f4e0baea061756543bd30e667a76f5a31423aa834",
+      "scripts/on-session-start.sh": "712123ece1a0fbb67d6a1d0db303712230ce424ab4fa6ceda3e202796449d582",
+      "scripts/on-stop-failure.sh": "71519423d039bc7d59c5af45f29ff1cd13ac3522aae6b57f5dc244cede76fa0e",
+      "scripts/on-stop.sh": "3f44cf96f0028fc15333f9ff6f6af5c7bceb545e445a49328a0a0e133bc248f4",
+      "scripts/should-use-structured.sh": "6460753a80c1fb6a39bba772a569644cc50bcc7b529a0f5f43b8944852410954",
+      "scripts/warp-notify.sh": "3bd4102f7b537535a35ea69c0437ee38d3bed8e9b8734acaec7ff4d04565fbb9",
+      "tests/test-hooks.sh": "56a82d0750475e79cce2aeb01097207007e7d7e58b2f982c3c15548da24a65fb"
+    },
+    "configuration": {
+      "settings.json": {
+        "extraKnownMarketplaces": {
+          "infinishell-claude-update-fixture": {
+            "source": {
+              "source": "git",
+              "url": "http://127.0.0.1:55859/fixture.git"
+            },
+            "autoUpdate": true
+          }
+        },
+        "enabledPlugins": {
+          "warp@infinishell-claude-update-fixture": true
+        }
+      },
+      "plugins/known_marketplaces.json": {
+        "infinishell-claude-update-fixture": {
+          "source": {
+            "source": "git",
+            "url": "http://127.0.0.1:55859/fixture.git"
+          },
+          "installLocation": "<isolated-probe>/home/.claude/plugins/marketplaces/infinishell-claude-update-fixture",
+          "lastUpdated": "2026-09-16T11:20:53.239Z",
+          "autoUpdate": true
+        }
+      },
+      "plugins/installed_plugins.json": {
+        "version": 2,
+        "plugins": {
+          "warp@infinishell-claude-update-fixture": [
+            {
+              "scope": "user",
+              "installPath": "<isolated-probe>/home/.claude/plugins/cache/infinishell-claude-update-fixture/warp/2.2.0",
+              "version": "2.2.0",
+              "installedAt": "2026-09-16T11:20:53.970Z",
+              "lastUpdated": "2026-09-16T11:20:53.970Z",
+              "gitCommitSha": "ce193c868c99773fef59648d5e381f41f097f5a7"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "automatic_update_observed": false,
+  "fixture_after_native_new_version_update": {
+    "tree_sha256": {
+      ".claude-plugin/plugin.json": "b3b4b883e141b3754cf845482be5293c140d123c8c28098680707b74dbebe822",
+      "hooks/hooks.json": "58df57ff9e94cc59a4e7f038b067614ed7a047fd71f352c84a34252d037f66ee",
+      "scripts/build-payload.sh": "0ebf0734250d70d7c34a6948d550aeb140b785bcdeaa36e96f0fbac27850e881",
+      "scripts/emit-terminal-sequence.sh": "c461961b191ceb56cbd33f010a89f4c10d8927628c5aca4da3d79f4a881b3b9f",
+      "scripts/legacy/on-notification.sh": "ce184c59f210189eda2105d49cbb85e5e346b8190320ae000f0e31bc01af3a4d",
+      "scripts/legacy/on-session-start.sh": "e33036ff07a277d2403053e4b60610ac15a53d3e2eb36cf88d68efbf7bf54f0a",
+      "scripts/legacy/on-stop.sh": "0456cc984d9323f74ed0aa16c1758ad375f233d5a7d2ade777f21ec47c678d18",
+      "scripts/legacy/warp-notify.sh": "2e05721b486a376923d4efb290723937660892c3decc25e3329267e2509a5fc4",
+      "scripts/on-notification.sh": "dfe593f0b4e535335b9923b9bab597a35220e22085cd31e4a3eb833ece7d67f9",
+      "scripts/on-permission-request.sh": "4ccb832b300b67375c640e5b2fc2d08024e3c14256c92fa0cc96042c158bcfd6",
+      "scripts/on-post-tool-use.sh": "94f60981fcdaf0004e0ae94f0c780f8be32ee404ddf395b92a1378912df743d4",
+      "scripts/on-prompt-submit.sh": "58986635076f5b85a06e4d8f4e0baea061756543bd30e667a76f5a31423aa834",
+      "scripts/on-session-start.sh": "712123ece1a0fbb67d6a1d0db303712230ce424ab4fa6ceda3e202796449d582",
+      "scripts/on-stop-failure.sh": "71519423d039bc7d59c5af45f29ff1cd13ac3522aae6b57f5dc244cede76fa0e",
+      "scripts/on-stop.sh": "249852062f8659a265e8b55b887fd5384bc0027ac31c296f3ac9fb13e4341d6c",
+      "scripts/should-use-structured.sh": "f34b95caf2959dcb321d00eb72dc736c85d8f96958b03472380725ea950588bb",
+      "scripts/warp-notify.sh": "13c0200fb79b666eacfec87fd33fdd36ec29f0f8b836b2e26009b2848d7696fe",
+      "tests/test-hooks.sh": "56a82d0750475e79cce2aeb01097207007e7d7e58b2f982c3c15548da24a65fb"
+    },
+    "configuration": {
+      "settings.json": {
+        "extraKnownMarketplaces": {
+          "infinishell-claude-update-fixture": {
+            "source": {
+              "source": "git",
+              "url": "http://127.0.0.1:55859/fixture.git"
+            },
+            "autoUpdate": true
+          }
+        },
+        "enabledPlugins": {
+          "warp@infinishell-claude-update-fixture": true
+        }
+      },
+      "plugins/known_marketplaces.json": {
+        "infinishell-claude-update-fixture": {
+          "source": {
+            "source": "git",
+            "url": "http://127.0.0.1:55859/fixture.git"
+          },
+          "installLocation": "<isolated-probe>/home/.claude/plugins/marketplaces/infinishell-claude-update-fixture",
+          "lastUpdated": "2026-09-16T11:21:56.529Z",
+          "autoUpdate": true
+        }
+      },
+      "plugins/installed_plugins.json": {
+        "version": 2,
+        "plugins": {
+          "warp@infinishell-claude-update-fixture": [
+            {
+              "scope": "user",
+              "installPath": "<isolated-probe>/home/.claude/plugins/cache/infinishell-claude-update-fixture/warp/2.2.1-fixture",
+              "version": "2.2.1-fixture",
+              "installedAt": "2026-09-16T11:20:53.970Z",
+              "lastUpdated": "2026-09-16T11:21:57.226Z",
+              "gitCommitSha": "3f7c2c08f0a29c2746056cc1e543f499176a02df"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "fixture_old_cache_after_native_update": {
+    ".claude-plugin/plugin.json": "50c3aa9299fa465386062f35c395c0c690d8541f312b047584ad6f217cd7f1ee",
+    ".orphaned_at": "721b4c6eada6516d746914d318a05b702050d1015e010791ec622e72497d064e",
+    "hooks/hooks.json": "cbea2d15f3793688a5aa1b9ee459097db88f9446cb5c7d7cb2fe11fa2f39907c",
+    "scripts/build-payload.sh": "5b90e57a52d0f2efbce6c9648ffe6d470ef9cb903fa2d3b1d45a12005f045c36",
+    "scripts/emit-terminal-sequence.sh": "c461961b191ceb56cbd33f010a89f4c10d8927628c5aca4da3d79f4a881b3b9f",
+    "scripts/legacy/on-notification.sh": "ce184c59f210189eda2105d49cbb85e5e346b8190320ae000f0e31bc01af3a4d",
+    "scripts/legacy/on-session-start.sh": "e33036ff07a277d2403053e4b60610ac15a53d3e2eb36cf88d68efbf7bf54f0a",
+    "scripts/legacy/on-stop.sh": "0456cc984d9323f74ed0aa16c1758ad375f233d5a7d2ade777f21ec47c678d18",
+    "scripts/legacy/warp-notify.sh": "2e05721b486a376923d4efb290723937660892c3decc25e3329267e2509a5fc4",
+    "scripts/on-notification.sh": "dfe593f0b4e535335b9923b9bab597a35220e22085cd31e4a3eb833ece7d67f9",
+    "scripts/on-permission-request.sh": "4ccb832b300b67375c640e5b2fc2d08024e3c14256c92fa0cc96042c158bcfd6",
+    "scripts/on-post-tool-use.sh": "94f60981fcdaf0004e0ae94f0c780f8be32ee404ddf395b92a1378912df743d4",
+    "scripts/on-prompt-submit.sh": "58986635076f5b85a06e4d8f4e0baea061756543bd30e667a76f5a31423aa834",
+    "scripts/on-session-start.sh": "712123ece1a0fbb67d6a1d0db303712230ce424ab4fa6ceda3e202796449d582",
+    "scripts/on-stop-failure.sh": "71519423d039bc7d59c5af45f29ff1cd13ac3522aae6b57f5dc244cede76fa0e",
+    "scripts/on-stop.sh": "3f44cf96f0028fc15333f9ff6f6af5c7bceb545e445a49328a0a0e133bc248f4",
+    "scripts/should-use-structured.sh": "6460753a80c1fb6a39bba772a569644cc50bcc7b529a0f5f43b8944852410954",
+    "scripts/warp-notify.sh": "3bd4102f7b537535a35ea69c0437ee38d3bed8e9b8734acaec7ff4d04565fbb9",
+    "tests/test-hooks.sh": "56a82d0750475e79cce2aeb01097207007e7d7e58b2f982c3c15548da24a65fb"
+  },
+  "observations": {
+    "different_version_native_update_verified": true,
+    "new_active_cache_equals_unpatched_fixture_source": true,
+    "old_cache_original_files_preserved": true,
+    "old_cache_added_files": [
+      ".orphaned_at"
+    ],
+    "model_requests": 0,
+    "upstream_new_version_used": false
+  }
+}

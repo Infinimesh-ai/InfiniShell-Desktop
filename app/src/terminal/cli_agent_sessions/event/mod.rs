@@ -21,6 +21,10 @@ pub enum CLIAgentEventType {
     PermissionReplied,
     QuestionAsked,
     IdlePrompt,
+    /// 普通桌面通知不携带可验证的任务终态。
+    Notification,
+    /// 仅由明确的结构化取消结果发出。
+    Cancelled,
     Unknown(String),
 }
 
@@ -44,6 +48,12 @@ pub enum CLIAgentEventSource {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default)]
 pub struct CLIAgentEventPayload {
+    /// 可选的上游去重和排序信息，旧版插件保持兼容。
+    pub event_id: Option<String>,
+    pub sequence: Option<u64>,
+    pub turn_id: Option<String>,
+    pub prompt_id: Option<String>,
+    pub terminal_unverified: Option<bool>,
     pub query: Option<String>,
     pub response: Option<String>,
     pub transcript_path: Option<String>,

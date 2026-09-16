@@ -1,0 +1,16 @@
+{
+  "source_commit": "6921a9925955a1955503e259cd935eaea4ac2ac0",
+  "source_tree_dirty": true,
+  "tmux_sha256": "a47f7c82de1e2779eadbd089ab4daccf60cd136a2b8dd976bec3399b9755a9f9",
+  "host_platform": "darwin",
+  "ssh": "OpenSSH_10.3p1, LibreSSL 3.3.6",
+  "tmux": "tmux 3.7c",
+  "credentials_provided": false,
+  "model_requests": false,
+  "native_cli_hook_triggered": false,
+  "notification_origin": "bundled_hook_replay",
+  "product_ssh_ui_verified": false,
+  "different_os_host_verified": false,
+  "error": "SSH 上下文检查失败：<local-user>@127.0.0.1: Permission denied (publickey).\r\n",
+  "passed": false
+}

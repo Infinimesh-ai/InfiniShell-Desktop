@@ -1,0 +1,10 @@
+{
+  "api": "es_new_descendants_client",
+  "minimum_macos": "27.0",
+  "new_client_result": 3,
+  "process_exit": 0,
+  "stderr": "",
+  "entitlement_added": false,
+  "system_configuration_changed": false,
+  "model_requests": false
+}

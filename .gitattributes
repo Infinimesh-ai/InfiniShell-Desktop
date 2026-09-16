@@ -12,6 +12,14 @@
 *.recording -text
 app/assets/bundled/bootstrap/*_subshell_bootstrap_block_output.txt -text
 
+# 统一差异补丁的空上下文行需要前导空格；固定上游原文须保持清单中的字节摘要。
+app/assets/bundled/cli-agent-plugins/*/upstream.patch whitespace=-blank-at-eol
+app/assets/bundled/cli-agent-plugins/codex/source/plugins/orchestration/skills/factory-files/references/scorers.md whitespace=-blank-at-eol
+
+# 原始验收输出保留终端空白与文件摘要，不对记录做格式整理。
+specs/cli-agent-parity/validation/*.test-output.txt -text whitespace=-blank-at-eol,-blank-at-eof
+specs/cli-agent-parity/validation/macos-gui-pty-grok-login-boundary.txt -text whitespace=-blank-at-eol,-blank-at-eof
+
 *.pdb filter=lfs diff=lfs merge=lfs -text
 crates/input_classifier/models/** filter=lfs diff=lfs merge=lfs -text
 crates/input_classifier/models/**/*tokenizer.json -filter -diff -merge text linguist-generated=true

@@ -1,0 +1,23 @@
+{
+  "recorded_at": "2026-09-16T11:43:23.390965+00:00",
+  "platform": "macOS arm64",
+  "baseline_commit": "6921a9925955a1955503e259cd935eaea4ac2ac0",
+  "worktree_dirty": true,
+  "final_commit_verification": false,
+  "test_binary_sha256": "e4537946e46dc3b882359b5c33fe325d7eced9154290ea5f10687d1ddcdb2764",
+  "note": "build18 仅更新现有 FTL 文案；debug RustEmbed 运行时读取当前资源，Cargo复用build17二进制。check19通过全部新Rust，相关模块492项build17通过。bundle7与最终提交跨平台仍待验。",
+  "checks": [
+    {
+      "command": "cargo test -p warp --lib i18n::tests",
+      "summary": "11 passed; 0 failed; 4.33s; reused debug binary in 0.85s",
+      "exit_code": 0,
+      "log_sha256": "d9dab06a8ac77bd01cecd5685ed39bb9c87a4e0b5bee113f72a15f9b6f963b4e"
+    },
+    {
+      "command": "cargo check -p warp",
+      "summary": "Finished dev profile in 1m11s",
+      "exit_code": 0,
+      "log_sha256": "c063f776fee4ad6addd6bf594738f922cc950b1b2516614a3897f08d06b0349c"
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+--- a/plugins/warp/scripts/build-payload.sh
++++ b/plugins/warp/scripts/build-payload.sh
+@@ -1,22 +1,8 @@
+ #!/bin/bash
+-# Builds a structured JSON notification payload for warp://cli-agent.
+-#
+-# Usage: source this file, then call build_payload with event-specific fields.
+-#
+-# Example:
+-#   source "$(dirname "${BASH_SOURCE[0]}")/build-payload.sh"
+-#   BODY=$(build_payload "$INPUT" "stop" \
+-#       --arg query "$QUERY" \
+-#       --arg response "$RESPONSE")
+-#
+-# The function extracts common fields (session_id, cwd, project) from the
+-# hook's stdin JSON (passed as $1), then merges any extra jq args you pass.
++# 基于 Warp MIT 插件的最小修补：保留 Codex 0.147.0 原生 turn_id。
+ 
+-# The current protocol version this plugin knows how to produce.
+ PLUGIN_CURRENT_PROTOCOL_VERSION=1
+ 
+-# Negotiate the protocol version with Warp.
+-# Uses min(plugin_current, warp_declared), falling back to 1 if Warp doesn't advertise a version.
+ negotiate_protocol_version() {
+     local warp_version="${WARP_CLI_AGENT_PROTOCOL_VERSION:-1}"
+     if [ "$warp_version" -lt "$PLUGIN_CURRENT_PROTOCOL_VERSION" ] 2>/dev/null; then
+@@ -27,31 +13,28 @@
+ }
+ 
+ build_payload() {
+-    local input="$1"
+-    local event="$2"
++    local input="$1" event="$2"
+     shift 2
++    local protocol_version session_id cwd project turn_id
++    protocol_version=$(negotiate_protocol_version)
++    session_id=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
++    cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
++    turn_id=$(printf '%s' "$input" | jq -r '.turn_id | select(type == "string" and length > 0)' 2>/dev/null)
++    project=""
++    [ -n "$cwd" ] && project=$(basename "$cwd")
+ 
+-    local protocol_version
+-    protocol_version=$(negotiate_protocol_version)
+-
+-    # Extract common fields from the hook input
+-    local session_id cwd project
+-    session_id=$(echo "$input" | jq -r '.session_id // empty' 2>/dev/null)
+-    cwd=$(echo "$input" | jq -r '.cwd // empty' 2>/dev/null)
+-    project=""
+-    if [ -n "$cwd" ]; then
+-        project=$(basename "$cwd")
+-    fi
+-
+-    # Build the payload: common fields + any extra args passed by the caller.
+-    # Extra args should be jq flag pairs like: --arg key "value" or --argjson key '{"a":1}'
+-    jq -nc \
++    # 不透传未经此版本证明存在的 event_id、sequence 或 Claude 的 prompt_id。
++    jq -anc \
+         --argjson v "$protocol_version" \
+-        --arg agent "codex" \
+-        --arg event "$event" \
+-        --arg session_id "$session_id" \
+-        --arg cwd "$cwd" \
+-        --arg project "$project" \
+-        "$@" \
+-        '{v:$v, agent:$agent, event:$event, session_id:$session_id, cwd:$cwd, project:$project} + $ARGS.named'
++        --arg agent "codex" --arg event "$event" \
++        --arg session_id "$session_id" --arg cwd "$cwd" --arg project "$project" \
++        --arg turn_id "$turn_id" "$@" '
++        {v:$v, agent:$agent, event:$event, session_id:$session_id, cwd:$cwd, project:$project}
++        + $ARGS.named
++        | if .turn_id == "" then
++            del(.turn_id)
++            | if .event == "stop" or .event == "stop_failure" then
++                .event = "notification" | .terminal_unverified = true | .error_type = (.error_type // "uncorrelated_hook")
++              else . end
++          else . end'
+ }
+--- a/plugins/warp/scripts/on-stop.sh
++++ b/plugins/warp/scripts/on-stop.sh
+@@ -1,29 +1,18 @@
+ #!/bin/bash
+-# Hook script for Codex Stop event.
+-# Sends a structured Warp notification when Codex finishes a turn.
+-
++# 只转发带原生回合身份的 Stop；hook 继续运行时不报告成功。
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ source "$SCRIPT_DIR/should-use-structured.sh"
++if ! should_use_structured; then exit 0; fi
++source "$SCRIPT_DIR/build-payload.sh"
++INPUT=$(cat)
++[ "$(printf '%s' "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null)" = "true" ] && exit 0
+ 
+-if ! should_use_structured; then
+-    exit 0
+-fi
+-
+-source "$SCRIPT_DIR/build-payload.sh"
+-
+-INPUT=$(cat)
+-
+-RESPONSE=$(echo "$INPUT" | jq -r '.last_assistant_message // empty' 2>/dev/null)
+-if [ -n "$RESPONSE" ] && [ ${#RESPONSE} -gt 200 ]; then
+-    RESPONSE="${RESPONSE:0:197}..."
+-fi
+-
+-TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+-
+-BODY=$(build_payload "$INPUT" "stop" \
+-    --arg response "$RESPONSE" \
+-    --arg transcript_path "$TRANSCRIPT_PATH")
+-
++RESPONSE=$(printf '%s' "$INPUT" | jq -r '.last_assistant_message | select(type == "string")' 2>/dev/null)
++TRANSCRIPT_PATH=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
++EVENT="stop"
++[ -z "$RESPONSE" ] && EVENT="notification"
++if [ ${#RESPONSE} -gt 200 ]; then RESPONSE="${RESPONSE:0:197}..."; fi
++BODY=$(build_payload "$INPUT" "$EVENT" --arg response "$RESPONSE" --arg transcript_path "$TRANSCRIPT_PATH")
+ "$SCRIPT_DIR/warp-notify.sh" "warp://cli-agent" "$BODY"
+--- a/plugins/warp/hooks/hooks.json
++++ b/plugins/warp/hooks/hooks.json
+@@ -5,7 +5,7 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${PLUGIN_ROOT}/scripts/on-session-start.sh"
++            "command": "bash \"$PLUGIN_ROOT/scripts/on-session-start.sh\""
+           }
+         ]
+       }
+@@ -15,7 +15,7 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${PLUGIN_ROOT}/scripts/on-stop.sh"
++            "command": "bash \"$PLUGIN_ROOT/scripts/on-stop.sh\""
+           }
+         ]
+       }
+@@ -25,7 +25,7 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${PLUGIN_ROOT}/scripts/on-permission-request.sh"
++            "command": "bash \"$PLUGIN_ROOT/scripts/on-permission-request.sh\""
+           }
+         ]
+       }
+@@ -35,7 +35,7 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${PLUGIN_ROOT}/scripts/on-prompt-submit.sh"
++            "command": "bash \"$PLUGIN_ROOT/scripts/on-prompt-submit.sh\""
+           }
+         ]
+       }
+@@ -45,7 +45,7 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${PLUGIN_ROOT}/scripts/on-post-tool-use.sh"
++            "command": "bash \"$PLUGIN_ROOT/scripts/on-post-tool-use.sh\""
+           }
+         ]
+       }
+--- a/plugins/warp/scripts/warp-notify.sh
++++ b/plugins/warp/scripts/warp-notify.sh
+@@ -18,4 +18,12 @@
+ 
+ # OSC 777 format: \033]777;notify;<title>;<body>\007
+ # Write directly to /dev/tty to ensure it reaches the terminal
+-printf '\033]777;notify;%s;%s\007' "$TITLE" "$BODY" > /dev/tty 2>/dev/null || true
++SEQ=$(printf '\033]777;notify;%s;%s\007' "$TITLE" "$BODY")
++if [ -n "${TMUX:-}" ]; then
++    # tmux 需要 DCS 透传封套，内部每个 ESC 都必须双写；不修改用户透传配置。
++    ESC=$'\033'
++    SEQ="${SEQ//$ESC/$ESC$ESC}"
++    (printf '\033Ptmux;%s\033\\' "$SEQ" > /dev/tty) 2>/dev/null || true
++else
++    (printf '%s' "$SEQ" > /dev/tty) 2>/dev/null || true
++fi

@@ -1,0 +1,35 @@
+{
+  "tag": "rust-v0.147.0",
+  "files": [
+    {
+      "path": "codex-rs/core/src/unified_exec/process.rs",
+      "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/unified_exec/process.rs",
+      "sha256": "cc4a304fe888d57cc4b979364590dc2834a6469391fe3dc60d855fffa81dfaf1"
+    },
+    {
+      "path": "codex-rs/utils/pty/src/lib.rs",
+      "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/utils/pty/src/lib.rs",
+      "sha256": "f1fbf14faab8a0a1448480ee7e7517afaf20b8718a9c211c34d98928bd55f0eb"
+    },
+    {
+      "path": "codex-rs/utils/pty/src/pipe.rs",
+      "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/utils/pty/src/pipe.rs",
+      "sha256": "a1c9a32ee75ba7f959307cf962c6a36bebb5c2e43a2fb1fb4bc0ac4fcf8b6811"
+    },
+    {
+      "path": "codex-rs/utils/pty/src/process.rs",
+      "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/utils/pty/src/process.rs",
+      "sha256": "527d36198f72a0ad7b8759a3d1dfa703deb5f08c45c454430739ac8c773738d6"
+    },
+    {
+      "path": "codex-rs/utils/pty/src/process_group.rs",
+      "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/utils/pty/src/process_group.rs",
+      "sha256": "4c9c062f990c9bfef8c61641956765379586c4f4bb8fc61db67cf1a515d084d3"
+    },
+    {
+      "path": "codex-rs/utils/pty/src/pty.rs",
+      "url": "https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/utils/pty/src/pty.rs",
+      "sha256": "7af080346d83e1e1addab3bada4d6b4232a701852537d33f6a7e7c26b549d8e0"
+    }
+  ]
+}

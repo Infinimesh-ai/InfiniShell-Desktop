@@ -2775,6 +2775,22 @@ fn serialize_outgoing_tool_call(
             "grep".to_owned(),
             json!({ "queries": g.queries, "path": g.path }).to_string(),
         ),
+        Some(Tool::SendMessageToAgent(message)) => ("send_message_to_agent".to_owned(), json!({"addresses":message.addresses,"subject":message.subject,"message":message.message}).to_string()),
+        Some(Tool::RunAgents(request)) => {
+            let harness = match request.harness.as_ref().and_then(|harness| harness.variant.as_ref()) {
+                Some(api::harness::Variant::ClaudeCode(_)) => "claude",
+                Some(api::harness::Variant::Codex(_)) => "codex",
+                Some(api::harness::Variant::Oz(_)) => "oz",
+                Some(api::harness::Variant::OpenCode(_)) => "opencode",
+                Some(api::harness::Variant::Gemini(_)) => "gemini",
+                None => "unknown",
+            };
+            ("run_agents".to_owned(), json!({
+                "summary":request.summary,"base_prompt":request.base_prompt,"harness":harness,"model_id":request.model_id,"plan_id":request.plan_id,
+                "skills":request.skills.iter().filter_map(|skill| match &skill.skill_reference { Some(api::skill_ref::SkillReference::Path(path)) => Some(path), Some(api::skill_ref::SkillReference::BundledSkillId(_)) | None => None }).collect::<Vec<_>>(),
+                "agent_run_configs":request.agent_run_configs.iter().map(|config| json!({"name":config.name,"prompt":config.prompt,"title":config.title})).collect::<Vec<_>>()
+            }).to_string())
+        }
         Some(Tool::AskUserQuestion(a)) => {
             let questions: Vec<Value> = a
                 .questions
@@ -3010,6 +3026,8 @@ fn is_plan_mode_turn(input: &[AIAgentInput]) -> bool {
 /// read_shell_command_output / ask_user_question / read_skill / read_documents /
 /// create_documents / edit_documents / webfetch / websearch / mcp/*`。
 const PLAN_MODE_BLOCKED_TOOLS: &[&str] = &[
+    "run_agents",
+    "send_message_to_agent",
     "run_shell_command",
     // Zap M4:跨主机批量执行同属写/执行类,Plan Mode 下一并硬过滤。
     tools::project_hosts::TOOL_NAME,
@@ -3031,6 +3049,24 @@ pub fn available_tool_names(params: &RequestParams) -> Vec<String> {
     let mut names: Vec<String> = tools::REGISTRY
         .iter()
         .filter(|t| {
+            if matches!(t.name, "run_agents" | "send_message_to_agent")
+                && (!params.local_orchestration_enabled
+                    || (t.name == "run_agents"
+                        && params.parent_agent_id.is_some()
+                        && !FeatureFlag::MultiLevelOrchestration.is_enabled())
+                    || params
+                        .supported_tools_override
+                        .as_ref()
+                        .is_some_and(|supported| {
+                            !supported.contains(&if t.name == "run_agents" {
+                                api::ToolType::RunAgents
+                            } else {
+                                api::ToolType::SendMessageToAgent
+                            })
+                        }))
+            {
+                return false;
+            }
             if is_lrc && t.name == "run_shell_command" {
                 return false;
             }
@@ -3099,6 +3135,24 @@ fn build_tools_array(
     let mut out: Vec<GenaiTool> = tools::REGISTRY
         .iter()
         .filter(|t| {
+            if matches!(t.name, "run_agents" | "send_message_to_agent")
+                && (!params.local_orchestration_enabled
+                    || (t.name == "run_agents"
+                        && params.parent_agent_id.is_some()
+                        && !FeatureFlag::MultiLevelOrchestration.is_enabled())
+                    || params
+                        .supported_tools_override
+                        .as_ref()
+                        .is_some_and(|supported| {
+                            !supported.contains(&if t.name == "run_agents" {
+                                api::ToolType::RunAgents
+                            } else {
+                                api::ToolType::SendMessageToAgent
+                            })
+                        }))
+            {
+                return false;
+            }
             if is_lrc && t.name == "run_shell_command" {
                 return false;
             }
@@ -4688,6 +4742,8 @@ pub async fn generate_byop_output(
                         && call.fn_name != tools::todowrite::TOOL_NAME
                         && call.fn_name != tools::machine_memory::TOOL_NAME
                         && call.fn_name != tools::skill::READ_SKILL.name
+                        && call.fn_name != tools::local_orchestration::RUN_AGENTS.name
+                        && call.fn_name != tools::local_orchestration::SEND_MESSAGE.name
                     {
                         if let Some(msg_id) = tool_msg_ids.get(&call.call_id).cloned() {
                             // 已 emit 占位 → 节流增量刷新。

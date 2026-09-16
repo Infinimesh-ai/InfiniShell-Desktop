@@ -11,6 +11,7 @@ fn harness_config_name_round_trips_for_known_variants() {
         Harness::OpenCode,
         Harness::Gemini,
         Harness::Codex,
+        Harness::Grok,
     ] {
         assert_eq!(
             Harness::from_config_name(harness.config_name()),
@@ -32,4 +33,14 @@ fn harness_from_config_name_round_trips_unknown() {
         Harness::from_config_name(Harness::Unknown.config_name()),
         Some(Harness::Unknown),
     );
+}
+
+#[test]
+fn grok_identity_does_not_enable_unverified_execution_modes() {
+    assert_eq!(
+        Harness::parse_orchestration_harness("Grok"),
+        Some(Harness::Grok)
+    );
+    assert_eq!(Harness::parse_local_child_harness("grok"), None);
+    assert!(!Harness::Grok.should_display_in_help_text());
 }

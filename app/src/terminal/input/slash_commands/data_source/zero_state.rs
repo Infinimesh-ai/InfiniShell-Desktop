@@ -49,7 +49,7 @@ impl SyncDataSource for GuiZeroStateDataSource {
             && FeatureFlag::ListSkills.is_enabled()
             && AISettings::as_ref(app).is_any_ai_enabled(app)
         {
-            let cli_agent_providers = source.active_cli_agent_providers(app);
+            let cli_agent = source.active_cli_agent(app);
             let active_session = source.active_session().as_ref(app);
             let cwd = active_session.current_working_directory_location(app);
             let skill_manager_handle = SkillManager::handle(app);
@@ -60,7 +60,8 @@ impl SyncDataSource for GuiZeroStateDataSource {
                 .into_iter()
                 .sorted_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()))
             {
-                if let Some(providers) = &cli_agent_providers {
+                if let Some(agent) = cli_agent {
+                    let providers = agent.supported_skill_providers_for_scope(skill.scope);
                     if !skill_manager.skill_exists_for_any_provider(&skill, providers) {
                         continue;
                     }

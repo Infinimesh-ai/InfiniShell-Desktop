@@ -50,3 +50,20 @@ fn codex_remains_product_disabled() {
         }
     );
 }
+
+#[test]
+fn readiness_asks_for_the_same_agent_identity_as_the_installation_scan() {
+    let _codex = FeatureFlag::LocalClaudeCodexChildHarnesses.override_enabled(true);
+    for (harness, installed) in [
+        (Harness::Claude, CLIAgent::Claude),
+        (Harness::Codex, CLIAgent::Codex),
+    ] {
+        assert_eq!(
+            local_harness_setup_state_with_cli_resolver(harness, |agent| {
+                assert_eq!(agent, installed);
+                true
+            }),
+            LocalHarnessSetupState::Ready
+        );
+    }
+}

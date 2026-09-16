@@ -711,6 +711,16 @@ impl ConvertAPIToolCallToAIAgentAction for api::message::ToolCall {
             api::message::tool_call::Tool::ReadSkill(read_skill) => {
                 create_standard_action(convert_read_skill(read_skill, params.skill_path_origin)?)
             }
+            api::message::tool_call::Tool::RunAgents(request) => create_standard_action(
+                AIAgentActionType::from_run_agents_api(request, params.skill_path_origin)?,
+            ),
+            api::message::tool_call::Tool::SendMessageToAgent(message) => {
+                create_standard_action(AIAgentActionType::SendMessageToAgent {
+                    addresses: message.addresses,
+                    subject: message.subject,
+                    message: message.message,
+                })
+            }
             api::message::tool_call::Tool::AskUserQuestion(ask) => {
                 let questions = ask
                     .questions

@@ -3956,6 +3956,30 @@ impl CodeReviewView {
         SavePosition::new(header, &self.header_position_id).finish()
     }
 
+    /// 只读导出当前有效评审，供托管任务草稿复用；不清空评论，也不产生发送成功事件。
+    pub(crate) fn comments_for_managed_input(
+        &self,
+        ctx: &AppContext,
+    ) -> Option<AgentReviewCommentBatch> {
+        let comments = self
+            .active_comment_model
+            .as_ref()?
+            .as_ref(ctx)
+            .comments
+            .iter()
+            .filter(|comment| !comment.outdated)
+            .cloned()
+            .collect::<Vec<_>>();
+        if comments.is_empty() {
+            return None;
+        }
+        let batch = ReviewCommentBatch::from_comments(comments);
+        Some(AgentReviewCommentBatch {
+            diff_set: self.collect_diff_set(&batch),
+            comments: batch.comments,
+        })
+    }
+
     /// Prepares review comments and emits an event for a higher-level view to route
     /// them to an available terminal.
     fn handle_submit_review_with_comments(&mut self, ctx: &mut ViewContext<Self>) {

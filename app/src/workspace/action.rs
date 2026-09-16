@@ -724,6 +724,9 @@ pub enum WorkspaceAction {
     /// Open the InfiniShell TUI launch modal (for debugging)
     #[cfg(debug_assertions)]
     OpenAgentCliLaunchModal,
+    /// 打开本地 CLI 托管任务与历史恢复入口。
+    #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+    OpenLocalCLITaskManager,
     /// Reset the InfiniShell TUI launch modal dismissed state (for debugging)
     #[cfg(debug_assertions)]
     ResetAgentCliLaunchModalState,
@@ -1137,6 +1140,8 @@ impl WorkspaceAction {
             | OpenNetworkLogPane => false,
             #[cfg(not(target_family = "wasm"))]
             CleanupStorage => false,
+            #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+            OpenLocalCLITaskManager => false,
             #[cfg(debug_assertions)]
             ShowHoaOnboardingFlow => false,
             #[cfg(target_family = "wasm")]

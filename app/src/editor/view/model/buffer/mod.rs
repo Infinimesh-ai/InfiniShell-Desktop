@@ -22,6 +22,7 @@ use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use string_offset::{ByteOffset, CharOffset};
 use sum_tree::{self, Cursor, FilterCursor, SeekBias, SumTree};
+pub(crate) use time::Global as BufferRevision;
 use time::{Global, Lamport};
 use undo::{LocalUndoStack, UndoHistory};
 use vec1::{Vec1, vec1};

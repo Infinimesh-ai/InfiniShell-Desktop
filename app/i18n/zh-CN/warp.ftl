@@ -4572,17 +4572,18 @@ conversation-rename-too-long = 对话标题不得超过 { $max } 个字符。
 cli-agent-plugin-update-not-effective = 插件更新未生效。
 cli-agent-platform-plugin-install-not-effective = 平台插件安装未生效。
 cli-agent-platform-plugin-update-not-effective = 平台插件更新未生效。
-cli-agent-plugin-codex-warp-installed = Warp 插件已安装。请重启 Codex 以启用。
-cli-agent-plugin-codex-warp-updated = Warp 插件已更新。请重启 Codex 以启用。
+cli-agent-plugin-codex-warp-installed = 插件文件已安装。请在 Codex 中通过 /hooks 检查通知 Hooks，然后重启 Codex。
+cli-agent-plugin-codex-warp-updated = 插件文件已更新。请在 Codex 中通过 /hooks 检查通知 Hooks，然后重启 Codex。
 cli-agent-plugin-codex-warp-install-title = 为 Codex 安装 Warp 插件
-cli-agent-plugin-codex-run-commands-restart = 运行以下命令，然后重启 Codex。
+cli-agent-plugin-codex-run-commands-restart = 运行以下命令，在 Codex 中通过 /hooks 检查通知 Hooks，然后重启 Codex。
+cli-agent-plugin-codex-persistent-source-step = 在导出的 InfiniShell 插件包目录中，安装或更新 Codex 通知插件。
 cli-agent-plugin-add-marketplace-step = 添加 Warp 插件市场仓库
-cli-agent-plugin-codex-activate-note = 重启 Codex 以启用插件。
+cli-agent-plugin-codex-activate-note = 请在 Codex 中通过 /hooks 检查通知 Hooks，然后重启 Codex 以应用你的选择。
 cli-agent-plugin-codex-warp-update-title = 更新 Codex 的 Warp 插件
 cli-agent-plugin-upgrade-marketplace-step = 更新插件市场
 cli-agent-plugin-reinstall-warp-plugin-step = 重新安装 Warp 插件
-cli-agent-plugin-codex-activate-update-note = 重启 Codex 以启用更新。
-cli-agent-plugin-codex-marketplace-recovery-note = 如果因 codex-warp 未配置为 Git 插件市场而失败，请移除并重新添加该插件市场。
+cli-agent-plugin-codex-activate-update-note = 更新后的 Hook 定义可能需要在 Codex 中通过 /hooks 重新检查。完成检查后，请重启 Codex。
+cli-agent-plugin-codex-marketplace-recovery-note = 安装失败时，请先查看错误再重试；问题解决前，请保留恢复文件。
 cli-agent-plugin-claude-installed = InfiniShell 插件已安装。请运行 /reload-plugins 以启用。
 cli-agent-plugin-claude-updated = InfiniShell 插件已更新。请运行 /reload-plugins 以启用。
 cli-agent-plugin-gemini-installed = InfiniShell 插件已安装。请重启 Gemini CLI 以启用。
@@ -5515,3 +5516,231 @@ settings-warpify-reuse-control-master = 复用现有 SSH ControlMaster
 settings-exec-profile-run-agents = 运行智能体：
 settings-network-error-invalid-proxy-url = 代理 URL 无效
 settings-network-error-timeout = { $seconds } 秒后超时
+
+# CLI 任务状态与启动
+cli-agent-status-unknown = 状态未知。请在终端中确认任务结果。
+cli-agent-status-disconnected = 连接已中断。任务结果尚未确认。
+cli-agent-waiting-for-answer = 等待你的答复
+cli-agent-grok-managed-unavailable = Grok Build 托管任务尚未通过验证。请在终端中使用 Grok。
+ambient-agent-local-harness-terminal-unavailable = 无法打开本地任务终端。原生提示必须可见，因此未启动任务。
+
+cli-agent-plugin-refresh-marketplace-step = 刷新插件市场并保留已安装插件：
+cli-agent-plugin-disabled = 此插件已禁用。请手动启用以恢复通知。
+cli-agent-plugin-enable-step = 启用已安装插件：
+cli-agent-plugin-enable-codex-config-step = 在 Codex 的 config.toml 中启用此插件：
+cli-agent-grok-image-paste-unavailable = 当前 Grok Build 版本尚未验证图片粘贴。请移除图片附件后再发送。
+cli-agent-image-too-large = { $filename } 过大，无法发送给智能体（上限 { $limit_mb } MB）。
+
+cli-agent-task-already-bound = 此终端已关联一个本地任务。
+cli-agent-input-still-sending = 上一条输入仍在发送。新草稿已保留，请在发送结束后重试。
+cli-agent-task-already-running = 此任务已有活动连接，请打开该任务，无需再启动进程。
+cli-agent-task-manager-title = 本地 CLI 任务
+cli-agent-task-result-subject = 本地任务结果
+cli-agent-task-waiting-native-approval = 等待 CLI 中的审批
+cli-agent-task-disconnected = 任务连接已中断，请手动继续或重连
+cli-agent-task-runtime-failed = 本地 CLI 任务失败，请打开任务查看已保存的结果。
+cli-agent-message-sending = 正在发送任务消息…
+cli-agent-message-acknowledged = 任务消息已接收
+cli-agent-message-unconfirmed = 任务消息接收尚未确认
+cli-agent-message-failed = 任务消息发送失败
+cli-agent-message-cancelled = 任务消息已取消
+cli-agent-message-status-subject = { $status }：{ $subject }
+cli-agent-task-invalid-launch = 保存的任务或项目目录与此次启动请求不匹配。
+cli-agent-managed-version-unavailable = 此 CLI 版本的托管任务未启用或尚未通过验证，请使用终端会话。
+cli-agent-claude-queue-unverified = Claude 运行中追加指令尚未通过验证，请保留草稿，在当前回合结束后发送。
+cli-agent-message-invalid-recipients = 请选择 1 至 16 个不重复的本地接收任务。
+cli-agent-message-local-only = 此会话无法使用本地任务消息。
+cli-agent-message-recipient-unavailable = 接收任务没有活动的托管连接，请先继续或重连该任务。
+cli-agent-message-delivery-failed = 任务消息未被接收，请先检查已保存的消息状态再重试。
+cli-agent-grok-managed-unverified = 此版本的 Grok 托管回合、审批、取消与会话恢复尚未通过验证，请使用终端会话。
+cli-agent-grok-managed-login-required = 请先在终端登录 Grok，再检查托管连接。
+cli-agent-task-save-failed = 无法保存本地任务，任务结果尚未确认。
+ambient-agent-local-harness-persistence-failed = 无法保存本地任务，任务未启动。{ $error }
+ambient-agent-local-harness-working-directory-unavailable = 无法确定本地任务的工作目录。
+ambient-agent-local-harness-shell-required = 启动本地任务前需要检测到终端 Shell。
+cli-agent-plugin-grok-install-title = 设置 Grok 通知
+cli-agent-plugin-grok-install-subtitle = 随附插件需要此终端可用的 Grok 1.0.30 和 Node.js 18 或更新版本。
+cli-agent-plugin-grok-cli-version-step = 检查 Grok 版本
+cli-agent-plugin-grok-node-version-step = 检查 Node.js 版本
+cli-agent-plugin-grok-enable-step = 启用已安装的 InfiniShell 插件
+cli-agent-plugin-grok-restart-note = 安装所需运行时或启用插件后，请重启 Grok，再重试通知设置。
+cli-agent-plugin-grok-operation-failed = Grok 插件命令失败或超时。
+cli-agent-plugin-grok-incompatible = 此 Grok 或 Node.js 版本未通过插件兼容性检查。
+cli-agent-plugin-grok-invalid-state = Grok 插件注册不明确或来自自定义来源，请先修复再更新。
+cli-agent-plugin-grok-update-restored = Grok 插件更新失败，已恢复先前版本。
+cli-agent-plugin-grok-restore-failed = Grok 插件更新失败，无法确认自动恢复结果，请查看安装日志。
+
+# 本地 CLI 任务管理
+cli-task-manager-title = 本地 CLI 任务
+cli-task-manager-new = 新建任务
+cli-task-manager-start = 启动任务
+cli-task-manager-send = 发送指令
+cli-task-manager-resume = 继续历史会话
+cli-task-manager-cancel = 取消当前回合
+cli-task-manager-disconnect = 断开 CLI
+cli-task-manager-discard-draft = 清除未确认草稿
+cli-task-manager-directory = 项目目录
+cli-task-manager-directory-placeholder = 本地项目的绝对路径
+cli-task-manager-prompt = 任务指令
+cli-task-manager-prompt-placeholder = 描述任务内容，按 Enter 插入换行。
+cli-task-manager-empty-prompt = 启动或发送前，请输入任务指令。
+cli-task-manager-invalid-directory = 请输入已存在本地目录的绝对路径。
+cli-task-manager-input-pending = 正在等待 CLI 确认接收这条指令，草稿已保留。
+cli-task-manager-input-waiting-ready = 正在等待 CLI 会话初始化，随后发送指令。
+cli-task-manager-input-uncertain = 指令是否送达尚不确定。请先检查 CLI 历史，再清除草稿并编写新指令；清除草稿不会取消已经送达的输入。
+cli-task-manager-task-row = { $cli } · { $state } · { $task }
+cli-task-manager-task-details = 任务：{ $task }
+    状态：{ $state }
+    原生会话：{ $session }
+cli-task-manager-not-installed = 未安装
+cli-task-manager-version-unknown = 无法确定版本
+cli-task-manager-scanning = 正在检查安装…
+cli-task-manager-installation = { $cli }：{ $version }
+    { $path }
+cli-task-manager-local-only = 这些任务在本机运行。关闭面板后，已连接的任务仍会继续运行。SSH 和 tmux 终端会话单独管理。
+cli-task-manager-grok-unavailable = Grok Build 的审批、取消与恢复行为尚未验证，暂不可使用托管任务。仍可使用终端会话。
+cli-task-manager-claude-verification = Claude Code 2.1.273 可在此功能开关下用于验证；登录、成功回合、审批及恢复仍需完整验收。
+cli-task-manager-empty = 尚未保存本地 CLI 任务。
+cli-task-manager-permission = 新任务权限
+cli-task-manager-permission-inherit = 继承 CLI 设置
+cli-task-manager-permission-readonly = Codex 只读
+cli-task-manager-permission-workspace = Codex 项目写入
+cli-task-manager-permission-inherit-help = 继承权限可能包含 CLI 配置中已允许的访问。应用不会更改这些设置，也不会添加绕过审批的启动参数。
+cli-task-manager-session-pending = 等待原生会话确认
+cli-task-manager-approval = 请求审批：{ $method }
+cli-task-manager-allow-once = 仅允许本次
+cli-task-manager-deny-once = 仅拒绝本次
+cli-task-manager-output = 进度与结果
+cli-task-manager-error = CLI 任务详情：{ $error }
+cli-task-manager-resume-unavailable = 没有可继续的已确认原生会话，不会自动启动新任务。
+cli-task-manager-unknown-cli = 未知 CLI
+cli-task-manager-state-queued = 已排队
+cli-task-manager-state-running = 运行中
+cli-task-manager-state-waiting = 等待审批
+cli-task-manager-state-unconfirmed = 结果待确认
+cli-agent-task-outcome-unconfirmed = CLI 尚未确认任务结果。请查看现有终端。
+cli-task-manager-state-completed = 已完成
+cli-task-manager-state-failed = 失败
+cli-task-manager-state-cancelled = 已取消
+cli-task-manager-state-disconnected = 连接中断
+cli-task-manager-state-unknown = 未知
+cli-task-manager-copy-result = 复制完整结果
+cli-task-manager-output-truncated = 预览已截短，完整结果已保留，可点击复制。
+
+cli-task-manager-message-read-failed = 无法读取已保存的任务消息。
+cli-task-manager-copy-input = 复制消息
+cli-task-manager-restore-input = 恢复未确认草稿
+cli-task-manager-input-not-recoverable = 这条记录无法恢复为未确认的文本草稿，仍可复制已保存的内容。
+cli-task-manager-draft-in-use = 已有其他草稿或未确认指令。请先保留或清除当前内容，再恢复另一条记录。
+cli-task-manager-saved-inputs = 已保存的任务消息
+cli-task-manager-saved-inputs-help = 这里显示历次运行收到和发出的消息。仅未确认的用户输入可以恢复为草稿，已存消息不会自动重发。
+cli-task-manager-message-details = 消息：{ $message } · 第 { $generation } 次运行 · { $state }
+cli-task-manager-input-truncated = 输入预览已截短，点击“复制输入”可获取完整的已存内容。
+cli-task-manager-message-queued = 已排队
+cli-task-manager-message-sent = 已尝试发送
+cli-task-manager-message-acknowledged = 已记录确认状态
+cli-task-manager-message-failed = 发送失败
+cli-task-manager-message-cancelled = 已取消
+cli-task-manager-message-unknown = 状态未知
+
+cli-agent-task-skill-unavailable = 技能 { $skill } 缺失、未启用、重复或内容无效。
+cli-agent-task-skill-local-required = 技能 { $skill } 必须可作为本地文件访问。
+
+cli-task-manager-tools-title = 本地任务工具
+cli-task-manager-tools-spawn = 允许派发子任务
+cli-task-manager-tools-messages = 允许父子任务消息
+cli-task-manager-tools-help = 默认关闭。启用后可查看相关任务，并使用所选能力。子任务继承这些权限，CLI 原生审批仍独立生效。继续任务时使用已保存的权限。
+cli-task-manager-effective-permissions = CLI 实际生效权限
+
+cli-agent-plugin-patch-incompatible = 当前 CLI 版本或平台不支持已验证的通知修补。
+cli-agent-plugin-patch-modified = 插件版本、来源或文件改动未经验证，已停止自动替换。
+cli-agent-plugin-patch-failed = 无法应用或验证通知修补，请查看安装日志后重试。
+cli-agent-plugin-patch-manual-note = 仅执行原生安装不会应用 InfiniShell 通知修补。SSH 或容器需要传输随附修补，并在目标主机运行校验脚本；暂不支持 Windows 自动修补。
+cli-agent-message-unconfirmed-id = 消息 { $message_id } 的接收尚未确认。请查询原记录，勿自动重投。{ $error }
+
+cli-agent-task-skill-plugin-failed = 无法准备隔离技能插件：{ $error }
+cli-agent-task-skill-one-per-turn = 托管任务中每轮请选择一个 Claude 技能。
+cli-agent-task-parent-changed = 父任务已进入另一轮。请从当前轮重新派发此子任务。
+cli-agent-input-images-unverified = 尚未验证 { $cli } 的托管图片输入。草稿已保留。
+cli-task-manager-images-unverified-hint = 尚未验证 { $cli } 的托管图片输入。
+cli-agent-input-attachment-invalid = 图片已损坏或与声明格式不一致。
+cli-task-manager-review-empty = 当前没有可导入的有效评审意见。草稿未变更。
+cli-task-manager-review-remote = 此任务在本机运行。请导入本地仓库的评审意见。
+cli-agent-input-attachment-save-failed = 无法保存本地附件：{ $error }
+cli-agent-task-skills-require-managed = 技能传递需要托管 Codex 或 Claude 任务。
+
+cli-agent-input-images-processing = 请等待图片处理完成。草稿已保留。
+
+cli-agent-input-file-attachment-unavailable = 此 CLI 输入暂不支持发送文件附件卡片。请改为插入文件路径；草稿和附件已保留。
+
+cli-agent-input-multiline-paste-unavailable = 此 CLI 尚未启用安全的多行粘贴。文本已保留；请先在 CLI 中启用括号粘贴后再重试。
+
+cli-agent-input-delivery-failed = 输入未能完整送达。草稿已保留；重试前请检查 CLI 中的输入。
+
+cli-agent-input-image-delivery-failed = 图片未能全部送达。草稿和附件已保留；重试前请检查 CLI。
+
+cli-agent-input-remote-image-unavailable = 远程 CLI 的剪贴板图片传输尚未验证。请使用远程文件路径。
+
+cli-agent-input-target-changed = 等待操作完成期间，CLI 输入会话已变更。未插入文本。
+
+cli-task-manager-attach-files = 附加图片或插入文件
+cli-task-manager-import-review = 导入当前评审
+cli-task-manager-skills = 选择本地技能
+cli-task-manager-no-skills = 未找到适用于此项目的本地技能。
+cli-task-manager-skills-index-failed = 无法加载此项目的本地技能。请检查目录后再次刷新。
+cli-task-manager-preparing-input = 正在准备输入… CLI 确认接收前将保留草稿。
+cli-task-manager-attachments = 附件与技能
+
+cli-agent-task-exit-unconfirmed = 尚未确认上次 CLI 进程已停止。任务记录已保留，请等待清理完成后再继续；缺少退出回执的旧记录暂时无法安全恢复。
+
+cli-task-manager-skills-session-fixed = 此 Claude 会话只能使用启动时注册的技能。若要选择其他技能，请新建任务。
+
+cli-task-manager-message-route = 主题：{ $subject } · 从 { $sender }（第 { $sender_generation } 次运行）发往 { $recipient }（第 { $recipient_generation } 次运行）
+
+cli-task-manager-message-no-receipt = 尚无接收确认。排队或发出不代表已送达。
+
+cli-task-manager-message-native-receipt = 接收依据：CLI 原生协议已确认收到。此确认不表示任务已完成。
+
+cli-task-manager-message-history-receipt = 接收依据：已保存到应用对话历史，供下一次正常请求使用。此记录不表示 CLI 已立即收到或执行。
+
+cli-task-manager-message-unverified-receipt = 记录中的确认状态缺少可识别的接收依据。不能据此认定 CLI 已收到，也不会自动重发。
+
+cli-agent-plugin-codex-hooks-title = 检查 Codex 通知 Hooks
+
+cli-agent-plugin-codex-hooks-subtitle = 插件文件已安装。通知运行前，需要在 Codex 中授权当前 Hook 定义。
+
+cli-agent-plugin-codex-hooks-review-step = 在 Codex 内打开 /hooks，检查 warp@codex-warp 通知 Hooks，并决定要启用和信任哪些 Hook。
+
+cli-agent-plugin-codex-hooks-activation-note = 检查 Hooks 后重启 Codex。InfiniShell 只有收到当前通知后才会确认已生效；更新后可能需要重新检查。
+
+ai-footer-authorize-notifications = 授权通知
+
+ai-footer-authorize-notifications-tooltip = 插件已安装，但原生 hook 仍需授权或无法核实。打开 CLI 授权步骤；InfiniShell 不会自动授予信任。
+
+ai-footer-verify-notifications = 核对通知
+
+ai-footer-verify-notifications-tooltip = 本机授权配置匹配，但当前 CLI 会话尚未发出可信通知。请重启或核对 CLI 配置。
+
+cli-agent-task-permission-ceiling-unavailable = 无法确认子任务会保持在父任务的权限范围内。
+
+cli-agent-task-permission-ceiling-mismatch = 子 CLI 的权限与父任务不一致，尚未发送任务输入。
+
+cli-task-manager-copy-history-result = 复制完整历史结果
+
+cli-task-manager-history-read-failed = 无法读取已保存的历史结果。
+
+cli-task-manager-history-generation = 第 { $generation } 次运行 · { $state }
+
+cli-task-manager-history-selection-expired = 任务或历史结果快照已变化，请重新选择要查看的结果。
+
+cli-task-manager-history-no-result = 此次运行尚无已保存的最终结果。
+
+cli-task-manager-history-title = 历史结果
+
+cli-task-manager-history-loading = 正在读取历史结果…
+
+cli-task-manager-history-empty = 暂无历史运行记录。
+
+cli-task-manager-history-read-only = 当前查看第 { $generation } 次运行的历史结果。发送、取消和继续操作仍针对当前运行（第 { $active_generation } 次）。
+
+cli-task-manager-history-details = 保存状态：{ $state } · 原生会话：{ $session }

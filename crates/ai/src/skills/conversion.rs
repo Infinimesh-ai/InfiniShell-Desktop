@@ -22,6 +22,8 @@ pub enum SkillConversionError {
     ScopeInvalid,
     #[error("Invalid provider")]
     ProviderInvalid,
+    #[error("The remote skill protocol does not support provider {0}")]
+    UnsupportedProvider(SkillProvider),
     #[error("Invalid content")]
     ContentInvalid,
     #[error("Skill path origin is unavailable")]
@@ -138,9 +140,11 @@ pub fn skill_reference_from_read_skill_ref(
         }
     }
 }
-impl From<ParsedSkill> for api::Skill {
-    fn from(skill: ParsedSkill) -> Self {
-        api::Skill {
+impl TryFrom<ParsedSkill> for api::Skill {
+    type Error = SkillConversionError;
+
+    fn try_from(skill: ParsedSkill) -> Result<Self, Self::Error> {
+        Ok(api::Skill {
             descriptor: Some(api::SkillDescriptor {
                 skill_reference: Some(api::skill_descriptor::SkillReference::Path(
                     skill.path.display_path(),
@@ -148,7 +152,7 @@ impl From<ParsedSkill> for api::Skill {
                 name: skill.name,
                 description: skill.description,
                 scope: Some(skill.scope.into()),
-                provider: Some(skill.provider.into()),
+                provider: Some(skill.provider.try_into()?),
             }),
             content: Some(api::FileContent {
                 file_path: skill.path.display_path(),
@@ -160,7 +164,7 @@ impl From<ParsedSkill> for api::Skill {
                         end: line_range.end as u32,
                     }),
             }),
-        }
+        })
     }
 }
 
@@ -178,8 +182,10 @@ impl From<SkillScope> for api::skill_descriptor::Scope {
     }
 }
 
-impl From<SkillProvider> for api::skill_descriptor::Provider {
-    fn from(scope: SkillProvider) -> Self {
+impl TryFrom<SkillProvider> for api::skill_descriptor::Provider {
+    type Error = SkillConversionError;
+
+    fn try_from(scope: SkillProvider) -> Result<Self, Self::Error> {
         let provider_type: api::skill_descriptor::provider::Type = match scope {
             SkillProvider::InfiniShell => api::skill_descriptor::provider::Type::Warp(()),
             SkillProvider::Agents => api::skill_descriptor::provider::Type::Agents(()),
@@ -192,11 +198,12 @@ impl From<SkillProvider> for api::skill_descriptor::Provider {
             SkillProvider::Github => api::skill_descriptor::provider::Type::Github(()),
             SkillProvider::OpenCode => api::skill_descriptor::provider::Type::OpenCode(()),
             SkillProvider::Kiro => api::skill_descriptor::provider::Type::Kiro(()),
+            SkillProvider::Grok => return Err(SkillConversionError::UnsupportedProvider(scope)),
         };
 
-        api::skill_descriptor::Provider {
+        Ok(api::skill_descriptor::Provider {
             r#type: Some(provider_type),
-        }
+        })
     }
 }
 

@@ -22,6 +22,8 @@ pub(super) fn parse(body: &str) -> Option<CLIAgentEvent> {
         "permission_replied" => CLIAgentEventType::PermissionReplied,
         "question_asked" => CLIAgentEventType::QuestionAsked,
         "idle_prompt" => CLIAgentEventType::IdlePrompt,
+        "notification" => CLIAgentEventType::Notification,
+        "cancelled" => CLIAgentEventType::Cancelled,
         other => CLIAgentEventType::Unknown(other.to_string()),
     };
 
@@ -46,6 +48,11 @@ pub(super) fn parse(body: &str) -> Option<CLIAgentEvent> {
         cwd: raw.cwd,
         project: raw.project,
         payload: CLIAgentEventPayload {
+            event_id: raw.event_id,
+            sequence: raw.sequence,
+            turn_id: raw.turn_id,
+            prompt_id: raw.prompt_id,
+            terminal_unverified: raw.terminal_unverified,
             query: raw.query,
             response: raw.response,
             transcript_path: raw.transcript_path,

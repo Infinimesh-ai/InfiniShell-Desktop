@@ -1,0 +1,17 @@
+{
+  "test": "ai::cli_agent_runtime::codex::tests::idle_crash::live_codex_idle_crash_after_ready_disconnects_once",
+  "test_case": "idle-crash",
+  "scope": "rust_adapter_idle_crash_after_native_ready",
+  "credentials_provided": false,
+  "model_requests_expected": false,
+  "app_restart_and_ui_verified": false,
+  "test_binary_sha256": "9507e5d5b31f01e4f18d2451b5f2ea4f4e93edb1481909de1827fe5349d3e5f0",
+  "supervisor_binary_sha256": "eeb2486cc28e50f499ddf279fcabade4c3efea5783af54f98b090dd8b313557b",
+  "supervised_process_lifecycle": true,
+  "platform": "darwin",
+  "commit": "6921a9925955a1955503e259cd935eaea4ac2ac0",
+  "worktree_dirty": true,
+  "cli_version": "codex-cli 0.147.0",
+  "test_exit_code": 0,
+  "acceptance_passed": true
+}

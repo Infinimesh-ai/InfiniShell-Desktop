@@ -154,6 +154,8 @@ pub struct RequestParams {
     pub web_search_enabled: bool,
     pub computer_use_enabled: bool,
     pub ask_user_question_enabled: bool,
+    /// 请求构造时快照本机编排权限，执行器仍在派发前复核。
+    pub local_orchestration_enabled: bool,
     pub research_agent_enabled: bool,
     pub supported_tools_override: Option<Vec<warp_multi_agent_api::ToolType>>,
     /// Zap BYOP 专用:本地会话 id,只用于 request-readiness 诊断日志。
@@ -280,6 +282,7 @@ impl RequestParams {
             web_search_enabled: false,
             computer_use_enabled: false,
             ask_user_question_enabled: false,
+            local_orchestration_enabled: false,
             research_agent_enabled: false,
             supported_tools_override: None,
             byop_conversation_id: Some(AIConversationId::new()),
@@ -449,6 +452,12 @@ impl RequestParams {
             .get_ask_user_question_setting(app, terminal_view_id)
             != crate::ai::execution_profiles::AskUserQuestionPermission::Never;
 
+        let local_orchestration_enabled = cfg!(feature = "local_fs")
+            && FeatureFlag::LocalCLIManagedTasks.is_enabled()
+            && session_context.skill_path_origin() == ai::skills::SkillPathOrigin::Local
+            && !BlocklistAIPermissions::as_ref(app)
+                .get_run_agents_setting(app, terminal_view_id)
+                .is_never_allow();
         let byop_target_task_id = if request_input.input_messages.len() == 1 {
             request_input
                 .input_messages
@@ -502,6 +511,7 @@ impl RequestParams {
             web_search_enabled,
             computer_use_enabled,
             ask_user_question_enabled,
+            local_orchestration_enabled,
             research_agent_enabled,
             supported_tools_override: request_input.supported_tools_override.clone(),
             byop_conversation_id: Some(conversation.id),

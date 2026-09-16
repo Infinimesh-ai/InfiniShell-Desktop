@@ -1,0 +1,30 @@
+{
+  "date_utc": "2026-09-16T11:01:21.018887+00:00",
+  "source_build": "bundle6",
+  "executed_binary_sha256": "92816593bb159e1a9b8929e4beef9110461993d95f0e29e8cacf59564ccd5166",
+  "result": "not_verified",
+  "attempted_physical_keys": [
+    "s",
+    "h",
+    "i",
+    "Down"
+  ],
+  "observed_composition": "shi with underline",
+  "candidate_list_visible_in_app_capture": false,
+  "system_candidate_window_access": "CUA getApp com.apple.inputmethod.SCIM returned NSCocoaErrorDomain 256 / kLSApplicationNotFoundErr for SCIM_Extension.appex",
+  "candidate_chosen": false,
+  "input_source_settings_changed": false,
+  "new_model_requests": 0,
+  "draft_cleared_and_reopened_empty": true,
+  "before_counts": {
+    "local_cli_tasks": 2,
+    "local_cli_task_generations": 3,
+    "local_cli_messages": 3
+  },
+  "after_counts": {
+    "local_cli_tasks": 2,
+    "local_cli_task_generations": 3,
+    "local_cli_messages": 3
+  },
+  "limitation": "没有可见候选列表，不能证明指定候选选择；可能受系统候选窗口的自动化可见性限制，未据此判定产品缺陷。"
+}

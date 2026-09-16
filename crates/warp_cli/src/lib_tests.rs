@@ -14,11 +14,38 @@ use crate::memory_store::{MemoryCommand, MemoryStoreCommand};
 #[test]
 fn identifies_worker_subcommands() {
     assert!(is_worker_invocation("minidump-server"));
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+    assert!(is_worker_invocation("cli-agent-supervisor"));
     #[cfg(unix)]
     assert!(is_worker_invocation(&terminal_server_subcommand()));
     #[cfg(feature = "plugin_host")]
     assert!(is_worker_invocation("--plugin-host"));
     assert!(!is_worker_invocation("--prompt"));
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+#[test]
+fn cli_agent_supervisor_preserves_manifest_path_and_execution_mode() {
+    let path = std::path::PathBuf::from("插件 空 格/manifest.json");
+    for execute in [false, true] {
+        let mut arguments = vec![
+            OsString::from("warp"),
+            OsString::from("cli-agent-supervisor"),
+            path.clone().into_os_string(),
+        ];
+        if execute {
+            arguments.push(OsString::from("--execute"));
+        }
+        let arguments = Args::try_parse_from(arguments).unwrap();
+        let Some(Command::Worker(WorkerCommand::CliAgentSupervisor {
+            manifest,
+            execute: actual_execute,
+        })) = arguments.command() else {
+            panic!("隐藏监督 worker 必须进入专属入口");
+        };
+        assert_eq!(manifest, &path);
+        assert_eq!(*actual_execute, execute);
+    }
 }
 
 #[test]

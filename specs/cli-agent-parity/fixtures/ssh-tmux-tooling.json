@@ -1,0 +1,33 @@
+{
+  "platform": "macOS arm64",
+  "installed_globally": false,
+  "sources": [
+    {
+      "name": "libevent-2.1.13-stable",
+      "url": "https://github.com/libevent/libevent/releases/download/release-2.1.13-stable/libevent-2.1.13-stable.tar.gz",
+      "sha256": "f7e9383b8c0baa81b687e5b5eecc01beefaf1b19b64151d95ed61647fe7a315c"
+    },
+    {
+      "name": "tmux-3.7c",
+      "url": "https://github.com/tmux/tmux/releases/download/3.7c/tmux-3.7c.tar.gz",
+      "sha256": "7c60cae9a0e25288e2e24750aafc9e8800fc7fd4555e447e1b29ee4201cfb3bf"
+    }
+  ],
+  "release_asset_digest_verified": true,
+  "build_flags": {
+    "libevent": [
+      "--disable-shared",
+      "--disable-openssl",
+      "--disable-libevent-regress",
+      "--disable-samples"
+    ],
+    "tmux": [
+      "--disable-utf8proc",
+      "--disable-jemalloc"
+    ]
+  },
+  "system_dependency": "existing ncurses",
+  "tmux_version": "3.7c",
+  "tmux_binary_sha256": "a47f7c82de1e2779eadbd089ab4daccf60cd136a2b8dd976bec3399b9755a9f9",
+  "scope": "SSH/OSC byte transport only; not Unicode layout acceptance"
+}

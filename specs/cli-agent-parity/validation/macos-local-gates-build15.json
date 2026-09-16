@@ -1,0 +1,47 @@
+{
+  "recorded_at": "2026-09-16T10:54:54.228091+00:00",
+  "platform": "macOS arm64",
+  "baseline_commit": "6921a9925955a1955503e259cd935eaea4ac2ac0",
+  "worktree_dirty": true,
+  "final_commit_verification": false,
+  "test_binary_sha256": "7eccb4fcb62e7fbf722947844e5623c5956f381866d675d9c62f164b95431436",
+  "note": "这是 build15/check18/TUI tests2 的中间验证。Codex 安装缓存修补的原生重启回退仍未修复；后续改动必须重验。过滤重叠不加总，ignored 不算通过。",
+  "checks": [
+    {
+      "command": "cargo test -p warp --lib i18n::tests",
+      "summary": "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 6376 filtered out; finished in 4.67s",
+      "exit_code": 0,
+      "log_sha256": "bab9dbaca6a7fe1f599c0709c73bf2b87a8d1ba79132da72a75be30d43ae23f8"
+    },
+    {
+      "command": "warp libtest filter: cli_agent",
+      "summary": "test result: ok. 470 passed; 0 failed; 13 ignored; 0 measured; 5904 filtered out; finished in 3.33s",
+      "exit_code": 0,
+      "log_sha256": "c7a4d1b27ccb527c3880a126342aa06fe94d0100d06fbb0fd36b2861d2b61101"
+    },
+    {
+      "command": "cargo check -p warp",
+      "summary": "Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 09s",
+      "exit_code": 0,
+      "log_sha256": "9a8dce22e6c6fa07b70d06b7ffb0801121671af28a017afc7745a5d10a171a7b"
+    },
+    {
+      "command": "cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'",
+      "summary": "Summary [   0.264s] 9 tests run: 9 passed, 927 skipped",
+      "exit_code": 0,
+      "log_sha256": "ba700539e3a7cf92bf6209ffb574a2a7364ef3601965ed2bc0c5396c312a75f1"
+    },
+    {
+      "command": "python3 -B -m unittest discover -s script/cli-agent-parity -p '*_tests.py'",
+      "summary": "Ran 52 tests in 4.879s",
+      "exit_code": 0,
+      "log_sha256": "02d6121adffd08480f5d32e520cf728fefd91415f105497e081f4b3406dd5970"
+    },
+    {
+      "command": "node --test script/cli-agent-parity/grok_plugin_tests.cjs",
+      "summary": "ℹ pass 11",
+      "exit_code": 0,
+      "log_sha256": "7a3614a7b270837cc7e54b512f17d3d1c6174f4ae5e70adafa3df6ce376d5783"
+    }
+  ]
+}

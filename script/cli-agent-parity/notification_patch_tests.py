@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""验证离线安装事务及配置保护；构造夹具不计作真实 CLI 生命周期验收。"""
+
+import importlib.util
+import json
+from pathlib import Path
+import os
+import tempfile
+import unittest
+from unittest import mock
+
+
+SPEC = importlib.util.spec_from_file_location("notification_patch", Path(__file__).with_name("apply_notification_patch.py"))
+PATCH = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(PATCH)
+
+
+class NotificationPatchTests(unittest.TestCase):
+    def fixture(self, directory):
+        root = Path(directory)
+        (root / "scripts").mkdir(parents=True)
+        metadata = {"files": {}, "compatible_bases": [{"version": "test", "tree_sha256": {}}]}
+        replacements = {}
+        for suffix in ("a", "b"):
+            name = "scripts/" + suffix
+            original = ("original-" + suffix).encode()
+            replacement = ("replacement-" + suffix).encode()
+            (root / name).write_bytes(original)
+            (root / name).chmod(0o755)
+            metadata["files"][name] = {"upstream_sha256": PATCH.digest(original), "replacement_sha256": PATCH.digest(replacement)}
+            metadata["compatible_bases"][0]["tree_sha256"][name] = PATCH.digest(original)
+            replacements[name] = replacement
+        return root, metadata, replacements
+
+    def hook_fixture(self, directory, agent):
+        root = Path(directory) / "应用 数据 ' $() ` 配置" / agent
+        root.mkdir(parents=True)
+        _, replacements = PATCH.bundle_data(PATCH.default_bundle(), agent)
+        metadata = {"files": {}}
+        originals = {}
+        for name, replacement in replacements.items():
+            original = ("original " + name).encode()
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(original)
+            metadata["files"][name] = {"upstream_sha256": PATCH.digest(original), "replacement_sha256": PATCH.digest(replacement)}
+            originals[name] = original
+        return root, metadata, originals, replacements
+
+    def test_hook_manifest_failure_restores_scripts_in_spaced_chinese_path(self):
+        for agent in PATCH.CONTRACTS:
+            with self.subTest(agent=agent), tempfile.TemporaryDirectory() as temporary:
+                root, metadata, originals, replacements = self.hook_fixture(temporary, agent)
+                real_write = PATCH.atomic_write
+
+                def fail_hook(path, contents, mode):
+                    if path.name == "hooks.json":
+                        raise OSError("注入 hooks 清单替换失败")
+                    return real_write(path, contents, mode)
+
+                with mock.patch.object(PATCH, "atomic_write", fail_hook):
+                    with self.assertRaises(OSError):
+                        PATCH.apply_files(root, metadata, replacements)
+                self.assertEqual({name: (root / name).read_bytes() for name in originals}, originals)
+                PATCH.apply_files(root, metadata, replacements)
+                PATCH.apply_files(root, metadata, replacements)
+                self.assertEqual({name: (root / name).read_bytes() for name in replacements}, replacements)
+                self.assertEqual(len([path for path in root.rglob("*") if path.is_file()]), len(replacements))
+
+    def test_custom_hook_manifest_is_rejected_before_any_script_replacement(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, originals, replacements = self.hook_fixture(temporary, "claude")
+            (root / "hooks/hooks.json").write_bytes(b'{"hooks":{"Custom":[]}}')
+            with self.assertRaises(ValueError):
+                PATCH.apply_files(root, metadata, replacements)
+            self.assertEqual((root / "scripts/build-payload.sh").read_bytes(), originals["scripts/build-payload.sh"])
+            self.assertEqual((root / "hooks/hooks.json").read_bytes(), b'{"hooks":{"Custom":[]}}')
+
+    def test_notify_failure_restores_hooks_and_scripts_in_spaced_chinese_path(self):
+        for agent in PATCH.CONTRACTS:
+            with self.subTest(agent=agent), tempfile.TemporaryDirectory() as temporary:
+                root, metadata, originals, replacements = self.hook_fixture(temporary, agent)
+                real_write = PATCH.atomic_write
+
+                def fail_notify(path, contents, mode):
+                    if path.name == "warp-notify.sh":
+                        raise OSError("注入 tmux 通知替换失败")
+                    return real_write(path, contents, mode)
+
+                with mock.patch.object(PATCH, "atomic_write", fail_notify):
+                    with self.assertRaises(OSError):
+                        PATCH.apply_files(root, metadata, replacements)
+                self.assertEqual({name: (root / name).read_bytes() for name in originals}, originals)
+
+    def test_custom_notify_is_rejected_before_other_replacements(self):
+        for agent in PATCH.CONTRACTS:
+            with self.subTest(agent=agent), tempfile.TemporaryDirectory() as temporary:
+                root, metadata, originals, replacements = self.hook_fixture(temporary, agent)
+                (root / "scripts/warp-notify.sh").write_bytes(b"custom notification")
+                with self.assertRaises(ValueError):
+                    PATCH.apply_files(root, metadata, replacements)
+                for name, original in originals.items():
+                    expected = b"custom notification" if name == "scripts/warp-notify.sh" else original
+                    self.assertEqual((root / name).read_bytes(), expected)
+
+    def test_idempotent_apply_and_whole_tree_validation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, replacements = self.fixture(temporary)
+            original_mode = (root / "scripts/a").stat().st_mode & 0o777
+            PATCH.validate_tree(root, "test", metadata)
+            PATCH.apply_files(root, metadata, replacements)
+            PATCH.validate_tree(root, "test", metadata)
+            PATCH.apply_files(root, metadata, replacements)
+            self.assertEqual((root / "scripts/a").read_bytes(), replacements["scripts/a"])
+            self.assertEqual((root / "scripts/a").stat().st_mode & 0o777, original_mode)
+            self.assertEqual(len(list((root / "scripts").iterdir())), 2)
+
+    def test_custom_script_is_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, replacements = self.fixture(temporary)
+            (root / "scripts/b").write_text("custom")
+            with self.assertRaises(ValueError):
+                PATCH.apply_files(root, metadata, replacements)
+            self.assertEqual((root / "scripts/a").read_text(), "original-a")
+            self.assertEqual((root / "scripts/b").read_text(), "custom")
+
+    def test_unknown_extra_file_blocks_native_update_preflight(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, _ = self.fixture(temporary)
+            (root / "custom-hook.sh").write_text("user content")
+            with self.assertRaises(ValueError):
+                PATCH.validate_tree(root, "test", metadata)
+
+    def test_atomic_failure_rolls_back_only_changed_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, replacements = self.fixture(temporary)
+            real_write = PATCH.atomic_write
+            count = 0
+
+            def fail_second(path, contents, mode):
+                nonlocal count
+                count += 1
+                if count == 2:
+                    raise OSError("注入写入失败")
+                return real_write(path, contents, mode)
+
+            with mock.patch.object(PATCH, "atomic_write", fail_second):
+                with self.assertRaises(OSError):
+                    PATCH.apply_files(root, metadata, replacements)
+            self.assertEqual((root / "scripts/a").read_text(), "original-a")
+            self.assertEqual((root / "scripts/b").read_text(), "original-b")
+
+    def test_rollback_preserves_concurrent_edit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, replacements = self.fixture(temporary)
+            real_write = PATCH.atomic_write
+
+            def concurrent_edit(path, contents, mode):
+                if path.name == "b":
+                    (root / "scripts/a").write_text("concurrent")
+                    raise OSError("注入并发编辑")
+                return real_write(path, contents, mode)
+
+            with mock.patch.object(PATCH, "atomic_write", concurrent_edit):
+                with self.assertRaisesRegex(ValueError, "恢复失败"):
+                    PATCH.apply_files(root, metadata, replacements)
+            self.assertEqual((root / "scripts/a").read_text(), "concurrent")
+
+    @unittest.skipUnless(os.name == "posix", "符号链接行为限 Unix")
+    def test_link_cannot_redirect_patch(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, replacements = self.fixture(temporary)
+            external = root / "outside"
+            external.write_text("original-a")
+            (root / "scripts/a").unlink()
+            (root / "scripts/a").symlink_to(external)
+            with self.assertRaises(ValueError):
+                PATCH.apply_files(root, metadata, replacements)
+            self.assertEqual(external.read_text(), "original-a")
+
+    def test_disabled_codex_config_is_preserved(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            settings = '[plugins."warp@codex-warp"]\nenabled = false\n\n[other]\nvalue = "keep"\n'
+            (home / "config.toml").write_text(settings)
+            with self.assertRaisesRegex(ValueError, "未启用"):
+                PATCH.installation(home, "codex")
+            self.assertEqual((home / "config.toml").read_text(), settings)
+
+    def test_disabled_claude_config_is_preserved(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            (home / "plugins").mkdir()
+            (home / "plugins/installed_plugins.json").write_text(json.dumps({"plugins": {"warp@claude-code-warp": [{"scope": "user", "installPath": "/unvisited", "version": "2.2.0"}]}}))
+            settings = '{"enabledPlugins":{"warp@claude-code-warp":false},"other":"keep"}'
+            (home / "settings.json").write_text(settings)
+            with self.assertRaisesRegex(ValueError, "禁用"):
+                PATCH.installation(home, "claude")
+            self.assertEqual((home / "settings.json").read_text(), settings)
+
+    def test_export_is_self_contained_and_does_not_include_other_agents(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / "export"
+            PATCH.export_bundle(PATCH.default_bundle(), destination)
+            self.assertTrue((destination / "apply_notification_patch.py").is_file())
+            self.assertFalse((destination / "grok").exists())
+            manifest = json.loads((destination / "SHA256SUMS.json").read_text())
+            for name, expected in manifest.items():
+                self.assertEqual(PATCH.digest((destination / name).read_bytes()), expected)
+            for agent in PATCH.CONTRACTS:
+                PATCH.bundle_data(destination, agent)
+
+
+if __name__ == "__main__":
+    unittest.main()

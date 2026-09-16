@@ -511,3 +511,55 @@ impl From<api::message::tool_call::insert_review_comments::Comment> for InsertRe
         }
     }
 }
+
+impl AIAgentActionType {
+    pub fn from_run_agents_api(
+        value: api::RunAgents,
+        origin: &crate::skills::SkillPathOrigin,
+    ) -> Result<Self, ToolToAIAgentActionError> {
+        use crate::agent::action::{
+            RunAgentsAgentRunConfig, RunAgentsExecutionMode, RunAgentsRequest,
+        };
+        use crate::agent::orchestration_config::harness_proto_to_string;
+        let execution_mode = match value.execution_mode {
+            Some(api::run_agents::ExecutionModeOneOf::Remote(remote)) => {
+                RunAgentsExecutionMode::Remote {
+                    environment_id: remote.environment_id,
+                    worker_host: remote.worker_host,
+                    computer_use_enabled: remote.computer_use_enabled,
+                    runner_id: remote.runner_id,
+                }
+            }
+            Some(api::run_agents::ExecutionModeOneOf::Local(_)) | None => {
+                RunAgentsExecutionMode::Local
+            }
+        };
+        let skills = value
+            .skills
+            .into_iter()
+            .map(|skill| crate::skills::skill_reference_from_api_skill_ref(skill, origin))
+            .collect::<Option<Vec<_>>>()
+            .ok_or(ToolToAIAgentActionError::MissingSkillReference)?;
+        Ok(Self::RunAgents(RunAgentsRequest {
+            summary: value.summary,
+            base_prompt: value.base_prompt,
+            skills,
+            model_id: value.model_id,
+            harness_type: harness_proto_to_string(value.harness.as_ref()).unwrap_or_default(),
+            execution_mode,
+            agent_run_configs: value
+                .agent_run_configs
+                .into_iter()
+                .map(|config| RunAgentsAgentRunConfig {
+                    name: config.name,
+                    prompt: config.prompt,
+                    title: config.title,
+                    agent_identity_uid: config.agent_identity_uid,
+                    model_id: config.model_id,
+                })
+                .collect(),
+            plan_id: value.plan_id,
+            harness_auth_secret_name: None,
+        }))
+    }
+}

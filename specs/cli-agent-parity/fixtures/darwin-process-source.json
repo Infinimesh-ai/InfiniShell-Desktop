@@ -1,0 +1,51 @@
+{
+  "xnu_commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+  "exact_running_kernel_source_match_claimed": false,
+  "files": [
+    {
+      "path": "bsd/kern/kern_event.c",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_event.c",
+      "sha256": "d6bd6351f97713c24d05235179d67ec6947be0114dec1298f77e4deb457b618d"
+    },
+    {
+      "path": "bsd/kern/kern_fork.c",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_fork.c",
+      "sha256": "73b578159deebc71434185d3638ab1468f995a19c882e1902d001994bb0391c3"
+    },
+    {
+      "path": "bsd/kern/kern_proc.c",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_proc.c",
+      "sha256": "34f745a213769ffa47b4edace6e3e158f654075def1b0fe50edf97f9bf53589d"
+    },
+    {
+      "path": "bsd/kern/kern_prot.c",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_prot.c",
+      "sha256": "988c19ea6b73574292a70ea2ce3174374a7ec70de76ffe6a8d4f07675c846014"
+    },
+    {
+      "path": "bsd/kern/kern_sig.c",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_sig.c",
+      "sha256": "343742eb42c5b584c529d348f9772ce03ffedd3be9d986badd60692459b6acdf"
+    },
+    {
+      "path": "bsd/kern/proc_info.c",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/proc_info.c",
+      "sha256": "557092f14fbad3341100f59e0391d2e812c54b79a7404c89b2af97471ad67082"
+    },
+    {
+      "path": "bsd/sys/event.h",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/sys/event.h",
+      "sha256": "a172b971272e10ced09ea58b2d74aea333901b8a7ed27864a261df79adc4714c"
+    },
+    {
+      "path": "bsd/sys/proc_info.h",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/sys/proc_info.h",
+      "sha256": "f898ba1f6acecf128f6bb960bf07c7029fdd936620e03b6206419834cf2941fa"
+    },
+    {
+      "path": "bsd/sys/proc_info_private.h",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/sys/proc_info_private.h",
+      "sha256": "ccc01e88d5bf47bc9c3f5ba3a25c3e6202bbcd7b86aa967af31d714657571c3b"
+    }
+  ]
+}

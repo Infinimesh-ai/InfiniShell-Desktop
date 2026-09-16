@@ -1209,6 +1209,22 @@ impl RightPanelView {
             .get_code_review_view(pane_group_id, selected_repo_path)
     }
 
+    /// 托管任务导入评审只追加草稿，保留评审面板中尚未发送的原始评论。
+    #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+    pub(crate) fn local_cli_review_prompt(&self, ctx: &AppContext) -> Result<String, String> {
+        let view = self
+            .get_active_code_review_view(ctx)
+            .ok_or_else(|| crate::t!("cli-task-manager-review-empty"))?;
+        let view = view.as_ref(ctx);
+        if view.repo_path().is_some_and(LocalOrRemotePath::is_remote) {
+            return Err(crate::t!("cli-task-manager-review-remote"));
+        }
+        let review = view
+            .comments_for_managed_input(ctx)
+            .ok_or_else(|| crate::t!("cli-task-manager-review-empty"))?;
+        Ok(crate::terminal::cli_agent::build_review_prompt(&review))
+    }
+
     fn is_maximized(&self, app: &AppContext) -> bool {
         self.active_pane_group
             .as_ref()

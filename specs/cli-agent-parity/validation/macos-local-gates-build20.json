@@ -1,0 +1,24 @@
+{
+  "recorded_at": "2026-09-16T12:26:48.485285+00:00",
+  "platform": "macOS arm64",
+  "baseline_commit": "6921a9925955a1955503e259cd935eaea4ac2ac0",
+  "worktree_dirty": true,
+  "final_commit_verification": false,
+  "test_binary_sha256": "117eb2e5bfb4145cc640ba3a004f715616ed08d9e95c990f974dac0c424f991d",
+  "note": "Stop取消计时器回归修改后，build20双语已过。相关nextest尚未开始编译/执行，在等待另一个worktree共享target构建锁时由本任务主动撤下，计划合并授权冷缓存修复后统一build21。未影响另一任务编译，不计相关模块门禁通过。",
+  "checks": [
+    {
+      "command": "cargo test -p warp --lib i18n::tests",
+      "summary": "ok. 11 passed; 0 failed; 0 ignored; 0 measured; 6403 filtered out; finished in 6.27s",
+      "build_summary": "Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 31s",
+      "exit_code": 0,
+      "log_sha256": "f491421731b18828e9d9532cf25ce60ab9a728558cb617820c843699ab506972"
+    },
+    {
+      "command": "cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_cli_mailbox)'",
+      "status": "cancelled_before_build_while_waiting_for_shared_target_lock",
+      "exit_code": 130,
+      "tests_executed": 0
+    }
+  ]
+}

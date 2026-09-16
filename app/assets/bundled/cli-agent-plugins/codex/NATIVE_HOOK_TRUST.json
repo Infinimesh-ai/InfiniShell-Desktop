@@ -1,0 +1,69 @@
+{
+  "cli": "codex-cli 0.147.0",
+  "plugin": "warp@codex-warp",
+  "plugin_version": "0.4.0",
+  "patch_revision": 3,
+  "hooks_file_sha256": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+  "hooks": [
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+      "eventName": "permissionRequest",
+      "handlerType": "command",
+      "command": "bash \"$PLUGIN_ROOT/scripts/on-permission-request.sh\"",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:60f3f1de21f20eb4f54007342338e7000b9dca06a111e776a37dcd62fdd7b215",
+      "trustStatus": "untrusted"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+      "eventName": "postToolUse",
+      "handlerType": "command",
+      "command": "bash \"$PLUGIN_ROOT/scripts/on-post-tool-use.sh\"",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:4ff952d5bac454272cc8d3eec507954c8bab421066aaa2e60026e09920d20ed6",
+      "trustStatus": "untrusted"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+      "eventName": "sessionStart",
+      "handlerType": "command",
+      "command": "bash \"$PLUGIN_ROOT/scripts/on-session-start.sh\"",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:4524bbc6e5a9e4b2528f06432e7aa9829b42d7e7aa24d66b0c30aada912baf34",
+      "trustStatus": "untrusted"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+      "eventName": "userPromptSubmit",
+      "handlerType": "command",
+      "command": "bash \"$PLUGIN_ROOT/scripts/on-prompt-submit.sh\"",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:122190ef9554a17967255480c31b7beb36e69e08353840c7ef947c145186ad91",
+      "trustStatus": "untrusted"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+      "eventName": "stop",
+      "handlerType": "command",
+      "command": "bash \"$PLUGIN_ROOT/scripts/on-stop.sh\"",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:e206bdb01c8e380c7b5a4fa4ee1473c1f20338b9762bcfe0d0832ac7f99eb46c",
+      "trustStatus": "untrusted"
+    }
+  ]
+}

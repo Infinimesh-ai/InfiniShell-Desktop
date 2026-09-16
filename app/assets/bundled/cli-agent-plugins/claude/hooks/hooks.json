@@ -1,0 +1,98 @@
+{
+  "description": "Warp terminal notifications",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/on-session-start.sh"
+            ]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/on-stop.sh"
+            ]
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/on-notification.sh"
+            ]
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/on-permission-request.sh"
+            ]
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/on-prompt-submit.sh"
+            ]
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/on-post-tool-use.sh"
+            ]
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/on-stop-failure.sh"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,324 @@
+--- a/plugins/warp/scripts/build-payload.sh
++++ b/plugins/warp/scripts/build-payload.sh
+@@ -1,23 +1,8 @@
+ #!/bin/bash
+-# Builds a structured JSON notification payload for warp://cli-agent.
+-#
+-# Usage: source this file, then call build_payload with event-specific fields.
+-#
+-# Example:
+-#   source "$(dirname "${BASH_SOURCE[0]}")/build-payload.sh"
+-#   BODY=$(build_payload "$INPUT" "stop" \
+-#       --arg query "$QUERY" \
+-#       --arg response "$RESPONSE" \
+-#       --arg transcript_path "$TRANSCRIPT_PATH")
+-#
+-# The function extracts common fields (session_id, cwd, project) from the
+-# hook's stdin JSON (passed as $1), then merges any extra jq args you pass.
++# 基于 Warp MIT 插件的最小修补：保留 Claude 原生 prompt_id，不生成伪序号。
+ 
+-# The current protocol version this plugin knows how to produce.
+ PLUGIN_CURRENT_PROTOCOL_VERSION=1
+ 
+-# Negotiate the protocol version with Warp.
+-# Uses min(plugin_current, warp_declared), falling back to 1 if Warp doesn't advertise a version.
+ negotiate_protocol_version() {
+     local warp_version="${WARP_CLI_AGENT_PROTOCOL_VERSION:-1}"
+     if [ "$warp_version" -lt "$PLUGIN_CURRENT_PROTOCOL_VERSION" ] 2>/dev/null; then
+@@ -28,31 +13,28 @@
+ }
+ 
+ build_payload() {
+-    local input="$1"
+-    local event="$2"
++    local input="$1" event="$2"
+     shift 2
++    local protocol_version session_id cwd project prompt_id
++    protocol_version=$(negotiate_protocol_version)
++    session_id=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
++    cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
++    prompt_id=$(printf '%s' "$input" | jq -r '.prompt_id | select(type == "string" and length > 0)' 2>/dev/null)
++    project=""
++    [ -n "$cwd" ] && project=$(basename "$cwd")
+ 
+-    local protocol_version
+-    protocol_version=$(negotiate_protocol_version)
+-
+-    # Extract common fields from the hook input
+-    local session_id cwd project
+-    session_id=$(echo "$input" | jq -r '.session_id // empty' 2>/dev/null)
+-    cwd=$(echo "$input" | jq -r '.cwd // empty' 2>/dev/null)
+-    project=""
+-    if [ -n "$cwd" ]; then
+-        project=$(basename "$cwd")
+-    fi
+-
+-    # Build the payload: common fields + any extra args passed by the caller.
+-    # Extra args should be jq flag pairs like: --arg key "value" or --argjson key '{"a":1}'
+-    jq -nc \
++    # ASCII JSON 使 C0/C1 均无法逃逸 OSC，终端解析后仍保留中英文原文。
++    jq -anc \
+         --argjson v "$protocol_version" \
+-        --arg agent "claude" \
+-        --arg event "$event" \
+-        --arg session_id "$session_id" \
+-        --arg cwd "$cwd" \
+-        --arg project "$project" \
+-        "$@" \
+-        '{v:$v, agent:$agent, event:$event, session_id:$session_id, cwd:$cwd, project:$project} + $ARGS.named'
++        --arg agent "claude" --arg event "$event" \
++        --arg session_id "$session_id" --arg cwd "$cwd" --arg project "$project" \
++        --arg prompt_id "$prompt_id" "$@" '
++        {v:$v, agent:$agent, event:$event, session_id:$session_id, cwd:$cwd, project:$project}
++        + $ARGS.named
++        | if .prompt_id == "" then
++            del(.prompt_id)
++            | if .event == "stop" or .event == "stop_failure" then
++                .event = "notification" | .terminal_unverified = true | .error_type = (.error_type // "uncorrelated_hook")
++              else . end
++          else . end'
+ }
+--- a/plugins/warp/scripts/on-stop.sh
++++ b/plugins/warp/scripts/on-stop.sh
+@@ -1,73 +1,23 @@
+ #!/bin/bash
+-# Hook script for Claude Code Stop event
+-# Sends a structured Warp notification when Claude completes a task
++# 只使用本次 Stop 的载荷，避免读取异步转录时串入下一条提示词。
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ source "$SCRIPT_DIR/should-use-structured.sh"
+-
+-# Legacy fallback for old Warp versions
+ if ! should_use_structured; then
+     [ "$TERM_PROGRAM" = "WarpTerminal" ] && exec "$SCRIPT_DIR/legacy/on-stop.sh"
+     exit 0
+ fi
++source "$SCRIPT_DIR/build-payload.sh"
++INPUT=$(cat)
++[ "$(printf '%s' "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null)" = "true" ] && exit 0
+ 
+-source "$SCRIPT_DIR/build-payload.sh"
+-
+-# Read hook input from stdin
+-INPUT=$(cat)
+-
+-# Skip if a stop hook is already active (prevents double-notification)
+-STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null)
+-if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+-    exit 0
++RESPONSE=$(printf '%s' "$INPUT" | jq -r '.last_assistant_message | select(type == "string")' 2>/dev/null)
++TRANSCRIPT_PATH=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
++EVENT="stop"
++# 没有最终文本或仍有后台工作时只报告通知，不声称整项任务已经完成。
++if [ -z "$RESPONSE" ] || [ "$(printf '%s' "$INPUT" | jq '(.background_tasks // []) | length' 2>/dev/null)" != "0" ]; then
++    EVENT="notification"
+ fi
+-
+-# Extract the last user prompt and assistant response from the transcript.
+-# Small delay to allow Claude Code to flush the current turn to the transcript file.
+-# The Stop hook fires before the transcript is fully written.
+-TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+-sleep 0.3
+-QUERY=""
+-RESPONSE=""
+-if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+-    # Get the last human prompt from the transcript.
+-    # "user" type messages include both human prompts and tool-result messages.
+-    # Human prompts have content that is either a plain string or an array
+-    # containing {type:"text"} blocks. Tool-result messages have content arrays
+-    # containing only {type:"tool_result"} blocks. We filter to messages that
+-    # have at least one "text" block (or are a plain string).
+-    QUERY=$(jq -rs '
+-        [
+-            .[] | select(.type == "user") |
+-            if .message.content | type == "string" then .
+-            elif [.message.content[] | select(.type == "text")] | length > 0 then .
+-            else empty
+-            end
+-        ] | last |
+-        if .message.content | type == "array"
+-        then [.message.content[] | select(.type == "text") | .text] | join(" ")
+-        else .message.content // empty
+-        end
+-    ' "$TRANSCRIPT_PATH" 2>/dev/null)
+-
+-    # Get the last assistant response
+-    RESPONSE=$(jq -rs '
+-        [.[] | select(.type == "assistant" and .message.content)] | last |
+-        [.message.content[] | select(.type == "text") | .text] | join(" ")
+-    ' "$TRANSCRIPT_PATH" 2>/dev/null)
+-
+-    # Truncate for notification display
+-    if [ -n "$QUERY" ] && [ ${#QUERY} -gt 200 ]; then
+-        QUERY="${QUERY:0:197}..."
+-    fi
+-    if [ -n "$RESPONSE" ] && [ ${#RESPONSE} -gt 200 ]; then
+-        RESPONSE="${RESPONSE:0:197}..."
+-    fi
+-fi
+-
+-BODY=$(build_payload "$INPUT" "stop" \
+-    --arg query "$QUERY" \
+-    --arg response "$RESPONSE" \
+-    --arg transcript_path "$TRANSCRIPT_PATH")
+-
++if [ ${#RESPONSE} -gt 200 ]; then RESPONSE="${RESPONSE:0:197}..."; fi
++BODY=$(build_payload "$INPUT" "$EVENT" --arg response "$RESPONSE" --arg transcript_path "$TRANSCRIPT_PATH")
+ "$SCRIPT_DIR/warp-notify.sh" "warp://cli-agent" "$BODY"
+--- a/plugins/warp/scripts/should-use-structured.sh
++++ b/plugins/warp/scripts/should-use-structured.sh
+@@ -1,44 +1,25 @@
+ #!/bin/bash
+-# Determines whether the current Warp build supports structured CLI agent notifications.
+-#
+-# Usage:
+-#   source "$SCRIPT_DIR/should-use-structured.sh"
+-#   if should_use_structured; then
+-#       # ... send structured notification
+-#   else
+-#       # ... legacy fallback or exit
+-#   fi
+-#
+-# Returns 0 (true) when structured notifications are safe to use, 1 (false) otherwise.
++# Grok 兼容加载 Claude hooks 时必须静默退出，不能切回硬编码 Claude 的旧协议。
++if [ -n "${GROK_HOOK_EVENT:-}" ] || [ -n "${GROK_SESSION_ID:-}" ]; then
++    exit 0
++fi
+ 
+-# Last known Warp release per channel that unconditionally set
+-# WARP_CLI_AGENT_PROTOCOL_VERSION without gating it behind the
+-# HOANotifications feature flag. These builds advertise protocol
+-# support but can't actually render structured notifications.
++# 保留上游对于尚不能渲染结构化通知的旧 Warp 发布版本的判断。
+ LAST_BROKEN_DEV=""
+ LAST_BROKEN_STABLE="v0.2026.03.25.08.24.stable_05"
+ LAST_BROKEN_PREVIEW="v0.2026.03.25.08.24.preview_05"
+ 
+ should_use_structured() {
+-    # No protocol version advertised → Warp doesn't know about structured notifications.
+     [ -z "${WARP_CLI_AGENT_PROTOCOL_VERSION:-}" ] && return 1
+-
+-    # No client version available → can't verify this build has the fix.
+-    # (This catches the broken prod release before this was set, but after WARP_CLI_AGENT_PROTOCOL_VERSION was set without a flag check.)
+     [ -z "${WARP_CLIENT_VERSION:-}" ] && return 1
+-
+-    # Check whether this version is at or before the last broken release for its channel.
+     local threshold=""
+     case "$WARP_CLIENT_VERSION" in
+-        *dev*)     threshold="$LAST_BROKEN_DEV" ;;
+-        *stable*)  threshold="$LAST_BROKEN_STABLE" ;;
++        *dev*) threshold="$LAST_BROKEN_DEV" ;;
++        *stable*) threshold="$LAST_BROKEN_STABLE" ;;
+         *preview*) threshold="$LAST_BROKEN_PREVIEW" ;;
+     esac
+-
+-    # If we matched a channel and the version is <= the broken threshold, fall back.
+     if [ -n "$threshold" ] && [[ ! "$WARP_CLIENT_VERSION" > "$threshold" ]]; then
+         return 1
+     fi
+-
+     return 0
+ }
+--- a/plugins/warp/hooks/hooks.json
++++ b/plugins/warp/hooks/hooks.json
+@@ -7,7 +7,10 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/on-session-start.sh"
++            "command": "bash",
++            "args": [
++              "${CLAUDE_PLUGIN_ROOT}/scripts/on-session-start.sh"
++            ]
+           }
+         ]
+       }
+@@ -17,7 +20,10 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/on-stop.sh"
++            "command": "bash",
++            "args": [
++              "${CLAUDE_PLUGIN_ROOT}/scripts/on-stop.sh"
++            ]
+           }
+         ]
+       }
+@@ -28,7 +34,10 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/on-notification.sh"
++            "command": "bash",
++            "args": [
++              "${CLAUDE_PLUGIN_ROOT}/scripts/on-notification.sh"
++            ]
+           }
+         ]
+       }
+@@ -38,7 +47,10 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/on-permission-request.sh"
++            "command": "bash",
++            "args": [
++              "${CLAUDE_PLUGIN_ROOT}/scripts/on-permission-request.sh"
++            ]
+           }
+         ]
+       }
+@@ -48,7 +60,10 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/on-prompt-submit.sh"
++            "command": "bash",
++            "args": [
++              "${CLAUDE_PLUGIN_ROOT}/scripts/on-prompt-submit.sh"
++            ]
+           }
+         ]
+       }
+@@ -58,7 +73,10 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/on-post-tool-use.sh"
++            "command": "bash",
++            "args": [
++              "${CLAUDE_PLUGIN_ROOT}/scripts/on-post-tool-use.sh"
++            ]
+           }
+         ]
+       }
+@@ -68,7 +86,10 @@
+         "hooks": [
+           {
+             "type": "command",
+-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/on-stop-failure.sh"
++            "command": "bash",
++            "args": [
++              "${CLAUDE_PLUGIN_ROOT}/scripts/on-stop-failure.sh"
++            ]
+           }
+         ]
+       }
+--- a/plugins/warp/scripts/warp-notify.sh
++++ b/plugins/warp/scripts/warp-notify.sh
+@@ -24,4 +24,13 @@
+ 
+ # OSC 777 format: \033]777;notify;<title>;<body>\007
+ SEQ=$(printf '\033]777;notify;%s;%s\007' "$TITLE" "$BODY")
++# 新版 terminalSequence 只接收原始 OSC，由 Claude 自己处理 tmux；DCS 只用于兼容 TTY。
++if [ -n "${TMUX:-}" ] && ! _supports_terminal_sequence; then
++    ESC=$'\033'
++    TMUX_SEQ="${SEQ//$ESC/$ESC$ESC}"
++    if (printf '\033Ptmux;%s\033\\' "$TMUX_SEQ" > /dev/tty) 2>/dev/null; then
++        exit 0
++    fi
++    # 没有控制终端时仍交还原始 OSC，不能把 DCS 放入 JSON 回退字段。
++fi
+ emit_terminal_sequence "$SEQ"

@@ -385,6 +385,39 @@ fn test_relocate_comments_empty_input() {
 }
 
 #[test]
+fn local_cli_review_import_preserves_source_and_filters_outdated_comments() {
+    App::test((), |mut app| async move {
+        let test = TestContext::new(&mut app, "test.txt", "line 1\nline 2");
+        test.code_review_view.update(&mut app, |view, ctx| {
+            assert!(view.comments_for_managed_input(ctx).is_none());
+            let current = create_general_comment("检查中文多行\nReview second line");
+            let mut old = create_general_comment("过期意见");
+            old.outdated = true;
+            let model = view.active_comment_model.clone().unwrap();
+            model.update(ctx, |batch, ctx| {
+                batch.upsert_comments(vec![current.clone(), old.clone()], ctx)
+            });
+            let exported = view.comments_for_managed_input(ctx).unwrap();
+            assert_eq!(exported.comments.len(), 1);
+            assert_eq!(exported.comments[0].id, current.id);
+            assert_eq!(exported.comments[0].content, current.content);
+            let source = model.as_ref(ctx);
+            assert_eq!(source.comments.len(), 2);
+            assert!(
+                source
+                    .comments
+                    .iter()
+                    .any(|comment| comment.id == old.id && comment.outdated)
+            );
+            assert_eq!(
+                view.comments_for_managed_input(ctx).unwrap().comments[0].id,
+                current.id
+            );
+        });
+    });
+}
+
+#[test]
 fn test_relocate_comments_general_comment_passes_through() {
     App::test((), |mut app| async move {
         let ctx = TestContext::new(&mut app, "test.txt", "line 1\nline 2\nline 3");

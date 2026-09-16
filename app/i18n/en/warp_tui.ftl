@@ -765,3 +765,11 @@ tui-session-state-transcript-unavailable = Transcript view is unavailable
 tui-session-state-input-mode-unavailable = Input-mode model is unavailable
 tui-session-state-suggestions-mode-unavailable = Suggestions-mode model is unavailable
 tui-session-state-orchestration-tabs-unavailable = Orchestration tab bar is unavailable
+
+# 本地任务消息与技能交付；TUI 使用独立编译期消息域。
+tui-cli-agent-message-sending = Sending task message…
+tui-cli-agent-message-acknowledged = Task message received
+tui-cli-agent-message-unconfirmed = Task message delivery unconfirmed
+tui-cli-agent-message-failed = Task message failed
+tui-cli-agent-message-cancelled = Task message cancelled
+tui-cli-agent-task-skills-require-managed = Skill delivery requires a managed Codex or Claude task.

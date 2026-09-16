@@ -260,6 +260,7 @@ fn test_detect_known_agents() {
                 ("claude", CLIAgent::Claude),
                 ("gemini", CLIAgent::Gemini),
                 ("codex", CLIAgent::Codex),
+                ("grok", CLIAgent::Grok),
                 ("deepseek", CLIAgent::DeepSeek),
                 ("deepseek-tui", CLIAgent::DeepSeek),
                 ("agy", CLIAgent::Antigravity),
@@ -331,10 +332,7 @@ fn test_detect_with_leading_whitespace() {
                 CLIAgent::detect("  claude", None, None, ctx),
                 Some(CLIAgent::Claude),
             );
-            assert_eq!(
-                CLIAgent::detect("\tclaude --help", None, None, ctx),
-                Some(CLIAgent::Claude),
-            );
+            assert_eq!(CLIAgent::detect("\tclaude --help", None, None, ctx), None,);
         });
     });
 }
@@ -359,10 +357,7 @@ fn test_detect_with_alias() {
                 CLIAgent::detect("c", None, Some(&map), ctx),
                 Some(CLIAgent::Claude),
             );
-            assert_eq!(
-                CLIAgent::detect("c --help", None, Some(&map), ctx),
-                Some(CLIAgent::Claude),
-            );
+            assert_eq!(CLIAgent::detect("c --help", None, Some(&map), ctx), None,);
 
             let map = aliases(&[("o", "omp")]);
             assert_eq!(
@@ -579,6 +574,7 @@ fn test_cli_agent_search_dirs_include_home_managed_bins() {
     assert!(dirs.contains(&home.join(".cargo/bin")));
     assert!(dirs.contains(&home.join(".bun/bin")));
     assert!(dirs.contains(&home.join(".local/bin")));
+    assert!(dirs.contains(&home.join(".grok/bin")));
 }
 
 #[test]
@@ -681,4 +677,164 @@ fn test_warp_tui_variant_properties() {
         CLIAgent::from_serialized_name(&CLIAgent::WarpTui.to_serialized_name()),
         CLIAgent::WarpTui
     );
+}
+
+#[test]
+fn management_and_structured_commands_do_not_enable_rich_input() {
+    assert!(!CLIAgent::Grok.matches_command("grok plugin install hooks", None));
+    assert!(!CLIAgent::Grok.matches_command("grok --cwd '/tmp/my repo' inspect", None));
+    assert!(!CLIAgent::Grok.matches_command("grok agent stdio", None));
+    assert!(!CLIAgent::Grok.matches_command("grok -p 'fix the tests'", None));
+    assert!(!CLIAgent::Grok.matches_command("grok --version", None));
+    assert!(!CLIAgent::Codex.matches_command("codex --profile default plugin list", None));
+    assert!(!CLIAgent::Codex.matches_command("codex exec 'fix the tests'", None));
+    assert!(!CLIAgent::Codex.matches_command("codex app-server", None));
+    assert!(!CLIAgent::Codex.matches_command("codex resume --help", None));
+    assert!(!CLIAgent::Claude.matches_command("claude mcp list", None));
+    assert!(!CLIAgent::Claude.matches_command("claude --print 'fix the tests'", None));
+    assert!(!CLIAgent::Claude.matches_command("claude --version", None));
+}
+
+#[test]
+fn interactive_resume_and_prompt_values_keep_rich_input() {
+    assert!(CLIAgent::Grok.matches_command("grok --resume", None));
+    assert!(CLIAgent::Grok.matches_command("grok --worktree", None));
+    assert!(CLIAgent::Grok.matches_command("grok --resume plugin", None));
+    assert!(CLIAgent::Grok.matches_command("grok --model plugin '修复错误'", None));
+    assert!(CLIAgent::Grok.matches_command("grok dashboard", None));
+    assert!(CLIAgent::Codex.matches_command("codex resume --last", None));
+    assert!(CLIAgent::Codex.matches_command("codex fork --last", None));
+    assert!(CLIAgent::Codex.matches_command("codex -- 'plugin'", None));
+    assert!(CLIAgent::Claude.matches_command("claude --continue", None));
+    assert!(CLIAgent::Claude.matches_command("claude --resume", None));
+}
+
+#[test]
+fn parity_detection_handles_quoted_paths_and_windows_launchers() {
+    assert!(CLIAgent::Grok.matches_command(
+        "MODE=test '/opt/my tools/grok' '修复错误'",
+        Some(EscapeChar::Backslash)
+    ));
+    assert!(CLIAgent::Codex.matches_command(
+        r#""C:\Program Files\Codex\codex.exe" resume --last"#,
+        Some(EscapeChar::Backtick)
+    ));
+    assert!(!CLIAgent::Claude.matches_command(
+        r#""C:\Program Files\Claude\claude.cmd" --version"#,
+        Some(EscapeChar::Backtick)
+    ));
+    assert!(!CLIAgent::Grok.matches_command("grok-wrapper", None));
+}
+
+#[test]
+fn management_aliases_do_not_enable_rich_input() {
+    App::test((), |mut app| async move {
+        app.update(|ctx| {
+            let map = aliases(&[("gx", "grok plugin"), ("cx", "codex --profile default")]);
+            assert_eq!(CLIAgent::detect("gx list", None, Some(&map), ctx), None);
+            assert_eq!(
+                CLIAgent::detect("cx --version", None, Some(&map), ctx),
+                None
+            );
+            assert_eq!(
+                CLIAgent::detect("cx resume --last", None, Some(&map), ctx),
+                Some(CLIAgent::Codex)
+            );
+        });
+    });
+}
+
+#[test]
+fn version_probe_rejects_unrelated_or_malformed_output() {
+    assert_eq!(
+        super::parse_cli_agent_version(CLIAgent::Grok, "grok 1.0.30 (04b7ffed98c6)\n"),
+        Some("1.0.30".to_string())
+    );
+    assert_eq!(
+        super::parse_cli_agent_version(CLIAgent::Codex, "codex-cli 0.147.0\n"),
+        Some("0.147.0".to_string())
+    );
+    assert_eq!(
+        super::parse_cli_agent_version(CLIAgent::Claude, "2.1.0 (Claude Code)\n"),
+        Some("2.1.0".to_string())
+    );
+    assert_eq!(
+        super::parse_cli_agent_version(CLIAgent::Grok, "claude 1.0.30"),
+        None
+    );
+    assert_eq!(
+        super::parse_cli_agent_version(CLIAgent::Codex, "codex-cli 0.147"),
+        None
+    );
+    assert_eq!(
+        super::parse_cli_agent_version(CLIAgent::Claude, "login required"),
+        None
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn installation_requires_executable_permission() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = tempfile::tempdir().unwrap();
+    let executable = directory.path().join("grok");
+    std::fs::write(&executable, "#!/bin/sh\n").unwrap();
+    std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(
+        super::find_cli_agent_executable(CLIAgent::Grok, &[directory.path().to_path_buf()]),
+        None
+    );
+    std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(
+        super::find_cli_agent_executable(CLIAgent::Grok, &[directory.path().to_path_buf()]),
+        Some(executable)
+    );
+}
+
+#[test]
+fn grok_agents_skill_compatibility_is_limited_to_home_scope() {
+    use ai::skills::{SkillProvider, SkillScope};
+
+    assert!(CLIAgent::Grok.supports_skill(SkillProvider::Grok, SkillScope::Project));
+    assert!(CLIAgent::Grok.supports_skill(SkillProvider::Claude, SkillScope::Project));
+    assert!(CLIAgent::Grok.supports_skill(SkillProvider::Agents, SkillScope::Home));
+    assert!(!CLIAgent::Grok.supports_skill(SkillProvider::Agents, SkillScope::Project));
+    assert!(!CLIAgent::Claude.supports_skill(SkillProvider::Grok, SkillScope::Home));
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[test]
+fn cached_dispatch_path_is_the_same_binary_as_the_completed_installation_scan() {
+    let directory = tempfile::tempdir().unwrap();
+    let user_bin = directory.path().join("user installation 中文");
+    std::fs::create_dir(&user_bin).unwrap();
+    for agent in [CLIAgent::Claude, CLIAgent::Codex, CLIAgent::Grok] {
+        let command = agent.command_prefixes()[0];
+        let executable = user_bin.join(if cfg!(windows) {
+            format!("{command}.EXE")
+        } else {
+            command.to_owned()
+        });
+        std::fs::write(&executable, b"test binary fixture").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let found = super::find_cli_agent_executable(agent, &[user_bin.clone()]).unwrap();
+        assert_eq!(found, executable);
+        assert!(found.is_absolute());
+        let installation = super::CLIAgentInstallation {
+            executable: Some(found),
+            version: super::CLIAgentVersionStatus::Detected("fixture-version".to_owned()),
+        };
+        let model = super::CLIAgentInstallModel {
+            cache: Some(HashMap::from([(agent, installation.clone())])),
+            scan_generation: 7,
+        };
+        assert_eq!(model.executable(agent), Some(executable.as_path()));
+        assert_eq!(model.installation(agent), Some(&installation));
+        assert_eq!(model.scan_generation, 7);
+    }
 }

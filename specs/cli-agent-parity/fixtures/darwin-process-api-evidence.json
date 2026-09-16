@@ -1,0 +1,46 @@
+{
+  "platform": "darwin",
+  "os_version": "27.0",
+  "model_requests": false,
+  "kqueue": {
+    "root_pid": 98250,
+    "note_track_registered": false,
+    "note_track_errno": 45,
+    "note_track_error": "[Errno 45] Operation not supported",
+    "child_pid": 98251,
+    "events": [
+      {
+        "ident": 98250,
+        "filter": -5,
+        "flags": 33,
+        "fflags": 1073741824,
+        "data": 0
+      },
+      {
+        "ident": 98250,
+        "filter": -5,
+        "flags": 32817,
+        "fflags": 2147483648,
+        "data": 0
+      }
+    ],
+    "note_fork_received": true,
+    "child_pid_delivered": false,
+    "expected_limitation_confirmed": true
+  },
+  "audit_token_signal": {
+    "available": true,
+    "pid": 98255,
+    "pid_version": 423645,
+    "wrong_version_result": 3,
+    "wrong_version_errno": 3,
+    "original_alive_after_wrong_version": true,
+    "correct_version_result": 0,
+    "correct_version_errno": 0,
+    "exit_status": -9,
+    "passed": true,
+    "full_tree_tracking_proven": false
+  },
+  "complete_descendant_tracking_available": false,
+  "probe_expectations_passed": true
+}

@@ -344,6 +344,7 @@ pub struct BlocklistAIContextModel {
 
     /// Images and files to be included as attachments with the next AI query.
     pending_attachments: Vec<PendingAttachment>,
+    pending_attachments_revision: u64,
 
     /// Storage for diff hunk attachments that can be referenced in queries
     pending_inline_diff_hunk_attachments: HashMap<String, AIAgentAttachment>,
@@ -476,6 +477,7 @@ impl BlocklistAIContextModel {
             pending_context_block_ids: HashSet::new(),
             pending_context_selected_text: None,
             pending_attachments: Default::default(),
+            pending_attachments_revision: 0,
             conversation_selection,
             terminal_surface_id,
             pending_inline_diff_hunk_attachments: Default::default(),
@@ -499,6 +501,7 @@ impl BlocklistAIContextModel {
             pending_context_block_ids: HashSet::new(),
             pending_context_selected_text: None,
             pending_attachments: Default::default(),
+            pending_attachments_revision: 0,
             conversation_selection,
             terminal_surface_id,
             pending_inline_diff_hunk_attachments: Default::default(),
@@ -555,6 +558,10 @@ impl BlocklistAIContextModel {
     }
 
     /// Returns all pending attachments (images and files) for the next query.
+    pub(crate) fn pending_attachments_revision(&self) -> u64 {
+        self.pending_attachments_revision
+    }
+
     pub fn pending_attachments(&self) -> &[PendingAttachment] {
         &self.pending_attachments
     }
@@ -884,6 +891,7 @@ impl BlocklistAIContextModel {
         self.pending_attachments
             .retain(|a| !matches!(a, PendingAttachment::Image(_)));
         if self.pending_attachments.len() < original_attachment_count {
+            self.pending_attachments_revision = self.pending_attachments_revision.wrapping_add(1);
             ctx.emit(BlocklistAIContextEvent::UpdatedPendingContext {
                 previous_block_ids: self.pending_context_block_ids.clone(),
                 requires_block_resync: false,
@@ -941,6 +949,7 @@ impl BlocklistAIContextModel {
         // Remove from the end to avoid shifting indices.
         for &idx in image_indices.iter().rev().take(to_remove) {
             self.pending_attachments.remove(idx);
+            self.pending_attachments_revision = self.pending_attachments_revision.wrapping_add(1);
         }
 
         ctx.emit(BlocklistAIContextEvent::UpdatedPendingContext {
@@ -1207,6 +1216,9 @@ impl BlocklistAIContextModel {
                 requires_text_resync: false,
             });
         }
+        if !attachments.is_empty() {
+            self.pending_attachments_revision = self.pending_attachments_revision.wrapping_add(1);
+        }
         self.pending_attachments.extend(attachments);
     }
 
@@ -1214,6 +1226,7 @@ impl BlocklistAIContextModel {
     pub fn remove_pending_attachment(&mut self, index: usize, ctx: &mut ModelContext<Self>) {
         if index < self.pending_attachments.len() {
             self.pending_attachments.remove(index);
+            self.pending_attachments_revision = self.pending_attachments_revision.wrapping_add(1);
             ctx.emit(BlocklistAIContextEvent::UpdatedPendingContext {
                 previous_block_ids: self.pending_context_block_ids.clone(),
                 requires_block_resync: false,
@@ -1266,6 +1279,7 @@ impl BlocklistAIContextModel {
                 requires_text_resync: false,
             });
         }
+        self.pending_attachments_revision = self.pending_attachments_revision.wrapping_add(1);
         self.pending_attachments.clear();
     }
 
@@ -1283,6 +1297,7 @@ impl BlocklistAIContextModel {
                 requires_text_resync: false,
             });
         }
+        self.pending_attachments_revision = self.pending_attachments_revision.wrapping_add(1);
         std::mem::take(&mut self.pending_attachments)
     }
 }

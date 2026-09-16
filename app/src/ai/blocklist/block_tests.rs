@@ -11,8 +11,7 @@ use warpui::{App, SingletonEntity};
 // Zap:上游这里还导入了 `UserAvatarInfo` / `user_avatar_info_for_conversation_creator`
 // (按会话 creator 的云端用户目录取头像)以及 `ChannelState`(Oz 云端 run 页面根地址)。
 // 两条能力都已随云端剥离:`user_avatar_info_for_ai_block` 固定用当前本机用户,
-// `recording_artifact_view_url` 固定返回 `None`,`AIAgentActionType` 也没有
-// `SendMessageToAgent` 变体(编排统一走 `RunAgents`)。对应的用例已删除。
+// `recording_artifact_view_url` 固定返回 `None`。对应的云端用例已删除。
 #[cfg(feature = "local_fs")]
 use super::{AIBlockEvent, open_code_action_event};
 use super::{
@@ -458,8 +457,32 @@ fn local_arm_allows_claude() {
         StartAgentExecutionMode::Local {
             harness_type: Some(ref harness_type),
             model_id: Some(ref model_id),
+            ..
         } if harness_type == "claude" && model_id == "auto"
     ));
+}
+
+#[test]
+fn local_dispatch_preserves_skill_references_until_native_launch_validation() {
+    let references = vec![SkillReference::Path(LocalOrRemotePath::Local(
+        PathBuf::from("/project/.agents/skills/review/SKILL.md"),
+    ))];
+    let mode = run_agents_to_start_agent_mode(
+        &RunAgentsExecutionMode::Local,
+        "oz",
+        "auto",
+        &references,
+        None,
+        &agent_cfg(),
+    )
+    .unwrap();
+    let StartAgentExecutionMode::Local {
+        skill_references, ..
+    } = mode
+    else {
+        panic!("本地执行类型错误");
+    };
+    assert_eq!(skill_references, references);
 }
 
 #[test]

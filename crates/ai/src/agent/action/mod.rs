@@ -22,8 +22,9 @@ use crate::agent::action_result::{
     EditDocumentsResult, FileGlobResult, FileGlobV2Result, GrepResult, InsertReviewCommentsResult,
     ReadDocumentsResult, ReadFilesResult, ReadMCPResourceResult, ReadShellCommandOutputResult,
     ReadSkillResult, RequestCommandOutputResult, RequestFileEditsResult, RunAgentsResult,
-    SuggestNewConversationResult, SuggestPromptResult, TransferShellCommandControlToUserResult,
-    WaitForEventsResult, WriteToLongRunningShellCommandResult,
+    SendMessageToAgentResult, SuggestNewConversationResult, SuggestPromptResult,
+    TransferShellCommandControlToUserResult, WaitForEventsResult,
+    WriteToLongRunningShellCommandResult,
 };
 use crate::agent::{AIAgentCitation, FileLocations};
 use crate::diff_validation::ParsedDiff;
@@ -149,6 +150,13 @@ pub enum AIAgentActionType {
     /// `base_prompt` when the per-agent `prompt` is empty).
     RunAgents(RunAgentsRequest),
 
+    /// 向本机已记录的父子任务发送消息；接收确认与派发状态分别记录。
+    SendMessageToAgent {
+        addresses: Vec<String>,
+        subject: String,
+        message: String,
+    },
+
     /// Synthesized from a server-emitted Message::ToolCall::WaitForEvents;
     /// dispatched by WaitForEventsExecutor.
     WaitForEvents {
@@ -230,6 +238,8 @@ pub enum StartAgentExecutionMode {
         /// model id (used by the orchestrate confirmation card so the user's
         /// model selection is honored on local launches).
         model_id: Option<String>,
+        /// 保留本地技能引用及其来源，启动时按 CLI 原生能力验证并交付。
+        skill_references: Vec<SkillReference>,
     },
     Remote {
         environment_id: String,
@@ -331,6 +341,9 @@ impl AIAgentActionType {
             Self::AskUserQuestion { .. } => {
                 AIAgentActionResultType::AskUserQuestion(AskUserQuestionResult::Cancelled)
             }
+            Self::SendMessageToAgent { .. } => {
+                AIAgentActionResultType::SendMessageToAgent(SendMessageToAgentResult::Cancelled)
+            }
             Self::RunAgents(_) => AIAgentActionResultType::RunAgents(RunAgentsResult::Cancelled),
             Self::WaitForEvents { .. } => {
                 AIAgentActionResultType::WaitForEvents(WaitForEventsResult::Cancelled)
@@ -363,6 +376,7 @@ impl AIAgentActionType {
             Self::ReadSkill(_) => "Reading skill",
             Self::TransferShellCommandControlToUser { .. } => "Transferring control",
             Self::AskUserQuestion { .. } => "Asking question",
+            Self::SendMessageToAgent { .. } => "Sending task message",
             Self::RunAgents(_) => "Orchestrating agents",
             Self::WaitForEvents { .. } => "Waiting for events",
         }
@@ -402,6 +416,7 @@ impl AIAgentActionType {
             Self::AskUserQuestion { questions } => {
                 format!("Ask user {} question(s)", questions.len())
             }
+            Self::SendMessageToAgent { .. } => "Send task message".to_owned(),
             Self::RunAgents(req) => {
                 format!("Orchestrate {} agent(s)", req.agent_run_configs.len())
             }
@@ -543,6 +558,9 @@ impl Display for AIAgentActionType {
             AIAgentActionType::AskUserQuestion { questions } => {
                 write!(f, "AskUserQuestion: {} question(s)", questions.len())
             }
+            AIAgentActionType::SendMessageToAgent {
+                addresses, subject, ..
+            } => write!(f, "SendMessageToAgent: {addresses:?} ({subject})"),
             AIAgentActionType::RunAgents(req) => {
                 let names = req
                     .agent_run_configs

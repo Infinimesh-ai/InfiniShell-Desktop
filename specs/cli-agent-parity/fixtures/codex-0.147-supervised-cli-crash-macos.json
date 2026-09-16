@@ -1,0 +1,399 @@
+{
+  "platform": "darwin",
+  "scope": "real_codex_tool_via_supervisor_custom_host",
+  "crash_target": "codex",
+  "rust_adapter_tested": false,
+  "model_requested": true,
+  "credentials_isolated": true,
+  "supervisor_sha256": "17a2dd3d147072681a52acc7cadc00c1a4880552ff81ede6e8c6c0d5832a41b2",
+  "cli_version": "codex-cli 0.147.0",
+  "native": {
+    "thread_id": "01a0a998-a79b-71b2-9913-7d45f6253550",
+    "turn_id": "01a0a998-a7af-7230-8c48-f3f4029cfa36"
+  },
+  "generation": "b182b4e3-a737-48f6-8b79-a07929211f08",
+  "tool_identity": {
+    "pid": 97003,
+    "ppid": 96983,
+    "pgid": 97003,
+    "sid": 97003,
+    "sleep_pid": 97005
+  },
+  "worker": {
+    "pid": 96982,
+    "host_pid": 96981
+  },
+  "approval": {
+    "accepted": 1,
+    "last_request_matched_exact_fixture": true
+  },
+  "before": [
+    {
+      "pid": 96981,
+      "ppid": 96979,
+      "pgid": 96979,
+      "sid": 96979,
+      "state": "S",
+      "start": "Wed Sep 16 17:42:26 2026",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "present": true
+    },
+    {
+      "pid": 96982,
+      "ppid": 96981,
+      "pgid": 96979,
+      "sid": 96979,
+      "state": "S",
+      "start": "Wed Sep 16 17:42:27 2026",
+      "command": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+      "present": true
+    },
+    {
+      "pid": 96983,
+      "ppid": 96982,
+      "pgid": 96983,
+      "sid": 96979,
+      "state": "S",
+      "start": "Wed Sep 16 17:42:27 2026",
+      "command": "/opt/homebrew/Caskroom/codex/0.147.0/bin/codex",
+      "present": true
+    },
+    {
+      "pid": 97003,
+      "ppid": 96983,
+      "pgid": 97003,
+      "sid": 97003,
+      "state": "Ss",
+      "start": "Wed Sep 16 17:42:38 2026",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "present": true
+    },
+    {
+      "pid": 97005,
+      "ppid": 97003,
+      "pgid": 97003,
+      "sid": 97003,
+      "state": "S",
+      "start": "Wed Sep 16 17:42:38 2026",
+      "command": "/bin/sleep",
+      "present": true
+    }
+  ],
+  "heartbeat_before_kill": {
+    "bytes": 60,
+    "lines": 4,
+    "sha256": "abf7c271f893500456d0a4cc96312404312735e17b1a503513a0a6e015c186cd"
+  },
+  "host_alive_at_cli_kill": true,
+  "cli_sigkill_sent": true,
+  "receipt_observed_after_sec": 0.03,
+  "receipt": {
+    "version": 1,
+    "generation": "b182b4e3-a737-48f6-8b79-a07929211f08",
+    "cleanup_confirmed": true,
+    "containment": "unix_process_group",
+    "exit_reason": "stdio_closed",
+    "exit_code": null,
+    "manifest_sha256": "477a5fb3e2d9e707ac6b50caf85e6c2fb76ad3167bfa4f88c158822b184541f3"
+  },
+  "heartbeat_at_receipt": {
+    "bytes": 60,
+    "lines": 4,
+    "sha256": "abf7c271f893500456d0a4cc96312404312735e17b1a503513a0a6e015c186cd"
+  },
+  "after_receipt": [
+    {
+      "pid": 96981,
+      "ppid": 96979,
+      "pgid": 96979,
+      "sid": 96979,
+      "state": "S",
+      "start": "Wed Sep 16 17:42:26 2026",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "present": true
+    },
+    {
+      "pid": 96982,
+      "ppid": 96981,
+      "pgid": 96979,
+      "sid": null,
+      "state": "Z",
+      "start": "Wed Sep 16 17:42:27 2026",
+      "command": "<defunct>",
+      "present": true
+    },
+    {
+      "pid": 96983,
+      "present": false
+    },
+    {
+      "pid": 97003,
+      "ppid": 1,
+      "pgid": 97003,
+      "sid": 97003,
+      "state": "Ss",
+      "start": "Wed Sep 16 17:42:38 2026",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "present": true
+    },
+    {
+      "pid": 97005,
+      "ppid": 97003,
+      "pgid": 97003,
+      "sid": 97003,
+      "state": "S",
+      "start": "Wed Sep 16 17:42:38 2026",
+      "command": "/bin/sleep",
+      "present": true
+    }
+  ],
+  "host_alive_after_receipt": true,
+  "heartbeat_later": {
+    "bytes": 240,
+    "lines": 16,
+    "sha256": "9d009191f8d598dd58f513b68aa870486e180e20f2287b04ec3aa5899a432040"
+  },
+  "after_observation": [
+    {
+      "pid": 96981,
+      "ppid": 96979,
+      "pgid": 96979,
+      "sid": 96979,
+      "state": "S",
+      "start": "Wed Sep 16 17:42:26 2026",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "present": true
+    },
+    {
+      "pid": 96982,
+      "present": false
+    },
+    {
+      "pid": 96983,
+      "present": false
+    },
+    {
+      "pid": 97003,
+      "ppid": 1,
+      "pgid": 97003,
+      "sid": 97003,
+      "state": "Ss",
+      "start": "Wed Sep 16 17:42:38 2026",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "present": true
+    },
+    {
+      "pid": 97005,
+      "ppid": 97003,
+      "pgid": 97003,
+      "sid": 97003,
+      "state": "S",
+      "start": "Wed Sep 16 17:42:38 2026",
+      "command": "/bin/sleep",
+      "present": true
+    }
+  ],
+  "heartbeat_continued_after_receipt": true,
+  "manifest_digest_matches": true,
+  "tool_has_distinct_group_from_cli": true,
+  "passed": false,
+  "fixture_cleanup": [
+    {
+      "pid": 97003,
+      "present": false
+    },
+    {
+      "pid": 97005,
+      "present": false
+    }
+  ],
+  "host_stderr": "",
+  "supervisor_unchanged_during_probe": true,
+  "protocol_events": [
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "turn/started",
+        "params": {
+          "threadId": "01a0a998-a79b-71b2-9913-7d45f6253550",
+          "turn": {
+            "id": "01a0a998-a7af-7230-8c48-f3f4029cfa36",
+            "items": [],
+            "itemsView": "notLoaded",
+            "status": "inProgress",
+            "error": null,
+            "startedAt": 1789551749,
+            "completedAt": null,
+            "durationMs": null
+          }
+        },
+        "emittedAtMs": 1789551749043
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a0a998-bcb0-7960-813d-4088a75bcbca",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "这是隔离临时项目里的进程清理测试。必须只调用 exec_command 一次，原样执行以下固定命令，不改文件、不检查其他目录、不用其他工具；获准后保持进程运行，不主动停止或重试。拒绝则结束。命令：\n/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14 heartbeat.py",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a0a998-a79b-71b2-9913-7d45f6253550",
+          "turnId": "01a0a998-a7af-7230-8c48-f3f4029cfa36",
+          "startedAtMs": 1789551754416
+        },
+        "emittedAtMs": 1789551754416
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "userMessage",
+            "id": "01a0a998-bcb0-7960-813d-4088a75bcbca",
+            "clientId": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "这是隔离临时项目里的进程清理测试。必须只调用 exec_command 一次，原样执行以下固定命令，不改文件、不检查其他目录、不用其他工具；获准后保持进程运行，不主动停止或重试。拒绝则结束。命令：\n/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14 heartbeat.py",
+                "text_elements": []
+              }
+            ]
+          },
+          "threadId": "01a0a998-a79b-71b2-9913-7d45f6253550",
+          "turnId": "01a0a998-a7af-7230-8c48-f3f4029cfa36",
+          "completedAtMs": 1789551754416
+        },
+        "emittedAtMs": 1789551754416
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "agentMessage",
+            "id": "msg_0ea6248e1ab6828e016aaa648bb2cc87d0989bfe5031c54b4f",
+            "text": "",
+            "phase": "commentary",
+            "memoryCitation": null
+          },
+          "threadId": "01a0a998-a79b-71b2-9913-7d45f6253550",
+          "turnId": "01a0a998-a7af-7230-8c48-f3f4029cfa36",
+          "startedAtMs": 1789551755830
+        },
+        "emittedAtMs": 1789551755830
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/completed",
+        "params": {
+          "item": {
+            "type": "agentMessage",
+            "id": "msg_0ea6248e1ab6828e016aaa648bb2cc87d0989bfe5031c54b4f",
+            "text": "我将仅请求执行这条固定命令一次；若获准且启动成功，会保持进程运行，不主动停止或重试。",
+            "phase": "commentary",
+            "memoryCitation": null
+          },
+          "threadId": "01a0a998-a79b-71b2-9913-7d45f6253550",
+          "turnId": "01a0a998-a7af-7230-8c48-f3f4029cfa36",
+          "completedAtMs": 1789551756882
+        },
+        "emittedAtMs": 1789551756882
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/started",
+        "params": {
+          "item": {
+            "type": "commandExecution",
+            "id": "exec-7f1767b7-63bf-46d7-a02a-d21f9d109160",
+            "pluginId": null,
+            "scriptPath": null,
+            "command": "/bin/zsh -lc '/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14 heartbeat.py'",
+            "cwd": "<probe-project>",
+            "processId": null,
+            "source": "agent",
+            "status": "inProgress",
+            "commandActions": [
+              {
+                "type": "unknown",
+                "command": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14 heartbeat.py"
+              }
+            ],
+            "aggregatedOutput": null,
+            "exitCode": null,
+            "durationMs": null
+          },
+          "threadId": "01a0a998-a79b-71b2-9913-7d45f6253550",
+          "turnId": "01a0a998-a7af-7230-8c48-f3f4029cfa36",
+          "startedAtMs": 1789551758713
+        },
+        "emittedAtMs": 1789551758713
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "method": "item/commandExecution/requestApproval",
+        "id": 0,
+        "params": {
+          "threadId": "01a0a998-a79b-71b2-9913-7d45f6253550",
+          "turnId": "01a0a998-a7af-7230-8c48-f3f4029cfa36",
+          "itemId": "exec-7f1767b7-63bf-46d7-a02a-d21f9d109160",
+          "startedAtMs": 1789551758712,
+          "environmentId": "local",
+          "command": "/bin/zsh -lc '/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14 heartbeat.py'",
+          "cwd": "<probe-project>",
+          "commandActions": [
+            {
+              "type": "unknown",
+              "command": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14 heartbeat.py"
+            }
+          ],
+          "proposedExecpolicyAmendment": [
+            "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+            "heartbeat.py"
+          ],
+          "availableDecisions": [
+            "accept",
+            {
+              "acceptWithExecpolicyAmendment": {
+                "execpolicy_amendment": [
+                  "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+                  "heartbeat.py"
+                ]
+              }
+            },
+            "cancel"
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "id": 0,
+        "result": {
+          "decision": "accept"
+        }
+      }
+    }
+  ]
+}

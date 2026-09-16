@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use ai::agent::action_result::RunAgentsAgentOutcome;
+use ai::agent::action_result::{RunAgentsAgentOutcome, SendMessageToAgentResult};
 use warp::tui_export::{
     AIActionStatus, AIAgentAction, AIAgentActionResultType, AIAgentActionType,
     AskUserQuestionResult, FileGlobV2Result, GrepResult, RequestCommandOutputResult,
@@ -144,6 +144,16 @@ pub(crate) fn tool_call_display_state(
         None | Some(AIActionStatus::Preprocessing | AIActionStatus::Queued) => State::Pending,
         Some(AIActionStatus::Blocked) => State::Blocked,
         Some(AIActionStatus::RunningAsync) => State::Running,
+        Some(AIActionStatus::Finished(result))
+            if matches!(
+                result.result,
+                AIAgentActionResultType::SendMessageToAgent(
+                    SendMessageToAgentResult::Unconfirmed { .. }
+                )
+            ) =>
+        {
+            State::Blocked
+        }
         Some(finished @ AIActionStatus::Finished(_)) => {
             if finished.is_cancelled() {
                 State::Cancelled
@@ -186,6 +196,17 @@ pub(crate) fn tool_call_label_with_server(
         .map(|result| &result.result);
     let label = label_for_action(&action.action, state, result, block, server_name);
     match state {
+        // 接收确认缺失需要关注，但并不是等待用户批准工具调用。
+        State::Blocked
+            if matches!(
+                result,
+                Some(AIAgentActionResultType::SendMessageToAgent(
+                    SendMessageToAgentResult::Unconfirmed { .. }
+                ))
+            ) =>
+        {
+            label
+        }
         State::Blocked => warp::t!("tui-tool-awaiting-approval", label = label),
         State::Constructing
         | State::Pending
@@ -529,6 +550,21 @@ fn label_for_action(
             },
             State::Failed => warp::t!("tui-tool-questions-failed"),
             State::Cancelled => warp::t!("tui-tool-questions-cancelled"),
+        },
+        AIAgentActionType::SendMessageToAgent { .. } => match result {
+            Some(AIAgentActionResultType::SendMessageToAgent(
+                SendMessageToAgentResult::Acknowledged { .. },
+            )) => warp::t!("tui-cli-agent-message-acknowledged"),
+            Some(AIAgentActionResultType::SendMessageToAgent(
+                SendMessageToAgentResult::Unconfirmed { .. },
+            )) => warp::t!("tui-cli-agent-message-unconfirmed"),
+            Some(AIAgentActionResultType::SendMessageToAgent(SendMessageToAgentResult::Error(
+                _,
+            ))) => warp::t!("tui-cli-agent-message-failed"),
+            Some(AIAgentActionResultType::SendMessageToAgent(
+                SendMessageToAgentResult::Cancelled,
+            )) => warp::t!("tui-cli-agent-message-cancelled"),
+            _ => warp::t!("tui-cli-agent-message-sending"),
         },
         AIAgentActionType::RunAgents(request) => {
             let total = request.agent_run_configs.len();

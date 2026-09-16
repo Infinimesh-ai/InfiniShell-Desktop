@@ -1,0 +1,7 @@
+{
+  "platform": "macOS arm64",
+  "cli_version": "1.0.30",
+  "method": "真实 Grok 安装随附插件，并在控制 PTY 内以无认证隔离配置触发原生 hooks；未调用有额度的模型。",
+  "exit_code": 1,
+  "notifications": []
+}

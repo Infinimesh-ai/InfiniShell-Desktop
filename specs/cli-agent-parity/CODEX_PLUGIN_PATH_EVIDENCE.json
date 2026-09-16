@@ -1,0 +1,44 @@
+{
+  "cli": "codex-cli 0.147.0",
+  "host_os": "darwin",
+  "hook_manifest_sha256": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+  "mode": "native_first_turn_instrumented_session_start",
+  "model_request_attempted": true,
+  "credentials_provided": false,
+  "model_generation_verified": false,
+  "shell_snapshot_enabled": false,
+  "full_notification_lifecycle_verified": false,
+  "cases": [
+    {
+      "directory_name": "插件 空 格",
+      "initial_trust_status": "untrusted",
+      "explicit_fixture_trust_added": true,
+      "verified_trust_status": "trusted",
+      "native_thread_started": true,
+      "native_session_start": true,
+      "plugin_root_preserved": true,
+      "shell_injection_marker_absent": true
+    },
+    {
+      "directory_name": "插件 ' $(touch INJECTED) `touch INJECTED`",
+      "initial_trust_status": "untrusted",
+      "explicit_fixture_trust_added": true,
+      "verified_trust_status": "trusted",
+      "native_thread_started": true,
+      "native_session_start": true,
+      "plugin_root_preserved": true,
+      "shell_injection_marker_absent": true
+    },
+    {
+      "directory_name": "插件 \" $(touch INJECTED) `touch INJECTED`",
+      "initial_trust_status": "untrusted",
+      "explicit_fixture_trust_added": true,
+      "verified_trust_status": "trusted",
+      "native_thread_started": true,
+      "native_session_start": true,
+      "plugin_root_preserved": true,
+      "shell_injection_marker_absent": true
+    }
+  ],
+  "passed": true
+}

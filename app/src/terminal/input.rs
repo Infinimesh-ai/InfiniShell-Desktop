@@ -2582,8 +2582,7 @@ impl Input {
                 // These events are handled by UseAgentToolbar's subscription.
                 // The UseAgentToolbar shares this same AgentInputFooter instance,
                 // so its subscriber always fires alongside ours for every chip click.
-                AgentInputFooterEvent::WriteToPty(_)
-                | AgentInputFooterEvent::InsertIntoCLIRichInput(_)
+                AgentInputFooterEvent::InsertIntoCLI { .. }
                 | AgentInputFooterEvent::ToggleCodeReviewPane(_)
                 | AgentInputFooterEvent::ToggleFileExplorer(_) => {}
                 AgentInputFooterEvent::ToggledChipMenu { open } => {
@@ -2908,6 +2907,7 @@ impl Input {
                 EditorView::new(options, ctx)
                     .with_next_command_model(next_command_model.clone())
                     .with_context_model(ai_context_model.clone())
+                    .with_cli_image_input_owner(terminal_view_id)
             })
         };
 
@@ -8560,6 +8560,25 @@ impl Input {
         }
     }
 
+    pub(in crate::terminal) fn cli_input_is_processing_images(&self) -> bool {
+        self.is_processing_attached_images
+    }
+
+    pub(in crate::terminal) fn acknowledge_cli_input_submission(
+        &mut self,
+        revision: &crate::editor::EditorBufferRevision,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        if self.editor.as_ref(ctx).buffer_revision(ctx) != *revision {
+            return false;
+        }
+        if self.is_locked_in_shell_mode(ctx) {
+            self.exit_shell_mode_to_ai(ctx);
+        }
+        self.clear_buffer_and_reset_undo_stack(ctx);
+        true
+    }
+
     pub fn clear_buffer_and_reset_undo_stack(&mut self, ctx: &mut ViewContext<Self>) {
         self.clear_cached_hint_text();
         self.exit_cloud_handoff_compose(ctx);
@@ -10830,6 +10849,7 @@ impl Input {
                 ctx.emit(Event::InputFocusedFromMiddleClick);
             }
             EditorEvent::Focused => ctx.emit(Event::EditorFocused),
+            EditorEvent::ImagesProcessed { .. } | EditorEvent::FilePathsSelected { .. } => {}
             EditorEvent::ProcessingAttachedImages(is_processing) => {
                 self.set_is_processing_attached_images(*is_processing, ctx);
             }
@@ -13327,13 +13347,10 @@ impl Input {
     /// Shared submit path for Enter (default mode) and Ctrl+Enter (`submit_on_ctrl_enter` mode);
     /// callers must have already handled menu-intercept cases.
     fn emit_submit_cli_agent_input(&mut self, ctx: &mut ViewContext<Self>) {
-        // When the `!` prefix was stripped (shell mode in CLI agent input),
-        // prepend it back so the CLI agent receives the mode-switch prefix,
-        // then exit shell mode so the next prompt starts in AI mode.
+        // 只有终端确认提交已写入后才能退出 shell 模式；发送租约被拒绝时保留原草稿。
         let mut text = self.editor.as_ref(ctx).buffer_text(ctx);
         if self.is_locked_in_shell_mode(ctx) {
             text = format!("{TERMINAL_INPUT_PREFIX}{text}");
-            self.exit_shell_mode_to_ai(ctx);
         }
         ctx.emit(Event::SubmitCLIAgentInput { text });
     }

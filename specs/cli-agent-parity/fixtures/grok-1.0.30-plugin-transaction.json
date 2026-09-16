@@ -1,0 +1,146 @@
+{
+  "test_artifacts": "随附插件的临时版本副本；运行真实 Grok 插件 CLI。失败注入使用不存在的新安装来源。",
+  "steps": [
+    {
+      "args": [
+        "plugin",
+        "install",
+        "--trust",
+        "<probe-root>/old"
+      ],
+      "exit_code": 0,
+      "stdout": "Installed 1 plugin(s) from <probe-root>/old: infinishell-grok\n",
+      "stderr": "",
+      "registry": {
+        "version": 1,
+        "repos": {
+          "old-1f9a5f7f": {
+            "kind": {
+              "type": "Local",
+              "source_path": "<probe-root>/old"
+            },
+            "installed_at": "2026-09-16T06:13:39.315270+00:00",
+            "updated_at": "2026-09-16T06:13:39.315270+00:00",
+            "path": "<probe-root>/grok/installed-plugins/old-1f9a5f7f",
+            "plugins": {
+              "infinishell-grok": {
+                "version": "0.0.9"
+              }
+            }
+          }
+        }
+      },
+      "config": "[ui]\nscreen_mode = \"minimal\"\n\n[plugins]\nenabled = [\"infinishell-grok\"]\n"
+    },
+    {
+      "args": [
+        "plugin",
+        "uninstall",
+        "--keep-data",
+        "infinishell-grok"
+      ],
+      "exit_code": 0,
+      "stdout": "Uninstalled 1 plugin(s): infinishell-grok (data preserved)\n",
+      "stderr": "",
+      "registry": {
+        "version": 1,
+        "repos": {}
+      },
+      "config": "[ui]\nscreen_mode = \"minimal\"\n\n[plugins]\nenabled = [\"infinishell-grok\"]\n"
+    },
+    {
+      "args": [
+        "plugin",
+        "install",
+        "--trust",
+        "<probe-root>/new"
+      ],
+      "exit_code": 0,
+      "stdout": "Installed 1 plugin(s) from <probe-root>/new: infinishell-grok\n",
+      "stderr": "",
+      "registry": {
+        "version": 1,
+        "repos": {
+          "new-30486299": {
+            "kind": {
+              "type": "Local",
+              "source_path": "<probe-root>/new"
+            },
+            "installed_at": "2026-09-16T06:13:39.687904+00:00",
+            "updated_at": "2026-09-16T06:13:39.687904+00:00",
+            "path": "<probe-root>/grok/installed-plugins/new-30486299",
+            "plugins": {
+              "infinishell-grok": {
+                "version": "0.1.0"
+              }
+            }
+          }
+        }
+      },
+      "config": "[ui]\nscreen_mode = \"minimal\"\n\n[plugins]\nenabled = [\"infinishell-grok\"]\n"
+    },
+    {
+      "args": [
+        "plugin",
+        "uninstall",
+        "--keep-data",
+        "infinishell-grok"
+      ],
+      "exit_code": 0,
+      "stdout": "Uninstalled 1 plugin(s): infinishell-grok (data preserved)\n",
+      "stderr": "",
+      "registry": {
+        "version": 1,
+        "repos": {}
+      },
+      "config": "[ui]\nscreen_mode = \"minimal\"\n\n[plugins]\nenabled = [\"infinishell-grok\"]\n"
+    },
+    {
+      "args": [
+        "plugin",
+        "install",
+        "--trust",
+        "<probe-root>/missing-candidate"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: install failed: local path is not a directory: <probe-root>/missing-candidate\n",
+      "registry": {
+        "version": 1,
+        "repos": {}
+      },
+      "config": "[ui]\nscreen_mode = \"minimal\"\n\n[plugins]\nenabled = [\"infinishell-grok\"]\n"
+    },
+    {
+      "args": [
+        "plugin",
+        "install",
+        "--trust",
+        "<probe-root>/rollback"
+      ],
+      "exit_code": 0,
+      "stdout": "Installed 1 plugin(s) from <probe-root>/rollback: infinishell-grok\n",
+      "stderr": "",
+      "registry": {
+        "version": 1,
+        "repos": {
+          "rollback-1d88e09f": {
+            "kind": {
+              "type": "Local",
+              "source_path": "<probe-root>/rollback"
+            },
+            "installed_at": "2026-09-16T06:13:40.246549+00:00",
+            "updated_at": "2026-09-16T06:13:40.246549+00:00",
+            "path": "<probe-root>/grok/installed-plugins/rollback-1d88e09f",
+            "plugins": {
+              "infinishell-grok": {
+                "version": "0.1.0"
+              }
+            }
+          }
+        }
+      },
+      "config": "[ui]\nscreen_mode = \"minimal\"\n\n[plugins]\nenabled = [\"infinishell-grok\"]\n"
+    }
+  ]
+}

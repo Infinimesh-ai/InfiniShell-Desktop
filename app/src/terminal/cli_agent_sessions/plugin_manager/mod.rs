@@ -1,7 +1,11 @@
 pub(crate) mod claude;
 pub(crate) mod codex;
+mod codex_hook_trust;
+mod codex_source;
 pub(crate) mod deepseek;
 pub(crate) mod gemini;
+pub(crate) mod grok;
+pub(crate) mod notification_patch;
 pub(crate) mod opencode;
 
 use std::cmp::Ordering;
@@ -14,6 +18,7 @@ use claude::ClaudeCodePluginManager;
 use codex::CodexPluginManager;
 use deepseek::DeepSeekPluginManager;
 use gemini::GeminiPluginManager;
+use grok::GrokPluginManager;
 use opencode::OpenCodePluginManager;
 
 use crate::features::FeatureFlag;
@@ -26,6 +31,16 @@ use crate::terminal::shell::ShellType;
 pub enum PluginModalKind {
     Install,
     Update,
+    NativeAuthorization,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NativeAuthorizationStatus {
+    NotApplicable,
+    Required,
+    /// 仅说明本机配置匹配，不能替代当前原生会话发出的通知。
+    Configured,
+    Unknown,
 }
 
 /// A single step in the plugin install/update instructions pane.
@@ -158,6 +173,19 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
         false
     }
 
+    /// 显式禁用须由用户重新启用，安装和更新不得静默恢复开关。
+    fn is_disabled(&self) -> bool {
+        false
+    }
+
+    fn native_authorization_status(&self) -> NativeAuthorizationStatus {
+        NativeAuthorizationStatus::NotApplicable
+    }
+
+    fn native_authorization_instructions(&self) -> Option<&'static PluginInstructions> {
+        None
+    }
+
     /// Whether the on-disk plugin version is below the minimum required.
     /// Default returns `false` (no filesystem check).
     fn needs_update(&self) -> bool {
@@ -212,6 +240,11 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
 
     /// Manual installation instructions for the modal UI.
     fn install_instructions(&self) -> &'static PluginInstructions;
+
+    /// 远端终端不能依据本机配置判断插件已安装或已禁用。
+    fn remote_install_instructions(&self) -> &'static PluginInstructions {
+        self.install_instructions()
+    }
 
     /// Whether this agent supports version-based update checking.
     /// When `false`, the update chip is never shown; only the install chip appears.
@@ -271,11 +304,7 @@ pub(crate) fn plugin_manager_for_with_shell(
             if FeatureFlag::CodexNotifications.is_enabled()
                 && FeatureFlag::HOANotifications.is_enabled() =>
         {
-            Some(Box::new(CodexPluginManager::new(
-                shell_path,
-                shell_type,
-                path_env_var,
-            )))
+            Some(Box::new(CodexPluginManager::new(path_env_var)))
         }
         CLIAgent::Gemini
             if FeatureFlag::GeminiNotifications.is_enabled()
@@ -290,8 +319,12 @@ pub(crate) fn plugin_manager_for_with_shell(
         CLIAgent::DeepSeek if FeatureFlag::HOANotifications.is_enabled() => {
             Some(Box::new(DeepSeekPluginManager))
         }
+        CLIAgent::Grok if FeatureFlag::HOANotifications.is_enabled() => {
+            Some(Box::new(GrokPluginManager::new(path_env_var)))
+        }
         CLIAgent::OpenCode
         | CLIAgent::Codex
+        | CLIAgent::Grok
         | CLIAgent::Gemini
         | CLIAgent::DeepSeek
         | CLIAgent::Amp

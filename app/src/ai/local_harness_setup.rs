@@ -1,8 +1,9 @@
 use warp_cli::agent::Harness;
 
 use crate::features::FeatureFlag;
+use crate::terminal::cli_agent::CLIAgent;
 #[cfg(not(target_family = "wasm"))]
-use crate::util::path::resolve_executable;
+use crate::terminal::cli_agent::discover_cli_agent_executable;
 
 /// Tooltip shown when a local harness is product-enabled but its CLI is missing.
 pub(crate) const LOCAL_HARNESS_INSTALLATION_REQUIRED_TOOLTIP: &str =
@@ -33,6 +34,7 @@ impl LocalHarnessSetupState {
 /// Returns the product-level disabled reason for a local harness.
 pub(crate) fn local_harness_product_disabled_message(harness: Harness) -> Option<&'static str> {
     match harness {
+        Harness::Grok => Some(crate::t_static!("cli-agent-grok-managed-unavailable")),
         Harness::Codex if !local_codex_harness_is_enabled() => {
             Some(LOCAL_CODEX_HARNESS_DISABLED_MESSAGE)
         }
@@ -59,36 +61,42 @@ pub(crate) fn local_harness_setup_state(harness: Harness) -> LocalHarnessSetupSt
 
 fn local_harness_setup_state_with_cli_resolver(
     harness: Harness,
-    cli_is_installed: impl Fn(&str) -> bool,
+    cli_is_installed: impl Fn(CLIAgent) -> bool,
 ) -> LocalHarnessSetupState {
     if let Some(message) = local_harness_product_disabled_message(harness) {
         return LocalHarnessSetupState::ProductDisabled { message };
     }
 
     match harness {
-        Harness::Claude if !cli_is_installed("claude") => LocalHarnessSetupState::MissingHarness {
-            tooltip: LOCAL_HARNESS_INSTALLATION_REQUIRED_TOOLTIP,
-        },
-        Harness::Codex if !cli_is_installed("codex") => LocalHarnessSetupState::MissingHarness {
-            tooltip: LOCAL_CODEX_HARNESS_INSTALLATION_REQUIRED_TOOLTIP,
-        },
+        Harness::Claude if !cli_is_installed(CLIAgent::Claude) => {
+            LocalHarnessSetupState::MissingHarness {
+                tooltip: LOCAL_HARNESS_INSTALLATION_REQUIRED_TOOLTIP,
+            }
+        }
+        Harness::Codex if !cli_is_installed(CLIAgent::Codex) => {
+            LocalHarnessSetupState::MissingHarness {
+                tooltip: LOCAL_CODEX_HARNESS_INSTALLATION_REQUIRED_TOOLTIP,
+            }
+        }
         Harness::Oz
         | Harness::Claude
         | Harness::OpenCode
         | Harness::Gemini
         | Harness::Codex
+        | Harness::Grok
         | Harness::Unknown => LocalHarnessSetupState::Ready,
     }
 }
 
-fn local_cli_is_installed(command: &str) -> bool {
+fn local_cli_is_installed(agent: CLIAgent) -> bool {
     #[cfg(not(target_family = "wasm"))]
     {
-        resolve_executable(command).is_some()
+        // 与安装扫描使用同一目录集，避免用户目录中的 CLI 被界面误判为缺失。
+        discover_cli_agent_executable(agent).is_some()
     }
     #[cfg(target_family = "wasm")]
     {
-        let _ = command;
+        let _ = agent;
         false
     }
 }

@@ -25,6 +25,7 @@ pub mod documents;
 pub mod edit;
 pub mod exa;
 pub mod files;
+pub mod local_orchestration;
 pub mod long_shell;
 pub mod machine_memory;
 pub mod markers;
@@ -89,6 +90,8 @@ pub const REGISTRY: &[&OpenAiTool] = &[
     &long_shell::WRITE_TO_LONG_RUNNING_SHELL_COMMAND,
     &long_shell::READ_SHELL_COMMAND_OUTPUT,
     &ask::ASK_USER_QUESTION,
+    &local_orchestration::RUN_AGENTS,
+    &local_orchestration::SEND_MESSAGE,
     &skill::READ_SKILL,
     // 本地文档系统(AIDocumentModel)
     &documents::READ_DOCUMENTS,
@@ -206,6 +209,8 @@ pub fn action_result_to_msg_result(
         ReqR::CallMcpTool(r) => MsgR::CallMcpTool(r),
         ReqR::ReadMcpResource(r) => MsgR::ReadMcpResource(r),
         ReqR::AskUserQuestion(r) => MsgR::AskUserQuestion(r),
+        ReqR::RunAgentsResult(r) => MsgR::RunAgentsResult(r),
+        ReqR::SendMessageToAgent(r) => MsgR::SendMessageToAgent(r),
         ReqR::ReadSkill(r) => MsgR::ReadSkill(r),
         ReqR::ReadDocuments(r) => MsgR::ReadDocuments(r),
         ReqR::EditDocuments(r) => MsgR::EditDocuments(r),

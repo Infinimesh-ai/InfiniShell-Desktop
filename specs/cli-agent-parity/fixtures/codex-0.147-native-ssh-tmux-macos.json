@@ -1,0 +1,824 @@
+{
+  "source_commit": "6921a9925955a1955503e259cd935eaea4ac2ac0",
+  "source_tree_dirty": true,
+  "platform": "darwin",
+  "codex_commit": "be6e8eac029b183056b7e4402879f15d2c85f61b",
+  "codex_sha256": "19c4f144c5226a9f17c58e6f0fa854843b0f77a6eb420f40e2745a12f10f5d37",
+  "tmux_sha256": "a47f7c82de1e2779eadbd089ab4daccf60cd136a2b8dd976bec3399b9755a9f9",
+  "prompt": "INFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL",
+  "credentials_provided": false,
+  "product_ssh_ui_verified": false,
+  "keystroke_input_verified": false,
+  "model_lifecycle_verified": false,
+  "native_hook_summary_obtained": false,
+  "cases": [
+    {
+      "mode": "direct",
+      "passed": true,
+      "native_install": [
+        {
+          "arguments": [
+            "plugin",
+            "marketplace",
+            "add",
+            "<isolated-probe>/direct/marketplace",
+            "--json"
+          ],
+          "exit_code": 0,
+          "stdout": "{\n  \"marketplaceName\": \"infinishell-ssh-transport-probe\",\n  \"installedRoot\": \"<isolated-probe>/direct/marketplace\",\n  \"alreadyAdded\": false\n}\n",
+          "stderr": ""
+        },
+        {
+          "arguments": [
+            "plugin",
+            "add",
+            "ssh-transport-probe@infinishell-ssh-transport-probe",
+            "--json"
+          ],
+          "exit_code": 0,
+          "stdout": "{\n  \"pluginId\": \"ssh-transport-probe@infinishell-ssh-transport-probe\",\n  \"name\": \"ssh-transport-probe\",\n  \"marketplaceName\": \"infinishell-ssh-transport-probe\",\n  \"version\": \"0.1.0\",\n  \"installedPath\": \"<isolated-probe>/direct/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+          "stderr": ""
+        }
+      ],
+      "authorization_rpc": [
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_ssh_probe/0.147.0 (Mac OS 27.0.0; arm64) WarpTerminal (infinishell_ssh_probe; 0.1.0)",
+              "codexHome": "<isolated-probe>/direct/home/.codex",
+              "platformFamily": "unix",
+              "platformOs": "macos"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "MacBookPro16",
+              "installationId": "b0dd4c6d-083a-4c60-ad6a-129354603fb1",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789562367141
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 2,
+            "result": {
+              "data": [
+                {
+                  "cwd": "<isolated-probe>/direct/work",
+                  "hooks": [
+                    {
+                      "key": "ssh-transport-probe@infinishell-ssh-transport-probe:hooks/hooks.json:session_start:0:0",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_SSH_PROBE_PYTHON\" \"$PLUGIN_ROOT/native_hook.py\" session",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-probe>/direct/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+                      "displayOrder": 0,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:535385b7ba4d8088c9ee0cb7aa74bbc82012114f53e93b9d564cf1806d58a617",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "ssh-transport-probe@infinishell-ssh-transport-probe:hooks/hooks.json:user_prompt_submit:0:0",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_SSH_PROBE_PYTHON\" \"$PLUGIN_ROOT/native_hook.py\" prompt",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-probe>/direct/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+                      "displayOrder": 1,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:548489bc0a3111c064a1ece15c29c81922055fb4cda375f4a2b3c330c3dc6cae",
+                      "trustStatus": "untrusted"
+                    }
+                  ],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 10,
+            "result": {
+              "status": "ok",
+              "version": "sha256:dd4f6a9385e25cb875e598455ea5f9ca12b6f7fb4fd215e72eabff60be6845ce",
+              "filePath": "<isolated-probe>/direct/home/.codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 11,
+            "result": {
+              "status": "ok",
+              "version": "sha256:29a26673db091e7d395c659e864a20c89001fe06200c95f8d09a1fc07b0a9856",
+              "filePath": "<isolated-probe>/direct/home/.codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        }
+      ],
+      "reference_tree_sha256": {
+        ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+        "hooks/hooks.json": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+        "scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+        "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+        "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+        "scripts/on-prompt-submit.sh": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+        "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+        "scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+        "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+        "scripts/warp-notify.sh": "144f0ce32c629c920ee6d6c164f1fcbd36aaac0429c5348087a33a382d75a050"
+      },
+      "native_cache": "<isolated-probe>/direct/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+      "ssh_exit": 0,
+      "trust_selected_in_native_tui": true,
+      "kept_existing_model_in_native_tui": true,
+      "ssh_stdout_sha256": "eaa58a99c1176d4f9e3259b7854dacc1cbd30d1878c561ca79892b8103d465ac",
+      "ssh_stdout_bytes": 13818,
+      "ssh_stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "terminal_query_responses": {
+        "1b5b366e": 1,
+        "1b5b63": 1
+      },
+      "native": {
+        "native-start": {
+          "pid": 45065,
+          "pgid": 45065,
+          "sid": 45065,
+          "tty": "/dev/ttys007",
+          "tmux": null,
+          "tmux_pane": null,
+          "codex_pid": 45067
+        },
+        "native-exit": {
+          "pid": 45067,
+          "exit_code": 0,
+          "forced": false
+        },
+        "SessionStart": {
+          "input": {
+            "session_id": "01a0aa3a-b2dd-74a3-bf38-49e7b38a5e13",
+            "transcript_path": "<isolated-probe>/direct/home/.codex/sessions/2026/09/16/rollout-2026-09-16T20-39-28-01a0aa3a-b2dd-74a3-bf38-49e7b38a5e13.jsonl",
+            "cwd": "<isolated-probe>/direct/work",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "source": "startup"
+          },
+          "pid": 45093,
+          "ppid": 45067,
+          "pgid": 45065,
+          "sid": 45065,
+          "tty": {
+            "path": "/dev/tty",
+            "isatty": true,
+            "foreground_pgid": 45065
+          },
+          "reference_script": "on-session-start.sh",
+          "reference_exit": 0,
+          "reference_stdout": "",
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<isolated-probe>/direct/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": null,
+            "TMUX_PANE": null,
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "local",
+            "TERM_PROGRAM": "WarpTerminal"
+          }
+        },
+        "UserPromptSubmit": {
+          "input": {
+            "session_id": "01a0aa3a-b2dd-74a3-bf38-49e7b38a5e13",
+            "turn_id": "01a0aa3a-b395-7f31-829c-4503f62be220",
+            "transcript_path": "<isolated-probe>/direct/home/.codex/sessions/2026/09/16/rollout-2026-09-16T20-39-28-01a0aa3a-b2dd-74a3-bf38-49e7b38a5e13.jsonl",
+            "cwd": "<isolated-probe>/direct/work",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "prompt": "INFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL"
+          },
+          "pid": 45116,
+          "ppid": 45067,
+          "pgid": 45065,
+          "sid": 45065,
+          "tty": {
+            "path": "/dev/tty",
+            "isatty": true,
+            "foreground_pgid": 45065
+          },
+          "reference_script": "on-prompt-submit.sh",
+          "reference_exit": 0,
+          "reference_stdout": "",
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<isolated-probe>/direct/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": null,
+            "TMUX_PANE": null,
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "local",
+            "TERM_PROGRAM": "WarpTerminal"
+          },
+          "block_output": {
+            "continue": false,
+            "stopReason": "6c3df80db5fd49e7afda1acc4b33f14d"
+          }
+        }
+      },
+      "native_session_id": "01a0aa3a-b2dd-74a3-bf38-49e7b38a5e13",
+      "native_turn_id": "01a0aa3a-b395-7f31-829c-4503f62be220",
+      "notifications": [
+        {
+          "v": 1,
+          "agent": "codex",
+          "event": "session_start",
+          "session_id": "01a0aa3a-b2dd-74a3-bf38-49e7b38a5e13",
+          "cwd": "<isolated-probe>/direct/work",
+          "project": "work",
+          "plugin_version": "0.4.0"
+        },
+        {
+          "v": 1,
+          "agent": "codex",
+          "event": "prompt_submit",
+          "session_id": "01a0aa3a-b2dd-74a3-bf38-49e7b38a5e13",
+          "cwd": "<isolated-probe>/direct/work",
+          "project": "work",
+          "turn_id": "01a0aa3a-b395-7f31-829c-4503f62be220",
+          "query": "INFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL"
+        }
+      ],
+      "native_cli_hook_triggered": true,
+      "native_hook_summary_obtained": false,
+      "model_http_request_count": 0,
+      "result": "transport_received",
+      "native_tui_blocked_observed": true,
+      "ssh_stdout_redacted_text": "\u001b[?2004h\u001b[>4;0m\u001b[>7u\u001b[?1004h\u001b[6n\u001b]10;?\u001b\\\u001b]11;?\u001b\\\u001b[?u\u001b[c\u001b[?2026h\u001b[1;1H\u001b[J\u001b[1;39H\u001b[0m\u001b[49m\u001b[K\u001b[2;39H\u001b[0m\u001b[49m\u001b[K\u001b[3;39H\u001b[0m\u001b[49m\u001b[K\u001b[4;39H\u001b[0m\u001b[49m\u001b[K\u001b[5;39H\u001b[0m\u001b[49m\u001b[K\u001b[6;39H\u001b[0m\u001b[49m\u001b[K\u001b[7;39H\u001b[0m\u001b[49m\u001b[K\u001b[8;39H\u001b[0m\u001b[49m\u001b[K\u001b[9;39H\u001b[0m\u001b[49m\u001b[K\u001b[10;39H\u001b[0m\u001b[49m\u001b[K\u001b[11;39H\u001b[0m\u001b[49m\u001b[K\u001b[12;39H\u001b[0m\u001b[49m\u001b[K\u001b[13;39H\u001b[0m\u001b[49m\u001b[K\u001b[14;39H\u001b[0m\u001b[49m\u001b[K\u001b[15;39H\u001b[0m\u001b[49m\u001b[K\u001b[16;39H\u001b[0m\u001b[49m\u001b[K\u001b[17;39H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;55H\u001b[0m\u001b[49m\u001b[K\u001b[20;2H\u001b[0m\u001b[49m\u001b[K\u001b[21;114H\u001b[0m\u001b[49m\u001b[K\u001b[22;2H\u001b[0m\u001b[49m\u001b[K\u001b[23;136H\u001b[0m\u001b[49m\u001b[K\u001b[24;75H\u001b[0m\u001b[49m\u001b[K\u001b[25;2H\u001b[0m\u001b[49m\u001b[K\u001b[26;19H\u001b[0m\u001b[49m\u001b[K\u001b[27;14H\u001b[0m\u001b[49m\u001b[K\u001b[28;2H\u001b[0m\u001b[49m\u001b[K\u001b[29;26H\u001b[0m\u001b[49m\u001b[K\u001b[30;2H\u001b[0m\u001b[49m\u001b[K\u001b[31;2H\u001b[0m\u001b[49m\u001b[K\u001b[32;2H\u001b[0m\u001b[49m\u001b[K\u001b[33;2H\u001b[0m\u001b[49m\u001b[K\u001b[34;2H\u001b[0m\u001b[49m\u001b[K\u001b[35;2H\u001b[0m\u001b[49m\u001b[K\u001b[36;2H\u001b[0m\u001b[49m\u001b[K\u001b[37;2H\u001b[0m\u001b[49m\u001b[K\u001b[38;2H\u001b[0m\u001b[49m\u001b[K\u001b[39;2H\u001b[0m\u001b[49m\u001b[K\u001b[40;2H\u001b[0m\u001b[49m\u001b[K\u001b[1;1H                                      \u001b[2;1H             _._:=++==+,_             \u001b[3;1H         _=,/*\\+/+\\=||=_ _\"+_         \u001b[4;1H       ,|*|+**\"^`   `\"*`\"~=~||+       \u001b[5;1H      ;*_\\*',,_            /*|;|,     \u001b[6;1H     \\^;/'^|\\`\\\\            \".|\\\\,    \u001b[7;1H    ~* +`  |*/;||,           '.\\||,   \u001b[8;1H   +^\"-*    '\\|*/\"|_          ! |/|   \u001b[9;1H   ||_|`     ,//|;|*            \"`|   \u001b[10;1H   |=~'`    ;||^\\|\".~++++++_+, =\" |   \u001b[11;1H    _~;*  _;+` /* |\"|___.:,,,|/,/,|   \u001b[12;1H    \\^_\"^ ^\\,./`   `^*''* ^*\"/,;_/    \u001b[13;1H     *^, \", `              ,'/*_|     \u001b[14;1H       ^\\,`\\+_          _=_+|_+\"      \u001b[15;1H         ^*,\\_!*+:;=;;.=*+_,|*        \u001b[16;1H           `*\"*|~~___,_;+*\"           \u001b[17;1H                                      \u001b[19;3HWelcome\u001b[19;11Hto\u001b[19;14H\u001b[1mCodex\u001b[22m,\u001b[19;21HOpenAI's\u001b[19;30Hcommand-line\u001b[19;43Hcoding\u001b[19;50Hagent\u001b[21;1H>\u001b[21;3H\u001b[1mYou are in \u001b[22m<isolated-probe>/direct/work\u001b[23;3HDo\u001b[23;6Hyou\u001b[23;10Htrust\u001b[23;16Hthe\u001b[23;20Hcontents\u001b[23;29Hof\u001b[23;32Hthis\u001b[23;37Hdirectory?\u001b[23;48HWorking\u001b[23;56Hwith\u001b[23;61Huntrusted\u001b[23;71Hcontents\u001b[23;80Hcomes\u001b[23;86Hwith\u001b[23;91Hhigher\u001b[23;98Hrisk\u001b[23;103Hof\u001b[23;106Hprompt\u001b[23;113Hinjection.\u001b[23;124HTrusting\u001b[23;133Hthe\u001b[24;3Hdirectory\u001b[24;13Hallows\u001b[24;20Hproject-local\u001b[24;34Hconfig,\u001b[24;42Hhooks,\u001b[24;49Hand\u001b[24;53Hexec\u001b[24;58Hpolicies\u001b[24;67Hto\u001b[24;70Hload.\u001b[26;1H\u001b[38;5;6;49m› 1. Yes, continue\u001b[27;3H\u001b[39;49m2.\u001b[27;6HNo,\u001b[27;10Hquit\u001b[29;3H\u001b[2mPress enter to continue\u001b[39m\u001b[49m\u001b[0m\u001b[?25l\u001b[?2026l\u001b[?2026h\u001b[1;2H\u001b[0m\u001b[49m\u001b[K\u001b[2;33H\u001b[0m\u001b[49m\u001b[K\u001b[3;2H\u001b[0m\u001b[49m\u001b[K\u001b[4;89H\u001b[0m\u001b[49m\u001b[K\u001b[5;2H\u001b[0m\u001b[49m\u001b[K\u001b[6;42H\u001b[0m\u001b[49m\u001b[K\u001b[7;2H\u001b[0m\u001b[49m\u001b[K\u001b[8;19H\u001b[0m\u001b[49m\u001b[K\u001b[9;24H\u001b[0m\u001b[49m\u001b[K\u001b[10;2H\u001b[0m\u001b[49m\u001b[K\u001b[11;42H\u001b[0m\u001b[49m\u001b[K\u001b[12;2H\u001b[0m\u001b[49m\u001b[K\u001b[13;2H\u001b[0m\u001b[49m\u001b[K\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;2H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;2H\u001b[0m\u001b[49m\u001b[K\u001b[21;2H\u001b[0m\u001b[49m\u001b[K\u001b[22;2H\u001b[0m\u001b[49m\u001b[K\u001b[23;2H\u001b[0m\u001b[49m\u001b[K\u001b[24;2H\u001b[0m\u001b[49m\u001b[K\u001b[25;2H\u001b[0m\u001b[49m\u001b[K\u001b[26;2H\u001b[0m\u001b[49m\u001b[K\u001b[27;2H\u001b[0m\u001b[49m\u001b[K\u001b[28;2H\u001b[0m\u001b[49m\u001b[K\u001b[29;2H\u001b[0m\u001b[49m\u001b[K\u001b[30;2H\u001b[0m\u001b[49m\u001b[K\u001b[31;2H\u001b[0m\u001b[49m\u001b[K\u001b[32;2H\u001b[0m\u001b[49m\u001b[K\u001b[33;2H\u001b[0m\u001b[49m\u001b[K\u001b[34;2H\u001b[0m\u001b[49m\u001b[K\u001b[35;2H\u001b[0m\u001b[49m\u001b[K\u001b[36;2H\u001b[0m\u001b[49m\u001b[K\u001b[37;2H\u001b[0m\u001b[49m\u001b[K\u001b[38;2H\u001b[0m\u001b[49m\u001b[K\u001b[39;2H\u001b[0m\u001b[49m\u001b[K\u001b[40;2H\u001b[0m\u001b[49m\u001b[K\u001b[1;1H \u001b[2;1H  GPT-5.4 is no longer available\u001b[3;1H \u001b[4;1H  Codex now uses GPT-5.6 Terra in place\u001b[4;41Hof\u001b[4;44HGPT-5.4.\u001b[4;53HSwitch\u001b[4;60Hto\u001b[4;63HGPT-5.6\u001b[4;71HTerra\u001b[4;77Hto\u001b[4;80Hcontinue.\u001b[5;1H \u001b[6;1H  Choose how you'd like Codex to proceed.\u001b[7;1H \u001b[8;1H\u001b[38;5;6;49m› 1. Try new model\u001b[9;1H\u001b[39;49m  2. Use existing model\u001b[10;1H \u001b[11;1H  \u001b[2mUse ↑/↓ to move, press enter to confirm\u001b[12;1H\u001b[22m \u001b[13;1H \u001b[14;1H \u001b[15;1H \u001b[16;1H \u001b[17;1H \u001b[21;1H \u001b[26;1H \u001b[39m\u001b[49m\u001b[0m\u001b[?25l\u001b[?2026l\u001b]0;work\u0007\u001b[?2026h\u001b[1;1H\u001b[J\u001b[1;2H\u001b[0m\u001b[49m\u001b[K\u001b[2;53H\u001b[0m\u001b[49m\u001b[K\u001b[3;53H\u001b[0m\u001b[49m\u001b[K\u001b[4;53H\u001b[0m\u001b[49m\u001b[K\u001b[5;53H\u001b[0m\u001b[49m\u001b[K\u001b[6;53H\u001b[0m\u001b[49m\u001b[K\u001b[7;53H\u001b[0m\u001b[49m\u001b[K\u001b[8;2H\u001b[0m\u001b[49m\u001b[K\u001b[9;2H\u001b[0m\u001b[49m\u001b[K\u001b[10;22H\u001b[0m\u001b[49m\u001b[K\u001b[11;2H\u001b[0m\u001b[49m\u001b[K\u001b[12;121H\u001b[0m\u001b[49m\u001b[K\u001b[2;1H\u001b[2m╭──────────────────────────────────────────────────╮\u001b[3;1H│ >_ \u001b[22m\u001b[1mOpenAI Codex\u001b[22m\u001b[2m\u001b[2m (v0.147.0)                       │\u001b[4;1H│                                                  │\u001b[5;1H│ model:     \u001b[3mloading\u001b[23m   \u001b[22m\u001b[38;5;6;49m/model\u001b[2m\u001b[39;49m to change            │\u001b[6;1H│ directory: \u001b[22m<user-temporary-root>/direct/work\u001b[2m │\u001b[7;1H╰──────────────────────────────────────────────────╯\u001b[10;1H\u001b[22m\u001b[1m›\u001b[10;3H\u001b[22m\u001b[2m\u001b[2mImplement {feature}\u001b[12;3H\u001b[22m\u001b[38;2;246;226;183;49mgpt-5.4 default\u001b[2m\u001b[39;49m · \u001b[22m\u001b[38;2;171;223;167;49m<isolated-probe>/direct/work\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[10;3H\u001b[?2026l\u001b[?2026h\u001b[1;1H\u001b[J\u001b[1;2H\u001b[0m\u001b[49m\u001b[K\u001b[2;2H\u001b[0m\u001b[49m\u001b[K\u001b[3;22H\u001b[0m\u001b[49m\u001b[K\u001b[4;2H\u001b[0m\u001b[49m\u001b[K\u001b[5;121H\u001b[0m\u001b[49m\u001b[K\u001b[3;1H\u001b[1m›\u001b[3;3H\u001b[22m\u001b[2m\u001b[2mImplement {feature}\u001b[5;3H\u001b[22m\u001b[38;2;246;226;183;49mgpt-5.4 default\u001b[2m\u001b[39;49m · \u001b[22m\u001b[38;2;171;223;167;49m<isolated-probe>/direct/work\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[3;3H\u001b[?2026l\u001b[?2026h\u001b[1;40r\u001b[1;1H\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001b[r\u001b[1;9r\u001b[1;1H\r\n\u001b[39;49m\u001b[K\u001b[2m╭──────────────────────────────────────────────────╮\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K\u001b[2m│ >_ \u001b[22m\u001b[1mOpenAI Codex\u001b[22m\u001b[2m\u001b[2m (v0.147.0)                       │\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K\u001b[2m│                                                  │\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K\u001b[2m│ model:     \u001b[22mgpt-5.4\u001b[2m   \u001b[22m\u001b[38;5;6;49m/model\u001b[2m\u001b[39;49m to change            │\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K\u001b[2m│ directory: \u001b[22m<user-temporary-root>/direct/work\u001b[2m │\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K\u001b[2m╰──────────────────────────────────────────────────╯\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K  \u001b[1mTip:\u001b[22m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[39m\u001b[49m\u001b[0m\u001b[r\u001b[3;3H\u001b[10;2H\u001b[0m\u001b[49m\u001b[K\u001b[11;2H\u001b[0m\u001b[49m\u001b[K\u001b[12;22H\u001b[0m\u001b[49m\u001b[K\u001b[13;2H\u001b[0m\u001b[49m\u001b[K\u001b[14;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[12;3H\u001b[?2026l\u001b[?2026h\u001b[10;40r\u001b[10;1H\u001bM\u001bM\u001bM\u001bM\u001b[r\u001b[1;13r\u001b[9;1H\r\n\u001b[39;49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K\u001b[1m\u001b[2m› \u001b[22m\u001b[22mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[r\u001b[12;3H\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;2H\u001b[0m\u001b[49m\u001b[K\u001b[16;22H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[16;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;2H\u001b[0m\u001b[49m\u001b[K\u001b[16;22H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[16;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;2H\u001b[0m\u001b[49m\u001b[K\u001b[16;22H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[16;3H\u001b[?2026l\u001b]0;⠙ work\u0007\u001b]0;⠹ work\u0007\u001b[?2026h\u001b[14;1H\u001b[J\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;34H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;22H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;121H\u001b[0m\u001b[49m\u001b[K\u001b[15;1H•\u001b[15;3H\u001b[2mWorking\u001b[15;11H(0s • esc to interrupt)\u001b[18;1H\u001b[22m\u001b[1m›\u001b[18;3H\u001b[22m\u001b[2m\u001b[2mImplement {feature}\u001b[20;3H\u001b[22m\u001b[38;2;246;226;183;49mgpt-5.4 default\u001b[2m\u001b[39;49m · \u001b[22m\u001b[38;2;171;223;167;49m<isolated-probe>/direct/work\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[18;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;34H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;22H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[18;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;34H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;22H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[18;3H\u001b[?2026l\u001b]0;⠸ work\u0007\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;34H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;22H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[18;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;34H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;22H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[18;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;34H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;22H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[18;3H\u001b[?2026l\u001b]0;⠼ work\u0007\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;34H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;22H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[18;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;34H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;22H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[18;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;34H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;22H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[18;3H\u001b[?2026l\u001b]0;⠴ work\u0007\u001b[?2026h\u001b[14;1H\u001b[J\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;28H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;34H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;22H\u001b[0m\u001b[49m\u001b[K\u001b[21;2H\u001b[0m\u001b[49m\u001b[K\u001b[22;121H\u001b[0m\u001b[49m\u001b[K\u001b[15;1H•\u001b[15;3H\u001b[2mRunning SessionStart hook\u001b[17;1H\u001b[22m•\u001b[17;3H\u001b[2mWorking\u001b[17;11H(0s • esc to interrupt)\u001b[20;1H\u001b[22m\u001b[1m›\u001b[20;3H\u001b[22m\u001b[2m\u001b[2mImplement {feature}\u001b[22;3H\u001b[22m\u001b[38;2;246;226;183;49mgpt-5.4 default\u001b[2m\u001b[39;49m · \u001b[22m\u001b[38;2;171;223;167;49m<isolated-probe>/direct/work\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[20;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;28H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;34H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;22H\u001b[0m\u001b[49m\u001b[K\u001b[21;2H\u001b[0m\u001b[49m\u001b[K\u001b[22;121H\u001b[0m\u001b[49m\u001b[K\u001b[15;3HR\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[20;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;28H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;34H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;22H\u001b[0m\u001b[49m\u001b[K\u001b[21;2H\u001b[0m\u001b[49m\u001b[K\u001b[22;121H\u001b[0m\u001b[49m\u001b[K\u001b[15;3H\u001b[1mR\u001b[22mu\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[20;3H\u001b[?2026l\u001b]777;notify;warp://cli-agent;{\"v\":1,\"agent\":\"codex\",\"event\":\"session_start\",\"session_id\":\"01a0aa3a-b2dd-74a3-bf38-49e7b38a5e13\",\"cwd\":\"<isolated-probe>/direct/work\",\"project\":\"work\",\"plugin_version\":\"0.4.0\"}\u0007\u001b]0;⠦ work\u0007\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;28H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;34H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;22H\u001b[0m\u001b[49m\u001b[K\u001b[21;2H\u001b[0m\u001b[49m\u001b[K\u001b[22;121H\u001b[0m\u001b[49m\u001b[K\u001b[15;4H\u001b[1mu\u001b[22mn\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[20;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;28H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;34H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;22H\u001b[0m\u001b[49m\u001b[K\u001b[21;2H\u001b[0m\u001b[49m\u001b[K\u001b[22;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[20;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;28H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;34H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;22H\u001b[0m\u001b[49m\u001b[K\u001b[21;2H\u001b[0m\u001b[49m\u001b[K\u001b[22;121H\u001b[0m\u001b[49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[20;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;28H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;34H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;22H\u001b[0m\u001b[49m\u001b[K\u001b[21;2H\u001b[0m\u001b[49m\u001b[K\u001b[22;121H\u001b[0m\u001b[49m\u001b[K\u001b[15;5H\u001b[1mn\u001b[22mn\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[20;3H\u001b[?2026l\u001b[?2026h\u001b[14;2H\u001b[0m\u001b[49m\u001b[K\u001b[15;28H\u001b[0m\u001b[49m\u001b[K\u001b[16;2H\u001b[0m\u001b[49m\u001b[K\u001b[17;34H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;22H\u001b[0m\u001b[49m\u001b[K\u001b[21;2H\u001b[0m\u001b[49m\u001b[K\u001b[22;121H\u001b[0m\u001b[49m\u001b[K\u001b[15;6H\u001b[1mn\u001b[22mi\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[20;3H\u001b[?2026l\u001b]777;notify;warp://cli-agent;{\"v\":1,\"agent\":\"codex\",\"event\":\"prompt_submit\",\"session_id\":\"01a0aa3a-b2dd-74a3-bf38-49e7b38a5e13\",\"cwd\":\"<isolated-probe>/direct/work\",\"project\":\"work\",\"turn_id\":\"01a0aa3a-b395-7f31-829c-4503f62be220\",\"query\":\"INFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\"}\u0007\u001b]0;⠧ work\u0007\u001b[?2026h\u001b[14;40r\u001b[14;1H\u001bM\u001bM\u001bM\u001b[r\u001b[1;16r\u001b[13;1H\r\n\u001b[39;49m\u001b[K\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K\u001b[1m\u001b[38;5;1;49m•\u001b[22m\u001b[39;49m UserPromptSubmit hook (stopped)\u001b[39m\u001b[49m\u001b[0m\r\n\u001b[39;49m\u001b[K  stop: 6c3df80db5fd49e7afda1acc4b33f14d\u001b[39m\u001b[49m\u001b[0m\u001b[r\u001b[20;3H\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;28H\u001b[0m\u001b[49m\u001b[K\u001b[19;2H\u001b[0m\u001b[49m\u001b[K\u001b[20;34H\u001b[0m\u001b[49m\u001b[K\u001b[21;2H\u001b[0m\u001b[49m\u001b[K\u001b[22;2H\u001b[0m\u001b[49m\u001b[K\u001b[23;22H\u001b[0m\u001b[49m\u001b[K\u001b[24;2H\u001b[0m\u001b[49m\u001b[K\u001b[25;121H\u001b[0m\u001b[49m\u001b[K\u001b[20;3HW\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[23;3H\u001b[?2026l\u001b]0;work\u0007\u001b[?2026h\u001b[17;1H\u001b[J\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;22H\u001b[0m\u001b[49m\u001b[K\u001b[20;2H\u001b[0m\u001b[49m\u001b[K\u001b[21;121H\u001b[0m\u001b[49m\u001b[K\u001b[19;1H\u001b[1m›\u001b[19;3H\u001b[22m\u001b[2m\u001b[2mImplement {feature}\u001b[21;3H\u001b[22m\u001b[38;2;246;226;183;49mgpt-5.4 default\u001b[2m\u001b[39;49m · \u001b[22m\u001b[38;2;171;223;167;49m<isolated-probe>/direct/work\u001b[39m\u001b[49m\u001b[0m\u001b[0 q\u001b[?25h\u001b[19;3H\u001b[?2026l\u001b[?2026h\u001b[17;1H\u001b[J\u001b[17;2H\u001b[0m\u001b[49m\u001b[K\u001b[18;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;19H\u001b[0m\u001b[49m\u001b[K\u001b[20;2H\u001b[0m\u001b[49m\u001b[K\u001b[19;1H\u001b[2m›\u001b[19;3HShutting down...\u001b[39m\u001b[49m\u001b[0m\u001b[?25l\u001b[?2026l\u001b[17;1H\u001b[J\u001b]0;\u0007\u001b[<1u\u001b[<u\u001b[>4;0m\u001b[?2004l\u001b[?1004l\u001b[0 q\u001b[?25h\u001b[0 q\u001b[?25hTo continue this session, run \u001b[36mcodex resume 01a0aa3a-b2dd-74a3-bf38-49e7b38a5e13\u001b[39m\r\n",
+      "argv_initial_prompt_count": 1
+    },
+    {
+      "mode": "tmux-on",
+      "passed": true,
+      "native_install": [
+        {
+          "arguments": [
+            "plugin",
+            "marketplace",
+            "add",
+            "<isolated-probe>/tmux-on/marketplace",
+            "--json"
+          ],
+          "exit_code": 0,
+          "stdout": "{\n  \"marketplaceName\": \"infinishell-ssh-transport-probe\",\n  \"installedRoot\": \"<isolated-probe>/tmux-on/marketplace\",\n  \"alreadyAdded\": false\n}\n",
+          "stderr": ""
+        },
+        {
+          "arguments": [
+            "plugin",
+            "add",
+            "ssh-transport-probe@infinishell-ssh-transport-probe",
+            "--json"
+          ],
+          "exit_code": 0,
+          "stdout": "{\n  \"pluginId\": \"ssh-transport-probe@infinishell-ssh-transport-probe\",\n  \"name\": \"ssh-transport-probe\",\n  \"marketplaceName\": \"infinishell-ssh-transport-probe\",\n  \"version\": \"0.1.0\",\n  \"installedPath\": \"<isolated-probe>/tmux-on/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+          "stderr": ""
+        }
+      ],
+      "authorization_rpc": [
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_ssh_probe/0.147.0 (Mac OS 27.0.0; arm64) WarpTerminal (infinishell_ssh_probe; 0.1.0)",
+              "codexHome": "<isolated-probe>/tmux-on/home/.codex",
+              "platformFamily": "unix",
+              "platformOs": "macos"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "MacBookPro16",
+              "installationId": "3354c161-fb11-4e21-86bf-afdd9f4fca5f",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789562367277
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 2,
+            "result": {
+              "data": [
+                {
+                  "cwd": "<isolated-probe>/tmux-on/work",
+                  "hooks": [
+                    {
+                      "key": "ssh-transport-probe@infinishell-ssh-transport-probe:hooks/hooks.json:session_start:0:0",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_SSH_PROBE_PYTHON\" \"$PLUGIN_ROOT/native_hook.py\" session",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-probe>/tmux-on/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+                      "displayOrder": 0,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:535385b7ba4d8088c9ee0cb7aa74bbc82012114f53e93b9d564cf1806d58a617",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "ssh-transport-probe@infinishell-ssh-transport-probe:hooks/hooks.json:user_prompt_submit:0:0",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_SSH_PROBE_PYTHON\" \"$PLUGIN_ROOT/native_hook.py\" prompt",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-probe>/tmux-on/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+                      "displayOrder": 1,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:548489bc0a3111c064a1ece15c29c81922055fb4cda375f4a2b3c330c3dc6cae",
+                      "trustStatus": "untrusted"
+                    }
+                  ],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 10,
+            "result": {
+              "status": "ok",
+              "version": "sha256:f1f94912fc549294c23a5071bfb79d9dbf84587a3cfa070eb8544dec30355514",
+              "filePath": "<isolated-probe>/tmux-on/home/.codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 11,
+            "result": {
+              "status": "ok",
+              "version": "sha256:6c2f70b2d27e0ffb359436fbb4a79baf5b434b648a921a90c64fa2b37647c01b",
+              "filePath": "<isolated-probe>/tmux-on/home/.codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        }
+      ],
+      "reference_tree_sha256": {
+        ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+        "hooks/hooks.json": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+        "scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+        "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+        "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+        "scripts/on-prompt-submit.sh": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+        "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+        "scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+        "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+        "scripts/warp-notify.sh": "144f0ce32c629c920ee6d6c164f1fcbd36aaac0429c5348087a33a382d75a050"
+      },
+      "native_cache": "<isolated-probe>/tmux-on/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+      "ssh_exit": 0,
+      "trust_selected_in_native_tui": true,
+      "kept_existing_model_in_native_tui": true,
+      "ssh_stdout_sha256": "ead1848994ed4ab8403c0ca86b568d5550505c37acc93ca68449dc1096fb3e77",
+      "ssh_stdout_bytes": 37071,
+      "ssh_stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "terminal_query_responses": {
+        "1b5b63": 1,
+        "1b5b3e63": 1
+      },
+      "native": {
+        "native-start": {
+          "pid": 45153,
+          "pgid": 45153,
+          "sid": 45153,
+          "tty": "/dev/ttys008",
+          "tmux": "<isolated-sockets>/tmux-on.sock,45152,0",
+          "tmux_pane": "%0",
+          "codex_pid": 45154
+        },
+        "native-exit": {
+          "pid": 45154,
+          "exit_code": 0,
+          "forced": false
+        },
+        "SessionStart": {
+          "input": {
+            "session_id": "01a0aa3a-bd49-7083-a512-de95d73a46b4",
+            "transcript_path": "<isolated-probe>/tmux-on/home/.codex/sessions/2026/09/16/rollout-2026-09-16T20-39-31-01a0aa3a-bd49-7083-a512-de95d73a46b4.jsonl",
+            "cwd": "<isolated-probe>/tmux-on/work",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "source": "startup"
+          },
+          "pid": 45213,
+          "ppid": 45154,
+          "pgid": 45153,
+          "sid": 45153,
+          "tty": {
+            "path": "/dev/tty",
+            "isatty": true,
+            "foreground_pgid": 45153
+          },
+          "reference_script": "on-session-start.sh",
+          "reference_exit": 0,
+          "reference_stdout": "",
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<isolated-probe>/tmux-on/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": "<isolated-sockets>/tmux-on.sock,45152,0",
+            "TMUX_PANE": "%0",
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "local",
+            "TERM_PROGRAM": "WarpTerminal"
+          }
+        },
+        "UserPromptSubmit": {
+          "input": {
+            "session_id": "01a0aa3a-bd49-7083-a512-de95d73a46b4",
+            "turn_id": "01a0aa3a-be03-7373-a8c8-141a3f0274ca",
+            "transcript_path": "<isolated-probe>/tmux-on/home/.codex/sessions/2026/09/16/rollout-2026-09-16T20-39-31-01a0aa3a-bd49-7083-a512-de95d73a46b4.jsonl",
+            "cwd": "<isolated-probe>/tmux-on/work",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "prompt": "INFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL"
+          },
+          "pid": 45236,
+          "ppid": 45154,
+          "pgid": 45153,
+          "sid": 45153,
+          "tty": {
+            "path": "/dev/tty",
+            "isatty": true,
+            "foreground_pgid": 45153
+          },
+          "reference_script": "on-prompt-submit.sh",
+          "reference_exit": 0,
+          "reference_stdout": "",
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<isolated-probe>/tmux-on/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": "<isolated-sockets>/tmux-on.sock,45152,0",
+            "TMUX_PANE": "%0",
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "local",
+            "TERM_PROGRAM": "WarpTerminal"
+          },
+          "block_output": {
+            "continue": false,
+            "stopReason": "cb6c137056114e8ca3e5be3a676697c2"
+          }
+        }
+      },
+      "native_session_id": "01a0aa3a-bd49-7083-a512-de95d73a46b4",
+      "native_turn_id": "01a0aa3a-be03-7373-a8c8-141a3f0274ca",
+      "notifications": [
+        {
+          "v": 1,
+          "agent": "codex",
+          "event": "session_start",
+          "session_id": "01a0aa3a-bd49-7083-a512-de95d73a46b4",
+          "cwd": "<isolated-probe>/tmux-on/work",
+          "project": "work",
+          "plugin_version": "0.4.0"
+        },
+        {
+          "v": 1,
+          "agent": "codex",
+          "event": "prompt_submit",
+          "session_id": "01a0aa3a-bd49-7083-a512-de95d73a46b4",
+          "cwd": "<isolated-probe>/tmux-on/work",
+          "project": "work",
+          "turn_id": "01a0aa3a-be03-7373-a8c8-141a3f0274ca",
+          "query": "INFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL"
+        }
+      ],
+      "native_cli_hook_triggered": true,
+      "native_hook_summary_obtained": false,
+      "model_http_request_count": 0,
+      "result": "transport_received",
+      "native_tui_blocked_observed": true,
+      "ssh_stdout_redacted_text": "\u001b[?1049h\u001b[?1h\u001b=\u001b[H\u001b[2J\u001b[?12l\u001b[?25h\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[?1006l\u001b[?1005l\u001b[?2004h\u001b[?2031h\u001b[?996n\u001b(B\u001b[m\u001b[?12l\u001b[?25h\u001b[?1006l\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[1;1H\u001b[1;40r\u001b[c\u001b[>c\u001b[>q\u001b]10;?\u001b\\\u001b]11;?\u001b\\\u001b[1;1H\u001b[?25l\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[H\u001b[18t\u001b[14t\u001b(B\u001b[m\u001b[?12l\u001b[?25h\u001b[?1006l\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[1;1H\u001b[1;40r\u001b[1;1H\u001b[?25l\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[H\u001b[?7727h\u001b(B\u001b[m\u001b[?12l\u001b[?25h\u001b[?1006l\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[1;1H\u001b[1;40r\u001b[?7727h\u001b(B\u001b[m\u001b[?12l\u001b[?25h\u001b[?1006l\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[1;1H\u001b[1;40r\u001b[1;1H\u001b[?25l\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[H\r\n\u001b[J\u001b[H\u001b[K\u001b[4;19H\u001b[21;14H\u001b[?25l\u001b[H                                      \u001b[K\r\n             _._:=++==+,_             \u001b[K\r\n         _=,/*\\+/+\\=||=_ _\"+_         \u001b[K\r\n       ,|*|+**\"^`   `\"*`\"~=~||+       \u001b[K\r\n      ;*_\\*',,_            /*|;|,     \u001b[K\r\n     \\^;/'^|\\`\\\\            \".|\\\\,    \u001b[K\r\n    ~* +`  |*/;||,           '.\\||,   \u001b[K\r\n   +^\"-*    '\\|*/\"|_          ! |/|   \u001b[K\r\n   ||_|`     ,//|;|*            \"`|   \u001b[K\r\n   |=~'`    ;||^\\|\".~++++++_+, =\" |   \u001b[K\r\n    _~;*  _;+` /* |\"|___.:,,,|/,/,|   \u001b[K\r\n    \\^_\"^ ^\\,./`   `^*''* ^*\"/,;_/    \u001b[K\r\n     *^, \", `              ,'/*_|     \u001b[K\r\n       ^\\,`\\+_          _=_+|_+\"      \u001b[K\r\n         ^*,\\_!*+:;=;;.=*+_,|*        \u001b[K\r\n           `*\"*|~~___,_;+*\"           \u001b[K\r\n                                      \u001b[K\r\n\u001b[K\r\n  Welcome to \u001b[1mCodex\u001b(B\u001b[m, OpenAI's command-line coding agent\u001b[K\r\n\u001b[K\r\n> \u001b[1mYou are in \u001b(B\u001b[m<isolated-probe>/tmux-on/work\u001b[K\r\n\u001b[K\r\n  Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt injection. Trusting the     \u001b[24;1H  directory allows project-local config, hooks, and exec policies to load.\u001b[K\r\n\u001b[K\u001b[36m\r\n› 1. Yes, continue\u001b[39m\u001b[K\r\n  2. No, quit\u001b[K\r\n\u001b[K\r\n  \u001b[2mPress enter to continue\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[29;26H\u001b[?25l\u001b[7;2H\u001b[H\u001b[K\r\n  GPT-5.4 is no longer available\u001b[K\r\n\u001b[K\r\n  Codex now uses GPT-5.6 Terra in place of GPT-5.4. Switch to GPT-5.6 Terra to continue.\u001b[K\r\n\u001b[K\r\n  Choose how you'd like Codex to proceed.\u001b[K\r\n\u001b[K\u001b[36m\r\n› 1. Try new model\u001b[39m\u001b[K\r\n  2. Use existing model\u001b[K\r\n\u001b[K\r\n  \u001b[2mUse ↑/↓ to move, press enter to confirm\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[26;2H\u001b[2;1H\u001b[J\u001b[H\u001b[K\u001b[12;20H\u001b[H\u001b[K\u001b[2m\r\n╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b[3mloading\u001b(B\u001b[m\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[10;3H\u001b[?12l\u001b[?25h\u001b[2;1H\u001b[J\u001b[H\u001b[K\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\r\n\u001b[4B\u001b[7B\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[16;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[16;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[16;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[16;3H\u001b[?25l\u001b[?12l\u001b[?25h\u001b[15;1H\u001b[J\u001b[A\u001b[K\u001b[?25l\u001b[?12l\u001b[?25h\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[?12l\u001b[?25h\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[?12l\u001b[?25h\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b]777;notify;warp://cli-agent;{\"v\":1,\"agent\":\"codex\",\"event\":\"session_start\",\"session_id\":\"01a0aa3a-bd49-7083-a512-de95d73a46b4\",\"cwd\":\"<isolated-probe>/tmux-on/work\",\"project\":\"work\",\"plugin_version\":\"0.4.0\"}\u0007\u001b(B\u001b[m\u001b[?12l\u001b[?25h\u001b[?1006l\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[1;1H\u001b[1;40r\u001b[18;3H\u001b[?25l\u001b[?12l\u001b[?25h\u001b[15;1H\u001b[J\u001b[A\u001b[K\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;245m\u001b[1mR\u001b(B\u001b[m\u001b[38;5;244m\u001b[1munning SessionStart hook\u001b(B\u001b[m\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[20;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;245m\u001b[1mR\u001b(B\u001b[m\u001b[38;5;244m\u001b[1munning SessionStart hook\u001b(B\u001b[m\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[20;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;248m\u001b[1mR\u001b(B\u001b[m\u001b[38;5;245m\u001b[1mu\u001b(B\u001b[m\u001b[38;5;244m\u001b[1mnning SessionStart hook\u001b(B\u001b[m\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[20;3H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;251m\u001b[1mR\u001b(B\u001b[m\u001b[38;5;248m\u001b[1mu\u001b(B\u001b[m\u001b[38;5;245m\u001b[1mn\u001b(B\u001b[m\u001b[38;5;244m\u001b[1mning SessionStart hook\u001b(B\u001b[m\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[20;3H\u001b]777;notify;warp://cli-agent;{\"v\":1,\"agent\":\"codex\",\"event\":\"prompt_submit\",\"session_id\":\"01a0aa3a-bd49-7083-a512-de95d73a46b4\",\"cwd\":\"<isolated-probe>/tmux-on/work\",\"project\":\"work\",\"turn_id\":\"01a0aa3a-be03-7373-a8c8-141a3f0274ca\",\"query\":\"INFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\"}\u0007\u001b(B\u001b[m\u001b[?12l\u001b[?25h\u001b[?1006l\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[1;1H\u001b[1;40r\u001b[20;3H\u001b[?25l\u001b[?12l\u001b[?25h\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;254m\u001b[1mR\u001b(B\u001b[m\u001b[38;5;251m\u001b[1mu\u001b(B\u001b[m\u001b[38;5;248m\u001b[1mn\u001b(B\u001b[m\u001b[38;5;245m\u001b[1mn\u001b(B\u001b[m\u001b[38;5;244m\u001b[1ming SessionStart hook\u001b(B\u001b[m\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[20;3H\u001b[?25l\u001b[?12l\u001b[?25h\u001b[15;1H\u001b[J\u001b[A\u001b[K\u001b[14;40r\u001b[14;1H\u001bM\u001bM\u001bM\u001b[1;40r\u001b[16;1H\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[31m\u001b[1m\r\n•\u001b(B\u001b[m UserPromptSubmit hook (stopped)\u001b[K\r\n  stop: cb6c137056114e8ca3e5be3a676697c2\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mUse /skills to list available skills\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-on/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[19;3H\u001b[18;1H\u001b[J\u001b[A\u001b[K\u001b[?25l\u001b[2m\u001b[H╭───────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                        │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                   │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change             │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-on/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰───────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[31m\u001b[1m\r\n•\u001b(B\u001b[m UserPromptSubmit hook (stopped)\u001b[K\r\n  stop: cb6c137056114e8ca3e5be3a676697c2\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[2m\r\n›\u001b(B\u001b[m \u001b[2mShutting down...\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[19;19H\u001b[?25l\u001b[18;1H\u001b[J\u001b[A\u001b[K\u001b[?12l\u001b[?25hTo continue this session, run \u001b[36mcodex resume 01a0aa3a-bd49-7083-a512-de95d73a46b4\r\n\u001b(B\u001b[m\u001b[1;40r\u001b(B\u001b[m\u001b[?1l\u001b>\u001b[H\u001b[2J\u001b[?12l\u001b[?25h\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[?1006l\u001b[?1005l\u001b[?2004l\u001b[?7727l\u001b[?1004l\u001b[?1049l\u001b[?2031l[exited]\r\n",
+      "argv_initial_prompt_count": 1
+    },
+    {
+      "mode": "tmux-off",
+      "passed": true,
+      "native_install": [
+        {
+          "arguments": [
+            "plugin",
+            "marketplace",
+            "add",
+            "<isolated-probe>/tmux-off/marketplace",
+            "--json"
+          ],
+          "exit_code": 0,
+          "stdout": "{\n  \"marketplaceName\": \"infinishell-ssh-transport-probe\",\n  \"installedRoot\": \"<isolated-probe>/tmux-off/marketplace\",\n  \"alreadyAdded\": false\n}\n",
+          "stderr": ""
+        },
+        {
+          "arguments": [
+            "plugin",
+            "add",
+            "ssh-transport-probe@infinishell-ssh-transport-probe",
+            "--json"
+          ],
+          "exit_code": 0,
+          "stdout": "{\n  \"pluginId\": \"ssh-transport-probe@infinishell-ssh-transport-probe\",\n  \"name\": \"ssh-transport-probe\",\n  \"marketplaceName\": \"infinishell-ssh-transport-probe\",\n  \"version\": \"0.1.0\",\n  \"installedPath\": \"<isolated-probe>/tmux-off/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+          "stderr": ""
+        }
+      ],
+      "authorization_rpc": [
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_ssh_probe/0.147.0 (Mac OS 27.0.0; arm64) WarpTerminal (infinishell_ssh_probe; 0.1.0)",
+              "codexHome": "<isolated-probe>/tmux-off/home/.codex",
+              "platformFamily": "unix",
+              "platformOs": "macos"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "MacBookPro16",
+              "installationId": "bcbc034e-7f49-4560-b365-5530f388c62c",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789562367409
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 2,
+            "result": {
+              "data": [
+                {
+                  "cwd": "<isolated-probe>/tmux-off/work",
+                  "hooks": [
+                    {
+                      "key": "ssh-transport-probe@infinishell-ssh-transport-probe:hooks/hooks.json:session_start:0:0",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_SSH_PROBE_PYTHON\" \"$PLUGIN_ROOT/native_hook.py\" session",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-probe>/tmux-off/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+                      "displayOrder": 0,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:535385b7ba4d8088c9ee0cb7aa74bbc82012114f53e93b9d564cf1806d58a617",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "ssh-transport-probe@infinishell-ssh-transport-probe:hooks/hooks.json:user_prompt_submit:0:0",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "\"$INFINISHELL_SSH_PROBE_PYTHON\" \"$PLUGIN_ROOT/native_hook.py\" prompt",
+                      "timeoutSec": 10,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-probe>/tmux-off/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+                      "displayOrder": 1,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:548489bc0a3111c064a1ece15c29c81922055fb4cda375f4a2b3c330c3dc6cae",
+                      "trustStatus": "untrusted"
+                    }
+                  ],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 10,
+            "result": {
+              "status": "ok",
+              "version": "sha256:56efcdbc1f231b56115ec951eadb1d340c61dc9c9b108379b33d3932c148d841",
+              "filePath": "<isolated-probe>/tmux-off/home/.codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 11,
+            "result": {
+              "status": "ok",
+              "version": "sha256:b5593cc2ec4b543dd20005cf4c3f7d7ea7932513b7fa5c7d27d70d664572bdd0",
+              "filePath": "<isolated-probe>/tmux-off/home/.codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        }
+      ],
+      "reference_tree_sha256": {
+        ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+        "hooks/hooks.json": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+        "scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+        "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+        "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+        "scripts/on-prompt-submit.sh": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+        "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+        "scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+        "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+        "scripts/warp-notify.sh": "144f0ce32c629c920ee6d6c164f1fcbd36aaac0429c5348087a33a382d75a050"
+      },
+      "native_cache": "<isolated-probe>/tmux-off/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+      "ssh_exit": 0,
+      "trust_selected_in_native_tui": true,
+      "kept_existing_model_in_native_tui": true,
+      "ssh_stdout_sha256": "f76e24404e7b3979b7d2b605fca2432352c8d71988832939feb376f0bf232447",
+      "ssh_stdout_bytes": 38276,
+      "ssh_stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "terminal_query_responses": {
+        "1b5b63": 1,
+        "1b5b3e63": 1
+      },
+      "native": {
+        "native-start": {
+          "pid": 45275,
+          "pgid": 45275,
+          "sid": 45275,
+          "tty": "/dev/ttys008",
+          "tmux": "<isolated-sockets>/tmux-off.sock,45274,0",
+          "tmux_pane": "%0",
+          "codex_pid": 45276
+        },
+        "native-exit": {
+          "pid": 45276,
+          "exit_code": 0,
+          "forced": false
+        },
+        "SessionStart": {
+          "input": {
+            "session_id": "01a0aa3a-c740-79c3-8590-ea1138192ea4",
+            "transcript_path": "<isolated-probe>/tmux-off/home/.codex/sessions/2026/09/16/rollout-2026-09-16T20-39-33-01a0aa3a-c740-79c3-8590-ea1138192ea4.jsonl",
+            "cwd": "<isolated-probe>/tmux-off/work",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "source": "startup"
+          },
+          "pid": 45335,
+          "ppid": 45276,
+          "pgid": 45275,
+          "sid": 45275,
+          "tty": {
+            "path": "/dev/tty",
+            "isatty": true,
+            "foreground_pgid": 45275
+          },
+          "reference_script": "on-session-start.sh",
+          "reference_exit": 0,
+          "reference_stdout": "",
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<isolated-probe>/tmux-off/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": "<isolated-sockets>/tmux-off.sock,45274,0",
+            "TMUX_PANE": "%0",
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "local",
+            "TERM_PROGRAM": "WarpTerminal"
+          }
+        },
+        "UserPromptSubmit": {
+          "input": {
+            "session_id": "01a0aa3a-c740-79c3-8590-ea1138192ea4",
+            "turn_id": "01a0aa3a-c7f8-7873-8da7-b15422939e2a",
+            "transcript_path": "<isolated-probe>/tmux-off/home/.codex/sessions/2026/09/16/rollout-2026-09-16T20-39-33-01a0aa3a-c740-79c3-8590-ea1138192ea4.jsonl",
+            "cwd": "<isolated-probe>/tmux-off/work",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "prompt": "INFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL"
+          },
+          "pid": 45374,
+          "ppid": 45276,
+          "pgid": 45275,
+          "sid": 45275,
+          "tty": {
+            "path": "/dev/tty",
+            "isatty": true,
+            "foreground_pgid": 45275
+          },
+          "reference_script": "on-prompt-submit.sh",
+          "reference_exit": 0,
+          "reference_stdout": "",
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<isolated-probe>/tmux-off/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": "<isolated-sockets>/tmux-off.sock,45274,0",
+            "TMUX_PANE": "%0",
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "local",
+            "TERM_PROGRAM": "WarpTerminal"
+          },
+          "block_output": {
+            "continue": false,
+            "stopReason": "999e78924b7845ec8350e1a285873146"
+          }
+        }
+      },
+      "native_session_id": "01a0aa3a-c740-79c3-8590-ea1138192ea4",
+      "native_turn_id": "01a0aa3a-c7f8-7873-8da7-b15422939e2a",
+      "notifications": [],
+      "native_cli_hook_triggered": true,
+      "native_hook_summary_obtained": false,
+      "model_http_request_count": 0,
+      "result": "blocking_observed",
+      "native_tui_blocked_observed": true,
+      "ssh_stdout_redacted_text": "\u001b[?1049h\u001b[?1h\u001b=\u001b[H\u001b[2J\u001b[?12l\u001b[?25h\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[?1006l\u001b[?1005l\u001b[?2004h\u001b[?2031h\u001b[?996n\u001b(B\u001b[m\u001b[?12l\u001b[?25h\u001b[?1006l\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[1;1H\u001b[1;40r\u001b[c\u001b[>c\u001b[>q\u001b]10;?\u001b\\\u001b]11;?\u001b\\\u001b[1;1H\u001b[?25l\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[H\u001b[18t\u001b[14t\u001b(B\u001b[m\u001b[?12l\u001b[?25h\u001b[?1006l\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[1;1H\u001b[1;40r\u001b[1;1H\u001b[?25l\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[H\u001b[?7727h\u001b(B\u001b[m\u001b[?12l\u001b[?25h\u001b[?1006l\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[1;1H\u001b[1;40r\u001b[?7727h\u001b(B\u001b[m\u001b[?12l\u001b[?25h\u001b[?1006l\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[1;1H\u001b[1;40r\u001b[1;1H\u001b[?25l\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[H\r\n\u001b[J\u001b[H\u001b[K\u001b[4;19H\u001b[21;14H\u001b[?25l\u001b[H                                      \u001b[K\r\n             _._:=++==+,_             \u001b[K\r\n         _=,/*\\+/+\\=||=_ _\"+_         \u001b[K\r\n       ,|*|+**\"^`   `\"*`\"~=~||+       \u001b[K\r\n      ;*_\\*',,_            /*|;|,     \u001b[K\r\n     \\^;/'^|\\`\\\\            \".|\\\\,    \u001b[K\r\n    ~* +`  |*/;||,           '.\\||,   \u001b[K\r\n   +^\"-*    '\\|*/\"|_          ! |/|   \u001b[K\r\n   ||_|`     ,//|;|*            \"`|   \u001b[K\r\n   |=~'`    ;||^\\|\".~++++++_+, =\" |   \u001b[K\r\n    _~;*  _;+` /* |\"|___.:,,,|/,/,|   \u001b[K\r\n    \\^_\"^ ^\\,./`   `^*''* ^*\"/,;_/    \u001b[K\r\n     *^, \", `              ,'/*_|     \u001b[K\r\n       ^\\,`\\+_          _=_+|_+\"      \u001b[K\r\n         ^*,\\_!*+:;=;;.=*+_,|*        \u001b[K\r\n           `*\"*|~~___,_;+*\"           \u001b[K\r\n                                      \u001b[K\r\n\u001b[K\r\n  Welcome to \u001b[1mCodex\u001b(B\u001b[m, OpenAI's command-line coding agent\u001b[K\r\n\u001b[K\r\n> \u001b[1mYou are in \u001b(B\u001b[m<isolated-probe>/tmux-off/work\u001b[K\r\n\u001b[K\r\n  Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt injection. Trusting the     \u001b[24;1H  directory allows project-local config, hooks, and exec policies to load.\u001b[K\r\n\u001b[K\u001b[36m\r\n› 1. Yes, continue\u001b[39m\u001b[K\r\n  2. No, quit\u001b[K\r\n\u001b[K\r\n  \u001b[2mPress enter to continue\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[29;26H\u001b[?25l\u001b[7;2H\u001b[H\u001b[K\r\n  GPT-5.4 is no longer available\u001b[K\r\n\u001b[K\r\n  Codex now uses GPT-5.6 Terra in place of GPT-5.4. Switch to GPT-5.6 Terra to continue.\u001b[K\r\n\u001b[K\r\n  Choose how you'd like Codex to proceed.\u001b[K\r\n\u001b[K\u001b[36m\r\n› 1. Try new model\u001b[39m\u001b[K\r\n  2. Use existing model\u001b[K\r\n\u001b[K\r\n  \u001b[2mUse ↑/↓ to move, press enter to confirm\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[26;2H\u001b[2;1H\u001b[J\u001b[H\u001b[K\u001b[12;21H\u001b[H\u001b[K\u001b[2m\r\n╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b[3mloading\u001b(B\u001b[m\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[10;3H\u001b[?12l\u001b[?25h\u001b[?25l\u001b[H\u001b[K\u001b[2m\r\n╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b[3mloading\u001b(B\u001b[m\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[10;3H\u001b[2;1H\u001b[J\u001b[H\u001b[K\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\u001bM\r\n\u001b[2B\u001b[7B\u001b[2B\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[16;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[16;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[16;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[16;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[16;3H\u001b[?25l\u001b[?12l\u001b[?25h\u001b[15;1H\u001b[J\u001b[A\u001b[K\u001b[?25l\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[?12l\u001b[?25h\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[?12l\u001b[?25h\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[?12l\u001b[?25h\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[18;3H\u001b[14;40r\u001b[14;1H\u001bM\u001bM\u001bM\u001b[1;40r\u001b[16;1H\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[31m\u001b[1m\r\n•\u001b(B\u001b[m UserPromptSubmit hook (stopped)\u001b[K\r\n  stop: 999e78924b7845ec8350e1a285873146\u001b[K\r\n\u001b[K\u001b[38;5;244m\u001b[1m\r\n•\u001b(B\u001b[m \u001b[38;5;244m\u001b[1mWorking\u001b(B\u001b[m \u001b[2m(0s • esc to interrupt)\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[21;3H\u001b[?25l\u001b[?12l\u001b[?25h\u001b[18;1H\u001b[J\u001b[A\u001b[K\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[31m\u001b[1m\r\n•\u001b(B\u001b[m UserPromptSubmit hook (stopped)\u001b[K\r\n  stop: 999e78924b7845ec8350e1a285873146\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\r\n›\u001b(B\u001b[m \u001b[2mExplain this codebase\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[38;5;223mgpt-5.4 default\u001b[39m\u001b[2m · \u001b(B\u001b[m\u001b[38;5;151m<isolated-probe>/tmux-off/work\u001b[39m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[19;3H\u001b[18;1H\u001b[J\u001b[A\u001b[K\u001b[?25l\u001b[2m\u001b[H╭────────────────────────────────────────────────────╮\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ >_ \u001b(B\u001b[m\u001b[1mOpenAI Codex\u001b(B\u001b[m\u001b[2m (v0.147.0)                         │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│                                                    │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ model:     \u001b(B\u001b[mgpt-5.4\u001b[2m   \u001b(B\u001b[m\u001b[36m/model\u001b[39m\u001b[2m to change              │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n│ directory: \u001b(B\u001b[m<user-temporary-root>/tmux-off/work\u001b[2m │\u001b(B\u001b[m\u001b[K\u001b[2m\r\n╰────────────────────────────────────────────────────╯\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n  \u001b[1mTip:\u001b(B\u001b[m Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished documents, and take on  \u001b[9;1H  your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower, then turn it up for harder jobs.\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[1m\u001b[2m\r\n› \u001b(B\u001b[mINFINISHELL_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[31m\u001b[1m\r\n•\u001b(B\u001b[m UserPromptSubmit hook (stopped)\u001b[K\r\n  stop: 999e78924b7845ec8350e1a285873146\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[2m\r\n›\u001b(B\u001b[m \u001b[2mShutting down...\u001b(B\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[?12l\u001b[?25h\u001b[19;19H\u001b[?25l\u001b[18;1H\u001b[J\u001b[A\u001b[K\u001b[?12l\u001b[?25hTo continue this session, run \u001b[36mcodex resume 01a0aa3a-c740-79c3-8590-ea1138192ea4\r\n\u001b(B\u001b[m\u001b[1;40r\u001b(B\u001b[m\u001b[?1l\u001b>\u001b[H\u001b[2J\u001b[?12l\u001b[?25h\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[?1006l\u001b[?1005l\u001b[?2004l\u001b[?7727l\u001b[?1004l\u001b[?1049l\u001b[?2031l[exited]\r\n",
+      "argv_initial_prompt_count": 1
+    }
+  ],
+  "recorded_test_pids_still_alive": [],
+  "isolated_sshd_exit": 0,
+  "model_http_requests": [],
+  "model_http_request_count": 0,
+  "passed": true,
+  "validation_note": "原生执行后增加的阻断状态、唯一 stopReason 与会话断言已对本次原始字节复验，没有再次提交提示；收尾补入 sshd 私有 HOME SetEnv，未重跑原生输入。脚本摘要是 fixture 导出时版本。",
+  "native_hook_source_sha256": "387528f20420287f66baeb87df888b88e8eb122bbbac76161191ad131831d8f7",
+  "remote_launcher_source_sha256": "b5b0351b8b5f3e4c4fd32b83d86227ed96b6b2a69785ab61ee354fe20873a202",
+  "redaction": {
+    "raw_stream_retained_in_private_report": true,
+    "fixture_stream_is_redacted": true,
+    "raw_byte_digest_and_length_unchanged": true,
+    "native_hook_summary_obtained": false
+  },
+  "probe_script_sha256_at_fixture_export": "ef476a61fb084060ae61bc56b16e107a1eb3ff864caadc792363da42443cee05"
+}

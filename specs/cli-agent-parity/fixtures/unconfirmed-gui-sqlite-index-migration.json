@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "source": "isolated_gui_bundle7_sqlite_read_only_backup",
+  "source_modified": false,
+  "sqlite_version": "3.53.4",
+  "prior_migration": "20260916000000",
+  "added_migration": "20260916000001",
+  "sql_migration_executed": true,
+  "diesel_runtime_test_executed": false,
+  "original_table_rows": {
+    "local_cli_tasks": 0,
+    "local_cli_task_generations": 0,
+    "local_cli_messages": 0
+  },
+  "existing_records_unchanged": true,
+  "up_sql_sha256": "29cfbb865f21ecd5ae3c5338a0c4b5d999ec56534830403e02a5e82edff17207",
+  "duplicate_native_session_rejected": true,
+  "downgrade_with_unconfirmed_record_rejected": true,
+  "rollback_preserved_protective_index": true,
+  "downgrade_without_unconfirmed_record_succeeded": true,
+  "integrity_check": "ok"
+}

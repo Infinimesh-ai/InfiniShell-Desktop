@@ -9,6 +9,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use ai::agent::action::SuggestPromptRequest;
+use ai::agent::action_result::SendMessageToAgentResult;
 use ai::agent::document_action_presentation::DocumentActionPresentation;
 use ai::agent::file_locations::group_file_contexts_for_display;
 use ai::skills::{ParsedSkill, SkillReference};
@@ -797,6 +798,41 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                                 &request.skill,
                                 app,
                             ));
+                        }
+                        AIAgentOutputMessageType::Action(AIAgentAction {
+                            action: AIAgentActionType::SendMessageToAgent { subject, .. },
+                            id,
+                            ..
+                        }) => {
+                            should_render_footer = false;
+                            should_render_suggestions = false;
+                            let result = props
+                                .action_model
+                                .as_ref(app)
+                                .get_action_result(id)
+                                .map(|result| &result.result);
+                            let label = match result {
+                                Some(AIAgentActionResultType::SendMessageToAgent(
+                                    SendMessageToAgentResult::Acknowledged { .. },
+                                )) => crate::t!("cli-agent-message-acknowledged"),
+                                Some(AIAgentActionResultType::SendMessageToAgent(
+                                    SendMessageToAgentResult::Unconfirmed { .. },
+                                )) => crate::t!("cli-agent-message-unconfirmed"),
+                                Some(AIAgentActionResultType::SendMessageToAgent(
+                                    SendMessageToAgentResult::Error(_),
+                                )) => crate::t!("cli-agent-message-failed"),
+                                Some(AIAgentActionResultType::SendMessageToAgent(
+                                    SendMessageToAgentResult::Cancelled,
+                                )) => crate::t!("cli-agent-message-cancelled"),
+                                _ => crate::t!("cli-agent-message-sending"),
+                            };
+                            let text = crate::t!(
+                                "cli-agent-message-status-subject",
+                                status = label,
+                                subject = subject
+                            );
+                            output_items
+                                .add_child(RenderableAction::new(&text, app).render(app).finish());
                         }
                         AIAgentOutputMessageType::Action(AIAgentAction {
                             action: AIAgentActionType::RunAgents(_req),

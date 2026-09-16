@@ -7,20 +7,29 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 #[cfg(unix)]
 use std::collections::HashSet;
-#[cfg(unix)]
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+#[cfg(not(target_family = "wasm"))]
+use std::time::Duration;
 
-use ai::skills::SkillProvider;
+use ai::skills::{SkillProvider, SkillScope};
+#[cfg(not(target_family = "wasm"))]
+use command::Stdio;
+#[cfg(not(target_family = "wasm"))]
+use command::r#async::Command;
 use enum_iterator::Sequence;
+#[cfg(not(target_family = "wasm"))]
+use futures::future::join_all;
 use markdown_parser::parse_markdown;
 use pathfinder_color::ColorU;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use warp_cli::agent::Harness;
-use warp_completer::parsers::simple::top_level_command;
+use warp_completer::parsers::simple::{all_parsed_commands, top_level_command};
 use warp_editor::content::buffer::Buffer;
 use warp_editor::content::markdown::MarkdownStyle;
 use warp_util::path::EscapeChar;
+#[cfg(not(target_family = "wasm"))]
+use warpui::r#async::FutureExt as _;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::ai::agent::{AgentReviewCommentBatch, DiffSetHunk};
@@ -161,6 +170,7 @@ pub enum CLIAgent {
     Claude,
     Gemini,
     Codex,
+    Grok,
     Amp,
     Droid,
     OpenCode,
@@ -188,6 +198,7 @@ impl CLIAgent {
             CLIAgent::Claude => &["claude"],
             CLIAgent::Gemini => &["gemini"],
             CLIAgent::Codex => &["codex"],
+            CLIAgent::Grok => &["grok"],
             CLIAgent::Amp => &["amp"],
             CLIAgent::Droid => &["droid"],
             CLIAgent::OpenCode => &["opencode"],
@@ -249,6 +260,7 @@ impl CLIAgent {
             Harness::Gemini => Some(CLIAgent::Gemini),
             Harness::OpenCode => Some(CLIAgent::OpenCode),
             Harness::Codex => Some(CLIAgent::Codex),
+            Harness::Grok => Some(CLIAgent::Grok),
             Harness::Unknown => Some(CLIAgent::Unknown),
         }
     }
@@ -258,6 +270,7 @@ impl CLIAgent {
             CLIAgent::Claude => "Claude Code".to_string(),
             CLIAgent::Gemini => "Gemini".to_string(),
             CLIAgent::Codex => "Codex".to_string(),
+            CLIAgent::Grok => "Grok Build".to_string(),
             CLIAgent::Amp => "Amp".to_string(),
             CLIAgent::Droid => "Droid".to_string(),
             CLIAgent::OpenCode => "OpenCode".to_string(),
@@ -283,6 +296,7 @@ impl CLIAgent {
             CLIAgent::Claude => Some(Icon::ClaudeLogo),
             CLIAgent::Gemini => Some(Icon::GeminiLogo),
             CLIAgent::Codex => Some(Icon::OpenAILogo),
+            CLIAgent::Grok => Some(Icon::GrokLogo),
             CLIAgent::Amp => Some(Icon::AmpLogo),
             CLIAgent::Droid => Some(Icon::DroidLogo),
             CLIAgent::OpenCode => Some(Icon::OpenCodeLogo),
@@ -311,6 +325,7 @@ impl CLIAgent {
     pub fn supported_skill_providers(&self) -> &'static [SkillProvider] {
         match self {
             CLIAgent::Claude => &[SkillProvider::Claude],
+            CLIAgent::Grok => &[SkillProvider::Grok, SkillProvider::Claude],
             CLIAgent::Codex => &[
                 SkillProvider::Agents,
                 SkillProvider::Claude,
@@ -337,6 +352,27 @@ impl CLIAgent {
             CLIAgent::Omp => &[SkillProvider::Agents],
             CLIAgent::WarpTui => &[],
             CLIAgent::Unknown => &[],
+        }
+    }
+
+    /// Grok 只声明兼容用户级 Agents 技能，不能把项目级目录误呈现为原生技能。
+    pub fn supports_skill(&self, provider: SkillProvider, scope: SkillScope) -> bool {
+        self.supported_skill_providers_for_scope(scope)
+            .contains(&provider)
+    }
+
+    pub fn supported_skill_providers_for_scope(
+        &self,
+        scope: SkillScope,
+    ) -> &'static [SkillProvider] {
+        if *self == Self::Grok && scope == SkillScope::Home {
+            &[
+                SkillProvider::Grok,
+                SkillProvider::Claude,
+                SkillProvider::Agents,
+            ]
+        } else {
+            self.supported_skill_providers()
         }
     }
 
@@ -377,6 +413,7 @@ impl CLIAgent {
             CLIAgent::Claude => Some(CLAUDE_ORANGE),
             CLIAgent::Gemini => Some(GEMINI_BLUE),
             CLIAgent::Codex => Some(OPENAI_COLOR),
+            CLIAgent::Grok => Some(ColorU::black()),
             CLIAgent::Amp => Some(AMP_COLOR),
             CLIAgent::Droid => Some(DROID_COLOR),
             CLIAgent::OpenCode => Some(OPENCODE_COLOR),
@@ -415,7 +452,7 @@ impl CLIAgent {
     fn extract_first_command(command: &str, escape_char: Option<EscapeChar>) -> Option<String> {
         match escape_char {
             Some(esc) => top_level_command(command, esc),
-            None => command.split_whitespace().next().map(String::from),
+            None => top_level_command(command, EscapeChar::Backslash),
         }
     }
 
@@ -426,7 +463,258 @@ impl CLIAgent {
             return false;
         };
         let basename = first_word.rsplit(['/', '\\']).next().unwrap_or(&first_word);
+        if matches!(self, Self::Claude | Self::Codex | Self::Grok) {
+            let basename = basename
+                .strip_suffix(".exe")
+                .or_else(|| basename.strip_suffix(".cmd"))
+                .or_else(|| basename.strip_suffix(".bat"))
+                .unwrap_or(basename);
+            return self.command_prefixes().contains(&basename)
+                && self.is_interactive_command(command, escape_char);
+        }
         self.command_prefixes().contains(&basename)
+    }
+
+    /// 只给交互会话提供终端工具栏；管理命令和结构化服务不接收富输入。
+    fn is_interactive_command(&self, command: &str, escape_char: Option<EscapeChar>) -> bool {
+        let Some(parsed) =
+            all_parsed_commands(command, escape_char.unwrap_or(EscapeChar::Backslash)).next()
+        else {
+            return false;
+        };
+        let mut arguments = parsed.parts.iter().skip(1).peekable();
+        let mut saw_positional = false;
+        while let Some(argument) = arguments.next() {
+            let argument = argument.item.as_str();
+            if argument == "--" {
+                break;
+            }
+            let flag = argument.split('=').next().unwrap_or(argument);
+            if matches!(flag, "--help" | "-h" | "--version" | "-V" | "-v")
+                || (matches!(self, Self::Claude) && matches!(flag, "--print" | "-p"))
+                || (matches!(self, Self::Grok)
+                    && matches!(flag, "--single" | "-p" | "--prompt-file" | "--prompt-json"))
+            {
+                return false;
+            }
+            if argument.starts_with('-') {
+                if !argument.contains('=') && self.option_takes_value(flag) {
+                    if arguments
+                        .peek()
+                        .is_some_and(|next| !next.item.starts_with('-'))
+                    {
+                        arguments.next();
+                    } else if !matches!(flag, "-r" | "--resume" | "-w" | "--worktree") {
+                        return false;
+                    }
+                }
+                continue;
+            }
+            if !saw_positional {
+                if self.non_interactive_commands().contains(&argument) {
+                    return false;
+                }
+                saw_positional = true;
+            }
+        }
+        true
+    }
+
+    /// 依据受测版本帮助枚举参数，避免把模型名、目录或配置值当成管理子命令。
+    fn option_takes_value(&self, flag: &str) -> bool {
+        match self {
+            Self::Codex => matches!(
+                flag,
+                "-c" | "--config"
+                    | "--enable"
+                    | "--disable"
+                    | "--remote"
+                    | "--remote-auth-token-env"
+                    | "-i"
+                    | "--image"
+                    | "-m"
+                    | "--model"
+                    | "--local-provider"
+                    | "-p"
+                    | "--profile"
+                    | "-s"
+                    | "--sandbox"
+                    | "-C"
+                    | "--cd"
+                    | "--add-dir"
+                    | "-a"
+                    | "--ask-for-approval"
+            ),
+            Self::Claude => matches!(
+                flag,
+                "--agent"
+                    | "--agents"
+                    | "--allowedTools"
+                    | "--allowed-tools"
+                    | "--append-system-prompt"
+                    | "--betas"
+                    | "--disallowedTools"
+                    | "--disallowed-tools"
+                    | "--fallback-model"
+                    | "--input-format"
+                    | "--json-schema"
+                    | "--max-budget-usd"
+                    | "--mcp-config"
+                    | "--model"
+                    | "--output-format"
+                    | "--permission-mode"
+                    | "--permission-prompt-tool"
+                    | "--plugin-dir"
+                    | "-r"
+                    | "--resume"
+                    | "--session-id"
+                    | "--settings"
+                    | "--setting-sources"
+                    | "--system-prompt"
+                    | "--tools"
+                    | "--add-dir"
+            ),
+            Self::Grok => matches!(
+                flag,
+                "--agent"
+                    | "--agents"
+                    | "--allow"
+                    | "--allowedTools"
+                    | "--cwd"
+                    | "--debug-file"
+                    | "--deny"
+                    | "--disallowedTools"
+                    | "--disallowed-tools"
+                    | "--json-schema"
+                    | "--leader-socket"
+                    | "-m"
+                    | "--model"
+                    | "--max-turns"
+                    | "--output-format"
+                    | "--permission-mode"
+                    | "-r"
+                    | "--resume"
+                    | "--reasoning-effort"
+                    | "--effort"
+                    | "--rules"
+                    | "-s"
+                    | "--session-id"
+                    | "--sandbox"
+                    | "--system-prompt-override"
+                    | "--system-prompt"
+                    | "--tools"
+                    | "-w"
+                    | "--worktree"
+                    | "--worktree-ref"
+                    | "--ref"
+            ),
+            Self::Gemini
+            | Self::Amp
+            | Self::Droid
+            | Self::OpenCode
+            | Self::Copilot
+            | Self::Pi
+            | Self::OhMyPi
+            | Self::Auggie
+            | Self::CursorCli
+            | Self::Goose
+            | Self::DeepSeek
+            | Self::Hermes
+            | Self::Vibe
+            | Self::Antigravity
+            | Self::Omp
+            | Self::WarpTui
+            | Self::Unknown => false,
+        }
+    }
+
+    fn non_interactive_commands(&self) -> &'static [&'static str] {
+        match self {
+            Self::Codex => &[
+                "exec",
+                "e",
+                "review",
+                "login",
+                "logout",
+                "mcp",
+                "plugin",
+                "mcp-server",
+                "app-server",
+                "remote-control",
+                "app",
+                "completion",
+                "update",
+                "doctor",
+                "sandbox",
+                "debug",
+                "apply",
+                "a",
+                "archive",
+                "delete",
+                "unarchive",
+                "cloud",
+                "exec-server",
+                "features",
+                "help",
+            ],
+            Self::Claude => &[
+                "auth",
+                "doctor",
+                "install",
+                "mcp",
+                "plugin",
+                "plugins",
+                "setup-token",
+                "update",
+                "upgrade",
+                "help",
+            ],
+            Self::Grok => &[
+                "agent",
+                "clone",
+                "completions",
+                "cursor-worker",
+                "doctor",
+                "du",
+                "disk-usage",
+                "export",
+                "help",
+                "inspect",
+                "leader",
+                "login",
+                "logout",
+                "mcp",
+                "memory",
+                "models",
+                "plugin",
+                "sessions",
+                "setup",
+                "trace",
+                "update",
+                "usage",
+                "version",
+                "v",
+                "worktree",
+                "wrap",
+            ],
+            Self::Gemini
+            | Self::Amp
+            | Self::Droid
+            | Self::OpenCode
+            | Self::Copilot
+            | Self::Pi
+            | Self::OhMyPi
+            | Self::Auggie
+            | Self::CursorCli
+            | Self::Goose
+            | Self::DeepSeek
+            | Self::Hermes
+            | Self::Vibe
+            | Self::Antigravity
+            | Self::Omp
+            | Self::WarpTui
+            | Self::Unknown => &[],
+        }
     }
 
     /// Detects the CLI agent from a command string.
@@ -653,6 +941,7 @@ impl From<CLIAgent> for CLIAgentType {
             CLIAgent::Claude => CLIAgentType::Claude,
             CLIAgent::Gemini => CLIAgentType::Gemini,
             CLIAgent::Codex => CLIAgentType::Codex,
+            CLIAgent::Grok => CLIAgentType::Grok,
             CLIAgent::Amp => CLIAgentType::Amp,
             CLIAgent::Droid => CLIAgentType::Droid,
             CLIAgent::OpenCode => CLIAgentType::OpenCode,
@@ -682,54 +971,100 @@ pub enum CLIAgentInstallEvent {
     ScanComplete,
 }
 
-/// Singleton model，跟踪 CLI agent 的安装状态。
-///
-/// 构造时通过 `ctx.spawn` 启动后台 PATH 扫描，扫描完成后 emit
-/// [`CLIAgentInstallEvent::ScanComplete`] 并自动同步 per-agent 设置。
-///
-/// 所有需要查询安装状态的 UI 代码应通过 `CLIAgentInstallModel::as_ref(ctx)`
-/// 读取，并订阅事件以在扫描完成后触发重绘。
+/// 安装发现与版本探测的结果；PATH 命中不代表已登录或托管协议可用。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CLIAgentInstallation {
+    pub executable: Option<PathBuf>,
+    pub version: CLIAgentVersionStatus,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CLIAgentVersionStatus {
+    NotInstalled,
+    NotProbed,
+    Detected(String),
+    /// 程序存在，但执行失败、超时或输出不是该 CLI 的版本。
+    Unknown,
+}
+
+/// 缓存本机安装信息；远端会话不能将该缓存视为远端 CLI 的能力证明。
 pub struct CLIAgentInstallModel {
-    /// None = 扫描尚未完成; Some = 已有结果。
-    cache: Option<HashMap<CLIAgent, bool>>,
+    cache: Option<HashMap<CLIAgent, CLIAgentInstallation>>,
+    scan_generation: u64,
 }
 
 impl CLIAgentInstallModel {
-    pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        ctx.spawn(
-            async move { scan_cli_agent_installations() },
-            Self::on_scan_complete,
-        );
-        Self { cache: None }
+    #[cfg(test)]
+    pub(crate) fn empty_for_test() -> Self {
+        Self {
+            cache: Some(HashMap::new()),
+            scan_generation: 0,
+        }
     }
 
-    fn on_scan_complete(&mut self, results: HashMap<CLIAgent, bool>, ctx: &mut ModelContext<Self>) {
-        self.cache = Some(results.clone());
+    pub fn new(ctx: &mut ModelContext<Self>) -> Self {
+        let mut model = Self {
+            cache: None,
+            scan_generation: 0,
+        };
+        model.refresh(ctx);
+        model
+    }
 
-        // 自动同步到 per-agent 设置
-        crate::settings::AISettings::handle(ctx).update(ctx, |settings, ctx| {
-            settings.sync_per_agent_from_scan(&results, ctx);
-        });
+    /// 安装或升级之后重新扫描；旧扫描结果不会覆盖较新的请求。
+    pub fn refresh(&mut self, ctx: &mut ModelContext<Self>) {
+        self.scan_generation += 1;
+        let generation = self.scan_generation;
+        ctx.spawn(
+            async move { (generation, scan_cli_agent_installations().await) },
+            Self::on_scan_complete,
+        );
+    }
 
+    fn on_scan_complete(
+        &mut self,
+        (generation, results): (u64, HashMap<CLIAgent, CLIAgentInstallation>),
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if generation != self.scan_generation {
+            return;
+        }
+        self.cache = Some(results);
+        if let Some(snapshot) = self.snapshot() {
+            crate::settings::AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                settings.sync_per_agent_from_scan(&snapshot, ctx);
+            });
+        }
         ctx.emit(CLIAgentInstallEvent::ScanComplete);
     }
 
-    /// 查询某个 agent 是否已安装。扫描未完成时返回 false。
-    pub fn is_cli_agent_installed(&self, agent: CLIAgent) -> bool {
-        self.cache
-            .as_ref()
-            .map(|m| m.get(&agent).copied().unwrap_or(false))
-            .unwrap_or(false)
+    /// 查询安装路径和版本；扫描尚未完成时返回 None。
+    pub fn installation(&self, agent: CLIAgent) -> Option<&CLIAgentInstallation> {
+        self.cache.as_ref()?.get(&agent)
     }
 
-    /// 扫描是否已完成。
+    /// 复用安装扫描实际探测的程序路径，不因派发时 PATH 不同而换用另一份 CLI。
+    pub(crate) fn executable(&self, agent: CLIAgent) -> Option<&Path> {
+        self.installation(agent)?.executable.as_deref()
+    }
+
+    pub fn is_cli_agent_installed(&self, agent: CLIAgent) -> bool {
+        self.installation(agent)
+            .is_some_and(|installation| installation.executable.is_some())
+    }
+
     pub fn is_scan_complete(&self) -> bool {
         self.cache.is_some()
     }
 
-    /// 获取安装状态快照。扫描未完成时返回 None。
+    /// 保持既有设置同步使用的安装状态接口。
     pub fn snapshot(&self) -> Option<HashMap<CLIAgent, bool>> {
-        self.cache.clone()
+        self.cache.as_ref().map(|cache| {
+            cache
+                .iter()
+                .map(|(agent, installation)| (*agent, installation.executable.is_some()))
+                .collect()
+        })
     }
 }
 
@@ -739,42 +1074,142 @@ impl Entity for CLIAgentInstallModel {
 
 impl SingletonEntity for CLIAgentInstallModel {}
 
-/// 同步 PATH 搜索，检测所有 agent 是否安装。仅供 `ctx.spawn` 异步任务内部使用。
-#[cfg(unix)]
-fn scan_cli_agent_installations() -> HashMap<CLIAgent, bool> {
+#[cfg(not(target_family = "wasm"))]
+async fn scan_cli_agent_installations() -> HashMap<CLIAgent, CLIAgentInstallation> {
     let search_dirs = cli_agent_search_dirs().collect::<Vec<_>>();
-    enum_iterator::all::<CLIAgent>()
-        .filter(|a| !matches!(a, CLIAgent::Unknown))
-        .map(|a| (a, cli_agent_is_on_path_with_dirs(a, &search_dirs)))
-        .collect()
+    join_all(
+        enum_iterator::all::<CLIAgent>()
+            .filter(|agent| *agent != CLIAgent::Unknown)
+            .map(|agent| {
+                let executable = find_cli_agent_executable(agent, &search_dirs);
+                async move {
+                    let version = match executable.as_deref() {
+                        None => CLIAgentVersionStatus::NotInstalled,
+                        Some(path)
+                            if matches!(
+                                agent,
+                                CLIAgent::Claude | CLIAgent::Codex | CLIAgent::Grok
+                            ) =>
+                        {
+                            probe_cli_agent_version(agent, path).await
+                        }
+                        Some(_) => CLIAgentVersionStatus::NotProbed,
+                    };
+                    (
+                        agent,
+                        CLIAgentInstallation {
+                            executable,
+                            version,
+                        },
+                    )
+                }
+            }),
+    )
+    .await
+    .into_iter()
+    .collect()
 }
 
-/// 同步 PATH 搜索，检测所有 agent 是否安装。仅供 `ctx.spawn` 异步任务内部使用。
-#[cfg(windows)]
-fn scan_cli_agent_installations() -> HashMap<CLIAgent, bool> {
-    enum_iterator::all::<CLIAgent>()
-        .filter(|a| !matches!(a, CLIAgent::Unknown))
-        .map(|a| (a, cli_agent_is_on_path(a)))
-        .collect()
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn discover_cli_agent_executable(agent: CLIAgent) -> Option<PathBuf> {
+    find_cli_agent_executable(agent, &cli_agent_search_dirs().collect::<Vec<_>>())
 }
 
-#[cfg(unix)]
-fn cli_agent_is_on_path_with_dirs(agent: CLIAgent, search_dirs: &[PathBuf]) -> bool {
-    match agent {
-        CLIAgent::Unknown => false,
-        CLIAgent::CursorCli => is_on_path_in_dirs("cursor-agent", search_dirs),
-        CLIAgent::DeepSeek => {
-            is_on_path_in_dirs("deepseek", search_dirs)
-                || is_on_path_in_dirs("deepseek-tui", search_dirs)
-        }
-        other => is_on_path_in_dirs(other.command_prefix(), search_dirs),
+#[cfg(not(target_family = "wasm"))]
+fn find_cli_agent_executable(agent: CLIAgent, search_dirs: &[PathBuf]) -> Option<PathBuf> {
+    let commands = match agent {
+        CLIAgent::CursorCli => &["cursor-agent"][..],
+        other => other.command_prefixes(),
+    };
+    let executable = search_dirs.iter().find_map(|directory| {
+        commands
+            .iter()
+            .find_map(|command| find_executable_in_dir(directory, command))
+    })?;
+    if executable.is_absolute() {
+        Some(executable)
+    } else {
+        // PATH 可含相对目录；后台派发仍须绑定扫描时的工作目录。
+        Some(std::env::current_dir().ok()?.join(executable))
     }
 }
 
-/// 内联 PATH 搜索，零进程、零闪窗。
 #[cfg(unix)]
-fn is_on_path_in_dirs(cmd: &str, search_dirs: &[PathBuf]) -> bool {
-    search_dirs.iter().any(|dir| dir.join(cmd).is_file())
+fn find_executable_in_dir(directory: &Path, command: &str) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let path = directory.join(command);
+    let metadata = std::fs::metadata(&path).ok()?;
+    (metadata.is_file() && metadata.permissions().mode() & 0o111 != 0).then_some(path)
+}
+
+#[cfg(windows)]
+fn find_executable_in_dir(directory: &Path, command: &str) -> Option<PathBuf> {
+    let extensions = std::env::var("PATHEXT").unwrap_or_else(|_| ".EXE;.CMD;.BAT;.COM".into());
+    extensions
+        .split(';')
+        .filter(|extension| !extension.is_empty())
+        .map(|extension| directory.join(format!("{command}{extension}")))
+        .find(|path| path.is_file())
+}
+
+#[cfg(not(target_family = "wasm"))]
+async fn probe_cli_agent_version(agent: CLIAgent, executable: &Path) -> CLIAgentVersionStatus {
+    let mut command = Command::new(executable);
+    command
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .kill_on_drop(true);
+    let Ok(Ok(output)) = command.output().with_timeout(Duration::from_secs(3)).await else {
+        return CLIAgentVersionStatus::Unknown;
+    };
+    if !output.status.success() {
+        return CLIAgentVersionStatus::Unknown;
+    }
+    String::from_utf8(output.stdout)
+        .ok()
+        .and_then(|output| parse_cli_agent_version(agent, &output))
+        .map(CLIAgentVersionStatus::Detected)
+        .unwrap_or(CLIAgentVersionStatus::Unknown)
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn parse_cli_agent_version(agent: CLIAgent, output: &str) -> Option<String> {
+    let output = output.trim();
+    let version = match agent {
+        CLIAgent::Codex => output
+            .strip_prefix("codex-cli ")?
+            .split_whitespace()
+            .next()?,
+        CLIAgent::Grok => output.strip_prefix("grok ")?.split_whitespace().next()?,
+        CLIAgent::Claude => output.strip_suffix(" (Claude Code)")?,
+        CLIAgent::Gemini
+        | CLIAgent::Amp
+        | CLIAgent::Droid
+        | CLIAgent::OpenCode
+        | CLIAgent::Copilot
+        | CLIAgent::Pi
+        | CLIAgent::OhMyPi
+        | CLIAgent::Auggie
+        | CLIAgent::CursorCli
+        | CLIAgent::Goose
+        | CLIAgent::DeepSeek
+        | CLIAgent::Hermes
+        | CLIAgent::Vibe
+        | CLIAgent::Antigravity
+        | CLIAgent::Omp
+        | CLIAgent::WarpTui
+        | CLIAgent::Unknown => return None,
+    };
+    let core_version = version.split(['-', '+']).next()?;
+    let components = core_version.split('.').collect::<Vec<_>>();
+    (components.len() == 3
+        && components.iter().all(|component| {
+            !component.is_empty() && component.bytes().all(|byte| byte.is_ascii_digit())
+        }))
+    .then(|| version.to_string())
 }
 
 #[cfg(unix)]
@@ -806,6 +1241,7 @@ fn extend_common_cli_dirs(dirs: &mut Vec<PathBuf>) {
         home.join(".cargo/bin"),
         home.join(".bun/bin"),
         home.join(".local/bin"),
+        home.join(".grok/bin"),
     ]);
 
     if let Ok(node_versions) = std::fs::read_dir(home.join(".nvm/versions/node")) {
@@ -829,27 +1265,22 @@ fn dedupe_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
     deduped
 }
 
-#[cfg(windows)]
-fn cli_agent_is_on_path(agent: CLIAgent) -> bool {
-    match agent {
-        CLIAgent::Unknown => false,
-        CLIAgent::CursorCli => is_on_path("cursor-agent"),
-        CLIAgent::DeepSeek => is_on_path("deepseek") || is_on_path("deepseek-tui"),
-        other => is_on_path(other.command_prefix()),
-    }
+#[cfg(target_family = "wasm")]
+async fn scan_cli_agent_installations() -> HashMap<CLIAgent, CLIAgentInstallation> {
+    // 浏览器不能探测本机进程，也不能将本机缓存当成远端安装状态。
+    HashMap::new()
 }
 
 #[cfg(windows)]
-fn is_on_path(cmd: &str) -> bool {
-    let pathext = std::env::var("PATHEXT").unwrap_or_else(|_| ".EXE;.CMD;.BAT".into());
-    let Ok(path_var) = std::env::var("PATH") else {
-        return false;
-    };
-    let exts: Vec<&str> = pathext.split(';').collect();
-    std::env::split_paths(&path_var).any(|dir| {
-        exts.iter()
-            .any(|ext| dir.join(format!("{}{}", cmd, ext)).is_file())
-    })
+fn cli_agent_search_dirs() -> impl Iterator<Item = PathBuf> {
+    let mut directories = std::env::var_os("PATH")
+        .map(|path| std::env::split_paths(&path).collect::<Vec<_>>())
+        .unwrap_or_default();
+    if let Some(home) = dirs::home_dir() {
+        directories.push(home.join(".grok").join("bin"));
+        directories.push(home.join(".local").join("bin"));
+    }
+    directories.into_iter()
 }
 
 #[cfg(test)]

@@ -13320,6 +13320,21 @@ impl TerminalView {
         if !is_agent_supported(&notification.agent) {
             return false;
         }
+        let detected_agent = {
+            let model = self.model.lock();
+            self.detect_cli_agent_command_from_model(&model, ctx)
+                .map(|(agent, _)| agent)
+        };
+        if detected_agent.is_some_and(|agent| agent != notification.agent) {
+            return false;
+        }
+        // Grok 会继承 Claude hooks，不能让先到的兼容事件改变当前命令身份。
+        if CLIAgentSessionsModel::as_ref(ctx)
+            .session(self.view_id)
+            .is_some_and(|session| session.agent != notification.agent)
+        {
+            return false;
+        }
         let has_listener = CLIAgentSessionsModel::as_ref(ctx)
             .session(self.view_id)
             .is_some_and(|s| s.listener.is_some());
@@ -13535,7 +13550,9 @@ impl TerminalView {
                 });
             if should_auto_toggle_input {
                 match status {
-                    CLIAgentSessionStatus::Blocked { .. } => {
+                    CLIAgentSessionStatus::Blocked { .. }
+                    | CLIAgentSessionStatus::Unknown
+                    | CLIAgentSessionStatus::Disconnected => {
                         // Auto-close rich input when the agent is blocked
                         // (it requires direct keyboard interaction in the terminal).
                         self.close_cli_agent_rich_input(
@@ -13570,15 +13587,27 @@ impl TerminalView {
             .or(session_context.summary.as_deref().filter(|s| !s.is_empty()))
             .unwrap_or(agent.command_prefix())
             .to_owned();
-        let description = if let CLIAgentSessionStatus::Blocked { message } = status {
+        let description = if matches!(status, CLIAgentSessionStatus::Unknown) {
+            crate::t!("cli-agent-status-unknown")
+        } else if matches!(status, CLIAgentSessionStatus::Disconnected) {
+            crate::t!("cli-agent-status-disconnected")
+        } else if let CLIAgentSessionStatus::Blocked { message } = status {
             message.clone().unwrap_or_default()
         } else {
             session_context.response.clone().unwrap_or_default()
         };
 
-        let trigger = if matches!(status, CLIAgentSessionStatus::Blocked { .. }) {
+        let trigger = if matches!(
+            status,
+            CLIAgentSessionStatus::Blocked { .. }
+                | CLIAgentSessionStatus::Unknown
+                | CLIAgentSessionStatus::Disconnected
+        ) {
             NotificationsTrigger::NeedsAttention
-        } else if matches!(status, CLIAgentSessionStatus::Failed { .. }) {
+        } else if matches!(
+            status,
+            CLIAgentSessionStatus::Failed { .. } | CLIAgentSessionStatus::Cancelled
+        ) {
             NotificationsTrigger::AgentTaskCompleted(false)
         } else {
             NotificationsTrigger::AgentTaskCompleted(true)
@@ -16161,7 +16190,7 @@ impl TerminalView {
     }
 
     /// Adds ephemeral error toast to toast stack.
-    fn show_error_toast(&mut self, text: String, ctx: &mut ViewContext<Self>) {
+    pub(crate) fn show_error_toast(&mut self, text: String, ctx: &mut ViewContext<Self>) {
         let window_id = ctx.window_id();
         ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
             let toast = DismissibleToast::error(text);
@@ -16263,29 +16292,21 @@ impl TerminalView {
             let clipboard_content = ctx.clipboard().read();
 
             if is_cli_agent_paste && clipboard_content.has_image_data() {
-                if !cfg!(windows) {
-                    self.write_user_bytes_to_pty(vec![escape_sequences::C0::SYN], ctx);
-                    return;
-                }
-
-                // On Windows, Claude Code uses Alt+V for native image paste.
-                let is_claude = CLIAgentSessionsModel::as_ref(ctx)
-                    .session(self.view_id)
-                    .is_some_and(|s| s.agent == CLIAgent::Claude);
-                if is_claude {
-                    self.write_user_bytes_to_pty(vec![escape_sequences::C0::ESC, b'v'], ctx);
-                    return;
-                }
-
-                // For all other agents on Windows, fall through to the normal paste path. When
-                // bracketed paste is enabled (true for TUI-based CLI agents), the empty-text paste
-                // sends \x1b[200~\x1b[201~ to the PTY. The agent interprets this as a "paste
-                // happened" signal and reads the Windows clipboard directly for image data.
+                self.paste_clipboard_image_to_cli_agent(ctx);
+                return;
             }
 
             clipboard_content_with_escaped_paths(clipboard_content, shell_family, false)
         };
 
+        if is_cli_agent_paste {
+            if let Some(generation) =
+                CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
+            {
+                self.insert_text_into_cli_agent_pty(&copied, generation, ctx);
+            }
+            return;
+        }
         if should_paste_in_input {
             // We put everything from the clipboard into the input box, even
             // if it includes non-printable characters.
@@ -23453,11 +23474,18 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) -> Option<CliAgentRouting> {
         self.active_cli_agent(ctx)?;
+        let generation = CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)?;
+        if !self.cli_agent_input_target_matches(generation, ctx) {
+            self.show_error_toast(crate::t!("cli-agent-input-delivery-failed"), ctx);
+            return None;
+        }
         if self.is_cli_agent_rich_input_open(ctx) {
             self.append_to_rich_input(&text, ctx);
             Some(CliAgentRouting::RichInput)
         } else {
-            self.write_to_pty(text.into_bytes(), ctx);
+            if !self.insert_text_into_cli_agent_pty(&text, generation, ctx) {
+                return None;
+            }
             self.focus_terminal(ctx);
             Some(CliAgentRouting::Pty)
         }
@@ -23471,7 +23499,8 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) -> anyhow::Result<()> {
         let text = cli_agent::build_review_prompt(review);
-        self.try_send_text_to_cli_agent_or_rich_input(text, ctx);
+        self.try_send_text_to_cli_agent_or_rich_input(text, ctx)
+            .ok_or_else(|| anyhow::anyhow!(crate::t!("cli-agent-input-delivery-failed")))?;
         Ok(())
     }
 

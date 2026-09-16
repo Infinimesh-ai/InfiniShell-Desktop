@@ -1,0 +1,12 @@
+{
+  "official_key_fingerprint": "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE",
+  "signature_packet_version": 4,
+  "signature_type": "binary_document",
+  "public_key_algorithm": "RSA",
+  "hash_algorithm": "sha512",
+  "openssl_exit_code": 0,
+  "openssl_result": "Verified OK",
+  "openssl_stderr": "",
+  "signature_verified": true,
+  "manifest_sha256": "02aa2311fd5d9a4cc9a5aea017b89f5067eec78013bd340f62450719a5393fca"
+}

@@ -1,18 +1,30 @@
 //! Implementation of terminal panes.
 #[cfg(not(target_family = "wasm"))]
 use std::collections::HashMap;
+#[cfg(not(target_family = "wasm"))]
+use std::path::PathBuf;
+#[cfg(not(target_family = "wasm"))]
+use std::sync::Arc;
 use std::sync::mpsc::SyncSender;
 
+use ai::skills::SkillReference;
+#[cfg(not(target_family = "wasm"))]
+use uuid::Uuid;
 #[cfg(not(target_family = "wasm"))]
 use warp_cli::agent::Harness;
 use warp_core::execution_mode::AppExecutionMode;
+#[cfg(not(target_family = "wasm"))]
+use warp_core::features::FeatureFlag;
 use warp_errors::report_error;
 use warpui::{
     AppContext, EntityId, ModelHandle, SingletonEntity, ViewContext, ViewHandle, WindowId,
 };
 
 #[cfg(not(target_family = "wasm"))]
-use super::local_harness_launch::{PreparedLocalHarnessLaunch, prepare_local_harness_child_launch};
+use super::local_harness_launch::{
+    PreparedLocalHarnessLaunch, persist_local_harness_child_launch,
+    prepare_local_harness_child_launch,
+};
 use super::{
     DetachType, PaneConfiguration, PaneContent, PaneId, PaneStackEvent, PaneView, ShareableLink,
     ShareableLinkError, TerminalPaneId,
@@ -32,6 +44,16 @@ use crate::ai::blocklist::agent_view::{AgentViewControllerEvent, AgentViewEntryO
 use crate::ai::blocklist::{BlocklistAIHistoryModel, StartAgentRequest};
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::blocklist::{apply_child_agent_model_override, prepare_local_oz_child_launch};
+#[cfg(not(target_family = "wasm"))]
+use crate::ai::cli_agent_runtime::conversation_bridge::local_parent_history_identity;
+#[cfg(not(target_family = "wasm"))]
+use crate::ai::cli_agent_runtime::coordinator::LocalCLITaskCoordinator;
+#[cfg(not(target_family = "wasm"))]
+use crate::ai::cli_agent_runtime::local_skills::{
+    collect_local_child_skills, prepare_local_cli_skill_inputs,
+};
+#[cfg(not(target_family = "wasm"))]
+use crate::ai::cli_agent_runtime::{InputContent, PermissionPolicy, SessionOptions, SessionTarget};
 use crate::ai::conversation_utils;
 use crate::ai::llms::LLMPreferences;
 use crate::ai::orchestration::{RemoteChildLaunchConfig, prepare_remote_child_launch};
@@ -44,9 +66,13 @@ use crate::pane_group::child_agent::{
     ErrorChildAgentConversationRequest, create_error_child_agent_conversation,
 };
 use crate::pane_group::{self, Direction, PaneGroup};
+#[cfg(not(target_family = "wasm"))]
+use crate::persistence::local_cli_tasks::{LocalCliTask, LocalCliTaskState, checkpoint_task};
 use crate::persistence::{BlockCompleted, ModelEvent};
 #[cfg(not(target_family = "wasm"))]
 use crate::session_management::SessionNavigationData;
+#[cfg(not(target_family = "wasm"))]
+use crate::terminal::cli_agent::{CLIAgent, CLIAgentInstallModel, discover_cli_agent_executable};
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::general_settings::GeneralSettings;
 #[cfg(not(target_family = "wasm"))]
@@ -57,6 +83,8 @@ use crate::terminal::shared_session::protocol::SessionSourceType;
 use crate::terminal::view::Event;
 use crate::terminal::{TerminalManager, TerminalView};
 use crate::view_components::ToastFlavor;
+#[cfg(not(target_family = "wasm"))]
+use crate::workspace::WorkspaceAction;
 use crate::workspace::sync_inputs::SyncedInputState;
 use crate::workspace::{PaneViewLocator, WorkspaceRegistry};
 #[cfg(not(target_family = "wasm"))]
@@ -1406,6 +1434,7 @@ fn dispatch_start_agent_conversation(
         StartAgentExecutionMode::Local {
             harness_type: None,
             model_id,
+            ..
         } => {
             launch_local_no_harness_child(group, parent_pane_id, request, model_id, ctx);
         }
@@ -1413,6 +1442,7 @@ fn dispatch_start_agent_conversation(
         StartAgentExecutionMode::Local {
             harness_type: Some(harness_type),
             model_id,
+            skill_references,
         } => {
             launch_local_harness_child(
                 group,
@@ -1421,6 +1451,7 @@ fn dispatch_start_agent_conversation(
                 request,
                 harness_type,
                 model_id,
+                skill_references,
                 ctx,
             );
         }
@@ -1501,6 +1532,22 @@ fn launch_local_no_harness_child(
     model_id: Option<String>,
     ctx: &mut ViewContext<PaneGroup>,
 ) {
+    if matches!(&request.execution_mode, StartAgentExecutionMode::Local {skill_references, ..} if !skill_references.is_empty())
+    {
+        let _ = create_error_child_agent_conversation(
+            group,
+            ErrorChildAgentConversationRequest {
+                parent_pane_id,
+                name: request.name,
+                parent_conversation_id: request.parent_conversation_id,
+                request_id: Some(request.id),
+                orchestration_harness: Some(Harness::Oz),
+                error_message: crate::t!("cli-agent-task-skills-require-managed"),
+            },
+            ctx,
+        );
+        return;
+    }
     let request_id = request.id;
     let parent_conversation_id = request.parent_conversation_id;
     let prompt = request.prompt.clone();
@@ -1621,8 +1668,7 @@ fn launch_local_no_harness_child(
     });
 }
 
-/// Asynchronously prepares a local harness launch, then creates the
-/// hidden child pane and executes the launch command.
+/// 准备本地启动，并在运行交互式 CLI 前显示子任务终端。
 #[cfg(not(target_family = "wasm"))]
 #[allow(clippy::too_many_arguments)]
 fn launch_local_harness_child(
@@ -1632,6 +1678,7 @@ fn launch_local_harness_child(
     request: StartAgentRequest,
     harness_type: String,
     model_id: Option<String>,
+    skill_references: Vec<SkillReference>,
     ctx: &mut ViewContext<PaneGroup>,
 ) {
     let startup_directory = group.startup_path_for_new_session(Some(terminal_pane_id), ctx);
@@ -1639,10 +1686,32 @@ fn launch_local_harness_child(
     let agent_name = normalize_orchestrator_agent_name(&request.name);
     let request_name = agent_name.clone().unwrap_or_default();
     let parent_conversation_id = request.parent_conversation_id;
-    let parent_run_id = request.parent_run_id.clone();
+    let parent_metadata = BlocklistAIHistoryModel::as_ref(ctx)
+        .conversation(&parent_conversation_id)
+        .map(|conversation| {
+            (
+                conversation
+                    .run_id()
+                    .or_else(|| request.parent_run_id.clone())
+                    .unwrap_or_else(|| parent_conversation_id.to_string()),
+                conversation.orchestration_harness().unwrap_or(Harness::Oz),
+                conversation.parent_agent_id().map(str::to_owned),
+                local_parent_history_identity(conversation),
+            )
+        });
     let prompt = request.prompt.clone();
     let orchestration_harness =
         Harness::parse_orchestration_harness(&harness_type).unwrap_or(Harness::Unknown);
+    let managed = FeatureFlag::LocalCLIManagedTasks.is_enabled()
+        && matches!(orchestration_harness, Harness::Claude | Harness::Codex);
+    let discovered_executable = CLIAgent::from_harness(orchestration_harness).and_then(|agent| {
+        CLIAgentInstallModel::as_ref(ctx)
+            .executable(agent)
+            .map(PathBuf::from)
+    });
+    let managed_model = model_id.clone();
+    let initial_prompt = prompt.clone();
+    let prepared_skills = collect_local_child_skills(&skill_references, ctx);
     let shell_type = group
         .terminal_view_from_pane_id(parent_pane_id, ctx)
         .and_then(|terminal_view| terminal_view.as_ref(ctx).active_session_shell_type(ctx));
@@ -1655,27 +1724,226 @@ fn launch_local_harness_child(
 
     let model_id_for_harness_env = model_id.clone();
     let agent_name_for_task = agent_name.clone();
+    let startup_directory_for_task = startup_directory.clone();
+    let persistence_sender = group.model_event_sender.clone();
+    let parent_spawner = Arc::new(ctx.spawner());
     let _ = ctx.spawn(
         async move {
-            prepare_local_harness_child_launch(
+            let mut initial_input = vec![InputContent::Text(initial_prompt)];
+            initial_input.extend(prepare_local_cli_skill_inputs(
+                prepared_skills?,
+                orchestration_harness,
+                managed,
+            )?);
+            let sender = persistence_sender.ok_or_else(|| {
+                crate::t!(
+                    "ambient-agent-local-harness-persistence-failed",
+                    error = "SQLite writer unavailable"
+                )
+            })?;
+            let (parent_run_id, parent_harness, grandparent_run_id, history_identity) =
+                parent_metadata.ok_or_else(|| {
+                    crate::t!(
+                        "ambient-agent-local-harness-persistence-failed",
+                        error = "Parent conversation unavailable"
+                    )
+                })?;
+            let working_directory = startup_directory_for_task
+                .ok_or_else(|| {
+                    crate::t!("ambient-agent-local-harness-working-directory-unavailable")
+                })?
+                .to_string_lossy()
+                .into_owned();
+            let discovered_executable = discovered_executable.or_else(|| {
+                CLIAgent::from_harness(orchestration_harness)
+                    .and_then(discover_cli_agent_executable)
+            });
+            let mut launch = prepare_local_harness_child_launch(
                 prompt,
                 harness_type,
                 model_id_for_harness_env,
-                parent_run_id,
+                Some(parent_run_id.clone()),
                 agent_name_for_task,
                 shell_type,
-                startup_directory,
+                discovered_executable.clone(),
             )
+            .await?;
+            let managed_options = if managed {
+                let executable = discovered_executable
+                    .ok_or_else(|| crate::t!("cli-agent-message-recipient-unavailable"))?;
+                launch.native_session_id = None;
+                // 托管通道不使用旧 Oz 云邮箱环境；原生 ID 由握手结果写入。
+                launch.env_vars.clear();
+                Some(SessionOptions {
+                    executable,
+                    cwd: working_directory.clone().into(),
+                    state_dir: crate::ai::cli_agent_runtime::current_state_dir(),
+                    target: SessionTarget::New,
+                    generation: Uuid::new_v4(),
+                    permission_policy: PermissionPolicy::Inherit,
+                    permission_ceiling: None,
+                    model: managed_model,
+                    local_tools: None,
+                    selected_skills: Vec::new(),
+                })
+            } else {
+                None
+            };
+            let parent_task = LocalCliTask {
+                version: 1,
+                task_id: parent_run_id.clone(),
+                parent_task_id: grandparent_run_id,
+                parent_generation: None,
+                harness: parent_harness.to_string(),
+                working_directory: working_directory.clone(),
+                config_json: serde_json::json!({
+                    "execution_kind": "local_parent",
+                    "conversation_id": parent_conversation_id.to_string(),
+                    "history_identity": history_identity,
+                })
+                .to_string(),
+                native_session_id: None,
+                generation: 1,
+                revision: 0,
+                state: LocalCliTaskState::Queued,
+                result: None,
+                terminal_evidence: None,
+            };
+            let task = LocalCliTask {
+                version: 1,
+                task_id: launch.run_id.clone(),
+                parent_task_id: Some(parent_run_id.clone()),
+                parent_generation: None,
+                harness: orchestration_harness.to_string(),
+                working_directory,
+                config_json: if let Some(options) = managed_options.as_ref() {
+                    serde_json::json!({
+                        "execution_kind": "managed",
+                        "permission_policy": options.permission_policy,
+                        "model": options.model,
+                        "agent_config": launch.config,
+                        "skill_references": skill_references,
+                    })
+                    .to_string()
+                } else {
+                    serde_json::to_string(&launch.config).map_err(|error| {
+                        crate::t!(
+                            "ambient-agent-local-harness-persistence-failed",
+                            error = error.to_string()
+                        )
+                    })?
+                },
+                native_session_id: launch.native_session_id.clone(),
+                generation: 1,
+                revision: 0,
+                state: LocalCliTaskState::Queued,
+                result: None,
+                terminal_evidence: None,
+            };
+            let expected_parent_identity = (parent_harness == Harness::Oz)
+                .then_some(history_identity)
+                .flatten();
+            let validation_identity = expected_parent_identity.clone();
+            let validation_run_id = parent_run_id.clone();
+            let task = persist_local_harness_child_launch(&sender, parent_task, task, move || {
+                let spawner = parent_spawner.clone();
+                let identity = validation_identity.clone();
+                let run_id = validation_run_id.clone();
+                async move {
+                    if parent_harness != Harness::Oz {
+                        return Ok(());
+                    }
+                    spawner
+                        .spawn(move |_, ctx| {
+                            let is_current = BlocklistAIHistoryModel::as_ref(ctx)
+                                .conversation(&parent_conversation_id)
+                                .is_some_and(|conversation| {
+                                    identity.is_some()
+                                        && local_parent_history_identity(conversation) == identity
+                                        && conversation
+                                            .run_id()
+                                            .is_none_or(|current| current == run_id)
+                                });
+                            is_current
+                                .then_some(())
+                                .ok_or_else(|| crate::t!("cli-agent-task-parent-changed"))
+                        })
+                        .await
+                        .map_err(|_| crate::t!("cli-agent-task-parent-changed"))?
+                }
+            })
             .await
+            .map_err(|error| {
+                crate::t!(
+                    "ambient-agent-local-harness-persistence-failed",
+                    error = error
+                )
+            })?;
+            Ok((
+                launch,
+                task,
+                sender,
+                parent_run_id,
+                managed_options,
+                initial_input,
+                expected_parent_identity,
+            ))
         },
         move |group, result, ctx| match result {
-            Ok(launch) => {
+            Ok((
+                launch,
+                task,
+                sender,
+                parent_run_id,
+                managed_options,
+                initial_input,
+                expected_parent_identity,
+            )) => {
+                if expected_parent_identity.is_some()
+                    && !BlocklistAIHistoryModel::as_ref(ctx)
+                        .conversation(&parent_conversation_id)
+                        .is_some_and(|conversation| {
+                            local_parent_history_identity(conversation) == expected_parent_identity
+                                && conversation
+                                    .run_id()
+                                    .is_none_or(|current| current == parent_run_id)
+                        })
+                {
+                    record_failed_local_harness_launch(task, sender, parent_pane_id, ctx);
+                    let _ = create_error_child_agent_conversation(
+                        group,
+                        ErrorChildAgentConversationRequest {
+                            parent_pane_id,
+                            name: request_name,
+                            parent_conversation_id,
+                            request_id: Some(request_id),
+                            orchestration_harness: Some(orchestration_harness),
+                            error_message: crate::t!("cli-agent-task-parent-changed"),
+                        },
+                        ctx,
+                    );
+                    return;
+                }
                 let PreparedLocalHarnessLaunch {
                     command,
                     env_vars,
                     run_id,
                     task_id,
+                    ..
                 } = launch;
+                if let Some(parent_terminal) = group.terminal_view_from_pane_id(parent_pane_id, ctx)
+                {
+                    BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                        let parent_task_id = parent_run_id.parse().ok();
+                        history.assign_run_id_for_conversation(
+                            parent_conversation_id,
+                            parent_run_id,
+                            parent_task_id,
+                            parent_terminal.id(),
+                            ctx,
+                        );
+                    });
+                }
                 let is_shared_session_creator =
                     inherit_share_for_local_child(host_source.as_ref(), task_id);
                 match create_hidden_child_agent_conversation(
@@ -1686,7 +1954,10 @@ fn launch_local_harness_child(
                         parent_conversation_id,
                         orchestration_harness: Some(orchestration_harness),
                         env_vars,
-                        task_context: None,
+                        task_context: Some(HiddenChildAgentTaskContext {
+                            task_id,
+                            working_dir: startup_directory,
+                        }),
                         is_shared_session_creator,
                     },
                     ctx,
@@ -1703,14 +1974,6 @@ fn launch_local_harness_child(
                             ctx,
                         );
 
-                        BlocklistAIHistoryModel::handle(ctx).update(ctx, |model, ctx| {
-                            model.record_new_conversation_request_complete(
-                                request_id,
-                                conversation_id,
-                                ctx,
-                            );
-                        });
-
                         BlocklistAIHistoryModel::handle(ctx).update(ctx, |history_model, ctx| {
                             history_model.assign_run_id_for_conversation(
                                 conversation_id,
@@ -1721,8 +1984,69 @@ fn launch_local_harness_child(
                             );
                         });
 
+                        // Claude/Codex 继承用户的原生权限设置；登录、信任与审批
+                        // 提示必须位于可见终端，不能依靠隐藏 pane 跳过授权。
+                        let ready =
+                            if matches!(orchestration_harness, Harness::Claude | Harness::Codex)
+                                && group
+                                    .unhide_child_agent_pane_for_split_off(conversation_id, ctx)
+                                    .is_none()
+                            {
+                                Err(crate::t!(
+                                    "ambient-agent-local-harness-terminal-unavailable"
+                                ))
+                            } else if let Some(options) = managed_options {
+                                LocalCLITaskCoordinator::handle(ctx).update(
+                                    ctx,
+                                    |coordinator, ctx| {
+                                        coordinator.start_prepared_with_input(
+                                            task.clone(),
+                                            options,
+                                            initial_input,
+                                            ctx,
+                                        )
+                                    },
+                                )
+                            } else {
+                                CLIAgentSessionsModel::handle(ctx)
+                                    .update(ctx, |sessions, ctx| {
+                                        sessions.bind_local_task(
+                                            terminal_view_id,
+                                            task.clone(),
+                                            sender.clone(),
+                                            ctx,
+                                        )
+                                    })
+                                    .map_err(|error| {
+                                        crate::t!(
+                                            "ambient-agent-local-harness-persistence-failed",
+                                            error = error
+                                        )
+                                    })
+                            };
+                        if let Err(error_message) = ready {
+                            record_failed_local_harness_launch(task, sender, parent_pane_id, ctx);
+                            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                                history.update_conversation_status_with_error(
+                                    terminal_view_id,
+                                    conversation_id,
+                                    ConversationStatus::Error,
+                                    Some(RenderableAIError::other(error_message, false)),
+                                    ctx,
+                                );
+                                history.record_new_conversation_request_complete(
+                                    request_id,
+                                    conversation_id,
+                                    ctx,
+                                );
+                            });
+                            return;
+                        }
+
                         new_terminal_view.update(ctx, |terminal_view, ctx| {
-                            terminal_view.execute_command_or_set_pending(&command, ctx);
+                            if !managed {
+                                terminal_view.execute_command_or_set_pending(&command, ctx);
+                            }
                             terminal_view.enter_agent_view(
                                 None,
                                 Some(conversation_id),
@@ -1730,8 +2054,21 @@ fn launch_local_harness_child(
                                 ctx,
                             );
                         });
+                        if managed {
+                            // 打开统一任务面板，让托管审批和结果在派发后立即可操作。
+                            ctx.dispatch_typed_action(&WorkspaceAction::OpenLocalCLITaskManager);
+                        }
+                        // 启动准备和持久化绑定都成功后，才向派发器返回已启动。
+                        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                            history.record_new_conversation_request_complete(
+                                request_id,
+                                conversation_id,
+                                ctx,
+                            );
+                        });
                     }
                     _ => {
+                        record_failed_local_harness_launch(task, sender, parent_pane_id, ctx);
                         let _ = create_error_child_agent_conversation(
                             group,
                             ErrorChildAgentConversationRequest {
@@ -1740,9 +2077,9 @@ fn launch_local_harness_child(
                                 parent_conversation_id,
                                 request_id: Some(request_id),
                                 orchestration_harness: Some(orchestration_harness),
-                                error_message:
-                                    "Failed to create a hidden pane for the local child harness."
-                                        .to_string(),
+                                error_message: crate::t!(
+                                    "ambient-agent-local-harness-terminal-unavailable"
+                                ),
                             },
                             ctx,
                         );
@@ -1762,6 +2099,42 @@ fn launch_local_harness_child(
                     },
                     ctx,
                 );
+            }
+        },
+    );
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn record_failed_local_harness_launch(
+    mut task: LocalCliTask,
+    sender: SyncSender<ModelEvent>,
+    parent_pane_id: PaneId,
+    ctx: &mut ViewContext<PaneGroup>,
+) {
+    task.revision += 1;
+    task.state = LocalCliTaskState::Failed;
+    task.terminal_evidence = Some("launch_failed_before_dispatch".to_owned());
+    let _ = ctx.spawn(
+        async move {
+            let generation = task.generation;
+            checkpoint_task(&sender, task, Some(generation))?
+                .await
+                .map_err(|_| "本地任务检查点通道已关闭".to_owned())?
+        },
+        move |group, result, ctx| {
+            if let Err(error) = result
+                && let Some(terminal) = group.terminal_view_from_pane_id(parent_pane_id, ctx)
+            {
+                terminal.update(ctx, |view, ctx| {
+                    view.show_persistent_toast(
+                        crate::t!(
+                            "ambient-agent-local-harness-persistence-failed",
+                            error = error
+                        ),
+                        ToastFlavor::Error,
+                        ctx,
+                    );
+                });
             }
         },
     );

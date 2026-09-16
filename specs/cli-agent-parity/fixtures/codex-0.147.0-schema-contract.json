@@ -1,0 +1,560 @@
+{
+  "v1/InitializeParams.json": {
+    "required": [
+      "clientInfo"
+    ],
+    "properties": {
+      "capabilities": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/InitializeCapabilities"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "clientInfo": {
+        "$ref": "#/definitions/ClientInfo"
+      }
+    }
+  },
+  "v1/InitializeResponse.json": {
+    "required": [
+      "codexHome",
+      "platformFamily",
+      "platformOs",
+      "userAgent"
+    ],
+    "properties": {
+      "codexHome": {
+        "allOf": [
+          {
+            "$ref": "#/definitions/AbsolutePathBuf"
+          }
+        ],
+        "description": "Absolute path to the server's $CODEX_HOME directory."
+      },
+      "platformFamily": {
+        "description": "Platform family for the running app-server target, for example `\"unix\"` or `\"windows\"`.",
+        "type": "string"
+      },
+      "platformOs": {
+        "description": "Operating system for the running app-server target, for example `\"macos\"`, `\"linux\"`, or `\"windows\"`.",
+        "type": "string"
+      },
+      "userAgent": {
+        "type": "string"
+      }
+    }
+  },
+  "v2/ThreadStartParams.json": {
+    "properties": {
+      "approvalPolicy": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/AskForApproval"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "approvalsReviewer": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ApprovalsReviewer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Override where approval requests are routed for review on this thread and subsequent turns."
+      },
+      "baseInstructions": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "config": {
+        "additionalProperties": true,
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "cwd": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "developerInstructions": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "ephemeral": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "model": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "modelProvider": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "personality": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/Personality"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "sandbox": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/SandboxMode"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "serviceName": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "serviceTier": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sessionStartSource": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ThreadStartSource"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "threadSource": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ThreadSource"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Optional client-supplied analytics source classification for this thread."
+      }
+    }
+  },
+  "AskForApproval": {
+    "oneOf": [
+      {
+        "enum": [
+          "untrusted",
+          "on-request",
+          "never"
+        ],
+        "type": "string"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "granular": {
+            "properties": {
+              "mcp_elicitations": {
+                "type": "boolean"
+              },
+              "request_permissions": {
+                "default": false,
+                "type": "boolean"
+              },
+              "rules": {
+                "type": "boolean"
+              },
+              "sandbox_approval": {
+                "type": "boolean"
+              },
+              "skill_approval": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mcp_elicitations",
+              "rules",
+              "sandbox_approval"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "granular"
+        ],
+        "title": "GranularAskForApproval",
+        "type": "object"
+      }
+    ]
+  },
+  "v2/TurnStartParams.json": {
+    "required": [
+      "input",
+      "threadId"
+    ],
+    "properties": {
+      "approvalPolicy": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/AskForApproval"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Override the approval policy for this turn and subsequent turns."
+      },
+      "approvalsReviewer": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ApprovalsReviewer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Override where approval requests are routed for review on this turn and subsequent turns."
+      },
+      "clientUserMessageId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "cwd": {
+        "description": "Override the working directory for this turn and subsequent turns.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "effort": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ReasoningEffort"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Override the reasoning effort for this turn and subsequent turns."
+      },
+      "input": {
+        "items": {
+          "$ref": "#/definitions/UserInput"
+        },
+        "type": "array"
+      },
+      "model": {
+        "description": "Override the model for this turn and subsequent turns.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "outputSchema": {
+        "description": "Optional JSON Schema used to constrain the final assistant message for this turn."
+      },
+      "personality": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/Personality"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Override the personality for this turn and subsequent turns."
+      },
+      "sandboxPolicy": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/SandboxPolicy"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Override the sandbox policy for this turn and subsequent turns."
+      },
+      "serviceTier": {
+        "description": "Override the service tier for this turn and subsequent turns.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "summary": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ReasoningSummary"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Override the reasoning summary for this turn and subsequent turns."
+      },
+      "threadId": {
+        "type": "string"
+      }
+    }
+  },
+  "v2/TurnSteerParams.json": {
+    "required": [
+      "expectedTurnId",
+      "input",
+      "threadId"
+    ],
+    "properties": {
+      "clientUserMessageId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "expectedTurnId": {
+        "description": "Required active turn id precondition. The request fails when it does not match the currently active turn.",
+        "type": "string"
+      },
+      "input": {
+        "items": {
+          "$ref": "#/definitions/UserInput"
+        },
+        "type": "array"
+      },
+      "threadId": {
+        "type": "string"
+      }
+    }
+  },
+  "v2/TurnInterruptParams.json": {
+    "required": [
+      "threadId",
+      "turnId"
+    ],
+    "properties": {
+      "threadId": {
+        "type": "string"
+      },
+      "turnId": {
+        "type": "string"
+      }
+    }
+  },
+  "v2/ThreadResumeParams.json": {
+    "required": [
+      "threadId"
+    ],
+    "properties": {
+      "approvalPolicy": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/AskForApproval"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "approvalsReviewer": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ApprovalsReviewer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Override where approval requests are routed for review on this thread and subsequent turns."
+      },
+      "baseInstructions": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "config": {
+        "additionalProperties": true,
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "cwd": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "developerInstructions": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "model": {
+        "description": "Configuration overrides for the resumed thread, if any.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "modelProvider": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "personality": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/Personality"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "sandbox": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/SandboxMode"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "serviceTier": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "threadId": {
+        "type": "string"
+      }
+    }
+  },
+  "CommandExecutionRequestApprovalResponse.json": {
+    "required": [
+      "decision"
+    ],
+    "properties": {
+      "decision": {
+        "$ref": "#/definitions/CommandExecutionApprovalDecision"
+      }
+    }
+  },
+  "CommandExecutionApprovalDecision": {
+    "oneOf": [
+      {
+        "description": "User approved the command.",
+        "enum": [
+          "accept"
+        ],
+        "type": "string"
+      },
+      {
+        "description": "User approved the command and future prompts in the same session-scoped approval cache should run without prompting.",
+        "enum": [
+          "acceptForSession"
+        ],
+        "type": "string"
+      },
+      {
+        "additionalProperties": false,
+        "description": "User approved the command, and wants to apply the proposed execpolicy amendment so future matching commands can run without prompting.",
+        "properties": {
+          "acceptWithExecpolicyAmendment": {
+            "properties": {
+              "execpolicy_amendment": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "execpolicy_amendment"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "acceptWithExecpolicyAmendment"
+        ],
+        "title": "AcceptWithExecpolicyAmendmentCommandExecutionApprovalDecision",
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "description": "User chose a persistent network policy rule (allow/deny) for this host.",
+        "properties": {
+          "applyNetworkPolicyAmendment": {
+            "properties": {
+              "network_policy_amendment": {
+                "$ref": "#/definitions/NetworkPolicyAmendment"
+              }
+            },
+            "required": [
+              "network_policy_amendment"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "applyNetworkPolicyAmendment"
+        ],
+        "title": "ApplyNetworkPolicyAmendmentCommandExecutionApprovalDecision",
+        "type": "object"
+      },
+      {
+        "description": "User denied the command. The agent will continue the turn.",
+        "enum": [
+          "decline"
+        ],
+        "type": "string"
+      },
+      {
+        "description": "User denied the command. The turn will also be immediately interrupted.",
+        "enum": [
+          "cancel"
+        ],
+        "type": "string"
+      }
+    ]
+  }
+}

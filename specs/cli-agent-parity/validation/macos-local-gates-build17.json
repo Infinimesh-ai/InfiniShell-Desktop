@@ -1,0 +1,29 @@
+{
+  "recorded_at": "2026-09-16T11:39:28.897506+00:00",
+  "platform": "macOS arm64",
+  "baseline_commit": "6921a9925955a1955503e259cd935eaea4ac2ac0",
+  "worktree_dirty": true,
+  "final_commit_verification": false,
+  "test_binary_sha256": "e4537946e46dc3b882359b5c33fe325d7eced9154290ea5f10687d1ddcdb2764",
+  "note": "Codex来源写回的TOML格式误判修复后回归。保留缺失与空表区别，拒绝非法配置形状并兼容有效内联表。此后发现的旧Git来源恢复提示已单独同步中英文，build18待验；新GUI和同提交跨平台未通过。",
+  "checks": [
+    {
+      "command": "cargo test -p warp --lib i18n::tests",
+      "summary": "11 passed; 0 failed; 4.53s; build 2m44",
+      "exit_code": 0,
+      "log_sha256": "fcff13bef3b3b90da7609a5947a8c33fd0e934253eb47a91ff0cbf1ec415d90d"
+    },
+    {
+      "command": "cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_cli_mailbox)'",
+      "summary": "492 tests run: 492 passed, 5919 skipped; 6.699s",
+      "exit_code": 0,
+      "log_sha256": "46879c541d474cdeab7bf2afe5a5afff37b73b6c3235b0f6b1e803959631ef07"
+    },
+    {
+      "command": "python3 -B -m unittest discover -s script/cli-agent-parity -p '*_tests.py'",
+      "summary": "64 tests passed; 5.027s",
+      "exit_code": 0,
+      "log_sha256": "25401ee82c8fb2790a67b5740722605cfdd6721b884f9a723debad1cad50f037"
+    }
+  ]
+}

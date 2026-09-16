@@ -87,7 +87,8 @@ fn parsed_skill_api_conversion_emits_plain_path_reference() {
         scope: SkillScope::Project,
         provider: SkillProvider::Agents,
     }
-    .into();
+    .try_into()
+    .unwrap();
 
     let descriptor = api_skill
         .descriptor
@@ -239,4 +240,15 @@ fn read_skill_ref_with_remote_origin_preserves_host_identity() {
     };
     assert_eq!(path.host_id, host_id);
     assert_eq!(path.path.as_str(), "/repo/.agents/skills/deploy/SKILL.md");
+}
+
+#[test]
+fn grok_provider_is_rejected_by_the_older_remote_protocol() {
+    let result = api::skill_descriptor::Provider::try_from(SkillProvider::Grok);
+    assert!(matches!(
+        result,
+        Err(super::SkillConversionError::UnsupportedProvider(
+            SkillProvider::Grok
+        ))
+    ));
 }

@@ -229,9 +229,11 @@ fn build_harness_snapshot(
                 Some(LocalHarnessSetupState::MissingHarness { tooltip }) => match harness {
                     Harness::Claude => crate::t!("ai-orchestration-install-claude"),
                     Harness::Codex => crate::t!("ai-orchestration-install-codex"),
-                    Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Unknown => {
-                        tooltip.to_string()
-                    }
+                    Harness::Oz
+                    | Harness::OpenCode
+                    | Harness::Gemini
+                    | Harness::Grok
+                    | Harness::Unknown => tooltip.to_string(),
                 },
                 Some(LocalHarnessSetupState::ProductDisabled { message }) => match harness {
                     Harness::Codex => crate::t!("ai-orchestration-local-codex-disabled"),
@@ -239,6 +241,7 @@ fn build_harness_snapshot(
                     | Harness::Claude
                     | Harness::OpenCode
                     | Harness::Gemini
+                    | Harness::Grok
                     | Harness::Unknown => message.to_string(),
                 },
                 Some(LocalHarnessSetupState::Ready) | None => {

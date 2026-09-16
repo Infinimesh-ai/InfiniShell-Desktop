@@ -758,6 +758,7 @@ pub fn run_agents_to_start_agent_mode(
                 Ok(StartAgentExecutionMode::Local {
                     harness_type: None,
                     model_id,
+                    skill_references: run_skills.to_vec(),
                 })
             } else {
                 if let Some(harness) = Harness::parse_local_child_harness(trimmed)
@@ -768,6 +769,7 @@ pub fn run_agents_to_start_agent_mode(
                 Ok(StartAgentExecutionMode::Local {
                     harness_type: Some(trimmed.to_string()),
                     model_id,
+                    skill_references: run_skills.to_vec(),
                 })
             }
         }

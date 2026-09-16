@@ -103,3 +103,21 @@ fn foreign_encoded_remote_skills_root_resolves_provider_parent_directory() {
         )))
     );
 }
+
+#[test]
+fn grok_project_skills_keep_their_provider_identity() {
+    let path = LocalOrRemotePath::Remote(RemotePath::new(
+        HostId::new("remote-host".to_string()),
+        StandardizedPath::try_new("/repo/.grok/skills/review/SKILL.md").unwrap(),
+    ));
+    assert_eq!(get_provider_for_path(&path), Some(SkillProvider::Grok));
+}
+
+#[test]
+fn windows_grok_skills_keep_their_provider_identity() {
+    let path = LocalOrRemotePath::Remote(RemotePath::new(
+        HostId::new("remote-host".to_string()),
+        StandardizedPath::try_new(r"C:\repo\.grok\skills\review\SKILL.md").unwrap(),
+    ));
+    assert_eq!(get_provider_for_path(&path), Some(SkillProvider::Grok));
+}

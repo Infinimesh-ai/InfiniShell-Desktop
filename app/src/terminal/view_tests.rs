@@ -2478,6 +2478,9 @@ fn submit_cli_agent_rich_input_restores_unlocked_input_config() {
         let terminal = add_window_with_terminal(&mut app, None);
 
         terminal.update(&mut app, |view, ctx| {
+            view.model
+                .lock()
+                .simulate_long_running_block(CLIAgent::Droid.command_prefix(), "");
             view.input.update(ctx, |input, ctx| {
                 input.ai_input_model().update(ctx, |ai_input, ctx| {
                     ai_input.set_input_config(
@@ -7887,6 +7890,9 @@ fn submit_rich_input_and_collect_pty_writes(
     });
 
     terminal.update(app, |view, ctx| {
+        view.model
+            .lock()
+            .simulate_long_running_block(agent.command_prefix(), "");
         CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
             sessions.set_session(
                 view.view_id,
@@ -7909,7 +7915,10 @@ fn submit_rich_input_and_collect_pty_writes(
 
         view.open_cli_agent_rich_input(CLIAgentInputEntrypoint::FooterButton, ctx);
         assert!(view.has_active_cli_agent_input_session(ctx));
-
+    });
+    terminal.update(app, |view, ctx| {
+        view.input
+            .update(ctx, |input, ctx| input.replace_buffer_content(text, ctx));
         view.submit_cli_agent_rich_input(text.to_owned(), ctx);
     });
 
@@ -8277,6 +8286,9 @@ fn attach_path_as_context_routes_to_open_cli_agent_rich_input() {
         });
 
         terminal.update(&mut app, |view, ctx| {
+            view.model
+                .lock()
+                .simulate_long_running_block(CLIAgent::Claude.command_prefix(), "");
             view.attach_path_as_context(std::path::Path::new("src/main.rs"), ctx);
         });
 
@@ -8386,6 +8398,7 @@ fn paste_raw_image_clipboard_in_cli_agent_sends_correct_bytes() {
     fn run_for_agent(agent: CLIAgent) {
         App::test((), move |mut app| async move {
             initialize_app_for_terminal_view(&mut app);
+            app.add_singleton_model(|_| ToastStack);
             let _agent_view = FeatureFlag::AgentView.override_enabled(true);
 
             let terminal = add_window_with_terminal(&mut app, None);
@@ -8441,6 +8454,10 @@ fn paste_raw_image_clipboard_in_cli_agent_sends_correct_bytes() {
             });
 
             let writes = pty_writes.borrow();
+            if agent == CLIAgent::Grok {
+                assert!(writes.is_empty());
+                return;
+            }
             assert_eq!(
                 writes.len(),
                 1,
@@ -8465,6 +8482,7 @@ fn paste_raw_image_clipboard_in_cli_agent_sends_correct_bytes() {
 
     run_for_agent(CLIAgent::Claude);
     run_for_agent(CLIAgent::OpenCode);
+    run_for_agent(CLIAgent::Grok);
     run_for_agent(CLIAgent::Codex);
 }
 
@@ -9400,11 +9418,15 @@ fn submit_cli_agent_rich_input_clears_draft() {
         let terminal = open_cli_agent_rich_input_for_agent(&mut app, CLIAgent::Claude);
 
         terminal.update(&mut app, |view, ctx| {
+            view.model
+                .lock()
+                .simulate_long_running_block(CLIAgent::Claude.command_prefix(), "");
             view.submit_cli_agent_rich_input("hello agent".to_owned(), ctx);
             // Input stays open because auto-dismiss is off.
             assert!(view.has_active_cli_agent_input_session(ctx));
         });
 
+        warpui::r#async::Timer::after(std::time::Duration::from_millis(100)).await;
         terminal.read(&app, |view, ctx| {
             let session = CLIAgentSessionsModel::as_ref(ctx)
                 .session(view.view_id)
@@ -10266,7 +10288,11 @@ fn single_general_review_comment(content: &str) -> AgentReviewCommentBatch {
 }
 
 fn set_warp_tui_session(view: &mut TerminalView, ctx: &mut ViewContext<TerminalView>) {
-    view.model.lock().simulate_long_running_block("warp", "");
+    {
+        let mut model = view.model.lock();
+        model.simulate_long_running_block("warp", "");
+        model.set_mode(ansi::Mode::BracketedPaste);
+    }
     assert_eq!(
         CLIAgent::detect("warp", None, None, ctx),
         Some(CLIAgent::WarpTui)

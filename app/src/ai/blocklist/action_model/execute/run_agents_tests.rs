@@ -278,6 +278,7 @@ fn local_codex_run_agents_maps_to_local_harness_mode_when_flag_enabled() {
         StartAgentExecutionMode::Local {
             harness_type: Some("codex".to_string()),
             model_id: None,
+            skill_references: Vec::new(),
         }
     );
 }

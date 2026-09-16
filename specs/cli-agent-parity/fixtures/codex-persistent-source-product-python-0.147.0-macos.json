@@ -1,0 +1,619 @@
+{
+  "commands": [
+    {
+      "arguments": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "codex-cli 0.147.0\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "https://github.com/warpdotdev/codex-warp.git",
+        "--ref",
+        "31ce59d9011cfb1d78f265649a228dac5de58d76",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"codex-warp\",\n  \"installedRoot\": \"<isolated-root>/codex/.tmp/marketplaces/codex-warp\",\n  \"alreadyAdded\": false\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "warp@codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"warp@codex-warp\",\n  \"name\": \"warp\",\n  \"marketplaceName\": \"codex-warp\",\n  \"version\": \"0.4.0\",\n  \"installedPath\": \"<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "orchestration@codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"orchestration@codex-warp\",\n  \"name\": \"orchestration\",\n  \"marketplaceName\": \"codex-warp\",\n  \"version\": \"0.4.0\",\n  \"installedPath\": \"<isolated-root>/codex/plugins/cache/codex-warp/orchestration/0.4.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "app_server_traces": [
+    {
+      "stage": "disable_existing_orchestration",
+      "events": [
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_cache_refresh_probe/0.147.0 (Mac OS 27.0.0; arm64) unknown (infinishell_cache_refresh_probe; 0.1.0)",
+              "codexHome": "<isolated-root>/codex",
+              "platformFamily": "unix",
+              "platformOs": "macos"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "MacBookPro16",
+              "installationId": "ada7690d-76be-4d7e-936c-51a285b72295",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789557788754
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 2,
+            "result": {
+              "status": "ok",
+              "version": "sha256:35220ec198984da25949572c340b82d0bbd10721f7a2d097b81caccf40cb9d25",
+              "filePath": "<isolated-root>/codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 3,
+            "result": {
+              "data": [
+                {
+                  "cwd": "<isolated-root>",
+                  "hooks": [
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                      "eventName": "permissionRequest",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-permission-request.sh",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 0,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:a5f8b0ebc36bb459328ffeb5f62ff146dfb74e3d88d4c369cf0280f7b354e388",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                      "eventName": "postToolUse",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-post-tool-use.sh",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 1,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:be77e14a9094af2f521258e2bff1f5d777249bc50ce8eb0574a85bea9bd79e7f",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-session-start.sh",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 2,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:91587043033e7831d4d154fdef2e495f3113c3552a4529d8013f5546ffb2c140",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-prompt-submit.sh",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 3,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:2480a7db650a36e05d8005aabca58b9d106f3b7a46f7094d7747d0d77773f75c",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                      "eventName": "stop",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-stop.sh",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 4,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:6a3b3af655efa426e920425de93a830fe25b8b5a62ef7b9a699e7ff40d9ef351",
+                      "trustStatus": "untrusted"
+                    }
+                  ],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "hooks": {
+        "data": [
+          {
+            "cwd": "<isolated-root>",
+            "hooks": [
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                "eventName": "permissionRequest",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-permission-request.sh",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 0,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:a5f8b0ebc36bb459328ffeb5f62ff146dfb74e3d88d4c369cf0280f7b354e388",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                "eventName": "postToolUse",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-post-tool-use.sh",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 1,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:be77e14a9094af2f521258e2bff1f5d777249bc50ce8eb0574a85bea9bd79e7f",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                "eventName": "sessionStart",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-session-start.sh",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 2,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:91587043033e7831d4d154fdef2e495f3113c3552a4529d8013f5546ffb2c140",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-prompt-submit.sh",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 3,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:2480a7db650a36e05d8005aabca58b9d106f3b7a46f7094d7747d0d77773f75c",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                "eventName": "stop",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-stop.sh",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 4,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:6a3b3af655efa426e920425de93a830fe25b8b5a62ef7b9a699e7ff40d9ef351",
+                "trustStatus": "untrusted"
+              }
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      }
+    },
+    {
+      "stage": "new_process_after_product_migration",
+      "events": [
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_cache_refresh_probe/0.147.0 (Mac OS 27.0.0; arm64) unknown (infinishell_cache_refresh_probe; 0.1.0)",
+              "codexHome": "<isolated-root>/codex",
+              "platformFamily": "unix",
+              "platformOs": "macos"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "MacBookPro16",
+              "installationId": "ada7690d-76be-4d7e-936c-51a285b72295",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789557788979
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 3,
+            "result": {
+              "data": [
+                {
+                  "cwd": "<isolated-root>",
+                  "hooks": [
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                      "eventName": "permissionRequest",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-permission-request.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 0,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:60f3f1de21f20eb4f54007342338e7000b9dca06a111e776a37dcd62fdd7b215",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                      "eventName": "postToolUse",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-post-tool-use.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 1,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:4ff952d5bac454272cc8d3eec507954c8bab421066aaa2e60026e09920d20ed6",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-session-start.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 2,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:4524bbc6e5a9e4b2528f06432e7aa9829b42d7e7aa24d66b0c30aada912baf34",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-prompt-submit.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 3,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:122190ef9554a17967255480c31b7beb36e69e08353840c7ef947c145186ad91",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                      "eventName": "stop",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-stop.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 4,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:e206bdb01c8e380c7b5a4fa4ee1473c1f20338b9762bcfe0d0832ac7f99eb46c",
+                      "trustStatus": "untrusted"
+                    }
+                  ],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "hooks": {
+        "data": [
+          {
+            "cwd": "<isolated-root>",
+            "hooks": [
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                "eventName": "permissionRequest",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-permission-request.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 0,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:60f3f1de21f20eb4f54007342338e7000b9dca06a111e776a37dcd62fdd7b215",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                "eventName": "postToolUse",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-post-tool-use.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 1,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:4ff952d5bac454272cc8d3eec507954c8bab421066aaa2e60026e09920d20ed6",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                "eventName": "sessionStart",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-session-start.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 2,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:4524bbc6e5a9e4b2528f06432e7aa9829b42d7e7aa24d66b0c30aada912baf34",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-prompt-submit.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 3,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:122190ef9554a17967255480c31b7beb36e69e08353840c7ef947c145186ad91",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                "eventName": "stop",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-stop.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "<isolated-root>/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 4,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:e206bdb01c8e380c7b5a4fa4ee1473c1f20338b9762bcfe0d0832ac7f99eb46c",
+                "trustStatus": "untrusted"
+              }
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      }
+    },
+    {
+      "stage": "disable_target_before_product_update",
+      "events": [
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_cache_refresh_probe/0.147.0 (Mac OS 27.0.0; arm64) unknown (infinishell_cache_refresh_probe; 0.1.0)",
+              "codexHome": "<isolated-root>/codex",
+              "platformFamily": "unix",
+              "platformOs": "macos"
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "MacBookPro16",
+              "installationId": "ada7690d-76be-4d7e-936c-51a285b72295",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789557789023
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 2,
+            "result": {
+              "status": "ok",
+              "version": "sha256:f0e8bdb38074dbd5e54c663120303c6b518dfd280fa6290679947054ddb191af",
+              "filePath": "<isolated-root>/codex/config.toml",
+              "overriddenMetadata": null
+            }
+          }
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 3,
+            "result": {
+              "data": [
+                {
+                  "cwd": "<isolated-root>",
+                  "hooks": [],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "hooks": {
+        "data": [
+          {
+            "cwd": "<isolated-root>",
+            "hooks": [],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      }
+    }
+  ],
+  "passed": true,
+  "product_python_helper": true,
+  "product_rust_gui_verified": false,
+  "thread_or_turn_created": false,
+  "checks": {
+    "canonical_git_to_owned_source": true,
+    "original_git_snapshot_preserved": true,
+    "orchestration_cache_and_disabled_kept": true,
+    "user_trust_preserved": true,
+    "new_native_process_keeps_patch": true,
+    "product_disabled_update_refused_without_change": true
+  },
+  "scope": "<isolated-root>"
+}

@@ -59,6 +59,92 @@ jobs:
           cmake --version
           protoc --version
 
+      # 复用 prepare_environment 中固定的 Node 引导，实际运行测试而非依赖 runner 的旧版本。
+      - name: Install Node for CLI plugin verification
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 20.9.0
+
+      - name: Test Grok notification plugin scripts
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          node --version
+          node -e "if (Number(process.versions.node.split('.')[0]) < 18) throw new Error('Node 18+ is required');"
+          node --test script/cli-agent-parity/grok_plugin_tests.cjs
+
+      - name: Test notification patch file transactions
+        shell: bash
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          set -euo pipefail
+          command -v python3
+          python3 -c "import sys; assert sys.version_info >= (3, 11), 'Python 3.11+ is required'; print(sys.version)"
+          python3 script/cli-agent-parity/notification_patch_tests.py -v
+          python3 -B script/cli-agent-parity/codex_persistent_source_tests.py -v
+          python3 script/cli-agent-parity/codex_adapter_runner_tests.py -v
+          python3 -B script/cli-agent-parity/codex_windows_hook_tests.py -v
+          python3 -B script/cli-agent-parity/codex_plugin_lifecycle_tests.py -v
+          python3 -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
+          python3 -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
+          python3 -B script/cli-agent-parity/probe_claude_no_credentials_tests.py -v
+
+      - name: Prepare fixed native Codex without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          codex_executable="$(python3 -B script/cli-agent-parity/prepare_codex_cli.py --download-dir "$RUNNER_TEMP/codex-0147-inputs")"
+          printf 'INFINISHELL_TEST_CODEX_EXE=%s\n' "$codex_executable" >> "$GITHUB_ENV"
+
+      - name: Prepare fixed native Claude without credentials
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          claude_executable="$(python3 -B script/cli-agent-parity/prepare_claude_cli.py --download-dir "$RUNNER_TEMP/claude-21273-inputs")"
+          printf 'INFINISHELL_TEST_CLAUDE_EXE=%s\n' "$claude_executable" >> "$GITHUB_ENV"
+
+      - name: Verify native Claude initialization and idle EOF
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python3 -B script/cli-agent-parity/probe_claude_no_credentials.py --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-initialize-idle-eof.json"
+
+      - name: Verify native Codex plugin registry failure recovery
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python3 -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-lifecycle.json"
+
+      - name: Verify native Codex persistent plugin source
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          python3 -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-cache-refresh.json"
+
+      - name: Test Claude and Codex Bash notification payloads
+        shell: bash
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          set -euo pipefail
+          command -v bash
+          command -v jq
+          bash --version
+          jq --version
+          python3 script/cli-agent-parity/plugin_compatibility_tests.py -v
+
+      - name: Test Unix PTY notification framing
+        shell: bash
+        run: python3 script/cli-agent-parity/tmux_notification_tests.py
+
       - name: Check InfiniShell-Desktop
         shell: bash
         run: cargo check -p warp --lib
@@ -67,7 +153,66 @@ jobs:
         shell: bash
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::request_file_edits::tests::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::action_model::execute::read_skill::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests)'
+          -E 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(terminal::view::use_agent_footer::tests) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)'
+
+      # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
+      - name: Test shared CLI action contracts and skills
+        shell: bash
+        run: >-
+          cargo nextest run --no-fail-fast -p ai --lib
+          -E 'test(agent::action_result::) | test(agent::action::) | test(skills::)'
+
+      - name: Test CLI harness arguments
+        shell: bash
+        run: cargo nextest run --no-fail-fast -p warp_cli --lib
+
+      - name: Test bilingual TUI task message states
+        shell: bash
+        run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
+
+      - name: Test managed command process ownership
+        shell: bash
+        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::)'
+
+      # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
+      - name: Build CLI process supervisor
+        shell: bash
+        env:
+          CARGO_BUILD_JOBS: "2"
+        run: cargo build -p warp_tui --bin infinishell-tui
+
+      - name: Test supervisor cleanup after host crash
+        shell: bash
+        run: |
+          set -euo pipefail
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          export INFINISHELL_CLI_SUPERVISOR_EXECUTABLE="$target_dir/debug/infinishell-tui"
+          cargo nextest run --no-fail-fast -p warp --lib --run-ignored only -E 'test(managed_process::live_tests::supervised_)'
+
+      - name: Verify native recovery and idle-crash boundaries without credentials
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          test_binary="$(cargo test -p warp --lib --no-run --message-format=json | python3 -c 'import json,sys; items=[json.loads(line) for line in sys.stdin]; paths=[item["executable"] for item in items if item.get("reason")=="compiler-artifact" and item.get("target",{}).get("name")=="warp" and item.get("profile",{}).get("test") and item.get("executable")]; assert len(paths)==1, paths; print(paths[0])')"
+          python3 -B script/cli-agent-parity/run_codex_adapter_live.py --test-case missing-session --test-binary "$test_binary" --codex "$INFINISHELL_TEST_CODEX_EXE" --supervisor "$target_dir/debug/infinishell-tui" --output "$RUNNER_TEMP/codex-missing-session.ndjson"
+          python3 -B script/cli-agent-parity/run_codex_adapter_live.py --test-case idle-crash --test-binary "$test_binary" --codex "$INFINISHELL_TEST_CODEX_EXE" --supervisor "$target_dir/debug/infinishell-tui" --output "$RUNNER_TEMP/codex-idle-crash.ndjson"
+
+      - name: Preserve Linux native CLI boundary evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-linux-native-boundaries-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/codex-plugin-lifecycle.json
+            ${{ runner.temp }}/codex-plugin-cache-refresh.json
+            ${{ runner.temp }}/codex-missing-session.*
+            ${{ runner.temp }}/codex-idle-crash.*
+            ${{ runner.temp }}/claude-initialize-idle-eof.json
+            ${{ runner.temp }}/claude-21273-inputs/claude-fixed-inputs.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Test rust-genai
         shell: bash
@@ -81,7 +226,7 @@ jobs:
       - name: Run desktop workspace unit tests
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
         shell: bash
-        # warp_tui 仍依赖已移除的 Warp 云 API，也不属于桌面版发布产物。
+        # 全量桌面测试不包含 TUI；本次变动的 TUI 消息状态已由上方定向步骤覆盖。
         # integration 需要专用图形会话，此处完成跨平台编译后交由 GUI 测试流程执行。
         run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
 
@@ -137,6 +282,97 @@ jobs:
           & $env:RUSTC_WRAPPER --version
           & $env:RUSTC_WRAPPER --zero-stats
 
+      # 与仓库共用构建引导使用同一固定 Node 版本；缺依赖必须失败，不能跳过校验。
+      - name: Install Node for CLI plugin verification
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 20.9.0
+
+      - name: Test Grok notification plugin scripts
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $ErrorActionPreference = 'Stop'
+          node --version
+          if ($LASTEXITCODE -ne 0) { throw 'Node version probe failed' }
+          node -e "if (Number(process.versions.node.split('.')[0]) < 18) throw new Error('Node 18+ is required');"
+          if ($LASTEXITCODE -ne 0) { throw 'Node test runtime is unavailable' }
+          node --test script/cli-agent-parity/grok_plugin_tests.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Grok notification script tests failed' }
+
+      - name: Test notification patch file transactions
+        shell: pwsh
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+            throw 'Native Python 3.11+ is required; notification file transactions were not verified'
+          }
+          python -c "import os, sys; assert os.name == 'nt', 'Native Windows Python is required'; assert sys.version_info >= (3, 11), 'Python 3.11+ is required'; print(sys.version)"
+          if ($LASTEXITCODE -ne 0) { throw 'Native Python version probe failed' }
+          python script/cli-agent-parity/notification_patch_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Windows notification file transaction tests failed' }
+          python -B script/cli-agent-parity/codex_persistent_source_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Persistent Codex source transaction tests failed' }
+          python script/cli-agent-parity/codex_adapter_runner_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'CLI acceptance evidence validation failed' }
+          python -B script/cli-agent-parity/codex_windows_hook_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Windows hook command and fixed-input validation failed' }
+          python -B script/cli-agent-parity/codex_plugin_lifecycle_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Native plugin lifecycle evidence validation failed' }
+          python -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed CLI extraction validation failed' }
+          python -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed Claude preparation validation failed' }
+          python -B script/cli-agent-parity/probe_claude_no_credentials_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Claude initialize and idle EOF evidence validation failed' }
+
+      - name: Prepare fixed native Codex without credentials
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $codexExecutable = python -B script/cli-agent-parity/prepare_codex_cli.py --download-dir "$env:RUNNER_TEMP\codex-0147-hook-inputs"
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed native Codex preparation failed' }
+          "INFINISHELL_TEST_CODEX_EXE=$codexExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Prepare fixed native Claude without credentials
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $claudeExecutable = python -B script/cli-agent-parity/prepare_claude_cli.py --download-dir "$env:RUNNER_TEMP\claude-21273-inputs"
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed native Claude preparation failed' }
+          "INFINISHELL_TEST_CLAUDE_EXE=$claudeExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Verify native Claude initialization and idle EOF
+        shell: pwsh
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -B script/cli-agent-parity/probe_claude_no_credentials.py --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output "$env:RUNNER_TEMP\claude-initialize-idle-eof.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Native Claude initialize and idle EOF validation failed' }
+
+      - name: Verify native Codex plugin registry failure recovery
+        shell: pwsh
+        timeout-minutes: 5
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-executable "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-plugin-lifecycle.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Native Codex plugin registry failure recovery failed' }
+
+      - name: Verify native Codex persistent plugin source
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-executable "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-plugin-cache-refresh.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Native Codex persistent plugin source validation failed' }
+
       - name: Check InfiniShell-Desktop
         shell: pwsh
         run: cargo check -p warp --lib
@@ -155,7 +391,85 @@ jobs:
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::request_file_edits::tests::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::action_model::execute::read_skill::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests)'
+          -E 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(terminal::view::use_agent_footer::tests) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)'
+
+      # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
+      - name: Test shared CLI action contracts and skills
+        shell: pwsh
+        run: >-
+          cargo nextest run --no-fail-fast -p ai --lib
+          -E 'test(agent::action_result::) | test(agent::action::) | test(skills::)'
+
+      - name: Test CLI harness arguments
+        shell: pwsh
+        run: cargo nextest run --no-fail-fast -p warp_cli --lib
+
+      - name: Test bilingual TUI task message states
+        shell: pwsh
+        run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
+
+      - name: Test managed command process ownership
+        shell: pwsh
+        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::)'
+
+      # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
+      - name: Build CLI process supervisor
+        shell: pwsh
+        env:
+          CARGO_BUILD_JOBS: "2"
+        run: cargo build -p warp_tui --bin infinishell-tui
+
+      - name: Test supervisor cleanup after host crash
+        shell: pwsh
+        run: |
+          $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:INFINISHELL_CLI_SUPERVISOR_EXECUTABLE = Join-Path $metadata.target_directory 'debug/infinishell-tui.exe'
+          cargo nextest run --no-fail-fast -p warp --lib --run-ignored only -E 'test(managed_process::live_tests::supervised_)'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify native recovery and idle-crash boundaries without credentials
+        shell: pwsh
+        timeout-minutes: 15
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cargo metadata failed' }
+          $buildMessages = cargo test -p warp --lib --no-run --message-format=json
+          if ($LASTEXITCODE -ne 0) { throw 'Same-commit warp test build failed' }
+          $executables = @($buildMessages | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.target.name -eq 'warp' -and $_.profile.test -and $_.executable } | ForEach-Object { $_.executable })
+          if ($executables.Count -ne 1) { throw 'Expected exactly one warp libtest executable' }
+          $worker = Join-Path $metadata.target_directory 'debug/infinishell-tui.exe'
+          python -B script/cli-agent-parity/run_codex_adapter_live.py --test-case missing-session --test-binary $executables[0] --codex "$env:INFINISHELL_TEST_CODEX_EXE" --supervisor $worker --output "$env:RUNNER_TEMP\codex-missing-session.ndjson"
+          if ($LASTEXITCODE -ne 0) { throw 'Native missing-session recovery validation failed' }
+          python -B script/cli-agent-parity/run_codex_adapter_live.py --test-case idle-crash --test-binary $executables[0] --codex "$env:INFINISHELL_TEST_CODEX_EXE" --supervisor $worker --output "$env:RUNNER_TEMP\codex-idle-crash.ndjson"
+          if ($LASTEXITCODE -ne 0) { throw 'Native idle-crash boundary validation failed' }
+          # 实际穿过 Rust 启动器、cmd 包装及同提交监督 worker，不能只检验字符串转义。
+          $shimDirectory = Join-Path $env:RUNNER_TEMP ('codex shim 中文 & path-' + [Guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $shimDirectory | Out-Null
+          Copy-Item -LiteralPath $env:INFINISHELL_TEST_CODEX_EXE -Destination (Join-Path $shimDirectory 'codex-native.exe')
+          $shim = Join-Path $shimDirectory 'codex.cmd'
+          $shimContents = '@echo off' + "`r`n" + '"%~dp0codex-native.exe" %*' + "`r`n" + 'exit /b %errorlevel%' + "`r`n"
+          [System.IO.File]::WriteAllText($shim, $shimContents, [System.Text.Encoding]::ASCII)
+          python -B script/cli-agent-parity/run_codex_adapter_live.py --test-case missing-session --test-binary $executables[0] --codex $shim --supervisor $worker --output "$env:RUNNER_TEMP\codex-missing-session-cmd.ndjson"
+          if ($LASTEXITCODE -ne 0) { throw 'Native cmd shim missing-session recovery validation failed' }
+
+      - name: Preserve Windows native CLI boundary evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-windows-native-boundaries-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/codex-plugin-lifecycle.json
+            ${{ runner.temp }}/codex-plugin-cache-refresh.json
+            ${{ runner.temp }}/codex-missing-session*
+            ${{ runner.temp }}/codex-idle-crash.*
+            ${{ runner.temp }}/claude-initialize-idle-eof.json
+            ${{ runner.temp }}/claude-21273-inputs/claude-fixed-inputs.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Test rust-genai
         shell: pwsh
@@ -169,10 +483,72 @@ jobs:
       - name: Run desktop workspace unit tests
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
         shell: pwsh
-        # warp_tui 仍依赖已移除的 Warp 云 API，也不属于桌面版发布产物。
+        # 全量桌面测试不包含 TUI；本次变动的 TUI 消息状态已由上方定向步骤覆盖。
         # integration 需要专用图形会话，此处完成跨平台编译后交由 GUI 测试流程执行。
         # nextest 配置仅串行 Windows 的 warp 主应用测试，其他 crate 仍可并行执行。
         run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
+
+      # 单独验证 Git Bash/jq，不将原生文件事务通过冒充 Windows hooks 已通过。
+      # 即使前面的独立门禁失败，也保留这项验证的真实结果。
+      - name: Test Windows Git Bash notification payloads
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gitBashCandidates = @(
+            "$env:PROGRAMFILES\Git\bin\bash.exe",
+            "$env:LOCALAPPDATA\Programs\Git\bin\bash.exe"
+          )
+          $gitBash = $gitBashCandidates | Where-Object { Test-Path -PathType Leaf $_ } | Select-Object -First 1
+          if (-not $gitBash) {
+            throw 'Windows payloads were not verified: Git for Windows bash.exe is missing'
+          }
+          $env:PATH = "$(Split-Path -Parent $gitBash);$env:PATH"
+          $resolvedBash = (Get-Command bash.exe -ErrorAction Stop).Source
+          if ($resolvedBash -ne $gitBash) { throw 'The Bash resolved by payload tests does not match Git for Windows' }
+          Write-Output "Verified Git Bash path: $gitBash"
+          & $gitBash --version
+          if ($LASTEXITCODE -ne 0) { throw 'Git Bash version probe failed' }
+          & $gitBash --noprofile --norc -c 'case "$(uname -s)" in MINGW*|MSYS*) ;; *) exit 1 ;; esac; command -v jq >/dev/null && jq --version'
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Windows payloads were not verified: native Git Bash or jq is unavailable'
+          }
+          python -c "import os, sys; assert os.name == 'nt' and sys.version_info >= (3, 11), 'Native Windows Python 3.11+ is required'"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows payload Python preflight failed' }
+          python script/cli-agent-parity/plugin_compatibility_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Git Bash notification payload tests failed; hooks remain unverified' }
+
+      # 原生候选只在临时目录加载，必须在模型调用前由真实 hook 阻断，不开启产品安装门禁。
+      - name: Verify Codex Windows native hooks without model requests
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        timeout-minutes: 20
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gitBashCandidates = @(
+            "$env:PROGRAMFILES\Git\usr\bin\bash.exe",
+            "$env:LOCALAPPDATA\Programs\Git\usr\bin\bash.exe"
+          )
+          $gitBash = $gitBashCandidates | Where-Object { Test-Path -PathType Leaf $_ } | Select-Object -First 1
+          if (-not $gitBash) { throw 'Native Git Bash with msys-2.0.dll is required for Codex hooks' }
+          $env:INFINISHELL_GIT_BASH_EXE = (Resolve-Path $gitBash).Path
+          $env:INFINISHELL_JQ_EXE = (Get-Command jq.exe -ErrorAction Stop).Source
+          python -B "$env:GITHUB_WORKSPACE\script\cli-agent-parity\probe_codex_windows_hooks.py" --repo "$env:GITHUB_WORKSPACE" --architecture x86_64 --download-dir "$env:RUNNER_TEMP\codex-0147-hook-inputs" --bash-executable "$env:INFINISHELL_GIT_BASH_EXE" --jq-executable "$env:INFINISHELL_JQ_EXE" --output "$env:RUNNER_TEMP\codex-windows-native-hooks.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Codex native Windows hook verification failed; compatibility remains unverified' }
+
+      - name: Preserve Codex Windows native hook evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codex-windows-native-hooks-${{ github.sha }}
+          path: ${{ runner.temp }}/codex-windows-native-hooks.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Report sccache statistics
         if: ${{ always() }}

@@ -9,6 +9,8 @@
 #[cfg(not(target_family = "wasm"))]
 pub mod r#async;
 pub mod blocking;
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+pub mod managed;
 #[cfg(unix)]
 pub mod unix;
 #[cfg(windows)]

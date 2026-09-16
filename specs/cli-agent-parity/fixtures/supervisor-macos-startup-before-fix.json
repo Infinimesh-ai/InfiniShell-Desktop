@@ -1,0 +1,28 @@
+{
+  "platform": "darwin",
+  "test_binary_sha256": "960355ef4115754782cb2ca102c4c494a2f0f0c35f7c9362761ff6ce5f6d2283",
+  "supervisor_sha256": "d5fd86b329100f41665e465c42ba0917b2f92b804770fca595976c9bd3442263",
+  "models_requested": false,
+  "cases": [
+    {
+      "case": "host_handshake",
+      "ready": false,
+      "exit_code": 101,
+      "stdout": "\nrunning 1 test\ntest ai::cli_agent_runtime::managed_process::live_tests::fixture_host ... FAILED\n\nfailures:\n\nfailures:\n    ai::cli_agent_runtime::managed_process::live_tests::fixture_host\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6354 filtered out; finished in 0.21s\n\n",
+      "stderr": "\nthread 'ai::cli_agent_runtime::managed_process::live_tests::fixture_host' (1644002) panicked at app/src/ai/cli_agent_runtime/managed_process_live_tests.rs:200:6:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 35, kind: WouldBlock, message: \"Resource temporarily unavailable\" }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+      "receipt": null,
+      "passed": false
+    },
+    {
+      "case": "blocking_control_idle_exit",
+      "ready": true,
+      "readiness_delay_sec": 0.088,
+      "exit_code": 1,
+      "stdout_bytes": 0,
+      "stderr": "Error: Operation not permitted (os error 1)\n",
+      "receipt": null,
+      "passed": false
+    }
+  ],
+  "passed": false
+}

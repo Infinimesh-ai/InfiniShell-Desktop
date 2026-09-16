@@ -10,6 +10,7 @@ pub(super) mod read_mcp_resource;
 pub(super) mod read_skill;
 pub(super) mod request_file_edits;
 pub(super) mod run_agents;
+pub(super) mod send_message_to_agent;
 pub(super) mod shell_command;
 pub(super) mod start_agent;
 pub(super) mod suggest_new_conversation;
@@ -486,6 +487,7 @@ impl BlocklistAIActionExecutor {
             AIAgentActionType::AskUserQuestion { .. } => self
                 .ask_user_question_executor
                 .update(ctx, |executor, ctx| executor.preprocess_action(input, ctx)),
+            AIAgentActionType::SendMessageToAgent { .. } => futures::future::ready(()).boxed(),
             AIAgentActionType::RunAgents(_) => self
                 .run_agents_executor
                 .update(ctx, |executor, ctx| executor.preprocess_action(input, ctx)),
@@ -661,6 +663,9 @@ impl BlocklistAIActionExecutor {
                 .ask_user_question_executor
                 .update(ctx, |executor, ctx| executor.execute(input, ctx))
                 .into(),
+            AIAgentActionType::SendMessageToAgent { .. } => {
+                send_message_to_agent::execute(input, ctx).into()
+            }
             AIAgentActionType::RunAgents(_) => self
                 .run_agents_executor
                 .update(ctx, |executor, ctx| executor.execute(input, ctx))
@@ -897,6 +902,7 @@ impl BlocklistAIActionExecutor {
             AIAgentActionType::AskUserQuestion { .. } => self
                 .ask_user_question_executor
                 .update(ctx, |executor, ctx| executor.should_autoexecute(input, ctx)),
+            AIAgentActionType::SendMessageToAgent { .. } => true,
             AIAgentActionType::RunAgents(_) => self
                 .run_agents_executor
                 .update(ctx, |executor, ctx| executor.should_autoexecute(input, ctx)),

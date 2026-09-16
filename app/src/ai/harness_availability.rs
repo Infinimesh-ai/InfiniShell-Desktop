@@ -34,6 +34,7 @@ const KNOWN_HARNESSES: &[Harness] = &[
     Harness::Oz,
     Harness::Claude,
     Harness::Codex,
+    Harness::Grok,
     Harness::Gemini,
     Harness::OpenCode,
 ];
@@ -62,6 +63,7 @@ fn local_cli_command_for(harness: Harness) -> Option<&'static str> {
         Harness::Oz => None,
         Harness::Claude => Some("claude"),
         Harness::Codex => Some("codex"),
+        Harness::Grok => Some("grok"),
         Harness::Gemini => Some("gemini"),
         Harness::OpenCode => Some("opencode"),
         Harness::Unknown => None,

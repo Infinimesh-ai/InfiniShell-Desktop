@@ -1277,9 +1277,27 @@ pub(crate) fn convert_tool_call_result_to_input(
                 context,
             })
         }
-        Some(ToolCallResultType::SendMessageToAgent(_)) => {
-            // 云端工具已物理切除
-            None
+        Some(ToolCallResultType::SendMessageToAgent(result)) => {
+            use ai::agent::action_result::SendMessageToAgentResult;
+            let result = match &result.result {
+                Some(api::send_message_to_agent_result::Result::Success(success)) => {
+                    SendMessageToAgentResult::Acknowledged {
+                        message_id: success.message_id.clone(),
+                    }
+                }
+                Some(api::send_message_to_agent_result::Result::Error(error)) => {
+                    SendMessageToAgentResult::Error(error.message.clone())
+                }
+                None => SendMessageToAgentResult::Cancelled,
+            };
+            Some(AIAgentInput::ActionResult {
+                result: AIAgentActionResult {
+                    id: tool_call_id.into(),
+                    task_id: task_id.clone(),
+                    result: AIAgentActionResultType::SendMessageToAgent(result),
+                },
+                context,
+            })
         }
         Some(ToolCallResultType::RunAgentsResult(result)) => {
             use ai::agent::action_result::{
@@ -1452,7 +1470,9 @@ fn create_cancelled_result_for_tool_call(
         ToolType::AskUserQuestion(_) => {
             AIAgentActionResultType::AskUserQuestion(AskUserQuestionResult::Cancelled)
         }
-        ToolType::SendMessageToAgent(_) => return None,
+        ToolType::SendMessageToAgent(_) => AIAgentActionResultType::SendMessageToAgent(
+            ai::agent::action_result::SendMessageToAgentResult::Cancelled,
+        ),
         // These tools are deprecated.
         ToolType::SuggestCreatePlan(_) | ToolType::SuggestPlan(_) => return None,
         ToolType::WaitForEvents(_) => {

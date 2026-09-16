@@ -172,6 +172,11 @@ use crate::ai::blocklist::{
     BlocklistAIHistoryEvent, FORK_PREFIX, PendingAttachment, PendingQueryState, QueuedQueryOrigin,
     SerializedBlockListItem, SlashCommandRequest,
 };
+// InfiniShell:`ClientProfileId` 是上游云端 profile 同步引入的类型,我方无此类型且此处未使用。
+#[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+use crate::ai::cli_agent_runtime::task_manager_view::{
+    LocalCLITaskManagerEvent, LocalCLITaskManagerView,
+};
 #[cfg(target_family = "wasm")]
 use crate::ai::conversation_details_panel::ConversationDetailsPanel;
 use crate::ai::conversation_navigation::ConversationNavigationData;
@@ -179,7 +184,6 @@ use crate::ai::conversation_utils;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentModel};
 use crate::ai::execution_profiles::ExecutionProfileId;
 use crate::ai::execution_profiles::editor::ExecutionProfileEditorManager;
-// InfiniShell:`ClientProfileId` 是上游云端 profile 同步引入的类型,我方无此类型且此处未使用。
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::facts::view::AIFactPage;
 use crate::ai::facts::{AIFactManager, AIFactView, AIFactViewEvent};
@@ -969,6 +973,8 @@ pub struct Workspace {
     pending_session_config_tab_config_chip_tutorial:
         Option<PendingSessionConfigTabConfigChipTutorial>,
     new_worktree_modal: ModalViewState<Modal<NewWorktreeModal>>,
+    #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+    local_cli_task_manager: Option<ModalViewState<Modal<LocalCLITaskManagerView>>>,
     close_session_confirmation_dialog: ViewHandle<CloseSessionConfirmationDialog>,
     rewind_confirmation_dialog: ViewHandle<RewindConfirmationDialog>,
     delete_conversation_confirmation_dialog: ViewHandle<DeleteConversationConfirmationDialog>,
@@ -2004,6 +2010,58 @@ impl Workspace {
             me.handle_new_worktree_modal_event(event, ctx);
         });
         ModalViewState::new(modal)
+    }
+
+    #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+    fn build_local_cli_task_manager(
+        ctx: &mut ViewContext<Self>,
+    ) -> ModalViewState<Modal<LocalCLITaskManagerView>> {
+        let body = ctx.add_typed_action_view(LocalCLITaskManagerView::new);
+        ctx.subscribe_to_view(&body, |workspace, manager, event, ctx| match event {
+            LocalCLITaskManagerEvent::Close => workspace.close_local_cli_task_manager(ctx),
+            LocalCLITaskManagerEvent::ImportReview {
+                draft_key,
+                input_generation,
+            } => {
+                let result = workspace
+                    .right_panel_view
+                    .as_ref(ctx)
+                    .local_cli_review_prompt(ctx)
+                    .and_then(|text| {
+                        manager.update(ctx, |view, ctx| {
+                            view.append_context(draft_key, *input_generation, text, ctx)
+                        })
+                    });
+                if let Err(error) = result {
+                    manager.update(ctx, |view, ctx| view.show_input_error(error, ctx));
+                }
+            }
+        });
+        let modal = ctx.add_typed_action_view(|ctx| {
+            Modal::new(Some(crate::t!("cli-agent-task-manager-title")), body, ctx)
+                .with_max_height_percentage(0.9)
+                .with_modal_style(UiComponentStyles {
+                    width: Some(760.),
+                    ..Default::default()
+                })
+                .with_body_style(UiComponentStyles {
+                    height: Some(580.),
+                    ..Default::default()
+                })
+        });
+        ctx.subscribe_to_view(&modal, |workspace, _, event, ctx| match event {
+            ModalEvent::Close => workspace.close_local_cli_task_manager(ctx),
+        });
+        ModalViewState::new(modal)
+    }
+
+    #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+    fn close_local_cli_task_manager(&mut self, ctx: &mut ViewContext<Self>) {
+        if let Some(modal) = &mut self.local_cli_task_manager {
+            modal.close();
+        }
+        self.focus_active_tab(ctx);
+        ctx.notify();
     }
 
     fn build_remove_tab_config_confirmation_dialog(
@@ -3213,6 +3271,8 @@ impl Workspace {
             show_session_config_tab_config_chip: false,
             pending_session_config_tab_config_chip_tutorial: None,
             new_worktree_modal,
+            #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+            local_cli_task_manager: None,
             close_session_confirmation_dialog,
             rewind_confirmation_dialog,
             delete_conversation_confirmation_dialog,
@@ -18379,11 +18439,6 @@ impl Workspace {
             return;
         };
 
-        let instructions = match kind {
-            PluginModalKind::Install => manager.install_instructions(),
-            PluginModalKind::Update => manager.update_instructions(),
-        };
-
         // Read session metadata from the originating terminal before creating the instructions pane.
         let active_view = self
             .active_tab_pane_group()
@@ -18394,6 +18449,18 @@ impl Workspace {
             .as_ref()
             .and_then(|view| view.as_ref(ctx).active_session_is_local(ctx))
             .is_some_and(|is_local| !is_local);
+
+        let instructions = match kind {
+            PluginModalKind::Install if is_remote_session => manager.remote_install_instructions(),
+            PluginModalKind::Install => manager.install_instructions(),
+            PluginModalKind::Update => manager.update_instructions(),
+            PluginModalKind::NativeAuthorization => {
+                let Some(instructions) = manager.native_authorization_instructions() else {
+                    return;
+                };
+                instructions
+            }
+        };
 
         let custom_command_prefix = active_view.and_then(|view| {
             CLIAgentSessionsModel::as_ref(ctx)
@@ -22998,6 +23065,26 @@ impl TypedActionView for Workspace {
                 self.close_new_session_dropdown_menu(ctx);
                 ctx.notify();
             }
+            #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+            OpenLocalCLITaskManager => {
+                if FeatureFlag::LocalCLIManagedTasks.is_enabled() {
+                    if self.local_cli_task_manager.is_none() {
+                        self.local_cli_task_manager = Some(Self::build_local_cli_task_manager(ctx));
+                    }
+                    let cwd = self
+                        .active_session_view(ctx)
+                        .and_then(|view| view.as_ref(ctx).pwd())
+                        .map(PathBuf::from);
+                    if let Some(modal) = &mut self.local_cli_task_manager {
+                        modal.view.update(ctx, |modal, ctx| {
+                            modal.body().update(ctx, |body, ctx| body.on_open(cwd, ctx));
+                        });
+                        modal.open();
+                        ctx.focus(&modal.view);
+                    }
+                    ctx.notify();
+                }
+            }
             OpenNewWorktreeRepoPicker => {
                 self.open_repo_picker_for_new_worktree_modal(ctx);
             }
@@ -25792,6 +25879,12 @@ impl View for Workspace {
 
         if self.new_worktree_modal.is_open() {
             stack.add_child(self.new_worktree_modal.render());
+        }
+        #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+        if let Some(modal) = &self.local_cli_task_manager
+            && modal.is_open()
+        {
+            stack.add_child(modal.render());
         }
 
         if self.workflow_modal.as_ref(app).is_open() {

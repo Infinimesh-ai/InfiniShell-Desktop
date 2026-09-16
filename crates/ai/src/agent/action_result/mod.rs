@@ -80,6 +80,9 @@ pub enum AIAgentActionResultType {
     /// outcomes), launch denied (Stage 2), failure, or cancelled.
     RunAgents(RunAgentsResult),
 
+    /// 只有接收方的原生协议确认后才能成功。
+    SendMessageToAgent(SendMessageToAgentResult),
+
     /// Result of the client-side wait_for_events watchdog or inbound
     /// resume.
     WaitForEvents(WaitForEventsResult),
@@ -146,6 +149,7 @@ impl Display for AIAgentActionResultType {
             AIAgentActionResultType::InsertReviewComments(result) => result.fmt(f),
             AIAgentActionResultType::TransferShellCommandControlToUser(result) => result.fmt(f),
             AIAgentActionResultType::AskUserQuestion(result) => result.fmt(f),
+            AIAgentActionResultType::SendMessageToAgent(result) => result.fmt(f),
             AIAgentActionResultType::RunAgents(result) => result.fmt(f),
             AIAgentActionResultType::WaitForEvents(result) => result.fmt(f),
             AIAgentActionResultType::OpenCodeReview | AIAgentActionResultType::InitProject => {
@@ -682,6 +686,7 @@ impl AIAgentActionResultType {
             AIAgentActionResultType::AskUserQuestion(_) => {
                 "The user's answers to clarifying questions"
             }
+            AIAgentActionResultType::SendMessageToAgent(_) => "The local task message receipt",
             AIAgentActionResultType::RunAgents(_) => {
                 "The result of an orchestrate batch of child agents"
             }
@@ -717,6 +722,7 @@ impl AIAgentActionResultType {
                 TransferShellCommandControlToUserResult::Snapshot { .. }
                 | TransferShellCommandControlToUserResult::CommandFinished { .. },
             ) => true,
+            Self::SendMessageToAgent(SendMessageToAgentResult::Acknowledged { .. }) => true,
             Self::AskUserQuestion(AskUserQuestionResult::Success { .. }) => true,
             Self::RunAgents(RunAgentsResult::Launched { agents, .. }) => agents
                 .iter()
@@ -747,6 +753,7 @@ impl AIAgentActionResultType {
             | Self::RunAgents(RunAgentsResult::Failure { .. } | RunAgentsResult::Denied { .. }) => {
                 true
             }
+            Self::SendMessageToAgent(SendMessageToAgentResult::Error(_)) => true,
             Self::RunAgents(RunAgentsResult::Launched { agents, .. }) => agents
                 .iter()
                 .all(|agent| matches!(agent.kind, RunAgentsAgentOutcomeKind::Failed { .. })),
@@ -785,6 +792,7 @@ impl AIAgentActionResultType {
             | Self::ReadSkill(ReadSkillResult::Cancelled)
             // SkippedByAutoApprove is intentionally excluded: the agent should continue.
             | Self::AskUserQuestion(AskUserQuestionResult::Cancelled)
+            | Self::SendMessageToAgent(SendMessageToAgentResult::Cancelled)
             | Self::RunAgents(RunAgentsResult::Cancelled)
             | Self::WaitForEvents(WaitForEventsResult::Cancelled) => true,
             _ => false,
@@ -1249,6 +1257,29 @@ impl Display for WaitForEventsResult {
         match self {
             Self::Completed => write!(f, "Wait for events completed"),
             Self::Cancelled => write!(f, "Wait for events cancelled"),
+        }
+    }
+}
+
+/// 未确认结果不能映射为成功，也不能触发自动重投。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SendMessageToAgentResult {
+    Acknowledged { message_id: String },
+    Unconfirmed { message_id: String },
+    Error(String),
+    Cancelled,
+}
+
+impl Display for SendMessageToAgentResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Acknowledged { message_id } => write!(f, "Message acknowledged: {message_id}"),
+            Self::Unconfirmed { message_id } => write!(
+                f,
+                "Message delivery unconfirmed; do not resend: {message_id}"
+            ),
+            Self::Error(error) => write!(f, "Message failed: {error}"),
+            Self::Cancelled => write!(f, "Message cancelled"),
         }
     }
 }

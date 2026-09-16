@@ -1,5 +1,6 @@
 mod element;
 mod figma_utils;
+mod image_input;
 mod model;
 mod movement;
 mod snapshot;
@@ -23,8 +24,11 @@ use base64::Engine as _;
 use base64::engine::general_purpose;
 use element::CommandXRayMouseStateHandle;
 use figma_utils::is_figma_png;
+use image_input::ImageInputState;
+pub use image_input::{EditorImageInputScope, ProcessedImageAttachments};
 use itertools::{Either, Itertools};
 use mime_guess::from_path;
+pub(crate) use model::EditorBufferRevision;
 use model::{
     Anchor, AnchorBias, Bias, DisplayMap, DrawableSelection, EditorModel, EditorModelEvent, Edits,
     LocalPendingSelection, LocalSelection, MarkedTextState, MovementResult, SelectionMode,
@@ -1128,10 +1132,12 @@ pub enum EditorAction {
     ReadAndProcessImagesAsync {
         num_images_user_attached: usize,
         file_paths: Vec<String>,
+        scope: EditorImageInputScope,
     },
     /// Stores non-image file paths picked via the attach-file button into the pending files state.
     ProcessNonImageFiles {
         file_paths: Vec<String>,
+        scope: EditorImageInputScope,
     },
 }
 
@@ -1951,6 +1957,7 @@ pub struct EditorView {
     drag_drop_path_transformer: Option<PathTransformerFn>,
 
     process_attached_images_future_handle: Option<SpawnedFutureHandle>,
+    image_input: ImageInputState,
 
     is_password: bool,
 
@@ -3289,6 +3296,7 @@ impl EditorView {
             delegate_paste_handling: options.delegate_paste_handling,
             drag_drop_path_transformer: options.drag_drop_path_transformer,
             process_attached_images_future_handle: None,
+            image_input: ImageInputState::default(),
             is_password: options.is_password,
             keymap_context_modifier: options.keymap_context_modifier,
         }
@@ -3313,6 +3321,7 @@ impl EditorView {
     }
 
     pub fn abort_attached_images_future_handle(&mut self, ctx: &mut ViewContext<Self>) {
+        self.invalidate_image_processing();
         if let Some(process_attached_images_future_handle) =
             self.process_attached_images_future_handle.take()
         {
@@ -3830,6 +3839,10 @@ impl EditorView {
     // Returns the buffer characters count (similar to String::Chars::Count).
     pub fn buffer_size(&self, ctx: &AppContext) -> CharOffset {
         self.editor_model.as_ref(ctx).buffer(ctx).len()
+    }
+
+    pub(crate) fn buffer_revision(&self, ctx: &AppContext) -> EditorBufferRevision {
+        self.editor_model.as_ref(ctx).buffer_revision(ctx)
     }
 
     pub fn buffer_text(&self, ctx: &AppContext) -> String {
@@ -5081,6 +5094,7 @@ impl EditorView {
     }
 
     pub fn attach_files(&mut self, ctx: &mut ViewContext<Self>) {
+        let scope = self.image_input_scope(ctx);
         let window_id = ctx.window_id();
         let view_id = self.view_id;
 
@@ -5168,6 +5182,7 @@ impl EditorView {
                                 &EditorAction::ReadAndProcessImagesAsync {
                                     num_images_user_attached,
                                     file_paths: image_paths_to_process,
+                                    scope,
                                 },
                             );
                         }
@@ -5179,6 +5194,7 @@ impl EditorView {
                                 view_id,
                                 &EditorAction::ProcessNonImageFiles {
                                     file_paths: non_image_paths,
+                                    scope,
                                 },
                             );
                         }
@@ -5229,9 +5245,12 @@ impl EditorView {
             return;
         }
 
+        let Some((token, scope)) = self.begin_image_processing(ctx) else {
+            return;
+        };
         let window_id = ctx.window_id();
 
-        ctx.spawn(
+        self.process_attached_images_future_handle = Some(ctx.spawn(
             async move {
                 let mut images = vec![];
                 let mut num_unsupported_images: usize = 0;
@@ -5275,6 +5294,10 @@ impl EditorView {
                 (images, num_unsupported_images, num_read_errors)
             },
             move |this, (images, num_unsupported_images, num_read_errors), ctx| {
+                if !this.image_processing_matches(token, scope, ctx) {
+                    this.finish_image_processing(token, ctx);
+                    return;
+                }
                 if num_unsupported_images > 0 {
                     let message = if num_unsupported_images == 1 && num_images_user_attached == 1 {
                         crate::t!("editor-image-unsupported-type")
@@ -5310,15 +5333,17 @@ impl EditorView {
                     });
                 }
 
-                if !images.is_empty() {
-                    this.process_and_attach_images_as_ai_context(
-                        num_images_user_attached,
-                        images,
-                        ctx,
-                    );
+                if this.strict_image_batch(ctx)
+                    && (num_unsupported_images > 0 || num_read_errors > 0)
+                {
+                    this.finish_image_processing(token, ctx);
+                } else if !images.is_empty() {
+                    this.process_image_batch(num_images_user_attached, images, token, scope, ctx);
+                } else {
+                    this.finish_image_processing(token, ctx);
                 }
             },
-        );
+        ));
     }
 
     /// Processes and attaches images to the AI context model.
@@ -5347,6 +5372,20 @@ impl EditorView {
             return;
         }
 
+        let Some((token, scope)) = self.begin_image_processing(ctx) else {
+            return;
+        };
+        self.process_image_batch(num_images_user_attached, pending_images, token, scope, ctx);
+    }
+
+    fn process_image_batch(
+        &mut self,
+        num_images_user_attached: usize,
+        pending_images: Vec<AttachedImage>,
+        token: uuid::Uuid,
+        scope: EditorImageInputScope,
+        ctx: &mut ViewContext<Self>,
+    ) {
         let is_udi_enabled = InputSettings::as_ref(ctx).is_universal_developer_input_enabled(ctx);
 
         send_telemetry_from_ctx!(
@@ -5397,8 +5436,8 @@ impl EditorView {
                 )
             },
             move |this, (num_oversized_images, num_unprocessed_images, pending_images), ctx| {
-                // Future was aborted
-                if this.process_attached_images_future_handle.is_none() {
+                if !this.image_processing_matches(token, scope, ctx) {
+                    this.finish_image_processing(token, ctx);
                     return;
                 }
 
@@ -5439,21 +5478,30 @@ impl EditorView {
                     });
                 }
 
+                if this.strict_image_batch(ctx)
+                    && (num_oversized_images > 0 || num_unprocessed_images > 0)
+                {
+                    this.finish_image_processing(token, ctx);
+                    return;
+                }
                 if let Some(context_model) = &this.context_model {
                     context_model.update(ctx, |context_model, ctx| {
                         context_model.append_pending_images(pending_images, ctx);
                     });
+                } else {
+                    this.emit_processed_images(pending_images, ctx);
                 }
-
-                ctx.emit(Event::ProcessingAttachedImages(false));
+                this.finish_image_processing(token, ctx);
             },
         ));
-
-        ctx.emit(Event::ProcessingAttachedImages(true));
     }
 
     /// Stores non-image files selected via the file picker into the pending files context.
     fn process_non_image_files(&mut self, file_paths: Vec<String>, ctx: &mut ViewContext<Self>) {
+        if self.context_model.is_none() {
+            self.emit_selected_file_paths(file_paths, ctx);
+            return;
+        }
         let attachments: Vec<PendingAttachment> = file_paths
             .iter()
             .filter_map(|path_str| {
@@ -8520,6 +8568,14 @@ pub enum Event {
     AcceptAIContextMenuItem(AIContextMenuSearchableAction),
     SelectAIContextMenuCategory(AIContextMenuCategory),
     ProcessingAttachedImages(bool),
+    ImagesProcessed {
+        generation: uuid::Uuid,
+        images: ProcessedImageAttachments,
+    },
+    FilePathsSelected {
+        generation: uuid::Uuid,
+        file_paths: Vec<String>,
+    },
     VoiceStateUpdated {
         is_listening: bool,
         is_transcribing: bool,
@@ -8601,13 +8657,20 @@ impl TypedActionView for EditorView {
             ReadAndProcessImagesAsync {
                 num_images_user_attached,
                 file_paths,
-            } => self.read_and_process_images_async(
-                *num_images_user_attached,
-                file_paths.clone(),
-                ctx,
-            ),
-            ProcessNonImageFiles { file_paths } => {
-                self.process_non_image_files(file_paths.clone(), ctx);
+                scope,
+            } => {
+                if self.image_input_scope_matches(*scope, ctx) {
+                    self.read_and_process_images_async(
+                        *num_images_user_attached,
+                        file_paths.clone(),
+                        ctx,
+                    );
+                }
+            }
+            ProcessNonImageFiles { file_paths, scope } => {
+                if self.image_input_scope_matches(*scope, ctx) {
+                    self.process_non_image_files(file_paths.clone(), ctx);
+                }
             }
             Tab => self.tab(ctx),
             ShiftTab => self.shift_tab(ctx),

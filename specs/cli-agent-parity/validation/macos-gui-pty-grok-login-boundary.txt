@@ -1,0 +1,37 @@
+Window: "grok", App: InfiniShell.
+0 standard window grok, Value: Command Input., Secondary Actions: Raise, Description: Input your shell command, press enter to execute. Press cmd-up to navigate to output of previously executed commands. Press cmd-l to re-focus command input.
+	1 text entry area 
+  <pty-root>/project
+
+
+
+                                                                        ⠀⠀⠀⠀⠀⠀⣀⣀⡀⠀⠀⠀⢀⠄
+                                                                        ⠀⠀⠀⣠⣾⠿⠛⠛⠛⠛⢀⡴⠁⠀
+                                                                        ⠀⠀⣼⡟⠁⠀⠀⠀⢀⡴⠻⣿⡀⠀
+                                                                        ⠀⠀⣿⡇⠀⠀⠀⠔⠁⠀⠀⣿⡇⠀
+                                           
+	2 close button
+	3 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	4 minimize button
+5 menu bar
+	6 InfiniShellParityPTY
+	7 File
+	8 Edit
+	9 View
+	10 Tab
+	11 Blocks
+	12 AI
+	13 Drive
+	14 Window
+	15 Help
+
+The focused UI element is 1 text entry area 
+  <pty-root>/project
+
+
+
+                                                                        ⠀⠀⠀⠀⠀⠀⣀⣀⡀⠀⠀⠀⢀⠄
+                                                                        ⠀⠀⠀⣠⣾⠿⠛⠛⠛⠛⢀⡴⠁⠀
+                                                                        ⠀⠀⣼⡟⠁⠀⠀⠀⢀⡴⠻⣿⡀⠀
+                                                                        ⠀⠀⣿⡇⠀⠀⠀⠔⠁⠀⠀⣿⡇⠀
+                                           

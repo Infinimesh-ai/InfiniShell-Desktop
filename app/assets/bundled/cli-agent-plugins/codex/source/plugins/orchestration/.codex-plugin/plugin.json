@@ -1,0 +1,10 @@
+{
+  "name": "orchestration",
+  "description": "Warp integration for Codex in Oz cloud agent environments, including parent-message delivery hooks and skills",
+  "version": "0.4.0",
+  "author": {
+    "name": "Warp",
+    "url": "https://warp.dev"
+  },
+  "homepage": "https://github.com/warpdotdev/codex-warp"
+}

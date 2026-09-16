@@ -221,7 +221,11 @@ pub(crate) fn redact_inputs(inputs: &mut [AIAgentInput]) {
                     }
                     // Orchestrate results contain agent IDs / canonical error
                     // strings only; no user-provided text to redact.
-                    AIAgentActionResultType::RunAgents(_)
+                    AIAgentActionResultType::SendMessageToAgent(
+                        ai::agent::action_result::SendMessageToAgentResult::Error(error),
+                    ) => redact_secrets(error),
+                    AIAgentActionResultType::SendMessageToAgent(_)
+                    | AIAgentActionResultType::RunAgents(_)
                     | AIAgentActionResultType::WaitForEvents(_) => {}
                 }
             }

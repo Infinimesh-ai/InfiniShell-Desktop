@@ -1,0 +1,16 @@
+{"event":"acceptance_started","scope":"rust_adapter_process_restart"}
+{"event":"session_ready","native_session_id":"01a0a92e-4b5a-74e2-b57d-321ab06feba4","permissions":{"approvalPolicy":"untrusted","approvalsReviewer":"user","sandbox":{"excludeSlashTmp":false,"excludeTmpdirEnvVar":false,"networkAccess":false,"type":"workspaceWrite","writableRoots":[]}}}
+{"event":"phase_started","phase":"first_turn"}
+{"event":"message_accepted","message_id":"e7e72f37-dd79-4246-8d81-641e1ca6cac3","phase":"first_turn","turn_id":"01a0a92e-4b97-79f3-be05-2921e8db9cb5"}
+{"event":"turn_started","phase":"first_turn","turn_id":"01a0a92e-4b97-79f3-be05-2921e8db9cb5"}
+{"event":"turn_finished","outcome":"Completed","output":"PARITY_ONE","phase":"first_turn","turn_id":"01a0a92e-4b97-79f3-be05-2921e8db9cb5"}
+{"event":"phase_started","phase":"second_turn"}
+{"event":"message_accepted","message_id":"d66a6b0b-4433-46e7-b510-c5950c24eeda","phase":"second_turn","turn_id":"01a0a92e-6bff-76a2-a038-3ce2df68a559"}
+{"event":"turn_started","phase":"second_turn","turn_id":"01a0a92e-6bff-76a2-a038-3ce2df68a559"}
+{"event":"turn_finished","outcome":"Completed","output":"PARITY_TWO","phase":"second_turn","turn_id":"01a0a92e-6bff-76a2-a038-3ce2df68a559"}
+{"event":"phase_started","phase":"approval_allow"}
+{"event":"message_accepted","message_id":"8cda65b9-0d02-4a4d-9a4e-add425179226","phase":"approval_allow","turn_id":"01a0a92e-7434-7370-ab78-985a6a42ba87"}
+{"event":"turn_started","phase":"approval_allow","turn_id":"01a0a92e-7434-7370-ab78-985a6a42ba87"}
+{"details":"/bin/zsh -lc \"'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' -c 'from pathlib import Path; Path(\\\"approval-allow.txt\\\").write_text('\\\"'\\\"'PARITY_APPROVAL'\\\"'\\\"')'\"","event":"native_tool_progress","phase":"approval_allow","turn_id":"01a0a92e-7434-7370-ab78-985a6a42ba87"}
+{"approval_id":"01a0a92e-7434-7370-ab78-985a6a42ba87:0","command_within_fixture":false,"decision":"DenyOnce","event":"approval_requested","method":"item/commandExecution/requestApproval","phase":"approval_allow"}
+{"event":"acceptance_failed","reason":"审批命令超出预先列明的临时文件测试范围，已拒绝"}

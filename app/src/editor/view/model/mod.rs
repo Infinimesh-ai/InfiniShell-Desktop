@@ -60,6 +60,13 @@ lazy_static! {
         AUTOCOMPLETE_SYMBOLS.values().cloned().collect();
 }
 
+/// 保留缓冲区身份和版本，异步提交不得清除后续编辑产生的新草稿。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct EditorBufferRevision {
+    buffer_id: warpui::EntityId,
+    version: buffer::BufferRevision,
+}
+
 /// A snapshot of the editor that does not expose
 /// buffer implementation details.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2812,6 +2819,13 @@ impl EditorModel {
     #[cfg(test)]
     pub fn displayed_text(&self, app: &AppContext) -> String {
         self.display_map(app).text(app)
+    }
+
+    pub(crate) fn buffer_revision(&self, ctx: &AppContext) -> EditorBufferRevision {
+        EditorBufferRevision {
+            buffer_id: self.buffer_handle().id(),
+            version: self.buffer(ctx).versions(),
+        }
     }
 
     pub fn buffer_text<C: ModelAsRef>(&self, ctx: &C) -> String {

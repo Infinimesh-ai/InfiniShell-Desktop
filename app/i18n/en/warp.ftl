@@ -4730,17 +4730,18 @@ conversation-rename-too-long = Conversation titles must be { $max } characters o
 cli-agent-plugin-update-not-effective = The plugin update didn't take effect.
 cli-agent-platform-plugin-install-not-effective = The platform plugin installation didn't take effect.
 cli-agent-platform-plugin-update-not-effective = The platform plugin update didn't take effect.
-cli-agent-plugin-codex-warp-installed = Warp plugin installed. Restart Codex to activate it.
-cli-agent-plugin-codex-warp-updated = Warp plugin updated. Restart Codex to activate it.
+cli-agent-plugin-codex-warp-installed = Plugin files installed. Review the notification hooks with /hooks in Codex, then restart Codex.
+cli-agent-plugin-codex-warp-updated = Plugin files updated. Review the notification hooks with /hooks in Codex, then restart Codex.
 cli-agent-plugin-codex-warp-install-title = Install the Warp plugin for Codex
-cli-agent-plugin-codex-run-commands-restart = Run the following commands, then restart Codex.
+cli-agent-plugin-codex-run-commands-restart = Run the following commands, review the notification hooks with /hooks in Codex, then restart Codex.
+cli-agent-plugin-codex-persistent-source-step = In the exported InfiniShell plugin bundle directory, install or update the Codex notification plugin.
 cli-agent-plugin-add-marketplace-step = Add the Warp plugin marketplace repository
-cli-agent-plugin-codex-activate-note = Restart Codex to activate the plugin.
+cli-agent-plugin-codex-activate-note = Review the notification hooks with /hooks in Codex, then restart Codex to apply your choices.
 cli-agent-plugin-codex-warp-update-title = Update the Warp plugin for Codex
 cli-agent-plugin-upgrade-marketplace-step = Upgrade the marketplace
 cli-agent-plugin-reinstall-warp-plugin-step = Reinstall the Warp plugin
-cli-agent-plugin-codex-activate-update-note = Restart Codex to activate the update.
-cli-agent-plugin-codex-marketplace-recovery-note = If this fails because codex-warp isn't configured as a Git marketplace, remove and re-add the marketplace.
+cli-agent-plugin-codex-activate-update-note = Updated hook definitions may require another review with /hooks in Codex. Review them, then restart Codex.
+cli-agent-plugin-codex-marketplace-recovery-note = If installation fails, review the error before retrying. Keep any recovery files until the issue is resolved.
 cli-agent-plugin-claude-installed = InfiniShell plugin installed. Run /reload-plugins to activate it.
 cli-agent-plugin-claude-updated = InfiniShell plugin updated. Run /reload-plugins to activate it.
 cli-agent-plugin-gemini-installed = InfiniShell plugin installed. Restart Gemini CLI to activate it.
@@ -5703,3 +5704,231 @@ settings-warpify-reuse-control-master = Reuse existing SSH ControlMaster
 settings-exec-profile-run-agents = Run agents:
 settings-network-error-invalid-proxy-url = Invalid proxy URL
 settings-network-error-timeout = Timed out after { $seconds } seconds
+
+# CLI 任务状态与启动
+cli-agent-status-unknown = Status unknown. Check the terminal to confirm the task outcome.
+cli-agent-status-disconnected = Connection interrupted. The task outcome has not been confirmed.
+cli-agent-waiting-for-answer = Waiting for your answer
+cli-agent-grok-managed-unavailable = Grok Build managed tasks are not yet verified. Use Grok in a terminal.
+ambient-agent-local-harness-terminal-unavailable = Could not open the local task terminal. The task was not started because native prompts must remain visible.
+
+cli-agent-plugin-refresh-marketplace-step = Refresh the marketplace while keeping the installed plugin:
+cli-agent-plugin-disabled = This plugin is disabled. Enable it explicitly to restore notifications.
+cli-agent-plugin-enable-step = Enable the installed plugin:
+cli-agent-plugin-enable-codex-config-step = Enable the plugin in your Codex config.toml:
+cli-agent-grok-image-paste-unavailable = Grok Build image paste is not verified for this CLI version. Remove the image attachments before sending.
+cli-agent-image-too-large = { $filename } is too large to send to the agent (limit { $limit_mb } MB).
+
+cli-agent-task-already-bound = This terminal already has an active local task.
+cli-agent-input-still-sending = The previous input is still being sent. Your draft has been kept; send it again when the transfer finishes.
+cli-agent-task-already-running = This task already has a live connection. Open it instead of starting another process.
+cli-agent-task-manager-title = Local CLI tasks
+cli-agent-task-result-subject = Local task result
+cli-agent-task-waiting-native-approval = Waiting for approval in the CLI
+cli-agent-task-disconnected = Task disconnected; resume or reconnect explicitly
+cli-agent-task-runtime-failed = The local CLI task failed. Open the task to inspect its saved result.
+cli-agent-message-sending = Sending task message…
+cli-agent-message-acknowledged = Task message received
+cli-agent-message-unconfirmed = Task message delivery unconfirmed
+cli-agent-message-failed = Task message failed
+cli-agent-message-cancelled = Task message cancelled
+cli-agent-message-status-subject = { $status }: { $subject }
+cli-agent-task-invalid-launch = The saved task or project directory does not match this launch request.
+cli-agent-managed-version-unavailable = Managed tasks are not enabled or verified for this CLI version. Use a terminal session.
+cli-agent-claude-queue-unverified = Sending another instruction while Claude is running has not passed verification. Keep this draft and send it after the current turn finishes.
+cli-agent-message-invalid-recipients = Choose between 1 and 16 unique local recipients.
+cli-agent-message-local-only = Local task messaging is unavailable for this conversation.
+cli-agent-message-recipient-unavailable = The recipient has no active managed connection. Resume or reconnect the task first.
+cli-agent-message-delivery-failed = The task message was not accepted. Check the saved message status before retrying.
+cli-agent-grok-managed-unverified = Grok managed turns, approvals, cancellation, and session recovery have not passed verification for this version. Use a terminal session.
+cli-agent-grok-managed-login-required = Sign in to Grok in a terminal before checking the managed connection.
+cli-agent-task-save-failed = The local task could not be saved. Its result has not been confirmed.
+ambient-agent-local-harness-persistence-failed = Could not save the local task. The task was not started. { $error }
+ambient-agent-local-harness-working-directory-unavailable = Could not determine the local task’s working directory.
+ambient-agent-local-harness-shell-required = A detected shell is required to launch a local task.
+cli-agent-plugin-grok-install-title = Set up Grok notifications
+cli-agent-plugin-grok-install-subtitle = The bundled plugin requires Grok 1.0.30 and Node.js 18 or newer in this terminal.
+cli-agent-plugin-grok-cli-version-step = Check the Grok version
+cli-agent-plugin-grok-node-version-step = Check the Node.js version
+cli-agent-plugin-grok-enable-step = Enable the installed InfiniShell plugin
+cli-agent-plugin-grok-restart-note = After installing the requirements or enabling the plugin, restart Grok and retry the notification setup.
+cli-agent-plugin-grok-operation-failed = The Grok plugin command failed or timed out.
+cli-agent-plugin-grok-incompatible = This Grok or Node.js version has not passed the plugin compatibility check.
+cli-agent-plugin-grok-invalid-state = The Grok plugin registration is ambiguous or belongs to a custom source. Resolve it before updating.
+cli-agent-plugin-grok-update-restored = The Grok plugin update failed. The previous version was restored.
+cli-agent-plugin-grok-restore-failed = The Grok plugin update failed and automatic recovery could not be verified. Review the installation log.
+
+# 本地 CLI 任务管理
+cli-task-manager-title = Local CLI tasks
+cli-task-manager-new = New task
+cli-task-manager-start = Start task
+cli-task-manager-send = Send instruction
+cli-task-manager-resume = Continue history
+cli-task-manager-cancel = Cancel turn
+cli-task-manager-disconnect = Disconnect CLI
+cli-task-manager-discard-draft = Clear unconfirmed draft
+cli-task-manager-directory = Project directory
+cli-task-manager-directory-placeholder = Absolute path to a local project
+cli-task-manager-prompt = Instruction
+cli-task-manager-prompt-placeholder = Describe the task. Enter inserts a new line.
+cli-task-manager-empty-prompt = Enter an instruction before starting or sending.
+cli-task-manager-invalid-directory = Choose an existing local directory using its absolute path.
+cli-task-manager-input-pending = Waiting for the CLI to acknowledge this instruction. The draft is retained.
+cli-task-manager-input-waiting-ready = Waiting for the CLI session to initialize before sending.
+cli-task-manager-input-uncertain = Delivery is uncertain. Review the CLI history before clearing this draft and composing a new instruction. Clearing the draft does not cancel input already delivered.
+cli-task-manager-task-row = { $cli } · { $state } · { $task }
+cli-task-manager-task-details = Task: { $task }
+    State: { $state }
+    Native session: { $session }
+cli-task-manager-not-installed = Not installed
+cli-task-manager-version-unknown = Version unavailable
+cli-task-manager-scanning = Checking installation…
+cli-task-manager-installation = { $cli }: { $version }
+    { $path }
+cli-task-manager-local-only = These tasks run on this computer. Closing this panel keeps connected tasks running. SSH and tmux terminal sessions are managed separately.
+cli-task-manager-grok-unavailable = Grok Build managed tasks are unavailable until its approval, cancellation, and recovery behavior is verified. Terminal sessions remain available.
+cli-task-manager-claude-verification = Claude Code 2.1.273 is available for verification behind this feature flag. Authentication, successful turns, approvals, and recovery still require a complete acceptance run.
+cli-task-manager-empty = No local CLI tasks have been saved yet.
+cli-task-manager-permission = Permissions for new tasks
+cli-task-manager-permission-inherit = Inherit CLI settings
+cli-task-manager-permission-readonly = Codex read-only
+cli-task-manager-permission-workspace = Codex project writes
+cli-task-manager-permission-inherit-help = Inherited permissions may include access already allowed by your CLI configuration. This app does not change those settings or add approval bypass flags.
+cli-task-manager-session-pending = Awaiting native session confirmation
+cli-task-manager-approval = Permission requested: { $method }
+cli-task-manager-allow-once = Allow once
+cli-task-manager-deny-once = Deny once
+cli-task-manager-output = Progress and result
+cli-task-manager-error = CLI task details: { $error }
+cli-task-manager-resume-unavailable = No confirmed native session is available to continue. A new task will not be started automatically.
+cli-task-manager-unknown-cli = Unknown CLI
+cli-task-manager-state-queued = Queued
+cli-task-manager-state-running = Running
+cli-task-manager-state-waiting = Waiting for approval
+cli-task-manager-state-unconfirmed = Outcome unconfirmed
+cli-agent-task-outcome-unconfirmed = The CLI has not confirmed the task outcome. Check the existing terminal.
+cli-task-manager-state-completed = Completed
+cli-task-manager-state-failed = Failed
+cli-task-manager-state-cancelled = Cancelled
+cli-task-manager-state-disconnected = Disconnected
+cli-task-manager-state-unknown = Unknown
+cli-task-manager-copy-result = Copy full result
+cli-task-manager-output-truncated = This preview is shortened. The complete result remains saved and can be copied.
+
+cli-task-manager-message-read-failed = Saved task messages could not be loaded.
+cli-task-manager-copy-input = Copy message
+cli-task-manager-restore-input = Restore unconfirmed draft
+cli-task-manager-input-not-recoverable = This record cannot be restored as an unconfirmed text draft. You can still copy its saved content.
+cli-task-manager-draft-in-use = Another draft or unconfirmed instruction is already open. Preserve or clear it before restoring a different record.
+cli-task-manager-saved-inputs = Saved task messages
+cli-task-manager-saved-inputs-help = Incoming and outgoing messages from all runs are shown here. Only unconfirmed user input can be restored as a draft; no saved message is replayed automatically.
+cli-task-manager-message-details = Message: { $message } · Run: { $generation } · { $state }
+cli-task-manager-input-truncated = Input preview shortened. Copy input to get the complete saved content.
+cli-task-manager-message-queued = Queued
+cli-task-manager-message-sent = Delivery attempted
+cli-task-manager-message-acknowledged = Acknowledgement recorded
+cli-task-manager-message-failed = Delivery failed
+cli-task-manager-message-cancelled = Cancelled
+cli-task-manager-message-unknown = Status unknown
+
+cli-agent-task-skill-unavailable = Skill { $skill } is missing, inactive, duplicated, or invalid.
+cli-agent-task-skill-local-required = Skill { $skill } must be available as a local file.
+
+cli-task-manager-tools-title = Local task tools
+cli-task-manager-tools-spawn = Allow child tasks
+cli-task-manager-tools-messages = Allow parent and child messages
+cli-task-manager-tools-help = Disabled by default. Enabled tools can inspect related tasks and use the selected capabilities. Child tasks inherit these permissions; native CLI approvals still apply. Saved permissions are used when continuing a task.
+cli-task-manager-effective-permissions = Effective CLI permissions
+
+cli-agent-plugin-patch-incompatible = This CLI version or platform does not support the verified notification patch.
+cli-agent-plugin-patch-modified = The plugin has an unverified version, source, or modified files. Automatic replacement was stopped.
+cli-agent-plugin-patch-failed = The notification patch could not be applied or verified. Review the installation log before retrying.
+cli-agent-plugin-patch-manual-note = Native installation alone does not apply InfiniShell’s notification patch. For SSH or containers, transfer the bundled patch and run its verification script on that host. Windows automatic patching is not supported.
+cli-agent-message-unconfirmed-id = Delivery of message { $message_id } is unconfirmed. Check its saved status before retrying. { $error }
+
+cli-agent-task-skill-plugin-failed = Could not prepare the isolated skill plugin: { $error }
+cli-agent-task-skill-one-per-turn = Select one Claude skill per turn in managed tasks.
+cli-agent-task-parent-changed = The parent task has moved to another turn. Launch this child again from the current turn.
+cli-agent-input-images-unverified = Managed image input has not been verified for { $cli }. Your draft is unchanged.
+cli-task-manager-images-unverified-hint = Managed image input has not been verified for { $cli }.
+cli-agent-input-attachment-invalid = The image is damaged or does not match its declared format.
+cli-task-manager-review-empty = There are no current review comments to import. Your draft is unchanged.
+cli-task-manager-review-remote = This task runs locally. Import comments from a local repository.
+cli-agent-input-attachment-save-failed = Could not save the local attachment: { $error }
+cli-agent-task-skills-require-managed = Skill delivery requires a managed Codex or Claude task.
+
+cli-agent-input-images-processing = Wait for the images to finish processing. Your draft is kept.
+
+cli-agent-input-file-attachment-unavailable = This CLI input cannot send file attachment chips yet. Insert the file path instead; your draft and attachments are kept.
+
+cli-agent-input-multiline-paste-unavailable = Safe multiline paste is not enabled in this CLI. Your text is kept; enable bracketed paste in the CLI before retrying.
+
+cli-agent-input-delivery-failed = The input could not be fully delivered. Your draft is kept; check the CLI input before retrying.
+
+cli-agent-input-image-delivery-failed = The image batch could not be fully delivered. Your draft and attachments are kept; check the CLI before retrying.
+
+cli-agent-input-remote-image-unavailable = Clipboard image transfer to a remote CLI has not been verified. Use a remote file path instead.
+
+cli-agent-input-target-changed = The CLI input changed while this operation was pending. No text was inserted.
+
+cli-task-manager-attach-files = Attach images or insert files
+cli-task-manager-import-review = Import current review
+cli-task-manager-skills = Choose a local skill
+cli-task-manager-no-skills = No compatible local skills were found for this project.
+cli-task-manager-skills-index-failed = Could not load local skills for this project. Check the directory and try Refresh again.
+cli-task-manager-preparing-input = Preparing input… Your draft is kept until the CLI confirms receipt.
+cli-task-manager-attachments = Attachments and skills
+
+cli-agent-task-exit-unconfirmed = The previous CLI process has not been confirmed stopped. Your task is kept; wait for cleanup before resuming. Older records without an exit receipt cannot be resumed safely.
+
+cli-task-manager-skills-session-fixed = This Claude session can use only skills registered when it was started. Create a new task to choose different skills.
+
+cli-task-manager-message-route = Subject: { $subject } · From { $sender } (run { $sender_generation }) to { $recipient } (run { $recipient_generation })
+
+cli-task-manager-message-no-receipt = No confirmed receipt. Queuing or dispatch does not establish delivery.
+
+cli-task-manager-message-native-receipt = Receipt: the CLI native protocol confirmed receipt. This does not mean the task completed.
+
+cli-task-manager-message-history-receipt = Receipt: saved in application conversation history for its next normal request. This does not confirm immediate CLI delivery or execution.
+
+cli-task-manager-message-unverified-receipt = The stored acknowledgement has no recognized receipt evidence. Do not assume CLI delivery or automatically resend.
+
+cli-agent-plugin-codex-hooks-title = Review Codex notification hooks
+
+cli-agent-plugin-codex-hooks-subtitle = Plugin files are installed. Codex must authorize the current hook definitions before notifications can run.
+
+cli-agent-plugin-codex-hooks-review-step = Open /hooks inside Codex, inspect the warp@codex-warp notification hooks, and decide which hooks to enable and trust.
+
+cli-agent-plugin-codex-hooks-activation-note = After reviewing hooks, restart Codex. InfiniShell confirms activation only after receiving a current notification; updates may require another review.
+
+ai-footer-authorize-notifications = Authorize notifications
+
+ai-footer-authorize-notifications-tooltip = The plugin is installed, but native hook authorization is required or cannot be verified. Open the CLI authorization steps; InfiniShell will not grant trust automatically.
+
+ai-footer-verify-notifications = Verify notifications
+
+ai-footer-verify-notifications-tooltip = The local authorization configuration matches, but this CLI session has not sent a verified notification. Restart or check the CLI setup.
+
+cli-agent-task-permission-ceiling-unavailable = Cannot verify that the child task will stay within its parent’s permissions.
+
+cli-agent-task-permission-ceiling-mismatch = The child CLI permissions differ from its parent. No task input was sent.
+
+cli-task-manager-copy-history-result = Copy complete saved result
+
+cli-task-manager-history-read-failed = Saved results could not be loaded.
+
+cli-task-manager-history-generation = Run { $generation } · { $state }
+
+cli-task-manager-history-selection-expired = The task or saved-result snapshot changed. Select the result again.
+
+cli-task-manager-history-no-result = No final result is saved for this run.
+
+cli-task-manager-history-title = Saved results
+
+cli-task-manager-history-loading = Loading saved results…
+
+cli-task-manager-history-empty = No saved runs are available.
+
+cli-task-manager-history-read-only = Viewing saved run { $generation }. Send, Cancel, and Resume apply to the current run ({ $active_generation }).
+
+cli-task-manager-history-details = Saved state: { $state } · Native session: { $session }

@@ -1,0 +1,67 @@
+{
+  "passed": false,
+  "scope": "探针初始化失败，不计原生通知传输通过",
+  "attempts": [
+    {
+      "attempt": "first",
+      "passed": false,
+      "diagnosis": "原生目录信任页使用光标位移代替空格，探针文本匹配未识别，等待超时。",
+      "error": "原生 SSH TUI 超时",
+      "model_http_request_count": 0,
+      "recorded_test_pids_still_alive": [],
+      "ssh_exit": null,
+      "trust_selected_in_native_tui": false,
+      "ssh_stdout_bytes": 600973,
+      "ssh_stdout_sha256": "8e3dd58831e2f05ace55bea31470ee98ba88c9cbd637fb5a6f67ef2d6b24a352",
+      "ssh_stderr": "",
+      "stdout_redacted_excerpt": "\u001b]10;?\u001b\\\u001b]11;?\u001b\\                                                   _._:=++==+,_                      _=,/*\\+/+\\=||=_ _\"+_                ,|*|+**\"^`   `\"*`\"~=~||+             ;*_\\*',,_            /*|;|,          \\^;/'^|\\`\\\\            \".|\\\\,        ~* +`  |*/;||,           '.\\||,      +^\"-*    '\\|*/\"|_          ! |/|      ||_|`     ,//|;|*            \"`|      |=~'`    ;||^\\|\".~++++++_+, =\" |       _~;*  _;+` /* |\"|___.:,,,|/,/,|       \\^_\"^ ^\\,./`   `^*''* ^*\"/,;_/         *^, \", `              ,'/*_|            ^\\,`\\+_          _=_+|_+\"               ^*,\\_!*+:;=;;.=*+_,|*                   `*\"*|~~___,_;+*\"                                                 WelcometoCodex,OpenAI'scommand-linecodingagent>You are in <isolated-probe>/direct/workDoyoutrustthecontentsofthisdirectory?Workingwithuntrustedcontentscomeswithhigherriskofpromptinjection.Trustingthedirectoryallowsproject-localconfig,hooks,andexecpoliciestoload.› 1. Yes, continue2.No,quitPress enter to continue=+;||~~'|*\\~*`=*/||;,_|//-,\\/,\"*__^,|'/+\"\\+/\\+\\\\|* ,|'*|^/;|_,/\"\"\" \\|*|;|'/.*\"\"=|^_+|_|~*='|/||'=\\_..__+/!|!\\\\ **.|'\"****|*||'\\_./+;/,*.__|,,!|`~^;_\"`|++_~/=;+=\\||+\"=;^;/*;|\"\" ~!*+/^ /+/\\|;+`=*!|\\ '/*|//||*\\^\\|_/|\\\\/.,|\\;\\| \\\\ =* '*\\|_\".*/|,,-|,|-|\"/\\|~_|= -'*+~*-=____~^\";|,\\:\\,./*/;;|*|,!=,;\\`|\\`'^||\"||+,\"\"*\"\"\",///,/*~ \\+/^+^//=^//*\\+;/\",' =+,*^=,:;`_+\"_:^=++-\"+*/!\\/*|\"/,*=||+*^\\^|\\\\_/|,\".,\"|*\\*/|/_|=|\\;^|,\\\"\\|*\\ |^|'_|/*' \\=|,\"\\|;`*\\+, \";   .\\|/*^| || _|!_/\"^//++_,, ||* |/!|,/,_`=\\,._,:/^|//\"  `;'\\,\\\\,\\/***'^-|||` ,|\\\"|_,^;/**'\\\\,:^!__.^,*;|/ ~||=\\;++\\|*` \\\\~_-*`;+=+/*|+~=+_|\"+  _/\\+|\"=|*\\!,*, ,|/|/|=-^||||_,\\*/^_+|_\\` \\|\\|_ ~|/\\\\;/|_ +/| |/!+`\\_|\\''~+|,|/|_\"_=|/_+_|,|^*/_|,|*=_~~+_\".| _\\|\\,+*\" \"!//\\=^=.,/*|`\\,||,~,\\/+`\"\"\"\"\",~;\\/ \\\\+/\\\\ `/_/*,^ ^/*\\|=+=+';*^*|,+~_^~; ^-*_*\"-,++_ ,^;|=*|+,*_,,,|| `~.=+*/\\_ /,**_=,\\+|,  '=|||*\\\\+*\\.\\, ;-/`^+;|\\_,.=\\  _ +~| !^\\|/^\\^+|_  ~ |~|_|~|~+\\|  _.|-|'|*;/++_.\\/| ||\\,/_^_;+/=*,||,;=\\|,|\\!  /  /~||;/\"\"'",
+      "native_partial": null,
+      "native_hook_transport_verified": false,
+      "remaining_modes_executed": false
+    },
+    {
+      "attempt": "second",
+      "passed": false,
+      "diagnosis": "把 SSH 密钥目录移到系统 /tmp 后，原生 SSH 公钥认证拒绝；恢复原私有目录，仅 tmux socket 用短路径。",
+      "error": "缺少真实原生执行或退出记录",
+      "model_http_request_count": 0,
+      "recorded_test_pids_still_alive": [],
+      "ssh_exit": 255,
+      "trust_selected_in_native_tui": false,
+      "ssh_stdout_bytes": 0,
+      "ssh_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "ssh_stderr": "<local-user>@127.0.0.1: Permission denied (publickey).\r\n",
+      "stdout_redacted_excerpt": "",
+      "native_partial": {},
+      "native_hook_transport_verified": false,
+      "remaining_modes_executed": false
+    },
+    {
+      "attempt": "third",
+      "passed": false,
+      "diagnosis": "原生目录信任已明确选择，但随后旧模型迁移提示等待输入；未到达 hook。",
+      "error": "原生 SSH TUI 超时",
+      "model_http_request_count": 0,
+      "recorded_test_pids_still_alive": [],
+      "ssh_exit": null,
+      "trust_selected_in_native_tui": true,
+      "ssh_stdout_bytes": 4043,
+      "ssh_stdout_sha256": "c346798830b1901fa4273bc22a20fca92be25f6c4cd40c05be198c5990763c8f",
+      "ssh_stderr": "",
+      "stdout_redacted_excerpt": "\u001b]10;?\u001b\\\u001b]11;?\u001b\\                                                   _._:=++==+,_                      _=,/*\\+/+\\=||=_ _\"+_                ,|*|+**\"^`   `\"*`\"~=~||+             ;*_\\*',,_            /*|;|,          \\^;/'^|\\`\\\\            \".|\\\\,        ~* +`  |*/;||,           '.\\||,      +^\"-*    '\\|*/\"|_          ! |/|      ||_|`     ,//|;|*            \"`|      |=~'`    ;||^\\|\".~++++++_+, =\" |       _~;*  _;+` /* |\"|___.:,,,|/,/,|       \\^_\"^ ^\\,./`   `^*''* ^*\"/,;_/         *^, \", `              ,'/*_|            ^\\,`\\+_          _=_+|_+\"               ^*,\\_!*+:;=;;.=*+_,|*                   `*\"*|~~___,_;+*\"                                                 WelcometoCodex,OpenAI'scommand-linecodingagent>You are in <isolated-probe>/direct/workDoyoutrustthecontentsofthisdirectory?Workingwithuntrustedcontentscomeswithhigherriskofpromptinjection.Trustingthedirectoryallowsproject-localconfig,hooks,andexecpoliciestoload.› 1. Yes, continue2.No,quitPress enter to continue   GPT-5.4 is no longer available   Codex now uses GPT-5.6 Terra in placeofGPT-5.4.SwitchtoGPT-5.6Terratocontinue.   Choose how you'd like Codex to proceed. › 1. Try new model  2. Use existing model   Use ↑/↓ to move, press enter to confirm        ",
+      "native_partial": {
+        "native-start": {
+          "pid": 44849,
+          "pgid": 44849,
+          "sid": 44849,
+          "tty": "/dev/ttys007",
+          "tmux": null,
+          "tmux_pane": null,
+          "codex_pid": 44852
+        }
+      },
+      "native_hook_transport_verified": false,
+      "remaining_modes_executed": false
+    }
+  ]
+}

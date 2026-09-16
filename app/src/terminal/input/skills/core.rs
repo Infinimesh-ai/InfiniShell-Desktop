@@ -35,25 +35,31 @@ pub fn query_selectable_skills(
     query_text: &str,
     app: &AppContext,
 ) -> Vec<SelectableSkill> {
-    let cli_agent_providers = CLIAgentSessionsModel::as_ref(app)
+    let cli_agent = CLIAgentSessionsModel::as_ref(app)
         .session(terminal_view_id)
         .filter(|session| matches!(session.input_state, CLIAgentInputState::Open { .. }))
-        .map(|session| session.agent.supported_skill_providers());
+        .map(|session| session.agent);
     let skill_manager = SkillManager::as_ref(app);
     let query_text = query_text.trim();
     let mut results = skill_manager
         .get_skills_for_working_directory(working_directory, app)
         .into_iter()
         .filter(|skill| {
-            if let Some(providers) = &cli_agent_providers {
-                skill_manager.skill_exists_for_any_provider(skill, providers)
+            if let Some(agent) = cli_agent {
+                skill_manager.skill_exists_for_any_provider(
+                    skill,
+                    agent.supported_skill_providers_for_scope(skill.scope),
+                )
             } else {
                 include_bundled || skill.scope != SkillScope::Bundled
             }
         })
         .filter_map(|mut skill| {
-            if let Some(providers) = &cli_agent_providers {
-                skill.provider = skill_manager.best_supported_provider(&skill, providers);
+            if let Some(agent) = cli_agent {
+                skill.provider = skill_manager.best_supported_provider(
+                    &skill,
+                    agent.supported_skill_providers_for_scope(skill.scope),
+                );
             }
 
             let (name_match_result, score) = if query_text.is_empty() {

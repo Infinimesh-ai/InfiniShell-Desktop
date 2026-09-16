@@ -31,6 +31,15 @@ pub struct CLIAgentNotification {
     pub tool_input: Option<serde_json::Value>,
     pub plugin_version: Option<String>,
     pub error_type: Option<String>,
+    /// 可选的上游事件标识和会话内单调序号，供接收方去重。
+    pub event_id: Option<String>,
+    pub sequence: Option<u64>,
+    /// Codex 原生回合标识；不能用本地生成值替代。
+    pub turn_id: Option<String>,
+    /// Claude 原生输入标识，与 Codex 的回合字段分别传递。
+    pub prompt_id: Option<String>,
+    /// 插件只能确认发生过结束通知，但缺少原生回合关联；不能视为成功。
+    pub terminal_unverified: Option<bool>,
 }
 
 impl CLIAgentNotification {
@@ -50,6 +59,11 @@ impl CLIAgentNotification {
             tool_input: None,
             plugin_version: None,
             error_type: None,
+            event_id: None,
+            sequence: None,
+            turn_id: None,
+            prompt_id: None,
+            terminal_unverified: None,
         }
     }
 }

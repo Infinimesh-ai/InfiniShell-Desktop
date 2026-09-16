@@ -192,7 +192,7 @@ impl OrchestrationConfigStatus {
 
 /// Maps the proto `Harness` oneof to a client-side string identifier.
 /// Returns `None` for an unset variant.
-fn harness_proto_to_string(harness: Option<&api::Harness>) -> Option<String> {
+pub(crate) fn harness_proto_to_string(harness: Option<&api::Harness>) -> Option<String> {
     let variant = harness?.variant.as_ref()?;
     Some(
         match variant {

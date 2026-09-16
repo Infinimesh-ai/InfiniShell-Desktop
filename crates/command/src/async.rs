@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::{ExitStatus, Output, Stdio};
 use std::{fmt, io};
 
-use async_process::Child;
+pub use async_process::{Child, ChildStderr, ChildStdin, ChildStdout};
 
 /// Wrapper around a [`async_process::Command`] that ensures any new Command is set with the windows
 /// `CREATE_NO_WINDOW` flag to avoid a console window temporarily popping up.

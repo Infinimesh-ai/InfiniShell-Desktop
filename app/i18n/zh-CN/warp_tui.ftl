@@ -708,3 +708,11 @@ tui-session-state-transcript-unavailable = 对话记录视图不可用
 tui-session-state-input-mode-unavailable = 输入模式模型不可用
 tui-session-state-suggestions-mode-unavailable = 建议模式模型不可用
 tui-session-state-orchestration-tabs-unavailable = 编排标签栏不可用
+
+# 本地任务消息与技能交付；TUI 使用独立编译期消息域。
+tui-cli-agent-message-sending = 正在发送任务消息…
+tui-cli-agent-message-acknowledged = 任务消息已接收
+tui-cli-agent-message-unconfirmed = 任务消息接收尚未确认
+tui-cli-agent-message-failed = 任务消息发送失败
+tui-cli-agent-message-cancelled = 任务消息已取消
+tui-cli-agent-task-skills-require-managed = 技能传递需要托管 Codex 或 Claude 任务。

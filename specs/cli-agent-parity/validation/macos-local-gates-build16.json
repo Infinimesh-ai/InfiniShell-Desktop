@@ -1,0 +1,47 @@
+{
+  "recorded_at": "2026-09-16T11:34:28.290836+00:00",
+  "platform": "macOS arm64",
+  "baseline_commit": "6921a9925955a1955503e259cd935eaea4ac2ac0",
+  "worktree_dirty": true,
+  "final_commit_verification": false,
+  "test_binary_sha256": "9507e5d5b31f01e4f18d2451b5f2ea4f4e93edb1481909de1827fe5349d3e5f0",
+  "note": "build16 编译成功，但两项 Codex 来源事务测试失败；未计门禁通过。跨进程邮箱测试通过；原生空闲崩溃另有独立 NDJSON，不能替代完整树清理。后续修复必须重验。",
+  "checks": [
+    {
+      "command": "cargo test -p warp --lib i18n::tests",
+      "summary": "11 passed; 0 failed; 4.54s; build 3m24",
+      "exit_code": 0,
+      "log_sha256": "ab0c86953abd62169c6e606d2e68eeb322bb2c05a78bd1ae5a2088858b947ea4"
+    },
+    {
+      "command": "cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_cli_mailbox)'",
+      "summary": "489 tests run: 487 passed, 2 failed, 5919 skipped; 6.524s",
+      "exit_code": 100,
+      "log_sha256": "3843bb1f4241b9aec78e47a4cb85b8286a9de081a71db201197f443261f5d475"
+    },
+    {
+      "command": "python3 -B -m unittest discover -s script/cli-agent-parity -p '*_tests.py'",
+      "summary": "62 tests passed; 4.973s",
+      "exit_code": 0,
+      "log_sha256": "f29969760975d90d0830988cc95b999cbfd5592a26bdb477dc3d4fcf989719d4"
+    }
+  ],
+  "failures": [
+    {
+      "test": "terminal::cli_agent_sessions::plugin_manager::codex_source::tests::failure_after_config_commit_restores_only_changed_keys_and_keeps_concurrent_unrelated_write",
+      "assertion": "marketplace(&config(&home)).is_none()",
+      "source_line": 222
+    },
+    {
+      "test": "terminal::cli_agent_sessions::plugin_manager::codex_source::tests::migration_keeps_disabled_orchestration_other_marketplace_and_hook_trust",
+      "error": "配置写回后误判未知变化，回退也拒绝，旧缓存及阶段资料保留",
+      "source_line": 144
+    }
+  ],
+  "mailbox_restart": {
+    "test": "ai::local_cli_mailbox::tests::restart::local_mailbox_process_restart_preserves_sent_and_result_claims",
+    "passed": true,
+    "duration_seconds": 0.556,
+    "scope": "应用持久化跨进程故障注入，使用合成 ACK，非三方原生模型生命周期"
+  }
+}

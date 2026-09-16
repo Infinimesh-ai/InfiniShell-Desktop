@@ -1,5 +1,8 @@
 pub mod event;
+mod event_cursor;
 pub mod listener;
+#[cfg(feature = "local_fs")]
+mod local_tasks;
 #[cfg(not(target_family = "wasm"))]
 pub(crate) mod plugin_manager;
 
@@ -7,22 +10,26 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use event::{CLIAgentEvent, CLIAgentEventSource, CLIAgentEventType};
+use uuid::Uuid;
 use warpui::r#async::SpawnedFutureHandle;
 use warpui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
+use self::event_cursor::{EventCursor, EventDisposition};
 use self::listener::CLIAgentSessionListener;
 use super::CLIAgent;
 use crate::ai::blocklist::InputConfig;
 
-/// How long to wait, after observing a synthesized Ctrl-C write to a working
-/// CLI agent session's PTY, for further plugin activity before concluding the
-/// interrupt silently cancelled the session. See `observe_ctrl_c_write`.
+/// Ctrl-C 后等待可信事件的时间；超时只能将结果标记为未知。
 pub const CTRL_C_CANCEL_WINDOW: Duration = Duration::from_secs(2);
 
 /// Status of a tracked CLI agent session.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CLIAgentSessionStatus {
     InProgress,
+    /// 缺少可信终态，需要回到原生终端确认。
+    Unknown,
+    /// 连接已结束，但尚未收到任务终态。
+    Disconnected,
     Success,
     Failed {
         error_type: Option<String>,
@@ -31,10 +38,7 @@ pub enum CLIAgentSessionStatus {
     Blocked {
         message: Option<String>,
     },
-    /// The user interrupted the session with Ctrl-C and no further plugin
-    /// activity was observed within the grace window (see
-    /// `observe_ctrl_c_write`). Not terminal: a later `prompt_submit`
-    /// returns the session to `InProgress` like any other resumed turn.
+    /// 原生协议已确认取消；新的 prompt_submit 可以开启下一轮。
     Cancelled,
 }
 
@@ -43,6 +47,12 @@ impl CLIAgentSessionStatus {
         use crate::ai::agent::conversation::ConversationStatus;
         match self {
             CLIAgentSessionStatus::InProgress => ConversationStatus::InProgress,
+            CLIAgentSessionStatus::Unknown => ConversationStatus::Blocked {
+                blocked_action: crate::t!("cli-agent-status-unknown"),
+            },
+            CLIAgentSessionStatus::Disconnected => ConversationStatus::Blocked {
+                blocked_action: crate::t!("cli-agent-status-disconnected"),
+            },
             CLIAgentSessionStatus::Success => ConversationStatus::Success,
             CLIAgentSessionStatus::Failed { .. } => ConversationStatus::Error,
             CLIAgentSessionStatus::Blocked { message } => ConversationStatus::Blocked {
@@ -171,12 +181,8 @@ impl CLIAgentSession {
         self.remote_host.is_some()
     }
 
-    /// Whether the session surfaces trustworthy fine-grained status
-    /// (in-progress / blocked / success). True only after receiving a rich OSC
-    /// 777 notification. Codex's OSC 9 fallback emits only opaque `Stop`
-    /// notifications and never sets `received_rich_notification`, so it does
-    /// not qualify. Synthetic listener registration also does not qualify until
-    /// an actual rich notification arrives.
+    /// 是否已收到插件的结构化状态和上下文；这不能单独证明回合成功结束。
+    /// Codex OSC 9 回退和仅注册监听器都不算收到结构化通知。
     pub fn supports_rich_status(&self) -> bool {
         self.received_rich_notification
     }
@@ -196,6 +202,25 @@ impl CLIAgentSession {
     /// Applies an event to this session, updating context and status.
     /// Returns the new status if it changed, or `None` if the event was irrelevant.
     fn apply_event(&mut self, event: &CLIAgentEvent) -> Option<CLIAgentSessionStatus> {
+        if event.source == CLIAgentEventSource::CodexOsc9Fallback {
+            if self.received_rich_notification || self.status == CLIAgentSessionStatus::Unknown {
+                return None;
+            }
+            self.status = CLIAgentSessionStatus::Unknown;
+            return Some(self.status.clone());
+        }
+        // 同一轮的终态不可被晚到回调覆盖；只有新的输入才开启下一轮。
+        if matches!(
+            self.status,
+            CLIAgentSessionStatus::Success
+                | CLIAgentSessionStatus::Failed { .. }
+                | CLIAgentSessionStatus::Cancelled
+        ) && !matches!(
+            event.event,
+            CLIAgentEventType::PromptSubmit | CLIAgentEventType::SessionStart
+        ) {
+            return None;
+        }
         self.session_context.cwd = event.cwd.clone().or(self.session_context.cwd.take());
         self.session_context.project = event
             .project
@@ -214,7 +239,13 @@ impl CLIAgentSession {
                 CLIAgentSessionStatus::InProgress
             }
             CLIAgentEventType::ToolComplete => {
-                if !matches!(self.status, CLIAgentSessionStatus::Blocked { .. }) {
+                if !matches!(self.status, CLIAgentSessionStatus::Blocked { .. })
+                    && !(self.status == CLIAgentSessionStatus::Unknown
+                        && matches!(
+                            self.agent,
+                            CLIAgent::Codex | CLIAgent::Claude | CLIAgent::Grok
+                        ))
+                {
                     return None;
                 }
                 self.clear_permission_scoped_state();
@@ -228,7 +259,16 @@ impl CLIAgentSession {
                     self.session_context.response = event.payload.response.clone();
                 }
                 self.clear_permission_scoped_state();
-                CLIAgentSessionStatus::Success
+                // Stop 在其他 hook 决定继续之前执行；原生回合 ID 只能证明归属。
+                // 保留当前响应供查看，但不能锁定成功并吞掉同回合后续审批或失败。
+                if matches!(
+                    self.agent,
+                    CLIAgent::Codex | CLIAgent::Claude | CLIAgent::Grok
+                ) {
+                    CLIAgentSessionStatus::Unknown
+                } else {
+                    CLIAgentSessionStatus::Success
+                }
             }
             CLIAgentEventType::StopFailure => {
                 self.session_context.query = event.payload.query.clone();
@@ -252,7 +292,7 @@ impl CLIAgentSession {
                     .payload
                     .summary
                     .clone()
-                    .or_else(|| Some("Waiting for your answer".to_owned())),
+                    .or_else(|| Some(crate::t!("cli-agent-waiting-for-answer"))),
             },
             CLIAgentEventType::PermissionReplied => {
                 if !matches!(self.status, CLIAgentSessionStatus::Blocked { .. }) {
@@ -264,6 +304,11 @@ impl CLIAgentSession {
             // IdlePrompt means the agent is sitting at its prompt waiting for input.
             // This should not affect status — otherwise it would override Success after a Stop event.
             CLIAgentEventType::IdlePrompt => return None,
+            CLIAgentEventType::Notification => return None,
+            CLIAgentEventType::Cancelled => {
+                self.clear_permission_scoped_state();
+                CLIAgentSessionStatus::Cancelled
+            }
             CLIAgentEventType::SessionStart => {
                 self.plugin_version = event.payload.plugin_version.clone();
                 return None;
@@ -271,6 +316,9 @@ impl CLIAgentSession {
             CLIAgentEventType::Unknown(_) => return None,
         };
 
+        if self.status == new_status {
+            return None;
+        }
         self.status = new_status.clone();
         Some(new_status)
     }
@@ -345,12 +393,9 @@ struct CtrlCCancelState {
     has_seen_prompt_submit: bool,
     /// Abort handle for the in-flight grace-window timer, if armed.
     pending_cancel: Option<SpawnedFutureHandle>,
-    /// Identifies the window `pending_cancel` belongs to. `SpawnedFutureHandle::abort`
-    /// only takes effect the next time the future is polled, so a timer that has
-    /// already completed (and queued its resolve callback) can still run after
-    /// `abort()` is called. The callback captures this token and only acts if it
-    /// still matches when it fires, so a stale callback racing a disarming event
-    /// is a no-op instead of overwriting that event's status with `Cancelled`.
+    /// 标识 `pending_cancel` 所属的等待窗口。`SpawnedFutureHandle::abort` 要等下次轮询
+    /// 才生效，已完成计时并排队的回调仍可能执行。回调仅在令牌仍匹配时生效，
+    /// 防止过时回调把较新的事件状态覆盖为 `Unknown`。
     armed_token: Option<u64>,
 }
 
@@ -365,6 +410,15 @@ pub struct CLIAgentSessionsModel {
     /// Source of `CtrlCCancelState::armed_token` values. Monotonically increasing;
     /// never reused, so a stale callback can never alias a newer window.
     next_ctrl_c_token: u64,
+    event_cursors: HashMap<EntityId, EventCursor>,
+    input_generations: HashMap<EntityId, Uuid>,
+    input_submissions: HashMap<EntityId, Uuid>,
+    #[cfg(feature = "local_fs")]
+    local_task_bindings: HashMap<EntityId, local_tasks::TaskBinding>,
+    #[cfg(feature = "local_fs")]
+    restored_local_tasks: Vec<crate::persistence::model::LocalCliTask>,
+    #[cfg(feature = "local_fs")]
+    local_task_recovery_failed: bool,
 }
 
 impl Entity for CLIAgentSessionsModel {
@@ -380,11 +434,55 @@ impl CLIAgentSessionsModel {
             plugin_auto_failures: HashSet::new(),
             ctrl_c_cancel_state: HashMap::new(),
             next_ctrl_c_token: 0,
+            event_cursors: HashMap::new(),
+            input_generations: HashMap::new(),
+            input_submissions: HashMap::new(),
+            #[cfg(feature = "local_fs")]
+            local_task_bindings: HashMap::new(),
+            #[cfg(feature = "local_fs")]
+            restored_local_tasks: Vec::new(),
+            #[cfg(feature = "local_fs")]
+            local_task_recovery_failed: false,
         }
     }
 
     pub fn session(&self, terminal_view_id: EntityId) -> Option<&CLIAgentSession> {
         self.sessions.get(&terminal_view_id)
+    }
+
+    /// 异步粘贴和延迟 Enter 必须核对代次，禁止写入已取消或替换的会话。
+    pub(crate) fn input_generation(&self, terminal_view_id: EntityId) -> Option<Uuid> {
+        self.input_generations.get(&terminal_view_id).copied()
+    }
+
+    /// 同一代际只允许一个文本、附件与 Enter 提交流程，拒绝时调用方保留草稿。
+    pub(crate) fn begin_input_submission(
+        &mut self,
+        terminal_view_id: EntityId,
+        generation: Uuid,
+    ) -> bool {
+        if self.input_generation(terminal_view_id) != Some(generation)
+            || self.input_submissions.get(&terminal_view_id) == Some(&generation)
+        {
+            return false;
+        }
+        self.input_submissions.insert(terminal_view_id, generation);
+        true
+    }
+
+    pub(crate) fn is_input_submission_current(
+        &self,
+        terminal_view_id: EntityId,
+        generation: Uuid,
+    ) -> bool {
+        self.input_generation(terminal_view_id) == Some(generation)
+            && self.input_submissions.get(&terminal_view_id) == Some(&generation)
+    }
+
+    pub(crate) fn finish_input_submission(&mut self, terminal_view_id: EntityId, generation: Uuid) {
+        if self.input_submissions.get(&terminal_view_id) == Some(&generation) {
+            self.input_submissions.remove(&terminal_view_id);
+        }
     }
 
     /// Returns `true` if the rich input editor is currently open for this terminal.
@@ -424,7 +522,6 @@ impl CLIAgentSessionsModel {
             .filter(|s| s.agent == agent)
         {
             // Upgrade existing session with plugin context.
-            session.status = CLIAgentSessionStatus::InProgress;
             session.listener = Some(listener);
             session.plugin_version = plugin_version;
             session.remote_host = remote_host;
@@ -461,9 +558,36 @@ impl CLIAgentSessionsModel {
     }
 
     pub fn remove_session(&mut self, terminal_view_id: EntityId, ctx: &mut ModelContext<Self>) {
+        self.input_generations.remove(&terminal_view_id);
+        self.input_submissions.remove(&terminal_view_id);
         self.abort_pending_cancel(terminal_view_id);
         self.ctrl_c_cancel_state.remove(&terminal_view_id);
+        self.event_cursors.remove(&terminal_view_id);
         if let Some(session) = self.sessions.remove(&terminal_view_id) {
+            #[cfg(feature = "local_fs")]
+            {
+                self.persist_local_task_status(
+                    terminal_view_id,
+                    CLIAgentSessionStatus::Disconnected,
+                    session.session_context.clone(),
+                    None,
+                    ctx,
+                );
+                self.local_task_bindings.remove(&terminal_view_id);
+            }
+            if matches!(
+                session.status,
+                CLIAgentSessionStatus::InProgress
+                    | CLIAgentSessionStatus::Blocked { .. }
+                    | CLIAgentSessionStatus::Unknown
+            ) {
+                ctx.emit(CLIAgentSessionsModelEvent::StatusChanged {
+                    terminal_view_id,
+                    agent: session.agent,
+                    status: CLIAgentSessionStatus::Disconnected,
+                    session_context: Box::new(session.session_context),
+                });
+            }
             ctx.emit(CLIAgentSessionsModelEvent::Ended {
                 terminal_view_id,
                 agent: session.agent,
@@ -480,21 +604,66 @@ impl CLIAgentSessionsModel {
         event: &CLIAgentEvent,
         ctx: &mut ModelContext<Self>,
     ) {
-        if !self.sessions.contains_key(&terminal_view_id) {
+        let Some(session) = self.sessions.get(&terminal_view_id) else {
+            return;
+        };
+        // 拒绝其他 CLI、旧原生会话和重投事件，且不让它们解除正在等待的取消。
+        if event.agent != session.agent
+            || event
+                .session_id
+                .as_ref()
+                .zip(session.session_context.session_id.as_ref())
+                .is_some_and(|(incoming, active)| incoming != active)
+        {
             return;
         }
 
-        // Any plugin event other than `IdlePrompt` is evidence the CLI agent
-        // process is still alive — an interrupt produces silence instead.
-        // Disarm a pending Ctrl-C cancellation window so this event's own
-        // status transition drives the session. `IdlePrompt` is excluded:
-        // it means the CLI is sitting idle at its interactive prompt, which
-        // is evidence of idleness rather than aliveness, so treating it as
-        // disarming would let an idle notification that arrives instead of
-        // a genuine `stop`/`stop_failure` after an interrupt silently defeat
-        // the grace window, leaving the session stuck exactly like the bug
-        // this feature exists to fix. `apply_event` still treats `IdlePrompt`
-        // as a no-op for status, independent of this.
+        let disposition = self
+            .event_cursors
+            .entry(terminal_view_id)
+            .or_default()
+            .accept(event);
+        match disposition {
+            EventDisposition::Drop => return,
+            EventDisposition::UnverifiedTerminal => {
+                let session = self
+                    .sessions
+                    .get_mut(&terminal_view_id)
+                    .expect("session checked above");
+                // 无原生回合关联的旧插件通知不能更新结果，也不能覆盖已经确认的终态。
+                if matches!(
+                    session.status,
+                    CLIAgentSessionStatus::Success
+                        | CLIAgentSessionStatus::Failed { .. }
+                        | CLIAgentSessionStatus::Cancelled
+                        | CLIAgentSessionStatus::Unknown
+                ) {
+                    return;
+                }
+                session.status = CLIAgentSessionStatus::Unknown;
+                ctx.emit(CLIAgentSessionsModelEvent::StatusChanged {
+                    terminal_view_id,
+                    agent: session.agent,
+                    status: session.status.clone(),
+                    session_context: Box::new(session.session_context.clone()),
+                });
+                #[cfg(feature = "local_fs")]
+                {
+                    let context = session.session_context.clone();
+                    self.persist_local_task_status(
+                        terminal_view_id,
+                        CLIAgentSessionStatus::Unknown,
+                        context,
+                        None,
+                        ctx,
+                    );
+                }
+                return;
+            }
+            EventDisposition::Accept => {}
+        }
+
+        // 只有属于当前会话和回合的事件才能解除取消等待；空闲通知不确认取消。
         if !matches!(event.event, CLIAgentEventType::IdlePrompt) {
             self.abort_pending_cancel(terminal_view_id);
         }
@@ -536,26 +705,45 @@ impl CLIAgentSessionsModel {
                 agent: session.agent,
             });
         }
+        #[cfg(feature = "local_fs")]
+        {
+            let status = session.status.clone();
+            let context = session.session_context.clone();
+            let evidence = (event.source == CLIAgentEventSource::RichPlugin
+                && matches!(
+                    event.event,
+                    CLIAgentEventType::Stop
+                        | CLIAgentEventType::StopFailure
+                        | CLIAgentEventType::Cancelled
+                ))
+            .then(|| {
+                serde_json::json!({
+                    "source": "osc777",
+                    "event": format!("{:?}", event.event),
+                    "event_id": event.payload.event_id,
+                    "sequence": event.payload.sequence,
+                    "turn_id": event.payload.turn_id,
+                    "prompt_id": event.payload.prompt_id,
+                    "session_id": event.session_id,
+                })
+                .to_string()
+            });
+            self.persist_local_task_status(terminal_view_id, status, context, evidence, ctx);
+        }
     }
 
-    /// Observes a Ctrl-C byte (`0x03`) written to this session's PTY.
-    ///
-    /// This is observation only: the caller is responsible for forwarding the
-    /// byte to the PTY unchanged and immediately, regardless of what this
-    /// does. If the session is currently interruptible — `InProgress` or
-    /// `Blocked`, rich-status-capable (excludes the Codex OSC 9 fallback),
-    /// and has seen at least one `prompt_submit` (guarding against the
-    /// optimistic `InProgress` set at registration, before any turn has
-    /// started) — arms a grace window after which the session resolves to
-    /// `Cancelled` if no disarming plugin activity arrives first (any event
-    /// except `IdlePrompt`, which is evidence of idleness rather than
-    /// aliveness; see `update_from_event`). A second Ctrl-C while a window
-    /// is already armed reuses it rather than resetting the clock.
+    /// 观察发往此会话 PTY 的 Ctrl-C 字节（`0x03`），调用方仍应立即原样转发。
+    /// 仅在会话处于 `InProgress` 或 `Blocked`、支持富状态（不含 Codex OSC 9 回退），
+    /// 且已收到 `prompt_submit` 时启动原生确认等待，避免误用注册时的乐观运行状态。
+    /// 超时且没有可信事件时只标记 Unknown；重复 Ctrl-C 不重置等待窗口。
     pub fn observe_ctrl_c_write(
         &mut self,
         terminal_view_id: EntityId,
         ctx: &mut ModelContext<Self>,
     ) {
+        if let Some(generation) = self.input_generations.get_mut(&terminal_view_id) {
+            *generation = Uuid::new_v4();
+        }
         self.observe_ctrl_c_write_with_window(terminal_view_id, CTRL_C_CANCEL_WINDOW, ctx);
     }
 
@@ -602,12 +790,8 @@ impl CLIAgentSessionsModel {
         state.armed_token = Some(token);
     }
 
-    /// Called when a session's pending-cancel window lapses with no
-    /// disarming plugin event. Transitions the session to `Cancelled` unless
-    /// `token` no longer matches the currently armed window — meaning this
-    /// callback was already queued (post `Timer::after` completion, pre-poll)
-    /// when the window was disarmed, replaced, or removed, and
-    /// `SpawnedFutureHandle::abort` did not take effect in time to stop it.
+    /// 等待窗口结束且未收到解除等待的插件事件时，将会话标为 `Unknown`。
+    /// 若 `token` 不再匹配，则窗口已被解除、替换或移除；忽略尚未被 abort 阻止的排队回调。
     fn resolve_pending_cancel(
         &mut self,
         terminal_view_id: EntityId,
@@ -628,7 +812,7 @@ impl CLIAgentSessionsModel {
         if !owns_current_window {
             return;
         }
-        self.force_cancel(terminal_view_id, ctx);
+        self.resolve_unconfirmed_interrupt(terminal_view_id, ctx);
     }
 
     /// Aborts and clears any armed pending-cancel window for this terminal.
@@ -643,10 +827,12 @@ impl CLIAgentSessionsModel {
         }
     }
 
-    /// Sets `status` to `Cancelled` and emits `StatusChanged`, unless the
-    /// session has already moved past `InProgress`/`Blocked` or no longer
-    /// exists.
-    fn force_cancel(&mut self, terminal_view_id: EntityId, ctx: &mut ModelContext<Self>) {
+    /// 仅对仍存在且处于 `InProgress` 或 `Blocked` 的会话设置 `Unknown` 并发出状态事件。
+    fn resolve_unconfirmed_interrupt(
+        &mut self,
+        terminal_view_id: EntityId,
+        ctx: &mut ModelContext<Self>,
+    ) {
         let Some(session) = self.sessions.get_mut(&terminal_view_id) else {
             return;
         };
@@ -657,13 +843,22 @@ impl CLIAgentSessionsModel {
             return;
         }
 
-        session.status = CLIAgentSessionStatus::Cancelled;
+        // 沉默只代表未确认；不能把慢响应、断线或插件失效当成取消成功。
+        session.status = CLIAgentSessionStatus::Unknown;
         let agent = session.agent;
         let session_context = Box::new(session.session_context.clone());
+        #[cfg(feature = "local_fs")]
+        self.persist_local_task_status(
+            terminal_view_id,
+            CLIAgentSessionStatus::Unknown,
+            *session_context.clone(),
+            None,
+            ctx,
+        );
         ctx.emit(CLIAgentSessionsModelEvent::StatusChanged {
             terminal_view_id,
             agent,
-            status: CLIAgentSessionStatus::Cancelled,
+            status: CLIAgentSessionStatus::Unknown,
             session_context,
         });
     }
@@ -675,7 +870,7 @@ impl CLIAgentSessionsModel {
     pub(crate) fn has_pending_or_resolved_ctrl_c_cancel(&self, terminal_view_id: EntityId) -> bool {
         if matches!(
             self.sessions.get(&terminal_view_id).map(|s| &s.status),
-            Some(CLIAgentSessionStatus::Cancelled)
+            Some(CLIAgentSessionStatus::Cancelled | CLIAgentSessionStatus::Unknown)
         ) {
             return true;
         }
@@ -728,6 +923,8 @@ impl CLIAgentSessionsModel {
 
         let previous_input_state = session.input_state;
         session.input_state = CLIAgentInputState::Closed;
+        self.input_generations
+            .insert(terminal_view_id, Uuid::new_v4());
         session.should_auto_toggle_input = should_auto_toggle_input;
         ctx.emit(CLIAgentSessionsModelEvent::InputSessionChanged {
             terminal_view_id,
@@ -744,6 +941,8 @@ impl CLIAgentSessionsModel {
         ctx: &mut ModelContext<Self>,
     ) {
         let agent = session.agent;
+        self.input_generations
+            .insert(terminal_view_id, Uuid::new_v4());
         // Close any open rich input before replacing, so subscribers can
         // restore input config before the session ends.
         self.close_input(terminal_view_id, false, ctx);
@@ -751,6 +950,7 @@ impl CLIAgentSessionsModel {
         // arm, and any pending window belonged to the session being replaced.
         self.abort_pending_cancel(terminal_view_id);
         self.ctrl_c_cancel_state.remove(&terminal_view_id);
+        self.event_cursors.remove(&terminal_view_id);
         if let Some(old) = self.sessions.insert(terminal_view_id, session) {
             ctx.emit(CLIAgentSessionsModelEvent::Ended {
                 terminal_view_id,

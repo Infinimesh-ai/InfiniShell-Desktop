@@ -1542,7 +1542,9 @@ impl AgentDriver {
                         CLIAgentSessionStatus::Failed { .. } => {
                             harness_exit.end_run_now(());
                         }
-                        CLIAgentSessionStatus::InProgress => {
+                        CLIAgentSessionStatus::InProgress
+                        | CLIAgentSessionStatus::Unknown
+                        | CLIAgentSessionStatus::Disconnected => {
                             harness_exit.cancel_idle_timeout();
                         }
                     }

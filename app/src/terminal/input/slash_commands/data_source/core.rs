@@ -21,6 +21,7 @@ use crate::search::slash_command_menu::fuzzy_match::SlashCommandFuzzyMatchResult
 use crate::search::slash_command_menu::static_commands::{Availability, commands};
 use crate::search::slash_command_menu::{SlashCommandId, StaticCommand};
 use crate::settings::{AISettings, AISettingsChangedEvent};
+use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::{
     CLIAgentInputState, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
@@ -402,16 +403,12 @@ pub trait SlashCommandDataSource {
         CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.terminal_view_id())
     }
 
-    /// Returns the supported skill providers for the active CLI agent, or `None` if
-    /// CLI agent input is not open (meaning no filtering should be applied).
-    fn active_cli_agent_providers(
-        &self,
-        ctx: &AppContext,
-    ) -> Option<&'static [ai::skills::SkillProvider]> {
+    /// 返回富输入对应的 CLI，以便按技能来源和作用域筛选。
+    fn active_cli_agent(&self, ctx: &AppContext) -> Option<CLIAgent> {
         CLIAgentSessionsModel::as_ref(ctx)
             .session(self.terminal_view_id())
             .filter(|s| matches!(s.input_state, CLIAgentInputState::Open { .. }))
-            .map(|s| s.agent.supported_skill_providers())
+            .map(|s| s.agent)
     }
 
     /// Fuzzy-match the active commands against `query_text`. Returns scored [`InlineItem`]s with
@@ -459,7 +456,7 @@ pub trait SlashCommandDataSource {
             return Vec::new();
         }
 
-        let cli_agent_providers = self.active_cli_agent_providers(app);
+        let cli_agent = self.active_cli_agent(app);
         let active_session = self.active_session().as_ref(app);
         let cwd_path = active_session.current_working_directory_location(app);
         let skills = SkillManager::handle(app)
@@ -473,7 +470,8 @@ pub trait SlashCommandDataSource {
             // provider folder. We check all paths (not just the deduplicated
             // provider) because deduplication may have picked a higher-priority
             // provider even when the skill also exists in the CLI agent's folder.
-            if let Some(providers) = &cli_agent_providers {
+            if let Some(agent) = cli_agent {
+                let providers = agent.supported_skill_providers_for_scope(skill.scope);
                 if !skill_manager.skill_exists_for_any_provider(&skill, providers) {
                     continue;
                 }
