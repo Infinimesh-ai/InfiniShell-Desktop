@@ -21,6 +21,23 @@ on:
         required: true
         default: false
         type: boolean
+      run_intel_dmg_validation:
+        description: 原生 Intel 主机只读验收指定发行 Run 的 DMG
+        required: true
+        default: false
+        type: boolean
+      release_run_id:
+        description: 生成 Intel DMG 的正式 GitHub Actions Run ID
+        required: false
+        type: string
+      release_tag:
+        description: 该 Run 对应的冻结发布 Tag
+        required: false
+        type: string
+      release_sha:
+        description: 该 Tag 应指向的精确源提交 SHA
+        required: false
+        type: string
       full_workspace_tests:
         description: Compile GUI integration tests and run the desktop workspace unit suite
         required: true
@@ -29,6 +46,7 @@ on:
 # 自托管 runner 只需要读取代码。这个 workflow 不接收部署密钥，也不向仓库写入内容。
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: cross-platform-preflight-${{ github.ref }}
@@ -152,6 +170,68 @@ jobs:
           path: infinishell-intel-cli-preflight.tar.gz
           if-no-files-found: error
           retention-days: 3
+
+  macos_intel_dmg_validation:
+    name: macOS Intel DMG native acceptance
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_intel_dmg_validation }}
+    runs-on: macos-26-intel
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_RUN_ID: ${{ inputs.release_run_id }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      RELEASE_SHA: ${{ inputs.release_sha }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      - name: Download and verify exact release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == 'Infinimesh-ai/InfiniShell-Desktop' ]]
+          [[ "$RELEASE_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_TAG" =~ ^v0\.[0-9]{4}\.[0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{2}\.oss_[0-9]{2}$ ]]
+          run_sha=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RELEASE_RUN_ID" --jq .head_sha)
+          [[ "$run_sha" == "$RELEASE_SHA" ]]
+          git fetch --no-tags origin "refs/tags/$RELEASE_TAG"
+          tag_sha=$(git rev-parse 'FETCH_HEAD^{commit}')
+          [[ "$tag_sha" == "$RELEASE_SHA" ]]
+          mkdir -p assets/intel assets/resources
+          gh run download "$RELEASE_RUN_ID" -R "$GITHUB_REPOSITORY" \
+            -n infinishell-macos-intel -D assets/intel
+          gh run download "$RELEASE_RUN_ID" -R "$GITHUB_REPOSITORY" \
+            -n infinishell-bundled-remote-server-resources -D assets/resources
+          shasum -a 256 assets/resources/remote-server/manifest.json
+
+      - name: Mount DMG read-only and run native Intel binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg_count=$(find assets/intel -type f -name '*.dmg' | wc -l | tr -d ' ')
+          [[ "$dmg_count" -eq 1 ]]
+          dmg_file=$(find assets/intel -type f -name '*.dmg' -print -quit)
+          manifest_sha=$(shasum -a 256 assets/resources/remote-server/manifest.json | awk '{print $1}')
+          python3 script/release/validate-intel-dmg.py \
+            --tag "$RELEASE_TAG" \
+            --dmg "$dmg_file" \
+            --ci-resources assets/resources/remote-server \
+            --isolation "$RUNNER_TEMP/intel-dmg-acceptance-$GITHUB_RUN_ID" \
+            --manifest-sha256 "$manifest_sha" \
+            --expected-signature adhoc
+          shasum -a 256 "$dmg_file"
+
+      - name: Upload native acceptance evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: infinishell-intel-dmg-native-acceptance
+          path: ${{ runner.temp }}/intel-dmg-acceptance-${{ github.run_id }}/result.json
+          if-no-files-found: error
+          retention-days: 7
 
   windows:
     name: Windows x64
