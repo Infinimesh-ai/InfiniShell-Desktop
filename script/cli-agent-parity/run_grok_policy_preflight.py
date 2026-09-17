@@ -39,7 +39,8 @@ DIAGNOSTIC_METHODS = (
 )
 ALLOWED_METHODS = ("initialize", "session/new", "session/load", *DIAGNOSTIC_METHODS)
 RESPONSE_STATES = {"ok", "method_not_found", "auth_required", "rpc_error", "timeout"}
-NOTIFICATION_METHODS = {"session/update", "_x.ai/mcp_initialized", "_x.ai/mcp/init_progress", "_x.ai/mcp/server_status"}
+GLOBAL_CATALOG_METHOD = "_x.ai/mcp/servers_updated"
+NOTIFICATION_METHODS = {"session/update", "_x.ai/mcp_initialized", "_x.ai/mcp/init_progress", "_x.ai/mcp/server_status", GLOBAL_CATALOG_METHOD}
 JSON_TYPES = {"absent", "null", "boolean", "number", "string", "array", "object"}
 LIMITATIONS = (
     "candidate_source_differs_from_binary", "no_effective_builtin_catalog_interface_verified",
@@ -224,6 +225,9 @@ def project_events(events):
             require(isinstance(item, dict) and isinstance(item.get("event"), str)
                 and item["event"] in schemas, "event_schema_invalid")
             schema = schemas[item["event"]]
+            if item["event"] == "native_notification_diagnostic" and item.get("method") == GLOBAL_CATALOG_METHOD:
+                # 仅这一已核验的全局通知携带封闭空目录结论；未知参数仍不公开。
+                schema = schema | {"global_catalog_closed_empty": lambda value: type(value) is bool}
             require(set(item) == {"event", *schema}, "event_schema_invalid")
             require(all(check(item[name]) for name, check in schema.items()), "event_value_invalid")
             # 深拷贝只通过封闭模式的内容；未知字段的值不进入任何公开产物。
@@ -263,7 +267,12 @@ def audit_events(exit_code, stdout, events):
         require(len(set(generations)) == MAX_PROCESSES, "generation_reused")
         # 摘要只保留安全诊断；未知通知或异常帧不能靠成功finish覆盖。
         require(all(isinstance(row["method"], str) and row["method"] in NOTIFICATION_METHODS
-            and row["frame_type"] == row["params_type"] == "object" and row["session_id"]["type"] == "string"
+            and row["frame_type"] == row["params_type"] == "object"
+            and (row["global_catalog_closed_empty"] is True
+                and row["session_id"] == {"type": "absent"}
+                and row["method_summary"] == {"type": "string", "bytes": 25,
+                    "sha256": sha(GLOBAL_CATALOG_METHOD.encode())}
+                if row["method"] == GLOBAL_CATALOG_METHOD else row["session_id"]["type"] == "string")
             and not any(row[key] for key in ("id_present", "result_present", "error_present"))
             for row in one("native_notification_diagnostic")), "notification_unproved")
         require(public[0] is start and public[-1] is finish

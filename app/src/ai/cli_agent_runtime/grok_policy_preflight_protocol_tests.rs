@@ -309,6 +309,236 @@ fn known_mcp_initialization_diagnostic_does_not_expand_policy_white_list() {
 }
 
 #[test]
+fn empty_global_catalog_preserves_the_unbound_session_and_pending_rpc() {
+    let mut observations = Observations {
+        pending_response: Some((2, RequestKind::New)),
+        ..Observations::default()
+    };
+    let frame = json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated",
+        "params":{"mcpServers":[]}});
+
+    assert_eq!(observations.notification(&frame), Ok(()));
+    assert_eq!(observations.native_session, None);
+    assert_eq!(observations.pending_response, Some((2, RequestKind::New)));
+    assert!(observations.completed_responses.is_empty());
+    assert_eq!(observations.received_notifications, 1);
+    let diagnostic = notification_diagnostic(&frame, Uuid::nil());
+    assert_eq!(diagnostic["global_catalog_closed_empty"], true);
+    assert_eq!(diagnostic["session_id"], json!({"type":"absent"}));
+}
+
+#[test]
+fn global_catalog_accepts_only_the_actual_new_and_load_registered_lists() {
+    let new = outbound(RequestKind::New, 2, Path::new(CWD), None).unwrap();
+    let load = outbound(RequestKind::Load, 8, Path::new(CWD), Some(SESSION)).unwrap();
+    assert_eq!(new["params"]["mcpServers"], json!([]));
+    assert_eq!(load["params"]["mcpServers"], json!([]));
+    let mut observations = Observations::default();
+    observations.bind(SESSION).unwrap();
+
+    assert_eq!(
+        observations.notification(
+            &json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated",
+            "params":{"mcpServers":new["params"]["mcpServers"]}})
+        ),
+        Ok(())
+    );
+    assert_eq!(
+        observations.notification(
+            &json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated",
+            "params":{"mcpServers":load["params"]["mcpServers"]}})
+        ),
+        Ok(())
+    );
+    assert_eq!(observations.native_session.as_deref(), Some(SESSION));
+    assert_eq!(observations.received_notifications, 2);
+}
+
+#[test]
+fn nonempty_global_catalog_cannot_introduce_unregistered_servers() {
+    let mut observations = Observations::default();
+    let frame = json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated",
+        "params":{"mcpServers":[{"name":"unregistered-source","source":"local",
+            "type":"stdio","command":"OFFLINE_DO_NOT_EXECUTE"}]}});
+
+    assert_eq!(
+        observations.notification(&frame),
+        Err("native_extra_mcp_sources_observed")
+    );
+    assert_eq!(observations.received_notifications, 0);
+    assert_eq!(observations.native_session, None);
+}
+
+#[test]
+fn global_catalog_rejects_missing_malformed_and_extra_metadata() {
+    for params in [
+        json!({}),
+        json!({"mcpServers":null}),
+        json!({"mcpServers":{}}),
+        json!({"mcpServers":"OFFLINE_NOT_A_LIST"}),
+        json!({"mcpServers":[],"servers":[]}),
+        json!({"mcpServers":[],"_meta":{"capabilities":{}}}),
+        json!({"mcpServers":[],"tools":[]}),
+    ] {
+        let mut observations = Observations::default();
+        let frame = json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated","params":params});
+
+        assert_eq!(
+            observations.notification(&frame),
+            Err("native_mcp_catalog_invalid")
+        );
+        assert_eq!(observations.received_notifications, 0);
+        assert_eq!(observations.native_session, None);
+    }
+}
+
+#[test]
+fn global_catalog_cannot_claim_a_foreign_session_or_native_generation() {
+    for params in [
+        json!({"mcpServers":[],"sessionId":FOREIGN}),
+        json!({"mcpServers":[],"sessionId":SESSION}),
+        json!({"mcpServers":[],"generation":FOREIGN}),
+        json!({"mcpServers":[],"_meta":{"generation":FOREIGN}}),
+    ] {
+        let mut observations = Observations {
+            native_session: Some(SESSION.to_owned()),
+            pending_response: Some((3, RequestKind::Info)),
+            ..Observations::default()
+        };
+        let frame = json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated","params":params});
+
+        assert_eq!(
+            observations.notification(&frame),
+            Err("native_mcp_catalog_invalid")
+        );
+        assert_eq!(observations.native_session.as_deref(), Some(SESSION));
+        assert_eq!(observations.pending_response, Some((3, RequestKind::Info)));
+        assert_eq!(observations.received_notifications, 0);
+    }
+}
+
+#[test]
+fn global_catalog_rejects_response_request_and_outer_identity_injection() {
+    for frame in [
+        json!({"jsonrpc":"1.0","method":"_x.ai/mcp/servers_updated","params":{"mcpServers":[]}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"_x.ai/mcp/servers_updated","params":{"mcpServers":[]}}),
+        json!({"jsonrpc":"2.0","id":"skills-reload","method":"_x.ai/mcp/servers_updated","params":{"mcpServers":[]}}),
+        json!({"jsonrpc":"2.0","result":{},"method":"_x.ai/mcp/servers_updated","params":{"mcpServers":[]}}),
+        json!({"jsonrpc":"2.0","error":{},"method":"_x.ai/mcp/servers_updated","params":{"mcpServers":[]}}),
+        json!({"jsonrpc":"2.0","generation":FOREIGN,"method":"_x.ai/mcp/servers_updated","params":{"mcpServers":[]}}),
+    ] {
+        let mut observations = Observations {
+            pending_response: Some((2, RequestKind::New)),
+            ..Observations::default()
+        };
+
+        assert_eq!(
+            observations.notification(&frame),
+            Err("native_reverse_request_rejected")
+        );
+        assert_eq!(observations.pending_response, Some((2, RequestKind::New)));
+        assert!(observations.completed_responses.is_empty());
+        assert_eq!(observations.received_notifications, 0);
+    }
+}
+
+#[test]
+fn repeated_and_reordered_global_catalogs_do_not_complete_owned_rpcs() {
+    let mut observations = Observations {
+        pending_response: Some((1, RequestKind::Initialize)),
+        ..Observations::default()
+    };
+    let catalog = json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated",
+        "params":{"mcpServers":[]}});
+    let initialized = json!({"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1}});
+
+    observations.notification(&catalog).unwrap();
+    assert_eq!(
+        observations.pending_response,
+        Some((1, RequestKind::Initialize))
+    );
+    assert_eq!(
+        observations.response_transaction(&initialized),
+        Ok(Some(RequestKind::Initialize))
+    );
+    observations.pending_response = Some((2, RequestKind::New));
+    observations.notification(&catalog).unwrap();
+    observations.notification(&catalog).unwrap();
+    assert_eq!(observations.response_transaction(&initialized), Ok(None));
+    assert_eq!(observations.pending_response, Some((2, RequestKind::New)));
+    assert_eq!(observations.completed_responses.len(), 1);
+    assert_eq!(observations.received_notifications, 3);
+    assert_eq!(observations.native_session, None);
+}
+
+#[test]
+fn global_catalog_server_and_notification_budgets_preserve_pending_identity() {
+    let mut observations = Observations {
+        pending_response: Some((2, RequestKind::New)),
+        ..Observations::default()
+    };
+    let too_many = json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated",
+        "params":{"mcpServers":vec![json!({});65]}});
+    assert_eq!(
+        observations.notification(&too_many),
+        Err("native_mcp_catalog_budget_exceeded")
+    );
+    assert_eq!(observations.received_notifications, 0);
+
+    observations.received_notifications = MAX_FRAMES;
+    let catalog = json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated",
+        "params":{"mcpServers":[]}});
+    assert_eq!(
+        observations.notification(&catalog),
+        Err("native_mcp_catalog_budget_exceeded")
+    );
+    assert_eq!(observations.received_notifications, MAX_FRAMES);
+    assert_eq!(observations.pending_response, Some((2, RequestKind::New)));
+    assert_eq!(observations.native_session, None);
+}
+
+#[test]
+fn global_catalog_method_variants_do_not_expand_the_notification_contract() {
+    for method in [
+        "x.ai/mcp/servers_updated",
+        "__x.ai/mcp/servers_updated",
+        "_x.ai/mcp/servers_updated/extra",
+        "_x.ai/mcp/tools_changed",
+    ] {
+        let mut observations = Observations::default();
+        let frame = json!({"jsonrpc":"2.0","method":method,"params":{"mcpServers":[]}});
+        assert_eq!(
+            observations.notification(&frame),
+            Err("native_unknown_notification_rejected")
+        );
+        assert_eq!(observations.received_notifications, 0);
+    }
+}
+
+#[test]
+fn global_catalog_diagnostic_projects_the_verified_method_without_catalog_body() {
+    let frame = json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated",
+        "params":{"mcpServers":[{"name":"OFFLINE_PRIVATE_SERVER",
+            "env":[{"name":"OFFLINE_PRIVATE_ENV","value":"OFFLINE_PRIVATE_VALUE"}]}]}});
+    let diagnostic = notification_diagnostic(&frame, Uuid::nil());
+
+    assert_eq!(diagnostic["method"], "_x.ai/mcp/servers_updated");
+    assert_eq!(diagnostic["global_catalog_closed_empty"], false);
+    assert_eq!(diagnostic["method_summary"]["bytes"], 25);
+    assert_eq!(
+        diagnostic["method_summary"]["sha256"],
+        "5ad0b9eadd8fadb2225bf5c00b21c1cf42ab869332b86333e722aa248a106580"
+    );
+    assert!(!diagnostic.to_string().contains("OFFLINE_PRIVATE_SERVER"));
+    assert!(!diagnostic.to_string().contains("OFFLINE_PRIVATE_ENV"));
+    assert!(!diagnostic.to_string().contains("OFFLINE_PRIVATE_VALUE"));
+    assert_eq!(
+        Observations::default().notification(&frame),
+        Err("native_extra_mcp_sources_observed")
+    );
+}
+
+#[test]
 fn late_declared_response_and_exact_replay_do_not_complete_another_pending_rpc() {
     let mut observations = Observations {
         pending_response: Some((2, RequestKind::New)),

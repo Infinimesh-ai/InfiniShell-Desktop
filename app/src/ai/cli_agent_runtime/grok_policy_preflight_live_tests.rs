@@ -455,6 +455,21 @@ struct Observations {
     completed_responses: HashMap<usize, ([u8; 32], RequestKind)>,
 }
 
+fn global_catalog_empty(params: &Value) -> ProbeResult<()> {
+    check(
+        params
+            .as_object()
+            .is_some_and(|params| params.len() == 1 && params.contains_key("mcpServers")),
+        "native_mcp_catalog_invalid",
+    )?;
+    let servers = params["mcpServers"]
+        .as_array()
+        .ok_or("native_mcp_catalog_invalid")?;
+    check(servers.len() <= 64, "native_mcp_catalog_budget_exceeded")?;
+    // 实际 profile 及 New/Load 均注册空列表；目录不能引入其他服务域。
+    check(servers.is_empty(), "native_extra_mcp_sources_observed")
+}
+
 impl Observations {
     fn response_transaction(&mut self, frame: &Value) -> ProbeResult<Option<RequestKind>> {
         check(
@@ -515,6 +530,16 @@ impl Observations {
             "native_prompt_activity_rejected",
         )?;
         match frame["method"].as_str() {
+            Some("_x.ai/mcp/servers_updated") => {
+                // 全局目录属于当前阶段独占的传输；不声明会话、回合或原生 generation。
+                global_catalog_empty(&frame["params"])?;
+                check(
+                    self.received_notifications < MAX_FRAMES,
+                    "native_mcp_catalog_budget_exceeded",
+                )?;
+                self.received_notifications += 1;
+                return Ok(());
+            }
             Some("session/update") => {
                 check(
                     matches!(
@@ -560,17 +585,27 @@ fn notification_diagnostic(frame: &Value, generation: Uuid) -> Value {
             "session/update"
             | "_x.ai/mcp_initialized"
             | "_x.ai/mcp/init_progress"
-            | "_x.ai/mcp/server_status",
+            | "_x.ai/mcp/server_status"
+            | "_x.ai/mcp/servers_updated",
         ) => frame["method"].clone(),
         Some(_) | None => super::diagnostic_value(frame.get("method")),
     };
-    json!({"event":"native_notification_diagnostic","generation":generation,"method":method,
+    let mut diagnostic = json!({"event":"native_notification_diagnostic","generation":generation,"method":method,
         "method_summary":super::diagnostic_value(frame.get("method")),
         "frame_type":super::diagnostic_value_type(Some(frame)),
         "params_type":super::diagnostic_value_type(frame.get("params")),
         "id_present":frame.get("id").is_some(),"result_present":frame.get("result").is_some(),
         "error_present":frame.get("error").is_some(),
-        "session_id":super::diagnostic_value(frame.get("params").and_then(|params|params.get("sessionId")))})
+        "session_id":super::diagnostic_value(frame.get("params").and_then(|params|params.get("sessionId")))});
+    if frame["method"] == "_x.ai/mcp/servers_updated" {
+        // 仅公开封闭空目录的校验结论；失败参数或环境值不进入投影。
+        diagnostic["global_catalog_closed_empty"] = json!(
+            frame.as_object().is_some_and(|frame| frame.len() == 3)
+                && frame["jsonrpc"] == "2.0"
+                && global_catalog_empty(&frame["params"]).is_ok()
+        );
+    }
+    diagnostic
 }
 
 fn phase_outcome<T>(

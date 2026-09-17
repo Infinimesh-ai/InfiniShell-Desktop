@@ -414,8 +414,14 @@ class NativeFailureDiagnosticTests(unittest.TestCase):
         rows.insert(rows.index(event(rows, "process_cleanup", FIRST)), row)
         return rows
 
+    def global_catalog(self):
+        return self.notification() | {"method": runner.GLOBAL_CATALOG_METHOD,
+            "method_summary": {"type": "string", "bytes": 25,
+                "sha256": runner.sha(runner.GLOBAL_CATALOG_METHOD.encode())},
+            "session_id": {"type": "absent"}, "global_catalog_closed_empty": True}
+
     def test_four_notification_methods_and_typed_summaries_have_closed_public_projection(self):
-        for method in runner.NOTIFICATION_METHODS:
+        for method in runner.NOTIFICATION_METHODS - {runner.GLOBAL_CATALOG_METHOD}:
             row = self.notification() | {"method": method}
             public, faults = runner.project_events([row])
             self.assertEqual(public, [row])
@@ -424,6 +430,100 @@ class NativeFailureDiagnosticTests(unittest.TestCase):
             result = runner.audit_events(0, SUMMARY, self.insert(row))
             self.assertTrue(result["execution_boundary_passed"])
             self.assertEqual(result["policy"], runner.unknown_policy())
+
+    def test_closed_empty_global_catalog_preserves_unknown_policy_without_native_session(self):
+        row = self.global_catalog()
+        self.assertEqual(runner.project_events([row]), ([row], []))
+        result = runner.audit_events(0, SUMMARY, self.insert(row))
+        self.assertTrue(result["execution_boundary_passed"])
+        self.assertEqual(result["policy"], runner.unknown_policy())
+        self.assertEqual(result["failure_diagnostics"]["notifications"][0]["session_id"], {"type": "absent"})
+        self.assertNotIn("mcpServers", json.dumps(result))
+
+    def test_global_catalog_repeats_and_rpc_interleaving_preserve_the_owned_response_ledger(self):
+        rows = fixture()
+        owned = next(row for row in rows if row["event"] == "rpc_response" and row["rpc_id"] == 2)
+        before = copy.deepcopy([row for row in rows if row["event"] in {"rpc_sent", "rpc_response"}])
+        rows.insert(rows.index(owned), self.global_catalog())
+        rows.insert(rows.index(owned) + 1, self.global_catalog())
+        result = runner.audit_events(0, SUMMARY, rows)
+        self.assertTrue(result["execution_boundary_passed"])
+        self.assertEqual([row for row in result["events"] if row["event"] in {"rpc_sent", "rpc_response"}], before)
+        self.assertEqual(len(result["failure_diagnostics"]["notifications"]), 2)
+        self.assertEqual(result["policy"], runner.unknown_policy())
+
+    def test_global_catalog_cannot_replace_a_missing_pending_response_or_supply_an_id(self):
+        rows = self.insert(self.global_catalog())
+        rows.remove(next(row for row in rows if row["event"] == "rpc_response" and row["rpc_id"] == 2))
+        result = runner.audit_events(0, SUMMARY, rows)
+        self.assertFalse(result["execution_boundary_passed"])
+        self.assertEqual(result["failure_code"], "response_missing")
+        for changes in ({"rpc_id": 2}, {"rpc_id": "skills-reload"}, {"id_present": True}):
+            result = runner.audit_events(0, SUMMARY, self.insert(self.global_catalog() | changes))
+            self.assertFalse(result["execution_boundary_passed"])
+            self.assertEqual(result["policy"], runner.unknown_policy())
+
+    def test_unknown_notification_cannot_borrow_the_global_catalog_proof_field(self):
+        for method in ("OFFLINE_UNKNOWN_METHOD", "_x.ai/mcp/servers_updated/extra", self.summary("OFFLINE_UNKNOWN_METHOD")):
+            public, faults = runner.project_events([self.global_catalog() | {"method": method}])
+            self.assertEqual(public, [])
+            self.assertEqual(len(faults), 1)
+            self.assertNotIn("OFFLINE_UNKNOWN_METHOD", json.dumps(faults))
+
+    def test_global_catalog_rejects_claimed_session_and_explicit_null_session(self):
+        for session in (self.summary("OFFLINE_NATIVE_SESSION"), {"type": "null", "bytes": 4, "sha256": runner.sha(b"null")}):
+            row = self.global_catalog() | {"session_id": session}
+            self.assertEqual(runner.project_events([row]), ([row], []))
+            result = runner.audit_events(0, SUMMARY, self.insert(row))
+            self.assertFalse(result["execution_boundary_passed"])
+            self.assertEqual(result["failure_code"], "notification_unproved")
+
+    def test_global_catalog_requires_a_true_boolean_closed_empty_shape_proof(self):
+        row = self.global_catalog() | {"global_catalog_closed_empty": False}
+        self.assertEqual(runner.project_events([row]), ([row], []))
+        result = runner.audit_events(0, SUMMARY, self.insert(row))
+        self.assertFalse(result["execution_boundary_passed"])
+        self.assertEqual(result["failure_code"], "notification_unproved")
+        for proof in (1, None, "true", {}):
+            public, faults = runner.project_events([self.global_catalog() | {"global_catalog_closed_empty": proof}])
+            self.assertEqual(public, [])
+            self.assertEqual(len(faults), 1)
+
+    def test_global_catalog_raw_nonempty_catalog_and_extra_metadata_only_export_hashes(self):
+        for changes in ({"mcpServers": [{"name": "OFFLINE_PRIVATE_SERVER"}]},
+                {"params": {"mcpServers": [], "sessionId": "OFFLINE_PRIVATE_SESSION"}},
+                {"metadata": "OFFLINE_PRIVATE_METADATA"}):
+            public, faults = runner.project_events([self.global_catalog() | changes])
+            self.assertEqual(public, [])
+            self.assertEqual(len(faults), 1)
+            self.assertNotIn("OFFLINE_PRIVATE_", json.dumps(faults))
+
+    def test_global_catalog_method_hash_size_and_type_must_match_the_fixed_utf8_name(self):
+        summary = self.global_catalog()["method_summary"]
+        for changes in ({"bytes": 26}, {"bytes": True}, {"bytes": runner.MAX_EVIDENCE_BYTES + 1},
+                {"sha256": "a" * 64}, {"sha256": "INVALID_HASH"}, {"type": "object"}, {"type": []}):
+            row = self.global_catalog() | {"method_summary": summary | changes}
+            result = runner.audit_events(0, SUMMARY, self.insert(row))
+            self.assertFalse(result["execution_boundary_passed"])
+            self.assertEqual(result["policy"], runner.unknown_policy())
+
+    def test_global_catalog_stale_generation_or_foreign_phase_cannot_pass(self):
+        row = self.global_catalog() | {"generation": FOREIGN}
+        result = runner.audit_events(0, SUMMARY, self.insert(row))
+        self.assertFalse(result["execution_boundary_passed"])
+        self.assertEqual(result["failure_code"], "event_generation_invalid")
+        rows = fixture()
+        rows.insert(rows.index(event(rows, "process_cleanup", FIRST)) + 1, self.global_catalog())
+        result = runner.audit_events(0, SUMMARY, rows)
+        self.assertFalse(result["execution_boundary_passed"])
+        self.assertEqual(result["failure_code"], "event_outside_process")
+
+    def test_global_catalog_proof_does_not_relax_other_notification_session_binding(self):
+        row = self.notification() | {"session_id": {"type": "absent"}}
+        result = runner.audit_events(0, SUMMARY, self.insert(row))
+        self.assertFalse(result["execution_boundary_passed"])
+        self.assertEqual(result["failure_code"], "notification_unproved")
+        self.assertEqual(runner.project_events([self.notification() | {"global_catalog_closed_empty": True}])[0], [])
 
     def test_unknown_method_summary_survives_failure_without_becoming_interface_success(self):
         row = self.notification() | {"method": self.summary("OFFLINE_UNKNOWN_METHOD")}
