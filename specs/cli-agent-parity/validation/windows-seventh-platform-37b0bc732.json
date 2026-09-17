@@ -1,0 +1,390 @@
+{
+  "commit": "37b0bc73288aab5be4d0d151796eea557be4c0fb",
+  "run_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35178775808",
+  "job": {
+    "completedAt": "2026-09-17T04:25:59Z",
+    "conclusion": "failure",
+    "databaseId": 105066231166,
+    "name": "Windows x64",
+    "startedAt": "2026-09-17T03:36:12Z",
+    "status": "completed",
+    "steps": [
+      {
+        "completedAt": "2026-09-17T03:36:23Z",
+        "conclusion": "success",
+        "name": "Set up job",
+        "number": 1,
+        "startedAt": "2026-09-17T03:36:15Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:36:37Z",
+        "conclusion": "success",
+        "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+        "number": 2,
+        "startedAt": "2026-09-17T03:36:23Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:36:52Z",
+        "conclusion": "success",
+        "name": "Prepare job-local Python for CLI parity verification",
+        "number": 3,
+        "startedAt": "2026-09-17T03:36:37Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:36:52Z",
+        "conclusion": "success",
+        "name": "Configure Windows build environment",
+        "number": 4,
+        "startedAt": "2026-09-17T03:36:52Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:36:59Z",
+        "conclusion": "success",
+        "name": "Verify provisioned toolchain",
+        "number": 5,
+        "startedAt": "2026-09-17T03:36:52Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:37:07Z",
+        "conclusion": "success",
+        "name": "Install Node for CLI plugin verification",
+        "number": 6,
+        "startedAt": "2026-09-17T03:36:59Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:37:08Z",
+        "conclusion": "success",
+        "name": "Test Grok notification plugin scripts",
+        "number": 7,
+        "startedAt": "2026-09-17T03:37:07Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:37:22Z",
+        "conclusion": "failure",
+        "name": "Test notification patch file transactions",
+        "number": 8,
+        "startedAt": "2026-09-17T03:37:08Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:37:22Z",
+        "conclusion": "skipped",
+        "name": "Prepare fixed native Codex without credentials",
+        "number": 9,
+        "startedAt": "2026-09-17T03:37:22Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:37:22Z",
+        "conclusion": "skipped",
+        "name": "Prepare fixed native Claude without credentials",
+        "number": 10,
+        "startedAt": "2026-09-17T03:37:22Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:37:22Z",
+        "conclusion": "skipped",
+        "name": "Prepare fixed native Grok without credentials",
+        "number": 11,
+        "startedAt": "2026-09-17T03:37:22Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:37:22Z",
+        "conclusion": "skipped",
+        "name": "Verify fixed Grok unauthenticated ACP boundaries",
+        "number": 12,
+        "startedAt": "2026-09-17T03:37:22Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:37:22Z",
+        "conclusion": "skipped",
+        "name": "Verify native Claude initialization and idle EOF",
+        "number": 13,
+        "startedAt": "2026-09-17T03:37:22Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:37:22Z",
+        "conclusion": "skipped",
+        "name": "Verify native Codex plugin registry failure recovery",
+        "number": 14,
+        "startedAt": "2026-09-17T03:37:22Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:37:22Z",
+        "conclusion": "skipped",
+        "name": "Verify native Codex persistent plugin source",
+        "number": 15,
+        "startedAt": "2026-09-17T03:37:22Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:37:38Z",
+        "conclusion": "success",
+        "name": "Test Windows Git Bash notification payloads",
+        "number": 16,
+        "startedAt": "2026-09-17T03:37:22Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:38:51Z",
+        "conclusion": "success",
+        "name": "Verify Codex Windows native hooks without model requests",
+        "number": 17,
+        "startedAt": "2026-09-17T03:37:38Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:38:55Z",
+        "conclusion": "success",
+        "name": "Preserve Codex Windows native hook evidence",
+        "number": 18,
+        "startedAt": "2026-09-17T03:38:51Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:39:14Z",
+        "conclusion": "failure",
+        "name": "Verify Codex Windows ConPTY notification transport",
+        "number": 19,
+        "startedAt": "2026-09-17T03:38:55Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:39:18Z",
+        "conclusion": "success",
+        "name": "Preserve Codex Windows ConPTY evidence",
+        "number": 20,
+        "startedAt": "2026-09-17T03:39:14Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:44:40Z",
+        "conclusion": "success",
+        "name": "Check InfiniShell-Desktop",
+        "number": 21,
+        "startedAt": "2026-09-17T03:39:18Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:52:43Z",
+        "conclusion": "success",
+        "name": "Build InfiniShell SSH worker",
+        "number": 22,
+        "startedAt": "2026-09-17T03:44:40Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T03:52:45Z",
+        "conclusion": "success",
+        "name": "Test Windows PowerShell SSH worker arguments",
+        "number": 23,
+        "startedAt": "2026-09-17T03:52:43Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:07:48Z",
+        "conclusion": "failure",
+        "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+        "number": 24,
+        "startedAt": "2026-09-17T03:52:45Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:09:36Z",
+        "conclusion": "success",
+        "name": "Test shared CLI action contracts and skills",
+        "number": 25,
+        "startedAt": "2026-09-17T04:07:48Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:10:23Z",
+        "conclusion": "success",
+        "name": "Test CLI harness arguments",
+        "number": 26,
+        "startedAt": "2026-09-17T04:09:36Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:17:28Z",
+        "conclusion": "success",
+        "name": "Test bilingual TUI task message states",
+        "number": 27,
+        "startedAt": "2026-09-17T04:10:23Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:17:53Z",
+        "conclusion": "failure",
+        "name": "Test managed command process ownership",
+        "number": 28,
+        "startedAt": "2026-09-17T04:17:28Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:24:35Z",
+        "conclusion": "success",
+        "name": "Build CLI process supervisor",
+        "number": 29,
+        "startedAt": "2026-09-17T04:17:53Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:24:35Z",
+        "conclusion": "skipped",
+        "name": "Test supervisor cleanup after host crash",
+        "number": 30,
+        "startedAt": "2026-09-17T04:24:35Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:24:35Z",
+        "conclusion": "skipped",
+        "name": "Verify native recovery and idle-crash boundaries without credentials",
+        "number": 31,
+        "startedAt": "2026-09-17T04:24:35Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:24:36Z",
+        "conclusion": "failure",
+        "name": "Preserve Windows native CLI boundary evidence",
+        "number": 32,
+        "startedAt": "2026-09-17T04:24:35Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:25:49Z",
+        "conclusion": "success",
+        "name": "Test rust-genai",
+        "number": 33,
+        "startedAt": "2026-09-17T04:24:36Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:25:49Z",
+        "conclusion": "skipped",
+        "name": "Compile GUI integration tests",
+        "number": 34,
+        "startedAt": "2026-09-17T04:25:49Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:25:49Z",
+        "conclusion": "skipped",
+        "name": "Run desktop workspace unit tests",
+        "number": 35,
+        "startedAt": "2026-09-17T04:25:49Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:25:50Z",
+        "conclusion": "success",
+        "name": "Report sccache statistics",
+        "number": 36,
+        "startedAt": "2026-09-17T04:25:49Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:25:50Z",
+        "conclusion": "skipped",
+        "name": "Post Install Node for CLI plugin verification",
+        "number": 71,
+        "startedAt": "2026-09-17T04:25:50Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:25:52Z",
+        "conclusion": "success",
+        "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+        "number": 72,
+        "startedAt": "2026-09-17T04:25:50Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:25:52Z",
+        "conclusion": "success",
+        "name": "Complete job",
+        "number": 73,
+        "startedAt": "2026-09-17T04:25:52Z",
+        "status": "completed"
+      }
+    ],
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35178775808/job/105066231166"
+  },
+  "passed": false,
+  "raw_log": {
+    "path": "/tmp/infinishell-seventh-platform-37b0bc732/windows-job.raw.log",
+    "bytes": 725649,
+    "sha256": "317b57d36a2321e3125078703d832d39a75d291b7c483b91158fd721a2409c7f"
+  },
+  "test_summaries": [
+    "2026-09-17T04:07:48.1012935Z      Summary [ 374.483s] 1677 tests run: 1672 passed, 5 failed, 4730 skipped",
+    "2026-09-17T04:09:36.5450550Z      Summary [   0.398s] 71 tests run: 71 passed, 224 skipped",
+    "2026-09-17T04:10:23.6475655Z      Summary [   0.626s] 128 tests run: 128 passed, 0 skipped",
+    "2026-09-17T04:17:28.8539547Z      Summary [   0.385s] 9 tests run: 9 passed, 925 skipped",
+    "2026-09-17T04:17:53.6422408Z      Summary [   0.193s] 1 test run: 0 passed, 1 failed, 7 skipped",
+    "2026-09-17T04:25:49.3518964Z test result: ok. 81 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+  ],
+  "failure_excerpts": [
+    "2026-09-17T03:37:22.2023905Z AssertionError: {'path': '/private/probe/project', 'rule': 'Read(./literal/**)'} != {'path': '<isolated-probe>/project', 'rule': 'Read(./literal/**)'}\n2026-09-17T03:37:22.2026924Z - {'path': '/private/probe/project', 'rule': 'Read(./literal/**)'}",
+    "2026-09-17T04:06:24.5698018Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_concurrent_disable_is_preserved_and_blocks_recovery' (3656) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:24.5699904Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:26.4710415Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_concurrent_disable_is_preserved_and_blocks_recovery' (11524) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:26.4716928Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:28.1815841Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_concurrent_disable_is_preserved_and_blocks_recovery' (13412) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:28.1822885Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:30.1571814Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_patch_failure_keeps_original_active_registry_unchanged' (17656) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:30.1573801Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:32.1095909Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_patch_failure_keeps_original_active_registry_unchanged' (13496) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:32.1102459Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:34.0145165Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_patch_failure_keeps_original_active_registry_unchanged' (2724) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:34.0151648Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:35.9059453Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_publication_failure_restores_registry_and_preserves_unrelated_edits' (6960) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:35.9066227Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:37.9215486Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_publication_failure_restores_registry_and_preserves_unrelated_edits' (12304) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:37.9217412Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:39.9485479Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_publication_failure_restores_registry_and_preserves_unrelated_edits' (29140) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:39.9487401Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:42.0912358Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_recovery_after_interrupted_publication_restores_old_active_version' (14120) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:42.0914209Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:44.0932498Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_recovery_after_interrupted_publication_restores_old_active_version' (25024) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:44.0939001Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:46.1696861Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_recovery_after_interrupted_publication_restores_old_active_version' (30152) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:46.1698842Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:47.9957809Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_upgrade_publishes_patched_cache_and_keeps_old_version_files' (5188) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:47.9959699Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:50.0819650Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_upgrade_publishes_patched_cache_and_keeps_old_version_files' (17660) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:50.0821522Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:06:51.8168468Z     thread 'terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_upgrade_publishes_patched_cache_and_keeps_old_version_files' (28576) panicked at app\\src\\terminal\\cli_agent_sessions\\plugin_manager\\claude_tests.rs:65:82:\n2026-09-17T04:06:51.8170376Z     called `Result::unwrap()` on an `Err` value: PluginInstallError { message: \"This CLI version or platform does not support the verified notification patch.\", log: \"\" }",
+    "2026-09-17T04:17:53.6345451Z     thread 'managed::tests::isolated_driver' (17752) panicked at crates\\command\\src\\managed_tests.rs:71:60:\n2026-09-17T04:17:53.6348870Z     called `Result::unwrap()` on an `Err` value: Os { code: 5, kind: PermissionDenied, message: \"拒绝访问。\" }",
+    "2026-09-17T04:17:53.6393808Z     thread 'managed::tests::managed_tree_reaps_descendants_and_never_signals_after_confirmation' (8424) panicked at crates\\command\\src\\managed_tests.rs:48:13:\n2026-09-17T04:17:53.6397781Z     隔离监督验收失败: exit code: 101"
+  ],
+  "classification": [
+    {
+      "area": "permission_snapshot_probe",
+      "failure": "POSIX 测试夹具在 Windows 经 Path 转为反斜杠，原字符串未被脱敏；后续原生准备步骤因此跳过。"
+    },
+    {
+      "area": "codex_conpty",
+      "failure": "两个原生插件路径的 Git Bash 均不能打开 /dev/tty；没有真实通知抵达 ConPTY。",
+      "evidence": "windows-conpty-native-diagnostics-37b0bc732.json"
+    },
+    {
+      "area": "claude_plugin_transactions",
+      "failure": "5 个事务测试在 fixture 准备时调用生产 Windows 通知补丁门禁并被拒绝；并未进入事务断言。"
+    },
+    {
+      "area": "managed_process_ownership",
+      "failure": "isolated_driver 的 root_command.spawn 在 managed_tests.rs:71 返回 OS 5，未进入 root 的 ManagedTree::claim。"
+    },
+    {
+      "area": "native_boundary_artifact",
+      "failure": "前置失败导致原生边界探针跳过，没有可上传文件；不是另一个原生 CLI 结果。"
+    }
+  ],
+  "boundaries": {
+    "full_workspace_tests": false,
+    "gui_integration_compiled": false,
+    "model_generation_tested": false,
+    "acceptance_completed": false
+  }
+}

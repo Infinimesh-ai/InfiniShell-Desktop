@@ -1,0 +1,7 @@
+{"event":"session_ready","native_session_id":"01a0ad8b-cd01-7a30-8ee3-d9543d33d877","permissions":{"approvalPolicy":"untrusted","approvalsReviewer":"user","sandbox":{"excludeSlashTmp":false,"excludeTmpdirEnvVar":false,"networkAccess":false,"type":"workspaceWrite","writableRoots":[]}}}
+{"event":"phase_started","phase":"image_input"}
+{"event":"message_accepted","message_id":"db9f499e-4840-4452-b958-42e144c301b6","phase":"image_input","turn_id":"01a0ad8b-cd20-7d60-8e16-502d6983b420"}
+{"event":"turn_started","phase":"image_input","turn_id":"01a0ad8b-cd20-7d60-8e16-502d6983b420"}
+{"event":"turn_finished","outcome":"Completed","output":"BLUE","phase":"image_input","turn_id":"01a0ad8b-cd20-7d60-8e16-502d6983b420"}
+{"event":"connection_shutdown","native_session_id":"01a0ad8b-cd01-7a30-8ee3-d9543d33d877"}
+{"error":null,"event":"image_probe_finished","passed":true}

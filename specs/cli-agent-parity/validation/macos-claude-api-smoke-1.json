@@ -1,0 +1,46 @@
+{
+  "native_version": "2.1.273",
+  "binary": {
+    "platform": "darwin-arm64",
+    "binary": "claude",
+    "bytes": 212228880,
+    "sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
+    "url": "https://downloads.claude.ai/claude-code-releases/2.1.273/darwin-arm64/claude"
+  },
+  "endpoint_origin": "<user-configured-api>",
+  "model": "claude-sonnet-4-6",
+  "exit_code": 0,
+  "wall_seconds": 2.607,
+  "response": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "result": "INFINISHELL_CLAUDE_API_READY",
+    "total_cost_usd": 0.02640225,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 6979,
+      "cache_read_input_tokens": 0,
+      "output_tokens": 15,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 6979
+      },
+      "inference_geo": "not_available",
+      "iterations": [],
+      "speed": "standard"
+    }
+  },
+  "passed": true,
+  "tools_enabled": false,
+  "managed_adapter_tested": false,
+  "gui_tested": false
+}

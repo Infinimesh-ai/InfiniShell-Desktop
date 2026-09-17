@@ -8,6 +8,8 @@ use std::process::Stdio;
 const FIXTURE_ENV: &str = "INFINISHELL_COMMAND_MANAGED_FIXTURE";
 const DIRECTORY_ENV: &str = "INFINISHELL_COMMAND_MANAGED_DIRECTORY";
 const EMPTY_ROOT_ENV: &str = "INFINISHELL_COMMAND_MANAGED_EMPTY_ROOT";
+#[cfg(windows)]
+const STRICT_PARENT_ENV: &str = "INFINISHELL_COMMAND_MANAGED_STRICT_PARENT";
 const DRIVER: &str = "managed::tests::isolated_driver";
 const ROOT: &str = "managed::tests::fixture_root";
 const DESCENDANT: &str = "managed::tests::fixture_descendant";
@@ -17,7 +19,12 @@ fn command(name: &str, directory: &Path, managed: bool) -> Command {
     let mut command = if managed {
         Command::new_with_managed_process_group(executable)
     } else {
-        Command::new(executable)
+        #[cfg_attr(not(windows), expect(unused_mut))]
+        let mut command = Command::new(executable);
+        // 测试夹具保留测试运行器的 Job；普通 Command 的生产默认行为不在此改动。
+        #[cfg(windows)]
+        command.inherit_managed_job();
+        command
     };
     command
         .args(["--ignored", "--exact", name, "--nocapture"])
@@ -58,17 +65,51 @@ fn managed_tree_reaps_descendants_and_never_signals_after_confirmation() {
     assert!(directory.path().join("verified").exists());
 }
 
+#[cfg(windows)]
+#[test]
+fn managed_worker_reaps_descendants_inside_strict_parent_job() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut driver_command = command(DRIVER, directory.path(), true);
+    driver_command
+        .env(STRICT_PARENT_ENV, "1")
+        .stdin(Stdio::piped());
+    let driver = driver_command.spawn().expect("派生嵌套 Job 监督夹具");
+    let mut tree = ManagedTree::claim(driver).expect("监督夹具必须加入禁止脱离的父 Job");
+    assert_eq!(tree.containment(), Containment::WindowsJob);
+    tree.child_mut()
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"1")
+        .unwrap();
+    wait_until(|| tree.root_exited().unwrap());
+    assert!(
+        tree.terminate_and_confirm(Duration::from_secs(5))
+            .unwrap()
+            .success()
+    );
+    assert!(directory.path().join("verified").exists());
+}
+
 #[test]
 #[ignore = "只由受管理进程测试派生，隔离 Linux subreaper 的作用范围"]
 fn isolated_driver() {
     if std::env::var_os(FIXTURE_ENV).is_none() {
         return;
     }
+    #[cfg(windows)]
+    if std::env::var_os(STRICT_PARENT_ENV).is_some() {
+        // 父进程先绑定真实严格 Job，再授权夹具派生 worker，消除测试本身的绑定竞态。
+        let mut authorization = [0];
+        std::io::stdin().read_exact(&mut authorization).unwrap();
+        assert_eq!(authorization, [b'1']);
+    }
     let directory = std::path::PathBuf::from(std::env::var_os(DIRECTORY_ENV).unwrap());
     prepare_supervisor().unwrap();
     let mut root_command = command(ROOT, &directory, true);
     root_command.stdin(Stdio::piped());
-    let mut tree = ManagedTree::claim(root_command.spawn().unwrap()).unwrap();
+    let root = root_command.spawn().expect("派生等待授权的托管根进程");
+    let mut tree = ManagedTree::claim(root).expect("托管根进程必须加入自己的清理边界");
     tree.child_mut()
         .stdin
         .take()
@@ -96,7 +137,8 @@ fn isolated_driver() {
     // 原生会话空闲结束时可能只剩未回收的根进程，不能靠 killpg(僵尸组)判断退出。
     let mut empty_command = command(ROOT, &directory, true);
     empty_command.env(EMPTY_ROOT_ENV, "1").stdin(Stdio::piped());
-    let mut empty = ManagedTree::claim(empty_command.spawn().unwrap()).unwrap();
+    let root = empty_command.spawn().expect("派生等待授权的空根进程");
+    let mut empty = ManagedTree::claim(root).expect("空根进程必须加入自己的清理边界");
     empty
         .child_mut()
         .stdin
@@ -127,10 +169,21 @@ fn fixture_root() {
         return;
     }
     let directory = std::path::PathBuf::from(std::env::var_os(DIRECTORY_ENV).unwrap());
-    let mut command = command(DESCENDANT, &directory, false);
     #[cfg(windows)]
-    command.inherit_managed_job();
-    drop(command.spawn().unwrap());
+    {
+        // 真正的托管 Job 仍禁止 CLI 请求脱离；不能靠放宽 Job 限制修复派生失败。
+        let mut escape = command(DESCENDANT, &directory, false);
+        escape.creation_flags(windows::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB.0);
+        match escape.spawn() {
+            Err(error) => assert_eq!(error.raw_os_error(), Some(5), "脱离必须被严格 Job 拒绝"),
+            Ok(mut child) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("托管 Job 错误地允许后代脱离");
+            }
+        }
+    }
+    drop(command(DESCENDANT, &directory, false).spawn().unwrap());
     wait_until(|| directory.join("heartbeat").exists());
 }
 

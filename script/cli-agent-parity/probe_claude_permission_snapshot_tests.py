@@ -3,7 +3,7 @@
 
 import copy
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import queue
 import sys
 import unittest
@@ -106,8 +106,16 @@ class ProjectionTests(unittest.TestCase):
 
     def test_path_scrub_only_changes_private_anchor(self):
         value = {"path": "/private/probe/project", "rule": "Read(./literal/**)"}
-        self.assertEqual(probe.scrub(value, Path("/private/probe")),
+        self.assertEqual(probe.scrub(value, PurePosixPath("/private/probe")),
                          {"path": "<isolated-probe>/project", "rule": "Read(./literal/**)"})
+
+    def test_path_scrub_handles_windows_native_and_forward_slash_paths(self):
+        root = PureWindowsPath(r"C:\private\probe")
+        value = {"paths": [str(root / "project 中文"), (root / "project 中文").as_posix()],
+                 "rule": "Read(./literal/**)"}
+        self.assertEqual(probe.scrub(value, root),
+                         {"paths": ["<isolated-probe>\\project 中文", "<isolated-probe>/project 中文"],
+                          "rule": "Read(./literal/**)"})
 
 
 class ProtocolTests(unittest.TestCase):

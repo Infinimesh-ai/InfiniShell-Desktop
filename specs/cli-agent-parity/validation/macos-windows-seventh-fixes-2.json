@@ -1,0 +1,122 @@
+{
+  "base_commit": "c46714435ea284748236ad5ea255845e966ab821",
+  "worktree_dirty": true,
+  "source_manifest": "/tmp/infinishell-cli-parity-windows-seventh-fixes-inputs.json",
+  "source_manifest_sha256": "3d87f2909a406670e68390c649fda9d0bacfc4abf9c094afd2ed1f3b55b9ba05",
+  "target_directory": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 71.309,
+      "log": "/tmp/infinishell-cli-parity-windows-seventh-fixes-2-check.log",
+      "log_sha256": "a56792c6eb4339551f733a63556a98afe4c3fbe9b55ef744ff158ba7dd5f5ba3"
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 154.457,
+      "log": "/tmp/infinishell-cli-parity-windows-seventh-fixes-2-i18n.log",
+      "log_sha256": "19a40c881b3fb2f763d5ca57e559594331677699a34fbd72eecea4d0bff68304"
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::) | test(ai::agent_providers::chat_stream::) | test(ai::blocklist::action_model::execute::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 15.938,
+      "log": "/tmp/infinishell-cli-parity-windows-seventh-fixes-2-focused.log",
+      "log_sha256": "a6a222ac58a2628c2ca560280a5acd4e4026e64bd1fc760235d84d6254cfeb8b"
+    },
+    {
+      "name": "command-managed",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "command",
+        "--lib",
+        "managed::tests::"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 2.59,
+      "log": "/tmp/infinishell-cli-parity-windows-seventh-fixes-2-command.log",
+      "log_sha256": "c21d9764359587d371a8b3481f434a3925745d38347226e9f752e19a1f068edb"
+    }
+  ],
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "d72c75d2faaedda51db1c2b4636c447bfca849021f314fdd4c6df15731ca9a6b"
+  },
+  "source_unchanged_after_gates": true,
+  "source_files": [
+    {
+      "path": "crates/command/src/blocking.rs",
+      "sha256": "f8f675ae12eef5cf58408a5895eaaeb29c5d82e7151b3e282fc0a15b8eacece9"
+    },
+    {
+      "path": "crates/command/src/managed_tests.rs",
+      "sha256": "2615a782331dac9d7c6b28dd4cfed281c48d727a0893fe66481bfdcfa2e774e1"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/claude_tests.rs",
+      "sha256": "d64371809c298af95a7740e6931b1448ed2ae15b6a8a88b4f702a626d2b9c57d"
+    },
+    {
+      "path": "script/cli-agent-parity/probe_claude_permission_snapshot.py",
+      "sha256": "bade01bfe64de4a9e647d0210bcb097300b870f7d5e42d6e855300c19426a877"
+    },
+    {
+      "path": "script/cli-agent-parity/probe_claude_permission_snapshot_tests.py",
+      "sha256": "5fe0fe04bb30be8a5ca66e2adb9025b3151ca7c24cd2ce128889b82e3f8dfd53"
+    }
+  ],
+  "python": {
+    "source_manifest": "/tmp/infinishell-cli-parity-windows-seventh-fixes-inputs.json",
+    "argv": [
+      "python3",
+      "-B",
+      "script/cli-agent-parity/probe_claude_permission_snapshot_tests.py"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.119,
+    "stdout": "",
+    "stderr": "...............\n----------------------------------------------------------------------\nRan 15 tests in 0.001s\n\nOK\n",
+    "windows_native_executed": false
+  },
+  "withdrawn_attempt": {
+    "label": "windows-seventh-fixes-1",
+    "reason": "首个检查误在主工作树启动，执行测试前已停止；不计本次验证。",
+    "exit_code": 143
+  },
+  "localization": "无需本地化变更"
+}

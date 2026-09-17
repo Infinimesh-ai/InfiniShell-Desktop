@@ -105,11 +105,11 @@ impl Command {
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt as _;
-            // worker 随后在授权执行之前赋予专属 Job，不能继承应用的退出时机。
-            command.inner.creation_flags(
-                windows::Win32::System::Threading::CREATE_NO_WINDOW.0
-                    | windows::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB.0,
-            );
+            // 监督者已经拥有独立生命周期；worker 保留其宿主 Job，再在授权前加入严格嵌套 Job。
+            // 再次请求 breakaway 会被禁止脱离的宿主拒绝，且不属于 worker 所需的权限。
+            command
+                .inner
+                .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
         }
         command
     }

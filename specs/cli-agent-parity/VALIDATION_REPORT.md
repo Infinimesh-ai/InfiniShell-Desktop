@@ -140,3 +140,9 @@ Codex 0.147.0 默认 shell_snapshot 在包含引号与命令替换字符的 CODE
 3. 两种语言的实际界面尺寸、截断/换行及截图。
 4. 各平台 Actions URL、head SHA 和实际 CLI 交互证据。
 5. 尚存外部限制与所有未通过验收项；只有全部完成后更新 Goal。
+
+## 第七轮最终结果（2026-09-17）
+
+`37b0bc73288aab5be4d0d151796eea557be4c0fb`：Linux 所选门禁成功，Windows 失败；完整计数、失败定位及跳过项见 [第七轮报告](SEVENTH_PLATFORM_RUN_37B0BC732.md)。同提交 macOS 完整 Codex 官方包已通过真实生命周期、本地工具恢复和图片三项验证，见 [原生适配器报告](CODEX_COMPLETE_RUNTIME_NATIVE_VERIFICATION.md)；它不替代 GUI 应用重启或最终三平台验收。
+
+Claude API 鉴权补充：固定 2.1.273 / `claude-sonnet-4-6` 原生 print 请求在 2.607 秒返回 success 与精确标记，见 [脱敏报告](validation/macos-claude-api-smoke-1.json)。未启用工具，未运行托管适配器或 GUI，不计完整生命周期通过。

@@ -61,9 +61,73 @@ fn transaction_original(home: &Path) -> [serde_json::Value; 3] {
 
 fn patched_transaction_stage() -> tempfile::TempDir {
     let stage = transaction_tempdir();
-    transaction_installation(stage.path(), "2.2.0");
-    super::notification_patch::apply(stage.path(), super::PatchKind::Claude, "").unwrap();
+    let cache = transaction_installation(stage.path(), "2.2.0");
+    // 事务测试从已修补的缓存开始，不以通知运行时的平台门禁代替文件发布验证。
+    // 使用真实随附内容并核对完整缓存；Windows 可测试事务，但仍不能自动安装通知。
+    for (relative, contents) in [
+        (
+            "scripts/build-payload.sh",
+            include_str!(
+                "../../../../assets/bundled/cli-agent-plugins/claude/scripts/build-payload.sh"
+            ),
+        ),
+        (
+            "scripts/on-stop.sh",
+            include_str!("../../../../assets/bundled/cli-agent-plugins/claude/scripts/on-stop.sh"),
+        ),
+        (
+            "scripts/should-use-structured.sh",
+            include_str!(
+                "../../../../assets/bundled/cli-agent-plugins/claude/scripts/should-use-structured.sh"
+            ),
+        ),
+        (
+            "hooks/hooks.json",
+            include_str!("../../../../assets/bundled/cli-agent-plugins/claude/hooks/hooks.json"),
+        ),
+        (
+            "scripts/warp-notify.sh",
+            include_str!(
+                "../../../../assets/bundled/cli-agent-plugins/claude/scripts/warp-notify.sh"
+            ),
+        ),
+    ] {
+        fs::write(cache.join(relative), contents).unwrap();
+    }
+    super::notification_patch::verify_staged_claude_cache(&cache).unwrap();
     stage
+}
+
+#[cfg(windows)]
+#[test]
+fn claude_windows_notification_installation_is_rejected_without_changing_files() {
+    let home = transaction_tempdir();
+    let cache = transaction_installation(home.path(), "2.2.0");
+    let original = transaction_original(home.path());
+    assert!(super::notification_patch::preflight(home.path(), super::PatchKind::Claude).unwrap());
+    assert!(!ClaudeCodePluginManager::new(None, None, None).can_auto_install());
+
+    let error =
+        super::notification_patch::apply(home.path(), super::PatchKind::Claude, "").unwrap_err();
+
+    assert_eq!(
+        error.message,
+        super::notification_patch::unsupported().message
+    );
+    assert!(error.log.is_empty());
+    assert_eq!(transaction_original(home.path()), original);
+    let trees: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../../specs/cli-agent-parity/fixtures/claude-warp-compatible-original-trees.json"
+    ))
+    .unwrap();
+    for (relative, contents) in trees["2.2.0"].as_object().unwrap() {
+        assert_eq!(
+            fs::read_to_string(cache.join(relative)).unwrap(),
+            contents.as_str().unwrap(),
+            "Windows 拒绝安装后必须保留原文件：{relative}"
+        );
+    }
+    assert!(!home.path().join(super::CLAUDE_PUBLICATION_JOURNAL).exists());
 }
 
 #[test]

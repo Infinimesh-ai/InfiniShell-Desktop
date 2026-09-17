@@ -1,0 +1,49 @@
+{"event":"acceptance_started","scope":"rust_adapter_process_restart"}
+{"event":"session_ready","native_session_id":"01a0ad8a-23fe-7e70-9f32-fb26e25c7f13","permissions":{"approvalPolicy":"untrusted","approvalsReviewer":"user","sandbox":{"excludeSlashTmp":false,"excludeTmpdirEnvVar":false,"networkAccess":false,"type":"workspaceWrite","writableRoots":[]}}}
+{"event":"phase_started","phase":"first_turn"}
+{"event":"message_accepted","message_id":"950a5c54-73be-424c-8444-40266d48fa9f","phase":"first_turn","turn_id":"01a0ad8a-2454-70e0-8c10-75ce0bdd5122"}
+{"event":"turn_started","phase":"first_turn","turn_id":"01a0ad8a-2454-70e0-8c10-75ce0bdd5122"}
+{"event":"turn_finished","outcome":"Completed","output":"PARITY_ONE","phase":"first_turn","turn_id":"01a0ad8a-2454-70e0-8c10-75ce0bdd5122"}
+{"event":"phase_started","phase":"second_turn"}
+{"event":"message_accepted","message_id":"4abe9bd9-a746-4d1b-888f-b4df968c8065","phase":"second_turn","turn_id":"01a0ad8a-44d5-7402-91ac-d271b4f4eee4"}
+{"event":"turn_started","phase":"second_turn","turn_id":"01a0ad8a-44d5-7402-91ac-d271b4f4eee4"}
+{"event":"turn_finished","outcome":"Completed","output":"PARITY_TWO","phase":"second_turn","turn_id":"01a0ad8a-44d5-7402-91ac-d271b4f4eee4"}
+{"event":"phase_started","phase":"approval_allow"}
+{"event":"message_accepted","message_id":"30a8fd78-9c54-48c5-9818-43418649d588","phase":"approval_allow","turn_id":"01a0ad8a-4e61-7e80-bd7d-59b9768aaa0e"}
+{"event":"turn_started","phase":"approval_allow","turn_id":"01a0ad8a-4e61-7e80-bd7d-59b9768aaa0e"}
+{"details":"/bin/zsh -lc \"'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-allow.py'\"","event":"native_tool_progress","phase":"approval_allow","turn_id":"01a0ad8a-4e61-7e80-bd7d-59b9768aaa0e"}
+{"approval_id":"01a0ad8a-4e61-7e80-bd7d-59b9768aaa0e:0","command_within_fixture":true,"decision":"AllowOnce","event":"approval_requested","method":"item/commandExecution/requestApproval","phase":"approval_allow","request_details":{"availableDecisions":["accept",{"acceptWithExecpolicyAmendment":{"execpolicy_amendment":["/bin/zsh","-lc","'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-allow.py'"]}},"cancel"],"command":"/bin/zsh -lc \"'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-allow.py'\"","commandActions":[{"command":"'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-allow.py'","type":"unknown"}],"cwd":"<probe-root>/project","environmentId":"local","itemId":"exec-c5fc3976-2860-4338-9654-6fa0d3eae41b","proposedExecpolicyAmendment":["/bin/zsh","-lc","'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-allow.py'"],"startedAtMs":1789617923588,"threadId":"01a0ad8a-23fe-7e70-9f32-fb26e25c7f13","turnId":"01a0ad8a-4e61-7e80-bd7d-59b9768aaa0e"}}
+{"approval_id":"01a0ad8a-4e61-7e80-bd7d-59b9768aaa0e:0","decision":"AllowOnce","event":"approval_resolved","phase":"approval_allow"}
+{"event":"command_dispatched","message_id":"8a9b1577-8403-46fb-95cb-451c1eea6c91","native_receipt":false,"phase":"approval_allow","turn_id":"01a0ad8a-4e61-7e80-bd7d-59b9768aaa0e"}
+{"details":"{\"aggregatedOutput\":null,\"command\":\"/bin/zsh -lc \\\"'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-allow.py'\\\"\",\"commandActions\":[{\"command\":\"'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-allow.py'\",\"type\":\"unknown\"}],\"cwd\":\"<probe-root>/project\",\"durationMs\":0,\"exitCode\":0,\"id\":\"exec-c5fc3976-2860-4338-9654-6fa0d3eae41b\",\"pluginId\":null,\"processId\":\"14934\",\"scriptPath\":null,\"source\":\"unifiedExecStartup\",\"status\":\"completed\",\"type\":\"commandExecution\"}","event":"native_tool_progress","phase":"approval_allow","turn_id":"01a0ad8a-4e61-7e80-bd7d-59b9768aaa0e"}
+{"event":"turn_finished","outcome":"Completed","output":"APPROVED","phase":"approval_allow","turn_id":"01a0ad8a-4e61-7e80-bd7d-59b9768aaa0e"}
+{"allowed":true,"event":"file_effect_verified","phase":"approval_allow"}
+{"event":"phase_started","phase":"approval_deny"}
+{"event":"message_accepted","message_id":"655e8e3d-c3b5-4f8a-8d4f-83546510fd3f","phase":"approval_deny","turn_id":"01a0ad8a-6fbf-7871-8596-20a8f7d936da"}
+{"event":"turn_started","phase":"approval_deny","turn_id":"01a0ad8a-6fbf-7871-8596-20a8f7d936da"}
+{"details":"/bin/zsh -lc \"'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-deny.py'\"","event":"native_tool_progress","phase":"approval_deny","turn_id":"01a0ad8a-6fbf-7871-8596-20a8f7d936da"}
+{"approval_id":"01a0ad8a-6fbf-7871-8596-20a8f7d936da:1","command_within_fixture":true,"decision":"DenyOnce","event":"approval_requested","method":"item/commandExecution/requestApproval","phase":"approval_deny","request_details":{"availableDecisions":["accept",{"acceptWithExecpolicyAmendment":{"execpolicy_amendment":["/bin/zsh","-lc","'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-deny.py'"]}},"cancel"],"command":"/bin/zsh -lc \"'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-deny.py'\"","commandActions":[{"command":"'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-deny.py'","type":"unknown"}],"cwd":"<probe-root>/project","environmentId":"local","itemId":"exec-c5cfdb6c-ccd2-4c70-8d26-973f60ebeb55","proposedExecpolicyAmendment":["/bin/zsh","-lc","'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-deny.py'"],"startedAtMs":1789617930665,"threadId":"01a0ad8a-23fe-7e70-9f32-fb26e25c7f13","turnId":"01a0ad8a-6fbf-7871-8596-20a8f7d936da"}}
+{"approval_id":"01a0ad8a-6fbf-7871-8596-20a8f7d936da:1","decision":"DenyOnce","event":"approval_resolved","phase":"approval_deny"}
+{"event":"command_dispatched","message_id":"b1246bee-6f0c-42a7-8229-bedc8eca946c","native_receipt":false,"phase":"approval_deny","turn_id":"01a0ad8a-6fbf-7871-8596-20a8f7d936da"}
+{"details":"{\"aggregatedOutput\":null,\"command\":\"/bin/zsh -lc \\\"'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-deny.py'\\\"\",\"commandActions\":[{\"command\":\"'/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14' 'approval-deny.py'\",\"type\":\"unknown\"}],\"cwd\":\"<probe-root>/project\",\"durationMs\":null,\"exitCode\":null,\"id\":\"exec-c5cfdb6c-ccd2-4c70-8d26-973f60ebeb55\",\"pluginId\":null,\"processId\":null,\"scriptPath\":null,\"source\":\"agent\",\"status\":\"declined\",\"type\":\"commandExecution\"}","event":"native_tool_progress","phase":"approval_deny","turn_id":"01a0ad8a-6fbf-7871-8596-20a8f7d936da"}
+{"event":"turn_finished","outcome":"Completed","output":"DENIED","phase":"approval_deny","turn_id":"01a0ad8a-6fbf-7871-8596-20a8f7d936da"}
+{"allowed":false,"event":"file_effect_verified","phase":"approval_deny"}
+{"event":"phase_started","phase":"steer_applied"}
+{"event":"message_accepted","message_id":"147f6f01-0b29-4933-abec-fa793d1c8186","phase":"steer_applied","turn_id":"01a0ad8a-8765-7881-be98-822cc1fc37da"}
+{"event":"turn_started","phase":"steer_applied","turn_id":"01a0ad8a-8765-7881-be98-822cc1fc37da"}
+{"event":"message_accepted","message_id":"2ab8ff0c-62e1-4e6d-9a49-d668f058b2b4","phase":"steer_applied","turn_id":"01a0ad8a-8765-7881-be98-822cc1fc37da"}
+{"event":"turn_finished","outcome":"Completed","output":"STEER_APPLIED_1195ce639593497db7abbcaa149c87a4","phase":"steer_applied","turn_id":"01a0ad8a-8765-7881-be98-822cc1fc37da"}
+{"event":"steer_text_applied","marker":"STEER_APPLIED_1195ce639593497db7abbcaa149c87a4"}
+{"event":"phase_started","phase":"cancel"}
+{"event":"message_accepted","message_id":"557eea33-18e5-4d11-b9d2-ca6c1aa02917","phase":"cancel","turn_id":"01a0ad8a-a8ba-72c1-b028-65ed231804ef"}
+{"event":"turn_started","phase":"cancel","turn_id":"01a0ad8a-a8ba-72c1-b028-65ed231804ef"}
+{"event":"message_accepted","message_id":"89204ac4-bcc8-4463-8aae-65b8a0800099","phase":"cancel","turn_id":"01a0ad8a-a8ba-72c1-b028-65ed231804ef"}
+{"event":"turn_finished","outcome":"Cancelled","output":"","phase":"cancel","turn_id":"01a0ad8a-a8ba-72c1-b028-65ed231804ef"}
+{"event":"connection_shutdown","native_session_id":"01a0ad8a-23fe-7e70-9f32-fb26e25c7f13"}
+{"event":"session_ready","native_session_id":"01a0ad8a-23fe-7e70-9f32-fb26e25c7f13","permissions":{"approvalPolicy":"untrusted","approvalsReviewer":"user","sandbox":{"excludeSlashTmp":false,"excludeTmpdirEnvVar":false,"networkAccess":false,"type":"workspaceWrite","writableRoots":[]}}}
+{"event":"phase_started","phase":"resume_result"}
+{"event":"message_accepted","message_id":"87fe3ecc-e864-4d4b-95fc-88655e916364","phase":"resume_result","turn_id":"01a0ad8a-abe2-7ec2-bda4-9900f53ad66f"}
+{"event":"turn_started","phase":"resume_result","turn_id":"01a0ad8a-abe2-7ec2-bda4-9900f53ad66f"}
+{"event":"turn_finished","outcome":"Completed","output":"STEER_APPLIED_1195ce639593497db7abbcaa149c87a4","phase":"resume_result","turn_id":"01a0ad8a-abe2-7ec2-bda4-9900f53ad66f"}
+{"event":"connection_shutdown","native_session_id":"01a0ad8a-23fe-7e70-9f32-fb26e25c7f13"}
+{"app_restart_and_ui_verified":false,"event":"acceptance_passed","native_session_id":"01a0ad8a-23fe-7e70-9f32-fb26e25c7f13","scope":"rust_adapter_process_restart"}

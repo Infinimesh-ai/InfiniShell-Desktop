@@ -147,7 +147,8 @@ def scrub(value, root):
     if isinstance(value, list):
         return [scrub(item, root) for item in value]
     if isinstance(value, str):
-        return value.replace(str(root), "<isolated-probe>")
+        # Windows 原生接口可能混用两种分隔符，报告仍只隐藏本次私有根目录。
+        return value.replace(str(root), "<isolated-probe>").replace(root.as_posix(), "<isolated-probe>")
     return value
 
 

@@ -1,0 +1,16 @@
+{
+  "commit": "c46714435ea284748236ad5ea255845e966ab821",
+  "worktree_dirty": false,
+  "argv": [
+    "cargo",
+    "check",
+    "--target-dir",
+    "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+    "-p",
+    "warp"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 59.677,
+  "log": "/tmp/infinishell-cli-parity-c46714435-clean-check.log",
+  "log_sha256": "91da10df3d60e9286083073f7a1ad6134a8d12a5eedfcb468c266e3e24f74f37"
+}
