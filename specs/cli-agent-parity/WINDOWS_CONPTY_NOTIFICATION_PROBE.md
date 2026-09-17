@@ -15,10 +15,10 @@ MSYS `/dev/tty` 依赖已分配的控制终端。[MSYS2 3.6.5 dtable](https://gi
 `probe_codex_windows_conpty.py` 只在 Windows x64 原生执行：
 
 1. 复用 `codex_windows_hook_inputs.obtain_inputs` 固定下载/摘要缓存，不接受任意 Codex 版本。将当前提交的 DLL 和 OpenConsole 复制到私有临时目录，核对摘要并保留产品目录形状。
-2. 创建无可见桌面的私有 HPCON，附着一个 Python driver。driver 只导入现有 `probe_codex_windows_hooks.one_case`，不修改原探针、候选 PS 或随附生产脚本；只在已有临时测试插件中保留原场景的插桩和独立阻断 hook。
+2. 创建无可见桌面的私有 HPCON，附着一个 Python driver。driver 导入 `probe_codex_windows_hooks.one_case`；仅在临时测试插件中应用候选 Windows 输出器、原场景的插桩和独立阻断 hook，生产随附脚本保持原配方。
 3. driver 向子进程提供隔离 HOME / CODEX_HOME 和两个结构化通知能力变量，不复制任何认证。真实 app-server 的 RPC stdin/stdout 仍为独立管道。每次原生 initialize 握手返回后，`GetConsoleProcessList` 必须包含其实际 PID；句柄读取进程创建时间与可执行文件路径作为附着证据。对短暂 cmd / PS / Bash 的成员采样仅为诊断，缺采样不是“不附着”的证明。
 4. `CONOUT$` 先发送独立诊断标记，临时开启私有控制台的 VT 模式后立即恢复；此标记不满足原生通知门槛。随后复用原生场景的两个含中文、空格及 shell 元字符的路径，原样执行 SessionStart / UserPromptSubmit 通知脚本。
-5. 父探针并发保存 HPCON 真实输出原始字节。只接受与原生 hook 记录中的 session ID / turn ID 匹配的 `OSC 777;notify;warp://cli-agent` JSON；每个事件必须恰好一次。原生 hook 成功、stdout 文本、CONOUT$ 诊断标记或旧 session/turn 都不能代替通知。
+5. 父探针并发保存 HPCON 真实输出原始字节。只接受与原生 hook 记录中的 session ID / turn ID / cwd 匹配的 `OSC 777;notify;warp://cli-agent` JSON；每个事件必须恰好一次。原生 hook 成功、stdout 文本、CONOUT$ 诊断标记或旧 session/turn 都不能代替通知；中文路径损坏同样失败。
 6. driver 最长 120 秒，结束后关闭自持 HPCON 并有界等待输出 EOF。超时只终止自持进程句柄、关闭自己的控制台；不按名称/PID 批量终止、不改全局服务或控制台配置。任何 native、输出或关闭失败均返回非零，保留现场和否定证据。
 
 Windows 预检接入命令（由主代理调度）：
@@ -57,3 +57,13 @@ python -B "$env:GITHUB_WORKSPACE\script\cli-agent-parity\probe_codex_windows_con
 后续探针只增加私有 `BASH_ENV` 观察器：在实际原始 SessionStart / UserPromptSubmit 脚本及 `warp-notify.sh` 入口，记录能力 gate、两项能力变量、Bash/MSYS 版本、标准流是否为 tty，以及 `/dev/tty` **仅打开、不写入**的状态与错误。通知入口额外记录已有 argv 载荷中的 session/turn/event，舍弃正文。观察器在子 shell 中执行，不读取 hook stdin，不改原脚本、候选 PS、信任摘要或标准流；诊断 JSON 写到私有目录，再收入 `.native.json`。缺诊断仍是信息缺口，不能自动证明 gate 或 tty 分支。
 
 此修改用于取得首因证据，不是运输修复。唯有原来的真实 OSC 匹配才能通过。新增本机回归确认观察器保留含中文的 stdin/stdout/stderr，并拒绝把诊断 JSON 算作终端通知；11 项测试通过（0.035 秒）。本轮没有执行 Windows 二进制、Cargo、Git 或远端派发。
+
+## 第七轮首因与下一候选
+
+[第七轮](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35178775808)使用提交 `37b0bc73288aab5be4d0d151796eea557be4c0fb`。原生 hook 及独立 CONOUT$ 标记再次通过，实际通知仍失败。八条实际 Bash 诊断均确认结构化 gate 已允许、协议为 1、三路标准流不是 tty；`/dev/tty` 打开返回状态 1 和 `No such device or address`。通知入口的事件、session/turn 及两个含中文和 shell 元字符的目录正确。因此已将这次丢失定位到 MSYS 控制终端输出，而不是通知未生成或 gate 未开启。
+
+三份产物的 SHA-256、主报告、原生报告及原始 802 字节输出保留在 [首因证据](validation/windows-conpty-native-diagnostics-37b0bc732.json)。该文件包含隔离测试目录与 runner 路径，没有复制用户配置或凭据；原始产物未改写。第七轮其他步骤的结果另行记录，此项失败不因构建成功而改变。
+
+下一候选只替换临时插件 `warp-notify.sh` 的最后输出步骤：Git Bash 调用固定 SystemRoot 下的 Windows PowerShell 5.1，通知正文通过独立二进制 stdin 传入；固定明文 `codex_windows_notify.ps1` 编码为 `-EncodedCommand`，使用严格 UTF-8 解码及 `WriteConsoleW(CONOUT$)`，要求控制台已开启 VT，且不修改代码页或控制台模式。Unix `/dev/tty` 与 tmux 封套保留。候选不写原生 hook stdout，也不把助手退出 0 视为收到通知。
+
+候选的本机门禁为通知 4 项、ConPTY 12 项、启动器 15 项及 actionlint，见 [初始记录](validation/macos-windows-console-candidate-gates-1.json)及[含 VT 门槛的最新冻结输入](validation/macos-windows-console-candidate-gates-2.json)。其中 Unix 控制 PTY 真正核对了直连和 tmux 字节；Windows API 尚未执行。生产安装器、版本配方及 Windows 开放门槛均未改变，必须先取得候选 Windows 原生通知证据，再接入正式插件并验证安装事务。

@@ -1,0 +1,93 @@
+{
+  "base_commit": "37b0bc73288aab5be4d0d151796eea557be4c0fb",
+  "worktree_dirty": false,
+  "source_manifest": "/tmp/infinishell-cli-parity-37b0bc732-clean-inputs.json",
+  "source_manifest_sha256": "d0dc126f129d45c720ec6accb5d2d66724afde6ee6f25359df3d5fec7da5e004",
+  "target_directory": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 57.827,
+      "log": "/tmp/infinishell-cli-parity-37b0bc732-clean-check.log",
+      "log_sha256": "fd995ea1971c5f3fefa56af9714b14601e0d52e7b6fd0cf75456a11a99308d9c"
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 97.102,
+      "log": "/tmp/infinishell-cli-parity-37b0bc732-clean-i18n.log",
+      "log_sha256": "c59fe5a4dd2991047b6e5025cd08d45e2b92898c875ab512a1422068d6cc2725"
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::) | test(ai::agent_providers::chat_stream::) | test(ai::blocklist::action_model::execute::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 16.651,
+      "log": "/tmp/infinishell-cli-parity-37b0bc732-clean-focused.log",
+      "log_sha256": "00f9d8eef7c50e241e0aac4a4a3f766b68d6a32eb115fde8689deed11ad72f86"
+    }
+  ],
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "3fae6548531a3256b019341fc5c4988fe4dafa6487e4233b2675a3b873da7d08"
+  },
+  "source_unchanged_after_gates": true,
+  "source_inputs": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude.rs",
+      "sha256": "8a964b7162b524d43ac54a514f154fb7075d14f20b21d91aa3bed2de2ba00ad3"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_tests.rs",
+      "sha256": "67838954c593c27122958d3debf1429b4c0f1f6f4a9677b4d0a3116fddf519c2"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_permission_snapshot.rs",
+      "sha256": "f975263e55337003bb51230911fbc7f2722805f5119f3730cb1c054959dd9616"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_permission_snapshot_tests.rs",
+      "sha256": "4e480bc58d7a55358c313297f5e3a6a143a99a4b53a17f518ec6dc3d533cb640"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/claude-2.1.273-permission-snapshot-dynamic-macos.json",
+      "sha256": "15a8ed0aad6fbb4a1411fb8786bac1e926a93cd980a0f5c458cf70f401510ba2"
+    }
+  ],
+  "results": {
+    "check": "passed",
+    "i18n_passed": 11,
+    "focused_passed": 987,
+    "focused_skipped": 5523,
+    "same_commit": "37b0bc73288aab5be4d0d151796eea557be4c0fb"
+  }
+}

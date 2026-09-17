@@ -69,3 +69,5 @@ Linux/Windows 可复用 prepare_claude_cli.py 的固定原生文件和 RUNNER_TE
 生产适配器已接入上述串行观察，在首次原生 initialize 后等待最多 5 秒。所有回包按本连接代次的唯一 request ID 对应；两次 initialize 的原生 PID 必须一致，握手没有原生 session ID 时仍保持未确认关联，后续真实生命周期事件再确认。观察错误或超时释放正常 Inherit 聊天，并丢弃迟到观察回包；未知配置字段和任意原生错误正文不进入持久化。原生权限模式通知使旧观察失效，不产生任务完成事件。
 
 冻结 5 文件快照在独立验证树通过 `cargo check -p warp`（135.016s）、国际化 11 项和相关模块 987 项（11.969s 测试执行时间）。新增 22 项回归包含真实无凭据投影夹具、权限规则滞后、秘密过滤、模式/PID/cwd 漂移、旧代回包、观察超时与重复 initialize 后 MCP/技能保留。见 [源摘要与命令记录](validation/macos-claude-permission-observation-gates-1.json)。这是生产代码的本地回归，不是实际 Rust 适配器的 Claude 模型生命周期或父权限委派验收。复用已有就绪数据，不新增界面文案，无需本地化变更。
+
+下一轮跨平台预检已接入同一无凭据权限观测探针，独立要求固定 Claude 准备成功，并保存各平台 JSON。新增步骤尚未在 Linux/Windows 执行；本机 14 项投影/比较回归及工作流语法通过，见 [冻结门禁](validation/macos-windows-console-candidate-gates-2.json)。它不发模型请求、不伪造待审批响应，也不改变 `dispatchAuthorized=false` 的产品边界。

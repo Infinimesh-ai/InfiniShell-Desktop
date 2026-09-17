@@ -108,6 +108,9 @@ def verify_transport(raw, cases):
                      and item.get('event') == event and item.get('session_id') == session
                      and (event != 'prompt_submit' or item.get('turn_id') == turn)]
             require(len(found) == 1, f'{case["name"]} 的 {event} 必须真实且仅出现一次，实际 {len(found)}')
+            marker = markers['on-session-start.sh' if event == 'session_start' else 'on-prompt-submit.sh']
+            require(isinstance(marker.get('cwd'), str) and found[0].get('cwd') == marker['cwd'],
+                    '原生通知工作目录未完整保留 Unicode 或原始路径')
             matched.append(found[0])
     return matched
 
@@ -445,7 +448,7 @@ def main():
             *(repo / 'script/cli-agent-parity' / name for name in (
                 'probe_codex_windows_hooks.py', 'codex_windows_hook_command.py',
                 'codex_windows_hook_command.ps1', 'codex_windows_hook_inputs.py',
-                'apply_notification_patch.py'))]
+                'codex_windows_notify.py', 'codex_windows_notify.ps1', 'apply_notification_patch.py'))]
         report['source_sha256'] = {str(path.relative_to(repo)): sha256(path) for path in source_files}
         report['candidate_lf_sha256'] = require_candidate_contract()
         codex, plugin, report['fixed_inputs'] = obtain_inputs(repo, args.download_dir, 'x86_64')

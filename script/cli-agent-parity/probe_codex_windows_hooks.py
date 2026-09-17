@@ -122,6 +122,12 @@ def one_case(args, directory, requests, evidence):
     shutil.copytree(args.upstream_plugin, plugin)
     validate_tree(plugin, '0.4.0', metadata)
     apply_files(plugin, metadata, replacements)
+    from codex_windows_notify import candidate_notify, evidence as notify_evidence
+    notify_path = plugin / 'scripts/warp-notify.sh'
+    original_notify = notify_path.read_text(encoding='utf-8')
+    notification_candidate = candidate_notify(original_notify)
+    notify_path.write_text(notification_candidate, encoding='utf-8', newline='\n')
+    evidence['notification_transport_candidate'] = notify_evidence(original_notify, notification_candidate)
     hooks_path = plugin / 'hooks/hooks.json'
     hooks = json.loads(hooks_path.read_text(encoding='utf-8'))
     for groups in hooks['hooks'].values():

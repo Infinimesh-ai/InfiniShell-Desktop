@@ -15,8 +15,8 @@ from probe_codex_windows_conpty import (WinApi, environment_block, notifications
 
 def fixture_case():
     return {'name': '隔离 中文', 'passed': True, 'markers': {
-        'on-session-start.sh': {'session_id': 'native-session-unique'},
-        'on-prompt-submit.sh': {'turn_id': 'native-turn-unique'}}}
+        'on-session-start.sh': {'session_id': 'native-session-unique', 'cwd': 'C:/隔离 空格'},
+        'on-prompt-submit.sh': {'turn_id': 'native-turn-unique', 'cwd': 'C:/隔离 空格'}}}
 
 
 def osc(event, session='native-session-unique', turn='native-turn-unique', terminator=b'\x07'):
@@ -32,6 +32,11 @@ class ConptyProbeTests(unittest.TestCase):
         self.assertEqual(len(found), 2)
         self.assertEqual(found[1]['cwd'], 'C:/隔离 空格')
         self.assertEqual(len(notifications(raw)), 2)
+
+    def test_correct_ids_cannot_hide_corrupted_unicode_directory(self):
+        raw = (osc('session_start') + osc('prompt_submit')).replace('隔离'.encode(), b'??')
+        with self.assertRaises(ValueError):
+            verify_transport(raw, [fixture_case()])
 
     def test_native_hook_success_without_osc_is_failure(self):
         with self.assertRaises(ValueError):

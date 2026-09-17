@@ -261,13 +261,15 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 
 ## 10. 执行看板（2026-09-17，持续更新）
 
+最新检查点 `37b0bc73288aab5be4d0d151796eea557be4c0fb` 已推送并核对远端一致；包含 Claude 只读权限观测、完整固定 Codex 包及 Windows 探针修复。[第七轮 Linux/Windows 验证](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35178775808)已按相同 SHA 启动，完整工作区暂未开启。冻结输入通过 check、i18n 11 项、相关模块 987 项；干净同提交 check、i18n 11 项与相关模块 987 项全部通过。新包 GUI 工具当前可读但点击/滚动报 noWindowsAvailable，现场进程保留，未重派任务。
+
 当前工作分支 `codex/cli-agent-parity`，起点 `6921a9925955a1955503e259cd935eaea4ac2ac0`。原有未跟踪计划已保留，无用户代码改动被覆盖。实现检查点 `dbee1ecae81da54a1749de88a7caffb3099d7eb7` 已提交并推送；尚未发布。插件检查点 328d5ed352 与资源域检查点 6635f98690 已推送；6635f98690 的干净验证树已通过 check、国际化 11 项、相关模块 650 项、command 5 项与脚本 75 项。第四轮 Linux 通过、Windows 失败；第五轮 Windows 的候选 Codex hook 通过、Grok 锁读取失败。后续消息实现和锁修复已通过对应本地门禁，最终同提交平台与新包验收继续推进，另一任务网页搜索改动未纳入。
 
 | 阶段 | 当前进展 | 尚未满足 |
 | --- | --- | --- |
 | P0 | 固定 Codex 0.147.0、Claude 2.1.273、Grok 1.0.30 的真实接口已有独立证据；第六轮 Windows Grok ACP、Claude 初始化/EOF、Codex 原生插件注册表均通过；Claude 同进程权限查询已接入并通过本地回归 | Claude 缺成功模型登录；Grok 真实请求 402 额度耗尽；权限规则查询不等于沙箱和实际工具权限证明。系统新装 Codex 0.154.0 未纳入受测托管范围，已验证明确拒绝并保留草稿；受测 0.147.0 已恢复为独立固定副本 |
 | P1 | 三方身份、发现、版本和技能来源已实现；7e065 新包 Codex 真实两轮、中英文拼音、图片、技能与评审传递已有新证据 | 同轮文件路径已进入原生输入；私有测试副本漏装同版本 code-mode-host，导致实际工具启动失败，文件读取及第三轮审批未通过。已恢复完整官方包，待原生复验；其余三方真实输入/附件和最终双语布局继续验收 |
-| P2 | 普通 PTY Stop 统一 Unknown 降级，重复/旧事件已有回归；Codex 持久来源和 Grok 插件事务已有对应原生证据 | 第六轮 Windows ConPTY 有诊断 OSC、无实际通知，生产 gate 继续关闭；持久来源探针收尾失败已本地修复，Windows 待复验；插件完整组合及产品 SSH/tmux 待验 |
+| P2 | 普通 PTY Stop 统一 Unknown 降级，重复/旧事件已有回归；Codex 持久来源和 Grok 插件事务已有对应原生证据；第七轮已定位 Windows 丢通知为 Git Bash 无 `/dev/tty` | CONOUT$ 候选仅通过本机 31 项脚本测试，Windows 原生及正式配方待验，生产 gate 继续关闭；持久来源探针收尾修复的 Windows 复验仍待完成；插件完整组合及产品 SSH/tmux 待验 |
 | P3 | Claude/Codex 固定绕过审批与 Claude 启动全局配置写入已移除；审批原生 UI/托管入口与策略均有实现 | Claude 父权限只能按已验证快照证明，不能凭 mode 放行；Grok 关键执行未通过，Windows 托管及三方审批完整流程待验 |
 | P4 | SQLite 提交确认、原生会话/父代、消息与结果领取、重连和显式恢复已实现；Oz 普通消息和出站正文已在 7e065 干净提交通过 check、18 项提供商、11 项 i18n 与 965 项相关测试；macOS 资源域两种真实工具崩溃清理有证据 | 当前 Codex GUI 生命周期继续进行；真实 Oz 请求等待用户手动允许专用钥匙串项，电脑操作工具禁止操作该安全窗口。Claude/Grok 完整生命周期和最终同提交三方回收未通过 |
 | P5 | 7e065 干净 macOS 门禁与新包签名通过；第六轮两平台分别保留原生结果和失败；工作流已按真实前置依赖分离 Windows 原生探针与离线 Rust 检查，待同提交执行 | 第六 Linux 全部所选门禁通过（warp 定向 1684 项），Windows 两项探针失败导致本轮 Rust 门禁跳过；后续工作流不能追溯改变本轮。最终完整工作区/GUI/双语/三平台及 SSH/tmux 验收均未收口 |

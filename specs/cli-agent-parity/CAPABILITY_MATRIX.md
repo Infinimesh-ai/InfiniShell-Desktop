@@ -67,7 +67,9 @@
 
 ## 提交验收进度
 
-最新检查点 `7e06508554ae64cdd9321e0a69274e3d7b2d55ce` 已推送。[第六轮验证](SIXTH_PLATFORM_RUN_7E0650855.md)已经结束：Linux 所选门禁全部通过（warp 定向 1684 项）；Windows 在插件来源探针收尾、ConPTY 原生通知两项失败，Rust 门禁跳过。Grok/Claude 无凭据边界和 Codex 原生 hook 的独立成功保留，不能合并为 Windows 平台通过。完整工作区与 GUI 集成未执行。
+最新检查点 `37b0bc73288aab5be4d0d151796eea557be4c0fb` 已推送，干净 macOS 同提交 check、国际化 11 项、相关模块 987 项全部通过。第七轮 Linux/Windows 仍在执行；两平台 check 已通过，Windows 通知探针失败已确认是实际 Git Bash 无法打开 `/dev/tty`，另一个脚本测试失败待完整日志定位。候选 `CONOUT$` 输出器仅进入临时探针，未纳入生产配方；[诊断及候选边界](WINDOWS_CONPTY_NOTIFICATION_PROBE.md)保留真实失败和本机测试范围。
+
+[第六轮验证](SIXTH_PLATFORM_RUN_7E0650855.md)已经结束：Linux 所选门禁全部通过（warp 定向 1684 项）；Windows 在插件来源探针收尾、ConPTY 原生通知两项失败，Rust 门禁跳过。Grok/Claude 无凭据边界和 Codex 原生 hook 的独立成功保留，不能合并为 Windows 平台通过。完整工作区与 GUI 集成未执行。
 
 干净 macOS 同提交通过 check、提供商 18 项、国际化 11 项与相关模块 965 项，新包构建签名成功。全部 25 个应用文件变更与已通过的本地冻结输入一致，来源关联、执行命令、二进制摘要和历史失败见 [验证记录](VALIDATION_REPORT.md#当前提交验证)。
 
@@ -75,4 +77,4 @@
 
 先前 bundle4/5 的 Codex 生命周期与双向消息、bundle7 的插件与双语布局、bundle8 的普通通知及 Unknown/Unconfirmed，以及 macOS 资源域崩溃清理，分别保留其版本和输入范围；不能代替新包验收。历史各轮平台的失败、后续修复与仍未覆盖的组合统一见 [验证记录](VALIDATION_REPORT.md)。
 
-后续正在补齐 Windows 真实通知诊断、独立 Rust 门禁、完整固定 Codex 运行包和 Claude 同连接权限观测。Claude 缺成功模型登录、Grok 模型额度耗尽的限制未解除；这些实现和无凭据检查不计三方完整生命周期通过。
+37b0bc732 已接入 Claude 同连接只读权限观测、完整固定 Codex 运行包和 Windows 独立 Rust 门禁。观测仍不能证明原子权限上限，Claude 父任务派发继续拒绝；完整包的工具执行与候选通知仍需原生复验。Claude 缺成功模型登录、Grok 模型额度耗尽的限制未解除；这些实现和无凭据检查不计三方完整生命周期通过。

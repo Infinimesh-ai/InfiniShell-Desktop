@@ -98,6 +98,7 @@ jobs:
           python3 script/cli-agent-parity/codex_adapter_runner_tests.py -v
           python3 -B script/cli-agent-parity/codex_windows_hook_tests.py -v
           python3 -B script/cli-agent-parity/codex_plugin_lifecycle_tests.py -v
+          python3 -B script/cli-agent-parity/codex_windows_notify_tests.py -v
           python3 -B script/cli-agent-parity/codex_plugin_cache_refresh_tests.py -v
           python3 -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
           python3 -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
@@ -114,6 +115,7 @@ jobs:
           printf 'INFINISHELL_TEST_CODEX_EXE=%s\n' "$codex_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Claude without credentials
+        id: fixed_claude
         shell: bash
         timeout-minutes: 10
         run: |
@@ -142,6 +144,14 @@ jobs:
         run: |
           set -euo pipefail
           python3 -B script/cli-agent-parity/probe_claude_no_credentials.py --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-initialize-idle-eof.json"
+
+      - name: Verify native Claude permission observations without credentials
+        if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python3 -B script/cli-agent-parity/probe_claude_permission_snapshot.py --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-permission-observation.json"
 
       - name: Verify native Codex plugin registry failure recovery
         shell: bash
@@ -239,6 +249,7 @@ jobs:
             ${{ runner.temp }}/codex-missing-session.*
             ${{ runner.temp }}/codex-idle-crash.*
             ${{ runner.temp }}/claude-initialize-idle-eof.json
+            ${{ runner.temp }}/claude-permission-observation.json
             ${{ runner.temp }}/claude-21273-inputs/claude-fixed-inputs.json
             ${{ runner.temp }}/grok-cli-fixed/grok-fixed-inputs.json
             ${{ runner.temp }}/grok-fixed-acp.json
@@ -360,6 +371,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Windows hook command and fixed-input validation failed' }
           python -B script/cli-agent-parity/codex_plugin_lifecycle_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Native plugin lifecycle evidence validation failed' }
+          python -B script/cli-agent-parity/codex_windows_notify_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Windows notification transport candidate validation failed' }
           python -B script/cli-agent-parity/codex_plugin_cache_refresh_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Native persistent source cleanup validation failed' }
           python -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
@@ -385,6 +398,7 @@ jobs:
           "INFINISHELL_TEST_CODEX_EXE=$codexExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Prepare fixed native Claude without credentials
+        id: fixed_claude
         shell: pwsh
         timeout-minutes: 10
         run: |
@@ -419,6 +433,16 @@ jobs:
         run: |
           python -B script/cli-agent-parity/probe_claude_no_credentials.py --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output "$env:RUNNER_TEMP\claude-initialize-idle-eof.json"
           if ($LASTEXITCODE -ne 0) { throw 'Native Claude initialize and idle EOF validation failed' }
+
+      - name: Verify native Claude permission observations without credentials
+        if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -B script/cli-agent-parity/probe_claude_permission_snapshot.py --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output "$env:RUNNER_TEMP\claude-permission-observation.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Native Claude permission observation validation failed' }
 
       - name: Verify native Codex plugin registry failure recovery
         shell: pwsh
@@ -644,6 +668,7 @@ jobs:
             ${{ runner.temp }}/codex-missing-session*
             ${{ runner.temp }}/codex-idle-crash.*
             ${{ runner.temp }}/claude-initialize-idle-eof.json
+            ${{ runner.temp }}/claude-permission-observation.json
             ${{ runner.temp }}/claude-21273-inputs/claude-fixed-inputs.json
             ${{ runner.temp }}/grok-cli-fixed/grok-fixed-inputs.json
             ${{ runner.temp }}/grok-fixed-acp.json

@@ -100,6 +100,8 @@ if ($errors.Count -ne 0) { throw ($errors | Out-String) }
     for script in SCRIPTS:
         plain = base64.b64decode(encode(script)[len(PREFIX):]).decode("utf-16le")
         run_powershell(parser, {**env, "PROBE_SOURCE": base64.b64encode(plain.encode("utf-8")).decode("ascii")})
+    from codex_windows_notify import source_text as notification_source
+    run_powershell(parser, {**env, "PROBE_SOURCE": base64.b64encode(notification_source().encode("utf-8")).decode("ascii")})
 
 
 def verify_windows_argv(env):
