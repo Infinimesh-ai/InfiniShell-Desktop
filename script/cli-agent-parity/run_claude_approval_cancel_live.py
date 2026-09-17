@@ -11,7 +11,7 @@ import tempfile
 import uuid
 
 import run_claude_adapter_live as adapter
-from run_claude_batch_cancel_live import NATIVE_KEYS
+from run_claude_batch_cancel_live import NATIVE_KEYS, validate_cancel_diagnostics, validate_cancel_terminal
 from run_claude_managed_image_live import compact_stdout
 
 
@@ -57,6 +57,8 @@ EVENT_KEYS = {
         "http_request_count_verified"},
     "acceptance_failed": {"event", "scope", "reason_sha256"},
     "public_projection_rejected": {"event", "dropped_records"},
+    "cancel_terminal_observed": {"event", "phase", "turn_id", "native_session_id", "outcome", "expected_turn_id",
+        "turn_id_matches", "interrupt_acknowledged", "approval_cancelled", "turn_started", "error_bytes", "error_sha256"},
 }
 NATIVE_TYPES = {"assistant", "user", "result", "system", "control_request", "control_response",
                 "command_lifecycle", "stream_event", "control_cancel_request", "keep_alive",
@@ -72,7 +74,7 @@ TOOL_NAMES = {"Read", "Edit", "Write", "Bash", "Grep", "Glob", "LS", "Task", "Ag
     "TaskGet", "TaskUpdate", "TaskList", "TodoWrite", "WebFetch", "WebSearch", "NotebookEdit", "AskUserQuestion",
     "EnterPlanMode", "ExitPlanMode", "mcp__infinishell-local-tasks__inspect_local_tasks",
     "mcp__infinishell-local-tasks__run_agents", "mcp__infinishell-local-tasks__send_message_to_agent", "unknown"}
-TERMINAL_REASONS = {"aborted_streaming", "interrupted", "cancelled", "api_error", "completed", "end_turn", "unknown"}
+TERMINAL_REASONS = {"aborted_streaming", "aborted_tools", "interrupted", "cancelled", "api_error", "completed", "end_turn", "unknown"}
 BOOL_KEYS = {"credential_files_read_by_probe", "real_gui_verified", "persistence_verified", "fixed_profile_verified",
     "filesystem_sandbox_verified", "parent_permission_ceiling_verified", "full_bytes_verified", "native_receipt",
     "exact_edit_verified", "edit_allowed", "approval_still_pending", "native_execution_cancelled_verified",
@@ -131,6 +133,9 @@ def _native(row):
             for tool in value:
                 _require(isinstance(tool, dict) and set(tool) == {"id", "name"} and tool["name"] in TOOL_NAMES)
                 _safe_id(tool["id"], nullable=True)
+        elif key == "cancel_diagnostics":
+            _require(row.get("type") == "result")
+            validate_cancel_diagnostics(value)
         else:
             _safe_id(value, nullable=True)
     return row
@@ -139,6 +144,8 @@ def _native(row):
 def _event(event):
     _require(isinstance(event, dict) and event.get("event") in EVENT_KEYS
              and set(event).issubset(EVENT_KEYS[event["event"]]))
+    if event["event"] == "cancel_terminal_observed":
+        return validate_cancel_terminal(event, PHASES, approval=True)
     for key, value in event.items():
         if key == "event":
             continue
@@ -221,6 +228,15 @@ def audit_events(events):
              and beginning["max_native_inputs"] == 2 and beginning["phase_deadline_seconds"] == 180
              and beginning["permission_policy"] == "ClaudeRestrictedFilesV1")
     native_id = _uuid(ending["native_session_id"])
+    observed = [event for event in events if event["event"] == "cancel_terminal_observed"]
+    _require(len({event["turn_id"] for event in observed}) == len(observed))
+    for event in observed:
+        matching = [row for row in events if row["event"] == "turn_finished" and row.get("turn_id") == event["turn_id"]]
+        _require(len(matching) == 1 and event["native_session_id"] == native_id
+                 and event["phase"] == matching[0].get("phase") and event["outcome"] == matching[0].get("outcome")
+                 and event["outcome"] != "Failed" and event["turn_id_matches"] is True
+                 and event["interrupt_acknowledged"] is True and event["turn_started"] is True
+                 and event["approval_cancelled"] is True)
     _require(ending["native_inputs"] == 2 and ending["edit_allowed"] is False)
     for event, true, false in ((beginning, (), ("credential_files_read_by_probe", "real_gui_verified", "persistence_verified")),
         (ending, ("all_four_evidence_verified", "full_file_unchanged_verified", "same_native_session_verified",
@@ -334,7 +350,7 @@ def audit_events(events):
     results = select("stdout", "result")
     _require(len(results) == 2)
     (result_index, result), (continue_index, native_continue) = results
-    shape = ((result.get("terminal_reason") == "aborted_streaming" and result.get("subtype") == "error_during_execution"
+    shape = ((result.get("terminal_reason") in {"aborted_streaming", "aborted_tools"} and result.get("subtype") == "error_during_execution"
               and result.get("is_error") is True)
              or (result.get("terminal_reason") in {"interrupted", "cancelled"} and result.get("subtype") == "success"
                  and result.get("is_error") is False))

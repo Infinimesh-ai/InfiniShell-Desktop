@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "scope": "fixed_claude_macos_arm64_embedded_interface",
+  "version": "2.1.273",
+  "binary_bytes": 212228880,
+  "binary_sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
+  "read_only_inspection": true,
+  "native_cli_executed_for_this_inspection": false,
+  "inspected_windows": [
+    {
+      "offset": 170335099,
+      "observation": "中断分类同时接受 aborted_streaming 与 aborted_tools。"
+    },
+    {
+      "offset": 170335477,
+      "observation": "aborted_tools 与真实 api_error 分别处理。"
+    },
+    {
+      "start": 182666750,
+      "end": 182667610,
+      "sha256": "9f52e6db67da14da00115b7444d36fddf90f7055b57c552588b3c83cefd9ffd5",
+      "observation": "abortController signal 已中断时返回 reason aborted_tools。"
+    },
+    {
+      "start": 182669510,
+      "end": 182670130,
+      "sha256": "d1b58daaa8ebc9deeaa736a2bd435dfa4646742001855d9a8ee703c1e63c8dd2",
+      "observation": "工具等待及后置 hook 中断分支同样返回 reason aborted_tools。"
+    },
+    {
+      "offset": 191306673,
+      "observation": "固定 result 形态为 terminal_reason aborted_tools、is_error true、subtype error_during_execution。"
+    },
+    {
+      "start": 182515250,
+      "end": 182517600,
+      "sha256": "21e3558cc8676b49364efcddc75afbec4c87575e4b8484ec9e5a77a74156f4e8",
+      "observation": "完整 result 携带终止原因，原生先发 result 再发 cancelled 生命周期。"
+    }
+  ],
+  "adapter_candidate": {
+    "terminal_reason": "aborted_tools",
+    "subtype": "error_during_execution",
+    "is_error": true,
+    "still_requires_interrupt_requested": true,
+    "still_requires_interrupt_native_ack": true,
+    "still_requires_matching_native_cancelled_lifecycle": true,
+    "still_requires_complete_input_identity": true,
+    "api_error_must_prevent_cancelled": true
+  },
+  "limitations": [
+    "Edit-cancel1 的未知 terminal_reason 无法事后恢复，不能假定它就是 aborted_tools。",
+    "嵌入代码仅提供真实接口契约，不是新增在线取消通过。",
+    "其他平台二进制及修复后的适配器仍须真实验证。"
+  ],
+  "说明": "固定实际二进制限定窗口只读核验；根代理独立核对三窗口散列和固定枚举。未执行认证或模型，未保存嵌入源码正文；保持三证据与完整身份聚合，不将旧失败追认为成功。",
+  "root_window_hashes_independently_verified": true
+}

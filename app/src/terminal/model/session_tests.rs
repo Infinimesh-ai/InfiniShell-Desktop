@@ -10,7 +10,74 @@ use super::{
     BootstrapSessionType, ControlMasterOwnership, Session, SessionId, SessionInfo, Sessions,
     SessionsEvent, SshSessionTransportDescriptor,
 };
-use crate::terminal::model::ansi::{SSHValue, SshTransportValue};
+use crate::terminal::model::ansi::{BootstrappedValue, SSHValue, SshTransportValue};
+use crate::terminal::shell::ShellType;
+
+fn complete_command_snapshot() -> SessionInfo {
+    SessionInfo::new_for_test()
+        .with_shell_type(ShellType::Bash)
+        .merge_from_bootstrapped_value(BootstrappedValue {
+            shell: "bash".into(),
+            aliases: Some(String::new()),
+            function_names: Some(String::new()),
+            ..Default::default()
+        })
+}
+
+#[test]
+fn command_snapshot_requires_both_bootstrap_fields() {
+    for (aliases, function_names) in [
+        (None, None),
+        (Some(String::new()), None),
+        (None, Some(String::new())),
+    ] {
+        let info = SessionInfo::new_for_test()
+            .with_shell_type(ShellType::Bash)
+            .merge_from_bootstrapped_value(BootstrappedValue {
+                shell: "bash".into(),
+                aliases,
+                function_names,
+                ..Default::default()
+            });
+        assert!(!info.command_snapshot_complete);
+    }
+    let info = complete_command_snapshot();
+    assert!(info.command_snapshot_complete);
+    assert!(info.aliases.is_empty());
+    assert!(info.function_names.is_empty());
+}
+
+#[test]
+fn rebootstrap_without_snapshot_does_not_inherit_complete_flag() {
+    let info = complete_command_snapshot().merge_from_bootstrapped_value(BootstrappedValue {
+        shell: "bash".into(),
+        ..Default::default()
+    });
+    assert!(!info.command_snapshot_complete);
+    assert!(!SessionInfo::new_for_test().command_snapshot_complete);
+}
+
+#[test]
+fn executor_switch_invalidates_command_snapshot() {
+    let session = Session::new(
+        complete_command_snapshot(),
+        Arc::new(TestCommandExecutor::default()),
+    );
+    assert!(session.command_snapshot_complete());
+    session.set_command_executor(Arc::new(TestCommandExecutor::default()));
+    assert!(!session.command_snapshot_complete());
+}
+
+#[test]
+fn connection_switch_invalidates_command_snapshot() {
+    let session = Session::new(
+        complete_command_snapshot(),
+        Arc::new(TestCommandExecutor::default()),
+    );
+    assert!(session.command_snapshot_complete());
+    session.set_remote_host_id(None);
+    assert!(!session.command_snapshot_complete());
+}
 
 struct TestView {
     events: Vec<SessionsEvent>,

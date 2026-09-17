@@ -5,11 +5,13 @@ use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 #[cfg(unix)]
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+#[cfg(unix)]
+use nix::unistd::Uid;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tempfile::NamedTempFile;
@@ -29,6 +31,7 @@ const MCP_VERSION: &str = "2025-11-25";
 const MODERN_MCP_VERSION: &str = "2026-07-28";
 const PROTOCOL_VERSION_META: &str = "io.modelcontextprotocol/protocolVersion";
 const MAX_RECORDS: usize = 128;
+const MAX_PRIVATE_ERROR_BYTES: usize = 64 * 1024;
 const PROMPT: &str = "INFINISHELL_GROK_SDK_ORIGIN：只调用 infinishell-sdk-origin-probe 服务的 SDK MCP 工具 inspect 一次，参数必须为 {}。若需要发现工具，只允许调用 search_tool 一次，参数必须严格为 {\"limit\":5,\"query\":\"infinishell-sdk-origin-probe inspect\"}。调用 inspect 成功后只回复 INFINISHELL_SDK_INSPECT_OK。除此之外不得调用其他工具，不得读取或修改文件、创建终端、执行命令、派发任务或发送消息。";
 
 #[derive(Default)]
@@ -65,6 +68,11 @@ struct ProbeState {
     unexpected_tools: usize,
     unsafe_keys: usize,
     failure: Option<&'static str>,
+    last_native_response_diagnostic: Option<Value>,
+    private_error_response: Option<File>,
+    private_error_response_written: bool,
+    private_error_response_bytes: usize,
+    private_error_capture_status: Option<&'static str>,
 }
 
 #[derive(Default)]
@@ -219,6 +227,12 @@ impl SdkOriginProbe {
         result
     }
 
+    pub(super) fn observe_response_diagnostic(&self, message: &Value) {
+        let mut state = self.state.lock().expect("探针状态锁未被破坏");
+        state.last_native_response_diagnostic = Some(super::native_response_diagnostic(message));
+        capture_private_error_response(&mut state, message);
+    }
+
     fn check(&self) -> Result<(), String> {
         self.state
             .lock()
@@ -318,6 +332,117 @@ impl SdkOriginProbe {
             "frames":state.frames
         })
     }
+}
+
+fn open_private_error_response(root: &Path) -> Result<File, String> {
+    let metadata = fs::symlink_metadata(root).map_err(|_| "私有错误目录不可读取")?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err("私有错误目录必须为非链接目录".into());
+    }
+    #[cfg(unix)]
+    {
+        if metadata.uid() != Uid::current().as_raw() || metadata.mode() & 0o077 != 0 {
+            return Err("私有错误目录必须由当前用户独占".into());
+        }
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(root.join("private-native-error-response.ndjson"))
+            .map_err(|_| "私有错误文件不可安全创建")?;
+        let metadata = file.metadata().map_err(|_| "私有错误文件不可核对")?;
+        if !metadata.is_file()
+            || metadata.uid() != Uid::current().as_raw()
+            || metadata.mode() & 0o077 != 0
+            || metadata.nlink() != 1
+        {
+            return Err("私有错误文件必须为当前用户独占普通文件".into());
+        }
+        Ok(file)
+    }
+    #[cfg(not(unix))]
+    {
+        Err("私有原生错误夹具尚未验证此平台的独占文件权限".into())
+    }
+}
+
+fn private_error_response(message: &Value) -> Option<Value> {
+    if message.get("method").is_some() || message.get("error").is_none() {
+        return None;
+    }
+    // 私有诊断只保留错误字段；不复制 result、工具入参、提示或模型响应。
+    let mut error = json!({});
+    if let Some(fields) = message["error"].as_object() {
+        for key in ["code", "message"] {
+            if let Some(value) = fields
+                .get(key)
+                .filter(|value| value.is_string() || value.is_number() || value.is_null())
+            {
+                error[key] = value.clone();
+            }
+        }
+        if let Some(data) = fields.get("data").and_then(Value::as_object) {
+            let mut retained = json!({});
+            for key in ["message", "http_status", "code", "error_type"] {
+                if let Some(value) = data
+                    .get(key)
+                    .filter(|value| value.is_string() || value.is_number() || value.is_null())
+                {
+                    retained[key] = value.clone();
+                }
+            }
+            if retained
+                .as_object()
+                .is_some_and(|fields| !fields.is_empty())
+            {
+                error["data"] = retained;
+            }
+        }
+    }
+    let mut response = json!({"error":error});
+    for key in ["jsonrpc", "id"] {
+        if let Some(value) = message
+            .get(key)
+            .filter(|value| value.is_string() || value.is_number() || value.is_null())
+        {
+            response[key] = value.clone();
+        }
+    }
+    Some(response)
+}
+
+fn capture_private_error_response(state: &mut ProbeState, message: &Value) {
+    if state.private_error_response_written || state.private_error_response.is_none() {
+        return;
+    }
+    let Some(response) = private_error_response(message) else {
+        return;
+    };
+    state.private_error_response_written = true;
+    let Ok(mut bytes) = serde_json::to_vec(&response) else {
+        state.private_error_capture_status = Some("encoding_failed");
+        return;
+    };
+    bytes.push(b'\n');
+    if bytes.len() > MAX_PRIVATE_ERROR_BYTES {
+        state.private_error_capture_status = Some("budget_rejected");
+        return;
+    }
+    let file = state
+        .private_error_response
+        .as_mut()
+        .expect("私有错误文件已准备");
+    if file
+        .write_all(&bytes)
+        .and_then(|()| file.sync_all())
+        .is_err()
+    {
+        state.private_error_capture_status = Some("write_failed");
+        return;
+    }
+    state.private_error_response_bytes = bytes.len();
+    state.private_error_capture_status = Some("captured");
 }
 
 fn digest(value: &Value) -> [u8; 32] {
@@ -1224,6 +1349,11 @@ fn record(file: &mut File, value: &Value) -> Result<(), String> {
 async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
     let generation = Uuid::new_v4();
     let probe = SdkOriginProbe::new(generation);
+    probe
+        .state
+        .lock()
+        .expect("探针状态锁未被破坏")
+        .private_error_response = Some(open_private_error_response(root)?);
     let mut private_options = OpenOptions::new();
     private_options.write(true).create_new(true);
     #[cfg(unix)]
@@ -1397,6 +1527,21 @@ async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
         .await;
     let joined = tokio::time::timeout(Duration::from_secs(30), &mut task).await;
     let transport_ok = matches!(&joined, Ok(Ok(Ok(()))));
+    // 事件流关闭不能遮盖生产传输的真实错误；只保存稳定分类、长度和摘要。
+    let (transport_task_status, transport_error, transport_join_error) = match &joined {
+        Ok(Ok(Ok(()))) => ("ok", Value::Null, Value::Null),
+        Ok(Ok(Err(error))) => (
+            "runtime_error",
+            super::runtime_error_diagnostic(error),
+            Value::Null,
+        ),
+        Ok(Err(error)) => (
+            "join_error",
+            Value::Null,
+            super::diagnostic_value(Some(&Value::String(error.to_string()))),
+        ),
+        Err(_) => ("join_timeout", Value::Null, Value::Null),
+    };
     if joined.is_err() {
         task.abort();
     }
@@ -1460,6 +1605,33 @@ async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
 
     report["cleanup_confirmed"] = json!(cleanup_confirmed);
     report["transport_closed"] = json!(transport_ok);
+    report["transport_task_status"] = json!(transport_task_status);
+    report["transport_error"] = transport_error;
+    report["transport_join_error"] = transport_join_error;
+    report["last_native_response_diagnostic"] = probe
+        .state
+        .lock()
+        .expect("探针状态锁未被破坏")
+        .last_native_response_diagnostic
+        .clone()
+        .unwrap_or(Value::Null);
+    {
+        let state = probe.state.lock().expect("探针状态锁未被破坏");
+        report["private_error_capture_status"] =
+            json!(state.private_error_capture_status.unwrap_or("not_observed"));
+        report["private_error_response_bytes"] = json!(state.private_error_response_bytes);
+    }
+    report["failure_source"] = if passed {
+        Value::Null
+    } else {
+        json!(match transport_task_status {
+            "runtime_error" => "production_runtime",
+            "join_error" => "join_error",
+            "join_timeout" => "join_timeout",
+            _ if result.is_err() => "fixture_loop",
+            _ => "acceptance",
+        })
+    };
     report["cleanup_receipt_read"] = json!(receipt.is_ok());
     report["public_product_gate_open"] = json!(false);
     report["parent_permission_ceiling_verified"] = json!(false);
@@ -1514,6 +1686,111 @@ async fn native_sdk_registration_and_origin_probe() {
         exercise(&root, &mut file).await.is_ok(),
         "原生 SDK 注册探针未通过；请检查安全投影证据"
     );
+}
+
+#[test]
+fn malformed_response_shape_is_saved_before_the_jsonrpc_guard() {
+    let probe = SdkOriginProbe::new(Uuid::nil());
+    let mut protocol = GrokProtocol::new(SessionOptions {
+        executable: env::current_exe().unwrap(),
+        cwd: env::temp_dir(),
+        state_dir: env::temp_dir(),
+        target: SessionTarget::New,
+        generation: Uuid::nil(),
+        permission_policy: PermissionPolicy::Inherit,
+        permission_ceiling: None,
+        claude_profile: None,
+        model: None,
+        local_tools: None,
+        selected_skills: Vec::new(),
+    });
+    protocol.sdk_origin_probe = Some(probe.clone());
+    protocol.initialize();
+    let error = protocol
+        .receive(json!({"jsonrpc":true,"id":1,
+        "error":{"code":-32603,"message":"OFFLINE_MALFORMED_RESPONSE_BODY"}}))
+        .err()
+        .unwrap();
+
+    assert_eq!(
+        super::runtime_error_diagnostic(&error)["protocol_failure_kind"],
+        "invalid_jsonrpc_version"
+    );
+    let state = probe.state.lock().unwrap();
+    let diagnostic = state.last_native_response_diagnostic.as_ref().unwrap();
+    assert_eq!(diagnostic["jsonrpc"]["type"], "boolean");
+    assert_eq!(diagnostic["jsonrpc_is_2_0"], false);
+    assert_eq!(diagnostic["error_code"], -32603);
+    assert!(
+        !diagnostic
+            .to_string()
+            .contains("OFFLINE_MALFORMED_RESPONSE_BODY")
+    );
+    assert_eq!(state.sdk_requests, 0);
+    assert_eq!(state.inspect_calls, 0);
+}
+
+#[test]
+fn private_error_capture_keeps_one_error_without_model_or_prompt_fields() {
+    let private = NamedTempFile::new().unwrap();
+    let mut state = ProbeState {
+        private_error_response: Some(private.as_file().try_clone().unwrap()),
+        ..ProbeState::default()
+    };
+    capture_private_error_response(
+        &mut state,
+        &json!({"jsonrpc":"2.0","id":"offline-native-error",
+        "error":{"code":-32603,"message":"OFFLINE_NATIVE_ERROR",
+            "data":{"message":"OFFLINE_NESTED_ERROR","body":"OFFLINE_MODEL_BODY"}},
+        "result":{"text":"OFFLINE_MODEL_BODY"},"prompt":"OFFLINE_PROMPT_BODY"}),
+    );
+    capture_private_error_response(
+        &mut state,
+        &json!({"error":{"message":"OFFLINE_SECOND_ERROR"}}),
+    );
+
+    let raw = fs::read_to_string(private.path()).unwrap();
+    let response: Value = serde_json::from_str(raw.trim()).unwrap();
+    assert_eq!(response["error"]["message"], "OFFLINE_NATIVE_ERROR");
+    assert_eq!(response["error"]["data"]["message"], "OFFLINE_NESTED_ERROR");
+    assert_eq!(state.private_error_capture_status, Some("captured"));
+    assert_eq!(raw.lines().count(), 1);
+    assert!(!raw.contains("OFFLINE_MODEL_BODY"));
+    assert!(!raw.contains("OFFLINE_PROMPT_BODY"));
+    assert!(!raw.contains("OFFLINE_SECOND_ERROR"));
+}
+
+#[test]
+fn oversized_private_error_capture_preserves_an_empty_file() {
+    let private = NamedTempFile::new().unwrap();
+    let mut state = ProbeState {
+        private_error_response: Some(private.as_file().try_clone().unwrap()),
+        ..ProbeState::default()
+    };
+    capture_private_error_response(
+        &mut state,
+        &json!({"error":{"message":"x".repeat(MAX_PRIVATE_ERROR_BYTES)}}),
+    );
+
+    assert_eq!(state.private_error_capture_status, Some("budget_rejected"));
+    assert_eq!(state.private_error_response_bytes, 0);
+    assert_eq!(fs::metadata(private.path()).unwrap().len(), 0);
+}
+
+#[cfg(unix)]
+#[test]
+fn private_error_file_refuses_a_symlink_and_never_overwrites_evidence() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let root = tempfile::tempdir().unwrap();
+    fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let target = NamedTempFile::new().unwrap();
+    let path = root.path().join("private-native-error-response.ndjson");
+    symlink(target.path(), &path).unwrap();
+    assert!(open_private_error_response(root.path()).is_err());
+    fs::remove_file(&path).unwrap();
+    drop(open_private_error_response(root.path()).unwrap());
+    assert!(open_private_error_response(root.path()).is_err());
+    assert_eq!(fs::metadata(&path).unwrap().mode() & 0o777, 0o600);
 }
 
 #[test]
@@ -2106,7 +2383,8 @@ fn private_native_tool_and_approval_frames_stay_out_of_public_probe_reports() {
     assert!(actual.as_slice() == frames.as_slice());
     let private_text = std::str::from_utf8(&bytes).unwrap();
     for canary in [raw_name, raw_input, filepath, diagnostic_path.as_str()] {
-        assert!(private_text.contains(canary));
+        // 原生帧按 JSON 写入；Windows 路径的反斜线应先使用同一编码再比较。
+        assert!(private_text.contains(&serde_json::to_string(canary).unwrap()));
     }
     let state = probe.state.lock().unwrap();
     assert_eq!(state.private_tool_frame_count, 3);
@@ -2130,6 +2408,7 @@ fn private_native_tool_and_approval_frames_stay_out_of_public_probe_reports() {
         "private-native-tool-frames.ndjson",
     ] {
         assert!(!public.contains(canary));
+        assert!(!public.contains(&serde_json::to_string(canary).unwrap()));
     }
     #[cfg(unix)]
     {

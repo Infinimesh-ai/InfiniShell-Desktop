@@ -75,8 +75,10 @@ fn batch_result_matches(row: &Value, running: Uuid, joined: Uuid, native_id: &st
         && row["user_message_uuid"]
             .as_str()
             .is_some_and(|id| expected.contains(id))
-        && ((row["terminal_reason"] == "aborted_streaming"
-            && row["subtype"] == "error_during_execution"
+        && ((matches!(
+            row["terminal_reason"].as_str(),
+            Some("aborted_streaming" | "aborted_tools")
+        ) && row["subtype"] == "error_during_execution"
             && row["is_error"] == true)
             || (matches!(
                 row["terminal_reason"].as_str(),
@@ -358,6 +360,28 @@ async fn cancel_and_continue(
                 outcome,
                 output,
             } => {
+                let expected = if continuation_submitted {
+                    continuation
+                } else if terminals.is_empty() {
+                    joined
+                } else {
+                    running
+                };
+                let (outcome_name, error_bytes, error_sha256) = match &outcome {
+                    TurnOutcome::Completed => ("Completed", 0, None),
+                    TurnOutcome::Cancelled => ("Cancelled", 0, None),
+                    TurnOutcome::Failed { message } => (
+                        "Failed",
+                        message.len(),
+                        Some(format!("{:x}", Sha256::digest(message.as_bytes()))),
+                    ),
+                };
+                evidence.record(json!({"event":"cancel_terminal_observed",
+                    "phase":if continuation_submitted {"continue"} else {"batch_cancel"},
+                    "turn_id":turn_id,"native_session_id":native_id,"outcome":outcome_name,
+                    "expected_turn_id":expected,"turn_id_matches":turn_id == expected.to_string(),
+                    "interrupt_acknowledged":interrupt_acknowledged,"turn_started":started.contains(&expected),
+                    "error_bytes":error_bytes,"error_sha256":error_sha256}))?;
                 if continuation_submitted {
                     if turn_id != continuation.to_string()
                         || outcome != TurnOutcome::Completed
@@ -607,6 +631,22 @@ async fn real_claude_joined_batch_cancel() {
             .unwrap();
     }
     assert!(result.is_ok(), "真实共享批次取消未通过；检查安全投影证据");
+}
+
+#[test]
+fn tools_batch_result_requires_the_same_complete_cancellation_identity() {
+    let running = Uuid::from_u128(10);
+    let joined = Uuid::from_u128(11);
+    let native_id = Uuid::from_u128(20).to_string();
+    let mut row = json!({"direction":"stdout","type":"result","subtype":"error_during_execution",
+        "is_error":true,"terminal_reason":"aborted_tools","session_id":native_id,
+        "user_message_uuid":joined,"user_message_uuids":[running,joined]});
+    assert!(batch_result_matches(&row, running, joined, &native_id));
+    row["is_error"] = json!(false);
+    assert!(!batch_result_matches(&row, running, joined, &native_id));
+    row["is_error"] = json!(true);
+    row["user_message_uuids"] = json!([joined]);
+    assert!(!batch_result_matches(&row, running, joined, &native_id));
 }
 
 #[test]

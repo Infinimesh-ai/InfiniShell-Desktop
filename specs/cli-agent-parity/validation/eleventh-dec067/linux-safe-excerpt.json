@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "run_id": 35248824124,
+  "job_id": 105295774175,
+  "derived": true,
+  "说明": "从授权原日志白名单行生成；original_line_utf8按UTF-8编码可重建逐行原字节（含原换行）。未复制完整日志、环境或模型正文。",
+  "source_log_bytes": 75252,
+  "source_log_sha256": "922e5dbea3697d118624fb0230865b9003f8910fcd3ceb1a99bcf5b8a981e9a0",
+  "selected_original_lines_bytes": 654,
+  "selected_original_lines_sha256": "55c3820cc89f06ae723370bcee7c167e4c83578f3fdce6514a32c2de8552ed28",
+  "entry_count": 6,
+  "entries": [
+    {
+      "log_line": 592,
+      "step": "Test notification patch file transactions",
+      "text": "FAIL: test_timeout_retains_partial_output_after_process_group_stop (__main__.SourceRunnerTests.test_timeout_retains_partial_output_after_process_group_stop)",
+      "original_line_utf8": "2026-09-17T16:49:13.4692687Z FAIL: test_timeout_retains_partial_output_after_process_group_stop (__main__.SourceRunnerTests.test_timeout_retains_partial_output_after_process_group_stop)\n",
+      "original_line_bytes": 186,
+      "original_line_sha256": "7cd286a570aee90bb55a92f14e919cfd8b6f4f1c21b8bb47522b82e4365528ea"
+    },
+    {
+      "log_line": 595,
+      "step": "Test notification patch file transactions",
+      "text": "File \"/opt/actions-runner-infinishell/_work/InfiniShell-Desktop/InfiniShell-Desktop/script/cli-agent-parity/codex_source_runner_tests.py\", line 144, in test_timeout_retains_partial_output_after_process_group_stop",
+      "original_line_utf8": "2026-09-17T16:49:13.4695315Z   File \"/opt/actions-runner-infinishell/_work/InfiniShell-Desktop/InfiniShell-Desktop/script/cli-agent-parity/codex_source_runner_tests.py\", line 144, in test_timeout_retains_partial_output_after_process_group_stop\n",
+      "original_line_bytes": 244,
+      "original_line_sha256": "9bdcacd4bfb6f4a1fc5e383fd0223e5f8a6e23a8bd82ffc559e7fe5d523072ed"
+    },
+    {
+      "log_line": 596,
+      "step": "Test notification patch file transactions",
+      "text": "self.assertTrue(timed_out)",
+      "original_line_utf8": "2026-09-17T16:49:13.4696438Z     self.assertTrue(timed_out)\n",
+      "original_line_bytes": 60,
+      "original_line_sha256": "d249fb622e720c75bee2ea1e1ec0c1831d537e9b8d5e2f3cc10ea525efdb629e"
+    },
+    {
+      "log_line": 598,
+      "step": "Test notification patch file transactions",
+      "text": "AssertionError: False is not true",
+      "original_line_utf8": "2026-09-17T16:49:13.4697116Z AssertionError: False is not true\n",
+      "original_line_bytes": 63,
+      "original_line_sha256": "78cb899631e1c2c9d1f7fee5db0042e587589001b612ddacde74a3c781287d74"
+    },
+    {
+      "log_line": 601,
+      "step": "Test notification patch file transactions",
+      "text": "Ran 10 tests in 0.007s",
+      "original_line_utf8": "2026-09-17T16:49:13.4698022Z Ran 10 tests in 0.007s\n",
+      "original_line_bytes": 52,
+      "original_line_sha256": "4337ea2172fbd56d7c11ca2bbac5416b3681d0dd3dd60d8f222d98143f5e40d5"
+    },
+    {
+      "log_line": 603,
+      "step": "Test notification patch file transactions",
+      "text": "FAILED (failures=1)",
+      "original_line_utf8": "2026-09-17T16:49:13.4698323Z FAILED (failures=1)\n",
+      "original_line_bytes": 49,
+      "original_line_sha256": "3ec57f25d944ca6fd543c8a38325e0f7b0dc49b930b129e46efab95c12d5ef7b"
+    }
+  ]
+}

@@ -277,13 +277,119 @@ fn trace_live_protocol_ids(message: &Value) {
     let update = &params["update"];
     eprintln!(
         "GROK_NATIVE_PROTOCOL_IDS {}",
-        json!({"id":message.get("id"),"method":message.get("method"),
+        json!({"id":message.get("id").map(|id| if id.is_string() {diagnostic_value(Some(id))} else {id.clone()}),"method":message.get("method"),
             "sessionId":params.get("sessionId"),"sessionUpdate":update.get("sessionUpdate"),
             "eventId":params["_meta"].get("eventId"),"promptId":params["_meta"].get("promptId"),
             "streamStartMs":params["_meta"].get("streamStartMs"),"chunkId":params["_meta"].get("chunkId"),
             "toolCallId":update.get("toolCallId"),"status":update.get("status"),
-            "stopReason":message["result"].get("stopReason")})
+            "stopReason":message["result"].get("stopReason").map(|reason| match reason.as_str() {
+                Some("end_turn" | "max_tokens" | "refusal" | "cancelled") => reason.clone(),
+                Some(_) | None => diagnostic_value(Some(reason)),
+            }),
+            "response_diagnostic":native_response_diagnostic(message)})
     );
+}
+
+#[cfg(test)]
+fn diagnostic_value(value: Option<&Value>) -> Value {
+    let mut summary = json!({"type":diagnostic_value_type(value)});
+    if let Some(value) = value {
+        // 任意错误或畸形字段只保留长度和摘要，不保存正文、地址或查询。
+        let bytes = match value {
+            Value::String(text) => text.as_bytes().to_vec(),
+            Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::Array(_)
+            | Value::Object(_) => serde_json::to_vec(value).expect("JSON 值可序列化"),
+        };
+        summary["bytes"] = json!(bytes.len());
+        summary["sha256"] = json!(format!("{:x}", Sha256::digest(&bytes)));
+    }
+    summary
+}
+
+#[cfg(test)]
+fn diagnostic_value_type(value: Option<&Value>) -> &'static str {
+    match value {
+        None => "absent",
+        Some(Value::Null) => "null",
+        Some(Value::Bool(_)) => "boolean",
+        Some(Value::Number(_)) => "number",
+        Some(Value::String(_)) => "string",
+        Some(Value::Array(_)) => "array",
+        Some(Value::Object(_)) => "object",
+    }
+}
+
+#[cfg(test)]
+fn native_response_diagnostic(message: &Value) -> Value {
+    let error = message.get("error");
+    let result = message.get("result");
+    let http_status = message["error"]["data"]["http_status"]
+        .as_i64()
+        .filter(|code| (100..=599).contains(code));
+    let error_category = match http_status {
+        Some(401) => "http_401",
+        Some(402) => "http_402",
+        Some(403) => "http_403",
+        Some(429) => "http_429",
+        Some(400..=499) => "http_4xx",
+        Some(500..=599) => "http_5xx",
+        Some(_) | None => "unknown",
+    };
+    json!({
+        "jsonrpc":diagnostic_value(message.get("jsonrpc")),
+        "jsonrpc_is_2_0":message["jsonrpc"] == "2.0",
+        "response_id":diagnostic_value(message.get("id")),
+        "response_id_number":message["id"].as_u64().filter(|id| *id <= i64::MAX as u64),
+        "method_present":message.get("method").is_some(),
+        "error_present":error.is_some(),"error_type":diagnostic_value_type(error),
+        "error_code":message["error"]["code"].as_i64(),
+        "native_error_http_status":http_status,"native_error_category":error_category,
+        "error_code_type":diagnostic_value_type(error.and_then(|value| value.get("code"))),
+        "error_message":diagnostic_value(error.and_then(|value| value.get("message"))),
+        "error_data_message":diagnostic_value(error.and_then(|value| value.get("data")).and_then(|value| value.get("message"))),
+        "result_present":result.is_some(),"result_type":diagnostic_value_type(result),
+        "result_stop_reason":diagnostic_value(result.and_then(|value| value.get("stopReason"))),
+        "result_error_conflict":result.is_some() && error.is_some()
+    })
+}
+
+#[cfg(test)]
+fn runtime_error_diagnostic(error: &RuntimeError) -> Value {
+    let kind = match error {
+        RuntimeError::StaleGeneration => "stale_generation",
+        RuntimeError::ControllerClosed => "controller_closed",
+        RuntimeError::UnsupportedVersion(_) => "unsupported_version",
+        RuntimeError::InvalidConfiguration(_) => "invalid_configuration",
+        RuntimeError::PermissionCeilingRejected { .. } => "permission_ceiling_rejected",
+        RuntimeError::Protocol(_) => "protocol",
+        RuntimeError::Io(_) => "io",
+        RuntimeError::RequestTimedOut => "request_timed_out",
+        RuntimeError::EventBackpressure => "event_backpressure",
+    };
+    let protocol_failure = match error {
+        RuntimeError::Protocol(detail) => match detail.as_str() {
+            "invalid Grok response id" => "invalid_response_id",
+            "Grok response is not JSON-RPC 2.0" => "invalid_jsonrpc_version",
+            "unsolicited Grok response" => "unsolicited_response",
+            "conflicting Grok response for completed request" => "conflicting_response",
+            "Grok ACP stdout closed" => "stdout_closed",
+            "Grok native identity ledger limit reached" => "identity_ledger_limit",
+            _ => "unknown",
+        },
+        RuntimeError::StaleGeneration
+        | RuntimeError::ControllerClosed
+        | RuntimeError::UnsupportedVersion(_)
+        | RuntimeError::InvalidConfiguration(_)
+        | RuntimeError::PermissionCeilingRejected { .. }
+        | RuntimeError::Io(_)
+        | RuntimeError::RequestTimedOut
+        | RuntimeError::EventBackpressure => "not_protocol",
+    };
+    json!({"runtime_error_kind":kind,"protocol_failure_kind":protocol_failure,
+        "runtime_error_message":diagnostic_value(Some(&Value::String(error.to_string())))})
 }
 
 async fn write_message(
@@ -1432,6 +1538,11 @@ impl GrokProtocol {
     }
 
     fn receive(&mut self, message: Value) -> Result<Effects, RuntimeError> {
+        #[cfg(test)]
+        if let Some(probe) = &self.sdk_origin_probe {
+            // 在版本与身份前置校验之前保存安全形状，畸形帧也不能丢失终止诊断。
+            probe.observe_response_diagnostic(&message);
+        }
         if self.responses.len() >= MAX_NATIVE_IDENTITIES
             || self.notification_ids.len() >= MAX_NATIVE_IDENTITIES
             || self.observed_prompt_ids.len() >= MAX_NATIVE_IDENTITIES
@@ -1993,3 +2104,7 @@ mod live_tests;
 #[cfg(test)]
 #[path = "grok_sdk_origin_live_tests.rs"]
 mod sdk_origin_live_tests;
+
+#[cfg(test)]
+#[path = "grok_policy_preflight_live_tests.rs"]
+mod policy_preflight_live_tests;

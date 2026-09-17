@@ -27,6 +27,204 @@ use crate::workspaces::team::Team;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::workspaces::workspace::Workspace;
 
+#[cfg(unix)]
+mod launch_fallback {
+    use std::collections::{HashMap, HashSet};
+    use std::path::Path;
+    use std::sync::Arc;
+
+    use smol_str::SmolStr;
+
+    use super::super::{CLIAgent, CLIAgentLaunchSnapshot, cli_agent_launch_fallback};
+    use crate::terminal::model::session::command_executor::testing::TestCommandExecutor;
+    use crate::terminal::model::session::{Session, SessionInfo};
+    use crate::terminal::shell::ShellType;
+
+    fn snapshot() -> CLIAgentLaunchSnapshot<'static> {
+        CLIAgentLaunchSnapshot {
+            host_namespace_verified: true,
+            command_snapshot_complete: true,
+            shell_type: ShellType::Bash,
+            path: Some("/shell/bin"),
+            cwd: Some(Path::new("/project")),
+            command_known: false,
+        }
+    }
+
+    #[test]
+    fn current_path_keeps_bare_command_before_discovered_installation() {
+        let discovered = Path::new("/cache/bin/grok");
+        assert_eq!(
+            cli_agent_launch_fallback(CLIAgent::Grok, Some(discovered), snapshot(), |path| path
+                == discovered
+                || path == Path::new("/shell/bin/grok")),
+            None
+        );
+    }
+
+    #[test]
+    fn alias_or_function_snapshot_keeps_bare_command() {
+        let discovered = Path::new("/cache/bin/grok");
+        let mut snapshot = snapshot();
+        snapshot.command_known = true;
+        assert_eq!(
+            cli_agent_launch_fallback(CLIAgent::Grok, Some(discovered), snapshot, |path| path
+                == discovered),
+            None
+        );
+    }
+
+    #[test]
+    fn session_alias_and_function_names_retain_their_resolution_priority() {
+        let alias = SessionInfo::new_for_test().with_aliases(HashMap::from([(
+            SmolStr::new("grok"),
+            "custom-grok --profile user".into(),
+        )]));
+        let function =
+            SessionInfo::new_for_test().with_function_names(HashSet::from([SmolStr::new("grok")]));
+        let discovered = Path::new("/cache/bin/grok");
+        for info in [alias, function] {
+            let session = Session::new(info, Arc::new(TestCommandExecutor::default()));
+            let mut snapshot = snapshot();
+            snapshot.command_known = session.top_level_commands().any(|name| name == "grok");
+            assert!(snapshot.command_known);
+            assert_eq!(
+                cli_agent_launch_fallback(CLIAgent::Grok, Some(discovered), snapshot, |path| path
+                    == discovered),
+                None
+            );
+        }
+    }
+
+    #[test]
+    fn complete_local_snapshot_uses_same_cli_and_quotes_unicode_spaces_and_apostrophe() {
+        for agent in [CLIAgent::Claude, CLIAgent::Codex, CLIAgent::Grok] {
+            let path = format!("/用户/CLI 工具'目录/{}", agent.command_prefix());
+            let discovered = Path::new(&path);
+            let expected = format!("'/用户/CLI 工具'\"'\"'目录/{}'", agent.command_prefix());
+            for shell_type in [ShellType::Bash, ShellType::Zsh] {
+                let mut snapshot = snapshot();
+                snapshot.shell_type = shell_type;
+                assert_eq!(
+                    cli_agent_launch_fallback(agent, Some(discovered), snapshot, |path| path
+                        == discovered),
+                    Some(expected.clone())
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn relative_path_resolves_against_session_cwd() {
+        let mut snapshot = snapshot();
+        snapshot.path = Some("bin:/other");
+        let discovered = Path::new("/cache/bin/grok");
+        assert_eq!(
+            cli_agent_launch_fallback(CLIAgent::Grok, Some(discovered), snapshot, |path| path
+                == discovered
+                || path == Path::new("/project/bin/grok")),
+            None
+        );
+    }
+
+    #[test]
+    fn relative_path_without_reliable_cwd_keeps_bare_command() {
+        for cwd in [None, Some(Path::new("relative-project"))] {
+            let mut snapshot = snapshot();
+            snapshot.path = Some("bin:/other");
+            snapshot.cwd = cwd;
+            assert_eq!(
+                cli_agent_launch_fallback(
+                    CLIAgent::Grok,
+                    Some(Path::new("/cache/bin/grok")),
+                    snapshot,
+                    |_| true
+                ),
+                None
+            );
+        }
+    }
+
+    #[test]
+    fn empty_path_segment_uses_session_cwd() {
+        let mut snapshot = snapshot();
+        snapshot.path = Some(":/other");
+        let discovered = Path::new("/cache/bin/grok");
+        assert_eq!(
+            cli_agent_launch_fallback(CLIAgent::Grok, Some(discovered), snapshot, |path| path
+                == discovered
+                || path == Path::new("/project/grok")),
+            None
+        );
+    }
+
+    #[test]
+    fn unknown_path_or_incomplete_commands_do_not_use_cached_installation() {
+        let discovered = Path::new("/cache/bin/grok");
+        let mut no_path = snapshot();
+        no_path.path = None;
+        let mut incomplete = snapshot();
+        incomplete.command_snapshot_complete = false;
+        for snapshot in [no_path, incomplete] {
+            assert_eq!(
+                cli_agent_launch_fallback(CLIAgent::Grok, Some(discovered), snapshot, |path| path
+                    == discovered),
+                None
+            );
+        }
+    }
+
+    #[test]
+    fn remote_or_unknown_namespace_never_uses_host_installation() {
+        let mut snapshot = snapshot();
+        snapshot.host_namespace_verified = false;
+        let discovered = Path::new("/cache/bin/grok");
+        assert_eq!(
+            cli_agent_launch_fallback(CLIAgent::Grok, Some(discovered), snapshot, |path| path
+                == discovered),
+            None
+        );
+    }
+
+    #[test]
+    fn powershell_and_fish_keep_bare_command_with_unknown_resolution() {
+        let discovered = Path::new("/cache/bin/grok");
+        for shell_type in [ShellType::PowerShell, ShellType::Fish] {
+            let mut snapshot = snapshot();
+            snapshot.shell_type = shell_type;
+            assert_eq!(
+                cli_agent_launch_fallback(CLIAgent::Grok, Some(discovered), snapshot, |path| path
+                    == discovered),
+                None
+            );
+        }
+    }
+
+    #[test]
+    fn removed_installation_or_mismatched_cli_cannot_be_used() {
+        for discovered in [
+            None,
+            Some(Path::new("/cache/bin/grok")),
+            Some(Path::new("/cache/bin/claude")),
+            Some(Path::new("relative/grok")),
+        ] {
+            assert_eq!(
+                cli_agent_launch_fallback(CLIAgent::Grok, discovered, snapshot(), |_| false),
+                None
+            );
+        }
+        assert_eq!(
+            cli_agent_launch_fallback(
+                CLIAgent::Grok,
+                Some(Path::new("/cache/bin/claude")),
+                snapshot(),
+                |path| path == Path::new("/cache/bin/claude")
+            ),
+            None
+        );
+    }
+}
+
 /// Helper to build an alias map from pairs.
 fn aliases(pairs: &[(&str, &str)]) -> HashMap<SmolStr, String> {
     pairs

@@ -2296,6 +2296,111 @@ fn bootstrap_with_long_running_block(view: &mut TerminalView) {
     model.simulate_long_running_block("long-command", "output");
 }
 
+#[test]
+fn specific_cli_launch_waits_for_bootstrap_and_duplicate_callbacks_keep_one_draft() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |view, ctx| {
+            view.execute_specific_cli_agent_or_set_pending(CLIAgent::Grok, None, ctx);
+            let revision = view
+                .input
+                .as_ref(ctx)
+                .editor()
+                .as_ref(ctx)
+                .buffer_revision(ctx);
+            for _ in 0..2 {
+                view.handle_terminal_event(&ModelEvent::BootstrapPrecmdDone, ctx);
+            }
+            assert!(view.input.as_ref(ctx).has_pending_command());
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "grok");
+            assert_eq!(
+                view.input
+                    .as_ref(ctx)
+                    .editor()
+                    .as_ref(ctx)
+                    .buffer_revision(ctx),
+                revision
+            );
+            assert!(view.pending_specific_cli_agent_launch.is_some());
+            assert!(!view.awaiting_pending_command_completion);
+        });
+    });
+}
+
+#[test]
+fn specific_cli_launch_does_not_consume_intent_during_long_running_command() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |view, ctx| {
+            bootstrap_with_long_running_block(view);
+            view.execute_specific_cli_agent_or_set_pending(CLIAgent::Grok, None, ctx);
+            view.execute_pending_command((), ctx);
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "grok");
+            assert!(view.input.as_ref(ctx).has_pending_command());
+            assert!(view.pending_specific_cli_agent_launch.is_some());
+            assert!(!view.awaiting_pending_command_completion);
+        });
+    });
+}
+
+#[test]
+fn editing_and_restoring_cli_draft_invalidates_installation_fallback() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |view, ctx| {
+            view.execute_specific_cli_agent_or_set_pending(CLIAgent::Grok, None, ctx);
+            view.input.update(ctx, |input, ctx| {
+                input.replace_buffer_content("grok 用户追加", ctx);
+                input.replace_buffer_content("grok", ctx);
+            });
+            view.prepare_specific_cli_agent_pending_command(ctx);
+            assert!(view.pending_specific_cli_agent_launch.is_none());
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "grok");
+            assert!(view.input.as_ref(ctx).has_pending_command());
+        });
+    });
+}
+
+#[test]
+fn replacing_pending_command_invalidates_specific_cli_launch() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |view, ctx| {
+            view.execute_specific_cli_agent_or_set_pending(CLIAgent::Grok, None, ctx);
+            view.input.update(ctx, |input, ctx| {
+                input.clear_buffer_and_reset_undo_stack(ctx)
+            });
+            view.execute_command_or_set_pending("pwd", ctx);
+            assert!(view.pending_specific_cli_agent_launch.is_none());
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "pwd");
+        });
+    });
+}
+
+#[test]
+fn ctrl_c_and_terminal_shutdown_invalidate_specific_cli_launch() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |view, ctx| {
+            view.execute_specific_cli_agent_or_set_pending(CLIAgent::Grok, None, ctx);
+            view.write_to_pty(vec![0x03], ctx);
+            assert!(view.pending_specific_cli_agent_launch.is_none());
+            view.input.update(ctx, |input, ctx| {
+                input.clear_buffer_and_reset_undo_stack(ctx)
+            });
+            view.execute_specific_cli_agent_or_set_pending(CLIAgent::Grok, None, ctx);
+            assert!(view.pending_specific_cli_agent_launch.is_some());
+            view.prepare_for_pty_shutdown(ctx);
+            assert!(view.pending_specific_cli_agent_launch.is_none());
+        });
+    });
+}
+
 /// Places the active block in agent-driving-but-not-monitoring state:
 /// `requested_command_action_id` is set but `long_running_control_state` is None.
 /// This simulates the window between when the agent writes the command to the

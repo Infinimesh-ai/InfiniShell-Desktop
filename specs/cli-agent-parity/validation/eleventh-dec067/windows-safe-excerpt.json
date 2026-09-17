@@ -1,0 +1,139 @@
+{
+  "run_id": 35248824124,
+  "job_id": 105295774516,
+  "source_log_bytes": 940721,
+  "source_log_sha256": "3574dafb3280f4920b08383e20a87feee4bcc3c34aa6fbabc34b74a87c402af3",
+  "entries": [
+    {
+      "log_line": 521,
+      "step": "Test notification patch file transactions",
+      "text": "test_ambient_provider_keys_are_not_forwarded (__main__.IsolationTests.test_ambient_provider_keys_are_not_forwarded) ... FAIL"
+    },
+    {
+      "log_line": 533,
+      "step": "Test notification patch file transactions",
+      "text": "FAIL: test_ambient_provider_keys_are_not_forwarded (__main__.IsolationTests.test_ambient_provider_keys_are_not_forwarded)"
+    },
+    {
+      "log_line": 536,
+      "step": "Test notification patch file transactions",
+      "text": "File \"C:\\actions-runner\\_work\\InfiniShell-Desktop\\InfiniShell-Desktop\\script\\cli-agent-parity\\claude_coordinator_runner_tests.py\", line 537, in test_ambient_provider_keys_are_not_forwarded"
+    },
+    {
+      "log_line": 537,
+      "step": "Test notification patch file transactions",
+      "text": "self.assertEqual(environment[\"HOME\"], \"/fresh/home\")"
+    },
+    {
+      "log_line": 539,
+      "step": "Test notification patch file transactions",
+      "text": "AssertionError: '\\\\fresh\\\\home' != '/fresh/home'"
+    },
+    {
+      "log_line": 547,
+      "step": "Test notification patch file transactions",
+      "text": "Ran 56 tests in 0.107s"
+    },
+    {
+      "log_line": 549,
+      "step": "Test notification patch file transactions",
+      "text": "FAILED (failures=1, skipped=1)"
+    },
+    {
+      "log_line": 2008,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "test ai::cli_agent_runtime::grok::sdk_origin_live_tests::private_native_tool_and_approval_frames_stay_out_of_public_probe_reports ... FAILED"
+    },
+    {
+      "log_line": 2015,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6689 filtered out; finished in 1.87s"
+    },
+    {
+      "log_line": 2021,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "thread 'ai::cli_agent_runtime::grok::sdk_origin_live_tests::private_native_tool_and_approval_frames_stay_out_of_public_probe_reports' (15536) panicked at app\\src\\ai\\cli_agent_runtime\\grok_sdk_origin_live_tests.rs:2109:9:"
+    },
+    {
+      "log_line": 2022,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "assertion failed: private_text.contains(canary)"
+    },
+    {
+      "log_line": 2051,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6689 filtered out; finished in 1.88s"
+    },
+    {
+      "log_line": 2057,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "thread 'ai::cli_agent_runtime::grok::sdk_origin_live_tests::private_native_tool_and_approval_frames_stay_out_of_public_probe_reports' (16900) panicked at app\\src\\ai\\cli_agent_runtime\\grok_sdk_origin_live_tests.rs:2109:9:"
+    },
+    {
+      "log_line": 2058,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "assertion failed: private_text.contains(canary)"
+    },
+    {
+      "log_line": 2087,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6689 filtered out; finished in 1.94s"
+    },
+    {
+      "log_line": 2093,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "thread 'ai::cli_agent_runtime::grok::sdk_origin_live_tests::private_native_tool_and_approval_frames_stay_out_of_public_probe_reports' (18520) panicked at app\\src\\ai\\cli_agent_runtime\\grok_sdk_origin_live_tests.rs:2109:9:"
+    },
+    {
+      "log_line": 2094,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "assertion failed: private_text.contains(canary)"
+    },
+    {
+      "log_line": 2995,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "     Summary [ 372.247s] 1989 tests run: 1988 passed, 1 failed, 4701 skipped"
+    },
+    {
+      "log_line": 2996,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "text": "  TRY 3 FAIL [   2.096s] (1107/1989) warp ai::cli_agent_runtime::grok::sdk_origin_live_tests::private_native_tool_and_approval_frames_stay_out_of_public_probe_reports"
+    },
+    {
+      "log_line": 3704,
+      "step": "Preserve Windows native CLI boundary evidence",
+      "text": "##[error]No files were found with the provided path: C:\\actions-runner\\_work\\_temp/codex-plugin-lifecycle.json"
+    },
+    {
+      "log_line": 3705,
+      "step": "Preserve Windows native CLI boundary evidence",
+      "text": "C:\\actions-runner\\_work\\_temp/codex-plugin-cache-refresh.json"
+    },
+    {
+      "log_line": 3706,
+      "step": "Preserve Windows native CLI boundary evidence",
+      "text": "C:\\actions-runner\\_work\\_temp/codex-missing-session*"
+    },
+    {
+      "log_line": 3707,
+      "step": "Preserve Windows native CLI boundary evidence",
+      "text": "C:\\actions-runner\\_work\\_temp/codex-idle-crash.*"
+    },
+    {
+      "log_line": 3708,
+      "step": "Preserve Windows native CLI boundary evidence",
+      "text": "C:\\actions-runner\\_work\\_temp/claude-initialize-idle-eof.json"
+    },
+    {
+      "log_line": 3709,
+      "step": "Preserve Windows native CLI boundary evidence",
+      "text": "C:\\actions-runner\\_work\\_temp/claude-permission-observation.json"
+    },
+    {
+      "log_line": 3710,
+      "step": "Preserve Windows native CLI boundary evidence",
+      "text": "C:\\actions-runner\\_work\\_temp/claude-21273-inputs/claude-fixed-inputs.json"
+    }
+  ],
+  "read_only_source_changes": false
+}

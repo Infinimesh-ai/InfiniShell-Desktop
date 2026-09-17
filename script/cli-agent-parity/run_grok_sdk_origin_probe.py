@@ -25,6 +25,7 @@ MAX_TLS_CONNECTIONS = 32
 REQUESTED_MODEL_BUDGET = 2
 MAX_DEADLINE = 450
 MAX_EVIDENCE_BYTES = 16 * 1024 * 1024
+MAX_PRIVATE_ERROR_BYTES = 64 * 1024
 ORIGIN_STATES = {"unknown", "missing_native_origin", "candidate_mapping_only", "verified_native_fields"}
 EVENTS = {"probe_started", "probe_initialize_observed", "registration_received", "sdk_request_received",
     "native_tool_update_received", "native_mcp_status_observed", "probe_approval_observed", "probe_finished"}
@@ -38,11 +39,26 @@ INITIALIZATION_MODES = {"legacy_initialize", "modern_discover"}
 VERSION_CARRIERS = {"params.protocolVersion", "params._meta"}
 NATIVE_TOOL_KINDS = {"ToolSearch", "McpToolSearch", "SearchTools", "ToolLookup", "DiscoverTools",
     "ListTools", "Read", "Write", "Bash", "inspect", "probe_inspect", "other"}
+TRANSPORT_TASK_STATES = {"ok", "runtime_error", "join_error", "join_timeout"}
+FAILURE_SOURCES = {"production_runtime", "fixture_loop", "join_error", "join_timeout", "acceptance"}
+RUNTIME_ERROR_KINDS = {"stale_generation", "controller_closed", "unsupported_version", "invalid_configuration",
+    "permission_ceiling_rejected", "protocol", "io", "request_timed_out", "event_backpressure"}
+PROTOCOL_FAILURE_KINDS = {"invalid_response_id", "invalid_jsonrpc_version", "unsolicited_response",
+    "conflicting_response", "stdout_closed", "identity_ledger_limit", "unknown", "not_protocol"}
+NATIVE_ERROR_CATEGORIES = {"http_401", "http_402", "http_403", "http_429", "http_4xx", "http_5xx", "unknown"}
+FAILURE_DIAGNOSTIC_KEYS = {"transport_task_status", "transport_error", "transport_join_error",
+    "last_native_response_diagnostic", "failure_source", "private_error_capture_status",
+    "private_error_response_bytes"}
+PRIVATE_ERROR_CAPTURE_STATES = {"not_observed", "captured", "budget_rejected", "encoding_failed", "write_failed"}
+DIAGNOSTIC_SUMMARY_KEYS = {"error_message", "error_data_message", "runtime_error_message",
+    "result_stop_reason", "response_id", "transport_join_error"}
 MCP_REASONS = {"transport_closed", "handshake_failed", "config_added", "config_removed", "config_changed",
     "disabled", "auth_expired", "initialized", "restart_succeeded", "restart_failed", "managed_token_refreshed"}
 TYPE_KEYS = {"sdk_capability_type", "params_type", "session_id_type", "total_type", "connected_type",
-    "mcp_tool_count_type", "elapsed_ms_type", "name_type", "detail_type", "native_tool_name_type"}
-COUNTER_KEYS = {"total", "connected", "mcp_tool_count", "elapsed_ms"}
+    "mcp_tool_count_type", "elapsed_ms_type", "name_type", "detail_type", "native_tool_name_type",
+    "error_type", "error_code_type", "result_type"}
+COUNTER_KEYS = {"total", "connected", "mcp_tool_count", "elapsed_ms", "bytes", "response_id_number",
+    "private_error_response_bytes"}
 FIXED_VALUES = EVENTS | ORIGIN_STATES | {SCOPE, "sdk_mcp", "initialize", "tools/list", "tools/call", "ping", "server/discover",
     "unknown", "other", "absent", "null", "boolean", "number", "string", "array", "object",
     "absent_or_null", "unknown_or_absent", "outer_meta", "sdk_params", "sdk_params_meta",
@@ -77,7 +93,12 @@ KEYS = {"event", "scope", "max_native_inputs", "origin_verification", "credentia
     "discovery_count", "negotiatedProtocolVersion", "servedToolNames", "initialization_mode",
     "protocol_version_carrier", "metadata_schema_valid", "requested_protocol_version_sha256",
     "io.modelcontextprotocol/protocolVersion", "io.modelcontextprotocol/clientInfo",
-    "io.modelcontextprotocol/clientCapabilities", "io.modelcontextprotocol/serverInfo"}
+    "io.modelcontextprotocol/clientCapabilities", "io.modelcontextprotocol/serverInfo",
+    "response_diagnostic", "jsonrpc_is_2_0", "response_id", "response_id_number", "method_present",
+    "error_present", "error_type", "error_code", "error_code_type", "error_message", "error_data_message",
+    "result_present", "result_type", "result_stop_reason", "result_error_conflict", "bytes",
+    "runtime_error_kind", "protocol_failure_kind", "runtime_error_message",
+    "native_error_http_status", "native_error_category"} | FAILURE_DIAGNOSTIC_KEYS
 ID_KEYS = {"outer_id", "inner_id", "session_id", "prompt_id", "event_id", "tool_call_id",
     "native_session_id", "native_prompt_id", "request_id"}
 KEY_SET_KEYS = {"outer_keys", "params_keys", "inner_keys", "tool_params_keys", "metadata_keys"}
@@ -178,8 +199,43 @@ def projection(value, key=None, depth=0):
         return {"value_omitted": True}
     if key in ID_KEYS:
         return safe_id(value)
+    if key in DIAGNOSTIC_SUMMARY_KEYS:
+        if value is None:
+            return None
+        if (isinstance(value, dict) and set(value) <= {"type", "bytes", "sha256"}
+                and isinstance(value.get("type"), str) and value["type"] in JSON_TYPES
+                and ("bytes" not in value or type(value["bytes"]) is int and 0 <= value["bytes"] < 2 ** 63)
+                and ("sha256" not in value or isinstance(value["sha256"], str)
+                    and re.fullmatch(r"[0-9a-f]{64}", value["sha256"]))):
+            return value
+        # 正文即使恰好等于某个协议枚举，也不能作为错误摘要原文公开。
+        return {"type": type(value).__name__, "sha256": sha(json.dumps(value,
+            sort_keys=True, ensure_ascii=False).encode("utf-8"))}
+    if key in {"transport_error", "last_native_response_diagnostic"} and isinstance(value, dict):
+        allowed = ({"runtime_error_kind", "protocol_failure_kind", "runtime_error_message"}
+            if key == "transport_error" else {"jsonrpc", "jsonrpc_is_2_0", "response_id", "response_id_number",
+                "method_present", "error_present", "error_type", "error_code", "error_code_type",
+                "error_message", "error_data_message", "result_present", "result_type",
+                "result_stop_reason", "result_error_conflict", "native_error_http_status", "native_error_category"})
+        return {safe_key(str(name)): (projection(item, "runtime_error_message" if name == "jsonrpc" else name,
+            depth + 1) if name in allowed else {"type": type(item).__name__, "sha256": sha(json.dumps(item,
+                sort_keys=True, ensure_ascii=False).encode("utf-8"))}) for name, item in value.items()}
     if key in COUNTER_KEYS:
         return value if type(value) is int and 0 <= value < 2 ** 63 else None
+    if key == "error_code":
+        return value if type(value) is int and -(2 ** 63) <= value < 2 ** 63 else None
+    if key == "native_error_http_status":
+        return value if type(value) is int and 100 <= value <= 599 else None
+    if key in {"transport_task_status", "failure_source", "runtime_error_kind", "protocol_failure_kind",
+            "private_error_capture_status", "native_error_category"}:
+        if key == "failure_source" and value is None:
+            return None
+        allowed = {"transport_task_status": TRANSPORT_TASK_STATES, "failure_source": FAILURE_SOURCES,
+            "runtime_error_kind": RUNTIME_ERROR_KINDS, "protocol_failure_kind": PROTOCOL_FAILURE_KINDS,
+            "private_error_capture_status": PRIVATE_ERROR_CAPTURE_STATES,
+            "native_error_category": NATIVE_ERROR_CATEGORIES}[key]
+        return value if isinstance(value, str) and value in allowed else {"type": type(value).__name__,
+            "sha256": sha(json.dumps(value, sort_keys=True, ensure_ascii=False).encode("utf-8"))}
     if key == "servedToolNames":
         if isinstance(value, list) and all(item == "inspect" for item in value) and len(value) <= 1:
             return value
@@ -253,17 +309,17 @@ def public_events(events):
     return result
 
 
-def private_bytes(path):
+def private_bytes(path, max_bytes=MAX_EVIDENCE_BYTES):
     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
     try:
         attributes = os.fstat(descriptor)
         if (not stat.S_ISREG(attributes.st_mode) or attributes.st_uid != os.getuid()
                 or attributes.st_mode & 0o077 or attributes.st_nlink != 1
-                or attributes.st_size > MAX_EVIDENCE_BYTES):
+                or attributes.st_size > max_bytes):
             raise ValueError("私有证据必须是有限大小的独占普通文件")
         with os.fdopen(os.dup(descriptor), "rb") as file:
-            content = file.read(MAX_EVIDENCE_BYTES + 1)
-        if len(content) > MAX_EVIDENCE_BYTES:
+            content = file.read(max_bytes + 1)
+        if len(content) > max_bytes:
             raise ValueError("私有证据在读取期间超过大小预算")
         return content
     finally:
@@ -275,6 +331,30 @@ def private_events(path):
     if not all(isinstance(event, dict) for event in events):
         raise ValueError("私有证据事件必须是对象")
     return events
+
+
+def private_error_audit(path):
+    raw = private_bytes(path, MAX_PRIVATE_ERROR_BYTES)
+    records = [json.loads(line) for line in raw.splitlines() if line.strip()]
+    if len(records) > 1:
+        raise ValueError("私有原生错误只允许一个响应")
+    for response in records:
+        if (not isinstance(response, dict) or not set(response) <= {"jsonrpc", "id", "error"}
+                or not isinstance(response.get("error"), dict)
+                or not set(response["error"]) <= {"code", "message", "data"}):
+            raise ValueError("私有原生错误出现未经允许的字段")
+        scalar = lambda value: value is None or type(value) in (str, int, float)
+        if (any(not scalar(value) for key, value in response.items() if key != "error")
+                or any(not scalar(value) for key, value in response["error"].items() if key != "data")):
+            raise ValueError("私有原生错误字段必须为标量")
+        if "data" in response["error"]:
+            data = response["error"]["data"]
+            if (not isinstance(data, dict) or not set(data) <= {"message", "http_status", "code", "error_type"}
+                    or any(not scalar(value) for value in data.values())):
+                raise ValueError("私有原生错误 data 出现未经允许的字段")
+    # 原文仅留在独占侧文件；公开 metadata 只有文件长度、数量与摘要。
+    return {"private_native_error_response_bytes": len(raw), "private_native_error_response_count": len(records),
+        "private_native_error_response_sha256": sha(raw), "private_native_error_response_scope_verified": True}
 
 
 def exact_approval_observation(finish, events):
@@ -351,6 +431,10 @@ def probe_observation(exit_code, output, events):
     if len(starts) != 1 or len(finishes) != 1:
         return result
     start, finish = starts[0], finishes[0]
+    # 生产错误的安全投影与能力证明分开；失败摘要不能提升来源或产品门禁。
+    diagnostics = {key: finish[key] for key in FAILURE_DIAGNOSTIC_KEYS if key in finish}
+    if diagnostics:
+        result["failure_diagnostics"] = projection(diagnostics)
     state = finish.get("origin_verification")
     if isinstance(state, str) and state in ORIGIN_STATES:
         result["origin_verification"] = state
@@ -391,6 +475,8 @@ def probe_observation(exit_code, output, events):
             "cleanup_receipt_read", "transport_closed", "no_project_files"))
         and finish.get("parent_permission_ceiling_verified") is False
         and isinstance(state, str) and state in ORIGIN_STATES and finish.get("passed") is True
+        and finish.get("transport_task_status", "ok") == "ok"
+        and finish.get("transport_error") is None and finish.get("transport_join_error") is None
         and exit_code == 0 and "1 passed; 0 failed" in output and "test result: FAILED" not in output)
     verified = (state == "verified_native_fields" and finish.get("full_native_origin_fields_observed") is True
         and finish.get("native_origin_ledger_relation_verified") is True
@@ -531,6 +617,29 @@ def run(args):
             descriptor = os.open(diagnostic, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
             with os.fdopen(descriptor, "w", encoding="utf-8") as file:
                 file.write(output)
+            native_error = root / "private-native-error-response.ndjson"
+            try:
+                metadata.update(private_error_audit(native_error))
+                metadata["private_native_error_response_present"] = True
+                finishes = [event for event in events if event.get("event") == "probe_finished"]
+                if len(finishes) == 1:
+                    finish = finishes[0]
+                    status = finish.get("private_error_capture_status", "not_observed")
+                    consistent = (status in {"not_observed", "captured"}
+                        and metadata["private_native_error_response_count"] == int(status == "captured")
+                        and metadata["private_native_error_response_bytes"] == finish.get("private_error_response_bytes", 0))
+                    metadata["private_native_error_response_ledger_matches"] = consistent
+                    if not consistent:
+                        metadata["probe_passed"] = False
+                        metadata["native_origin_verified"] = False
+            except FileNotFoundError:
+                metadata["private_native_error_response_present"] = False
+                metadata["probe_passed"] = False
+                metadata["native_origin_verified"] = False
+            except (OSError, ValueError) as error:
+                metadata["private_native_error_response_audit_error_type"] = type(error).__name__
+                metadata["probe_passed"] = False
+                metadata["native_origin_verified"] = False
             if not events:
                 try:
                     events = private_events(raw_path)

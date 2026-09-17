@@ -213,6 +213,21 @@ async fn cancel_and_continue(
                 outcome,
                 output,
             } => {
+                let expected = if cancelled { continuation } else { running };
+                let (outcome_name, error_bytes, error_sha256) = match &outcome {
+                    TurnOutcome::Completed => ("Completed", 0, None),
+                    TurnOutcome::Cancelled => ("Cancelled", 0, None),
+                    TurnOutcome::Failed { message } => {
+                        ("Failed", message.len(), Some(digest(message.as_bytes())))
+                    }
+                };
+                evidence.record(json!({"event":"cancel_terminal_observed",
+                    "phase":if cancelled {"continue"} else {"pending_edit"},
+                    "turn_id":turn_id,"native_session_id":native_id,"outcome":outcome_name,
+                    "expected_turn_id":expected,"turn_id_matches":turn_id == expected.to_string(),
+                    "interrupt_acknowledged":interrupt_acknowledged,"approval_cancelled":approval_cancelled,
+                    "turn_started":started.contains(&expected),"error_bytes":error_bytes,
+                    "error_sha256":error_sha256}))?;
                 if !cancelled {
                     if turn_id != running.to_string()
                         || outcome != TurnOutcome::Cancelled
@@ -332,8 +347,10 @@ fn audit_native(
     let [(result_index, result), (continue_index, continued)] = results.as_slice() else {
         return Err("没有恰好两份原生执行结果".into());
     };
-    let shape = (result["terminal_reason"] == "aborted_streaming"
-        && result["subtype"] == "error_during_execution"
+    let shape = (matches!(
+        result["terminal_reason"].as_str(),
+        Some("aborted_streaming" | "aborted_tools")
+    ) && result["subtype"] == "error_during_execution"
         && result["is_error"] == true)
         || (matches!(
             result["terminal_reason"].as_str(),

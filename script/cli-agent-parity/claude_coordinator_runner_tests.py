@@ -534,8 +534,8 @@ class IsolationTests(unittest.TestCase):
             environment = runner.base.authenticated_environment(Path("/probe"), Path("/fresh/claude"), Path("/fresh/home"))
         self.assertNotIn("ANTHROPIC_API_KEY", environment)
         self.assertNotIn("XAI_API_KEY", environment)
-        self.assertEqual(environment["HOME"], "/fresh/home")
-        self.assertEqual(environment["CLAUDE_CONFIG_DIR"], "/fresh/claude")
+        self.assertEqual(environment["HOME"], str(Path("/fresh/home")))
+        self.assertEqual(environment["CLAUDE_CONFIG_DIR"], str(Path("/fresh/claude")))
 
     def test_api_secrets_are_redacted_in_values_and_json_strings(self):
         environment = {"ANTHROPIC_API_KEY": 'secret-with-"-quote', "ANTHROPIC_BASE_URL": "https://private-api.test"}

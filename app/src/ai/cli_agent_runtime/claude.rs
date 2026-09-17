@@ -343,7 +343,7 @@ fn live_native_protocol_ids(message: &Value) -> Value {
         ]),
         "tool_use_id":live_native_id(&message["request"]["tool_use_id"]),"tools":tools,
         "terminal_reason":match message["terminal_reason"].as_str() {
-            Some("aborted_streaming" | "interrupted" | "cancelled" | "api_error"
+            Some("aborted_streaming" | "aborted_tools" | "interrupted" | "cancelled" | "api_error"
                 | "completed" | "end_turn") => message["terminal_reason"].clone(),
             Some(_) => json!("unknown"),
             None => Value::Null,
@@ -394,6 +394,30 @@ fn live_native_id(value: &Value) -> Value {
 }
 
 #[cfg(test)]
+fn live_native_value_shape(value: Option<&Value>) -> Value {
+    let (kind, bytes) = match value {
+        None => ("missing", None),
+        Some(Value::Null) => ("null", Some(b"null".to_vec())),
+        Some(Value::Bool(value)) => ("boolean", Some(value.to_string().into_bytes())),
+        Some(Value::Number(value)) => ("number", Some(value.to_string().into_bytes())),
+        Some(Value::String(value)) => ("string", Some(value.as_bytes().to_vec())),
+        Some(value @ Value::Array(..)) => ("array", Some(value.to_string().into_bytes())),
+        Some(value @ Value::Object(..)) => ("object", Some(value.to_string().into_bytes())),
+    };
+    json!({"type":kind,"bytes":bytes.as_ref().map_or(0, Vec::len),
+        "sha256":bytes.map(|bytes| format!("{:x}", Sha256::digest(bytes)))})
+}
+
+#[cfg(test)]
+fn live_native_cancel_diagnostics(message: &Value) -> Value {
+    let mut errors = live_native_value_shape(message.get("errors"));
+    errors["count"] = json!(message["errors"].as_array().map_or(0, Vec::len));
+    // 取消诊断只保留形状和散列；未知原因及错误正文不会进入公共账本。
+    json!({"terminal_reason":live_native_value_shape(message.get("terminal_reason")),
+        "errors":errors})
+}
+
+#[cfg(test)]
 fn record_live_native_ids(
     protocol: &ClaudeProtocol,
     message: &Value,
@@ -410,6 +434,9 @@ fn record_live_native_ids(
         }
         let mut ids = live_native_protocol_ids(message);
         ids["direction"] = json!(direction);
+        if message["type"] == "result" {
+            ids["cancel_diagnostics"] = live_native_cancel_diagnostics(message);
+        }
         records.push(ids);
     }
     Ok(())
@@ -1456,8 +1483,10 @@ impl ClaudeProtocol {
                 });
                 let mut deferred_executions = Vec::new();
                 if matches!(&outcome, TurnOutcome::Cancelled)
-                    || (message["terminal_reason"] == "aborted_streaming"
-                        && message["subtype"] == "error_during_execution"
+                    || (matches!(
+                        message["terminal_reason"].as_str(),
+                        Some("aborted_streaming" | "aborted_tools")
+                    ) && message["subtype"] == "error_during_execution"
                         && message["is_error"] == true)
                 {
                     for id in &turn_ids {

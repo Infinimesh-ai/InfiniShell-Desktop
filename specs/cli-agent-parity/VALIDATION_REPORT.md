@@ -2,7 +2,11 @@
 
 更新日期：2026-09-18（北京时间）。Goal 未完成。工作分支 `codex/cli-agent-parity`；本轮实际修改提交前的 HEAD 与根代理当时实际远端核对均为 `b3d8b0f11657b0ed1ba34035dda8d363eb52747f`。本轮修改与证据将形成新检查点，实际平台运行与SHA另存；不将历史检查点或中间 dirty 快照计为最终同提交验收。
 
-## 当前快照与门禁
+检查点 `dec067d2d53fb65f11b37b66a72fa9e11e82cf04` 已实际提交、推送并核对远端一致。该提交干净验证树的 [source23 门禁](OFFICIAL_23_LOCAL_GATES.md)通过 check、i18n11、Rust1301、Python363、main构建、严格签名及完整双语资源嵌入。[source23 在线验收](OFFICIAL_23_NATIVE_LIVE.md)：Claude PNG3三输入、两个正常退出及同原生会话历史继续通过；Grok SDK8整体失败，但现代2026-07-28 MCP发现、工具列表及原生ready实际已观察；Claude等待Edit取消1整体失败，原生interrupt ACK、审批撤销、错误result及cancelled生命周期均已观察，未取得应用可信取消聚合。[CI11](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35248824124) 同SHA：Linux的Python超时夹具失败、Rust未执行；Windows的Python与Rust定向步骤失败，check和SSH worker构建通过；真实日志已取得，分别定位为纯测试的路径分隔符断言和私有JSON反斜线编码断言，原生准备因前置失败跳过、证据上传缺失为继发失败。两平台均不能计完整通过。后续修复不在该提交：[source24候选门禁](OFFICIAL_24_LOCAL_GATES.md)已冻结111路径并通过check、i18n11、Rust1378、Python410；包含Claude真实取消枚举补丁、Grok测试夹具对生产传输真实错误的诊断、标题栏普通终端启动及本地安装路径回退。只读预检已预编译并核对唯一ignored入口，准备标记已解除，原生接口尚未执行；该候选验证树dirty、未提交，不计新的同提交／跨平台／GUI通过。同一source24快照另行补跑实际`terminal::model::session::test`模块15/15通过，含新增4项，主1378计数不回填。source25已以同一111路径冻结Windows两处测试修复与两平台正确Session筛选，[正式候选门禁](OFFICIAL_25_LOCAL_GATES.md)已通过check、i18n11、Rust1393、Python410；新实际提交及同提交原生／平台复验仍待执行。
+
+## 当前候选与历史门禁
+
+最新候选为[source25](OFFICIAL_25_LOCAL_GATES.md)，111路径，manifest SHA `3a722bb3f6f2c0c4282b628c4e0671f6a8e4c17c972b2b407b667b681eba1101`；check52.750秒、i18n11／142.748秒、定向1393／5483 skipped／19.892秒、Python15组410／4.999秒均通过。候选dirty，尚未形成新实际提交；下列source20–22记录为历史，source23实际dec构建与有限原生结果见首段及独立专报。
 
 source21 已冻结87路径，manifest SHA `966dfd9ff2bced152808fb6ee75bb2a7b41e6f87eabb57157fdd0a947f24dff0`，通过 check（63.194秒）、i18n11（178.715秒）、定向1270／5534 skipped（18.283秒）及 Python14组363（4.794秒）；lib SHA `10755f06d9e0d004c99551f24063660139f34bc8e9f07d08f3f9dd328d81a09e`。没有 source21 main／签名／真实CLI，见 [独立归档](OFFICIAL_21_LOCAL_GATES.md)。随后发现的旧独立Claude AgentDriver 已在主工作区关闭，固定绕过与全局写入实现已移除，普通终端和托管任务保留各自入口；source22 的93路径新快照（manifest SHA `2179e1a3add0f5507440f565b9fe2b4382ab68112555c313d9fc758073cb1482`）已通过 check（85.881秒）、i18n11（169.478秒）、定向1301／5493 skipped（18.693秒）及 Python363（4.831秒），lib SHA `752f2bd512cbe2bc874904a0b647350979a2b46c702254c43e37beecc96f450a`。五项新增配置与分派/auth回归全部实际PASS；编译有两项测试桥导出unused_import警告，退出0。见 [source22 独立归档](OFFICIAL_22_LOCAL_GATES.md)；没有22main、实际CLI或同提交平台结论。
 
@@ -20,7 +24,7 @@ source21 已冻结87路径，manifest SHA `966dfd9ff2bced152808fb6ee75bb2a7b41e6
 
 source20 lib SHA 为 `c5819a0d7e73031b3ce19716e27e143b3188e03a5c6e7b0bc5e1a8b2a88c7716`，main／监督worker为 `8b1ad22b400b71b13e08ca6d9f8fdcc3b78da69c965d3fd9366a8cfa1ed3ddea`。身份来自原运行／构建报告，独立归档核对报告及日志，没有重算二进制或重新查询内核。当前文档整理也未重跑门禁。
 
-source21 已编译现代MCP、PNG Resume就绪／身份分离及待定Edit取消夹具并通过本地门禁，真实验证仍未进行。旧独立Claude入口修复将作为source22新增验证；它不属于source21通过范围。
+source21当时只编译现代MCP、PNG Resume就绪／身份分离及待定Edit取消夹具，没有原生验证；旧独立Claude入口修复在source22新增回归中通过，不属于source21范围。后续source23真实PNG3已完成第三输入历史继续，SDK8及等待Edit取消1整体失败，均保留原报告。
 
 ## 当前真实CLI证据
 
@@ -53,12 +57,12 @@ Resume最新startup的原生ID为null／关联false，夹具以 `resume_ready_id
 
 | 验收 | Codex | Claude | Grok |
 | --- | --- | --- | --- |
-| 新建／两轮／完整结果 | 原生与macOS GUI中间通过 | API与GUI有阶段证据，PNG2前两轮通过 | source11 GUI及source13 coordinator根任务通过 |
+| 新建／两轮／完整结果 | 原生与macOS GUI中间通过 | API与GUI有阶段证据，source23 PNG3三输入完整结果通过 | source11 GUI及source13 coordinator根任务通过 |
 | 审批允许／拒绝 | 中间GUI与实际文件效果通过 | 固定策略API／GUI通过；完整父子GUI待验 | 根任务精确Write通过；子任务上限未验 |
 | 运行中追加／原生接收／模型采用 | GUI真实Steer及父→子采用有证据 | API排队、GUI／父子实际合并与完整UUID结果有证据 | 根任务后续回合排队有证据，不宣称steer |
-| 取消／继续 | 中间真实取消与继续有证据 | 批次三证据取消有证据；等待Edit取消旧GUI失败、新真实夹具未运行 | source11正文后取消与同连接继续通过；SDK7清理不替代业务取消 |
-| 应用重启／恢复／回收 | bundle历史与活动退出后显式继续有证据 | 固定策略GUI历史继续有证据；PNG2第3输入未发／恢复未通过 | source11真实应用重启与历史记忆通过；最终提交整链待验 |
-| 父子双向消息／进度／结果 | macOS中间GUI有实际闭环 | 固定策略独立协调器执行与修正审计通过，完整GUI待验 | SDK发现尚未进入业务工具，未开放子任务 |
+| 取消／继续 | 中间真实取消与继续有证据 | 批次三证据取消有证据；source23等待Edit取消1已原生运行但应用可信聚合失败，source25补丁待真实复验 | source11正文后取消与同连接继续通过；SDK8发现／ready及清理不替代业务取消 |
+| 应用重启／恢复／回收 | bundle历史与活动退出后显式继续有证据 | 固定策略GUI历史继续有证据；source23 PNG3原ID新进程历史继续及第3结果通过，完整App／SQLite／GUI仍待验 | source11真实应用重启与历史记忆通过；最终提交整链待验 |
+| 父子双向消息／进度／结果 | macOS中间GUI有实际闭环 | 固定策略独立协调器执行与修正审计通过，完整GUI待验 | source23 SDK8发现／列表／原生ready已观察，inspect0／来源未验证，未开放子任务 |
 | 插件缺失／版本／禁用／更新失败恢复 | 各原生／GUI／平台子集有记录，完整故障组合待验 | 固定缓存与升级／强杀重试有记录，完整组合待验 | 安装器事务子集有记录，完整平台组合待验 |
 | 崩溃／重复／旧回调／重投／恢复失败 | 定向故障与macOS真实崩溃清理有证据，最终提交待验 | 共享回归不能替代真实异常工具崩溃；完整组合待验 | 共享回归及根任务正常清理不替代真实崩溃／SDK故障整链 |
 | 双语布局 | 旧bundle布局有证据，最新全功能待验 | 固定策略阶段布局有证据，动态FTL边界及最新GUI待验 | source11内嵌EN／ZH实际布局通过，最新完整布局待验 |
@@ -72,12 +76,12 @@ Resume最新startup的原生ID为null／关联false，夹具以 `resume_ready_id
 
 SSH／tmux的 [构造通知](SSH_TMUX_VERIFICATION.md) 与 [真实Codex原生TUI传输](CODEX_NATIVE_SSH_TMUX_VERIFICATION.md)分开记录；模型HTTP为零的探针不等于三方完整在线交互、输入、审批、重启和恢复。远端只通过仓库cross-platform-preflight workflow，在本地新门禁通过、实际修改提交推送且headSha一致后验证。最终按仓库要求执行全工作区门禁，不能以选定筛选覆盖替代。
 
-Codex默认shell_snapshot在含引号与命令替换字符CODEX_HOME中的上游路径限制仍有 [独立原记录](validation/macos-codex-shell-snapshot-path-limitation.json)，隔离探针关闭特性的正向结果不改变默认限制。Claude固定文件策略不是OS文件／网络沙箱，Inherit观察不能证明任意完整父权限上限。Grok SDK业务来源、现代发现版本、子任务权限及兼容Claude hooks完整链仍待验；旧额度／未登录失败保留历史，不再把已完成的官方在线授权和根任务成功说成当前无法使用。
+Codex默认shell_snapshot在含引号与命令替换字符CODEX_HOME中的上游路径限制仍有 [独立原记录](validation/macos-codex-shell-snapshot-path-limitation.json)，隔离探针关闭特性的正向结果不改变默认限制。Claude固定文件策略不是OS文件／网络沙箱，Inherit观察不能证明任意完整父权限上限。Grok SDK8现代发现版本注册已有真实部分证据，业务来源、子任务权限及兼容Claude hooks完整链仍待验；旧额度／未登录失败保留历史，不再把已完成的官方在线授权和根任务成功说成当前无法使用。
 
 ## 下一轮交付必须补齐
 
-1. source21本地门禁通过后发现遗留Claude入口，修复和source22新check／i18n／focused（包含旧harness1301项）／Python363已通过，接着精确commit／push／CI11；不做dirty21 main或native。随后隔离验证树检出同一新实际提交的干净源码，复验门禁并构建main／严格签名，再运行PNG3／SDK8／待Edit取消原生首轮；不能改写source20结果。
-2. PNG恢复第3输入的原生同ID／无重投／完整记忆结果，现代SDK发现与业务工具来源账本，等待Edit审批真实取消及随后继续。
+1. 修复source23 Claude等待Edit取消聚合，补Grok测试夹具对生产传输真实错误的诊断和标题栏启动；CI11 Windows实际日志已定位并精准修复两处纯测试断言；只读预检已完成预编译和唯一入口核对。source25新快照正式本地门禁已通过，精确commit／push；同一实际提交干净源码构建／严格签名及真实CLI验证。
+2. PNG3原生历史继续已有同提交范围限定证据；完整App／SQLite／GUI重启仍待验。新一轮须取得等待Edit取消后继续、现代SDK真实业务工具来源账本和Grok无输入只读接口调查，原生／权限／父子能力分别判断。
 3. 普通三方终端、附件／上下文／技能／评审、插件负向与故障、父子GUI与恢复的完整验收；最新英文／简体中文布局分别留证。
 4. 包含实际修改的同一提交macOS／Linux／Windows相关验证、完整工作区与独立SSH／tmux链；真实CLI证据与Actions head SHA相符。
 5. 完整能力矩阵、插件／发布配套、文档和验证报告；所有外部限制及失败准确列出，只有全部门槛满足才完成Goal。

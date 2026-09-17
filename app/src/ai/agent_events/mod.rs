@@ -6,6 +6,7 @@ use async_trait::async_trait;
 mod driver;
 mod message_hydrator;
 
+#[cfg(test)]
 pub(crate) use driver::{
     AgentEventConsumer, AgentEventConsumerControlFlow, AgentEventDriverConfig,
     AgentEventStreamClientEventSource, run_agent_event_driver,
@@ -17,6 +18,7 @@ pub(crate) use driver::{
     DEFAULT_PERMANENT_ERROR_BACKOFF_STEPS, agent_event_backoff,
     agent_event_failures_exceeded_threshold,
 };
+#[cfg(test)]
 pub(crate) use message_hydrator::MessageHydrator;
 
 /// 本地 agent 事件流入口。Zap 保留接口以支持本地 driver 注入,默认实现禁用云端 RTC。

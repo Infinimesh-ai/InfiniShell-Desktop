@@ -1,0 +1,834 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-09-17T17:05:23.019688+00:00",
+  "source_checkpoint": "source23",
+  "source_commit_from_independent_root_pre_postcheck": "dec067d2d53fb65f11b37b66a72fa9e11e82cf04",
+  "source_manifest_sha256": "89596f95bca52dd9b446670c6319fd6ca644f922852f411c6d9ce9e356125e27",
+  "sources": [
+    {
+      "path": "/private/tmp/infinishell-claude-managed-image-live-3.ndjson",
+      "bytes": 27814,
+      "sha256": "fd53d6900d93d3731283c7164de92c8a21415a74bc372296e8423912a1fa8f70",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "/private/tmp/infinishell-claude-managed-image-live-3.metadata.json",
+      "bytes": 3224,
+      "sha256": "893197c0a534930678d29a3941bb7e686aebb11575af87fb0e718475db127e47",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "/private/tmp/infinishell-grok-sdk-origin-probe-8.ndjson",
+      "bytes": 7207,
+      "sha256": "1922e99b8a0bc4b453bc605797fca260ed97464ec254e7f3ffb0d1f231d47294",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "/private/tmp/infinishell-grok-sdk-origin-probe-8.metadata.json",
+      "bytes": 4037,
+      "sha256": "5d3a4fb0403c95f001be152f7df723c4204b4a8d53039b4f61ccebe83f2629f1",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "/private/tmp/infinishell-grok-sdk-origin-probe-8.network.json",
+      "bytes": 2169,
+      "sha256": "1a822303b3bf0218c899f3cdd332afbbe2ffbd92355d6e147d54c94522d6ec29",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "/private/tmp/infinishell-claude-approval-cancel-live-1.ndjson",
+      "bytes": 44436,
+      "sha256": "c2dff25006e515b3b40b9233719310c9ec6120bc4412656a3b08b23a4beefb64",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "/private/tmp/infinishell-claude-approval-cancel-live-1.metadata.json",
+      "bytes": 2469,
+      "sha256": "03827465478299eec58ed361d80a90accf5ead2182b8763f5585294705c0eb17",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "/tmp/infinishell-cli-parity-official-23-native-inputs-postcheck.json",
+      "bytes": 1297,
+      "sha256": "e7c0f22c6ff0b5a17d3055ca8727c2f2fde5c229e9bf617088505c995b49f35d",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    }
+  ],
+  "independent_precheck_reference": {
+    "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/specs/cli-agent-parity/validation/macos-official-23-native-inputs-precheck.json",
+    "bytes": 901,
+    "sha256": "9392e434cebd34b3e572f18121604d756a3b5c9701d781a2c76e02429cc957c7",
+    "credential_shape_scan": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "credential_assignment": 0,
+      "email": 0
+    }
+  },
+  "independent_archived_inputs_reference": {
+    "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/specs/cli-agent-parity/validation/macos-official-23-inputs.json",
+    "bytes": 16078,
+    "sha256": "89596f95bca52dd9b446670c6319fd6ca644f922852f411c6d9ce9e356125e27",
+    "credential_shape_scan": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "credential_assignment": 0,
+      "email": 0
+    }
+  },
+  "binary_identity_matches_precheck": {
+    "PNG3": {
+      "lib": true,
+      "main": true,
+      "cli": true
+    },
+    "SDK8": {
+      "lib": true,
+      "main": true,
+      "cli": true
+    },
+    "EditCancel1": {
+      "lib": true,
+      "main": true,
+      "cli": true
+    }
+  },
+  "postcheck_artifact_hashes_equal_precheck": true,
+  "postcheck_signature_exit_code_preserved": null,
+  "sdk_runner_same_commit_verified_field_preserved": false,
+  "native_files_byteexact_copy": true,
+  "original_sources_rechecked_after_copy": true,
+  "private_receipts_not_read_no_kernel_requery": true,
+  "runs": {
+    "PNG3": {
+      "passed": true,
+      "test_exit_code": 0,
+      "scope": "claude_managed_png_process_resume",
+      "record_count": 57,
+      "event_counts": {
+        "acceptance_started": 1,
+        "attachment_prepared": 1,
+        "session_ready": 5,
+        "managed_connection_ready": 2,
+        "input_submitted": 3,
+        "message_accepted": 3,
+        "turn_started": 3,
+        "turn_finished": 3,
+        "connection_shutdown": 2,
+        "cleanup_checked": 2,
+        "attachment_restore_verified": 1,
+        "acceptance_passed": 1,
+        "native_protocol_ids": 30
+      },
+      "native_projection": {
+        "count": 30,
+        "type_counts": {
+          "control_response": 8,
+          "system": 5,
+          "command_lifecycle": 8,
+          "user": 3,
+          "assistant": 3,
+          "result": 3
+        },
+        "state_counts": {
+          "None": 22,
+          "queued": 3,
+          "started": 3,
+          "completed": 2
+        },
+        "subtype_counts": {
+          "None": 22,
+          "unknown": 2,
+          "init": 3,
+          "success": 3
+        },
+        "terminal_reason_counts": {
+          "None": 27,
+          "completed": 3
+        }
+      },
+      "timeline": [
+        {
+          "index": 1,
+          "event": "acceptance_started"
+        },
+        {
+          "index": 2,
+          "event": "attachment_prepared"
+        },
+        {
+          "index": 3,
+          "event": "session_ready",
+          "native_session_id": null
+        },
+        {
+          "index": 4,
+          "event": "managed_connection_ready",
+          "phase": "new",
+          "generation": "9367aa9f-2a03-4adf-9e56-297b420a982e",
+          "native_session_id": null
+        },
+        {
+          "index": 5,
+          "event": "input_submitted",
+          "phase": "image",
+          "generation": "9367aa9f-2a03-4adf-9e56-297b420a982e",
+          "message_id": "a1931623-5dc7-4dbc-b764-58709f4d9543"
+        },
+        {
+          "index": 6,
+          "event": "message_accepted",
+          "phase": "image",
+          "generation": "9367aa9f-2a03-4adf-9e56-297b420a982e",
+          "message_id": "a1931623-5dc7-4dbc-b764-58709f4d9543",
+          "turn_id": "a1931623-5dc7-4dbc-b764-58709f4d9543",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        },
+        {
+          "index": 7,
+          "event": "turn_started",
+          "phase": "image",
+          "generation": "9367aa9f-2a03-4adf-9e56-297b420a982e",
+          "turn_id": "a1931623-5dc7-4dbc-b764-58709f4d9543",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        },
+        {
+          "index": 8,
+          "event": "session_ready",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        },
+        {
+          "index": 9,
+          "event": "turn_finished",
+          "phase": "image",
+          "generation": "9367aa9f-2a03-4adf-9e56-297b420a982e",
+          "turn_id": "a1931623-5dc7-4dbc-b764-58709f4d9543",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef",
+          "outcome": "Completed"
+        },
+        {
+          "index": 10,
+          "event": "input_submitted",
+          "phase": "multiline",
+          "generation": "9367aa9f-2a03-4adf-9e56-297b420a982e",
+          "message_id": "8f5ee057-2b79-4542-8db7-01f9bd6b8d01"
+        },
+        {
+          "index": 11,
+          "event": "message_accepted",
+          "phase": "multiline",
+          "generation": "9367aa9f-2a03-4adf-9e56-297b420a982e",
+          "message_id": "8f5ee057-2b79-4542-8db7-01f9bd6b8d01",
+          "turn_id": "8f5ee057-2b79-4542-8db7-01f9bd6b8d01",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        },
+        {
+          "index": 12,
+          "event": "turn_started",
+          "phase": "multiline",
+          "generation": "9367aa9f-2a03-4adf-9e56-297b420a982e",
+          "turn_id": "8f5ee057-2b79-4542-8db7-01f9bd6b8d01",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        },
+        {
+          "index": 13,
+          "event": "session_ready",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        },
+        {
+          "index": 14,
+          "event": "turn_finished",
+          "phase": "multiline",
+          "generation": "9367aa9f-2a03-4adf-9e56-297b420a982e",
+          "turn_id": "8f5ee057-2b79-4542-8db7-01f9bd6b8d01",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef",
+          "outcome": "Completed"
+        },
+        {
+          "index": 15,
+          "event": "connection_shutdown",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        },
+        {
+          "index": 16,
+          "event": "cleanup_checked",
+          "generation": "9367aa9f-2a03-4adf-9e56-297b420a982e",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef",
+          "normal_exit": true,
+          "transport_closed": true,
+          "cleanup_confirmed": true
+        },
+        {
+          "index": 17,
+          "event": "attachment_restore_verified"
+        },
+        {
+          "index": 18,
+          "event": "session_ready",
+          "native_session_id": null
+        },
+        {
+          "index": 19,
+          "event": "managed_connection_ready",
+          "phase": "resume",
+          "generation": "e32689a8-7b8e-4fe5-9dcc-1009d92baaaf",
+          "native_session_id": null
+        },
+        {
+          "index": 20,
+          "event": "input_submitted",
+          "phase": "recall",
+          "generation": "e32689a8-7b8e-4fe5-9dcc-1009d92baaaf",
+          "message_id": "47c61de5-5e52-4268-a59e-4a5905af773f"
+        },
+        {
+          "index": 21,
+          "event": "message_accepted",
+          "phase": "recall",
+          "generation": "e32689a8-7b8e-4fe5-9dcc-1009d92baaaf",
+          "message_id": "47c61de5-5e52-4268-a59e-4a5905af773f",
+          "turn_id": "47c61de5-5e52-4268-a59e-4a5905af773f",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        },
+        {
+          "index": 22,
+          "event": "turn_started",
+          "phase": "recall",
+          "generation": "e32689a8-7b8e-4fe5-9dcc-1009d92baaaf",
+          "turn_id": "47c61de5-5e52-4268-a59e-4a5905af773f",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        },
+        {
+          "index": 23,
+          "event": "session_ready",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        },
+        {
+          "index": 24,
+          "event": "turn_finished",
+          "phase": "recall",
+          "generation": "e32689a8-7b8e-4fe5-9dcc-1009d92baaaf",
+          "turn_id": "47c61de5-5e52-4268-a59e-4a5905af773f",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef",
+          "outcome": "Completed"
+        },
+        {
+          "index": 25,
+          "event": "connection_shutdown",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        },
+        {
+          "index": 26,
+          "event": "cleanup_checked",
+          "generation": "e32689a8-7b8e-4fe5-9dcc-1009d92baaaf",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef",
+          "normal_exit": true,
+          "transport_closed": true,
+          "cleanup_confirmed": true
+        },
+        {
+          "index": 27,
+          "event": "acceptance_passed",
+          "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef"
+        }
+      ],
+      "native_user_count": 3,
+      "native_success_result_count": 3,
+      "input_controller_send_counts": [
+        2,
+        1,
+        1
+      ],
+      "native_session_id": "45854a15-8267-47d6-8b19-258deac5cfef",
+      "output_hashes_match_expected": true,
+      "cleanup_receipts_from_public_projection": [
+        {
+          "cleanup_confirmed": true,
+          "containment": "macos_resource_coalition",
+          "exit_code": 0,
+          "exit_reason": "stdio_closed",
+          "generation": "9367aa9f-2a03-4adf-9e56-297b420a982e",
+          "version": 1
+        },
+        {
+          "cleanup_confirmed": true,
+          "containment": "macos_resource_coalition",
+          "exit_code": 0,
+          "exit_reason": "stdio_closed",
+          "generation": "e32689a8-7b8e-4fe5-9dcc-1009d92baaaf",
+          "version": 1
+        }
+      ],
+      "attachment_reference_restored": true,
+      "image_replayed_to_native_on_restore": false,
+      "native_image_projection_count": 1,
+      "app_restart_and_sqlite_and_gui_not_verified": true
+    },
+    "SDK8": {
+      "passed": false,
+      "test_exit_code": 101,
+      "scope": "grok_native_sdk_origin_probe",
+      "record_count": 10,
+      "event_counts": {
+        "probe_started": 1,
+        "probe_initialize_observed": 1,
+        "native_mcp_status_observed": 4,
+        "sdk_request_received": 2,
+        "registration_received": 1,
+        "probe_finished": 1
+      },
+      "timeline": [
+        {
+          "index": 1,
+          "event": "probe_started"
+        },
+        {
+          "index": 2,
+          "event": "probe_initialize_observed",
+          "sequence": 1
+        },
+        {
+          "index": 3,
+          "event": "native_mcp_status_observed",
+          "sequence": 2
+        },
+        {
+          "index": 4,
+          "event": "sdk_request_received",
+          "sequence": 3
+        },
+        {
+          "index": 5,
+          "event": "registration_received"
+        },
+        {
+          "index": 6,
+          "event": "sdk_request_received",
+          "sequence": 5
+        },
+        {
+          "index": 7,
+          "event": "native_mcp_status_observed",
+          "sequence": 6
+        },
+        {
+          "index": 8,
+          "event": "native_mcp_status_observed",
+          "sequence": 7
+        },
+        {
+          "index": 9,
+          "event": "native_mcp_status_observed",
+          "sequence": 8
+        },
+        {
+          "index": 10,
+          "event": "probe_finished",
+          "native_session_id": {
+            "type": "string",
+            "sha256": "f46fc546ff7d58a3845e0515b459d3c48a6b188717065afbe59c9b5faef59705"
+          },
+          "transport_closed": false,
+          "cleanup_confirmed": true
+        }
+      ],
+      "observed_sdk_methods": [
+        "server/discover",
+        "tools/list"
+      ],
+      "requested_protocol_versions": [
+        "2026-07-28",
+        "2026-07-28"
+      ],
+      "six_origin_carriers_absent_for_registration_requests": true,
+      "business_origin_verified": false,
+      "inspect_call_count": 0,
+      "public_product_gate_open": false,
+      "transport_closed_from_public_record": false,
+      "cleanup_confirmed_from_public_record": true,
+      "no_native_exit_code_available_in_public_projection": true,
+      "network_summary": {
+        "tls_connections_attempted": 9,
+        "tls_bytes": 4229308,
+        "http_model_calls_observable": false,
+        "event_counts": {
+          "official_connect_attempt": 9,
+          "official_tunnel_opened": 9,
+          "rejected_nonofficial_origin": 2
+        }
+      },
+      "private_settings_unchanged_from_metadata": false,
+      "private_settings_scope_audit_from_metadata": {
+        "bytes_unchanged": false,
+        "before_sha256": "8b51690ac09910a6975d9a06dd138d6722e669bf10618a700c636812a4097bd6",
+        "after_sha256": "eededaf9df6afedbd8e81a759a44a85a349d18cadccdc18d926a14ee48674794",
+        "toml_parse_succeeded": true,
+        "permission_section_unchanged": true,
+        "native_marketplace_initialization_only": true,
+        "settings_scope_verified": true,
+        "changed_top_level_tables": [
+          "marketplace"
+        ]
+      },
+      "http_model_calls_or_cost_budget_not_verified": true
+    },
+    "EditCancel1": {
+      "passed": false,
+      "test_exit_code": 101,
+      "scope": "rust_adapter_pending_edit_cancel",
+      "record_count": 84,
+      "event_counts": {
+        "acceptance_started": 1,
+        "file_unchanged": 1,
+        "profile_verified": 2,
+        "input_submitted": 1,
+        "message_accepted": 1,
+        "turn_started": 1,
+        "edit_approval_requested": 1,
+        "interrupt_submitted": 1,
+        "edit_approval_cancelled": 1,
+        "interrupt_accepted": 1,
+        "connection_shutdown": 1,
+        "cleanup_checked": 1,
+        "native_protocol_ids": 70,
+        "acceptance_failed": 1
+      },
+      "timeline": [
+        {
+          "index": 1,
+          "event": "acceptance_started"
+        },
+        {
+          "index": 2,
+          "event": "file_unchanged",
+          "phase": "before"
+        },
+        {
+          "index": 3,
+          "event": "profile_verified"
+        },
+        {
+          "index": 4,
+          "event": "input_submitted",
+          "phase": "pending_edit",
+          "message_id": "4600f219-f1e8-430e-90f3-057140569980"
+        },
+        {
+          "index": 5,
+          "event": "message_accepted",
+          "message_id": "4600f219-f1e8-430e-90f3-057140569980",
+          "turn_id": "4600f219-f1e8-430e-90f3-057140569980",
+          "native_session_id": "e66ec243-26a0-4e57-b459-81a6f600eb88"
+        },
+        {
+          "index": 6,
+          "event": "turn_started",
+          "turn_id": "4600f219-f1e8-430e-90f3-057140569980",
+          "native_session_id": "e66ec243-26a0-4e57-b459-81a6f600eb88"
+        },
+        {
+          "index": 7,
+          "event": "profile_verified"
+        },
+        {
+          "index": 8,
+          "event": "edit_approval_requested",
+          "turn_id": "4600f219-f1e8-430e-90f3-057140569980",
+          "native_session_id": "e66ec243-26a0-4e57-b459-81a6f600eb88"
+        },
+        {
+          "index": 9,
+          "event": "interrupt_submitted",
+          "message_id": "9485c98b-5251-4d88-a63c-5d24e112a0c1"
+        },
+        {
+          "index": 10,
+          "event": "edit_approval_cancelled",
+          "native_session_id": "e66ec243-26a0-4e57-b459-81a6f600eb88"
+        },
+        {
+          "index": 11,
+          "event": "interrupt_accepted",
+          "message_id": "9485c98b-5251-4d88-a63c-5d24e112a0c1",
+          "turn_id": "4600f219-f1e8-430e-90f3-057140569980",
+          "native_session_id": "e66ec243-26a0-4e57-b459-81a6f600eb88"
+        },
+        {
+          "index": 12,
+          "event": "connection_shutdown",
+          "native_session_id": "e66ec243-26a0-4e57-b459-81a6f600eb88"
+        },
+        {
+          "index": 13,
+          "event": "cleanup_checked",
+          "generation": "961d6e7d-8b27-48ff-a98c-8754c4c8ee04",
+          "normal_exit": false,
+          "transport_closed": true,
+          "cleanup_confirmed": true
+        },
+        {
+          "index": 84,
+          "event": "acceptance_failed"
+        }
+      ],
+      "native_projection": {
+        "count": 70,
+        "type_counts": {
+          "control_request": 13,
+          "control_response": 12,
+          "system": 30,
+          "user": 5,
+          "command_lifecycle": 3,
+          "assistant": 5,
+          "control_cancel_request": 1,
+          "result": 1
+        },
+        "state_counts": {
+          "None": 67,
+          "queued": 1,
+          "started": 1,
+          "cancelled": 1
+        },
+        "subtype_counts": {
+          "None": 39,
+          "unknown": 29,
+          "init": 1,
+          "error_during_execution": 1
+        },
+        "terminal_reason_counts": {
+          "None": 69,
+          "unknown": 1
+        }
+      },
+      "native_interrupt_success_response_matched": true,
+      "native_cancelled_lifecycle_count": 1,
+      "native_error_result_count": 1,
+      "application_turn_finished_count": 0,
+      "application_cancelled_terminal_not_observed": true,
+      "cleanup_receipt_from_public_projection": {
+        "cleanup_confirmed": true,
+        "containment": "macos_resource_coalition",
+        "exit_code": 1,
+        "exit_reason": "stdio_closed",
+        "generation": "961d6e7d-8b27-48ff-a98c-8754c4c8ee04",
+        "version": 1
+      },
+      "after_cancel_file_and_resume_not_verified": true
+    }
+  },
+  "archives": [
+    {
+      "path": "validation/official-23-native/claude-managed-image-live-3.ndjson",
+      "bytes": 27814,
+      "sha256": "fd53d6900d93d3731283c7164de92c8a21415a74bc372296e8423912a1fa8f70",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "validation/official-23-native/claude-managed-image-live-3.metadata.json",
+      "bytes": 3224,
+      "sha256": "893197c0a534930678d29a3941bb7e686aebb11575af87fb0e718475db127e47",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "validation/official-23-native/grok-sdk-origin-probe-8.ndjson",
+      "bytes": 7207,
+      "sha256": "1922e99b8a0bc4b453bc605797fca260ed97464ec254e7f3ffb0d1f231d47294",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "validation/official-23-native/grok-sdk-origin-probe-8.metadata.json",
+      "bytes": 4037,
+      "sha256": "5d3a4fb0403c95f001be152f7df723c4204b4a8d53039b4f61ccebe83f2629f1",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "validation/official-23-native/grok-sdk-origin-probe-8.network.json",
+      "bytes": 2169,
+      "sha256": "1a822303b3bf0218c899f3cdd332afbbe2ffbd92355d6e147d54c94522d6ec29",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "validation/official-23-native/claude-approval-cancel-live-1.ndjson",
+      "bytes": 44436,
+      "sha256": "c2dff25006e515b3b40b9233719310c9ec6120bc4412656a3b08b23a4beefb64",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "validation/official-23-native/claude-approval-cancel-live-1.metadata.json",
+      "bytes": 2469,
+      "sha256": "03827465478299eec58ed361d80a90accf5ead2182b8763f5585294705c0eb17",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "validation/official-23-native/inputs-postcheck.json",
+      "bytes": 1297,
+      "sha256": "e7c0f22c6ff0b5a17d3055ca8727c2f2fde5c229e9bf617088505c995b49f35d",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    {
+      "path": "OFFICIAL_23_NATIVE_LIVE.md",
+      "bytes": 8524,
+      "sha256": "19d6ab98d5bf3d26ac8dc3d5c2a1f918fe292fa4ee53ccdb3cc30d227859e810",
+      "credential_shape_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    }
+  ],
+  "credential_shape_scan": {
+    "revision": "fixed-six-shapes-23-native-v1",
+    "categories": [
+      "api_key",
+      "jwt",
+      "bearer",
+      "private_key",
+      "credential_assignment",
+      "email"
+    ],
+    "only_counts_no_matched_content": true,
+    "original_public_file_count": 8,
+    "original_public_matches": 0,
+    "new_archive_file_count": 10,
+    "new_archive_matches": 0,
+    "audit_self_scan_counts": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "credential_assignment": 0,
+      "email": 0
+    },
+    "limitation": "固定形状零匹配不保证识别所有凭据格式。"
+  },
+  "boundaries": {
+    "no_test_output_txt_archived": true,
+    "no_private_auth_model_error_raw_stdout_read": true,
+    "no_target_or_frozen_read": true,
+    "no_Git_Cargo_CLI_model_network_GUI": true,
+    "no_old_artifact_or_root_docs_modified": true,
+    "full_cli_parity_acceptance_passed": false,
+    "full_app_restart_sqlite_gui_verified": false,
+    "same_commit_all_platform_full_workspace_ssh_tmux_verified": false,
+    "goal_complete": false
+  }
+}

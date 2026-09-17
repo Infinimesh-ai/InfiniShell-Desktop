@@ -2,6 +2,8 @@
 
 更新日期：2026-09-18（北京时间）。Goal 与 P0–P5 均在实施中。本轮实际修改提交前的基线为 `b3d8b0f11657b0ed1ba34035dda8d363eb52747f`，根代理核对当时远端一致；新提交的真实平台记录将另行保存。
 
+检查点 `dec067d2d53fb65f11b37b66a72fa9e11e82cf04` 已实际提交、推送并核对远端一致。该提交干净验证树的 [source23 门禁](OFFICIAL_23_LOCAL_GATES.md)通过 check、i18n11、Rust1301、Python363、main构建、严格签名及完整双语资源嵌入。[source23 在线验收](OFFICIAL_23_NATIVE_LIVE.md)：Claude PNG3三输入、两个正常退出及同原生会话历史继续通过；Grok SDK8整体失败，但现代2026-07-28 MCP发现、工具列表及原生ready实际已观察；Claude等待Edit取消1整体失败，原生interrupt ACK、审批撤销、错误result及cancelled生命周期均已观察，未取得应用可信取消聚合。[CI11](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35248824124) 同SHA：Linux的Python超时夹具失败、Rust未执行；Windows的Python与Rust定向步骤失败，check和SSH worker构建通过；真实日志已取得，分别定位为纯测试的路径分隔符断言和私有JSON反斜线编码断言，原生准备因前置失败跳过、证据上传缺失为继发失败。两平台均不能计完整通过。后续修复不在该提交：[source24候选门禁](OFFICIAL_24_LOCAL_GATES.md)已冻结111路径并通过check、i18n11、Rust1378、Python410；包含Claude真实取消枚举补丁、Grok测试夹具对生产传输真实错误的诊断、标题栏普通终端启动及本地安装路径回退。只读预检已预编译并核对唯一ignored入口，准备标记已解除，原生接口尚未执行；该候选验证树dirty、未提交，不计新的同提交／跨平台／GUI通过。同一source24快照另行补跑实际`terminal::model::session::test`模块15/15通过，含新增4项，主1378计数不回填。source25已以同一111路径冻结Windows两处测试修复与两平台正确Session筛选，[正式候选门禁](OFFICIAL_25_LOCAL_GATES.md)已通过check、i18n11、Rust1393、Python410；新实际提交及同提交原生／平台复验仍待执行。
+
 历史 source20 为 83 路径的中间脏快照：[本地门禁及构建](OFFICIAL_20_LOCAL_GATES.md)通过 check、i18n 11 项、定向 1248 项、Python 329 项、main 构建、严格签名和完整双语资源嵌入。两个 [source20 真实运行](SOURCE20_NATIVE_DISCOVERY.md)均整体 FAILED：Claude PNG 恢复身份判据提前失败；Grok SDK 仅进入首次发现回调。source21 已冻结 87 路径并通过 check、i18n 11、定向 1270、Python 363 项；未构建 main 或运行真实 CLI。随后发现旧独立 Claude AgentDriver 的固定绕过与全局配置写入，source22 已关闭旧入口并移除相关实现，以93路径 [source22 新快照](OFFICIAL_22_LOCAL_GATES.md)通过 check、i18n 11、定向1301、Python363；此修复不是沿用 source21 结论。
 
 当前真实证据与未满足组合统一见 [能力矩阵](CAPABILITY_MATRIX.md) 和 [验证报告](VALIDATION_REPORT.md)。历史检查点、原始失败与独立审计均保留在原专报，不改写为当前或最终同提交通过。
@@ -281,13 +283,13 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 
 | 阶段 | 已有代码或范围限定的证据 | 尚未满足 |
 | --- | --- | --- |
-| P0 | 三方固定接口、Claude API 与 Grok 官方在线根任务已有真实证据；SDK7 首次反向 `server/discover` | 现代 MCP 候选 source21 Cargo 已通过，原生验收未完成；Grok 业务工具来源及父权限上限、兼容 Claude hooks 完整链、其他版本兼容仍待验 |
-| P1 | 三方身份／版本／技能来源与 Grok 默认标题栏；Codex macOS 图片／文件／技能／评审、Claude 固定策略 GUI、Grok source11 托管根任务双语布局有证据 | 普通 PTY Claude／Grok 完整输入与上下文组合、三平台；Claude 生产 PNG 完整恢复及 GUI 未通过 |
+| P0 | 三方固定接口、Claude API 与 Grok 官方在线根任务已有真实证据；source23 SDK8现代discover／tools/list／native ready实际注册 | SDK8业务inspect0、整体FAILED；Grok 业务工具来源及父权限上限、兼容 Claude hooks 完整链、其他版本兼容仍待验 |
+| P1 | 三方身份／版本／技能来源与 Grok 默认标题栏；Codex macOS 图片／文件／技能／评审、Claude 固定策略 GUI、Grok source11 托管根任务双语布局有证据 | 普通 PTY Claude／Grok 完整输入与上下文组合、三平台；source23 Claude生产PNG3原生历史继续通过，完整桌面重启／SQLite／GUI仍待验 |
 | P2 | 插件事务、来源绑定、旧／重复事件回归；CI10 Windows 原生五项注册与两项 ConPTY 通知通过 | 其余通知、插件完整负向组合、当前修改同提交复验及三方 SSH／tmux 完整链 |
-| P3 | 可见子 pane 与托管路径已移除固定绕过；固定策略 Claude 父子夹具实际追加、双向 ACK 与结果回收有独立审计 | 旧独立 Claude AgentDriver 已关闭并移除绕过／全局写入，source22 新回归已通过，真实进程全局文件保持仍须独立证据；等待 Edit 审批取消旧 GUI 为 Failed，新夹具已编译、真实取消未验；Grok SDK 子任务与权限上限未完成 |
-| P4 | SQLite 代次／父子／消息／结果与显式历史恢复；Codex GUI、Claude 固定策略 GUI、Grok source11 GUI 重启恢复及 source13 生产 coordinator／SQLite 有中间证据 | 活跃重关联、故障恢复、Claude PNG Resume 第三输入与同会话结果、最终三方整链及父子 GUI 待验 |
-| P5 | b3d8 的 CI10 所选 Linux／Windows 门禁通过，`full_workspace_tests=false`；source20 本地门禁及构建通过 | source22 遗留入口修复的93路径冻结已通过本地门禁，尚未形成新实际提交的跨平台结论；最终实际修改提交三平台、全工作区、三方完整 GUI、双语布局和 SSH／tmux 未完成 |
+| P3 | 可见子 pane 与托管路径已移除固定绕过；固定策略 Claude 父子夹具实际追加、双向 ACK 与结果回收有独立审计 | 旧独立 Claude AgentDriver 已关闭并移除绕过／全局写入，source22 新回归已通过，真实进程全局文件保持仍须独立证据；source23等待Edit取消1真实进入待审批但错误result／原生cancelled尚未形成可信应用取消，整体FAILED；Grok SDK 子任务与权限上限未完成 |
+| P4 | SQLite 代次／父子／消息／结果与显式历史恢复；Codex GUI、Claude 固定策略 GUI、Grok source11 GUI 重启恢复及 source13 生产 coordinator／SQLite 有中间证据 | 活跃重关联、故障恢复、Claude PNG3原生Resume第三输入与同会话结果已通过，完整App／SQLite／GUI恢复及最终三方整链／父子GUI待验 |
+| P5 | b3d8 的 CI10 所选 Linux／Windows 门禁通过，`full_workspace_tests=false`；source20 本地门禁及构建通过 | 实际修改dec的干净source23门禁／构建／严格签名已通过；CI11两平台Python及Windows Rust定向均失败，作业已结束失败、真实Windows日志已取得并定位两处测试断言，修复候选待同提交平台复验；最终实际修改提交三平台、全工作区、三方完整 GUI、双语布局和 SSH／tmux 未完成 |
 
-近期顺序：完成现代 MCP、PNG 启动就绪／身份分离及待定 Edit 取消夹具整合。source21 门禁已通过；旧独立 Claude 入口修复的 source22 已通过 check／i18n／focused（1301项）／Python（363项），随后精确提交、推送并按该实际提交派发 CI11；不构建 dirty source21 main，不运行 dirty source21 原生验收。随后隔离验证树检出同一新提交的干净源码，再运行本地门禁、main／严格签名及 PNG3／SDK8／待定 Edit 取消首轮真实验收，形成同提交在线证据；GUI 与其余全量验收继续按原门槛完成。
+近期顺序：source23真实Claude取消聚合补丁、Grok测试夹具保留生产终止原因、标题栏普通终端启动与本地安装路径解析已进入候选。CI11 Linux超时夹具和Windows两处测试断言已精准修正；只读预检已真实预编译、核对唯一ignored入口并解除准备标记。source25正式check／i18n11／定向1393／Python410均通过，下一步精确提交、推送，在同一实际提交干净源码上运行门禁、构建／签名并分别重验等待Edit取消、SDK业务调用和无输入权限接口调查；旧FAILED记录不覆盖。GUI、三平台、全工作区及其余完整验收仍按原门槛推进。
 
 根代理最新 API 核对为 Linux／Windows runner 均 online、busy=false；此前 Linux 离线观察仅保留历史。派发前须重新核对并留证，可用性不等于平台验收通过，不构成整个 Goal 的实质阻塞。用户的 `web_runtime.rs`、`websearch_tests.rs` 及 `validation/gui-7e065085/` 全目录保留并排除本目标暂存。source22 新增旧入口不可用提示，英文与简体中文同步，i18n门禁11项已通过，最终双语检查待验。

@@ -593,6 +593,7 @@ class ProbeRunnerTests(unittest.TestCase):
         def launch(command, **_kwargs):
             self.assertEqual(command[1], runner.TEST_NAME)
             (private / "private-evidence.ndjson").write_text("".join(json.dumps(event) + "\n" for event in evidence()), encoding="utf-8")
+            (private / "private-native-error-response.ndjson").touch(mode=0o600)
             (private / "wrapper-audit.ndjson").write_text("".join(json.dumps({"event": "native_launch", "kind": kind,
                 "arguments_unchanged": True}) + "\n" for kind in
                 ["version"] * version_launches + [agent_kind] + (["unexpected"] if extra_launch else [])), encoding="utf-8")
@@ -640,6 +641,10 @@ class ProbeRunnerTests(unittest.TestCase):
         for path in (private / "private-evidence.ndjson", private / "private-test-output.txt"):
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
         self.assertEqual(metadata["private_evidence_sha256"], runner.shared.digest(private / "private-evidence.ndjson"))
+        self.assertEqual(metadata["private_native_error_response_sha256"],
+            runner.shared.digest(private / "private-native-error-response.ndjson"))
+        self.assertEqual(metadata["private_native_error_response_count"], 0)
+        self.assertTrue(metadata["private_native_error_response_ledger_matches"])
         for path in runner.artifacts(self.args.output):
             public = path.read_text(encoding="utf-8")
             self.assertNotIn("PRIVATE_BODY_CANARY", public)
@@ -1020,6 +1025,110 @@ class CalibratedDiscoveryTests(unittest.TestCase):
         event["metadata_keys"]["unknown"] = {"body": canary}
         event["private_body"] = {"body": canary}
         self.assertNotIn(canary, json.dumps(runner.public_events([event])))
+
+class SafeTerminationDiagnosticTests(unittest.TestCase):
+    def test_production_error_survives_the_closed_event_stream_without_proving_origin(self):
+        events = modern_evidence()
+        diagnostic = {"runtime_error_kind": "protocol", "protocol_failure_kind": "invalid_response_id",
+            "runtime_error_message": {"type": "string", "bytes": 42, "sha256": "a" * 64}}
+        events[-1].update(transport_task_status="runtime_error", transport_error=diagnostic,
+            transport_join_error=None, failure_source="production_runtime")
+        result = runner.probe_observation(0, "1 passed; 0 failed", events)
+        self.assertFalse(result["probe_passed"])
+        self.assertFalse(result["native_origin_verified"])
+        self.assertEqual(result["failure_diagnostics"]["transport_error"], diagnostic)
+        self.assertEqual(result["failure_diagnostics"]["failure_source"], "production_runtime")
+
+    def test_error_summaries_never_publish_raw_bodies_even_when_they_equal_protocol_values(self):
+        canary = "OFFLINE_ERROR_DIAGNOSTIC_PRIVATE_CANARY"
+        event = {"event": "probe_finished", "transport_error": {"runtime_error_kind": "protocol",
+            "protocol_failure_kind": "unknown", "runtime_error_message": "initialize", "message": canary},
+            "last_native_response_diagnostic": {"jsonrpc": {"type": "string", "bytes": 3, "sha256": "a" * 64},
+                "jsonrpc_is_2_0": True, "error_present": True, "error_type": "object", "error_code": -32603,
+                "error_message": canary, "error_data_message": {"type": "string", "bytes": 1,
+                    "sha256": "b" * 64, "message": "tools/list"}, "result_stop_reason": [canary]}}
+        public = runner.public_events([event])[0]
+        text = json.dumps(public)
+        self.assertNotIn(canary, text)
+        self.assertNotIn("initialize", text)
+        self.assertNotIn("tools/list", text)
+        self.assertEqual(public["last_native_response_diagnostic"]["error_code"], -32603)
+        self.assertTrue(public["last_native_response_diagnostic"]["jsonrpc_is_2_0"])
+
+    def test_malformed_diagnostic_enums_and_numbers_cannot_become_trusted_values(self):
+        for value in (True, -1, 2 ** 63, "OFFLINE_PRIVATE_NUMBER", {"private": "OFFLINE_PRIVATE_NUMBER"}):
+            with self.subTest(value=value):
+                self.assertIsNone(runner.projection(value, "bytes"))
+        for value in (True, 0.5, 2 ** 63, "OFFLINE_PRIVATE_CODE"):
+            with self.subTest(value=value):
+                self.assertIsNone(runner.projection(value, "error_code"))
+        for key in ("transport_task_status", "failure_source", "runtime_error_kind", "protocol_failure_kind"):
+            with self.subTest(key=key):
+                public = runner.projection("OFFLINE_PRIVATE_ENUM", key)
+                self.assertNotIn("OFFLINE_PRIVATE_ENUM", json.dumps(public))
+        self.assertIsNone(runner.projection(True, "native_error_http_status"))
+        self.assertIsNone(runner.projection("429", "native_error_http_status"))
+        self.assertEqual(runner.projection(429, "native_error_http_status"), 429)
+        self.assertEqual(runner.projection("http_429", "native_error_category"), "http_429")
+
+    def test_join_failure_or_unknown_transport_status_cannot_pass_a_forged_success(self):
+        for status in ("join_error", "join_timeout", "OFFLINE_PRIVATE_STATUS"):
+            with self.subTest(status=status):
+                events = evidence()
+                events[-1]["transport_task_status"] = status
+                observed = runner.probe_observation(0, "1 passed; 0 failed", events)
+                self.assertFalse(observed["probe_passed"])
+                self.assertNotIn("OFFLINE_PRIVATE_STATUS", json.dumps(observed))
+
+    def test_private_error_audit_publishes_only_count_length_and_file_digest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "error.ndjson"
+            path.touch(mode=0o600)
+            empty = runner.private_error_audit(path)
+            self.assertEqual(empty["private_native_error_response_count"], 0)
+            path.write_text(json.dumps({"jsonrpc": "2.0", "id": "offline-unknown-id", "error": {
+                "code": -32603, "message": "OFFLINE_RAW_ERROR_CANARY",
+                "data": {"http_status": 429, "message": "OFFLINE_RAW_NESTED_CANARY"}}}) + "\n")
+            audit = runner.private_error_audit(path)
+            self.assertEqual(audit["private_native_error_response_count"], 1)
+            self.assertEqual(audit["private_native_error_response_sha256"], runner.shared.digest(path))
+            self.assertTrue(audit["private_native_error_response_scope_verified"])
+            self.assertNotIn("CANARY", json.dumps(audit))
+
+    def test_private_error_audit_rejects_model_fields_multiple_records_and_oversize(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "error.ndjson"
+            path.touch(mode=0o600)
+            for response in ({"error": {}, "result": {}}, {"error": {"data": {"body": "OFFLINE_BODY"}}},
+                    {"error": {"message": {"prompt": "OFFLINE_PROMPT"}}}):
+                with self.subTest(response=response):
+                    path.write_text(json.dumps(response))
+                    with self.assertRaises(ValueError):
+                        runner.private_error_audit(path)
+            path.write_text('{"error":{}}\n{"error":{}}\n')
+            with self.assertRaises(ValueError):
+                runner.private_error_audit(path)
+            path.write_bytes(b"x" * (runner.MAX_PRIVATE_ERROR_BYTES + 1))
+            with self.assertRaises(ValueError):
+                runner.private_error_audit(path)
+
+    def test_private_error_audit_refuses_public_files_symlinks_and_hardlinks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "error.ndjson"
+            path.touch(mode=0o600)
+            path.chmod(0o644)
+            with self.assertRaises(ValueError):
+                runner.private_error_audit(path)
+            path.chmod(0o600)
+            link = Path(directory) / "link.ndjson"
+            link.symlink_to(path)
+            with self.assertRaises(OSError):
+                runner.private_error_audit(link)
+            hardlink = Path(directory) / "hardlink.ndjson"
+            os.link(path, hardlink)
+            with self.assertRaises(ValueError):
+                runner.private_error_audit(path)
+
 
 if __name__ == "__main__":
     unittest.main()

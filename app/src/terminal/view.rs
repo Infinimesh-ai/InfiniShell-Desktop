@@ -191,7 +191,7 @@ use super::ssh::util::{InteractiveSshCommand, SshWarpifyCommand, parse_interacti
 use super::warpify::WarpificationSource;
 use super::warpify::success_block::{WarpifySuccessBlock, WarpifySuccessBlockEvent};
 use super::warpify::trigger_state::{SshBlockState, WarpifyState};
-use super::{CLIAgent, GridType, cli_agent};
+use super::{CLIAgent, GridType, ShellLaunchState, cli_agent};
 #[cfg(any(test, feature = "integration_tests"))]
 use crate::ai::agent::UserQueryMode;
 use crate::ai::agent::api::ServerConversationToken;
@@ -2362,6 +2362,13 @@ struct CtrlCActiveBlockState {
     conversation_id_to_stop: Option<AIConversationId>,
 }
 
+/// 仅标题栏创建的原始草稿可以使用安装路径；编辑后的输入属于用户。
+struct PendingSpecificCLIAgentLaunch {
+    agent: CLIAgent,
+    executable: Option<PathBuf>,
+    revision: crate::editor::EditorBufferRevision,
+}
+
 impl Default for TerminalViewStateChange {
     fn default() -> TerminalViewStateChange {
         TerminalViewStateChange {
@@ -2577,6 +2584,7 @@ pub struct TerminalView {
     /// Commands that should run as separate blocks after the active pending
     /// command finishes successfully.
     pending_command_queue: VecDeque<String>,
+    pending_specific_cli_agent_launch: Option<PendingSpecificCLIAgentLaunch>,
     /// When true, enter agent view after pending setup commands complete
     /// (i.e. after `PendingCommandCompleted` is emitted). Set by
     /// `pane_tree_from_template_recursive` when a tab config has both
@@ -4278,6 +4286,7 @@ impl TerminalView {
             is_login_shell_bootstrapped: false,
             awaiting_pending_command_completion: false,
             pending_command_queue: Default::default(),
+            pending_specific_cli_agent_launch: None,
             enter_agent_view_after_pending_commands: false,
             enter_agent_view_after_ssh_bootstrap: None,
             pending_ssh_route_launch: None,
@@ -8862,6 +8871,7 @@ impl TerminalView {
     }
 
     pub(crate) fn prepare_for_pty_shutdown(&mut self, ctx: &mut ViewContext<Self>) {
+        self.pending_specific_cli_agent_launch = None;
         self.manual_pty_shutdown_requested = true;
 
         #[cfg(not(target_family = "wasm"))]
@@ -8990,6 +9000,7 @@ impl TerminalView {
         cleared_buffer_len: usize,
         ctx: &mut ViewContext<Self>,
     ) {
+        self.pending_specific_cli_agent_launch = None;
         let did_resolve_prompt_suggestion = self
             .resolve_passive_suggestion(PromptSuggestionResolution::Reject { ctrl_c: true }, ctx);
         if did_resolve_prompt_suggestion {
@@ -9558,7 +9569,11 @@ impl TerminalView {
         data: B,
         ctx: &mut ViewContext<Self>,
     ) {
-        ctx.emit(Event::WriteBytesToPty { bytes: data.into() });
+        let bytes = data.into();
+        if bytes.as_ref() == [0x03] {
+            self.pending_specific_cli_agent_launch = None;
+        }
+        ctx.emit(Event::WriteBytesToPty { bytes });
     }
 
     /// 暴露 PTY 输出广播接收端,给非录制订阅者用(目前是 SSH manager 的
@@ -15561,6 +15576,7 @@ impl TerminalView {
 
     /// Executes a command that was submitted by the user and not yet sent to the shell.
     pub fn execute_pending_command(&mut self, _: (), ctx: &mut ViewContext<Self>) {
+        self.prepare_specific_cli_agent_pending_command(ctx);
         let had_pending = self.input.read(ctx, |input, _| input.has_pending_command());
         self.input.update(ctx, |input, ctx| {
             input.execute_pending_command(ctx);
@@ -15568,6 +15584,7 @@ impl TerminalView {
         // If the pending command was just consumed, track that we're waiting
         // for the resulting block to complete.
         if had_pending && !self.input.read(ctx, |input, _| input.has_pending_command()) {
+            self.pending_specific_cli_agent_launch = None;
             self.awaiting_pending_command_completion = true;
         }
     }
@@ -15578,8 +15595,129 @@ impl TerminalView {
     // If we set it as pending, the command will execute when we trigger another call to
     // `execute_pending_command` (either from a `BlockCompleted` or `BootstrapPrecmdDone` event)
     pub fn execute_command_or_set_pending(&mut self, command: &str, ctx: &mut ViewContext<Self>) {
+        self.pending_specific_cli_agent_launch = None;
         self.set_pending_command(command, ctx);
         self.execute_pending_command((), ctx);
+    }
+
+    /// 先提交裸命令，在实际 shell 可执行时再按当前环境决定是否使用安装路径。
+    pub(crate) fn execute_specific_cli_agent_or_set_pending(
+        &mut self,
+        agent: CLIAgent,
+        executable: Option<PathBuf>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.pending_specific_cli_agent_launch = None;
+        self.set_pending_command(agent.command_prefix(), ctx);
+        self.pending_specific_cli_agent_launch = Some(PendingSpecificCLIAgentLaunch {
+            agent,
+            executable,
+            revision: self
+                .input
+                .as_ref(ctx)
+                .editor()
+                .as_ref(ctx)
+                .buffer_revision(ctx),
+        });
+        self.execute_pending_command((), ctx);
+    }
+
+    fn prepare_specific_cli_agent_pending_command(&mut self, ctx: &mut ViewContext<Self>) {
+        let Some(intent) = self.pending_specific_cli_agent_launch.as_ref() else {
+            return;
+        };
+        let input = self.input.as_ref(ctx);
+        if !input.has_pending_command()
+            || input.buffer_text(ctx) != intent.agent.command_prefix()
+            || input.editor().as_ref(ctx).buffer_revision(ctx) != intent.revision
+        {
+            self.pending_specific_cli_agent_launch = None;
+            return;
+        }
+        let has_local_pty = self.inactive_pty_reads_rx(ctx).is_some();
+        let replacement = {
+            // 这里只读取一次终端锁；先遵守 Input 的执行门槛，释放锁后才能更新输入。
+            let model = self.model.lock();
+            let active_block = model.block_list().active_block();
+            if !model.block_list().is_bootstrapped()
+                || (active_block.is_active_and_long_running()
+                    && !active_block.is_in_band_command_block())
+                || (!model.shared_session_status().is_executor()
+                    && active_block
+                        .session_id()
+                        .is_none_or(|id| !History::as_ref(ctx).is_appendable(&id)))
+            {
+                return;
+            }
+            let Some(session) = active_block
+                .session_id()
+                .and_then(|id| self.sessions.as_ref(ctx).get(id))
+            else {
+                return;
+            };
+            let host_namespace_verified = cfg!(all(
+                feature = "local_tty",
+                not(feature = "remote_tty"),
+                not(target_family = "wasm")
+            )) && cfg!(unix)
+                && has_local_pty
+                && !model.is_shared_session_viewer()
+                && !model.is_conversation_transcript_viewer()
+                && matches!(
+                    model.shell_launch_state(),
+                    ShellLaunchState::ShellSpawned { .. }
+                )
+                && model
+                    .shell_launch_state()
+                    .available_shell()
+                    .is_some_and(|shell| !shell.is_docker_sandbox())
+                && session.is_local()
+                && !session.is_subshell_or_ssh()
+                && !session.is_wsl()
+                && !session.is_msys2()
+                && matches!(session.launch_data(), Some(ShellLaunchData::Executable {
+                    executable_path, shell_type,
+                }) if executable_path.is_absolute() && *shell_type == session.shell().shell_type())
+                && session
+                    .shell()
+                    .shell_path()
+                    .as_deref()
+                    .is_some_and(|path| Path::new(path).is_absolute());
+            let metadata = active_block.metadata();
+            let cwd = metadata.current_working_directory().and_then(|cwd| {
+                session
+                    .launch_data()
+                    .and_then(|data| data.maybe_convert_absolute_path(cwd))
+            });
+            #[cfg(not(target_family = "wasm"))]
+            {
+                cli_agent::cli_agent_launch_fallback(
+                    intent.agent,
+                    intent.executable.as_deref(),
+                    cli_agent::CLIAgentLaunchSnapshot {
+                        host_namespace_verified,
+                        command_snapshot_complete: session.command_snapshot_complete(),
+                        shell_type: session.shell().shell_type(),
+                        path: session.path().as_deref(),
+                        cwd: cwd.as_deref(),
+                        command_known: session
+                            .top_level_commands()
+                            .any(|name| name == intent.agent.command_prefix()),
+                    },
+                    crate::util::path::file_exists_and_is_executable,
+                )
+            }
+            #[cfg(target_family = "wasm")]
+            {
+                let _ = (host_namespace_verified, cwd);
+                None::<String>
+            }
+        };
+        if let Some(replacement) = replacement {
+            self.input.update(ctx, |input, ctx| {
+                input.replace_buffer_content(&replacement, ctx);
+            });
+        }
     }
 
     /// 让当前终端在第一跳登录后继续执行保存路径的后续跳点。
@@ -22255,6 +22393,7 @@ impl TerminalView {
     }
 
     fn emit_execute_command(&mut self, event: ExecuteCommandEvent, ctx: &mut ViewContext<Self>) {
+        self.pending_specific_cli_agent_launch = None;
         self.update_scroll_position_locking(
             ScrollPositionUpdate::AfterCommandExecutionStarted,
             ctx,

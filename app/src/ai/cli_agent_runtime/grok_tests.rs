@@ -9,7 +9,7 @@ use uuid::Uuid;
 use super::{GrokProtocol, REQUEST_TIMEOUT, flush_effects, validate_options, verified_version};
 use crate::ai::cli_agent_runtime::local_tools::LocalToolPermissions;
 use crate::ai::cli_agent_runtime::{
-    ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand,
+    ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand, RuntimeError,
     RuntimeEventKind, SessionOptions, SessionTarget, TurnOutcome,
 };
 
@@ -262,6 +262,96 @@ fn out_of_order_response_cannot_replace_pending_authentication() {
     assert!(protocol.receive(fixture_response(3)).is_err());
     assert_eq!(protocol.pending.as_ref().unwrap().id, 1);
     assert!(protocol.session_id.is_none());
+}
+
+#[test]
+fn unknown_string_response_cannot_replace_a_numeric_pending_request() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.initialize();
+    let response = json!({"jsonrpc":"2.0","id":"OFFLINE_UNKNOWN_RESPONSE_ID",
+        "error":{"code":-32603,"message":"OFFLINE_PRIVATE_ERROR_BODY"}});
+
+    let error = protocol.receive(response.clone()).err().unwrap();
+    let diagnostic = super::runtime_error_diagnostic(&error);
+    assert_eq!(diagnostic["runtime_error_kind"], "protocol");
+    assert_eq!(diagnostic["protocol_failure_kind"], "invalid_response_id");
+    assert!(
+        !diagnostic
+            .to_string()
+            .contains("OFFLINE_PRIVATE_ERROR_BODY")
+    );
+    // 重投未知响应仍失败，不能建立身份或消耗原 pending 请求。
+    assert!(protocol.receive(response).is_err());
+    assert_eq!(protocol.pending.as_ref().unwrap().id, 1);
+    assert!(protocol.responses.is_empty());
+    assert!(protocol.session_id.is_none());
+}
+
+#[test]
+fn an_old_error_response_cannot_replace_current_authentication() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.initialize();
+    protocol.receive(fixture_response(1)).unwrap();
+    let error = protocol
+        .receive(json!({"jsonrpc":"2.0","id":1,
+        "error":{"code":-32603,"message":"OFFLINE_OLD_ERROR_BODY"}}))
+        .err()
+        .unwrap();
+
+    assert_eq!(
+        super::runtime_error_diagnostic(&error)["protocol_failure_kind"],
+        "conflicting_response"
+    );
+    assert_eq!(protocol.pending.as_ref().unwrap().id, 2);
+    assert!(protocol.session_id.is_none());
+}
+
+#[test]
+fn response_error_diagnostics_omit_arbitrary_bodies_and_malformed_codes() {
+    let message = json!({"jsonrpc":"2.0","id":"OFFLINE_PRIVATE_ID",
+        "error":{"code":true,"message":"OFFLINE_ERROR_BODY",
+            "data":{"message":{"private":"OFFLINE_NESTED_BODY"},"http_status":true}},
+        "result":{"stopReason":["OFFLINE_STOP_BODY"]}});
+    let diagnostic = super::native_response_diagnostic(&message);
+
+    assert_eq!(diagnostic["jsonrpc_is_2_0"], true);
+    assert_eq!(diagnostic["response_id"]["type"], "string");
+    assert_eq!(diagnostic["error_code"], Value::Null);
+    assert_eq!(diagnostic["error_code_type"], "boolean");
+    assert_eq!(diagnostic["native_error_http_status"], Value::Null);
+    assert_eq!(diagnostic["native_error_category"], "unknown");
+    assert_eq!(diagnostic["error_message"]["type"], "string");
+    assert_eq!(diagnostic["error_message"]["bytes"], 18);
+    assert_eq!(diagnostic["error_data_message"]["type"], "object");
+    assert_eq!(diagnostic["result_stop_reason"]["type"], "array");
+    assert_eq!(diagnostic["result_error_conflict"], true);
+    assert!(!diagnostic.to_string().contains("OFFLINE_"));
+}
+
+#[test]
+fn native_http_failure_category_only_uses_a_typed_status_field() {
+    let diagnostic = super::native_response_diagnostic(&json!({"jsonrpc":"2.0","id":4,
+        "error":{"code":-32603,"message":"OFFLINE_HTTP_ERROR_BODY","data":{"http_status":429}}}));
+
+    assert_eq!(diagnostic["native_error_http_status"], 429);
+    assert_eq!(diagnostic["native_error_category"], "http_429");
+    assert!(!diagnostic.to_string().contains("OFFLINE_HTTP_ERROR_BODY"));
+}
+
+#[test]
+fn runtime_error_diagnostics_do_not_expose_unrecognized_protocol_details() {
+    let diagnostic = super::runtime_error_diagnostic(&RuntimeError::Protocol(
+        "OFFLINE_PROTOCOL_PRIVATE_BODY".into(),
+    ));
+
+    assert_eq!(diagnostic["runtime_error_kind"], "protocol");
+    assert_eq!(diagnostic["protocol_failure_kind"], "unknown");
+    assert_eq!(diagnostic["runtime_error_message"]["type"], "string");
+    assert!(
+        !diagnostic
+            .to_string()
+            .contains("OFFLINE_PROTOCOL_PRIVATE_BODY")
+    );
 }
 
 #[test]

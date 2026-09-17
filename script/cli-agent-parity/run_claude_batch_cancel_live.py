@@ -23,14 +23,14 @@ NATIVE_KEYS = {
     "direction", "type", "subtype", "uuid", "session_id", "message_id",
     "user_message_uuid", "user_message_uuids", "command_uuid", "state", "request_id",
     "request_subtype", "tool_use_id", "tools", "terminal_reason", "is_error",
-    "response_request_id", "response_subtype",
+    "response_request_id", "response_subtype", "cancel_diagnostics",
 }
 EVENT_KINDS = {
     "acceptance_started", "profile_verified", "input_submitted", "message_accepted",
     "turn_started", "input_joined", "inspect_approval_requested", "inspect_approval_allowed",
     "inspect_literal_returned", "interrupt_submitted", "interrupt_accepted", "turn_finished",
     "connection_shutdown", "cleanup_checked", "native_protocol_ids",
-    "native_batch_cancel_verified", "acceptance_passed",
+    "native_batch_cancel_verified", "acceptance_passed", "cancel_terminal_observed",
 }
 
 
@@ -66,6 +66,46 @@ def _id(value):
     return value
 
 
+def validate_cancel_diagnostics(value):
+    """可选取消摘要只接受固定形状；旧账本不要求新增字段。"""
+    _require(isinstance(value, dict) and set(value) == {"terminal_reason", "errors"})
+    for key, shape in value.items():
+        keys = {"type", "bytes", "sha256"} | ({"count"} if key == "errors" else set())
+        _require(isinstance(shape, dict) and set(shape) == keys
+                 and shape["type"] in {"missing", "null", "boolean", "number", "string", "array", "object"}
+                 and type(shape["bytes"]) is int and 0 <= shape["bytes"] <= 8 * 1024 * 1024)
+        if shape["type"] == "missing":
+            _require(shape["bytes"] == 0 and shape["sha256"] is None)
+        else:
+            _hash(shape["sha256"])
+        if key == "errors":
+            _require(type(shape["count"]) is int and 0 <= shape["count"] <= 8 * 1024 * 1024
+                     and (shape["type"] == "array" or shape["count"] == 0))
+    return value
+
+
+def validate_cancel_terminal(event, phases, approval=False):
+    keys = {"event", "phase", "turn_id", "native_session_id", "outcome", "expected_turn_id",
+            "turn_id_matches", "interrupt_acknowledged", "turn_started", "error_bytes", "error_sha256"}
+    if approval:
+        keys.add("approval_cancelled")
+    _require(isinstance(event, dict) and set(event) == keys and event["event"] == "cancel_terminal_observed"
+             and event["phase"] in phases and event["outcome"] in {"Completed", "Cancelled", "Failed"})
+    _uuid(event["turn_id"])
+    _uuid(event["expected_turn_id"])
+    if event["native_session_id"] is not None:
+        _uuid(event["native_session_id"])
+    for key in {"turn_id_matches", "interrupt_acknowledged", "turn_started"} | ({"approval_cancelled"} if approval else set()):
+        _require(type(event[key]) is bool)
+    _require(event["turn_id_matches"] == (event["turn_id"] == event["expected_turn_id"])
+             and type(event["error_bytes"]) is int and 0 <= event["error_bytes"] <= 8 * 1024 * 1024)
+    if event["outcome"] == "Failed":
+        _hash(event["error_sha256"])
+    else:
+        _require(event["error_bytes"] == 0 and event["error_sha256"] is None)
+    return event
+
+
 def _flags(event, true=(), false=()):
     _require(all(event.get(key) is True for key in true)
              and all(event.get(key) is False for key in false))
@@ -75,8 +115,19 @@ def audit_events(events):
     """独立重算 ID、真实协议账本和三类取消信号，不以生产成功旗替代执行证据。"""
     _require(isinstance(events, list) and events
              and all(isinstance(event, dict) and event.get("event") in EVENT_KINDS for event in events))
+    for event in events:
+        if event["event"] == "cancel_terminal_observed":
+            validate_cancel_terminal(event, {"batch_cancel", "continue"})
     ending = _one(events, "acceptance_passed")
     native_id = _uuid(ending.get("native_session_id"))
+    observed = [event for event in events if event["event"] == "cancel_terminal_observed"]
+    _require(len({event["turn_id"] for event in observed}) == len(observed))
+    for event in observed:
+        matching = [row for row in events if row["event"] == "turn_finished" and row.get("turn_id") == event["turn_id"]]
+        _require(len(matching) == 1 and event["native_session_id"] == native_id
+                 and event["phase"] == matching[0].get("phase") and event["outcome"] == matching[0].get("outcome")
+                 and event["outcome"] != "Failed" and event["turn_id_matches"] is True
+                 and event["interrupt_acknowledged"] is True and event["turn_started"] is True)
     _require(ending.get("scope") == SCOPE)
     for key, expected in (("native_inputs", 3), ("native_executions", 2), ("joined_inputs", 1),
                           ("cancelled_inputs", 2), ("continued_inputs", 1), ("inspect_call_count", 1)):
@@ -183,6 +234,10 @@ def audit_events(events):
     rows = [event.get("native") for event in projections]
     _require(all(isinstance(row, dict) and set(row).issubset(NATIVE_KEYS)
                  and row.get("direction") in {"stdin", "stdout"} for row in rows))
+    for row in rows:
+        if "cancel_diagnostics" in row:
+            _require(row.get("type") == "result")
+            validate_cancel_diagnostics(row["cancel_diagnostics"])
     users = [(index, row) for index, row in enumerate(rows) if row.get("direction") == "stdin" and row.get("type") == "user"]
     _require(len(users) == 3 and [row.get("uuid") for _, row in users] == [running, joined, continuation])
     empty_id_hash = "sha256:" + hashlib.sha256(b"").hexdigest()
@@ -239,7 +294,7 @@ def audit_events(events):
     batch_result_uuid = _uuid(native_batch.get("uuid"))
     reason = native_batch.get("terminal_reason")
     subtype = native_batch.get("subtype")
-    _require((reason == "aborted_streaming" and subtype == "error_during_execution" and native_batch.get("is_error") is True)
+    _require((reason in {"aborted_streaming", "aborted_tools"} and subtype == "error_during_execution" and native_batch.get("is_error") is True)
              or (reason in {"interrupted", "cancelled"} and native_batch.get("is_error") is False
                  and subtype == "success"))
     _require(native_continue.get("session_id") == native_id and native_continue.get("subtype") == "success"

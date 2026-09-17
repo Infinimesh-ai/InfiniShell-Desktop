@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "run_id": 35248824124,
+  "job_id": 105295774516,
+  "derived": true,
+  "说明": "从授权原日志白名单行生成；original_line_utf8按UTF-8编码可重建逐行原字节（含原换行）。未复制完整日志、环境或模型正文。",
+  "source_log_bytes": 940721,
+  "source_log_sha256": "3574dafb3280f4920b08383e20a87feee4bcc3c34aa6fbabc34b74a87c402af3",
+  "selected_original_lines_bytes": 1402,
+  "selected_original_lines_sha256": "8155e1ee9e4be9613b6f2c71c540eb17e3d0751b36dad6e2b1a6fb86391a3e70",
+  "entry_count": 9,
+  "entries": [
+    {
+      "log_line": 615,
+      "step": "Test Windows Git Bash notification payloads",
+      "text": "Ran 13 tests in 10.962s",
+      "original_line_utf8": "Windows x64\tTest Windows Git Bash notification payloads\t2026-09-17T16:49:36.7265634Z Ran 13 tests in 10.962s\n",
+      "original_line_bytes": 109,
+      "original_line_sha256": "ca84a01db996fb477aed45a369c9a4738242e9a2a09da650fb590280a2bec7ff"
+    },
+    {
+      "log_line": 617,
+      "step": "Test Windows Git Bash notification payloads",
+      "text": "OK",
+      "original_line_utf8": "Windows x64\tTest Windows Git Bash notification payloads\t2026-09-17T16:49:36.7265913Z OK\n",
+      "original_line_bytes": 88,
+      "original_line_sha256": "fa5ec094be113751e481e9e5f77a15d01acf10691a770a32479bc4c344c19a01"
+    },
+    {
+      "log_line": 719,
+      "step": "Verify Codex Windows ConPTY notification transport",
+      "text": "Ran 16 tests in 0.437s",
+      "original_line_utf8": "Windows x64\tVerify Codex Windows ConPTY notification transport\t2026-09-17T16:51:31.1163467Z Ran 16 tests in 0.437s\n",
+      "original_line_bytes": 115,
+      "original_line_sha256": "2f4e2647efee8155b5f0ca9178643edda64f3789d562cca5a7e4269d8b055167"
+    },
+    {
+      "log_line": 721,
+      "step": "Verify Codex Windows ConPTY notification transport",
+      "text": "OK (skipped=1)",
+      "original_line_utf8": "Windows x64\tVerify Codex Windows ConPTY notification transport\t2026-09-17T16:51:31.1163762Z OK (skipped=1)\n",
+      "original_line_bytes": 107,
+      "original_line_sha256": "dfa304ce0d278ff4d05a9138edc109fe6a51e335a5199a81aabfe2f1e3c1a3b3"
+    },
+    {
+      "log_line": 3088,
+      "step": "Test shared CLI action contracts and skills",
+      "text": "     Summary [   0.386s] 71 tests run: 71 passed, 224 skipped",
+      "original_line_utf8": "Windows x64\tTest shared CLI action contracts and skills\t2026-09-17T17:14:24.5242486Z ^[[32;1m     Summary^[[0m [   0.386s] ^[[1m71^[[0m tests run: ^[[1m71^[[0m ^[[32;1mpassed^[[0m, ^[[1m224^[[0m ^[[33;1mskipped^[[0m\n",
+      "original_line_bytes": 216,
+      "original_line_sha256": "0142ae122ec21d479e270ff162481ea04038fafc51c3e91eb0a035b6c27fb51c"
+    },
+    {
+      "log_line": 3235,
+      "step": "Test CLI harness arguments",
+      "text": "     Summary [   0.959s] 128 tests run: 128 passed, 0 skipped",
+      "original_line_utf8": "Windows x64\tTest CLI harness arguments\t2026-09-17T17:14:29.6267799Z ^[[32;1m     Summary^[[0m [   0.959s] ^[[1m128^[[0m tests run: ^[[1m128^[[0m ^[[32;1mpassed^[[0m, ^[[1m0^[[0m ^[[33;1mskipped^[[0m\n",
+      "original_line_bytes": 199,
+      "original_line_sha256": "5fb37158c2451fc9708844da091cb08961e2cf7c85272f290e22030bcc69028a"
+    },
+    {
+      "log_line": 3393,
+      "step": "Test bilingual TUI task message states",
+      "text": "     Summary [   0.402s] 9 tests run: 9 passed, 925 skipped",
+      "original_line_utf8": "Windows x64\tTest bilingual TUI task message states\t2026-09-17T17:20:08.9864961Z ^[[32;1m     Summary^[[0m [   0.402s] ^[[1m9^[[0m tests run: ^[[1m9^[[0m ^[[32;1mpassed^[[0m, ^[[1m925^[[0m ^[[33;1mskipped^[[0m\n",
+      "original_line_bytes": 209,
+      "original_line_sha256": "10acb478b84d55d2d3dd8aff82d47366985c617295c3c666c653872b72b7d09e"
+    },
+    {
+      "log_line": 3414,
+      "step": "Test managed command process ownership",
+      "text": "     Summary [   0.347s] 2 tests run: 2 passed, 7 skipped",
+      "original_line_utf8": "Windows x64\tTest managed command process ownership\t2026-09-17T17:20:12.9874212Z ^[[32;1m     Summary^[[0m [   0.347s] ^[[1m2^[[0m tests run: ^[[1m2^[[0m ^[[32;1mpassed^[[0m, ^[[1m7^[[0m ^[[33;1mskipped^[[0m\n",
+      "original_line_bytes": 207,
+      "original_line_sha256": "031a0145dcd7edfb3e5e44ae254ccd8fb42c5d6c7041300cef43f8e4fedaded7"
+    },
+    {
+      "log_line": 3816,
+      "step": "Test rust-genai",
+      "text": "test result: ok. 81 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+      "original_line_utf8": "Windows x64\tTest rust-genai\t2026-09-17T17:25:34.1507415Z test result: ok. 81 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s\n",
+      "original_line_bytes": 152,
+      "original_line_sha256": "a9c99fe4407cfcfc8d12c4e9c5b85b049bc0d3e199b3526b23acc5b9223f5f78"
+    }
+  ]
+}

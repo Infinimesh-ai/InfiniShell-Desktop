@@ -138,12 +138,25 @@ class SourceRunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
             (root / "project").mkdir()
+            # 系统 shell 不依赖父 Python 的动态库环境；后台子进程同时持有输出管道。
             code, output, timed_out = runner.run_command(
-                [sys.executable, "-c", "import time; print('partial diagnostic', flush=True); time.sleep(30)"],
+                ["/bin/sh", "-c", "printf 'partial diagnostic\\n'; sleep 30 & wait"],
                 root, {"PATH": os.defpath}, 0.2)
-            self.assertTrue(timed_out)
+            self.assertTrue(timed_out, f"夹具未进入超时：code={code}, output={output!r}")
             self.assertNotEqual(code, 0)
             self.assertIn("partial diagnostic", output)
+
+    @unittest.skipUnless(os.name == "posix", "此运行器只支持生产 Unix 门控")
+    def test_immediate_process_failure_is_not_reported_as_timeout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            (root / "project").mkdir()
+            code, output, timed_out = runner.run_command(
+                ["/bin/sh", "-c", "printf 'fixture startup failure\\n' >&2; exit 7"],
+                root, {"PATH": os.defpath}, 2)
+            self.assertFalse(timed_out)
+            self.assertEqual(code, 7)
+            self.assertEqual(output, "fixture startup failure\n")
 
     def test_zero_exit_without_rust_events_is_failure_and_preserves_root(self):
         with tempfile.TemporaryDirectory() as temporary:

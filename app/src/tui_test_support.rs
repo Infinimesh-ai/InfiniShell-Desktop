@@ -158,6 +158,7 @@ pub fn add_tui_history_test_models(
             aliases: HashMap::new(),
             abbreviations: HashMap::new(),
             function_names: HashSet::new(),
+            command_snapshot_complete: false,
             builtins: HashSet::new(),
             keywords: Vec::new(),
             is_ssh_wrapper_session: IsSSHWrapperSession::No,

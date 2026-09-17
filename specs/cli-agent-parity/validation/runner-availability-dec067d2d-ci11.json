@@ -1,0 +1,37 @@
+{
+  "repository": "Infinimesh-ai/InfiniShell-Desktop",
+  "commit": "dec067d2d53fb65f11b37b66a72fa9e11e82cf04",
+  "remote_sha_verified": "dec067d2d53fb65f11b37b66a72fa9e11e82cf04",
+  "observation_started_utc": "2026-09-17T16:48:07.757154+00:00",
+  "observation_completed_utc": "2026-09-17T16:48:09.008804+00:00",
+  "runners": [
+    {
+      "id": 21,
+      "name": "infinishell-linux-x64",
+      "os": "Linux",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "infinishell-ci"
+      ]
+    },
+    {
+      "id": 22,
+      "name": "infinishell-windows-x64",
+      "os": "Windows",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "infinishell-ci",
+        "Windows"
+      ]
+    }
+  ],
+  "scope": "CI11 派发前真实API只读快照；在线不计平台门禁通过。",
+  "dispatch_requested": false
+}

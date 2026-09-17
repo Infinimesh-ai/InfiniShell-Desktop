@@ -1,0 +1,23 @@
+# 无提示调查的独立配置；不是用户全局配置，也不证明有效权限或工具目录。
+[cli]
+use_leader = false
+auto_update = false
+[models]
+default = "grok-4.6-build"
+session_summary = "grok-4.6-build"
+web_search = "grok-4.6-build"
+image_description = "grok-4.6-build"
+[features]
+turn_summary = false
+title_refresh = false
+support_permission = true
+[[permission.rules]]
+action = "ask"
+tool = "any"
+# 复用此前固定 CLI 的原生初始化形态，避免调查期间首次改写；不宣称插件已安装。
+[marketplace]
+default_skills_installs_purged = true
+official_marketplace_auto_installed = true
+[[marketplace.sources]]
+name = "xAI Official"
+git = "https://github.com/xai-org/plugin-marketplace.git"

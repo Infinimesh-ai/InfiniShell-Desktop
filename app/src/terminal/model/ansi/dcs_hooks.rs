@@ -252,13 +252,13 @@ impl DProtoHook {
                     value.editor = map_empty_to_none(v);
                 }
                 "aliases" => {
-                    value.aliases = map_empty_to_none(v);
+                    value.aliases = Some(v);
                 }
                 "abbreviations" => {
                     value.abbreviations = map_empty_to_none(v);
                 }
                 "function_names" => {
-                    value.function_names = map_empty_to_none(v);
+                    value.function_names = Some(v);
                 }
                 "env_var_names" => {
                     value.env_var_names = map_empty_to_none(v);
@@ -624,13 +624,13 @@ pub struct BootstrappedValue {
     #[serde(deserialize_with = "empty_string_is_none", default)]
     pub editor: Option<String>,
 
-    #[serde(deserialize_with = "empty_string_is_none")]
+    #[serde(deserialize_with = "command_snapshot_string", default)]
     pub aliases: Option<String>,
 
     #[serde(deserialize_with = "empty_string_is_none")]
     pub abbreviations: Option<String>,
 
-    #[serde(deserialize_with = "empty_string_is_none")]
+    #[serde(deserialize_with = "command_snapshot_string", default)]
     pub function_names: Option<String>,
 
     #[serde(deserialize_with = "empty_string_is_none")]
@@ -911,6 +911,14 @@ where
     }
 }
 
+/// 命令集合的显式空字符串是有效快照；缺字段或 null 才表示未知。
+fn command_snapshot_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Option::<String>::deserialize(deserializer)?.map(trim_null_byte))
+}
+
 fn parse_shell_options_list_deserializer<'de, D>(
     deserializer: D,
 ) -> Result<Option<HashSet<String>>, D::Error>
@@ -971,3 +979,7 @@ impl PendingHook {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "dcs_hooks_tests.rs"]
+mod tests;

@@ -962,6 +962,82 @@ fn restore_conversation_in_active_pane_enters_existing_live_conversation_without
         });
     });
 }
+#[test]
+fn cli_agent_tabs_remain_terminal_when_default_session_mode_is_agent() {
+    let _agent_view = FeatureFlag::AgentView.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let workspace = mock_workspace(&mut app);
+
+        app.update(|ctx| {
+            AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                settings
+                    .default_session_mode_internal
+                    .set_value(DefaultSessionMode::Agent, ctx)
+                    .expect("默认会话模式应能设置为 Agent");
+            });
+        });
+
+        workspace.update(&mut app, |workspace, ctx| {
+            assert_eq!(
+                AISettings::as_ref(ctx).default_session_mode(ctx),
+                DefaultSessionMode::Agent
+            );
+
+            // 普通新标签页仍进入 Agent 界面，保证回归场景实际启用了默认模式。
+            workspace.add_terminal_tab(false, ctx);
+            let default_terminal = workspace
+                .active_tab_pane_group()
+                .as_ref(ctx)
+                .active_session_view(ctx)
+                .expect("普通新标签页应有终端视图");
+            assert!(
+                default_terminal
+                    .as_ref(ctx)
+                    .active_conversation_id(ctx)
+                    .is_some()
+            );
+
+            workspace.handle_action(&WorkspaceAction::AddSpecificAgentTab(CLIAgent::Claude), ctx);
+            let claude_terminal = workspace
+                .active_tab_pane_group()
+                .as_ref(ctx)
+                .active_session_view(ctx)
+                .expect("Claude 新标签页应有终端视图");
+            assert_eq!(
+                claude_terminal.as_ref(ctx).active_conversation_id(ctx),
+                None
+            );
+            let claude_input = claude_terminal.as_ref(ctx).input().as_ref(ctx);
+            assert_eq!(claude_input.buffer_text(ctx), "claude");
+            assert!(claude_input.has_pending_command());
+
+            workspace.handle_action(&WorkspaceAction::AddSpecificAgentTab(CLIAgent::Codex), ctx);
+            let codex_terminal = workspace
+                .active_tab_pane_group()
+                .as_ref(ctx)
+                .active_session_view(ctx)
+                .expect("Codex 新标签页应有终端视图");
+            assert_eq!(codex_terminal.as_ref(ctx).active_conversation_id(ctx), None);
+            let codex_input = codex_terminal.as_ref(ctx).input().as_ref(ctx);
+            assert_eq!(codex_input.buffer_text(ctx), "codex");
+            assert!(codex_input.has_pending_command());
+
+            workspace.handle_action(&WorkspaceAction::AddSpecificAgentTab(CLIAgent::Grok), ctx);
+            let grok_terminal = workspace
+                .active_tab_pane_group()
+                .as_ref(ctx)
+                .active_session_view(ctx)
+                .expect("Grok 新标签页应有终端视图");
+            assert_eq!(grok_terminal.as_ref(ctx).active_conversation_id(ctx), None);
+            let grok_input = grok_terminal.as_ref(ctx).input().as_ref(ctx);
+            assert_eq!(grok_input.buffer_text(ctx), "grok");
+            assert!(grok_input.has_pending_command());
+        });
+    });
+}
+
 fn new_session_menu_label(item: &MenuItem<WorkspaceAction>) -> String {
     match item {
         MenuItem::Item(fields) => fields.label().to_string(),

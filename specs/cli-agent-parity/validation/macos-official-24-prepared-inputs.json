@@ -1,0 +1,453 @@
+{
+  "base_commit": "dec067d2d53fb65f11b37b66a72fa9e11e82cf04",
+  "worktree_clean": false,
+  "scope": "source24 准备快照：真实 Claude 取消枚举补丁、Grok 错误诊断、标题栏终端启动及完整命令快照。Grok 只读预检入口仍未准备，先编译并核对唯一 ignored 入口；不计同提交、原生或跨平台通过。",
+  "prior_manifest_sha256": "89596f95bca52dd9b446670c6319fd6ca644f922852f411c6d9ce9e356125e27",
+  "prior_frozen_files_verified_before_update": true,
+  "files": [
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "sha256": "108dee6fa003778c8f14e4d488b7aabc6c77bbeb983fdab20e83a92d0c2b76cb"
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/codex/NATIVE_HOOK_TRUST_WINDOWS.json",
+      "sha256": "e1531b5cbb8d331d06a3627b68ee5d20a4af00501657609670ebb99cf2bf42a0"
+    },
+    {
+      "path": "app/i18n/en/warp.ftl",
+      "sha256": "abc35589e8e30edb1f2c842105fb058a07d42d6baeae796dfe997a6a7f59f241"
+    },
+    {
+      "path": "app/i18n/zh-CN/warp.ftl",
+      "sha256": "36541327e2148064b683bed14c2cdb5164c33752d991c080ed5d8fa04386179a"
+    },
+    {
+      "path": "app/src/ai/agent_events/mod.rs",
+      "sha256": "5bef1a85486ac28d073c677e7357367d9493ddeafd6b25d6562fd22815ba97e2"
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver.rs",
+      "sha256": "274b3c1501a8483f8b04010762cbf1ffa98506fd5f0ef845b8e881d71b12010f"
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/harness/claude_code.rs",
+      "sha256": "74d9edc5725e329ab13aea61a2227e0bf8401af0a2b11681b3c16bd69e552a40"
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/harness/claude_code_tests.rs",
+      "sha256": "362af52d978774283b3ab0742af18319400231ca0fb8fcdf89357761b44ee67f"
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/harness/mod.rs",
+      "sha256": "7ecef5ca70d20c156a590866ad9efbd38cc0f32e38ccb63e75cf6e7cad4114fb"
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/harness/mod_tests.rs",
+      "sha256": "e8e2fcb93ce5b6b2887623dee1fadd4ee0211e7bca626a37b8abd72b2dbfd7ae"
+    },
+    {
+      "path": "app/src/ai/agent_sdk/mod.rs",
+      "sha256": "a4e63343414fec4503fea0d41d9c725b2790dfd520ba1f5c9cf69a01a96ec4c5"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude.rs",
+      "sha256": "a3088fb35454c7b3c2063962b572360f2c6cd1a2ba0eb83cb9f436be91bf97f2"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_approval_cancel_live_tests.rs",
+      "sha256": "f0635c815e9a60ff12cd30be6369c6d976f220710359ac9d50f061a6310535ec"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_batch_cancel_live_tests.rs",
+      "sha256": "e47bf362fb20dc547da5ce3a8739503ed9c301aedccbd407d5c3026b7f7c9f33"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_coordinator_live_tests.rs",
+      "sha256": "3c12e2574c420dede08a8fdfe34788fa75c0d2aed0771a707c05f077a6297de5"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_image_probe_live_tests.rs",
+      "sha256": "3e1f676ca11c3714f92bead43ee6c447a106fae213b6c61691742ec020a04e13"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_image_tests.rs",
+      "sha256": "c8e52d946a4808d24a3757d87d8825bd20dfc386329d0352018557885753d07d"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_live_tests.rs",
+      "sha256": "71ecbef19fa8317439fd6faceca1dabe238f201dedc5be21be65c23f099640af"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_managed_image_live_tests.rs",
+      "sha256": "bab12717c516dd026f28f6d2c75ffd6c6acb1f119385cbb59fb367c6e5fd49fb"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile.rs",
+      "sha256": "d96d8ef12cd91e4bb9ea81023b8328d3f375d7399105f29f771c1763700b24b0"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_live_tests.rs",
+      "sha256": "dd10f9a2373931244a8d3ba6c469f8bf8aa0169307d20b049325b19ce1552104"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_preflight.rs",
+      "sha256": "60ab9584b943ee7187806e0ef8c7dd2d137b5c335426573471e7cae9d7de0900"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_protocol_tests.rs",
+      "sha256": "234b82e830fce3b436b3ad5a43b2b685d296267c7db7f4ba075922f295b36116"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_tests.rs",
+      "sha256": "1de1a4cb8c23449ff7be0f58412fe33fdff89ae971f31919fe54b701b032ee6d"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_tests.rs",
+      "sha256": "aaab9ea2629467f72e84a9fad38baddcc31a6ea343e2554dd3cd67ae11ca393c"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex.rs",
+      "sha256": "bb6a20f458217e46f559d406461d671e19d3186432ee18a4236332709c1b5bf9"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex_live_tests.rs",
+      "sha256": "788cce2656fc68d2a77ea6c446a7e0c3ffb5604db08992810d5906fbb964cff1"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex_tests.rs",
+      "sha256": "be66787fa98076fe672564e7bfdb57d0cf345a0802111997eddefee4cd12bd30"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator.rs",
+      "sha256": "54af5b87d7d5e8fa3be7eac8c258cb0c38334d427c6f495d936163f02c944a5a"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator_tests.rs",
+      "sha256": "6872766d722b4fd6b981942dc08a6b276df247705b58f6c3cb78acf8dee9a1ad"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator_tools.rs",
+      "sha256": "9e54fe0e8985094f0ed7ebe0be727051c60959f0553e26c0024273e4903ba2bd"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok.rs",
+      "sha256": "6ee653604ffbe331bc1bb365de85b6e2a796a135e8a086c1a251ebc87fd2b8d0"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_coordinator_live_tests.rs",
+      "sha256": "055b6aae62ad81afebff901470ccca8f301f57b907988671650c5393e0cf9aa1"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_live_tests.rs",
+      "sha256": "b4944504e9d85923a118cd120eaef1e6db4190b7422a1cb35db387b35bcb888a"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_local_tools.rs",
+      "sha256": "6ad5252a39a78508b5645c9a4ee42d5173cc7ba774d3826440bf9b8cb28a09eb"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_local_tools_tests.rs",
+      "sha256": "53e248b2a36becaf7a84e06c038453e558906f1848dc1093d7d0cc13f5273881"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_policy_preflight_live_tests.rs",
+      "sha256": "9006f32876cf8521f0e1787f79b082d686b827fe497d35c65d1290b8c59b1883"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_policy_preflight_protocol_tests.rs",
+      "sha256": "258e9403318a52a769a0227a7c9e237068693a5888bed23824fddd41d1cc2bed"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_sdk_origin_live_tests.rs",
+      "sha256": "d8e1c980a20a9be75e62661243e70d4ae45217790fd17429efe4766b3ab4884f"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_tests.rs",
+      "sha256": "f76db84a1e4ed55b648f1d672a782d8f1106632efc23b12f1d3d562d18789f4a"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/local_tools.rs",
+      "sha256": "460c250327a3d524573d8ba59eb462e07bbfdfa4cdc1b8fa69cd583cdeb89a67"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/local_tools_tests.rs",
+      "sha256": "a34609bd2cc85a820f75c1c832fa0dc94f1590b5581c23302fbcee26047fc045"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_input.rs",
+      "sha256": "b033704f2362fdac9c6c4d747badc0efd282b60e2a354c0fa46271a0c2f0efa1"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_input_tests.rs",
+      "sha256": "0c9674f55569a1ca246186c136334066fe62ee95b6c4c5233dcdf3c7f795fc5b"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+      "sha256": "ac4b75372fbd79e543c92aef50ec34f44d4c385cf5161eabd268c95ef2e70697"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_tests.rs",
+      "sha256": "6bedb2a51279eda6e683f8c4d2fa3c6d3271cae0518b5f89f7315ff9de99b0dd"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/mod.rs",
+      "sha256": "824c117f9a342ab1234c51c4688d6ac54216e4ae9d51d19578886476916f0eb6"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions.rs",
+      "sha256": "f1ddf87888057f53e634c89df1cf5e3b030a895c24e47a2b8185a1e5014e5f2b"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions_tests.rs",
+      "sha256": "11a0154b72411c16d64700143212797158b007e83fc409446f05a7c4f6f2da6d"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_input.rs",
+      "sha256": "a67691b62b64c3c886f6d66d3400c61135e575e75dc1f8c581a5f94e84b11cef"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_view.rs",
+      "sha256": "dde148a2b48eae787200864f3c0393ac8a83559005adb2074659d2f61a3548a2"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_view_tests.rs",
+      "sha256": "9beb52a6fa0a96a38e4919d159f7bd883180bdd75dbb7d3dcf14081027286eb8"
+    },
+    {
+      "path": "app/src/ai/local_cli_mailbox.rs",
+      "sha256": "100d7c50e0efb4f9b249bae01dae8cdd9abcb58b3939064b6a68b901c5003728"
+    },
+    {
+      "path": "app/src/pane_group/pane/terminal_pane.rs",
+      "sha256": "f15b4fc18c4da172fed9403af0d8de3239d7ac750008d2d70dacdc1669418b03"
+    },
+    {
+      "path": "app/src/persistence/local_cli_tasks.rs",
+      "sha256": "122b11d43b6d75884880a1cb574243bedb7272baf23fd40774643db50826d272"
+    },
+    {
+      "path": "app/src/persistence/local_cli_tasks_tests.rs",
+      "sha256": "f590db51f542dc111d258d9e62af49f0e2fe4ccf1152e4759cf2dad46fd2bb3e"
+    },
+    {
+      "path": "app/src/terminal/cli_agent.rs",
+      "sha256": "32956761b112b7b9adfa2ccd498de62438b685847136223945d10c9b375753c8"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex.rs",
+      "sha256": "367d861d32001b881342461b2c85108e31edadcd733eabbca9fc37bcdfe26d6e"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_hook_trust.rs",
+      "sha256": "db168ba04f009bf42e1bf5445919ab6999e5901e9c2b235dfaec5c309ed6bac7"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_hook_trust_tests.rs",
+      "sha256": "64012376a4e5f0eacce4f0f2e43cb40a1489a68e638582662879ec9b6387b8c9"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_live_tests.rs",
+      "sha256": "28bcaf7e63a6440dc2ec8fd82d86fa09322eae27aa7965a810e71b97b3c598de"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_tests.rs",
+      "sha256": "45bd1411d7ea9282a428aa9900108b02d19aa32d307885f74cfa82b150ff5e08"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_tests.rs",
+      "sha256": "51af6d44d1822a604d8082d550d7f6042aebaa3c053a985179222ae412e1cb8f"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_tests.rs",
+      "sha256": "b5e94721aa30226e00431f31f975ca4ada39b6c0c3497bb9a81a7b6d2706d6a4"
+    },
+    {
+      "path": "app/src/terminal/model/ansi/dcs_hooks.rs",
+      "sha256": "de2c7beac8506d19461ddb55a4ba1ffdb88de4eab5c5e4b8629c08d5a045e702"
+    },
+    {
+      "path": "app/src/terminal/model/ansi/dcs_hooks_tests.rs",
+      "sha256": "20f13d2a1e4f5f72ae511d8da4f2ce08c18cddfc8fb1865546e11e53c9bc5712"
+    },
+    {
+      "path": "app/src/terminal/model/session.rs",
+      "sha256": "4f043cd324b75ea81cf3dc7bc758069dcc25e596443286c3f8ea91fd61702849"
+    },
+    {
+      "path": "app/src/terminal/model/session_tests.rs",
+      "sha256": "ac3926eb7938baad71af83c33aa5853ad50c6ce5a677603f275d90ee5d2a4633"
+    },
+    {
+      "path": "app/src/terminal/view.rs",
+      "sha256": "cf4b003a4d2c2f7c0e7d336171350c7cc0b6c67f4ea633626babe38b1863a502"
+    },
+    {
+      "path": "app/src/terminal/view_tests.rs",
+      "sha256": "7edc28cddd12b430e44cd37f34fe25ff0b56f11667becc2103622ff3da4308bd"
+    },
+    {
+      "path": "app/src/tui_test_support.rs",
+      "sha256": "33bfd0fc89ef28c4ddbebf60e1ffd702f548db2622a3bb50e63e2f5f346a0f77"
+    },
+    {
+      "path": "app/src/workspace/view.rs",
+      "sha256": "9e6a015d47e3b0def4572f3f14439dcb6bc8f767570e787a1d901d7a20169451"
+    },
+    {
+      "path": "app/src/workspace/view_tests.rs",
+      "sha256": "afb82d4ed435225300eb05cfebd99005a2ffbe36ae090388cf8208050b206439"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_adapter_runner_tests.py",
+      "sha256": "af84604615918505247489d3f8ce74af3592caaec23791abb1113738d9bf4b2d"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_approval_cancel_runner_tests.py",
+      "sha256": "6b86b6b0095be3cbc73d577967843c897306a3fb69d25ba07e3e6eabed273ffa"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+      "sha256": "b5f629b21abd49c212d176dd84b6bf083c23c61e4d1e51ab49498bcd154cfde3"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+      "sha256": "02cf1e37bab3eabebad013346f619e128023744a9b6d96fd5deae15524125fc8"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_image_probe_runner_tests.py",
+      "sha256": "28b731f4143494187b05a93f2d2a1863c1c651223add91d241fd7a39d9f91df8"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_managed_image_runner_tests.py",
+      "sha256": "424869d5331c301f1d15da37feaaee240c6d1d005e7ae5e25381bba34c71fe61"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_profile_runner_tests.py",
+      "sha256": "6bd8681209b5971b8889686e0bd487455b96a4fc33891737258b30f2f47ae1a9"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_source_runner_tests.py",
+      "sha256": "ff367cdc38afcefad7b3bcc7ce0cf12ec9de0530ca8685252da77315735c6e7b"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_adapter_runner_tests.py",
+      "sha256": "347e1ab5a499c6dcca5391e77a7f1b92254cbfee1b4888277a952d0b9d00c191"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_coordinator_runner_tests.py",
+      "sha256": "485b2e5a00bac79008aa865a359623d8b42bf13568dd288a8db6d4de5edacfcc"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+      "sha256": "de4b23fb81ce7f68e7f65fec920aceb2ccb17553cfabe505a8853ee7e1e43f7b"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_official_pty_runner_tests.py",
+      "sha256": "86eead713462959ad8e57cd63f7de216baecffa8e458390f3cc7f30845b8b720"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_policy_preflight_runner_tests.py",
+      "sha256": "f2717b7118de0e4d2ebbaa548b6696cb5a7fa734f90c82dd56de2d5717db4b61"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+      "sha256": "2ea02f9e0d481fa9bc514e5ee67cefd086f33df8aeb2be16cb7f41c27df7bb4e"
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_codex_cli.py",
+      "sha256": "f26231df0f34008a7966a21562a6ceeb07d9896ebdf8c08267e61b130a3ff7d0"
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_codex_cli_tests.py",
+      "sha256": "f8da0a3bb71ae47964f4d4a125c91f23ba65b1887834b6ec2d87d62261fc3ff7"
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_adapter_live.py",
+      "sha256": "52cb1c3071254dc031eab4b15c327d12a02d3f829035863094ebdec1225a3739"
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_approval_cancel_live.py",
+      "sha256": "b0064eaf2d70f3cc36f07c316fd99111f6073a8fe6c8ac4831b0d1afb2497e3a"
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_batch_cancel_live.py",
+      "sha256": "f4480b8125268ba37105c33e1b6834fedef0a98cf3bf6c1de1ea4a0b71a5fa46"
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_coordinator_live.py",
+      "sha256": "4f9d9940250da4489258cee039ff2394d1ea84036df92594b91b62ff3bab58fd"
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_image_probe.py",
+      "sha256": "bbf2c41b7467289e18b262090a2125941f4477008bc9ad9b25773673baaff2cd"
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_managed_image_live.py",
+      "sha256": "45ec89f38b4e5caecec00f581e636285c832e13f36a3ec4fe773dcdc1f9eaec3"
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_profile_live.py",
+      "sha256": "22441975639ecd328bc7be780907c1b27325931b6d6a922c6b6672335eaa021e"
+    },
+    {
+      "path": "script/cli-agent-parity/run_codex_source_live.py",
+      "sha256": "6d8bf45c8d05eaaa834a8f106f576993d69e3b2118b5e0853e51e62677ade02a"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_adapter_live.py",
+      "sha256": "b9b302bbbfdb1924b340e3cb8fee91633d5b5998904ec37ece98bf4894bd7f32"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_coordinator_live.py",
+      "sha256": "3a373865c28b60431c1c385d9473bd7efd6bdf6ddf098fa52116eb62c8203275"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_official_adapter_live.py",
+      "sha256": "3dd0ef8e495f02a7bdda681bc904759464924f24e97f55ceec0c7c6a7d55a06d"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_official_pty_live.py",
+      "sha256": "266589d48d0271bdee605349039f046066c2e8732ea919e21244c2bb71d1525c"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_policy_preflight.py",
+      "sha256": "820f94429c602704e4b35d8539a619d3ed9b77d9a97950889a2ef54ef8261efd"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_sdk_origin_probe.py",
+      "sha256": "6785eb8e81ce85ece007b5b6301e83758085d15427a4b24d63587dcfdfbd7794"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/claude-2.1.273-fixed-profile-control.json",
+      "sha256": "fb7c0fe39c3fea7d4b721ace8e62e034b8059f4e4492d80ad51981c056e88dbb"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/claude-2.1.273-tool-cancel-binary-contract.json",
+      "sha256": "c1969d1aacee0ff89ded7fed3f0c0e88f48e869fcb5f06108d84f10f3651a660"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/codex-0.147.0-native-hook-trust-rev4-windows.json",
+      "sha256": "b8253c5faa631257aa6f50052b919fb29c04f9effb086fa766626f188f7f0a13"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-final-history-offline.json",
+      "sha256": "a71da4851785ce794205fa5b13247961685c364d490510fd1834b67a15512731"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-local-tools-source-contract.json",
+      "sha256": "819a7e8ecdb0a76ee39c4606f9149529e6f52cda9fc6460b982e71f2c01df0a9"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-modern-discovery-source-contract.json",
+      "sha256": "ee23a14d79061c65999a8e5eb0b64c3157ddb1557344203cb75c43e8ef6175df"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-policy-preflight-config.toml",
+      "sha256": "4ea339fd82e2d8a0280526079f1809226bc1049847f877dfc209eda369384a0a"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-policy-preflight-profile.md",
+      "sha256": "d0a6ca5a682cf9fd15aba972660942ff61df24bfdf02f0acce68cc8512a0982a"
+    }
+  ]
+}

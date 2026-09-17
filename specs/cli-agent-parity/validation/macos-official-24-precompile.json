@@ -1,0 +1,18 @@
+{
+  "source_manifest_sha256": "3a0b00201651e650bff552184f4df64d67a2862504b010a188e8408845482814",
+  "argv": [
+    "cargo",
+    "test",
+    "--target-dir",
+    "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+    "-p",
+    "warp",
+    "--lib",
+    "--no-run"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 229.418,
+  "log": "/tmp/infinishell-cli-parity-official-24-precompile.log",
+  "log_sha256": "99d21548e1ab22919115b09ebcc358a3f009b7c5440e681e6c667b1ed73dc967",
+  "scope": "准备快照预编译，仅核对测试入口；不计最终门禁或原生验证。"
+}

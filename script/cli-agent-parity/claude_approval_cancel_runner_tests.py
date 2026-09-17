@@ -126,11 +126,117 @@ def resequence(events):
             event["sequence"] = number
 
 
+
+def tools_events():
+    events = complete_events()
+    native_of(events, type="result", subtype="error_during_execution")["terminal_reason"] = "aborted_tools"
+    event_of(events, "native_pending_edit_cancel_verified")["terminal_reason"] = "aborted_tools"
+    return events
+
+
+def cancel_summary():
+    return {"terminal_reason": {"type": "string", "bytes": 13,
+                                "sha256": hashlib.sha256(b"aborted_tools").hexdigest()},
+            "errors": {"type": "array", "bytes": 2, "count": 0,
+                       "sha256": hashlib.sha256(b"[]").hexdigest()}}
+
+
+def terminal_observation(events, failed=False):
+    completed = event_of(events, "turn_finished", phase="pending_edit")
+    event = {"event": "cancel_terminal_observed", "phase": "pending_edit", "turn_id": completed["turn_id"],
+             "expected_turn_id": completed["turn_id"], "native_session_id": completed["native_session_id"],
+             "outcome": "Failed" if failed else "Cancelled", "turn_id_matches": True,
+             "interrupt_acknowledged": True, "turn_started": True,
+             "error_bytes": 15 if failed else 0,
+             "error_sha256": hashlib.sha256(b"PRIVATE_FAILURE").hexdigest() if failed else None}
+    event["approval_cancelled"] = True
+    return event
+
 class ApprovalCancelAuditTests(unittest.TestCase):
     output = "test result: ok. 1 passed; 0 failed; 0 ignored; 7400 filtered out"
 
     def assert_rejected(self, events):
         self.assertFalse(runner.verified_acceptance(0, self.output, events))
+
+
+    def test_aborted_tools_complete_evidence_is_accepted(self):
+        events = tools_events()
+        self.assertTrue(runner.verified_acceptance(0, self.output, events))
+
+    def test_aborted_tools_requires_each_native_signal_and_current_generation(self):
+        for fields in ({"request_subtype": "interrupt"}, {"response_subtype": "success"},
+                       {"state": "cancelled"}, {"type": "result", "terminal_reason": "aborted_tools"}):
+            with self.subTest(fields=fields):
+                events = tools_events()
+                row = native_of(events, **fields)
+                events[:] = [event for event in events if event.get("native") is not row]
+                resequence(events)
+                self.assertFalse(runner.verified_acceptance(0, self.output, events))
+        events = tools_events()
+        native_of(events, request_subtype="interrupt")["request_id"] = f"infinishell-{identity(99)}-7"
+        self.assertFalse(runner.verified_acceptance(0, self.output, events))
+
+    def test_aborted_tools_cannot_hide_api_error_rejected_ack_or_incomplete_input_identity(self):
+        for key, value in (("terminal_reason", "api_error"), ("terminal_reason", "unknown"),
+                           ("is_error", False), ("subtype", "success"), ("user_message_uuids", [])):
+            with self.subTest(key=key, value=value):
+                events = tools_events()
+                native_of(events, type="result", subtype="error_during_execution")[key] = value
+                self.assertFalse(runner.verified_acceptance(0, self.output, events))
+        events = tools_events()
+        native_of(events, response_subtype="success")["response_subtype"] = "error"
+        self.assertFalse(runner.verified_acceptance(0, self.output, events))
+
+    def test_optional_cancel_summary_is_backward_compatible_and_contains_no_body(self):
+        events = tools_events()
+        native_of(events, type="result")["cancel_diagnostics"] = cancel_summary()
+        self.assertTrue(runner.verified_acceptance(0, self.output, events))
+        self.assertNotIn("PRIVATE", json.dumps(events))
+
+    def test_cancel_summary_rejects_unknown_body_boolean_lengths_and_invalid_hashes(self):
+        for key, value in (("body", "PRIVATE_BODY_CANARY"), ("bytes", True), ("sha256", "PRIVATE_HASH_CANARY")):
+            with self.subTest(key=key):
+                events = tools_events()
+                summary = cancel_summary()
+                summary["terminal_reason"][key] = value
+                native_of(events, type="result")["cancel_diagnostics"] = summary
+                self.assertFalse(runner.verified_acceptance(0, self.output, events))
+        events = tools_events()
+        summary = cancel_summary()
+        summary["errors"]["count"] = True
+        native_of(events, type="result")["cancel_diagnostics"] = summary
+        self.assertFalse(runner.verified_acceptance(0, self.output, events))
+
+    def test_optional_terminal_observation_agrees_with_the_real_terminal(self):
+        events = tools_events()
+        events.insert(-1, terminal_observation(events))
+        self.assertTrue(runner.verified_acceptance(0, self.output, events))
+        events[-2]["turn_id_matches"] = False
+        self.assertFalse(runner.verified_acceptance(0, self.output, events))
+
+    def test_failed_terminal_observation_never_counts_as_cancelled(self):
+        events = tools_events()
+        events.insert(-1, terminal_observation(events, failed=True))
+        self.assertFalse(runner.verified_acceptance(0, self.output, events))
+        self.assertNotIn("PRIVATE_FAILURE", json.dumps(events))
+
+    def test_failed_terminal_and_unknown_reason_summary_survive_only_safe_projection(self):
+        events = tools_events()
+        result = native_of(events, type="result")
+        result["terminal_reason"] = "unknown"
+        summary = cancel_summary()
+        summary["terminal_reason"] = {"type": "string", "bytes": len(b"PRIVATE_REASON_CANARY"),
+                                      "sha256": hashlib.sha256(b"PRIVATE_REASON_CANARY").hexdigest()}
+        result["cancel_diagnostics"] = summary
+        events.insert(-1, terminal_observation(events, failed=True))
+        projected, safe = runner.project_events(events)
+        self.assertTrue(safe)
+        self.assertNotIn("PRIVATE_", json.dumps(projected))
+        self.assertFalse(runner.verified_acceptance(0, self.output, projected))
+        events[-2]["body"] = "PRIVATE_BODY_CANARY"
+        projected, safe = runner.project_events(events)
+        self.assertFalse(safe)
+        self.assertNotIn("PRIVATE_BODY_CANARY", json.dumps(projected))
 
     def test_complete_native_evidence_is_accepted_without_changing_production_rules(self):
         events = complete_events()

@@ -4326,16 +4326,28 @@ impl Workspace {
         });
     }
 
-    /// 新建默认终端标签页，然后执行指定 CLI agent 的启动命令。
+    /// 新建终端标签页并忽略默认 Agent 模式，然后执行指定 CLI agent 的启动命令。
     fn add_tab_with_specific_agent(&mut self, agent: CLIAgent, ctx: &mut ViewContext<Self>) {
-        self.add_terminal_tab(false, ctx);
+        let executable = CLIAgentInstallModel::as_ref(ctx)
+            .executable(agent)
+            .map(Path::to_path_buf);
+        self.add_new_session_tab_internal_with_default_session_mode_behavior(
+            NewSessionSource::Tab,
+            Some(ctx.window_id()),
+            None,
+            None,
+            false,
+            DefaultSessionModeBehavior::Ignore,
+            ctx,
+        );
         self.active_tab_pane_group().update(ctx, |pane_group, ctx| {
             if let Some(terminal_view) = pane_group.active_session_view(ctx) {
                 terminal_view.update(ctx, |view, ctx| {
-                    view.execute_command_or_set_pending(agent.command_prefix(), ctx);
+                    view.execute_specific_cli_agent_or_set_pending(agent, executable, ctx);
                 });
             }
         });
+        ctx.notify();
     }
 
     fn toggle_ai_assistant_panel(&mut self, ctx: &mut ViewContext<Self>) {

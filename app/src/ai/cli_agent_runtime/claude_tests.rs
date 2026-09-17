@@ -2047,3 +2047,302 @@ fn runtime_mode_notification_invalidates_observation_without_finishing_any_turn(
 
 #[path = "claude_image_tests.rs"]
 mod image_tests;
+
+// 固定实际二进制已核验该形态；这里是合成回归，不冒充历史协议捕获。
+fn aborted_tools_result(turn_id: Uuid) -> Value {
+    let mut result = aborted_result(turn_id);
+    result["terminal_reason"] = json!("aborted_tools");
+    result
+}
+
+fn tools_cancellation_frames() -> (ClaudeProtocol, Value, Value, Value) {
+    let (protocol, mut result, ack, cancelled) = joined_cancellation_frames();
+    result["terminal_reason"] = json!("aborted_tools");
+    (protocol, result, ack, cancelled)
+}
+
+#[test]
+fn tools_joined_cancellation_waits_for_result_ack_then_lifecycle() {
+    let (protocol, result, ack, cancelled) = tools_cancellation_frames();
+    assert_joined_cancellation_order(protocol, result, ack, cancelled);
+}
+
+#[test]
+fn tools_joined_cancellation_waits_for_result_lifecycle_then_ack() {
+    let (protocol, result, ack, cancelled) = tools_cancellation_frames();
+    assert_joined_cancellation_order(protocol, result, cancelled, ack);
+}
+
+#[test]
+fn tools_joined_cancellation_waits_for_ack_result_then_lifecycle() {
+    let (protocol, result, ack, cancelled) = tools_cancellation_frames();
+    assert_joined_cancellation_order(protocol, ack, result, cancelled);
+}
+
+#[test]
+fn tools_joined_cancellation_waits_for_ack_lifecycle_then_result() {
+    let (protocol, result, ack, cancelled) = tools_cancellation_frames();
+    assert_joined_cancellation_order(protocol, ack, cancelled, result);
+}
+
+#[test]
+fn tools_joined_cancellation_waits_for_lifecycle_result_then_ack() {
+    let (protocol, result, ack, cancelled) = tools_cancellation_frames();
+    assert_joined_cancellation_order(protocol, cancelled, result, ack);
+}
+
+#[test]
+fn tools_joined_cancellation_waits_for_lifecycle_ack_then_result() {
+    let (protocol, result, ack, cancelled) = tools_cancellation_frames();
+    assert_joined_cancellation_order(protocol, cancelled, ack, result);
+}
+
+#[test]
+fn tools_joined_cancellation_missing_execution_ack_fails_the_whole_batch() {
+    let (mut protocol, result, _, cancelled) = tools_cancellation_frames();
+    assert!(protocol.receive(result).unwrap().events.is_empty());
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+    assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+}
+
+#[test]
+fn tools_joined_cancellation_missing_execution_lifecycle_fails_the_whole_batch() {
+    let (mut protocol, result, ack, _) = tools_cancellation_frames();
+    protocol.receive(ack).unwrap();
+    assert!(protocol.receive(result).unwrap().events.is_empty());
+    assert!(
+        protocol
+            .receive(lifecycle(Uuid::from_u128(11), "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+}
+
+#[test]
+fn tools_joined_cancellation_missing_native_result_fails_the_whole_batch() {
+    let (mut protocol, _, ack, cancelled) = tools_cancellation_frames();
+    protocol.receive(ack).unwrap();
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+    assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+}
+
+#[test]
+fn tools_joined_cancellation_rejects_a_result_missing_a_batch_input() {
+    let (mut protocol, mut result, ack, cancelled) = tools_cancellation_frames();
+    result["user_message_uuid"] = json!(Uuid::from_u128(10));
+    result["user_message_uuids"] = json!([Uuid::from_u128(10)]);
+    assert!(
+        matches!(protocol.receive(result), Err(RuntimeError::Protocol(message))
+        if message.contains("complete joined input batch"))
+    );
+    protocol.receive(ack).unwrap();
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+    assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+}
+
+#[test]
+fn tools_joined_cancellation_rejected_interrupt_fails_the_whole_batch() {
+    let (mut protocol, result, ack, cancelled) = tools_cancellation_frames();
+    assert!(protocol.receive(result).unwrap().events.is_empty());
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+    let request_id = &ack["response"]["request_id"];
+    let error = json!({"type":"control_response","response":{
+        "subtype":"error","request_id":request_id,"error":"interrupt rejected"}});
+    let effects = protocol.receive(error.clone()).unwrap();
+    assert_joined_batch_failed(effects);
+    assert!(protocol.receive(error).unwrap().events.is_empty());
+}
+
+#[test]
+fn tools_joined_aborted_batch_without_an_interrupt_remains_failed() {
+    let (mut protocol, running) = running_protocol();
+    let joined = Uuid::from_u128(11);
+    protocol.command(submit(joined, "合并输入"));
+    protocol.receive(lifecycle(joined, "started")).unwrap();
+    let mut result = aborted_tools_result(running);
+    result["user_message_uuid"] = json!(joined);
+    result["user_message_uuids"] = json!([running, joined]);
+    assert_joined_batch_failed(protocol.receive(result).unwrap());
+    assert!(
+        protocol
+            .receive(lifecycle(running, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+}
+
+#[test]
+fn tools_joined_api_error_after_deferred_abort_prevents_batch_cancellation() {
+    let (mut protocol, result, ack, cancelled) = tools_cancellation_frames();
+    protocol.receive(ack).unwrap();
+    assert!(protocol.receive(result).unwrap().events.is_empty());
+    let effects = protocol
+        .receive(json!({"type":"assistant", "uuid":"joined-api-error",
+        "user_message_uuid":Uuid::from_u128(10), "is_api_error_message":true,
+        "message":{"content":[{"type":"text","text":"Not logged in"}]}}))
+        .unwrap();
+    assert_eq!(
+        finished_events(effects),
+        vec![
+            RuntimeEventKind::TurnFinished {
+                turn_id: Uuid::from_u128(11).to_string(),
+                outcome: TurnOutcome::Failed {
+                    message: "Not logged in".into()
+                },
+                output: "Not logged in".into(),
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: Uuid::from_u128(10).to_string(),
+                outcome: TurnOutcome::Failed {
+                    message: "Not logged in".into()
+                },
+                output: "Not logged in".into(),
+            },
+        ]
+    );
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+}
+
+#[test]
+fn tools_joined_cancellation_duplicate_and_old_callbacks_cannot_finish_a_new_execution() {
+    let (protocol, result, ack, cancelled) = tools_cancellation_frames();
+    let mut protocol =
+        assert_joined_cancellation_order(protocol, result.clone(), ack.clone(), cancelled.clone());
+    assert!(protocol.receive(result.clone()).unwrap().events.is_empty());
+    assert!(protocol.receive(ack).unwrap().events.is_empty());
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+    assert!(protocol.expire_cancellations().events.is_empty());
+
+    let next = Uuid::from_u128(13);
+    protocol.command(submit(next, "新的执行"));
+    protocol.receive(lifecycle(next, "started")).unwrap();
+    let mut old_result = result;
+    old_result["uuid"] = json!(Uuid::new_v4());
+    assert!(protocol.receive(old_result).unwrap().events.is_empty());
+    assert!(
+        protocol
+            .receive(lifecycle(Uuid::from_u128(11), "started"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert!(
+        protocol
+            .receive(lifecycle(Uuid::from_u128(10), "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert_eq!(protocol.active_turn, Some(next));
+    assert!(protocol.turn_is_running(next));
+}
+
+#[test]
+fn tools_api_error_overrides_cancelled_lifecycle_before_aborted_tools_result() {
+    let (mut protocol, turn_id) = running_protocol();
+    let request = interrupt(&mut protocol, turn_id);
+    protocol
+        .receive(control_response(
+            request["request_id"].as_str().unwrap(),
+            json!({}),
+        ))
+        .unwrap();
+    assert!(
+        protocol
+            .receive(lifecycle(turn_id, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    protocol.receive(json!({"type":"assistant", "uuid":"api-error-before-abort", "user_message_uuid":turn_id.to_string(),
+        "is_api_error_message":true, "message":{"content":[{"type":"text","text":"Not logged in"}]}})).unwrap();
+    let effects = protocol.receive(aborted_tools_result(turn_id)).unwrap();
+    assert!(
+        matches!(effects.events.as_slice(), [RuntimeEventKind::TurnFinished { outcome: TurnOutcome::Failed { message }, .. }] if message == "Not logged in")
+    );
+}
+
+#[test]
+fn tools_cancellation_old_generation_ack_cannot_confirm_current_execution() {
+    let (mut protocol, result, mut ack, cancelled) = tools_cancellation_frames();
+    ack["response"]["request_id"] = json!(format!("infinishell-{}-3", Uuid::from_u128(99)));
+    assert!(finished_events(protocol.receive(result).unwrap()).is_empty());
+    assert!(finished_events(protocol.receive(ack).unwrap()).is_empty());
+    assert!(finished_events(protocol.receive(cancelled).unwrap()).is_empty());
+    assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+}
+
+#[test]
+fn tools_cancellation_unknown_error_reason_remains_failed() {
+    let (mut protocol, mut result, ack, cancelled) = tools_cancellation_frames();
+    result["terminal_reason"] = json!("unknown_native_error");
+    protocol.receive(ack).unwrap();
+    protocol.receive(cancelled).unwrap();
+    assert_joined_batch_failed(protocol.receive(result).unwrap());
+}
+
+#[test]
+fn tools_cancellation_rejects_an_error_result_with_a_success_subtype() {
+    let (mut protocol, mut result, ack, cancelled) = tools_cancellation_frames();
+    result["subtype"] = json!("success");
+    protocol.receive(ack).unwrap();
+    protocol.receive(cancelled).unwrap();
+    assert_joined_batch_failed(protocol.receive(result).unwrap());
+}
+
+#[test]
+fn live_cancel_diagnostics_keep_unknown_reason_and_errors_without_body() {
+    let (mut protocol, _) = running_protocol();
+    let records = Arc::new(Mutex::new(Vec::new()));
+    protocol.native_ids_for_live = Some(records.clone());
+    let reason = "私密取消原因_CANARY";
+    let errors = json!(["私密错误_CANARY", {"private":"私密字段_CANARY"}]);
+    let frame = json!({"type":"result","terminal_reason":reason,"errors":errors});
+    record_live_native_ids(&protocol, &frame, "stdout").unwrap();
+    let records = records.lock().unwrap();
+    let summary = &records[0]["cancel_diagnostics"];
+    assert_eq!(records[0]["terminal_reason"], "unknown");
+    assert_eq!(summary["terminal_reason"]["type"], "string");
+    assert_eq!(summary["terminal_reason"]["bytes"], reason.len());
+    assert_eq!(
+        summary["terminal_reason"]["sha256"],
+        format!("{:x}", Sha256::digest(reason.as_bytes()))
+    );
+    assert_eq!(summary["errors"]["type"], "array");
+    assert_eq!(summary["errors"]["count"], 2);
+    assert_eq!(
+        summary["errors"]["sha256"],
+        format!("{:x}", Sha256::digest(errors.to_string().as_bytes()))
+    );
+    assert!(!records[0].to_string().contains("CANARY"));
+    assert!(
+        live_native_protocol_ids(&frame)
+            .get("cancel_diagnostics")
+            .is_none()
+    );
+}
+
+#[test]
+fn live_cancel_diagnostics_distinguish_missing_null_and_non_string_values() {
+    let missing = live_native_cancel_diagnostics(&json!({"type":"result"}));
+    assert_eq!(
+        missing["terminal_reason"],
+        json!({"type":"missing","bytes":0,"sha256":null})
+    );
+    assert_eq!(missing["errors"]["count"], 0);
+    let shaped = live_native_cancel_diagnostics(
+        &json!({"type":"result","terminal_reason":null,"errors":false}),
+    );
+    assert_eq!(shaped["terminal_reason"]["type"], "null");
+    assert_eq!(shaped["terminal_reason"]["bytes"], 4);
+    assert_eq!(shaped["errors"]["type"], "boolean");
+    assert_eq!(shaped["errors"]["bytes"], 5);
+    assert_eq!(shaped["errors"]["count"], 0);
+    assert_eq!(
+        live_native_protocol_ids(&json!({"terminal_reason":"aborted_tools"}))["terminal_reason"],
+        "aborted_tools"
+    );
+}

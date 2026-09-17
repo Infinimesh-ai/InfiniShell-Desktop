@@ -10,6 +10,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Result;
 use async_channel::Sender;
@@ -851,6 +852,8 @@ pub struct SessionInfo {
     pub abbreviations: HashMap<SmolStr, String>,
     // A Vec is sufficient here because function_names are guaranteed to be unique.
     pub function_names: HashSet<SmolStr>,
+    /// 仅当前 bootstrap 明确提供 alias 和 function 两份快照时为真。
+    pub command_snapshot_complete: bool,
     pub builtins: HashSet<SmolStr>,
     pub keywords: Vec<SmolStr>,
     pub is_ssh_wrapper_session: IsSSHWrapperSession,
@@ -943,6 +946,7 @@ impl SessionInfo {
             aliases: Default::default(),
             abbreviations: Default::default(),
             function_names: Default::default(),
+            command_snapshot_complete: false,
             builtins: Default::default(),
             keywords: Default::default(),
             host_info: Default::default(),
@@ -991,6 +995,8 @@ impl SessionInfo {
     /// This should be called on the pending `SessionInfo` after the session is bootstrapped and
     /// used to create the canonical `Session` object for the newly bootstrapped session.
     pub fn merge_from_bootstrapped_value(mut self, bootstrapped_value: BootstrappedValue) -> Self {
+        let command_snapshot_complete =
+            bootstrapped_value.aliases.is_some() && bootstrapped_value.function_names.is_some();
         // Determine the value from the bootstrap message, falling back to the cached shell type
         // (from the `InitShell` payload) if unable to parse.
         let shell_type = match ShellType::from_name(bootstrapped_value.shell.as_str()) {
@@ -1069,6 +1075,7 @@ impl SessionInfo {
             aliases: aliases.unwrap_or_default(),
             abbreviations: abbreviations.unwrap_or_default(),
             function_names: function_names.unwrap_or_default(),
+            command_snapshot_complete,
             builtins: builtins.unwrap_or_default(),
             keywords: keywords.unwrap_or_default(),
             home_dir,
@@ -1179,6 +1186,8 @@ pub struct Session {
     /// The command executor for this session. Behind a `RwLock` so it can be
     /// swapped after a remote server reconnect (via `set_command_executor`).
     command_executor: RwLock<Arc<dyn CommandExecutor>>,
+    /// 连接或执行器切换后旧命令快照不能继续作为未命中的依据。
+    command_snapshot_complete: AtomicBool,
     load_external_commands_future: OnceCell<Shared<BoxFuture<'static, ()>>>,
     load_all_function_names_future: OnceCell<Shared<BoxFuture<'static, ()>>>,
     load_all_builtins_future: OnceCell<Shared<BoxFuture<'static, ()>>>,
@@ -1203,6 +1212,7 @@ impl Session {
             .unwrap_or_else(|| OperatingSystem::get().into());
 
         let session_type = SessionType::from(session_info.session_type.clone());
+        let command_snapshot_complete = AtomicBool::new(session_info.command_snapshot_complete);
         Self {
             info: session_info,
             created_at: Local::now(),
@@ -1210,6 +1220,7 @@ impl Session {
             additional_function_names: OnceCell::new(),
             additional_builtin_names: OnceCell::new(),
             command_executor: RwLock::new(command_executor),
+            command_snapshot_complete,
             load_external_commands_future: Default::default(),
             load_all_function_names_future: Default::default(),
             load_all_builtins_future: Default::default(),
@@ -1242,6 +1253,8 @@ impl Session {
     /// Updates the `host_id` on a `WarpifiedRemote` session type after the
     /// remote server handshake completes (or clears it on disconnect).
     pub fn set_remote_host_id(&self, host_id: Option<warp_core::HostId>) {
+        self.command_snapshot_complete
+            .store(false, Ordering::Relaxed);
         let mut st = self.session_type.lock();
         if let SessionType::WarpifiedRemote { host_id: ref mut h } = *st {
             *h = host_id;
@@ -1347,6 +1360,10 @@ impl Session {
             .map(Deref::deref)
     }
 
+    pub(crate) fn command_snapshot_complete(&self) -> bool {
+        self.command_snapshot_complete.load(Ordering::Relaxed)
+    }
+
     pub fn executable_names(&self) -> impl Iterator<Item = &str> {
         self.external_commands
             .get()
@@ -1387,6 +1404,8 @@ impl Session {
     /// server reconnect to swap in a new `RemoteServerCommandExecutor`
     /// backed by the reconnected client.
     pub fn set_command_executor(&self, executor: Arc<dyn CommandExecutor>) {
+        self.command_snapshot_complete
+            .store(false, Ordering::Relaxed);
         *self.command_executor.write() = executor;
     }
 
@@ -2002,6 +2021,7 @@ pub mod testing {
                 aliases: HashMap::new(),
                 abbreviations: HashMap::new(),
                 function_names: HashSet::new(),
+                command_snapshot_complete: false,
                 builtins: HashSet::new(),
                 keywords: Vec::new(),
                 is_ssh_wrapper_session: IsSSHWrapperSession::No,
@@ -2133,6 +2153,7 @@ pub mod testing {
                 created_at: Local::now(),
                 external_commands: Default::default(),
                 command_executor: RwLock::new(Arc::new(TestCommandExecutor::default())),
+                command_snapshot_complete: AtomicBool::new(false),
                 load_external_commands_future: Default::default(),
                 command_case_sensitivity: TopLevelCommandCaseSensitivity::CaseSensitive,
                 session_type: Mutex::new(session_type),
@@ -2153,6 +2174,7 @@ pub mod testing {
                 created_at: Local::now(),
                 external_commands: Default::default(),
                 command_executor: RwLock::new(Arc::new(TestCommandExecutor::default())),
+                command_snapshot_complete: AtomicBool::new(false),
                 load_external_commands_future: Default::default(),
                 command_case_sensitivity: TopLevelCommandCaseSensitivity::CaseSensitive,
                 session_type: Mutex::new(session_type),

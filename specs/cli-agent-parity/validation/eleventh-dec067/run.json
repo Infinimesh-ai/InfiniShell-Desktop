@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "archived_at_utc": "2026-09-17 17:37:26 UTC",
+  "说明": "CI11最终状态的GitHub API白名单投影；未归档环境、认证或模型内容。",
+  "repository": "Infinimesh-ai/InfiniShell-Desktop",
+  "fixed_commit": "dec067d2d53fb65f11b37b66a72fa9e11e82cf04",
+  "commit_matches": true,
+  "full": false,
+  "full_configuration_provenance": "根代理实际workflow_dispatch记录；本次run/jobs API不返回inputs。完整workspace与GUI集成门禁的实际skipped状态另见jobs.json。",
+  "api_endpoint": "repos/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35248824124",
+  "github_api": {
+    "conclusion": "failure",
+    "created_at": "2026-09-17T16:48:11Z",
+    "event": "workflow_dispatch",
+    "head_branch": "codex/cli-agent-parity",
+    "head_sha": "dec067d2d53fb65f11b37b66a72fa9e11e82cf04",
+    "html_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35248824124",
+    "id": 35248824124,
+    "name": "Cross-platform preflight",
+    "run_attempt": 1,
+    "run_started_at": "2026-09-17T16:48:11Z",
+    "status": "completed",
+    "updated_at": "2026-09-17T17:25:45Z",
+    "workflow_id": 334053434
+  },
+  "overall_acceptance_passed": false,
+  "修复后平台验证": "未执行；CI11仍为失败。",
+  "goal_complete": false
+}

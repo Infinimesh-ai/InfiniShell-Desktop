@@ -37,6 +37,8 @@ use crate::ai::blocklist::CLAUDE_ORANGE;
 use crate::code::editor::line::EditorLineLocation;
 use crate::code_review::comments::AttachedReviewCommentTarget;
 use crate::server::telemetry::CLIAgentType;
+use crate::terminal::model::session::command_executor::shell_quote_arg;
+use crate::terminal::shell::ShellType;
 use crate::ui_components::icons::Icon;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
@@ -976,6 +978,53 @@ pub enum CLIAgentInstallEvent {
 pub struct CLIAgentInstallation {
     pub executable: Option<PathBuf>,
     pub version: CLIAgentVersionStatus,
+}
+
+/// 仅使用当前终端的完整命令快照；安装扫描本身不能证明 shell 找不到命令。
+pub(crate) struct CLIAgentLaunchSnapshot<'a> {
+    pub host_namespace_verified: bool,
+    pub command_snapshot_complete: bool,
+    pub shell_type: ShellType,
+    pub path: Option<&'a str>,
+    pub cwd: Option<&'a Path>,
+    pub command_known: bool,
+}
+
+/// 在可靠的本地主 shell 中保留 alias/function/PATH 优先级，再考虑已安装路径。
+pub(crate) fn cli_agent_launch_fallback(
+    agent: CLIAgent,
+    discovered: Option<&Path>,
+    snapshot: CLIAgentLaunchSnapshot<'_>,
+    is_executable: impl Fn(&Path) -> bool,
+) -> Option<String> {
+    if !matches!(agent, CLIAgent::Claude | CLIAgent::Codex | CLIAgent::Grok)
+        || !snapshot.host_namespace_verified
+        || !snapshot.command_snapshot_complete
+        || snapshot.command_known
+        // Fish 的现有 PATH 快照可能把数组用空格连接；PowerShell 缺少完整命令快照。
+        || !matches!(snapshot.shell_type, ShellType::Bash | ShellType::Zsh)
+    {
+        return None;
+    }
+    let path = snapshot.path?;
+    for directory in std::env::split_paths(path) {
+        let directory = if directory.is_absolute() {
+            directory
+        } else {
+            let cwd = snapshot.cwd.filter(|cwd| cwd.is_absolute())?;
+            cwd.join(directory)
+        };
+        if is_executable(&directory.join(agent.command_prefix())) {
+            return None;
+        }
+    }
+    let discovered = discovered.filter(|path| path.is_absolute())?;
+    // 不将另一个 CLI 的安装路径错误套用到当前启动意图。
+    let basename = discovered.file_name()?.to_str()?;
+    if !agent.command_prefixes().contains(&basename) || !is_executable(discovered) {
+        return None;
+    }
+    Some(shell_quote_arg(discovered.to_str()?, snapshot.shell_type))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
