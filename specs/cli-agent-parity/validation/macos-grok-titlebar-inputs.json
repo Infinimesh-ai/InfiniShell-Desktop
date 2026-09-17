@@ -1,0 +1,13 @@
+{
+  "base_commit": "e4738e1ea96ea727c15d51e2c31dbf34152814b6",
+  "files": [
+    {
+      "path": "app/src/settings/ai.rs",
+      "sha256": "a5d74320c8fa184e3e3cc550f263f51f1d0e188260f21d066640eb6c3bfdfcf5"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+      "sha256": "9a782d98b367c0dca0998f430df30f70d8d694780787f02ea2af7801a61b5ee7"
+    }
+  ]
+}

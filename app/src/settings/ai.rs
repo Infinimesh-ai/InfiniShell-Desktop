@@ -1733,11 +1733,15 @@ fn default_true_bool() -> bool {
 }
 
 impl PerAgentSettings {
-    /// 返回指定 agent 的默认值。titlebar 对 Claude/Codex/Gemini/Antigravity 默认开启。
+    /// 返回指定 agent 的默认值。titlebar 对 Claude/Codex/Grok/Gemini/Antigravity 默认开启。
     pub fn default_for(agent: CLIAgent) -> Self {
         let titlebar = matches!(
             agent,
-            CLIAgent::Claude | CLIAgent::Codex | CLIAgent::Gemini | CLIAgent::Antigravity
+            CLIAgent::Claude
+                | CLIAgent::Codex
+                | CLIAgent::Grok
+                | CLIAgent::Gemini
+                | CLIAgent::Antigravity
         );
         Self {
             toolbar: true,

@@ -1,0 +1,20 @@
+{
+  "source_commit": "e4738e1ea96ea727c15d51e2c31dbf34152814b6",
+  "worktree_clean_before": true,
+  "argv": [
+    "./script/run",
+    "--dont-open",
+    "--features",
+    "local_cli_managed_tasks"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 225.768,
+  "log": "/tmp/infinishell-cli-parity-e4738e1ea-bundle.log",
+  "log_sha256": "00a3924de82fce75bd2cd3d34d6528949cfc87fc40ec1a097784a4d4b060ac99",
+  "worktree_clean_after": true,
+  "scope": "干净提交的GUI构建与签名；未运行GUI或原生生命周期。",
+  "worker": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "sha256": "2181ff4965056a5c9c408c2fcc6b0b7269db4ba16ed6fcf86ce51a4b55f31a9f"
+  }
+}

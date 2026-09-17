@@ -122,6 +122,7 @@ class NativeCompletionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             native_probe.binary_query_candidate(candidate)
 
+    @unittest.skipUnless(os.name == 'nt', '原生 jq 文本与二进制模式边界仅在 Windows 验证')
     def test_native_jq_binary_boundary_preserves_original_lf_crlf_and_literal_escapes(self):
         evidence = native_probe.verify_jq_newline_boundary(os.environ.copy())
         self.assertEqual([case['input_line_ending'] for case in evidence['cases']], ['LF', 'CRLF'])
