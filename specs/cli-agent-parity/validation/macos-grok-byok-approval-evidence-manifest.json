@@ -1,0 +1,58 @@
+{
+  "created_at_utc": "2026-09-17T05:20:26.161851+00:00",
+  "public_source_snapshot": "482711333c7195dc16a272777f86086d615e2afb",
+  "binary_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "source_is_exact_binary_build": false,
+  "total_messages_requests": 11,
+  "files": [
+    {
+      "name": "REPORT.md",
+      "bytes": 4246,
+      "sha256": "0cd69e9eb558820c4568f9c08d764b61102879e6dd803ae30dd4e49945677e66"
+    },
+    {
+      "name": "crates__codegen__xai-grok-pager__src__app__acp_handler__permissions.rs",
+      "bytes": 16499,
+      "sha256": "78c0d5f4186a3a9843669503184e6c2938e075a191472da73f47c2c875756a5f",
+      "source_url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-pager/src/app/acp_handler/permissions.rs"
+    },
+    {
+      "name": "crates__codegen__xai-grok-tools__src__implementations__opencode__write__mod.rs",
+      "bytes": 18553,
+      "sha256": "eb23595ca1aac72774958297c885c064c27bba6b8ffd7e165b944062e58f4c80",
+      "source_url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-tools/src/implementations/opencode/write/mod.rs"
+    },
+    {
+      "name": "crates__codegen__xai-grok-workspace__src__permission__prompter.rs",
+      "bytes": 96577,
+      "sha256": "6d1ce216c02121260f845159af06d1486219374201beb6ab103677e218cac94b",
+      "source_url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-workspace/src/permission/prompter.rs"
+    },
+    {
+      "name": "native-approval-2.json",
+      "bytes": 156892,
+      "sha256": "3cb45c90eb2d3e27480c1bee698a14872810cfec55a1bb0d5ce1a24364831b53"
+    },
+    {
+      "name": "native-approval-2.py",
+      "bytes": 23464,
+      "sha256": "8d3d7ae1f5ec651f0c7dd926ad8b84a46d9a92fa3b6fa377b39686b20db56be4"
+    },
+    {
+      "name": "native-approval-fixtures.json",
+      "bytes": 20028,
+      "sha256": "08fdd9d027a8a341a529f6c4e72340c4f54d7d0e26d64e8332fcf1640f92c96a"
+    },
+    {
+      "name": "native-approval.json",
+      "bytes": 150048,
+      "sha256": "ddc70dbb8bdfd1ba429fe07f494607e0a3592ec4d7c7165a149d63ad9513407b"
+    },
+    {
+      "name": "native-approval.py",
+      "bytes": 22872,
+      "sha256": "d175de6e13ff342f6faba271657c2712a14ab22a6b5739c8f3f9262e73060e50"
+    }
+  ],
+  "secret_and_origin_scan": "passed"
+}

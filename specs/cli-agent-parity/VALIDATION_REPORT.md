@@ -4,6 +4,9 @@
 
 ## 当前提交验证
 
+- `494569582` 的干净 macOS check、国际化 11 项及相关模块 987 项通过；[第八轮](EIGHTH_PLATFORM_RUN_494569582.md)已结束，Linux 所选门禁通过；Windows check 和 Rust 定向门禁通过，插件缓存清理、ConPTY hook 完成、缺失会话退出码断言三项未通过。
+- [Claude API 生产适配器](CLAUDE_API_ADAPTER_VERIFICATION.md)旧快照取消失败已保留。修复后的19文件冻结输入通过 check、i18n 11 项及相关模块 1001 项；真实两轮、允许/拒绝、运行中排队、取消与按原 ID 新进程恢复回收标记全部通过。此中间快照不计 GUI、父子任务或最终同提交通过。
+
 - 后续 Claude 同连接权限观测已在冻结源码通过 check、国际化 11 项及相关模块 987 项；[源摘要与门禁](validation/macos-claude-permission-observation-gates-1.json)保留 dirty 快照身份。错误/超时不阻断普通 Inherit 聊天，投影和原生执行规则不一致时拒绝作为派发依据；仍未开放 Claude 父任务派发，真实模型与原生 Rust 运行待验。
 - [固定 Codex 完整运行包](CODEX_FIXED_RUNTIME_PREPARATION.md)已补齐。Linux x64、Windows x64/ARM64 的真实官方包均已在本机完成全树提取及复核，13 项离线回归通过；[记录](validation/macos-codex-complete-packages-1.json)不计异平台程序执行或真实工具通过。
 
@@ -110,12 +113,12 @@ Grok 1.0.30 的真实 Rust 生产入口已通过安装、同版本损坏修复�
 
 | 验收路径 | Codex | Claude | Grok |
 | --- | --- | --- | --- |
-| 新建、两轮与结果 | macOS GUI 已通过中间包 | 缺测试登录 | 额度耗尽 |
-| 允许/拒绝审批 | macOS GUI 已验证允许文件存在、拒绝文件不存在 | 缺测试登录 | 真实权限协议未通过 |
-| 运行中追加并验证模型应用 | macOS GUI 原生 Steer 接收与父→运行中子任务实际采用追加内容通过 | 缺测试登录 | 额度耗尽 |
-| 取消真实当前回合 | macOS GUI 取消运行中的真实 sleep 回合，记录 cancelled；下一轮可完成 | 缺测试登录 | 运行中取消未通过 |
-| 继续、应用重启、历史恢复 | macOS bundle4/5 GUI 已验证完成历史及活动任务正常退出后的同原生 ID 继续，未重复执行；资源域实现的真实 Codex 崩溃清理独立通过，最终同提交整链待验 | 缺测试登录 | 仅空历史已有实证 |
-| 父子消息 ACK 与结果回收 | macOS GUI 生产协调器派发、子→父进度、父→运行中子追加、双向原生接收确认、结果回执与父查询回收通过；对应隔离 bundle4，中间证据见 `validation/macos-gui-parent-child-and-resume.json` | 无模型登录，真实父任务派发的权限上限尚不能证明，未通过 | 尚未开放执行 |
+| 新建、两轮与结果 | macOS GUI 已通过中间包 | API 生产适配器通过；GUI 待验 | 自定义 Claude 后端原生通过；产品与官方模型待验 |
+| 允许/拒绝审批 | macOS GUI 已验证允许文件存在、拒绝文件不存在 | API 生产适配器及文件效果通过；GUI 待验 | 原生单次允许/拒绝及文件效果通过；产品待验 |
+| 运行中追加并验证模型应用 | macOS GUI 原生 Steer 接收与父→运行中子任务实际采用追加内容通过 | API 生产适配器排队下一轮、接收确认与标记回收通过；同回合 steer 不支持 | 尚未验证 |
+| 取消真实当前回合 | macOS GUI 取消运行中的真实 sleep 回合，记录 cancelled；下一轮可完成 | 生产适配器完整证据聚合后 Cancelled；GUI 待验 | 原生真实输出后 cancelled/MidTurnAbort；产品待验 |
+| 继续、应用重启、历史恢复 | macOS bundle4/5 GUI 已验证完成历史及活动任务正常退出后的同原生 ID 继续，未重复执行；资源域实现的真实 Codex 崩溃清理独立通过，最终同提交整链待验 | 生产适配器原 ID 新进程恢复标记通过；应用重启与 GUI 待验 | 原生原 ID 新进程 load 模型历史通过；产品与 session/resume 待验 |
+| 父子消息 ACK 与结果回收 | macOS GUI 生产协调器派发、子→父进度、父→运行中子追加、双向原生接收确认、结果回执与父查询回收通过；对应隔离 bundle4，中间证据见 `validation/macos-gui-parent-child-and-resume.json` | API 鉴权可用；真实父任务派发的权限上限尚不能证明，未通过 | 尚未开放执行 |
 | 插件缺失/禁用/不兼容/失败恢复 | 原生隔离注册表生命周期部分通过；build16 两项事务失败已修，build17 回归通过；bundle7 GUI 持久来源及原生授权经重启保持，bundle8 已确认当前 GUI 富通知，完整负向组合与最终同提交 GUI 仍未通过 | 固定版本同版本保持及禁用、生产升级与暂存失败/父进程强杀后重试已有实证；完整故障组合与最终同提交平台验收仍待完成 | 真实生产安装、同版本修复、禁用拒绝、文件事务回滚及恢复已通过；其他平台和完整故障组合待验 |
 | 崩溃、重复/旧事件、消息重投 | build15 旧 listener 的真实 dispatcher 回归通过；旧进程组清理失败保留，资源域实现的真实运行工具崩溃与空闲崩溃清理通过；跨进程 Sent/结果重投故障注入通过；最终同提交待验 | 共享状态回归通过，不替代原生模型进程崩溃验收 | 共享状态回归通过，不替代 ACP 执行验收 |
 
@@ -146,3 +149,5 @@ Codex 0.147.0 默认 shell_snapshot 在包含引号与命令替换字符的 CODE
 `37b0bc73288aab5be4d0d151796eea557be4c0fb`：Linux 所选门禁成功，Windows 失败；完整计数、失败定位及跳过项见 [第七轮报告](SEVENTH_PLATFORM_RUN_37B0BC732.md)。同提交 macOS 完整 Codex 官方包已通过真实生命周期、本地工具恢复和图片三项验证，见 [原生适配器报告](CODEX_COMPLETE_RUNTIME_NATIVE_VERIFICATION.md)；它不替代 GUI 应用重启或最终三平台验收。
 
 Claude API 鉴权补充：固定 2.1.273 / `claude-sonnet-4-6` 原生 print 请求在 2.607 秒返回 success 与精确标记，见 [脱敏报告](validation/macos-claude-api-smoke-1.json)。未启用工具，未运行托管适配器或 GUI，不计完整生命周期通过。
+
+第九轮候选 20 文件冻结输入已通过 `cargo check -p warp`（58.327s）、i18n 11 项（143.857s，含编译）与相关模块 1002 项（16.131s）；Python 57 项通过、5 项 Windows 专用用例在 macOS 跳过。[门禁](validation/macos-ninth-candidate-gates.json)与[输入](validation/macos-ninth-candidate-inputs.json)绑定摘要。主工作区误启动的一次 check 已主动撤下，不计门禁；这些有效门禁均在隔离验证树执行。下一提交需按同 SHA 进行平台验证。

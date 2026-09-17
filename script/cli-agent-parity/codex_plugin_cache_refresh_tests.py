@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import stat
 import subprocess
 import sys
 import tempfile
@@ -167,6 +168,137 @@ class CacheRefreshCleanupTests(unittest.TestCase):
                 probe.run_and_cleanup(Path('codex'), Path('private'), report)
         self.assertFalse(report['private_directory_removed'])
         self.assertEqual(report['cleanup_failure']['type'], 'PermissionError')
+
+    def test_readonly_cleanup_requires_complete_job_and_eof_evidence(self):
+        complete = {'assigned_before_resume': True, 'cleanup_confirmed': True,
+                    'job_active_after_cleanup': 0, 'readers_eof': True, 'reader_errors': [],
+                    'root_exited_naturally': True, 'root_exit_code': 0}
+        self.assertTrue(probe.windows_cleanup_proven({'app_server_traces': [{'process_cleanup': complete}]}))
+        self.assertFalse(probe.windows_cleanup_proven({}))
+        for key, value in (('assigned_before_resume', False), ('cleanup_confirmed', False),
+                           ('job_active_after_cleanup', 1), ('job_active_after_cleanup', False),
+                           ('readers_eof', False), ('reader_errors', ['failure']),
+                           ('root_exited_naturally', False), ('root_exit_code', 1)):
+            with self.subTest(key=key, value=value):
+                self.assertFalse(probe.windows_cleanup_proven({'app_server_traces': [
+                    {'process_cleanup': complete}, {'process_cleanup': complete | {key: value}}]}))
+        for key in ('close_failure', 'job_close_failure', 'stream_close_failures'):
+            trace = {'process_cleanup': complete.copy()}
+            if key == 'close_failure':
+                trace[key] = {'type': 'OSError'}
+            else:
+                trace['process_cleanup'][key] = {'type': 'OSError'}
+            with self.subTest(key=key):
+                self.assertFalse(probe.windows_cleanup_proven({'app_server_traces': [trace]}))
+
+    def test_cleanup_diagnostics_preserve_original_error_when_inspection_fails(self):
+        report = {}
+        original = PermissionError('original removal failure')
+        handler = probe.cleanup_error_handler(Path('private'), None, report)
+        with patch.object(Path, 'lstat', side_effect=FileNotFoundError('concurrent removal')):
+            with self.assertRaises(PermissionError) as raised:
+                handler(os.unlink, 'private/file', (PermissionError, original, None))
+        self.assertIs(raised.exception, original)
+        diagnostic = report['directory_cleanup_errors'][0]
+        self.assertEqual(diagnostic['original_error']['message'], 'original removal failure')
+        self.assertEqual(diagnostic['retry_rejected']['type'], 'FileNotFoundError')
+        self.assertFalse(diagnostic['readonly_retry_attempted'])
+
+    def windows_empty_job_report(self, directory):
+        trace = {}
+        env = {key: value for key, value in os.environ.items()
+               if key.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TMP', 'TEMP')}
+        recorder = probe.CacheRefreshRecorder([sys.executable, '-c', 'import sys;sys.stdin.read()'],
+                                              env, directory, [], trace)
+        recorder.close()
+        self.assertTrue(probe.windows_cleanup_proven({'app_server_traces': [{'process_cleanup': trace}]}))
+        return {'app_server_traces': [{'process_cleanup': trace}]}
+
+    @unittest.skipUnless(os.name == 'nt', '需要真实 Windows 只读属性和 Job 清理证据')
+    def test_windows_readonly_file_is_removed_after_real_job_and_eof_cleanup(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary).resolve() / 'private'
+            directory.mkdir()
+            target = directory / 'tmp_pack_fixture'
+            target.write_bytes(b'private git pack')
+            os.chmod(target, stat.S_IREAD)
+            self.assertTrue(target.stat().st_file_attributes & 1)
+            report = self.windows_empty_job_report(directory)
+            with patch.object(probe, 'run'):
+                probe.run_and_cleanup(Path('codex'), directory, report)
+            self.assertFalse(directory.exists())
+            self.assertTrue(report['private_directory_removed'])
+            self.assertEqual(len(report['directory_cleanup_errors']), 1)
+            diagnostic = report['directory_cleanup_errors'][0]
+            self.assertEqual(diagnostic['original_error']['winerror'], 5)
+            self.assertTrue(diagnostic['file_attributes'] & 1)
+            self.assertTrue(diagnostic['readonly_retry_attempted'])
+            self.assertTrue(diagnostic['readonly_retry_succeeded'])
+
+    @unittest.skipUnless(os.name == 'nt', '需要真实 Windows 文件占用错误')
+    def test_windows_nonreadonly_sharing_error_is_not_retried_or_suppressed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary).resolve() / 'private'
+            directory.mkdir()
+            target = directory / 'locked-pack'
+            report = self.windows_empty_job_report(directory)
+            with target.open('wb') as handle:
+                handle.write(b'held by the test, outside the finished Job')
+                handle.flush()
+                self.assertFalse(target.stat().st_file_attributes & 1)
+                with patch.object(probe, 'run'):
+                    with self.assertRaises(PermissionError):
+                        probe.run_and_cleanup(Path('codex'), directory, report)
+            self.assertTrue(target.exists())
+            self.assertFalse(report['private_directory_removed'])
+            diagnostic = report['directory_cleanup_errors'][0]
+            self.assertFalse(diagnostic['readonly_retry_attempted'])
+            self.assertFalse(diagnostic['file_attributes'] & 1)
+            self.assertEqual(report['cleanup_failure']['winerror'], diagnostic['original_error']['winerror'])
+
+    @unittest.skipUnless(os.name == 'nt', '需要真实 Windows 文件属性')
+    def test_windows_nonreadonly_access_denied_keeps_original_error_and_file(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary).resolve()
+            target = directory / 'ordinary-file'
+            target.write_bytes(b'preserved')
+            report = self.windows_empty_job_report(directory)
+            original = PermissionError(13, 'injected access denied', str(target))
+            original.winerror = 5
+            handler = probe.cleanup_error_handler(directory, probe.file_identity(directory.lstat()), report)
+            with self.assertRaises(PermissionError) as raised:
+                handler(os.unlink, str(target), (PermissionError, original, None))
+            self.assertIs(raised.exception, original)
+            self.assertEqual(target.read_bytes(), b'preserved')
+            self.assertFalse(report['directory_cleanup_errors'][0]['readonly_retry_attempted'])
+
+    @unittest.skipUnless(os.name == 'nt', '需要真实 Windows 只读属性与文件占用错误')
+    def test_windows_readonly_retry_failure_restores_attribute_and_preserves_first_error(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary).resolve() / 'private'
+            directory.mkdir()
+            target = directory / 'locked-readonly-pack'
+            report = self.windows_empty_job_report(directory)
+            with target.open('wb') as handle:
+                handle.write(b'preserved')
+                handle.flush()
+                os.chmod(target, stat.S_IREAD)
+                original = PermissionError(13, 'injected initial readonly denial', str(target))
+                original.winerror = 5
+                handler = probe.cleanup_error_handler(directory, probe.file_identity(directory.lstat()), report)
+                # 固定第一次错误次序；重试执行真实 unlink，当前测试持有的句柄必须阻止删除。
+                with patch.object(probe.os, 'unlink', wraps=os.unlink) as unlink:
+                    with self.assertRaises(PermissionError) as raised:
+                        handler(unlink, str(target), (PermissionError, original, None))
+                    unlink.assert_called_once_with(target)
+                self.assertIs(raised.exception, original)
+            self.assertTrue(target.stat().st_file_attributes & 1)
+            diagnostic = report['directory_cleanup_errors'][0]
+            self.assertTrue(diagnostic['readonly_retry_attempted'])
+            self.assertFalse(diagnostic['readonly_retry_succeeded'])
+            self.assertTrue(diagnostic['original_readonly_restored'])
+            self.assertIn('retry_failure', diagnostic)
+            os.chmod(target, stat.S_IWRITE)
 
     def test_revert_requires_both_tree_and_native_revision(self):
         with tempfile.TemporaryDirectory() as temporary:

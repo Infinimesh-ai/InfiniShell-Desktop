@@ -22,11 +22,136 @@ from codex_windows_hook_inputs import (CODEX_COMMIT, RELEASE_ASSETS, obtain_inpu
                                        plugin_base, require, verify_plugin)
 
 
+HOOK_COMPLETION_TIMEOUT = 45
+HOOK_PROMPTS = (
+    "中文输入\nEnglish ' $() `literal` %PATH% !name! &",
+    "中文输入\r\nEnglish 保留原始 CRLF 和字面 \\r\\n ' $() `literal` %PATH% !name! &",
+)
+
+
+def binary_query_candidate(original):
+    command = "jq -r '.prompt // empty'"
+    require(original.count(command) == 1, 'UserPromptSubmit 不是固定上游 query 提取配方')
+    # 仅临时插件使用原生 jq 的二进制输出，既不引入 CR，也不删除用户已有的 CR。
+    candidate = original.replace(command, "jq --binary -r '.prompt // empty'")
+    return candidate, {'original_sha256': hashlib.sha256(original.encode('utf-8')).hexdigest(),
+                       'candidate_sha256': hashlib.sha256(candidate.encode('utf-8')).hexdigest(),
+                       'product_recipe_modified': False, 'newline_normalization_applied': False}
+
+
+def verify_jq_newline_boundary(environment, evidence=None):
+    executable = shutil.which('jq', path=environment['PATH'])
+    require(executable is not None, '缺少实际 jq 可执行文件')
+    version = subprocess.run([executable, '--version'], env=environment, capture_output=True, timeout=10, check=True)
+    cases = []
+    evidence = {} if evidence is None else evidence
+    evidence.update(jq_executable=executable, jq_version=version.stdout.decode('utf-8').strip(),
+                    cases=cases, normalization_used=False)
+    for label, prompt in zip(('LF', 'CRLF'), HOOK_PROMPTS):
+        source = json.dumps({'prompt': prompt}, ensure_ascii=False).encode('utf-8')
+        observed = {}
+        case = {'input_line_ending': label, 'input_utf8_hex': prompt.encode('utf-8').hex(),
+                'outputs': observed, 'binary_preserves_original_bytes': False}
+        cases.append(case)
+        for mode, flags in (('text', []), ('binary', ['--binary'])):
+            result = subprocess.run([executable, *flags, '-r', '.prompt // empty'],
+                                    input=source, env=environment, capture_output=True, timeout=10, check=True)
+            observed[mode] = {'stdout_hex': result.stdout.hex(), 'stderr_hex': result.stderr.hex()}
+            if mode == 'binary':
+                require(result.stdout == prompt.encode('utf-8') + b'\n' and not result.stderr,
+                        '原生 jq 二进制输出没有逐字保留测试输入')
+                case['binary_preserves_original_bytes'] = True
+    return evidence
+
+
+def hook_completion_snapshot(events, thread_id, turn_id, expected):
+    started, completed, turns = {}, {}, []
+    ignored = 0
+    for event in events:
+        message = event.get('value')
+        if event.get('channel') != 'stdout' or not isinstance(message, dict):
+            continue
+        method = message.get('method')
+        if method not in ('hook/started', 'hook/completed', 'turn/completed'):
+            continue
+        params = message.get('params', {})
+        related_turn = params.get('turn', {}).get('id') if method == 'turn/completed' else params.get('turnId')
+        if params.get('threadId') != thread_id or related_turn != turn_id:
+            ignored += 1
+            continue
+        if method == 'turn/completed':
+            turn = params['turn']
+            require(turn.get('status') == 'completed' and turn.get('error') is None,
+                    '原生阻断回合没有正常结束')
+            if turns:
+                require(turns[0] == turn, '同一原生回合终态内容冲突')
+            else:
+                turns.append(turn)
+            continue
+        run = params.get('run', {})
+        order = run.get('displayOrder')
+        require(order in expected, '观察到未授权或重复注册的 hook')
+        contract = expected[order]
+        require(run.get('eventName') == contract['eventName'] and run.get('sourcePath') == contract['sourcePath']
+                and isinstance(run.get('id'), str) and run['id'], 'hook 身份与原生注册表不一致')
+        entry = {'id': run['id'], 'status': run.get('status'), 'eventName': run['eventName'],
+                 'emitted_at_ms': message.get('emittedAtMs'), 'duration_ms': run.get('durationMs'),
+                 'observed_elapsed_ms': event.get('observed_elapsed_ms')}
+        target = completed if method == 'hook/completed' else started
+        if order in target:
+            require(target[order]['id'] == entry['id'] and target[order]['status'] == entry['status'],
+                    '同一 hook 注册项出现冲突执行')
+        target[order] = entry
+        if method == 'hook/completed':
+            require(run.get('status') == contract['expected_status'], '原生 hook 返回失败或非预期终态')
+        else:
+            require(run.get('status') == 'running', 'hook 开始事件没有运行状态')
+    complete = (set(started) == set(expected) and set(completed) == set(expected) and len(turns) == 1)
+    if complete:
+        require(all(started[order]['id'] == completed[order]['id'] for order in expected),
+                'hook 开始与完成没有关联到同一次执行')
+    return {'complete': complete, 'started': list(started.values()), 'completed': list(completed.values()),
+            'turn_completed': bool(turns), 'ignored_unrelated_events': ignored,
+            'pending_display_orders': sorted(set(expected) - set(completed))}
+
+
+def wait_for_hook_completion(recorder, thread_id, turn_id, native_hooks, blocker, requests, evidence):
+    expected = {hook['displayOrder']: {'eventName': hook['eventName'], 'sourcePath': hook['sourcePath'],
+        'expected_status': 'stopped' if hook['command'] == blocker else 'completed'}
+        for hook in native_hooks if hook['eventName'] in ('sessionStart', 'userPromptSubmit')}
+    require(sorted(item['expected_status'] for item in expected.values()) == ['completed', 'completed', 'stopped'],
+            '等待对象不是两个通知 hook 和一个独立阻断 hook')
+    started = time.monotonic()
+    deadline = started + HOOK_COMPLETION_TIMEOUT
+    wait_record = {'timeout_seconds': HOOK_COMPLETION_TIMEOUT, 'thread_id': thread_id, 'turn_id': turn_id}
+    evidence['hook_completion_wait'] = wait_record
+    try:
+        while True:
+            recorder.events_changed.clear()
+            snapshot = hook_completion_snapshot(list(recorder.events), thread_id, turn_id, expected)
+            wait_record.update(snapshot, elapsed_ms=round((time.monotonic() - started) * 1000),
+                               process_exit_code=recorder.process.poll(), reader_errors=list(recorder.reader_errors),
+                               model_http_requests=len(requests))
+            require(not requests, '等待原生 hook 时出现模型 HTTP 请求')
+            require(not recorder.reader_errors, '等待原生 hook 时读取输出失败')
+            if snapshot['complete']:
+                return
+            require(recorder.process.poll() is None, '原生进程在完整 hook 终态前退出')
+            remaining = deadline - time.monotonic()
+            require(remaining > 0, '原生 hook 或阻断回合未在有界等待中完整结束')
+            recorder.events_changed.wait(min(remaining, 0.25))
+    except BaseException as error:
+        wait_record['failure'] = {'type': type(error).__name__, 'message': str(error)}
+        raise
+
+
 class NativeRecorder:
     def __init__(self, command, env, directory, events):
         self.events = events
         self.reader_errors = []
         self.queue = queue.Queue()
+        self.events_changed = threading.Event()
+        started = time.monotonic()
         self.process = subprocess.Popen(command, env=env, cwd=directory, stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                         text=True, encoding='utf-8', errors='strict', bufsize=1)
@@ -39,11 +164,15 @@ class NativeRecorder:
                             value = json.loads(line)
                         except json.JSONDecodeError:
                             value = line.rstrip()
-                        self.events.append({'channel': channel, 'value': value})
+                        self.events.append({'channel': channel, 'value': value,
+                                            'observed_elapsed_ms': round((time.monotonic() - started) * 1000)})
+                        self.events_changed.set()
                         if channel == 'stdout':
                             self.queue.put(value)
                 except Exception as error:
                     self.reader_errors.append(str(error))
+                finally:
+                    self.events_changed.set()
             reader = threading.Thread(target=read, daemon=True)
             reader.start()
             self.readers.append(reader)
@@ -103,7 +232,19 @@ def start_codex(executable, env, directory, traces):
         raise
 
 
-def one_case(args, directory, requests, evidence):
+def capture_case_markers(directory, evidence):
+    markers = {}
+    for script in ('on-session-start.sh', 'on-prompt-submit.sh'):
+        path = directory / (script + '.json')
+        if path.exists():
+            require(path.is_file() and not path.is_symlink() and path.stat().st_size <= 65536,
+                    '原生 hook marker 不是受控小文件')
+            markers[script] = json.loads(path.read_text(encoding='utf-8'))
+    evidence['markers'] = markers
+    return markers
+
+
+def one_case(args, directory, requests, evidence, prompt=HOOK_PROMPTS[0]):
     from apply_notification_patch import apply_files, bundle_data, default_bundle, validate_tree
     metadata, replacements = bundle_data(default_bundle(), 'codex')
     cli_home = directory / 'codex'
@@ -148,14 +289,19 @@ def one_case(args, directory, requests, evidence):
         original_hashes[script] = hashlib.sha256(path.read_bytes()).hexdigest()
         original = path.with_name(script + '.fixture-original')
         path.rename(original)
-        # 插桩只发生于临时副本；原脚本逐字保留并实际调用，不把插桩当发布文件。
+        entry = original.name
+        if script == 'on-prompt-submit.sh':
+            candidate, evidence['query_binary_candidate'] = binary_query_candidate(original.read_text(encoding='utf-8'))
+            entry = script + '.fixture-candidate'
+            original.with_name(entry).write_text(candidate, encoding='utf-8', newline='\n')
+        # 插桩只发生于临时副本；原文件逐字保留，query 候选的唯一改动和摘要另行记录。
         wrapper = '''#!/bin/bash
 set -e
 input=$(cat)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 printf '%s' "$input" | jq -c --arg root "$PLUGIN_ROOT" '{hook_event_name,turn_id,session_id,cwd,prompt,plugin_root:$root}' > "$INFINISHELL_HOOK_PROBE_CASE/__FIXTURE_SCRIPT__.json"
-printf '%s' "$input" | bash -- "$SCRIPT_DIR/__FIXTURE_SCRIPT__.fixture-original"
-'''.replace('__FIXTURE_SCRIPT__', script)
+printf '%s' "$input" | bash -- "$SCRIPT_DIR/__FIXTURE_ENTRY__"
+'''.replace('__FIXTURE_SCRIPT__', script).replace('__FIXTURE_ENTRY__', entry)
         path.write_text(wrapper, encoding='utf-8', newline='\n')
     index = marketplace / '.agents/plugins/marketplace.json'
     index.parent.mkdir(parents=True)
@@ -198,7 +344,7 @@ printf '%s' "$input" | bash -- "$SCRIPT_DIR/__FIXTURE_SCRIPT__.fixture-original"
                          f'trusted_hash = {json.dumps(hook["currentHash"])}\n')
     before = config.read_bytes()
     recorder = start_codex(args.codex_executable, env, directory, evidence['traces'])
-    prompt = "中文输入\nEnglish ' $() `literal` %PATH% !name! &"
+    evidence['expected_prompt'] = prompt
     try:
         trusted = recorder.rpc('hooks/list', {'cwds': [str(directory)]}, 3)
         trusted_hooks = [hook for group in trusted['data'] for hook in group['hooks']
@@ -212,22 +358,9 @@ printf '%s' "$input" | bash -- "$SCRIPT_DIR/__FIXTURE_SCRIPT__.fixture-original"
         require(thread['modelProvider'] == 'local_hook_probe', '原生会话没有使用隔离的本机 provider')
         turn = recorder.rpc('turn/start', {'threadId': thread['thread']['id'], 'input': [
             {'type': 'text', 'text': prompt, 'text_elements': []}]}, 5)
-        deadline = time.monotonic() + 10
-        while time.monotonic() < deadline:
-            complete = [event['value'].get('params', {}).get('run', {}) for event in recorder.events
-                        if isinstance(event['value'], dict) and event['value'].get('method') == 'hook/completed']
-            if len(complete) >= 3 and any(run.get('eventName') == 'userPromptSubmit' and run.get('status') == 'stopped'
-                                         for run in complete):
-                break
-            time.sleep(0.05)
-        require(any(run.get('eventName') == 'userPromptSubmit' and run.get('status') == 'stopped'
-                    for run in complete), '原生阻断 hook 未确认执行')
-        require([run['status'] for run in complete if run['eventName'] == 'sessionStart'] == ['completed'],
-                '原始 SessionStart 脚本没有成功完成')
-        require(sorted(run['status'] for run in complete if run['eventName'] == 'userPromptSubmit') ==
-                ['completed', 'stopped'], '原始 UserPromptSubmit 或独立阻断脚本没有成功完成')
-        markers = {script: json.loads((directory / (script + '.json')).read_text(encoding='utf-8'))
-                   for script in ('on-session-start.sh', 'on-prompt-submit.sh')}
+        wait_for_hook_completion(recorder, thread['thread']['id'], turn['turn']['id'], trusted_hooks,
+                                 blocker, requests, evidence)
+        markers = capture_case_markers(directory, evidence)
         require(markers['on-session-start.sh']['hook_event_name'] == 'SessionStart', 'SessionStart 未原生执行')
         require(markers['on-prompt-submit.sh']['prompt'] == prompt, '原生 prompt 字节语义被更改')
         require(markers['on-prompt-submit.sh']['hook_event_name'] == 'UserPromptSubmit' and
@@ -246,7 +379,18 @@ printf '%s' "$input" | bash -- "$SCRIPT_DIR/__FIXTURE_SCRIPT__.fixture-original"
                 'model_http_requests': len(requests), 'model_generation_verified': False,
                 'native_conpty_notifications_verified': False, 'full_lifecycle_verified': False}
     finally:
-        recorder.close()
+        primary = sys.exc_info()[1]
+        try:
+            recorder.close()
+        except BaseException as error:
+            evidence['close_failure'] = {'type': type(error).__name__, 'message': str(error)}
+            if primary is None:
+                raise
+        finally:
+            try:
+                capture_case_markers(directory, evidence)
+            except Exception as error:
+                evidence['marker_capture_failure'] = {'type': type(error).__name__, 'message': str(error)}
 
 
 def main():
@@ -298,6 +442,9 @@ def main():
         report['checks'][phase] = True
         phase = 'native_bytes_and_cmd_boundary'
         report['checks'][phase] = verify_windows_bytes_and_boundary(args.native_environment)
+        phase = 'jq_newline_boundary'
+        report['jq_newline_boundary'] = {}
+        verify_jq_newline_boundary(args.native_environment, report['jq_newline_boundary'])
 
         class RejectModel(BaseHTTPRequestHandler):
             def do_GET(self):
@@ -318,10 +465,10 @@ def main():
         worker.start()
         phase = 'native_codex_hooks'
         with tempfile.TemporaryDirectory(prefix='infinishell-native-windows-hooks-') as tmp:
-            for name in ('插件 空 格', "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()"):
+            for name, prompt in zip(('插件 空 格', "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()"), HOOK_PROMPTS):
                 evidence = {'name': name, 'passed': False, 'traces': []}
                 report['cases'].append(evidence)
-                evidence.update(one_case(args, Path(tmp) / name, requests, evidence))
+                evidence.update(one_case(args, Path(tmp) / name, requests, evidence, prompt))
                 evidence['passed'] = True
         phase = 'zero_model_requests'
         require(not requests, f'原生进程关闭前出现模型 HTTP 请求: {requests}')

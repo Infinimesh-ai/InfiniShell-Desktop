@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -27,7 +28,112 @@ UPSTREAM_URL = 'https://github.com/warpdotdev/codex-warp.git'
 
 
 def failure_record(error):
-    return {'type': type(error).__name__, 'message': str(error)}
+    record = {'type': type(error).__name__, 'message': str(error)}
+    for key in ('errno', 'winerror', 'filename', 'filename2'):
+        value = getattr(error, key, None)
+        if value is not None:
+            record[key] = os.fspath(value) if isinstance(value, os.PathLike) else value
+    return record
+
+
+def windows_cleanup_proven(report):
+    traces = report.get('app_server_traces', [])
+    return bool(traces) and all(
+        trace.get('process_cleanup', {}).get('assigned_before_resume') is True
+        and trace['process_cleanup'].get('cleanup_confirmed') is True
+        and type(trace['process_cleanup'].get('job_active_after_cleanup')) is int
+        and trace['process_cleanup'].get('job_active_after_cleanup') == 0
+        and trace['process_cleanup'].get('readers_eof') is True
+        and trace['process_cleanup'].get('reader_errors') == []
+        and trace['process_cleanup'].get('root_exited_naturally') is True
+        and trace['process_cleanup'].get('root_exit_code') == 0
+        and not trace.get('close_failure')
+        and not trace['process_cleanup'].get('job_close_failure')
+        and not trace['process_cleanup'].get('stream_close_failures')
+        for trace in traces)
+
+
+def file_identity(metadata):
+    return metadata.st_dev, metadata.st_ino
+
+
+def windows_file_attributes(path, attributes):
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    setter = kernel.SetFileAttributesW
+    setter.argtypes, setter.restype = [wintypes.LPCWSTR, wintypes.DWORD], wintypes.BOOL
+    if not setter(str(path), attributes):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
+def cleanup_error_handler(directory, original_root, report):
+    attempted = set()
+
+    def onerror(function, filename, exception):
+        error = exception[1]
+        path = Path(filename)
+        diagnostic = {'function': getattr(function, '__name__', type(function).__name__),
+                      'path': str(path), 'original_error': failure_record(error),
+                      'job_and_output_cleanup_proven': windows_cleanup_proven(report),
+                      'readonly_retry_attempted': False}
+        report.setdefault('directory_cleanup_errors', []).append(diagnostic)
+        try:
+            metadata = path.lstat()
+            attributes = getattr(metadata, 'st_file_attributes', None)
+            diagnostic.update(file_attributes=attributes, regular_file=stat.S_ISREG(metadata.st_mode),
+                              symlink=stat.S_ISLNK(metadata.st_mode), links=metadata.st_nlink)
+            # 先记录可观测属性；WinError5 本身既不能证明只读，也不能证明后台进程残留。
+            require(os.name == 'nt' and isinstance(error, PermissionError) and getattr(error, 'winerror', None) == 5,
+                    '不是 Windows 拒绝访问错误')
+            require(function is os.unlink and diagnostic['job_and_output_cleanup_proven'],
+                    '没有精确 unlink 或 Job/输出收尾证明')
+            require(original_root is not None and path.is_absolute() and path != directory
+                    and path.is_relative_to(directory), '目标不是已记录私有目录的子文件')
+            require(directory.resolve() == directory and file_identity(directory.lstat()) == original_root,
+                    '私有目录身份或规范路径已变化')
+            for ancestor in (path, *path.parents):
+                info = ancestor.lstat()
+                require(not stat.S_ISLNK(info.st_mode) and not getattr(info, 'st_file_attributes', 0) & 0x400,
+                        '清理路径含符号链接或重解析点')
+                if ancestor == directory:
+                    break
+            require(stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1
+                    and isinstance(attributes, int) and attributes & 1,
+                    '目标不是带只读属性的普通单链接文件')
+            identity = file_identity(metadata)
+            require(identity not in attempted and identity[1] != 0, '该文件已重试或没有可靠身份')
+            current = path.lstat()
+            require(file_identity(current) == identity and current.st_file_attributes == attributes
+                    and current.st_nlink == 1, '清理文件身份或属性已变化')
+        except BaseException as inspection_error:
+            diagnostic['retry_rejected'] = failure_record(inspection_error)
+            raise error
+        attempted.add(identity)
+        diagnostic['readonly_retry_attempted'] = True
+        writable_attributes = attributes & ~1 or 0x80  # 空属性集由 FILE_ATTRIBUTE_NORMAL 表示。
+        try:
+            # 仅清除已观察到的只读位，不更改 ACL、目录或其他文件属性。
+            windows_file_attributes(path, writable_attributes)
+            current = path.lstat()
+            require(file_identity(current) == identity and current.st_file_attributes == writable_attributes,
+                    '解除只读后文件身份或属性不符合预期')
+            function(path)
+            diagnostic['readonly_retry_succeeded'] = True
+        except BaseException as retry_error:
+            diagnostic['readonly_retry_succeeded'] = False
+            diagnostic['retry_failure'] = failure_record(retry_error)
+            try:
+                current = path.lstat()
+                if file_identity(current) == identity and current.st_file_attributes == writable_attributes:
+                    windows_file_attributes(path, attributes)
+                    diagnostic['original_readonly_restored'] = True
+            except BaseException as restore_error:
+                diagnostic['attribute_restore_failure'] = failure_record(restore_error)
+            # 原错误保持为主异常；重试失败与属性恢复结果单独保留，不能将拒绝访问吞掉。
+            raise error
+
+    return onerror
 
 
 class WindowsProbeJob:
@@ -480,6 +586,15 @@ def run(executable, directory, report):
 
 
 def run_and_cleanup(executable, directory, report):
+    # 主入口独占创建私有目录；保留初始身份，拒绝给被替换的目录解除文件属性。
+    try:
+        root_metadata = directory.lstat()
+        original_root = (file_identity(root_metadata)
+                         if directory.is_absolute() and stat.S_ISDIR(root_metadata.st_mode)
+                         and root_metadata.st_ino != 0
+                         and not getattr(root_metadata, 'st_file_attributes', 0) & 0x400 else None)
+    except OSError:
+        original_root = None
     try:
         run(executable, directory, report)
     except BaseException as error:
@@ -489,7 +604,7 @@ def run_and_cleanup(executable, directory, report):
         report['retained_private_directory'] = str(directory)
         raise
     try:
-        shutil.rmtree(directory)
+        shutil.rmtree(directory, onerror=cleanup_error_handler(directory, original_root, report))
         report['private_directory_removed'] = True
     except BaseException as error:
         report['cleanup_failure'] = failure_record(error)

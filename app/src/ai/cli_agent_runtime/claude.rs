@@ -131,6 +131,8 @@ async fn run_transport(
     loop {
         let effects = protocol.expire_permission_observation();
         flush_effects(protocol, stdin, events, effects).await?;
+        let effects = protocol.expire_cancellations();
+        flush_effects(protocol, stdin, events, effects).await?;
         if protocol.request_timed_out() {
             return Err(RuntimeError::RequestTimedOut);
         }
@@ -317,6 +319,27 @@ struct UserTurn {
     finished: bool,
     output: String,
     error: Option<String>,
+    cancellation: Option<PendingCancellation>,
+}
+
+struct PendingCancellation {
+    started_at: Instant,
+    interrupt_requested: bool,
+    interrupt_acknowledged: bool,
+    native_cancelled: bool,
+    aborted_result: Option<String>,
+}
+
+impl PendingCancellation {
+    fn new() -> Self {
+        Self {
+            started_at: Instant::now(),
+            interrupt_requested: false,
+            interrupt_acknowledged: false,
+            native_cancelled: false,
+            aborted_result: None,
+        }
+    }
 }
 
 struct PendingApproval {
@@ -462,6 +485,52 @@ impl ClaudeProtocol {
         }
     }
 
+    fn expire_cancellations(&mut self) -> Effects {
+        let expired =
+            self.turns
+                .iter()
+                .filter_map(|(id, turn)| {
+                    let cancellation = turn.cancellation.as_ref()?;
+                    (!turn.finished && cancellation.started_at.elapsed() >= REQUEST_TIMEOUT).then(
+                        || {
+                            (
+                        *id,
+                        cancellation.aborted_result.clone().unwrap_or_else(|| {
+                            "Claude did not confirm cancellation; completion is uncertain".into()
+                        }),
+                    )
+                        },
+                    )
+                })
+                .collect::<Vec<_>>();
+        let mut effects = Effects::default();
+        for (turn_id, message) in expired {
+            self.finish_turn(
+                turn_id,
+                TurnOutcome::Failed { message },
+                None,
+                &mut effects.events,
+            );
+        }
+        effects
+    }
+
+    fn finish_confirmed_cancellation(&mut self, turn_id: Uuid, events: &mut Vec<RuntimeEventKind>) {
+        let confirmed = self
+            .turns
+            .get(&turn_id)
+            .and_then(|turn| turn.cancellation.as_ref())
+            .is_some_and(|cancellation| {
+                cancellation.interrupt_requested
+                    && cancellation.interrupt_acknowledged
+                    && cancellation.native_cancelled
+                    && cancellation.aborted_result.is_some()
+            });
+        if confirmed {
+            self.finish_turn(turn_id, TurnOutcome::Cancelled, None, events);
+        }
+    }
+
     fn remember_response(&mut self, event: &RuntimeEventKind) {
         if let RuntimeEventKind::MessageAccepted { message_id, .. }
         | RuntimeEventKind::CommandDispatched { message_id, .. }
@@ -545,6 +614,7 @@ impl ClaudeProtocol {
                         finished: false,
                         output: String::new(),
                         error: None,
+                        cancellation: None,
                     },
                 );
                 // 写入成功并非接收确认；只相信原生 replay 或 command_lifecycle。
@@ -567,6 +637,12 @@ impl ClaudeProtocol {
                         "interrupt requires the currently running command",
                     );
                 }
+                self.turns
+                    .get_mut(&turn_id)
+                    .expect("running turn exists")
+                    .cancellation
+                    .get_or_insert_with(PendingCancellation::new)
+                    .interrupt_requested = true;
                 let request = self.request(
                     PendingKind::Interrupt {
                         message_id,
@@ -772,7 +848,14 @@ impl ClaudeProtocol {
                         }
                     }
                     "cancelled" => {
-                        self.finish_turn(turn_id, TurnOutcome::Cancelled, None, &mut effects.events)
+                        // 认证失败也会发 cancelled；必须等待同回合的原生取消结果和确认。
+                        self.turns
+                            .get_mut(&turn_id)
+                            .expect("turn exists")
+                            .cancellation
+                            .get_or_insert_with(PendingCancellation::new)
+                            .native_cancelled = true;
+                        self.finish_confirmed_cancellation(turn_id, &mut effects.events);
                     }
                     // 未知生命周期不升级成功；需要原生 result 才能确认完成。
                     _ => {}
@@ -831,6 +914,19 @@ impl ClaudeProtocol {
                         text: output,
                     });
                 }
+                if let Some(message) = turn.error.clone()
+                    && turn
+                        .cancellation
+                        .as_ref()
+                        .is_some_and(|cancellation| cancellation.aborted_result.is_some())
+                {
+                    self.finish_turn(
+                        turn_id,
+                        TurnOutcome::Failed { message },
+                        None,
+                        &mut effects.events,
+                    );
+                }
             }
             "result" => {
                 let outcome = result_outcome(&message)?;
@@ -849,6 +945,20 @@ impl ClaudeProtocol {
                     ));
                 }
                 for turn_id in turn_ids {
+                    if message["terminal_reason"] == "aborted_streaming"
+                        && message["subtype"] == "error_during_execution"
+                        && message["is_error"] == true
+                        && let Some(turn) = self.turns.get_mut(&turn_id)
+                        && !turn.finished
+                        && turn.error.is_none()
+                        && let Some(cancellation) = &mut turn.cancellation
+                        && cancellation.interrupt_requested
+                    {
+                        // 2.1.273 先报错误形态的流中止，再报 cancelled；缺任一证据都不升级取消。
+                        cancellation.aborted_result = Some(error_text(&message));
+                        self.finish_confirmed_cancellation(turn_id, &mut effects.events);
+                        continue;
+                    }
                     self.finish_turn(
                         turn_id,
                         outcome.clone(),
@@ -1014,12 +1124,34 @@ impl ClaudeProtocol {
                 message_id,
                 turn_id,
             } => {
+                let mut rejected_abort = None;
+                if let Some(turn) = self.turns.get_mut(&turn_id)
+                    && !turn.finished
+                    && let Some(cancellation) = &mut turn.cancellation
+                {
+                    if success {
+                        cancellation.interrupt_acknowledged = true;
+                    } else if !cancellation.interrupt_acknowledged {
+                        cancellation.interrupt_requested = false;
+                        rejected_abort = cancellation.aborted_result.clone();
+                    }
+                }
                 let effect = if success {
                     accepted(message_id, Some(turn_id.to_string()))
                 } else {
                     failed(message_id, &error_text(response))
                 };
                 effects.events.extend(effect.events);
+                if let Some(message) = rejected_abort {
+                    self.finish_turn(
+                        turn_id,
+                        TurnOutcome::Failed { message },
+                        None,
+                        &mut effects.events,
+                    );
+                } else {
+                    self.finish_confirmed_cancellation(turn_id, &mut effects.events);
+                }
             }
         }
         for event in &effects.events {
@@ -1197,6 +1329,7 @@ impl ClaudeProtocol {
             return;
         }
         turn.finished = true;
+        turn.cancellation = None;
         let outcome = match &turn.error {
             Some(message) => TurnOutcome::Failed {
                 message: message.clone(),
@@ -1415,3 +1548,7 @@ fn dispatched(message_id: Uuid, turn_id: Option<String>) -> Effects {
 #[cfg(test)]
 #[path = "claude_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "claude_live_tests.rs"]
+mod live_tests;

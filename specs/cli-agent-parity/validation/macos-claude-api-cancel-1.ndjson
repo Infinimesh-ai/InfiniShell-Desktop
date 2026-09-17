@@ -1,0 +1,56 @@
+{"credential_files_read_by_probe": false, "event": "acceptance_started", "permission_policy": "Inherit", "scope": "rust_adapter_process_restart"}
+{"event": "session_ready", "filesystem_sandbox_verified": false, "native_session_association_confirmed": false, "native_session_id": null, "parent_permission_ceiling_verified": false, "permission_mode": "default"}
+{"event": "phase_started", "message_id": "09603c7f-3896-4ccb-807e-273e89c3dd9b", "phase": "first_turn"}
+{"event": "message_accepted", "message_id": "09603c7f-3896-4ccb-807e-273e89c3dd9b", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "first_turn", "turn_id": "09603c7f-3896-4ccb-807e-273e89c3dd9b"}
+{"event": "turn_started", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "first_turn", "turn_id": "09603c7f-3896-4ccb-807e-273e89c3dd9b"}
+{"event": "session_ready", "filesystem_sandbox_verified": false, "native_session_association_confirmed": true, "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "parent_permission_ceiling_verified": false, "permission_mode": "default"}
+{"event": "turn_finished", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "outcome": "Completed", "output": "PARITY_ONE", "phase": "first_turn", "turn_id": "09603c7f-3896-4ccb-807e-273e89c3dd9b"}
+{"event": "phase_started", "message_id": "c011f164-6646-4740-8a35-49c1ab6e9d39", "phase": "second_turn"}
+{"event": "message_accepted", "message_id": "c011f164-6646-4740-8a35-49c1ab6e9d39", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "second_turn", "turn_id": "c011f164-6646-4740-8a35-49c1ab6e9d39"}
+{"event": "turn_started", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "second_turn", "turn_id": "c011f164-6646-4740-8a35-49c1ab6e9d39"}
+{"event": "session_ready", "filesystem_sandbox_verified": false, "native_session_association_confirmed": true, "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "parent_permission_ceiling_verified": false, "permission_mode": "default"}
+{"event": "turn_finished", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "outcome": "Completed", "output": "PARITY_TWO", "phase": "second_turn", "turn_id": "c011f164-6646-4740-8a35-49c1ab6e9d39"}
+{"event": "phase_started", "message_id": "1d1ed1bb-5574-42b2-9de8-703c39db9bc5", "phase": "approval_allow"}
+{"event": "message_accepted", "message_id": "1d1ed1bb-5574-42b2-9de8-703c39db9bc5", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "approval_allow", "turn_id": "1d1ed1bb-5574-42b2-9de8-703c39db9bc5"}
+{"event": "turn_started", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "approval_allow", "turn_id": "1d1ed1bb-5574-42b2-9de8-703c39db9bc5"}
+{"event": "session_ready", "filesystem_sandbox_verified": false, "native_session_association_confirmed": true, "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "parent_permission_ceiling_verified": false, "permission_mode": "default"}
+{"approval_id": "3567d47c-6a71-43e5-bbaa-abc265daca3b", "decision": "AllowOnce", "event": "approval_requested", "exact_write_fixture": true, "phase": "approval_allow"}
+{"approval_id": "3567d47c-6a71-43e5-bbaa-abc265daca3b", "decision": "AllowOnce", "event": "approval_resolved", "native_receipt": false, "phase": "approval_allow"}
+{"event": "command_dispatched", "message_id": "a493c0c8-0fc1-41ae-a017-1a7b058ad6d5", "native_receipt": false, "phase": "approval_allow", "turn_id": "1d1ed1bb-5574-42b2-9de8-703c39db9bc5"}
+{"event": "turn_finished", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "outcome": "Completed", "output": "APPROVED", "phase": "approval_allow", "turn_id": "1d1ed1bb-5574-42b2-9de8-703c39db9bc5"}
+{"allowed": true, "event": "file_effect_verified", "phase": "approval_allow"}
+{"event": "phase_started", "message_id": "a76e3277-f3d1-4747-9dfd-a8520302e66f", "phase": "approval_deny"}
+{"event": "message_accepted", "message_id": "a76e3277-f3d1-4747-9dfd-a8520302e66f", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "approval_deny", "turn_id": "a76e3277-f3d1-4747-9dfd-a8520302e66f"}
+{"event": "turn_started", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "approval_deny", "turn_id": "a76e3277-f3d1-4747-9dfd-a8520302e66f"}
+{"event": "session_ready", "filesystem_sandbox_verified": false, "native_session_association_confirmed": true, "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "parent_permission_ceiling_verified": false, "permission_mode": "default"}
+{"approval_id": "44408449-7246-4a2b-85bd-a3c8cf8f1a99", "decision": "DenyOnce", "event": "approval_requested", "exact_write_fixture": true, "phase": "approval_deny"}
+{"approval_id": "44408449-7246-4a2b-85bd-a3c8cf8f1a99", "decision": "DenyOnce", "event": "approval_resolved", "native_receipt": false, "phase": "approval_deny"}
+{"event": "command_dispatched", "message_id": "ed8f3d67-5861-46c2-8ba9-56b429e63f91", "native_receipt": false, "phase": "approval_deny", "turn_id": "a76e3277-f3d1-4747-9dfd-a8520302e66f"}
+{"event": "turn_finished", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "outcome": "Completed", "output": "DENIED", "phase": "approval_deny", "turn_id": "a76e3277-f3d1-4747-9dfd-a8520302e66f"}
+{"allowed": false, "event": "file_effect_verified", "phase": "approval_deny"}
+{"event": "phase_started", "message_id": "6101d167-4453-4700-8480-0e7b19768735", "phase": "queued_input"}
+{"event": "message_accepted", "message_id": "6101d167-4453-4700-8480-0e7b19768735", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "queued_input", "turn_id": "6101d167-4453-4700-8480-0e7b19768735"}
+{"event": "turn_started", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "queued_input", "turn_id": "6101d167-4453-4700-8480-0e7b19768735"}
+{"active_turn_id": "6101d167-4453-4700-8480-0e7b19768735", "event": "queued_input_submitted", "message_id": "6d92edb7-0332-441d-9130-e7a6aae77d99", "phase": "queued_input", "same_turn_steering_verified": false, "submitted_while_running": true}
+{"event": "session_ready", "filesystem_sandbox_verified": false, "native_session_association_confirmed": true, "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "parent_permission_ceiling_verified": false, "permission_mode": "default"}
+{"event": "message_accepted", "message_id": "6d92edb7-0332-441d-9130-e7a6aae77d99", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "queued_input", "turn_id": "6d92edb7-0332-441d-9130-e7a6aae77d99"}
+{"event": "turn_finished", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "outcome": "Completed", "output": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200\n\nQUEUE_PARENT_DONE", "phase": "queued_input", "turn_id": "6101d167-4453-4700-8480-0e7b19768735"}
+{"event": "turn_started", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "queued_input", "turn_id": "6d92edb7-0332-441d-9130-e7a6aae77d99"}
+{"event": "session_ready", "filesystem_sandbox_verified": false, "native_session_association_confirmed": true, "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "parent_permission_ceiling_verified": false, "permission_mode": "default"}
+{"event": "turn_finished", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "outcome": "Completed", "output": "QUEUED_APPLIED_28cc54fe13a74b80991748c061394c25", "phase": "queued_input", "turn_id": "6d92edb7-0332-441d-9130-e7a6aae77d99"}
+{"event": "queued_input_result_verified", "marker": "QUEUED_APPLIED_28cc54fe13a74b80991748c061394c25", "native_acknowledgement_verified": true, "same_turn_steering_supported": false}
+{"event": "phase_started", "message_id": "b3886b40-183e-4e29-8453-afc6be738771", "phase": "cancel"}
+{"event": "message_accepted", "message_id": "b3886b40-183e-4e29-8453-afc6be738771", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "cancel", "turn_id": "b3886b40-183e-4e29-8453-afc6be738771"}
+{"event": "turn_started", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "cancel", "turn_id": "b3886b40-183e-4e29-8453-afc6be738771"}
+{"event": "session_ready", "filesystem_sandbox_verified": false, "native_session_association_confirmed": true, "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "parent_permission_ceiling_verified": false, "permission_mode": "default"}
+{"event": "message_accepted", "message_id": "8395c400-0af3-47f7-b8a6-b49e0e92f440", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "cancel", "turn_id": "b3886b40-183e-4e29-8453-afc6be738771"}
+{"event": "turn_finished", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "outcome": "Cancelled", "output": "", "phase": "cancel", "turn_id": "b3886b40-183e-4e29-8453-afc6be738771"}
+{"event": "connection_shutdown", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211"}
+{"event": "session_ready", "filesystem_sandbox_verified": false, "native_session_association_confirmed": false, "native_session_id": null, "parent_permission_ceiling_verified": false, "permission_mode": "default"}
+{"event": "phase_started", "message_id": "55021dab-8eba-4a42-8a48-c0734b772605", "phase": "resume_result"}
+{"event": "message_accepted", "message_id": "55021dab-8eba-4a42-8a48-c0734b772605", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "resume_result", "turn_id": "55021dab-8eba-4a42-8a48-c0734b772605"}
+{"event": "turn_started", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "phase": "resume_result", "turn_id": "55021dab-8eba-4a42-8a48-c0734b772605"}
+{"event": "session_ready", "filesystem_sandbox_verified": false, "native_session_association_confirmed": true, "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "parent_permission_ceiling_verified": false, "permission_mode": "default"}
+{"event": "turn_finished", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "outcome": "Completed", "output": "QUEUED_APPLIED_28cc54fe13a74b80991748c061394c25", "phase": "resume_result", "turn_id": "55021dab-8eba-4a42-8a48-c0734b772605"}
+{"event": "connection_shutdown", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211"}
+{"app_restart_and_ui_verified": false, "event": "acceptance_passed", "native_session_id": "52a4086a-90c2-4347-be86-af3886571211", "parent_permission_ceiling_verified": false, "queued_input_verified": true, "same_turn_steering_supported": false, "scope": "rust_adapter_process_restart"}

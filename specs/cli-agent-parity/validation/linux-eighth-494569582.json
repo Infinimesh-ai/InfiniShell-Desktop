@@ -1,0 +1,302 @@
+{
+  "run_id": 35182914808,
+  "commit": "49456958279cc193392b2d09118e680fc0b14ea4",
+  "job": {
+    "completedAt": "2026-09-17T05:12:10Z",
+    "conclusion": "success",
+    "databaseId": 105078775206,
+    "name": "Linux x64",
+    "startedAt": "2026-09-17T04:42:27Z",
+    "status": "completed",
+    "steps": [
+      {
+        "completedAt": "2026-09-17T04:42:39Z",
+        "conclusion": "success",
+        "name": "Set up job",
+        "number": 1,
+        "startedAt": "2026-09-17T04:42:29Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:43:01Z",
+        "conclusion": "success",
+        "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+        "number": 2,
+        "startedAt": "2026-09-17T04:42:39Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:43:01Z",
+        "conclusion": "success",
+        "name": "Install Python for CLI parity verification",
+        "number": 3,
+        "startedAt": "2026-09-17T04:43:01Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:43:01Z",
+        "conclusion": "success",
+        "name": "Verify provisioned toolchain",
+        "number": 4,
+        "startedAt": "2026-09-17T04:43:01Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:43:02Z",
+        "conclusion": "success",
+        "name": "Install Node for CLI plugin verification",
+        "number": 5,
+        "startedAt": "2026-09-17T04:43:01Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:43:02Z",
+        "conclusion": "success",
+        "name": "Test Grok notification plugin scripts",
+        "number": 6,
+        "startedAt": "2026-09-17T04:43:02Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:43:06Z",
+        "conclusion": "success",
+        "name": "Test notification patch file transactions",
+        "number": 7,
+        "startedAt": "2026-09-17T04:43:02Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:43:34Z",
+        "conclusion": "success",
+        "name": "Prepare fixed native Codex without credentials",
+        "number": 8,
+        "startedAt": "2026-09-17T04:43:06Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:44:00Z",
+        "conclusion": "success",
+        "name": "Prepare fixed native Claude without credentials",
+        "number": 9,
+        "startedAt": "2026-09-17T04:43:34Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:44:22Z",
+        "conclusion": "success",
+        "name": "Prepare fixed native Grok without credentials",
+        "number": 10,
+        "startedAt": "2026-09-17T04:44:00Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:44:31Z",
+        "conclusion": "success",
+        "name": "Verify fixed Grok unauthenticated ACP boundaries",
+        "number": 11,
+        "startedAt": "2026-09-17T04:44:22Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:44:32Z",
+        "conclusion": "success",
+        "name": "Verify native Claude initialization and idle EOF",
+        "number": 12,
+        "startedAt": "2026-09-17T04:44:31Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:44:34Z",
+        "conclusion": "success",
+        "name": "Verify native Claude permission observations without credentials",
+        "number": 13,
+        "startedAt": "2026-09-17T04:44:32Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:44:45Z",
+        "conclusion": "success",
+        "name": "Verify native Codex plugin registry failure recovery",
+        "number": 14,
+        "startedAt": "2026-09-17T04:44:34Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:44:51Z",
+        "conclusion": "success",
+        "name": "Verify native Codex persistent plugin source",
+        "number": 15,
+        "startedAt": "2026-09-17T04:44:45Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:44:56Z",
+        "conclusion": "success",
+        "name": "Test Claude and Codex Bash notification payloads",
+        "number": 16,
+        "startedAt": "2026-09-17T04:44:51Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:44:56Z",
+        "conclusion": "success",
+        "name": "Test Unix PTY notification framing",
+        "number": 17,
+        "startedAt": "2026-09-17T04:44:56Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:48:57Z",
+        "conclusion": "success",
+        "name": "Check InfiniShell-Desktop",
+        "number": 18,
+        "startedAt": "2026-09-17T04:44:56Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:56:59Z",
+        "conclusion": "success",
+        "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+        "number": 19,
+        "startedAt": "2026-09-17T04:48:57Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:57:49Z",
+        "conclusion": "success",
+        "name": "Test shared CLI action contracts and skills",
+        "number": 20,
+        "startedAt": "2026-09-17T04:56:59Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T04:58:14Z",
+        "conclusion": "success",
+        "name": "Test CLI harness arguments",
+        "number": 21,
+        "startedAt": "2026-09-17T04:57:49Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:03:28Z",
+        "conclusion": "success",
+        "name": "Test bilingual TUI task message states",
+        "number": 22,
+        "startedAt": "2026-09-17T04:58:14Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:03:36Z",
+        "conclusion": "success",
+        "name": "Test managed command process ownership",
+        "number": 23,
+        "startedAt": "2026-09-17T05:03:28Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:10:51Z",
+        "conclusion": "success",
+        "name": "Build CLI process supervisor",
+        "number": 24,
+        "startedAt": "2026-09-17T05:03:36Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:10:55Z",
+        "conclusion": "success",
+        "name": "Test supervisor cleanup after host crash",
+        "number": 25,
+        "startedAt": "2026-09-17T05:10:51Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:11:21Z",
+        "conclusion": "success",
+        "name": "Verify native recovery and idle-crash boundaries without credentials",
+        "number": 26,
+        "startedAt": "2026-09-17T05:10:55Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:11:25Z",
+        "conclusion": "success",
+        "name": "Preserve Linux native CLI boundary evidence",
+        "number": 27,
+        "startedAt": "2026-09-17T05:11:21Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:12:00Z",
+        "conclusion": "success",
+        "name": "Test rust-genai",
+        "number": 28,
+        "startedAt": "2026-09-17T05:11:25Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:12:00Z",
+        "conclusion": "skipped",
+        "name": "Compile GUI integration tests",
+        "number": 29,
+        "startedAt": "2026-09-17T05:12:00Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:12:00Z",
+        "conclusion": "skipped",
+        "name": "Run desktop workspace unit tests",
+        "number": 30,
+        "startedAt": "2026-09-17T05:12:00Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:12:01Z",
+        "conclusion": "success",
+        "name": "Post Install Node for CLI plugin verification",
+        "number": 58,
+        "startedAt": "2026-09-17T05:12:00Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:12:01Z",
+        "conclusion": "success",
+        "name": "Post Install Python for CLI parity verification",
+        "number": 59,
+        "startedAt": "2026-09-17T05:12:01Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:12:01Z",
+        "conclusion": "success",
+        "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+        "number": 60,
+        "startedAt": "2026-09-17T05:12:01Z",
+        "status": "completed"
+      },
+      {
+        "completedAt": "2026-09-17T05:12:01Z",
+        "conclusion": "success",
+        "name": "Complete job",
+        "number": 61,
+        "startedAt": "2026-09-17T05:12:01Z",
+        "status": "completed"
+      }
+    ],
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35182914808/job/105078775206"
+  },
+  "full_workspace_tests": false,
+  "gui_integration_compile": false,
+  "model_lifecycle_verified": false,
+  "all_selected_checks_passed": true,
+  "log_source": "/tmp/infinishell-eighth-platform-494569582/linux-job.raw.log",
+  "log_sha256": "e629bc393234932f5099fc87be726620163dd6951e37807a3755676c756791ce",
+  "test_summaries": [
+    "2026-09-17T04:56:59.0148680Z      Summary [  18.017s] 1706 tests run: 1706 passed, 4788 skipped",
+    "2026-09-17T04:57:49.5461806Z      Summary [   0.060s] 71 tests run: 71 passed, 220 skipped",
+    "2026-09-17T04:58:14.8291162Z      Summary [   0.157s] 128 tests run: 128 passed, 0 skipped",
+    "2026-09-17T05:03:28.7330096Z      Summary [   0.351s] 9 tests run: 9 passed, 927 skipped",
+    "2026-09-17T05:03:36.0082599Z      Summary [   0.213s] 1 test run: 1 passed, 14 skipped",
+    "2026-09-17T05:10:55.8448591Z      Summary [   1.602s] 4 tests run: 4 passed, 6490 skipped",
+    "2026-09-17T05:12:00.9700462Z test result: ok. 81 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+  ]
+}

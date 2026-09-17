@@ -664,20 +664,23 @@ impl GrokProtocol {
                     "promptCapabilities": capabilities.get("promptCapabilities"),
                     "sessionCapabilities": capabilities.get("sessionCapabilities")
                 });
-                let cached_login = result["authMethods"].as_array().is_some_and(|methods| {
-                    methods
-                        .iter()
-                        .any(|method| method["id"].as_str() == Some("cached_token"))
+                // 只选择原生明确公布的无交互认证，不读取凭据或代替用户配置模型后端。
+                let method = ["cached_token", "xai.api_key"].into_iter().find(|id| {
+                    result["authMethods"].as_array().is_some_and(|methods| {
+                        methods
+                            .iter()
+                            .any(|method| method["id"].as_str() == Some(*id))
+                    })
                 });
-                if !cached_login {
+                let Some(method) = method else {
                     return Err(RuntimeError::InvalidConfiguration(crate::t!(
                         "cli-agent-grok-managed-login-required"
                     )));
-                }
+                };
                 effects.writes.push(self.request(
                     PendingKind::Authenticate,
                     "authenticate",
-                    json!({"methodId": "cached_token", "_meta": {"headless": true}}),
+                    json!({"methodId": method, "_meta": {"headless": true}}),
                 ));
             }
             PendingKind::Authenticate => effects.writes.push(self.open_session()?),

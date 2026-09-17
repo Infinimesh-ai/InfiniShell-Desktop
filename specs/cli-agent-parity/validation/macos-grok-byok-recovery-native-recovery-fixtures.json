@@ -1,0 +1,506 @@
+{
+  "schema_version": 1,
+  "source_report": "native-recovery.json",
+  "source_report_sha256": "7d4070508a8cdaee7c95e1b28d04de00ef51296bc6d5102a9b4150f4dd5e19f2",
+  "native_binary_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "native_session_id": "01a0add1-d9d9-7411-9a11-590ebd81db56",
+  "random_marker": "SESSIONMEMO_64f29a9ea6a12f7ddb739a69",
+  "model_path": "Grok Build + 自定义 Claude 后端",
+  "cancel_trigger": [
+    {
+      "process": "first",
+      "trigger": "first_nonempty_agent_message_chunk",
+      "trigger_event": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "READY\n\n1"
+            }
+          },
+          "_meta": {
+            "totalTokens": 1551,
+            "eventId": "01a0add1-d9d9-7411-9a11-590ebd81db56-4",
+            "agentTimestampMs": 1789622609625,
+            "promptId": "43292eea-d88e-42a4-8e56-32420af0fbae",
+            "streamStartMs": 1789622609624,
+            "turnStartMs": 1789622606473,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 1
+          }
+        }
+      },
+      "notification": {
+        "jsonrpc": "2.0",
+        "method": "session/cancel",
+        "params": {
+          "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56"
+        }
+      },
+      "prompt_request_id": "first-running_cancel"
+    }
+  ],
+  "protocol_sequence": [
+    {
+      "process": "first",
+      "phase": "running_cancel",
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/cancel",
+        "params": {
+          "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56"
+        }
+      }
+    },
+    {
+      "process": "first",
+      "phase": "running_cancel",
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "first-running_cancel",
+        "result": {
+          "stopReason": "cancelled",
+          "_meta": {
+            "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56",
+            "requestId": "43292eea-d88e-42a4-8e56-32420af0fbae",
+            "promptId": "43292eea-d88e-42a4-8e56-32420af0fbae",
+            "totalTokens": 1474,
+            "modelId": "claude-sonnet-4-6",
+            "cancellationCategory": "MidTurnAbort"
+          }
+        }
+      }
+    },
+    {
+      "process": "first",
+      "phase": "close",
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "first-close",
+        "method": "session/close",
+        "params": {
+          "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56"
+        }
+      }
+    },
+    {
+      "process": "first",
+      "phase": "close",
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "first-close",
+        "result": {
+          "_meta": {
+            "x.ai/closeOutcome": "closed"
+          }
+        }
+      }
+    },
+    {
+      "process": "second",
+      "phase": "load_original_history",
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "second-load",
+        "method": "session/load",
+        "params": {
+          "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56",
+          "cwd": "<private-smoke>/empty-project",
+          "mcpServers": [],
+          "_meta": {
+            "yoloMode": false,
+            "autoMode": false
+          }
+        }
+      }
+    },
+    {
+      "process": "second",
+      "phase": "load_original_history",
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "second-load",
+        "result": {
+          "models": {
+            "currentModelId": "parity-claude",
+            "availableModels": [
+              {
+                "modelId": "grok-4.6",
+                "name": "Grok 4.6",
+                "description": "SpaceXAI's latest frontier model",
+                "_meta": {
+                  "totalContextTokens": 500000,
+                  "agentType": "grok-build-plan",
+                  "supportsReasoningEffort": true,
+                  "reasoningEffort": "high",
+                  "reasoningEfforts": [
+                    {
+                      "id": "xhigh",
+                      "value": "xhigh",
+                      "label": "Extra High Effort",
+                      "description": "Highest effort and reasoning level",
+                      "default": false
+                    },
+                    {
+                      "id": "high",
+                      "value": "high",
+                      "label": "High Effort",
+                      "description": "Higher implementation quality with extensive reasoning",
+                      "default": true
+                    },
+                    {
+                      "id": "medium",
+                      "value": "medium",
+                      "label": "Medium Effort",
+                      "description": "Balanced effort with standard implementation and testing",
+                      "default": false
+                    },
+                    {
+                      "id": "low",
+                      "value": "low",
+                      "label": "Low Effort",
+                      "description": "Quick, fast implementations",
+                      "default": false
+                    }
+                  ]
+                }
+              },
+              {
+                "modelId": "grok-4.5",
+                "name": "Grok 4.5",
+                "_meta": {
+                  "totalContextTokens": 500000,
+                  "agentType": "grok-build-plan",
+                  "supportsReasoningEffort": true,
+                  "reasoningEffort": "high",
+                  "reasoningEfforts": [
+                    {
+                      "id": "high",
+                      "value": "high",
+                      "label": "High Effort",
+                      "description": "Highest implementation quality with extensive reasoning",
+                      "default": true
+                    },
+                    {
+                      "id": "medium",
+                      "value": "medium",
+                      "label": "Medium Effort",
+                      "description": "Balanced effort with standard implementation and testing",
+                      "default": false
+                    },
+                    {
+                      "id": "low",
+                      "value": "low",
+                      "label": "Low Effort",
+                      "description": "Quick, fast implementations",
+                      "default": false
+                    }
+                  ]
+                }
+              },
+              {
+                "modelId": "parity-claude",
+                "name": "Grok Build - custom Claude backend",
+                "_meta": {
+                  "totalContextTokens": 200000,
+                  "agentType": "grok-build-plan"
+                }
+              }
+            ]
+          },
+          "configOptions": [
+            {
+              "id": "model",
+              "name": "Model",
+              "category": "model",
+              "type": "select",
+              "currentValue": "parity-claude",
+              "options": [
+                {
+                  "value": "grok-4.6",
+                  "name": "Grok 4.6"
+                },
+                {
+                  "value": "grok-4.5",
+                  "name": "Grok 4.5"
+                },
+                {
+                  "value": "parity-claude",
+                  "name": "Grok Build - custom Claude backend"
+                }
+              ]
+            }
+          ],
+          "_meta": {
+            "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56",
+            "codebaseIndexed": [],
+            "x.ai/sessionConfig": {
+              "options": [
+                {
+                  "id": "grok-4.6",
+                  "category": "model",
+                  "label": "Grok 4.6",
+                  "selected": false
+                },
+                {
+                  "id": "grok-4.5",
+                  "category": "model",
+                  "label": "Grok 4.5",
+                  "selected": false
+                },
+                {
+                  "id": "parity-claude",
+                  "category": "model",
+                  "label": "Grok Build - custom Claude backend",
+                  "selected": true
+                }
+              ]
+            },
+            "x.ai/sessionDetail": {
+              "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56",
+              "kind": "build",
+              "cwd": "<private-smoke>/empty-project",
+              "currentModelId": "parity-claude",
+              "title": "Prompt injection session hijack attempt"
+            },
+            "x.ai/memoryMode": "legacy"
+          }
+        }
+      }
+    },
+    {
+      "process": "second",
+      "phase": "recovered_marker",
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "second-recovered_marker",
+        "result": {
+          "stopReason": "end_turn",
+          "_meta": {
+            "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56",
+            "requestId": "3c8fd1d8-6b19-4010-abe4-dae70f6d0ec4",
+            "promptId": "3c8fd1d8-6b19-4010-abe4-dae70f6d0ec4",
+            "totalTokens": 15003,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 14979,
+            "outputTokens": 24,
+            "cachedReadTokens": 14903,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 14979,
+              "outputTokens": 24,
+              "totalTokens": 15003,
+              "cachedReadTokens": 14903,
+              "cacheCreationTokens": 73,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 2488,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 14979,
+                  "outputTokens": 24,
+                  "totalTokens": 15003,
+                  "cachedReadTokens": 14903,
+                  "cacheCreationTokens": 73,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 2488
+                }
+              },
+              "numTurns": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "process": "second",
+      "phase": "close",
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "second-close",
+        "method": "session/close",
+        "params": {
+          "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56"
+        }
+      }
+    },
+    {
+      "process": "second",
+      "phase": "close",
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "second-close",
+        "result": {
+          "_meta": {
+            "x.ai/closeOutcome": "closed"
+          }
+        }
+      }
+    }
+  ],
+  "turns": [
+    {
+      "process": "first",
+      "phase": "running_cancel",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": "first-running_cancel",
+        "result": {
+          "stopReason": "cancelled",
+          "_meta": {
+            "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56",
+            "requestId": "43292eea-d88e-42a4-8e56-32420af0fbae",
+            "promptId": "43292eea-d88e-42a4-8e56-32420af0fbae",
+            "totalTokens": 1474,
+            "modelId": "claude-sonnet-4-6",
+            "cancellationCategory": "MidTurnAbort"
+          }
+        }
+      },
+      "assistant_text": "READY\n\n1"
+    },
+    {
+      "process": "first",
+      "phase": "same_process_continue",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": "first-same_process_continue",
+        "result": {
+          "stopReason": "end_turn",
+          "_meta": {
+            "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56",
+            "requestId": "2183bb44-ddb2-431c-aaf6-111ea3dd8a4b",
+            "promptId": "2183bb44-ddb2-431c-aaf6-111ea3dd8a4b",
+            "totalTokens": 14930,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 14906,
+            "outputTokens": 24,
+            "cachedReadTokens": 14856,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 14906,
+              "outputTokens": 24,
+              "totalTokens": 14930,
+              "cachedReadTokens": 14856,
+              "cacheCreationTokens": 47,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 1941,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 14906,
+                  "outputTokens": 24,
+                  "totalTokens": 14930,
+                  "cachedReadTokens": 14856,
+                  "cacheCreationTokens": 47,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 1941
+                }
+              },
+              "numTurns": 1
+            }
+          }
+        }
+      },
+      "assistant_text": "SESSIONMEMO_64f29a9ea6a12f7ddb739a69"
+    },
+    {
+      "process": "second",
+      "phase": "recovered_marker",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": "second-recovered_marker",
+        "result": {
+          "stopReason": "end_turn",
+          "_meta": {
+            "sessionId": "01a0add1-d9d9-7411-9a11-590ebd81db56",
+            "requestId": "3c8fd1d8-6b19-4010-abe4-dae70f6d0ec4",
+            "promptId": "3c8fd1d8-6b19-4010-abe4-dae70f6d0ec4",
+            "totalTokens": 15003,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 14979,
+            "outputTokens": 24,
+            "cachedReadTokens": 14903,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 14979,
+              "outputTokens": 24,
+              "totalTokens": 15003,
+              "cachedReadTokens": 14903,
+              "cacheCreationTokens": 73,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 2488,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 14979,
+                  "outputTokens": 24,
+                  "totalTokens": 15003,
+                  "cachedReadTokens": 14903,
+                  "cacheCreationTokens": 73,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 2488
+                }
+              },
+              "numTurns": 1
+            }
+          }
+        }
+      },
+      "assistant_text": "SESSIONMEMO_64f29a9ea6a12f7ddb739a69"
+    }
+  ],
+  "process_outcomes": [
+    {
+      "label": "first",
+      "owned_pid": 84110,
+      "session_close": {
+        "jsonrpc": "2.0",
+        "id": "first-close",
+        "result": {
+          "_meta": {
+            "x.ai/closeOutcome": "closed"
+          }
+        }
+      },
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "readers_closed": true
+    },
+    {
+      "label": "second",
+      "owned_pid": 84127,
+      "session_close": {
+        "jsonrpc": "2.0",
+        "id": "second-close",
+        "result": {
+          "_meta": {
+            "x.ai/closeOutcome": "closed"
+          }
+        }
+      },
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "readers_closed": true
+    }
+  ],
+  "new_session_requests": 1,
+  "load_session_requests": 1,
+  "private_history_file_count": 16
+}

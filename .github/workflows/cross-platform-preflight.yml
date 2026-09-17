@@ -96,6 +96,7 @@ jobs:
           python3 script/cli-agent-parity/notification_patch_tests.py -v
           python3 -B script/cli-agent-parity/codex_persistent_source_tests.py -v
           python3 script/cli-agent-parity/codex_adapter_runner_tests.py -v
+          python3 -B script/cli-agent-parity/claude_adapter_runner_tests.py -v
           python3 -B script/cli-agent-parity/codex_windows_hook_tests.py -v
           python3 -B script/cli-agent-parity/codex_plugin_lifecycle_tests.py -v
           python3 -B script/cli-agent-parity/codex_windows_notify_tests.py -v
@@ -367,6 +368,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Persistent Codex source transaction tests failed' }
           python script/cli-agent-parity/codex_adapter_runner_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'CLI acceptance evidence validation failed' }
+          python -B script/cli-agent-parity/claude_adapter_runner_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Claude acceptance evidence validation failed' }
           python -B script/cli-agent-parity/codex_windows_hook_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Windows hook command and fixed-input validation failed' }
           python -B script/cli-agent-parity/codex_plugin_lifecycle_tests.py -v

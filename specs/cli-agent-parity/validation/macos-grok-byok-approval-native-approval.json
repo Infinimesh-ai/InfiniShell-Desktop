@@ -1,0 +1,4811 @@
+{
+  "schema_version": 1,
+  "binary_version": "grok 1.0.30 (04b7ffed98c6)",
+  "model_path": "Grok Build + 自定义 Claude 后端",
+  "official_grok_model_tested": false,
+  "native_received_real_credential": false,
+  "product_network_isolation_verified": false,
+  "leader_path_tested": false,
+  "redirects_followed": false,
+  "attempt": "native-approval-1",
+  "max_messages_requests": 12,
+  "max_tokens_per_request": 4096,
+  "events": [
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": 1,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": false,
+              "writeTextFile": false
+            },
+            "terminal": false
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "promptCapabilities": {
+              "image": false,
+              "audio": false,
+              "embeddedContext": true
+            },
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "sessionCapabilities": {
+              "list": {},
+              "resume": {},
+              "close": {}
+            },
+            "auth": {},
+            "_meta": {
+              "x.ai/fs_notify": true,
+              "x.ai/hooks": {
+                "blockingEvents": [
+                  "pre_tool_use",
+                  "stop",
+                  "subagent_stop"
+                ],
+                "decisions": [
+                  "deny",
+                  "block"
+                ],
+                "stopSignals": [
+                  "continue",
+                  "stopReason",
+                  "additionalContext"
+                ]
+              },
+              "x.ai/capabilities": {
+                "toolOverrides": {
+                  "x_keyword_search": true,
+                  "x_semantic_search": true,
+                  "x_user_search": false,
+                  "x_thread_fetch": false
+                }
+              }
+            }
+          },
+          "authMethods": [
+            {
+              "id": "xai.api_key",
+              "name": "xai.api_key",
+              "description": "XAI_API_KEY or api_key/env_key in config.toml"
+            },
+            {
+              "id": "grok.com",
+              "name": "Grok",
+              "description": "Sign in with Grok"
+            }
+          ],
+          "_meta": {
+            "grokShell": true,
+            "defaultAuthMethodId": "xai.api_key",
+            "x.ai/mcp/sdk": true,
+            "x.ai/pluginDirs": true,
+            "currentWorkingDirectory": "<private-smoke>/empty-project",
+            "agentVersion": "1.0.30",
+            "agentId": "f61b1c8b-30d3-5374-b905-a6e3c49d3fb4",
+            "agentInstanceId": "ed884f78-8cbf-4db6-9a23-c09804fca6db",
+            "hostname": "<redacted>",
+            "modelState": {
+              "currentModelId": "parity-claude",
+              "availableModels": [
+                {
+                  "modelId": "grok-4.6",
+                  "name": "Grok 4.6",
+                  "description": "SpaceXAI's latest frontier model",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "xhigh",
+                        "value": "xhigh",
+                        "label": "Extra High Effort",
+                        "description": "Highest effort and reasoning level",
+                        "default": false
+                      },
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Higher implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "modelId": "grok-4.5",
+                  "name": "Grok 4.5",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Highest implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "modelId": "parity-claude",
+                  "name": "Grok Build - custom Claude backend",
+                  "_meta": {
+                    "totalContextTokens": 200000,
+                    "agentType": "grok-build-plan"
+                  }
+                }
+              ]
+            },
+            "mcpServers": [],
+            "mcpApps": false,
+            "metadata": null,
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              }
+            ],
+            "cancelRewind": true,
+            "sessionRecap": true,
+            "feedbackTraceOffer": false,
+            "voiceMode": true
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/servers_updated",
+        "params": {
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "authenticate",
+        "params": {
+          "methodId": "xai.api_key",
+          "_meta": {
+            "headless": true
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {}
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "session/new",
+        "params": {
+          "cwd": "<private-smoke>/empty-project",
+          "mcpServers": [],
+          "_meta": {
+            "modelId": "parity-claude",
+            "yoloMode": false,
+            "autoMode": false
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp_initialized",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "mcpToolCount": 0,
+          "elapsedMs": 0
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                },
+                "_meta": {
+                  "workflowSource": "builtin",
+                  "workflowPath": "/Users/admin/actions-runner/_work/xai/xai/crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "send_feedback",
+                "web_search",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 1474,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-0",
+            "agentTimestampMs": 1789622223298,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 9
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                },
+                "_meta": {
+                  "workflowSource": "builtin",
+                  "workflowPath": "/Users/admin/actions-runner/_work/xai/xai/crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "send_feedback",
+                "web_search",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 1474,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-1",
+            "agentTimestampMs": 1789622223312,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 9
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "model_changed",
+            "model_id": "parity-claude"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "models": {
+            "currentModelId": "parity-claude",
+            "availableModels": [
+              {
+                "modelId": "grok-4.6",
+                "name": "Grok 4.6",
+                "description": "SpaceXAI's latest frontier model",
+                "_meta": {
+                  "totalContextTokens": 500000,
+                  "agentType": "grok-build-plan",
+                  "supportsReasoningEffort": true,
+                  "reasoningEffort": "high",
+                  "reasoningEfforts": [
+                    {
+                      "id": "xhigh",
+                      "value": "xhigh",
+                      "label": "Extra High Effort",
+                      "description": "Highest effort and reasoning level",
+                      "default": false
+                    },
+                    {
+                      "id": "high",
+                      "value": "high",
+                      "label": "High Effort",
+                      "description": "Higher implementation quality with extensive reasoning",
+                      "default": true
+                    },
+                    {
+                      "id": "medium",
+                      "value": "medium",
+                      "label": "Medium Effort",
+                      "description": "Balanced effort with standard implementation and testing",
+                      "default": false
+                    },
+                    {
+                      "id": "low",
+                      "value": "low",
+                      "label": "Low Effort",
+                      "description": "Quick, fast implementations",
+                      "default": false
+                    }
+                  ]
+                }
+              },
+              {
+                "modelId": "grok-4.5",
+                "name": "Grok 4.5",
+                "_meta": {
+                  "totalContextTokens": 500000,
+                  "agentType": "grok-build-plan",
+                  "supportsReasoningEffort": true,
+                  "reasoningEffort": "high",
+                  "reasoningEfforts": [
+                    {
+                      "id": "high",
+                      "value": "high",
+                      "label": "High Effort",
+                      "description": "Highest implementation quality with extensive reasoning",
+                      "default": true
+                    },
+                    {
+                      "id": "medium",
+                      "value": "medium",
+                      "label": "Medium Effort",
+                      "description": "Balanced effort with standard implementation and testing",
+                      "default": false
+                    },
+                    {
+                      "id": "low",
+                      "value": "low",
+                      "label": "Low Effort",
+                      "description": "Quick, fast implementations",
+                      "default": false
+                    }
+                  ]
+                }
+              },
+              {
+                "modelId": "parity-claude",
+                "name": "Grok Build - custom Claude backend",
+                "_meta": {
+                  "totalContextTokens": 200000,
+                  "agentType": "grok-build-plan"
+                }
+              }
+            ]
+          },
+          "configOptions": [
+            {
+              "id": "model",
+              "name": "Model",
+              "category": "model",
+              "type": "select",
+              "currentValue": "parity-claude",
+              "options": [
+                {
+                  "value": "grok-4.6",
+                  "name": "Grok 4.6"
+                },
+                {
+                  "value": "grok-4.5",
+                  "name": "Grok 4.5"
+                },
+                {
+                  "value": "parity-claude",
+                  "name": "Grok Build - custom Claude backend"
+                }
+              ]
+            }
+          ],
+          "_meta": {
+            "currentWorkingDirectory": "<private-smoke>/empty-project",
+            "codebaseIndexed": [],
+            "isGitRepo": false,
+            "gitRoot": null,
+            "showNonGitWarning": false,
+            "feedbackEnabled": true,
+            "x.ai/sessionConfig": {
+              "options": [
+                {
+                  "id": "grok-4.6",
+                  "category": "model",
+                  "label": "Grok 4.6",
+                  "selected": false
+                },
+                {
+                  "id": "grok-4.5",
+                  "category": "model",
+                  "label": "Grok 4.5",
+                  "selected": false
+                },
+                {
+                  "id": "parity-claude",
+                  "category": "model",
+                  "label": "Grok Build - custom Claude backend",
+                  "selected": true
+                }
+              ]
+            },
+            "x.ai/sessionDetail": {
+              "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+              "kind": "build",
+              "cwd": "<private-smoke>/empty-project",
+              "currentModelId": "parity-claude"
+            },
+            "x.ai/memoryMode": "legacy"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "Reply exactly INFINISHELL_GROK_APPROVAL_ROUND_1. Do not use any tools, inspect files, or run commands."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+              "title": null,
+              "cwd": "<private-smoke>/empty-project",
+              "isWorktree": false,
+              "modelId": "parity-claude",
+              "yolo": false,
+              "activity": "working",
+              "resident": true,
+              "lastChangeUnixMs": 1789622223323,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": [
+            {
+              "id": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+              "version": 0,
+              "kind": "prompt",
+              "text": "Reply exactly INFINISHELL_GROK_APPROVAL_ROUND_1. Do not use any tools, inspect files, or run commands.",
+              "position": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": [],
+          "runningPromptId": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+          "runningText": "Reply exactly INFINISHELL_GROK_APPROVAL_ROUND_1. Do not use any tools, inspect files, or run commands.",
+          "runningKind": "prompt"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "session_summary_generated",
+            "session_summary": "User requests specific literal string output"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "session_info_update",
+            "title": "User requests specific literal string output"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "response_started",
+            "message_id": "msg_011Cf8SjgP5KeyxLQccr5DbB",
+            "model": "claude-sonnet-4-6",
+            "input_tokens": 3,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 14811
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "INFINISHELL_GROK"
+            }
+          },
+          "_meta": {
+            "totalTokens": 1506,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-4",
+            "agentTimestampMs": 1789622225811,
+            "promptId": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+            "streamStartMs": 1789622225811,
+            "turnStartMs": 1789622223416,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 1
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "_APPROVAL_ROUND_"
+            }
+          },
+          "_meta": {
+            "totalTokens": 1506,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-5",
+            "agentTimestampMs": 1789622225882,
+            "promptId": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+            "streamStartMs": 1789622225811,
+            "turnStartMs": 1789622223416,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 2
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "1"
+            }
+          },
+          "_meta": {
+            "totalTokens": 1506,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-6",
+            "agentTimestampMs": 1789622225921,
+            "promptId": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+            "streamStartMs": 1789622225811,
+            "turnStartMs": 1789622223416,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 3
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                },
+                "_meta": {
+                  "workflowSource": "builtin",
+                  "workflowPath": "/Users/admin/actions-runner/_work/xai/xai/crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "send_feedback",
+                "web_search",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 14833,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-7",
+            "agentTimestampMs": 1789622225952,
+            "promptId": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+            "streamStartMs": 1789622225811,
+            "turnStartMs": 1789622223416,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 9
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "response_completed",
+            "message_id": "msg_011Cf8SjgP5KeyxLQccr5DbB",
+            "stop_reason": "end_turn",
+            "usage": {
+              "input_tokens": 3,
+              "output_tokens": 19,
+              "cache_read_input_tokens": 0,
+              "cache_creation_input_tokens": 14811,
+              "reasoning_tokens": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "turn_completed",
+            "prompt_id": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+            "stop_reason": "end_turn",
+            "usage": {
+              "inputTokens": 14814,
+              "outputTokens": 19,
+              "totalTokens": 14833,
+              "cachedReadTokens": 0,
+              "cacheCreationTokens": 14811,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 2523,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 14814,
+                  "outputTokens": 19,
+                  "totalTokens": 14833,
+                  "cachedReadTokens": 0,
+                  "cacheCreationTokens": 14811,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 2523
+                }
+              },
+              "numTurns": 1
+            },
+            "elapsed_ms": 2848
+          },
+          "_meta": {
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-10",
+            "agentTimestampMs": 1789622226177
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session/prompt_complete",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "promptId": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+          "stopReason": "end_turn",
+          "agentResult": null
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+              "title": null,
+              "cwd": "<private-smoke>/empty-project",
+              "isWorktree": false,
+              "modelId": "parity-claude",
+              "yolo": false,
+              "activity": "idle",
+              "resident": true,
+              "lastChangeUnixMs": 1789622226178,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "stopReason": "end_turn",
+          "_meta": {
+            "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+            "requestId": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+            "promptId": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+            "totalTokens": 14833,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 14814,
+            "outputTokens": 19,
+            "cachedReadTokens": 0,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 14814,
+              "outputTokens": 19,
+              "totalTokens": 14833,
+              "cachedReadTokens": 0,
+              "cacheCreationTokens": 14811,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 2523,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 14814,
+                  "outputTokens": 19,
+                  "totalTokens": 14833,
+                  "cachedReadTokens": 0,
+                  "cacheCreationTokens": 14811,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 2523
+                }
+              },
+              "numTurns": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "Reply exactly INFINISHELL_GROK_APPROVAL_ROUND_2. Do not use any tools, inspect files, or run commands."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+              "title": null,
+              "cwd": "<private-smoke>/empty-project",
+              "isWorktree": false,
+              "modelId": "parity-claude",
+              "yolo": false,
+              "activity": "working",
+              "resident": true,
+              "lastChangeUnixMs": 1789622226182,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": [
+            {
+              "id": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+              "version": 0,
+              "kind": "prompt",
+              "text": "Reply exactly INFINISHELL_GROK_APPROVAL_ROUND_2. Do not use any tools, inspect files, or run commands.",
+              "position": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": [],
+          "runningPromptId": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+          "runningText": "Reply exactly INFINISHELL_GROK_APPROVAL_ROUND_2. Do not use any tools, inspect files, or run commands.",
+          "runningKind": "prompt"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "response_started",
+            "message_id": "msg_011Cf8SjrYm2PtfvEpBvzMyF",
+            "model": "claude-sonnet-4-6",
+            "input_tokens": 3,
+            "cache_read_input_tokens": 14811,
+            "cache_creation_input_tokens": 66
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "INFINISHELL_G"
+            }
+          },
+          "_meta": {
+            "totalTokens": 14865,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-13",
+            "agentTimestampMs": 1789622227883,
+            "promptId": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+            "streamStartMs": 1789622227883,
+            "turnStartMs": 1789622226247,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 1
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "ROK_APPROVAL_ROUND"
+            }
+          },
+          "_meta": {
+            "totalTokens": 14865,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-14",
+            "agentTimestampMs": 1789622227941,
+            "promptId": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+            "streamStartMs": 1789622227883,
+            "turnStartMs": 1789622226247,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 2
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "_2"
+            }
+          },
+          "_meta": {
+            "totalTokens": 14865,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-15",
+            "agentTimestampMs": 1789622227972,
+            "promptId": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+            "streamStartMs": 1789622227883,
+            "turnStartMs": 1789622226247,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 3
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                },
+                "_meta": {
+                  "workflowSource": "builtin",
+                  "workflowPath": "/Users/admin/actions-runner/_work/xai/xai/crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "send_feedback",
+                "web_search",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 14899,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-16",
+            "agentTimestampMs": 1789622227983,
+            "promptId": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+            "streamStartMs": 1789622227883,
+            "turnStartMs": 1789622226247,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 9
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "response_completed",
+            "message_id": "msg_011Cf8SjrYm2PtfvEpBvzMyF",
+            "stop_reason": "end_turn",
+            "usage": {
+              "input_tokens": 3,
+              "output_tokens": 19,
+              "cache_read_input_tokens": 14811,
+              "cache_creation_input_tokens": 66,
+              "reasoning_tokens": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "turn_completed",
+            "prompt_id": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+            "stop_reason": "end_turn",
+            "usage": {
+              "inputTokens": 14880,
+              "outputTokens": 19,
+              "totalTokens": 14899,
+              "cachedReadTokens": 14811,
+              "cacheCreationTokens": 66,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 1735,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 14880,
+                  "outputTokens": 19,
+                  "totalTokens": 14899,
+                  "cachedReadTokens": 14811,
+                  "cacheCreationTokens": 66,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 1735
+                }
+              },
+              "numTurns": 1
+            },
+            "elapsed_ms": 1906
+          },
+          "_meta": {
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-19",
+            "agentTimestampMs": 1789622228092
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session/prompt_complete",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "promptId": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+          "stopReason": "end_turn",
+          "agentResult": null
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+              "title": null,
+              "cwd": "<private-smoke>/empty-project",
+              "isWorktree": false,
+              "modelId": "parity-claude",
+              "yolo": false,
+              "activity": "idle",
+              "resident": true,
+              "lastChangeUnixMs": 1789622228093,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "stopReason": "end_turn",
+          "_meta": {
+            "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+            "requestId": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+            "promptId": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+            "totalTokens": 14899,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 14880,
+            "outputTokens": 19,
+            "cachedReadTokens": 14811,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 14880,
+              "outputTokens": 19,
+              "totalTokens": 14899,
+              "cachedReadTokens": 14811,
+              "cacheCreationTokens": 66,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 1735,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 14880,
+                  "outputTokens": 19,
+                  "totalTokens": 14899,
+                  "cachedReadTokens": 14811,
+                  "cacheCreationTokens": 66,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 1735
+                }
+              },
+              "numTurns": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "INFINISHELL_GROK_APPROVAL: Use only the write tool to create the new file <private-smoke>/empty-project/approval-allow.txt with exactly this UTF-8 content: \"INFINISHELL_GROK_APPROVAL_ALLOW\\n\". The JSON quotes are not part of the file; the escaped newline is one newline. Request approval. Do not run shell commands or inspect other files. After successful writing reply ALLOW_CONFIRMED. If approval is denied, do not retry; reply ALLOW_WAS_DENIED."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+              "title": null,
+              "cwd": "<private-smoke>/empty-project",
+              "isWorktree": false,
+              "modelId": "parity-claude",
+              "yolo": false,
+              "activity": "working",
+              "resident": true,
+              "lastChangeUnixMs": 1789622228097,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": [
+            {
+              "id": "ae51d9ba-c562-410d-885f-d222256f9701",
+              "version": 0,
+              "kind": "prompt",
+              "text": "INFINISHELL_GROK_APPROVAL: Use only the write tool to create the new file <private-smoke>/empty-project/approval-allow.txt with exactly this UTF-8 content: \"INFINISHELL_GROK_APPROVAL_ALLOW\\n\". The JSON quotes are not part of the file; the escaped newline is one newline. Request approval. Do not run shell commands or inspect other files. After successful writing reply ALLOW_CONFIRMED. If approval is denied, do not retry; reply ALLOW_WAS_DENIED.",
+              "position": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": [],
+          "runningPromptId": "ae51d9ba-c562-410d-885f-d222256f9701",
+          "runningText": "INFINISHELL_GROK_APPROVAL: Use only the write tool to create the new file <private-smoke>/empty-project/approval-allow.txt with exactly this UTF-8 content: \"INFINISHELL_GROK_APPROVAL_ALLOW\\n\". The JSON quotes are not part of the file; the escaped newline is one newline. Request approval. Do not run shell commands or inspect other files. After successful writing reply ALLOW_CONFIRMED. If approval is denied, do not retry; reply ALLOW_WAS_DENIED.",
+          "runningKind": "prompt"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "response_started",
+            "message_id": "msg_011Cf8Sjzm8RhysQHUz5wGaW",
+            "model": "claude-sonnet-4-6",
+            "input_tokens": 3,
+            "cache_read_input_tokens": 14877,
+            "cache_creation_input_tokens": 207
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_call_id": "toolu_01NCMBW8xZRTyXVPozzh8W34",
+            "tool_index": 0,
+            "name": "write"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": ""
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "{\"file_"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "path\": "
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "\"/priva"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "te/var/"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "folders"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "/qp/t9_"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "qxjfn4x"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "l22sbd8"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "3t4qh7m"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "0000gp/"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "T/infin"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "ishell-"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "grok-re"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "al-smok"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "e-10qql"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "zu1/emp"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "ty-proj"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "ect/app"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "roval-a"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "llow.tx"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "t\""
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": ", \"cont"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "ent\": \""
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "INFINIS"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "HELL_GR"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "OK_APPR"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "OVAL_AL"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "LOW\\n\"}"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                },
+                "_meta": {
+                  "workflowSource": "builtin",
+                  "workflowPath": "/Users/admin/actions-runner/_work/xai/xai/crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "send_feedback",
+                "web_search",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 15238,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-22",
+            "agentTimestampMs": 1789622231352,
+            "promptId": "ae51d9ba-c562-410d-885f-d222256f9701",
+            "streamStartMs": 1789622230160,
+            "turnStartMs": 1789622228208,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 9
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "response_completed",
+            "message_id": "msg_011Cf8Sjzm8RhysQHUz5wGaW",
+            "stop_reason": "tool_use",
+            "usage": {
+              "input_tokens": 3,
+              "output_tokens": 151,
+              "cache_read_input_tokens": 14877,
+              "cache_creation_input_tokens": 207,
+              "reasoning_tokens": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call",
+            "toolCallId": "toolu_01NCMBW8xZRTyXVPozzh8W34",
+            "title": "write",
+            "rawInput": {
+              "file_path": "<private-smoke>/empty-project/approval-allow.txt",
+              "content": "INFINISHELL_GROK_APPROVAL_ALLOW\n"
+            },
+            "_meta": {
+              "x.ai/tool": {
+                "version": 1,
+                "name": "write",
+                "kind": "write",
+                "namespace": "opencode",
+                "label": "Write",
+                "read_only": false
+              }
+            }
+          },
+          "_meta": {
+            "totalTokens": 15238,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-23",
+            "agentTimestampMs": 1789622231353,
+            "promptId": "ae51d9ba-c562-410d-885f-d222256f9701",
+            "streamStartMs": 1789622230160,
+            "turnStartMs": 1789622228208,
+            "updateType": "ToolCall",
+            "updateParams": {
+              "toolCallId": "toolu_01NCMBW8xZRTyXVPozzh8W34",
+              "title": "write",
+              "kind": "Other",
+              "status": "Pending"
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "pending_interaction",
+            "tool_call_id": "toolu_01NCMBW8xZRTyXVPozzh8W34",
+            "kind": "permission"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "toolu_01NCMBW8xZRTyXVPozzh8W34",
+            "kind": "edit",
+            "title": "Write `<private-smoke>/empty-project/approval-allow.txt`",
+            "content": [
+              {
+                "type": "diff",
+                "path": "<private-smoke>/empty-project/approval-allow.txt",
+                "oldText": "",
+                "newText": "INFINISHELL_GROK_APPROVAL_ALLOW\n"
+              }
+            ],
+            "locations": [
+              {
+                "path": "<private-smoke>/empty-project/approval-allow.txt"
+              }
+            ],
+            "rawInput": {
+              "variant": "Write",
+              "file_path": "<private-smoke>/empty-project/approval-allow.txt",
+              "content": "INFINISHELL_GROK_APPROVAL_ALLOW\n"
+            },
+            "_meta": {
+              "x.ai/tool": {
+                "version": 1,
+                "name": "write",
+                "kind": "write",
+                "namespace": "opencode",
+                "label": "Write",
+                "read_only": false,
+                "input": {
+                  "path": "<private-smoke>/empty-project/approval-allow.txt"
+                }
+              }
+            }
+          },
+          "_meta": {
+            "totalTokens": 15238,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-24",
+            "agentTimestampMs": 1789622231353,
+            "promptId": "ae51d9ba-c562-410d-885f-d222256f9701",
+            "streamStartMs": 1789622230160,
+            "turnStartMs": 1789622228208,
+            "updateType": "ToolCallUpdate",
+            "updateParams": {
+              "toolCallId": "toolu_01NCMBW8xZRTyXVPozzh8W34",
+              "status": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "session/request_permission",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "toolCall": {
+            "toolCallId": "toolu_01NCMBW8xZRTyXVPozzh8W34",
+            "kind": "edit",
+            "title": "Write `<private-smoke>/empty-project/approval-allow.txt`",
+            "rawInput": {
+              "variant": "Write",
+              "file_path": "<private-smoke>/empty-project/approval-allow.txt",
+              "content": "INFINISHELL_GROK_APPROVAL_ALLOW\n"
+            },
+            "_meta": {
+              "x.ai/tool": {
+                "version": 1,
+                "name": "write",
+                "kind": "write",
+                "namespace": "opencode",
+                "label": "Write",
+                "read_only": false,
+                "input": {
+                  "path": "<private-smoke>/empty-project/approval-allow.txt"
+                }
+              }
+            }
+          },
+          "options": [
+            {
+              "optionId": "allow-edits-session",
+              "name": "Yes, allow all edits during this session",
+              "kind": "allow_always"
+            },
+            {
+              "optionId": "allow-once",
+              "name": "Yes",
+              "kind": "allow_once"
+            },
+            {
+              "optionId": "reject-once",
+              "name": "No, and tell Grok what to do differently",
+              "kind": "reject_once"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "outcome": {
+            "outcome": "selected",
+            "optionId": "reject-once"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "interaction_resolved",
+            "tool_call_id": "toolu_01NCMBW8xZRTyXVPozzh8W34"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "toolu_01NCMBW8xZRTyXVPozzh8W34",
+            "status": "failed",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "User rejected the execution for tool `write`"
+                }
+              }
+            ]
+          },
+          "_meta": {
+            "totalTokens": 15238,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-25",
+            "agentTimestampMs": 1789622231357,
+            "promptId": "ae51d9ba-c562-410d-885f-d222256f9701",
+            "streamStartMs": 1789622230160,
+            "turnStartMs": 1789622228208,
+            "updateType": "ToolCallUpdate",
+            "updateParams": {
+              "toolCallId": "toolu_01NCMBW8xZRTyXVPozzh8W34",
+              "status": "Failed"
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "turn_completed",
+            "prompt_id": "ae51d9ba-c562-410d-885f-d222256f9701",
+            "stop_reason": "cancelled",
+            "usage": {
+              "inputTokens": 15087,
+              "outputTokens": 151,
+              "totalTokens": 15238,
+              "cachedReadTokens": 14877,
+              "cacheCreationTokens": 207,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 3143,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 15087,
+                  "outputTokens": 151,
+                  "totalTokens": 15238,
+                  "cachedReadTokens": 14877,
+                  "cacheCreationTokens": 207,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 3143
+                }
+              },
+              "numTurns": 1
+            },
+            "elapsed_ms": 3395
+          },
+          "_meta": {
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-27",
+            "agentTimestampMs": 1789622231496,
+            "cancellationCategory": "PermissionRejected",
+            "cancellationContext": {
+              "tool_name": "write",
+              "reason": "User rejected the execution"
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session/prompt_complete",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "promptId": "ae51d9ba-c562-410d-885f-d222256f9701",
+          "stopReason": "cancelled",
+          "agentResult": null,
+          "cancellationCategory": "PermissionRejected",
+          "cancellationContext": {
+            "tool_name": "write",
+            "reason": "User rejected the execution"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+              "title": null,
+              "cwd": "<private-smoke>/empty-project",
+              "isWorktree": false,
+              "modelId": "parity-claude",
+              "yolo": false,
+              "activity": "idle",
+              "resident": true,
+              "lastChangeUnixMs": 1789622231497,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "result": {
+          "stopReason": "cancelled",
+          "_meta": {
+            "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+            "requestId": "ae51d9ba-c562-410d-885f-d222256f9701",
+            "promptId": "ae51d9ba-c562-410d-885f-d222256f9701",
+            "totalTokens": 15238,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 15087,
+            "outputTokens": 151,
+            "cachedReadTokens": 14877,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 15087,
+              "outputTokens": 151,
+              "totalTokens": 15238,
+              "cachedReadTokens": 14877,
+              "cacheCreationTokens": 207,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 3143,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 15087,
+                  "outputTokens": 151,
+                  "totalTokens": 15238,
+                  "cachedReadTokens": 14877,
+                  "cacheCreationTokens": 207,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 3143
+                }
+              },
+              "numTurns": 1
+            },
+            "cancellationCategory": "PermissionRejected",
+            "cancellationContext": {
+              "tool_name": "write",
+              "reason": "User rejected the execution"
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "INFINISHELL_GROK_APPROVAL: Use only the write tool to create the new file <private-smoke>/empty-project/approval-deny.txt with exactly this UTF-8 content: \"INFINISHELL_GROK_APPROVAL_DENY\\n\". The JSON quotes are not part of the file; the escaped newline is one newline. Request approval. Do not run shell commands or inspect other files. If approval is denied, do not retry or use another tool; reply DENIED_AS_EXPECTED."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+              "title": null,
+              "cwd": "<private-smoke>/empty-project",
+              "isWorktree": false,
+              "modelId": "parity-claude",
+              "yolo": false,
+              "activity": "working",
+              "resident": true,
+              "lastChangeUnixMs": 1789622231501,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": [
+            {
+              "id": "fef17346-25e8-441d-8a83-9c156fc07888",
+              "version": 0,
+              "kind": "prompt",
+              "text": "INFINISHELL_GROK_APPROVAL: Use only the write tool to create the new file <private-smoke>/empty-project/approval-deny.txt with exactly this UTF-8 content: \"INFINISHELL_GROK_APPROVAL_DENY\\n\". The JSON quotes are not part of the file; the escaped newline is one newline. Request approval. Do not run shell commands or inspect other files. If approval is denied, do not retry or use another tool; reply DENIED_AS_EXPECTED.",
+              "position": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": [],
+          "runningPromptId": "fef17346-25e8-441d-8a83-9c156fc07888",
+          "runningText": "INFINISHELL_GROK_APPROVAL: Use only the write tool to create the new file <private-smoke>/empty-project/approval-deny.txt with exactly this UTF-8 content: \"INFINISHELL_GROK_APPROVAL_DENY\\n\". The JSON quotes are not part of the file; the escaped newline is one newline. Request approval. Do not run shell commands or inspect other files. If approval is denied, do not retry or use another tool; reply DENIED_AS_EXPECTED.",
+          "runningKind": "prompt"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "response_started",
+            "message_id": "msg_011Cf8SkFF2GupD9udRG9L3a",
+            "model": "claude-sonnet-4-6",
+            "input_tokens": 3,
+            "cache_read_input_tokens": 15084,
+            "cache_creation_input_tokens": 355
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "ALLOW"
+            }
+          },
+          "_meta": {
+            "totalTokens": 15380,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-30",
+            "agentTimestampMs": 1789622233271,
+            "promptId": "fef17346-25e8-441d-8a83-9c156fc07888",
+            "streamStartMs": 1789622233260,
+            "turnStartMs": 1789622231562,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 1
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "_WAS_DENIED"
+            }
+          },
+          "_meta": {
+            "totalTokens": 15380,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-31",
+            "agentTimestampMs": 1789622233380,
+            "promptId": "fef17346-25e8-441d-8a83-9c156fc07888",
+            "streamStartMs": 1789622233260,
+            "turnStartMs": 1789622231562,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 2
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_call_id": "toolu_01NM24K7Qx16dTASjCjkLcd3",
+            "tool_index": 0,
+            "name": "write"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": ""
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "{\"file_"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "path\": "
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "\"/priva"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "te/var/"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "folders"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "/qp/t9_"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "qxjfn4x"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "l22sbd8"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "3t4qh7m"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "0000gp/"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "T/infin"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "ishell-"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "grok-re"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "al-smok"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "e-10qql"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "zu1/emp"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "ty-proj"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "ect/app"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "roval-d"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "eny.txt"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "\""
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": ", \"cont"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "ent\": \""
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "INFINIS"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "HELL_GR"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "OK_APPR"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "OVAL_DE"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_delta_chunk",
+            "tool_index": 0,
+            "arguments_delta": "NY\\n\"}"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                },
+                "_meta": {
+                  "workflowSource": "builtin",
+                  "workflowPath": "/Users/admin/actions-runner/_work/xai/xai/crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "send_feedback",
+                "web_search",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 15601,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-32",
+            "agentTimestampMs": 1789622234702,
+            "promptId": "fef17346-25e8-441d-8a83-9c156fc07888",
+            "streamStartMs": 1789622233260,
+            "turnStartMs": 1789622231562,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 9
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "response_completed",
+            "message_id": "msg_011Cf8SkFF2GupD9udRG9L3a",
+            "stop_reason": "tool_use",
+            "usage": {
+              "input_tokens": 3,
+              "output_tokens": 159,
+              "cache_read_input_tokens": 15084,
+              "cache_creation_input_tokens": 355,
+              "reasoning_tokens": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call",
+            "toolCallId": "toolu_01NM24K7Qx16dTASjCjkLcd3",
+            "title": "write",
+            "rawInput": {
+              "file_path": "<private-smoke>/empty-project/approval-deny.txt",
+              "content": "INFINISHELL_GROK_APPROVAL_DENY\n"
+            },
+            "_meta": {
+              "x.ai/tool": {
+                "version": 1,
+                "name": "write",
+                "kind": "write",
+                "namespace": "opencode",
+                "label": "Write",
+                "read_only": false
+              }
+            }
+          },
+          "_meta": {
+            "totalTokens": 15601,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-33",
+            "agentTimestampMs": 1789622234703,
+            "promptId": "fef17346-25e8-441d-8a83-9c156fc07888",
+            "streamStartMs": 1789622233260,
+            "turnStartMs": 1789622231562,
+            "updateType": "ToolCall",
+            "updateParams": {
+              "toolCallId": "toolu_01NM24K7Qx16dTASjCjkLcd3",
+              "title": "write",
+              "kind": "Other",
+              "status": "Pending"
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "pending_interaction",
+            "tool_call_id": "toolu_01NM24K7Qx16dTASjCjkLcd3",
+            "kind": "permission"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "toolu_01NM24K7Qx16dTASjCjkLcd3",
+            "kind": "edit",
+            "title": "Write `<private-smoke>/empty-project/approval-deny.txt`",
+            "content": [
+              {
+                "type": "diff",
+                "path": "<private-smoke>/empty-project/approval-deny.txt",
+                "oldText": "",
+                "newText": "INFINISHELL_GROK_APPROVAL_DENY\n"
+              }
+            ],
+            "locations": [
+              {
+                "path": "<private-smoke>/empty-project/approval-deny.txt"
+              }
+            ],
+            "rawInput": {
+              "variant": "Write",
+              "file_path": "<private-smoke>/empty-project/approval-deny.txt",
+              "content": "INFINISHELL_GROK_APPROVAL_DENY\n"
+            },
+            "_meta": {
+              "x.ai/tool": {
+                "version": 1,
+                "name": "write",
+                "kind": "write",
+                "namespace": "opencode",
+                "label": "Write",
+                "read_only": false,
+                "input": {
+                  "path": "<private-smoke>/empty-project/approval-deny.txt"
+                }
+              }
+            }
+          },
+          "_meta": {
+            "totalTokens": 15601,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-34",
+            "agentTimestampMs": 1789622234703,
+            "promptId": "fef17346-25e8-441d-8a83-9c156fc07888",
+            "streamStartMs": 1789622233260,
+            "turnStartMs": 1789622231562,
+            "updateType": "ToolCallUpdate",
+            "updateParams": {
+              "toolCallId": "toolu_01NM24K7Qx16dTASjCjkLcd3",
+              "status": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session/request_permission",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "toolCall": {
+            "toolCallId": "toolu_01NM24K7Qx16dTASjCjkLcd3",
+            "kind": "edit",
+            "title": "Write `<private-smoke>/empty-project/approval-deny.txt`",
+            "rawInput": {
+              "variant": "Write",
+              "file_path": "<private-smoke>/empty-project/approval-deny.txt",
+              "content": "INFINISHELL_GROK_APPROVAL_DENY\n"
+            },
+            "_meta": {
+              "x.ai/tool": {
+                "version": 1,
+                "name": "write",
+                "kind": "write",
+                "namespace": "opencode",
+                "label": "Write",
+                "read_only": false,
+                "input": {
+                  "path": "<private-smoke>/empty-project/approval-deny.txt"
+                }
+              }
+            }
+          },
+          "options": [
+            {
+              "optionId": "allow-edits-session",
+              "name": "Yes, allow all edits during this session",
+              "kind": "allow_always"
+            },
+            {
+              "optionId": "allow-once",
+              "name": "Yes",
+              "kind": "allow_once"
+            },
+            {
+              "optionId": "reject-once",
+              "name": "No, and tell Grok what to do differently",
+              "kind": "reject_once"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "outcome": {
+            "outcome": "selected",
+            "optionId": "reject-once"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "interaction_resolved",
+            "tool_call_id": "toolu_01NM24K7Qx16dTASjCjkLcd3"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "toolu_01NM24K7Qx16dTASjCjkLcd3",
+            "status": "failed",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "User rejected the execution for tool `write`"
+                }
+              }
+            ]
+          },
+          "_meta": {
+            "totalTokens": 15601,
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-35",
+            "agentTimestampMs": 1789622234709,
+            "promptId": "fef17346-25e8-441d-8a83-9c156fc07888",
+            "streamStartMs": 1789622233260,
+            "turnStartMs": 1789622231562,
+            "updateType": "ToolCallUpdate",
+            "updateParams": {
+              "toolCallId": "toolu_01NM24K7Qx16dTASjCjkLcd3",
+              "status": "Failed"
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "entries": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "update": {
+            "sessionUpdate": "turn_completed",
+            "prompt_id": "fef17346-25e8-441d-8a83-9c156fc07888",
+            "stop_reason": "cancelled",
+            "usage": {
+              "inputTokens": 15442,
+              "outputTokens": 159,
+              "totalTokens": 15601,
+              "cachedReadTokens": 15084,
+              "cacheCreationTokens": 355,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 3139,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 15442,
+                  "outputTokens": 159,
+                  "totalTokens": 15601,
+                  "cachedReadTokens": 15084,
+                  "cacheCreationTokens": 355,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 3139
+                }
+              },
+              "numTurns": 1
+            },
+            "elapsed_ms": 3337
+          },
+          "_meta": {
+            "eventId": "01a0adcc-0181-7123-9711-4915aef03756-37",
+            "agentTimestampMs": 1789622234840,
+            "cancellationCategory": "PermissionRejected",
+            "cancellationContext": {
+              "tool_name": "write",
+              "reason": "User rejected the execution"
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session/prompt_complete",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "promptId": "fef17346-25e8-441d-8a83-9c156fc07888",
+          "stopReason": "cancelled",
+          "agentResult": null,
+          "cancellationCategory": "PermissionRejected",
+          "cancellationContext": {
+            "tool_name": "write",
+            "reason": "User rejected the execution"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+              "title": null,
+              "cwd": "<private-smoke>/empty-project",
+              "isWorktree": false,
+              "modelId": "parity-claude",
+              "yolo": false,
+              "activity": "idle",
+              "resident": true,
+              "lastChangeUnixMs": 1789622234840,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "result": {
+          "stopReason": "cancelled",
+          "_meta": {
+            "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+            "requestId": "fef17346-25e8-441d-8a83-9c156fc07888",
+            "promptId": "fef17346-25e8-441d-8a83-9c156fc07888",
+            "totalTokens": 15601,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 15442,
+            "outputTokens": 159,
+            "cachedReadTokens": 15084,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 15442,
+              "outputTokens": 159,
+              "totalTokens": 15601,
+              "cachedReadTokens": 15084,
+              "cacheCreationTokens": 355,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 3139,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 15442,
+                  "outputTokens": 159,
+                  "totalTokens": 15601,
+                  "cachedReadTokens": 15084,
+                  "cacheCreationTokens": 355,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 3139
+                }
+              },
+              "numTurns": 1
+            },
+            "cancellationCategory": "PermissionRejected",
+            "cancellationContext": {
+              "tool_name": "write",
+              "reason": "User rejected the execution"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "proxy": [
+    {
+      "event": "rejected",
+      "status": 405,
+      "reason": "仅允许一次 Messages POST"
+    },
+    {
+      "event": "rejected",
+      "status": 403,
+      "reason": "路径不在允许范围"
+    },
+    {
+      "event": "rejected",
+      "status": 405,
+      "reason": "仅允许一次 Messages POST"
+    },
+    {
+      "event": "forwarding",
+      "request_number": 1,
+      "model": "claude-sonnet-4-6",
+      "max_tokens": 100,
+      "message_count": 1,
+      "tools_count": 1,
+      "contains_fixed_receipt": true,
+      "request_bytes": 1238,
+      "destination": "<用户指定服务 HTTPS origin>/v1/messages"
+    },
+    {
+      "event": "forwarding",
+      "request_number": 2,
+      "model": "claude-sonnet-4-6",
+      "max_tokens": 1024,
+      "message_count": 3,
+      "tools_count": 26,
+      "contains_fixed_receipt": true,
+      "request_bytes": 51563,
+      "destination": "<用户指定服务 HTTPS origin>/v1/messages"
+    },
+    {
+      "event": "upstream_response",
+      "status": 200,
+      "destination": "<用户指定服务 HTTPS origin>/v1/messages",
+      "model": "claude-sonnet-4-6",
+      "request_number": 1,
+      "request_bytes": 1238,
+      "stream": true,
+      "credential_sent_only_to_configured_origin": true
+    },
+    {
+      "event": "upstream_response",
+      "status": 200,
+      "destination": "<用户指定服务 HTTPS origin>/v1/messages",
+      "model": "claude-sonnet-4-6",
+      "request_number": 2,
+      "request_bytes": 51563,
+      "stream": true,
+      "credential_sent_only_to_configured_origin": true
+    },
+    {
+      "event": "forwarding",
+      "request_number": 3,
+      "model": "claude-sonnet-4-6",
+      "max_tokens": 1024,
+      "message_count": 5,
+      "tools_count": 26,
+      "contains_fixed_receipt": true,
+      "request_bytes": 51877,
+      "destination": "<用户指定服务 HTTPS origin>/v1/messages"
+    },
+    {
+      "event": "upstream_response",
+      "status": 200,
+      "destination": "<用户指定服务 HTTPS origin>/v1/messages",
+      "model": "claude-sonnet-4-6",
+      "request_number": 3,
+      "request_bytes": 51877,
+      "stream": true,
+      "credential_sent_only_to_configured_origin": true
+    },
+    {
+      "event": "forwarding",
+      "request_number": 4,
+      "model": "claude-sonnet-4-6",
+      "max_tokens": 1024,
+      "message_count": 7,
+      "tools_count": 26,
+      "contains_fixed_receipt": true,
+      "request_bytes": 52580,
+      "destination": "<用户指定服务 HTTPS origin>/v1/messages"
+    },
+    {
+      "event": "upstream_response",
+      "status": 200,
+      "destination": "<用户指定服务 HTTPS origin>/v1/messages",
+      "model": "claude-sonnet-4-6",
+      "request_number": 4,
+      "request_bytes": 52580,
+      "stream": true,
+      "credential_sent_only_to_configured_origin": true
+    },
+    {
+      "event": "forwarding",
+      "request_number": 5,
+      "model": "claude-sonnet-4-6",
+      "max_tokens": 1024,
+      "message_count": 10,
+      "tools_count": 26,
+      "contains_fixed_receipt": true,
+      "request_bytes": 53621,
+      "destination": "<用户指定服务 HTTPS origin>/v1/messages"
+    },
+    {
+      "event": "upstream_response",
+      "status": 200,
+      "destination": "<用户指定服务 HTTPS origin>/v1/messages",
+      "model": "claude-sonnet-4-6",
+      "request_number": 5,
+      "request_bytes": 53621,
+      "stream": true,
+      "credential_sent_only_to_configured_origin": true
+    }
+  ],
+  "requests_forwarded": 5,
+  "client_tools_denied": 2,
+  "permissions": [
+    {
+      "phase": "allow",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "session/request_permission",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "toolCall": {
+            "toolCallId": "toolu_01NCMBW8xZRTyXVPozzh8W34",
+            "kind": "edit",
+            "title": "Write `<private-smoke>/empty-project/approval-allow.txt`",
+            "rawInput": {
+              "variant": "Write",
+              "file_path": "<private-smoke>/empty-project/approval-allow.txt",
+              "content": "INFINISHELL_GROK_APPROVAL_ALLOW\n"
+            },
+            "_meta": {
+              "x.ai/tool": {
+                "version": 1,
+                "name": "write",
+                "kind": "write",
+                "namespace": "opencode",
+                "label": "Write",
+                "read_only": false,
+                "input": {
+                  "path": "<private-smoke>/empty-project/approval-allow.txt"
+                }
+              }
+            }
+          },
+          "options": [
+            {
+              "optionId": "allow-edits-session",
+              "name": "Yes, allow all edits during this session",
+              "kind": "allow_always"
+            },
+            {
+              "optionId": "allow-once",
+              "name": "Yes",
+              "kind": "allow_once"
+            },
+            {
+              "optionId": "reject-once",
+              "name": "No, and tell Grok what to do differently",
+              "kind": "reject_once"
+            }
+          ]
+        }
+      },
+      "correlated_tool_call": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "toolu_01NCMBW8xZRTyXVPozzh8W34",
+        "title": "Write `<private-smoke>/empty-project/approval-allow.txt`",
+        "rawInput": {
+          "variant": "Write",
+          "file_path": "<private-smoke>/empty-project/approval-allow.txt",
+          "content": "INFINISHELL_GROK_APPROVAL_ALLOW\n"
+        },
+        "_meta": {
+          "x.ai/tool": {
+            "version": 1,
+            "name": "write",
+            "kind": "write",
+            "namespace": "opencode",
+            "label": "Write",
+            "read_only": false,
+            "input": {
+              "path": "<private-smoke>/empty-project/approval-allow.txt"
+            }
+          }
+        },
+        "kind": "edit",
+        "content": [
+          {
+            "type": "diff",
+            "path": "<private-smoke>/empty-project/approval-allow.txt",
+            "oldText": "",
+            "newText": "INFINISHELL_GROK_APPROVAL_ALLOW\n"
+          }
+        ],
+        "locations": [
+          {
+            "path": "<private-smoke>/empty-project/approval-allow.txt"
+          }
+        ]
+      },
+      "exact_allow_target_and_content": false,
+      "exact_deny_target_and_content": false,
+      "granted_once": false,
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "outcome": {
+            "outcome": "selected",
+            "optionId": "reject-once"
+          }
+        }
+      }
+    },
+    {
+      "phase": "deny",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session/request_permission",
+        "params": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "toolCall": {
+            "toolCallId": "toolu_01NM24K7Qx16dTASjCjkLcd3",
+            "kind": "edit",
+            "title": "Write `<private-smoke>/empty-project/approval-deny.txt`",
+            "rawInput": {
+              "variant": "Write",
+              "file_path": "<private-smoke>/empty-project/approval-deny.txt",
+              "content": "INFINISHELL_GROK_APPROVAL_DENY\n"
+            },
+            "_meta": {
+              "x.ai/tool": {
+                "version": 1,
+                "name": "write",
+                "kind": "write",
+                "namespace": "opencode",
+                "label": "Write",
+                "read_only": false,
+                "input": {
+                  "path": "<private-smoke>/empty-project/approval-deny.txt"
+                }
+              }
+            }
+          },
+          "options": [
+            {
+              "optionId": "allow-edits-session",
+              "name": "Yes, allow all edits during this session",
+              "kind": "allow_always"
+            },
+            {
+              "optionId": "allow-once",
+              "name": "Yes",
+              "kind": "allow_once"
+            },
+            {
+              "optionId": "reject-once",
+              "name": "No, and tell Grok what to do differently",
+              "kind": "reject_once"
+            }
+          ]
+        }
+      },
+      "correlated_tool_call": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "toolu_01NM24K7Qx16dTASjCjkLcd3",
+        "title": "Write `<private-smoke>/empty-project/approval-deny.txt`",
+        "rawInput": {
+          "variant": "Write",
+          "file_path": "<private-smoke>/empty-project/approval-deny.txt",
+          "content": "INFINISHELL_GROK_APPROVAL_DENY\n"
+        },
+        "_meta": {
+          "x.ai/tool": {
+            "version": 1,
+            "name": "write",
+            "kind": "write",
+            "namespace": "opencode",
+            "label": "Write",
+            "read_only": false,
+            "input": {
+              "path": "<private-smoke>/empty-project/approval-deny.txt"
+            }
+          }
+        },
+        "kind": "edit",
+        "content": [
+          {
+            "type": "diff",
+            "path": "<private-smoke>/empty-project/approval-deny.txt",
+            "oldText": "",
+            "newText": "INFINISHELL_GROK_APPROVAL_DENY\n"
+          }
+        ],
+        "locations": [
+          {
+            "path": "<private-smoke>/empty-project/approval-deny.txt"
+          }
+        ]
+      },
+      "exact_allow_target_and_content": false,
+      "exact_deny_target_and_content": false,
+      "granted_once": false,
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "outcome": {
+            "outcome": "selected",
+            "optionId": "reject-once"
+          }
+        }
+      }
+    }
+  ],
+  "turns": [
+    {
+      "phase": "round_1",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "stopReason": "end_turn",
+          "_meta": {
+            "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+            "requestId": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+            "promptId": "eecdbaa6-b861-487f-b198-df851b6bf23e",
+            "totalTokens": 14833,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 14814,
+            "outputTokens": 19,
+            "cachedReadTokens": 0,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 14814,
+              "outputTokens": 19,
+              "totalTokens": 14833,
+              "cachedReadTokens": 0,
+              "cacheCreationTokens": 14811,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 2523,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 14814,
+                  "outputTokens": 19,
+                  "totalTokens": 14833,
+                  "cachedReadTokens": 0,
+                  "cacheCreationTokens": 14811,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 2523
+                }
+              },
+              "numTurns": 1
+            }
+          }
+        }
+      },
+      "assistant_text": "INFINISHELL_GROK_APPROVAL_ROUND_1"
+    },
+    {
+      "phase": "round_2",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "stopReason": "end_turn",
+          "_meta": {
+            "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+            "requestId": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+            "promptId": "9cd20535-65e6-405c-b5bc-97a2b6935d88",
+            "totalTokens": 14899,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 14880,
+            "outputTokens": 19,
+            "cachedReadTokens": 14811,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 14880,
+              "outputTokens": 19,
+              "totalTokens": 14899,
+              "cachedReadTokens": 14811,
+              "cacheCreationTokens": 66,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 1735,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 14880,
+                  "outputTokens": 19,
+                  "totalTokens": 14899,
+                  "cachedReadTokens": 14811,
+                  "cacheCreationTokens": 66,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 1735
+                }
+              },
+              "numTurns": 1
+            }
+          }
+        }
+      },
+      "assistant_text": "INFINISHELL_GROK_APPROVAL_ROUND_2"
+    },
+    {
+      "phase": "allow",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "result": {
+          "stopReason": "cancelled",
+          "_meta": {
+            "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+            "requestId": "ae51d9ba-c562-410d-885f-d222256f9701",
+            "promptId": "ae51d9ba-c562-410d-885f-d222256f9701",
+            "totalTokens": 15238,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 15087,
+            "outputTokens": 151,
+            "cachedReadTokens": 14877,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 15087,
+              "outputTokens": 151,
+              "totalTokens": 15238,
+              "cachedReadTokens": 14877,
+              "cacheCreationTokens": 207,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 3143,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 15087,
+                  "outputTokens": 151,
+                  "totalTokens": 15238,
+                  "cachedReadTokens": 14877,
+                  "cacheCreationTokens": 207,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 3143
+                }
+              },
+              "numTurns": 1
+            },
+            "cancellationCategory": "PermissionRejected",
+            "cancellationContext": {
+              "tool_name": "write",
+              "reason": "User rejected the execution"
+            }
+          }
+        }
+      },
+      "assistant_text": ""
+    },
+    {
+      "phase": "deny",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "result": {
+          "stopReason": "cancelled",
+          "_meta": {
+            "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+            "requestId": "fef17346-25e8-441d-8a83-9c156fc07888",
+            "promptId": "fef17346-25e8-441d-8a83-9c156fc07888",
+            "totalTokens": 15601,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 15442,
+            "outputTokens": 159,
+            "cachedReadTokens": 15084,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 15442,
+              "outputTokens": 159,
+              "totalTokens": 15601,
+              "cachedReadTokens": 15084,
+              "cacheCreationTokens": 355,
+              "reasoningTokens": 0,
+              "modelCalls": 1,
+              "apiDurationMs": 3139,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 15442,
+                  "outputTokens": 159,
+                  "totalTokens": 15601,
+                  "cachedReadTokens": 15084,
+                  "cacheCreationTokens": 355,
+                  "reasoningTokens": 0,
+                  "modelCalls": 1,
+                  "apiDurationMs": 3139
+                }
+              },
+              "numTurns": 1
+            },
+            "cancellationCategory": "PermissionRejected",
+            "cancellationContext": {
+              "tool_name": "write",
+              "reason": "User rejected the execution"
+            }
+          }
+        }
+      },
+      "assistant_text": "ALLOW_WAS_DENIED"
+    }
+  ],
+  "binary_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "script_sha256": "d175de6e13ff342f6faba271657c2712a14ab22a6b5739c8f3f9262e73060e50",
+  "outbound_destination": "<用户指定服务 HTTPS origin>/v1/messages",
+  "credential_source": "<用户授权的临时凭据文件>",
+  "sandbox_profile": "(version 1)(allow default)(deny network*)(allow network-outbound (remote ip \"localhost:54999\"))(deny file-read* (subpath \"/private/tmp/infinishell-claude-login-81lk9az5\") (subpath \"/tmp/infinishell-claude-login-81lk9az5\"))",
+  "sandbox_canary": {
+    "exit_code": 0,
+    "result": {
+      "allowed": {
+        "connected": true
+      },
+      "other_loopback": {
+        "errno": 1
+      },
+      "external": {
+        "errno": 1
+      },
+      "credential_file_read_errno": 1
+    },
+    "stderr": ""
+  },
+  "disabled_features": [
+    "turn_summary",
+    "title_refresh"
+  ],
+  "permission_policy": {
+    "action": "ask",
+    "tool": "any"
+  },
+  "native_sandbox_profile": "(version 1)(allow default)(deny network*)(allow network-outbound (remote ip \"localhost:54999\"))(deny file-read* (subpath \"<redacted>\") (subpath \"/tmp/infinishell-claude-login-81lk9az5\"))(deny file-write*)(allow file-write* (subpath \"<private-smoke>\") (literal \"/dev/null\"))",
+  "command": [
+    "/usr/bin/sandbox-exec",
+    "-p",
+    "(version 1)(allow default)(deny network*)(allow network-outbound (remote ip \"localhost:54999\"))(deny file-read* (subpath \"<redacted>\") (subpath \"/tmp/infinishell-claude-login-81lk9az5\"))(deny file-write*)(allow file-write* (subpath \"<private-smoke>\") (literal \"/dev/null\"))",
+    "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+    "agent",
+    "--no-leader",
+    "stdio"
+  ],
+  "environment_names": [
+    "GROK_DISABLE_AUTOUPDATER",
+    "GROK_HOME",
+    "HOME",
+    "INFINISHELL_GROK_BYOK_KEY",
+    "PATH",
+    "XDG_CONFIG_HOME"
+  ],
+  "initialize": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {},
+        "_meta": {
+          "x.ai/fs_notify": true,
+          "x.ai/hooks": {
+            "blockingEvents": [
+              "pre_tool_use",
+              "stop",
+              "subagent_stop"
+            ],
+            "decisions": [
+              "deny",
+              "block"
+            ],
+            "stopSignals": [
+              "continue",
+              "stopReason",
+              "additionalContext"
+            ]
+          },
+          "x.ai/capabilities": {
+            "toolOverrides": {
+              "x_keyword_search": true,
+              "x_semantic_search": true,
+              "x_user_search": false,
+              "x_thread_fetch": false
+            }
+          }
+        }
+      },
+      "authMethods": [
+        {
+          "id": "xai.api_key",
+          "name": "xai.api_key",
+          "description": "XAI_API_KEY or api_key/env_key in config.toml"
+        },
+        {
+          "id": "grok.com",
+          "name": "Grok",
+          "description": "Sign in with Grok"
+        }
+      ],
+      "_meta": {
+        "grokShell": true,
+        "defaultAuthMethodId": "xai.api_key",
+        "x.ai/mcp/sdk": true,
+        "x.ai/pluginDirs": true,
+        "currentWorkingDirectory": "<private-smoke>/empty-project",
+        "agentVersion": "1.0.30",
+        "agentId": "f61b1c8b-30d3-5374-b905-a6e3c49d3fb4",
+        "agentInstanceId": "ed884f78-8cbf-4db6-9a23-c09804fca6db",
+        "hostname": "<redacted>",
+        "modelState": {
+          "currentModelId": "parity-claude",
+          "availableModels": [
+            {
+              "modelId": "grok-4.6",
+              "name": "Grok 4.6",
+              "description": "SpaceXAI's latest frontier model",
+              "_meta": {
+                "totalContextTokens": 500000,
+                "agentType": "grok-build-plan",
+                "supportsReasoningEffort": true,
+                "reasoningEffort": "high",
+                "reasoningEfforts": [
+                  {
+                    "id": "xhigh",
+                    "value": "xhigh",
+                    "label": "Extra High Effort",
+                    "description": "Highest effort and reasoning level",
+                    "default": false
+                  },
+                  {
+                    "id": "high",
+                    "value": "high",
+                    "label": "High Effort",
+                    "description": "Higher implementation quality with extensive reasoning",
+                    "default": true
+                  },
+                  {
+                    "id": "medium",
+                    "value": "medium",
+                    "label": "Medium Effort",
+                    "description": "Balanced effort with standard implementation and testing",
+                    "default": false
+                  },
+                  {
+                    "id": "low",
+                    "value": "low",
+                    "label": "Low Effort",
+                    "description": "Quick, fast implementations",
+                    "default": false
+                  }
+                ]
+              }
+            },
+            {
+              "modelId": "grok-4.5",
+              "name": "Grok 4.5",
+              "_meta": {
+                "totalContextTokens": 500000,
+                "agentType": "grok-build-plan",
+                "supportsReasoningEffort": true,
+                "reasoningEffort": "high",
+                "reasoningEfforts": [
+                  {
+                    "id": "high",
+                    "value": "high",
+                    "label": "High Effort",
+                    "description": "Highest implementation quality with extensive reasoning",
+                    "default": true
+                  },
+                  {
+                    "id": "medium",
+                    "value": "medium",
+                    "label": "Medium Effort",
+                    "description": "Balanced effort with standard implementation and testing",
+                    "default": false
+                  },
+                  {
+                    "id": "low",
+                    "value": "low",
+                    "label": "Low Effort",
+                    "description": "Quick, fast implementations",
+                    "default": false
+                  }
+                ]
+              }
+            },
+            {
+              "modelId": "parity-claude",
+              "name": "Grok Build - custom Claude backend",
+              "_meta": {
+                "totalContextTokens": 200000,
+                "agentType": "grok-build-plan"
+              }
+            }
+          ]
+        },
+        "mcpServers": [],
+        "mcpApps": false,
+        "metadata": null,
+        "availableCommands": [
+          {
+            "name": "compact",
+            "description": "Compress conversation history to save context window",
+            "input": {
+              "hint": "optional context about what to preserve"
+            }
+          },
+          {
+            "name": "always-approve",
+            "description": "Toggle always-approve mode (skip all permission prompts)",
+            "input": {
+              "hint": "on|off"
+            }
+          },
+          {
+            "name": "context",
+            "description": "Show context window usage and session stats",
+            "input": null
+          },
+          {
+            "name": "session-info",
+            "description": "Show session details (model, turns, context usage)",
+            "input": null
+          },
+          {
+            "name": "deep-research",
+            "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+            "input": {
+              "hint": "<query>"
+            }
+          },
+          {
+            "name": "workflow",
+            "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+            "input": {
+              "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+            }
+          },
+          {
+            "name": "goal",
+            "description": "Set, manage, or check an autonomous goal",
+            "input": {
+              "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+            }
+          }
+        ],
+        "cancelRewind": true,
+        "sessionRecap": true,
+        "feedbackTraceOffer": false,
+        "voiceMode": true
+      }
+    }
+  },
+  "authenticate": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {}
+  },
+  "session_new": {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "result": {
+      "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+      "models": {
+        "currentModelId": "parity-claude",
+        "availableModels": [
+          {
+            "modelId": "grok-4.6",
+            "name": "Grok 4.6",
+            "description": "SpaceXAI's latest frontier model",
+            "_meta": {
+              "totalContextTokens": 500000,
+              "agentType": "grok-build-plan",
+              "supportsReasoningEffort": true,
+              "reasoningEffort": "high",
+              "reasoningEfforts": [
+                {
+                  "id": "xhigh",
+                  "value": "xhigh",
+                  "label": "Extra High Effort",
+                  "description": "Highest effort and reasoning level",
+                  "default": false
+                },
+                {
+                  "id": "high",
+                  "value": "high",
+                  "label": "High Effort",
+                  "description": "Higher implementation quality with extensive reasoning",
+                  "default": true
+                },
+                {
+                  "id": "medium",
+                  "value": "medium",
+                  "label": "Medium Effort",
+                  "description": "Balanced effort with standard implementation and testing",
+                  "default": false
+                },
+                {
+                  "id": "low",
+                  "value": "low",
+                  "label": "Low Effort",
+                  "description": "Quick, fast implementations",
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "modelId": "grok-4.5",
+            "name": "Grok 4.5",
+            "_meta": {
+              "totalContextTokens": 500000,
+              "agentType": "grok-build-plan",
+              "supportsReasoningEffort": true,
+              "reasoningEffort": "high",
+              "reasoningEfforts": [
+                {
+                  "id": "high",
+                  "value": "high",
+                  "label": "High Effort",
+                  "description": "Highest implementation quality with extensive reasoning",
+                  "default": true
+                },
+                {
+                  "id": "medium",
+                  "value": "medium",
+                  "label": "Medium Effort",
+                  "description": "Balanced effort with standard implementation and testing",
+                  "default": false
+                },
+                {
+                  "id": "low",
+                  "value": "low",
+                  "label": "Low Effort",
+                  "description": "Quick, fast implementations",
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "modelId": "parity-claude",
+            "name": "Grok Build - custom Claude backend",
+            "_meta": {
+              "totalContextTokens": 200000,
+              "agentType": "grok-build-plan"
+            }
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "id": "model",
+          "name": "Model",
+          "category": "model",
+          "type": "select",
+          "currentValue": "parity-claude",
+          "options": [
+            {
+              "value": "grok-4.6",
+              "name": "Grok 4.6"
+            },
+            {
+              "value": "grok-4.5",
+              "name": "Grok 4.5"
+            },
+            {
+              "value": "parity-claude",
+              "name": "Grok Build - custom Claude backend"
+            }
+          ]
+        }
+      ],
+      "_meta": {
+        "currentWorkingDirectory": "<private-smoke>/empty-project",
+        "codebaseIndexed": [],
+        "isGitRepo": false,
+        "gitRoot": null,
+        "showNonGitWarning": false,
+        "feedbackEnabled": true,
+        "x.ai/sessionConfig": {
+          "options": [
+            {
+              "id": "grok-4.6",
+              "category": "model",
+              "label": "Grok 4.6",
+              "selected": false
+            },
+            {
+              "id": "grok-4.5",
+              "category": "model",
+              "label": "Grok 4.5",
+              "selected": false
+            },
+            {
+              "id": "parity-claude",
+              "category": "model",
+              "label": "Grok Build - custom Claude backend",
+              "selected": true
+            }
+          ]
+        },
+        "x.ai/sessionDetail": {
+          "sessionId": "01a0adcc-0181-7123-9711-4915aef03756",
+          "kind": "build",
+          "cwd": "<private-smoke>/empty-project",
+          "currentModelId": "parity-claude"
+        },
+        "x.ai/memoryMode": "legacy"
+      }
+    }
+  },
+  "files_initially_absent": true,
+  "allow_file_exists": false,
+  "allow_file_exact_content": false,
+  "deny_file_exists": false,
+  "allow_file_still_exact": false,
+  "project_files": [],
+  "forced_cleanup": false,
+  "exit_code": 0,
+  "readers_closed": true,
+  "auth_file_created": false,
+  "temporary_root_removed": true,
+  "proxy_stopped": true,
+  "assistant_text": "INFINISHELL_GROK_APPROVAL_ROUND_1INFINISHELL_GROK_APPROVAL_ROUND_2ALLOW_WAS_DENIED",
+  "tool_event_count": 6,
+  "passed": false
+}

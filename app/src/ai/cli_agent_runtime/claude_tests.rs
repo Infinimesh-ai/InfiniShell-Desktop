@@ -8,6 +8,12 @@ const AUTH_FAILURE: &str = include_str!(
 const MISSING_RESUME: &str = include_str!(
     "../../../../specs/cli-agent-parity/fixtures/claude-2.1.273-missing-resume.ndjson"
 );
+const STREAMING_INTERRUPT: &str = include_str!(
+    "../../../../specs/cli-agent-parity/fixtures/claude-2.1.273-streaming-interrupt.ndjson"
+);
+const EARLY_INTERRUPT: &str = include_str!(
+    "../../../../specs/cli-agent-parity/fixtures/claude-2.1.273-early-interrupt.ndjson"
+);
 
 fn options() -> SessionOptions {
     SessionOptions {
@@ -103,6 +109,87 @@ fn approval() -> Value {
         "subtype":"can_use_tool", "tool_name":"Bash", "input":{"command":"git status"},
         "tool_use_id":"tool-1", "permission_suggestions":[{"type":"setMode", "mode":"bypassPermissions"}]
     }})
+}
+
+fn aborted_result(turn_id: Uuid) -> Value {
+    let mut result = capture(STREAMING_INTERRUPT)
+        .into_iter()
+        .find(|message| message["type"] == "result")
+        .unwrap();
+    result["session_id"] = json!("3ddff71c-4062-4198-a130-502e4c15684e");
+    result["user_message_uuid"] = json!(turn_id.to_string());
+    result["user_message_uuids"] = json!([turn_id.to_string()]);
+    result
+}
+
+fn interrupt(protocol: &mut ClaudeProtocol, turn_id: Uuid) -> Value {
+    protocol
+        .command(command(
+            Uuid::from_u128(12),
+            RuntimeAction::Interrupt {
+                turn_id: turn_id.to_string(),
+            },
+        ))
+        .writes[0]
+        .clone()
+}
+
+fn replay_native_cancellation(fixture: &str) -> Vec<RuntimeEventKind> {
+    let mut protocol = ready_protocol();
+    let mut request_id = None;
+    let mut events = Vec::new();
+    for record in fixture
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+    {
+        let mut message = record["message"].clone();
+        match record["direction"].as_str().unwrap() {
+            "metadata" => {}
+            "stdin" if message["type"] == "user" => {
+                let turn_id = parse_uuid(&message, "uuid").unwrap();
+                protocol.command(submit(
+                    turn_id,
+                    message["message"]["content"].as_str().unwrap(),
+                ));
+            }
+            "stdin" => {
+                let turn_id = protocol.active_turn.unwrap();
+                request_id = Some(interrupt(&mut protocol, turn_id)["request_id"].clone());
+            }
+            "stdout" => {
+                if message["type"] == "control_response" {
+                    message["response"]["request_id"] = request_id.clone().unwrap();
+                }
+                events.extend(protocol.receive(message.clone()).unwrap().events);
+                assert!(protocol.receive(message).unwrap().events.is_empty());
+            }
+            _ => panic!("取消夹具含有未知方向"),
+        }
+    }
+    events
+        .into_iter()
+        .filter(|event| matches!(event, RuntimeEventKind::TurnFinished { .. }))
+        .collect()
+}
+
+#[test]
+fn captured_streaming_interrupt_finishes_once_as_cancelled() {
+    let events = replay_native_cancellation(STREAMING_INTERRUPT);
+    assert!(
+        matches!(events.as_slice(), [RuntimeEventKind::TurnFinished {
+        outcome: TurnOutcome::Cancelled, turn_id, ..
+    }] if turn_id == "16fd486b-fd06-43a3-b10e-4d6a6eac59e1")
+    );
+}
+
+#[test]
+fn captured_early_interrupt_finishes_once_as_cancelled() {
+    let events = replay_native_cancellation(EARLY_INTERRUPT);
+    assert!(
+        matches!(events.as_slice(), [RuntimeEventKind::TurnFinished {
+        outcome: TurnOutcome::Cancelled, turn_id, ..
+    }] if turn_id == "1af014f1-17ac-4700-bd42-4104abedefec")
+    );
 }
 
 #[test]
@@ -226,7 +313,14 @@ fn control_interrupt_ack_does_not_finish_the_turn() {
             .all(|event| matches!(event, RuntimeEventKind::MessageAccepted { .. }))
     );
     assert!(protocol.turn_is_running(turn_id));
-    let cancelled = protocol.receive(lifecycle(turn_id, "cancelled")).unwrap();
+    assert!(
+        protocol
+            .receive(lifecycle(turn_id, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    let cancelled = protocol.receive(aborted_result(turn_id)).unwrap();
     assert!(matches!(
         cancelled.events[0],
         RuntimeEventKind::TurnFinished {
@@ -241,6 +335,278 @@ fn control_interrupt_ack_does_not_finish_the_turn() {
             .events
             .is_empty()
     );
+}
+
+#[test]
+fn cancellation_waits_for_ack_after_both_native_terminal_signals() {
+    let (mut protocol, turn_id) = running_protocol();
+    let request = interrupt(&mut protocol, turn_id);
+    assert!(
+        protocol
+            .receive(lifecycle(turn_id, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert!(
+        protocol
+            .receive(aborted_result(turn_id))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    let events = protocol
+        .receive(control_response(
+            request["request_id"].as_str().unwrap(),
+            json!({}),
+        ))
+        .unwrap()
+        .events;
+    assert!(matches!(
+        events.as_slice(),
+        [
+            RuntimeEventKind::MessageAccepted { .. },
+            RuntimeEventKind::TurnFinished {
+                outcome: TurnOutcome::Cancelled,
+                ..
+            }
+        ]
+    ));
+}
+
+#[test]
+fn cancellation_without_native_lifecycle_fails_after_deadline() {
+    let (mut protocol, turn_id) = running_protocol();
+    let request = interrupt(&mut protocol, turn_id);
+    protocol
+        .receive(control_response(
+            request["request_id"].as_str().unwrap(),
+            json!({}),
+        ))
+        .unwrap();
+    assert!(
+        protocol
+            .receive(aborted_result(turn_id))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    protocol
+        .turns
+        .get_mut(&turn_id)
+        .unwrap()
+        .cancellation
+        .as_mut()
+        .unwrap()
+        .started_at = Instant::now() - REQUEST_TIMEOUT;
+    let effects = protocol.expire_cancellations();
+    assert!(
+        matches!(effects.events.as_slice(), [RuntimeEventKind::TurnFinished { outcome: TurnOutcome::Failed { message }, .. }] if message.contains("ede_diagnostic"))
+    );
+    assert!(
+        protocol
+            .receive(lifecycle(turn_id, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert!(protocol.expire_cancellations().events.is_empty());
+}
+
+#[test]
+fn cancellation_ack_without_native_result_fails_after_deadline() {
+    let (mut protocol, turn_id) = running_protocol();
+    let request = interrupt(&mut protocol, turn_id);
+    protocol
+        .receive(control_response(
+            request["request_id"].as_str().unwrap(),
+            json!({}),
+        ))
+        .unwrap();
+    assert!(
+        protocol
+            .receive(lifecycle(turn_id, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    protocol
+        .turns
+        .get_mut(&turn_id)
+        .unwrap()
+        .cancellation
+        .as_mut()
+        .unwrap()
+        .started_at = Instant::now() - REQUEST_TIMEOUT;
+    assert!(
+        matches!(protocol.expire_cancellations().events.as_slice(), [RuntimeEventKind::TurnFinished { outcome: TurnOutcome::Failed { message }, .. }] if message.contains("completion is uncertain"))
+    );
+}
+
+#[test]
+fn aborted_result_without_requested_interrupt_remains_failed() {
+    let (mut protocol, turn_id) = running_protocol();
+    let effects = protocol.receive(aborted_result(turn_id)).unwrap();
+    assert!(matches!(
+        effects.events.as_slice(),
+        [RuntimeEventKind::TurnFinished {
+            outcome: TurnOutcome::Failed { .. },
+            ..
+        }]
+    ));
+    assert!(
+        protocol
+            .receive(lifecycle(turn_id, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+}
+
+#[test]
+fn ordinary_execution_error_with_interrupt_ack_remains_failed() {
+    let (mut protocol, turn_id) = running_protocol();
+    let request = interrupt(&mut protocol, turn_id);
+    protocol
+        .receive(control_response(
+            request["request_id"].as_str().unwrap(),
+            json!({}),
+        ))
+        .unwrap();
+    assert!(
+        protocol
+            .receive(lifecycle(turn_id, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    let mut result = aborted_result(turn_id);
+    result["terminal_reason"] = json!("api_error");
+    result["errors"] = json!(["API authentication failed"]);
+    let effects = protocol.receive(result).unwrap();
+    assert!(
+        matches!(effects.events.as_slice(), [RuntimeEventKind::TurnFinished {
+        outcome: TurnOutcome::Failed { message }, ..
+    }] if message == "API authentication failed")
+    );
+}
+
+#[test]
+fn rejected_interrupt_cannot_upgrade_deferred_abort_to_cancelled() {
+    let (mut protocol, turn_id) = running_protocol();
+    let request = interrupt(&mut protocol, turn_id);
+    assert!(
+        protocol
+            .receive(aborted_result(turn_id))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    let effects = protocol
+        .receive(json!({"type":"control_response", "response":{
+            "subtype":"error", "request_id":request["request_id"], "error":"interrupt rejected"
+        }}))
+        .unwrap();
+    assert!(matches!(
+        effects.events.as_slice(),
+        [
+            RuntimeEventKind::RequestFailed { .. },
+            RuntimeEventKind::TurnFinished {
+                outcome: TurnOutcome::Failed { .. },
+                ..
+            }
+        ]
+    ));
+    assert!(
+        protocol
+            .receive(lifecycle(turn_id, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+}
+
+#[test]
+fn api_error_overrides_cancelled_lifecycle_before_aborted_result() {
+    let (mut protocol, turn_id) = running_protocol();
+    let request = interrupt(&mut protocol, turn_id);
+    protocol
+        .receive(control_response(
+            request["request_id"].as_str().unwrap(),
+            json!({}),
+        ))
+        .unwrap();
+    assert!(
+        protocol
+            .receive(lifecycle(turn_id, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    protocol.receive(json!({"type":"assistant", "uuid":"api-error-before-abort", "user_message_uuid":turn_id.to_string(),
+        "is_api_error_message":true, "message":{"content":[{"type":"text","text":"Not logged in"}]}})).unwrap();
+    let effects = protocol.receive(aborted_result(turn_id)).unwrap();
+    assert!(
+        matches!(effects.events.as_slice(), [RuntimeEventKind::TurnFinished { outcome: TurnOutcome::Failed { message }, .. }] if message == "Not logged in")
+    );
+}
+
+#[test]
+fn api_error_after_deferred_abort_prevents_late_cancellation() {
+    let (mut protocol, turn_id) = running_protocol();
+    let request = interrupt(&mut protocol, turn_id);
+    protocol
+        .receive(control_response(
+            request["request_id"].as_str().unwrap(),
+            json!({}),
+        ))
+        .unwrap();
+    assert!(
+        protocol
+            .receive(aborted_result(turn_id))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    let effects = protocol.receive(json!({"type":"assistant", "uuid":"api-error-after-abort", "user_message_uuid":turn_id.to_string(),
+        "is_api_error_message":true, "message":{"content":[{"type":"text","text":"Not logged in"}]}})).unwrap();
+    assert!(
+        matches!(effects.events.last(), Some(RuntimeEventKind::TurnFinished { outcome: TurnOutcome::Failed { message }, .. }) if message == "Not logged in")
+    );
+    assert!(
+        protocol
+            .receive(lifecycle(turn_id, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+}
+
+#[test]
+fn unrelated_cancelled_command_cannot_confirm_interrupted_turn() {
+    let (mut protocol, turn_id) = running_protocol();
+    let request = interrupt(&mut protocol, turn_id);
+    protocol
+        .receive(control_response(
+            request["request_id"].as_str().unwrap(),
+            json!({}),
+        ))
+        .unwrap();
+    assert!(
+        protocol
+            .receive(aborted_result(turn_id))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert!(
+        protocol
+            .receive(lifecycle(Uuid::from_u128(90), "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert!(protocol.turn_is_running(turn_id));
 }
 
 #[test]

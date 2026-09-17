@@ -1,0 +1,17 @@
+12:58:24.127 [INFO] [i18n_embed] Selecting translations for domain "warp"
+12:58:24.150 [INFO] [warp::i18n] [i18n] initialized; current_languages=[LanguageIdentifier { language: Language(Some("en")), script: None, region: None, variants: None }], fallback=en
+
+running 1 test
+test ai::cli_agent_runtime::claude::live_tests::real_claude_managed_lifecycle ... 
+thread 'ai::cli_agent_runtime::claude::live_tests::real_claude_managed_lifecycle' (2968610) panicked at app/src/ai/cli_agent_runtime/claude_live_tests.rs:579:5:
+真实 Claude 适配器验收未通过；检查脱敏证据文件
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    ai::cli_agent_runtime::claude::live_tests::real_claude_managed_lifecycle
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6511 filtered out; finished in 16.75s
+

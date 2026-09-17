@@ -13,15 +13,15 @@ from probe_codex_windows_conpty import (WinApi, environment_block, notifications
                                          shell_diagnostic_source, verify_transport)
 
 
-def fixture_case():
+def fixture_case(prompt='中文输入\nEnglish'):
     return {'name': '隔离 中文', 'passed': True, 'markers': {
         'on-session-start.sh': {'session_id': 'native-session-unique', 'cwd': 'C:/隔离 空格'},
-        'on-prompt-submit.sh': {'turn_id': 'native-turn-unique', 'cwd': 'C:/隔离 空格'}}}
+        'on-prompt-submit.sh': {'turn_id': 'native-turn-unique', 'cwd': 'C:/隔离 空格', 'prompt': prompt}}}
 
 
-def osc(event, session='native-session-unique', turn='native-turn-unique', terminator=b'\x07'):
+def osc(event, session='native-session-unique', turn='native-turn-unique', terminator=b'\x07', query='中文输入\nEnglish'):
     payload = {'v': 1, 'agent': 'codex', 'event': event, 'session_id': session,
-               'turn_id': turn, 'cwd': 'C:/隔离 空格'}
+               'turn_id': turn, 'cwd': 'C:/隔离 空格', 'query': query}
     return b'\x1b]777;notify;warp://cli-agent;' + json.dumps(payload, ensure_ascii=False).encode('utf-8') + terminator
 
 
@@ -37,6 +37,17 @@ class ConptyProbeTests(unittest.TestCase):
         raw = (osc('session_start') + osc('prompt_submit')).replace('隔离'.encode(), b'??')
         with self.assertRaises(ValueError):
             verify_transport(raw, [fixture_case()])
+
+    def test_query_must_preserve_lf_crlf_and_literal_escape_without_normalization(self):
+        for prompt in ('中文\nEnglish', '中文\r\nEnglish', 'literal \\r\\n'):
+            with self.subTest(prompt=repr(prompt)):
+                raw = osc('session_start') + osc('prompt_submit', query=prompt)
+                self.assertEqual(verify_transport(raw, [fixture_case(prompt)])[1]['query'], prompt)
+        for original, changed in (('中文\nEnglish', '中文\r\nEnglish'),
+                                  ('中文\r\nEnglish', '中文\nEnglish'),
+                                  ('literal \\r\\n', 'literal \r\n')):
+            with self.subTest(original=repr(original)), self.assertRaises(ValueError):
+                verify_transport(osc('session_start') + osc('prompt_submit', query=changed), [fixture_case(original)])
 
     def test_native_hook_success_without_osc_is_failure(self):
         with self.assertRaises(ValueError):

@@ -1,0 +1,1065 @@
+{
+  "binary": "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+  "binary_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "binary_version": "grok 1.0.30 (04b7ffed98c6)",
+  "schema_version": 1,
+  "probe_sha256": "a651087c1cd1120a4c7501573bb653fa1da14287494118e0a1f721b2d2df4cb2",
+  "cases": [
+    {
+      "model_env_key_present": true,
+      "global_api_key_present": false,
+      "legacy_global_api_key_present": false,
+      "real_credentials_read": false,
+      "model_requests": 0,
+      "session_new_requests": 0,
+      "sandbox_profile": "(version 1)(allow default)(deny network*)",
+      "config": "[cli]\nuse_leader = false\nauto_update = false\n[models]\ndefault = \"parity-claude\"\nsession_summary = \"parity-claude\"\nweb_search = \"parity-claude\"\nimage_description = \"parity-claude\"\n[model.parity-claude]\nmodel = \"claude-sonnet-4-6\"\nname = \"Grok Build - custom Claude backend\"\nbase_url = \"http://127.0.0.1:1/v1\"\nenv_key = \"INFINISHELL_GROK_BYOK_KEY\"\napi_backend = \"messages\"\ncontext_window = 200000\nmax_completion_tokens = 4096\nmax_retries = 0\nsupports_backend_search = false\nsupports_reasoning_effort = false\nstream_tool_calls = false\nextra_headers = { \"anthropic-version\" = \"2023-06-01\" }\n",
+      "records": [
+        {
+          "direction": "stdin",
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": 1,
+              "clientCapabilities": {
+                "fs": {
+                  "readTextFile": false,
+                  "writeTextFile": false
+                },
+                "terminal": false
+              }
+            }
+          }
+        },
+        {
+          "direction": "stdout",
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "protocolVersion": 1,
+              "agentCapabilities": {
+                "loadSession": true,
+                "promptCapabilities": {
+                  "image": false,
+                  "audio": false,
+                  "embeddedContext": true
+                },
+                "mcpCapabilities": {
+                  "http": true,
+                  "sse": true
+                },
+                "sessionCapabilities": {
+                  "list": {},
+                  "resume": {},
+                  "close": {}
+                },
+                "auth": {},
+                "_meta": {
+                  "x.ai/fs_notify": true,
+                  "x.ai/hooks": {
+                    "blockingEvents": [
+                      "pre_tool_use",
+                      "stop",
+                      "subagent_stop"
+                    ],
+                    "decisions": [
+                      "deny",
+                      "block"
+                    ],
+                    "stopSignals": [
+                      "continue",
+                      "stopReason",
+                      "additionalContext"
+                    ]
+                  },
+                  "x.ai/capabilities": {
+                    "toolOverrides": {
+                      "x_keyword_search": true,
+                      "x_semantic_search": true,
+                      "x_user_search": false,
+                      "x_thread_fetch": false
+                    }
+                  }
+                }
+              },
+              "authMethods": [
+                {
+                  "id": "xai.api_key",
+                  "name": "xai.api_key",
+                  "description": "XAI_API_KEY or api_key/env_key in config.toml"
+                },
+                {
+                  "id": "grok.com",
+                  "name": "Grok",
+                  "description": "Sign in with Grok"
+                }
+              ],
+              "_meta": {
+                "grokShell": true,
+                "defaultAuthMethodId": "xai.api_key",
+                "x.ai/mcp/sdk": true,
+                "x.ai/pluginDirs": true,
+                "currentWorkingDirectory": "/private<private-probe>/project",
+                "agentVersion": "1.0.30",
+                "agentId": "<redacted>",
+                "agentInstanceId": "<redacted>",
+                "hostname": "<redacted>",
+                "modelState": {
+                  "currentModelId": "parity-claude",
+                  "availableModels": [
+                    {
+                      "modelId": "grok-4.6",
+                      "name": "Grok 4.6",
+                      "description": "SpaceXAI's latest frontier model",
+                      "_meta": {
+                        "totalContextTokens": 500000,
+                        "agentType": "grok-build-plan",
+                        "supportsReasoningEffort": true,
+                        "reasoningEffort": "high",
+                        "reasoningEfforts": [
+                          {
+                            "id": "xhigh",
+                            "value": "xhigh",
+                            "label": "Extra High Effort",
+                            "description": "Highest effort and reasoning level",
+                            "default": false
+                          },
+                          {
+                            "id": "high",
+                            "value": "high",
+                            "label": "High Effort",
+                            "description": "Higher implementation quality with extensive reasoning",
+                            "default": true
+                          },
+                          {
+                            "id": "medium",
+                            "value": "medium",
+                            "label": "Medium Effort",
+                            "description": "Balanced effort with standard implementation and testing",
+                            "default": false
+                          },
+                          {
+                            "id": "low",
+                            "value": "low",
+                            "label": "Low Effort",
+                            "description": "Quick, fast implementations",
+                            "default": false
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "modelId": "grok-4.5",
+                      "name": "Grok 4.5",
+                      "_meta": {
+                        "totalContextTokens": 500000,
+                        "agentType": "grok-build-plan",
+                        "supportsReasoningEffort": true,
+                        "reasoningEffort": "high",
+                        "reasoningEfforts": [
+                          {
+                            "id": "high",
+                            "value": "high",
+                            "label": "High Effort",
+                            "description": "Highest implementation quality with extensive reasoning",
+                            "default": true
+                          },
+                          {
+                            "id": "medium",
+                            "value": "medium",
+                            "label": "Medium Effort",
+                            "description": "Balanced effort with standard implementation and testing",
+                            "default": false
+                          },
+                          {
+                            "id": "low",
+                            "value": "low",
+                            "label": "Low Effort",
+                            "description": "Quick, fast implementations",
+                            "default": false
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "modelId": "parity-claude",
+                      "name": "Grok Build - custom Claude backend",
+                      "_meta": {
+                        "totalContextTokens": 200000,
+                        "agentType": "grok-build-plan"
+                      }
+                    }
+                  ]
+                },
+                "mcpServers": [],
+                "mcpApps": false,
+                "metadata": null,
+                "availableCommands": [
+                  {
+                    "name": "compact",
+                    "description": "Compress conversation history to save context window",
+                    "input": {
+                      "hint": "optional context about what to preserve"
+                    }
+                  },
+                  {
+                    "name": "always-approve",
+                    "description": "Toggle always-approve mode (skip all permission prompts)",
+                    "input": {
+                      "hint": "on|off"
+                    }
+                  },
+                  {
+                    "name": "context",
+                    "description": "Show context window usage and session stats",
+                    "input": null
+                  },
+                  {
+                    "name": "session-info",
+                    "description": "Show session details (model, turns, context usage)",
+                    "input": null
+                  },
+                  {
+                    "name": "deep-research",
+                    "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                    "input": {
+                      "hint": "<query>"
+                    }
+                  },
+                  {
+                    "name": "workflow",
+                    "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                    "input": {
+                      "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                    }
+                  },
+                  {
+                    "name": "goal",
+                    "description": "Set, manage, or check an autonomous goal",
+                    "input": {
+                      "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                    }
+                  }
+                ],
+                "cancelRewind": true,
+                "sessionRecap": true,
+                "feedbackTraceOffer": false,
+                "voiceMode": true
+              }
+            }
+          }
+        },
+        {
+          "direction": "stdout",
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "_x.ai/mcp/servers_updated",
+            "params": {
+              "mcpServers": []
+            }
+          }
+        },
+        {
+          "direction": "stdin",
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "authenticate",
+            "params": {
+              "methodId": "xai.api_key",
+              "_meta": {
+                "headless": true
+              }
+            }
+          }
+        },
+        {
+          "direction": "stdout",
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {}
+          }
+        }
+      ],
+      "environment_names": [
+        "GROK_DISABLE_AUTOUPDATER",
+        "GROK_HOME",
+        "HOME",
+        "INFINISHELL_GROK_BYOK_KEY",
+        "PATH",
+        "XDG_CONFIG_HOME"
+      ],
+      "initial_auth_json_exists": false,
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-p",
+        "(version 1)(allow default)(deny network*)",
+        "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+        "agent",
+        "--no-leader",
+        "stdio"
+      ],
+      "owned_pid": 80146,
+      "initialize": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "promptCapabilities": {
+              "image": false,
+              "audio": false,
+              "embeddedContext": true
+            },
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "sessionCapabilities": {
+              "list": {},
+              "resume": {},
+              "close": {}
+            },
+            "auth": {},
+            "_meta": {
+              "x.ai/fs_notify": true,
+              "x.ai/hooks": {
+                "blockingEvents": [
+                  "pre_tool_use",
+                  "stop",
+                  "subagent_stop"
+                ],
+                "decisions": [
+                  "deny",
+                  "block"
+                ],
+                "stopSignals": [
+                  "continue",
+                  "stopReason",
+                  "additionalContext"
+                ]
+              },
+              "x.ai/capabilities": {
+                "toolOverrides": {
+                  "x_keyword_search": true,
+                  "x_semantic_search": true,
+                  "x_user_search": false,
+                  "x_thread_fetch": false
+                }
+              }
+            }
+          },
+          "authMethods": [
+            {
+              "id": "xai.api_key",
+              "name": "xai.api_key",
+              "description": "XAI_API_KEY or api_key/env_key in config.toml"
+            },
+            {
+              "id": "grok.com",
+              "name": "Grok",
+              "description": "Sign in with Grok"
+            }
+          ],
+          "_meta": {
+            "grokShell": true,
+            "defaultAuthMethodId": "xai.api_key",
+            "x.ai/mcp/sdk": true,
+            "x.ai/pluginDirs": true,
+            "currentWorkingDirectory": "/private<private-probe>/project",
+            "agentVersion": "1.0.30",
+            "agentId": "<redacted>",
+            "agentInstanceId": "<redacted>",
+            "hostname": "<redacted>",
+            "modelState": {
+              "currentModelId": "parity-claude",
+              "availableModels": [
+                {
+                  "modelId": "grok-4.6",
+                  "name": "Grok 4.6",
+                  "description": "SpaceXAI's latest frontier model",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "xhigh",
+                        "value": "xhigh",
+                        "label": "Extra High Effort",
+                        "description": "Highest effort and reasoning level",
+                        "default": false
+                      },
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Higher implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "modelId": "grok-4.5",
+                  "name": "Grok 4.5",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Highest implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "modelId": "parity-claude",
+                  "name": "Grok Build - custom Claude backend",
+                  "_meta": {
+                    "totalContextTokens": 200000,
+                    "agentType": "grok-build-plan"
+                  }
+                }
+              ]
+            },
+            "mcpServers": [],
+            "mcpApps": false,
+            "metadata": null,
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              }
+            ],
+            "cancelRewind": true,
+            "sessionRecap": true,
+            "feedbackTraceOffer": false,
+            "voiceMode": true
+          }
+        }
+      },
+      "advertised_auth_methods": [
+        "xai.api_key",
+        "grok.com"
+      ],
+      "authenticate": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {}
+      },
+      "forced_cleanup": false,
+      "exit_code": 0,
+      "readers_closed": true,
+      "final_auth_json_exists": false,
+      "temporary_root_removed": true
+    },
+    {
+      "model_env_key_present": false,
+      "global_api_key_present": false,
+      "legacy_global_api_key_present": false,
+      "real_credentials_read": false,
+      "model_requests": 0,
+      "session_new_requests": 0,
+      "sandbox_profile": "(version 1)(allow default)(deny network*)",
+      "config": "[cli]\nuse_leader = false\nauto_update = false\n[models]\ndefault = \"parity-claude\"\nsession_summary = \"parity-claude\"\nweb_search = \"parity-claude\"\nimage_description = \"parity-claude\"\n[model.parity-claude]\nmodel = \"claude-sonnet-4-6\"\nname = \"Grok Build - custom Claude backend\"\nbase_url = \"http://127.0.0.1:1/v1\"\nenv_key = \"INFINISHELL_GROK_BYOK_KEY\"\napi_backend = \"messages\"\ncontext_window = 200000\nmax_completion_tokens = 4096\nmax_retries = 0\nsupports_backend_search = false\nsupports_reasoning_effort = false\nstream_tool_calls = false\nextra_headers = { \"anthropic-version\" = \"2023-06-01\" }\n",
+      "records": [
+        {
+          "direction": "stdin",
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": 1,
+              "clientCapabilities": {
+                "fs": {
+                  "readTextFile": false,
+                  "writeTextFile": false
+                },
+                "terminal": false
+              }
+            }
+          }
+        },
+        {
+          "direction": "stdout",
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "protocolVersion": 1,
+              "agentCapabilities": {
+                "loadSession": true,
+                "promptCapabilities": {
+                  "image": false,
+                  "audio": false,
+                  "embeddedContext": true
+                },
+                "mcpCapabilities": {
+                  "http": true,
+                  "sse": true
+                },
+                "sessionCapabilities": {
+                  "list": {},
+                  "resume": {},
+                  "close": {}
+                },
+                "auth": {},
+                "_meta": {
+                  "x.ai/fs_notify": true,
+                  "x.ai/hooks": {
+                    "blockingEvents": [
+                      "pre_tool_use",
+                      "stop",
+                      "subagent_stop"
+                    ],
+                    "decisions": [
+                      "deny",
+                      "block"
+                    ],
+                    "stopSignals": [
+                      "continue",
+                      "stopReason",
+                      "additionalContext"
+                    ]
+                  },
+                  "x.ai/capabilities": {
+                    "toolOverrides": {
+                      "x_keyword_search": true,
+                      "x_semantic_search": true,
+                      "x_user_search": false,
+                      "x_thread_fetch": false
+                    }
+                  }
+                }
+              },
+              "authMethods": [
+                {
+                  "id": "grok.com",
+                  "name": "Grok",
+                  "description": "Sign in with Grok"
+                }
+              ],
+              "_meta": {
+                "grokShell": true,
+                "defaultAuthMethodId": null,
+                "x.ai/mcp/sdk": true,
+                "x.ai/pluginDirs": true,
+                "currentWorkingDirectory": "/private<private-probe>/project",
+                "agentVersion": "1.0.30",
+                "agentId": "<redacted>",
+                "agentInstanceId": "<redacted>",
+                "hostname": "<redacted>",
+                "modelState": {
+                  "currentModelId": "parity-claude",
+                  "availableModels": [
+                    {
+                      "modelId": "grok-4.6",
+                      "name": "Grok 4.6",
+                      "description": "SpaceXAI's latest frontier model",
+                      "_meta": {
+                        "totalContextTokens": 500000,
+                        "agentType": "grok-build-plan",
+                        "supportsReasoningEffort": true,
+                        "reasoningEffort": "high",
+                        "reasoningEfforts": [
+                          {
+                            "id": "xhigh",
+                            "value": "xhigh",
+                            "label": "Extra High Effort",
+                            "description": "Highest effort and reasoning level",
+                            "default": false
+                          },
+                          {
+                            "id": "high",
+                            "value": "high",
+                            "label": "High Effort",
+                            "description": "Higher implementation quality with extensive reasoning",
+                            "default": true
+                          },
+                          {
+                            "id": "medium",
+                            "value": "medium",
+                            "label": "Medium Effort",
+                            "description": "Balanced effort with standard implementation and testing",
+                            "default": false
+                          },
+                          {
+                            "id": "low",
+                            "value": "low",
+                            "label": "Low Effort",
+                            "description": "Quick, fast implementations",
+                            "default": false
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "modelId": "grok-4.5",
+                      "name": "Grok 4.5",
+                      "_meta": {
+                        "totalContextTokens": 500000,
+                        "agentType": "grok-build-plan",
+                        "supportsReasoningEffort": true,
+                        "reasoningEffort": "high",
+                        "reasoningEfforts": [
+                          {
+                            "id": "high",
+                            "value": "high",
+                            "label": "High Effort",
+                            "description": "Highest implementation quality with extensive reasoning",
+                            "default": true
+                          },
+                          {
+                            "id": "medium",
+                            "value": "medium",
+                            "label": "Medium Effort",
+                            "description": "Balanced effort with standard implementation and testing",
+                            "default": false
+                          },
+                          {
+                            "id": "low",
+                            "value": "low",
+                            "label": "Low Effort",
+                            "description": "Quick, fast implementations",
+                            "default": false
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "modelId": "parity-claude",
+                      "name": "Grok Build - custom Claude backend",
+                      "_meta": {
+                        "totalContextTokens": 200000,
+                        "agentType": "grok-build-plan"
+                      }
+                    }
+                  ]
+                },
+                "mcpServers": [],
+                "mcpApps": false,
+                "metadata": null,
+                "availableCommands": [
+                  {
+                    "name": "compact",
+                    "description": "Compress conversation history to save context window",
+                    "input": {
+                      "hint": "optional context about what to preserve"
+                    }
+                  },
+                  {
+                    "name": "always-approve",
+                    "description": "Toggle always-approve mode (skip all permission prompts)",
+                    "input": {
+                      "hint": "on|off"
+                    }
+                  },
+                  {
+                    "name": "context",
+                    "description": "Show context window usage and session stats",
+                    "input": null
+                  },
+                  {
+                    "name": "session-info",
+                    "description": "Show session details (model, turns, context usage)",
+                    "input": null
+                  },
+                  {
+                    "name": "deep-research",
+                    "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                    "input": {
+                      "hint": "<query>"
+                    }
+                  },
+                  {
+                    "name": "workflow",
+                    "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                    "input": {
+                      "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                    }
+                  },
+                  {
+                    "name": "goal",
+                    "description": "Set, manage, or check an autonomous goal",
+                    "input": {
+                      "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                    }
+                  }
+                ],
+                "cancelRewind": true,
+                "sessionRecap": true,
+                "feedbackTraceOffer": false,
+                "voiceMode": true
+              }
+            }
+          }
+        },
+        {
+          "direction": "stdout",
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "_x.ai/mcp/servers_updated",
+            "params": {
+              "mcpServers": []
+            }
+          }
+        },
+        {
+          "direction": "stdin",
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "authenticate",
+            "params": {
+              "methodId": "xai.api_key",
+              "_meta": {
+                "headless": true
+              }
+            }
+          }
+        },
+        {
+          "direction": "stdout",
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32000,
+              "message": "Authentication required",
+              "data": "Set XAI_API_KEY or add api_key/env_key to config.toml."
+            }
+          }
+        }
+      ],
+      "environment_names": [
+        "GROK_DISABLE_AUTOUPDATER",
+        "GROK_HOME",
+        "HOME",
+        "PATH",
+        "XDG_CONFIG_HOME"
+      ],
+      "initial_auth_json_exists": false,
+      "command": [
+        "/usr/bin/sandbox-exec",
+        "-p",
+        "(version 1)(allow default)(deny network*)",
+        "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+        "agent",
+        "--no-leader",
+        "stdio"
+      ],
+      "owned_pid": 80149,
+      "initialize": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "promptCapabilities": {
+              "image": false,
+              "audio": false,
+              "embeddedContext": true
+            },
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "sessionCapabilities": {
+              "list": {},
+              "resume": {},
+              "close": {}
+            },
+            "auth": {},
+            "_meta": {
+              "x.ai/fs_notify": true,
+              "x.ai/hooks": {
+                "blockingEvents": [
+                  "pre_tool_use",
+                  "stop",
+                  "subagent_stop"
+                ],
+                "decisions": [
+                  "deny",
+                  "block"
+                ],
+                "stopSignals": [
+                  "continue",
+                  "stopReason",
+                  "additionalContext"
+                ]
+              },
+              "x.ai/capabilities": {
+                "toolOverrides": {
+                  "x_keyword_search": true,
+                  "x_semantic_search": true,
+                  "x_user_search": false,
+                  "x_thread_fetch": false
+                }
+              }
+            }
+          },
+          "authMethods": [
+            {
+              "id": "grok.com",
+              "name": "Grok",
+              "description": "Sign in with Grok"
+            }
+          ],
+          "_meta": {
+            "grokShell": true,
+            "defaultAuthMethodId": null,
+            "x.ai/mcp/sdk": true,
+            "x.ai/pluginDirs": true,
+            "currentWorkingDirectory": "/private<private-probe>/project",
+            "agentVersion": "1.0.30",
+            "agentId": "<redacted>",
+            "agentInstanceId": "<redacted>",
+            "hostname": "<redacted>",
+            "modelState": {
+              "currentModelId": "parity-claude",
+              "availableModels": [
+                {
+                  "modelId": "grok-4.6",
+                  "name": "Grok 4.6",
+                  "description": "SpaceXAI's latest frontier model",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "xhigh",
+                        "value": "xhigh",
+                        "label": "Extra High Effort",
+                        "description": "Highest effort and reasoning level",
+                        "default": false
+                      },
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Higher implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "modelId": "grok-4.5",
+                  "name": "Grok 4.5",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Highest implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "modelId": "parity-claude",
+                  "name": "Grok Build - custom Claude backend",
+                  "_meta": {
+                    "totalContextTokens": 200000,
+                    "agentType": "grok-build-plan"
+                  }
+                }
+              ]
+            },
+            "mcpServers": [],
+            "mcpApps": false,
+            "metadata": null,
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              }
+            ],
+            "cancelRewind": true,
+            "sessionRecap": true,
+            "feedbackTraceOffer": false,
+            "voiceMode": true
+          }
+        }
+      },
+      "advertised_auth_methods": [
+        "grok.com"
+      ],
+      "authenticate": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "error": {
+          "code": -32000,
+          "message": "Authentication required",
+          "data": "Set XAI_API_KEY or add api_key/env_key to config.toml."
+        }
+      },
+      "forced_cleanup": false,
+      "exit_code": 0,
+      "readers_closed": true,
+      "final_auth_json_exists": false,
+      "temporary_root_removed": true
+    }
+  ]
+}

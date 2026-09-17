@@ -29,7 +29,7 @@ OSC = re.compile(rb'\x1b\]777;notify;warp://cli-agent;(.*?)(?:\x07|\x1b\\)', re.
 def shell_diagnostic_source():
     # 只在私有 BASH_ENV 中观察真实入口；不替换发布脚本、不读取 hook stdin、不写终端。
     return r'''case "$0" in
-    */on-session-start.sh.fixture-original|*/on-prompt-submit.sh.fixture-original|*/warp-notify.sh)
+    */on-session-start.sh.fixture-original|*/on-prompt-submit.sh.fixture-original|*/on-prompt-submit.sh.fixture-candidate|*/warp-notify.sh)
     (
         set +e
         diagnostic_id=$BASHPID
@@ -111,6 +111,9 @@ def verify_transport(raw, cases):
             marker = markers['on-session-start.sh' if event == 'session_start' else 'on-prompt-submit.sh']
             require(isinstance(marker.get('cwd'), str) and found[0].get('cwd') == marker['cwd'],
                     '原生通知工作目录未完整保留 Unicode 或原始路径')
+            if event == 'prompt_submit':
+                require(isinstance(marker.get('prompt'), str) and found[0].get('query') == marker['prompt'],
+                        '原生通知 query 改变了输入文本或 LF/CRLF，不允许事后归一化')
             matched.append(found[0])
     return matched
 
@@ -281,16 +284,18 @@ def run_driver(configuration):
         environment.update(WARP_CLI_AGENT_PROTOCOL_VERSION='1', WARP_CLIENT_VERSION='conpty-probe', TERM_PROGRAM='WarpTerminal')
         environment.update(BASH_ENV=bash_environment.as_posix(),
                            INFINISHELL_CONPTY_DIAGNOSTICS_DIR=shell_diagnostics.as_posix())
+        report['jq_newline_boundary'] = {}
+        native.verify_jq_newline_boundary(environment, report['jq_newline_boundary'])
         server = ThreadingHTTPServer(('127.0.0.1', 0), RejectModel)
         server_thread = threading.Thread(target=server.serve_forever, daemon=True)
         server_thread.start()
         args = types.SimpleNamespace(repo=Path(config['repo']), upstream_plugin=Path(config['plugin']),
             codex_executable=Path(config['codex']), native_environment=environment, port=server.server_port)
-        for name in ('插件 空 格', "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()"):
+        for name, prompt in zip(('插件 空 格', "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()"), native.HOOK_PROMPTS):
             evidence = {'name': name, 'passed': False, 'traces': []}
             report['cases'].append(evidence)
             evidence.update(native.one_case(args, Path(config['private_dir']) / name,
-                                            report['model_http_requests'], evidence))
+                                            report['model_http_requests'], evidence, prompt))
             evidence['passed'] = True
         require(not report['model_http_requests'], '出现模型请求，不能通过无模型验收')
         report['passed'] = True
@@ -477,7 +482,7 @@ def main():
         for key in ('HOME', 'APPDATA', 'LOCALAPPDATA'):
             Path(environment[key]).mkdir(parents=True, exist_ok=True)
         report['driver'] = run_conpty(host / 'conpty.dll', [sys.executable, '-B', str(Path(__file__).resolve()),
-            '--driver-config', str(config_file)], environment, root, raw_output, 120)
+            '--driver-config', str(config_file)], environment, root, raw_output, 240)
         native = json.loads(native_report.read_text(encoding='utf-8'))
         report['raw_output'] = {'path': str(raw_output), 'sha256': sha256(raw_output), 'bytes': raw_output.stat().st_size}
         require(report['driver']['exit_code'] == 0 and native['passed'], '附着原生 hook 场景失败')

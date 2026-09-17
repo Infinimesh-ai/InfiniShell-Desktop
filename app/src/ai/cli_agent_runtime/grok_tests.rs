@@ -142,13 +142,63 @@ fn model_dependent_image_advertisement_never_implies_verified_image_input() {
 }
 
 #[test]
-fn missing_cached_login_does_not_start_interactive_auth_or_a_session() {
+fn missing_headless_credentials_does_not_start_interactive_auth_or_a_session() {
     let mut protocol = GrokProtocol::new(options());
     protocol.initialize();
     let mut initialize = fixture_response(1);
     initialize["result"]["authMethods"] = json!([{"id": "grok.com", "name": "Grok"}]);
     assert!(protocol.receive(initialize).is_err());
     assert_eq!(protocol.next_id, 1);
+    assert!(protocol.session_id.is_none());
+}
+
+#[test]
+fn native_byok_authentication_uses_only_advertised_method_without_credentials() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../../../specs/cli-agent-parity/fixtures/grok-1.0.30-byok-authentication.json"
+    ))
+    .unwrap();
+    let mut protocol = GrokProtocol::new(options());
+    protocol.initialize();
+    let effects = protocol.receive(fixture["initialize"].clone()).unwrap();
+    assert_eq!(effects.writes.len(), 1);
+    assert_eq!(effects.writes[0]["method"], "authenticate");
+    assert_eq!(
+        effects.writes[0]["params"],
+        json!({"methodId":"xai.api_key", "_meta":{"headless":true}})
+    );
+    assert!(effects.events.is_empty());
+    assert!(protocol.session_id.is_none());
+    let opened = protocol.receive(fixture["authenticate"].clone()).unwrap();
+    assert_eq!(opened.writes[0]["method"], "session/new");
+    assert!(opened.events.is_empty());
+    // 认证可用不提升未经过模型验收的执行或权限能力。
+    assert!(protocol.session_id.is_none());
+}
+
+#[test]
+fn cached_login_precedence_is_stable_and_api_authentication_failure_does_not_fallback() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.initialize();
+    let mut initialize = fixture_response(1);
+    initialize["result"]["authMethods"] = json!([
+        {"id":"xai.api_key"}, {"id":"cached_token"}, {"id":"grok.com"}
+    ]);
+    let effects = protocol.receive(initialize).unwrap();
+    assert_eq!(effects.writes[0]["params"]["methodId"], "cached_token");
+
+    let mut protocol = GrokProtocol::new(options());
+    protocol.initialize();
+    let mut initialize = fixture_response(1);
+    initialize["result"]["authMethods"] = json!([{"id":"xai.api_key"}, {"id":"grok.com"}]);
+    protocol.receive(initialize).unwrap();
+    assert!(
+        protocol
+            .receive(json!({"jsonrpc":"2.0", "id":2,
+        "error":{"code":-32000, "message":"Authentication required"}}))
+            .is_err()
+    );
+    assert_eq!(protocol.next_id, 2);
     assert!(protocol.session_id.is_none());
 }
 

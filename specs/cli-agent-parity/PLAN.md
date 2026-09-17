@@ -261,7 +261,11 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 
 ## 10. 执行看板（2026-09-17，持续更新）
 
-最新检查点 `37b0bc73288aab5be4d0d151796eea557be4c0fb` 已推送并核对远端一致；包含 Claude 只读权限观测、完整固定 Codex 包及 Windows 探针修复。[第七轮 Linux/Windows 验证](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35178775808)已按相同 SHA 启动，完整工作区暂未开启。冻结输入通过 check、i18n 11 项、相关模块 987 项；干净同提交 check、i18n 11 项与相关模块 987 项全部通过。新包 GUI 工具当前可读但点击/滚动报 noWindowsAvailable，现场进程保留，未重派任务。
+当前检查点 `49456958279cc193392b2d09118e680fc0b14ea4` 已推送并核对远端；[第八轮 Linux/Windows](EIGHTH_PLATFORM_RUN_494569582.md)已结束：Linux 所选检查全部通过；Windows check、1678 项 warp 定向测试和监督清理通过，但插件缓存清理、ConPTY 完成和缺失会话退出码断言三项失败。干净 macOS 同提交 check、国际化 11 项、相关模块 987 项通过。候选通知确已到达 PTY，仍不能据此开放生产配方。
+
+Claude API 鉴权已解除阻塞：新增真实适配器验收在 494569582 基础的四文件冻结输入通过 check、国际化 11 项和相关模块 988 项；同输入监督入口已构建，真实两轮、审批允许/拒绝文件效果及运行中排队通过；旧快照刚启动取消返回原生执行错误，后续修复的19文件冻结输入已通过取消与原 ID 进程恢复；GUI 与父子任务仍未通过，详见 [Claude API 验收](CLAUDE_API_ADAPTER_VERIFICATION.md)。此为中间快照，尚不替代最终同提交验收。
+
+历史检查点 `37b0bc73288aab5be4d0d151796eea557be4c0fb` 已推送并核对远端一致；包含 Claude 只读权限观测、完整固定 Codex 包及 Windows 探针修复。[第七轮 Linux/Windows 验证](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35178775808)已按相同 SHA 启动，完整工作区暂未开启。冻结输入通过 check、i18n 11 项、相关模块 987 项；干净同提交 check、i18n 11 项与相关模块 987 项全部通过。新包 GUI 工具当前可读但点击/滚动报 noWindowsAvailable，现场进程保留，未重派任务。
 
 后续候选 `c46714435ea284748236ad5ea255845e966ab821` 已提交并推送，增加 Windows CONOUT$ 输出候选和 Claude 无凭据权限观测步骤，尚未派发下一轮。第七轮已结束：Linux 全部所选检查通过（warp 定向 1706 项），Windows 未通过（warp 1672 通过、5 个 Claude 事务夹具失败；进程派生与两个脚本步骤失败）。[逐项归因](SEVENTH_PLATFORM_RUN_37B0BC732.md)保留原始负向证据；候选修复本地验证中。37b0bc732 的 macOS 完整 Codex 包已通过[三项真实适配器验证](CODEX_COMPLETE_RUNTIME_NATIVE_VERIFICATION.md)：生命周期、本地工具恢复和图片；不计 GUI 应用重启或新提交平台验收。
 
@@ -269,10 +273,10 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 
 | 阶段 | 当前进展 | 尚未满足 |
 | --- | --- | --- |
-| P0 | 固定 Codex 0.147.0、Claude 2.1.273、Grok 1.0.30 的真实接口已有独立证据；第六轮 Windows Grok ACP、Claude 初始化/EOF、Codex 原生插件注册表均通过；Claude 同进程权限查询已接入并通过本地回归 | Claude API 原生成功输出已验证，完整模型生命周期待验；Grok 真实请求 402 额度耗尽；权限规则查询不等于沙箱和实际工具权限证明。系统新装 Codex 0.154.0 未纳入受测托管范围，已验证明确拒绝并保留草稿；受测 0.147.0 已恢复为独立固定副本 |
+| P0 | 固定 Codex 0.147.0、Claude 2.1.273、Grok 1.0.30 的真实接口已有独立证据；第六轮 Windows Grok ACP、Claude 初始化/EOF、Codex 原生插件注册表均通过；Claude 同进程权限查询已接入并通过本地回归 | Claude API 生产适配器进程链路通过、GUI 待验；Grok 自定义 Claude 后端原生审批/取消/load 通过，产品链路待验，官方模型 402 未解除；权限规则查询不等于沙箱和实际工具权限证明。系统新装 Codex 0.154.0 未纳入受测托管范围，已验证明确拒绝并保留草稿；受测 0.147.0 已恢复为独立固定副本 |
 | P1 | 三方身份、发现、版本和技能来源已实现；7e065 新包 Codex 真实两轮、中英文拼音、图片、技能与评审传递已有新证据 | 同轮文件路径已进入原生输入；私有测试副本漏装同版本 code-mode-host，导致实际工具启动失败，文件读取及第三轮审批未通过。已恢复完整官方包，37b0bc732 原生适配器的实际文件允许/拒绝、继续和图片复验通过；GUI 原流程及其余三方真实输入/附件和最终双语布局继续验收 |
 | P2 | 普通 PTY Stop 统一 Unknown 降级，重复/旧事件已有回归；Codex 持久来源和 Grok 插件事务已有对应原生证据；第七轮已定位 Windows 丢通知为 Git Bash 无 `/dev/tty` | CONOUT$ 候选仅通过本机 31 项脚本测试，Windows 原生及正式配方待验，生产 gate 继续关闭；持久来源探针收尾修复的 Windows 复验仍待完成；插件完整组合及产品 SSH/tmux 待验 |
-| P3 | Claude/Codex 固定绕过审批与 Claude 启动全局配置写入已移除；审批原生 UI/托管入口与策略均有实现 | Claude 父权限只能按已验证快照证明，不能凭 mode 放行；Grok 关键执行未通过，Windows 托管及三方审批完整流程待验 |
+| P3 | Claude/Codex 固定绕过审批与 Claude 启动全局配置写入已移除；审批原生 UI/托管入口与策略均有实现 | Claude 父权限上限尚不能由观测快照证明，派发仍拒绝；Grok 原生关键协议已通过，产品关键执行未通过，Windows 托管及三方审批完整流程待验 |
 | P4 | SQLite 提交确认、原生会话/父代、消息与结果领取、重连和显式恢复已实现；Oz 普通消息和出站正文已在 7e065 干净提交通过 check、18 项提供商、11 项 i18n 与 965 项相关测试；macOS 资源域两种真实工具崩溃清理有证据 | 当前 Codex GUI 生命周期继续进行；真实 Oz 请求等待用户手动允许专用钥匙串项，电脑操作工具禁止操作该安全窗口。Claude/Grok 完整生命周期和最终同提交三方回收未通过 |
 | P5 | 7e065 干净 macOS 门禁与新包签名通过；第六轮两平台分别保留原生结果和失败；工作流已按真实前置依赖分离 Windows 原生探针与离线 Rust 检查，待同提交执行 | 第六 Linux 全部所选门禁通过（warp 定向 1684 项），Windows 两项探针失败导致本轮 Rust 门禁跳过；后续工作流不能追溯改变本轮。最终完整工作区/GUI/双语/三平台及 SSH/tmux 验收均未收口 |
 
@@ -297,3 +301,7 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 当前第三轮同提交结果见 [平台记录](THIRD_PLATFORM_RUN_328D5ED35.md)。后续 macOS 产品接入用独占 launchd job、原生身份及资源域销毁证明替代旧进程组确认，保留直接原生退出状态；新 worker 的 C 夹具组 4 项与通用组同字节副本重验 4 项通过，初次加载停滞原因仍未确定；真实 Codex 无凭据缺失会话和空闲崩溃通过。[真实运行工具两种崩溃](validation/macos-codex-coalition-tool-gates-1.json)分别确认全部目标退出、同一系统启动内资源域销毁及生产清理证明，修复原工具残留路径。这些是冻结源码中间构建，最终同提交 GUI/平台仍待验；[本地门禁](validation/macos-coalition-local-gates-2.json)与[接入契约](DARWIN_COALITION_PRODUCT_CONTRACT.md)保留各自边界。
 
 用户提供 API 后，固定 Claude 2.1.273 使用 `claude-sonnet-4-6` 已完成[真实原生鉴权与输出验证](validation/macos-claude-api-smoke-1.json)，模型鉴权限制解除。该用例关闭工具且未使用托管适配器；审批、取消、继续、应用重启及结果回收仍须验收。凭据仅保存在仓库外，不写入证据。
+
+Claude 取消修复、Grok 原生 API 认证和 Windows 探针修复的 19 文件冻结输入已通过 check、i18n 11 项和相关模块 1001 项；真实 Claude 适配器复验已通过两轮、审批、排队、取消、新进程恢复与标记回收；下一提交平台门禁及 GUI 待执行。Grok Build 经自定义 Claude 后端已取得真实回执、两轮、精确单次文件审批、运行中取消、原 ID 新进程 load 与随机标记回收证据；原生与产品集成、官方 Grok 模型仍分别验收，不合并计为完整通过。
+
+第九轮候选 20 文件冻结输入已通过 `cargo check -p warp`（58.327s）、i18n 11 项（143.857s，含编译）与相关模块 1002 项（16.131s）；Python 57 项通过、5 项 Windows 专用用例在 macOS 跳过。[门禁](validation/macos-ninth-candidate-gates.json)与[输入](validation/macos-ninth-candidate-inputs.json)绑定摘要。主工作区误启动的一次 check 已主动撤下，不计门禁；这些有效门禁均在隔离验证树执行。下一提交需按同 SHA 进行平台验证。

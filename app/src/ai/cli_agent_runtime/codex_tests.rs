@@ -4,7 +4,10 @@ use std::{env, fs};
 use futures::io::Cursor;
 
 use super::*;
-use crate::ai::cli_agent_runtime::managed_process;
+use crate::ai::cli_agent_runtime::managed_process::{
+    self, ExitReason,
+    ExitReason::{HostDisconnected, NativeExit, StdioClosed, StopRequested},
+};
 
 const TWO_TURNS: &str =
     include_str!("../../../../specs/cli-agent-parity/fixtures/codex-0.147.0-two-turns.ndjson");
@@ -477,14 +480,38 @@ async fn live_codex_missing_session_is_not_replaced() {
         task,
     } = connect(settings).unwrap();
     // 保留 controller，但不发送 Submit、Steer 或任何模型输入。
-    let result = tokio::time::timeout(Duration::from_secs(60), task)
-        .await
-        .expect("真实缺失会话恢复及监督退出超时");
+    let result = tokio::time::timeout(Duration::from_secs(60), task).await;
+    let mut observed_events = Vec::new();
+    let event_channel_closed = loop {
+        match events.try_recv() {
+            Ok(event) => observed_events.push(event),
+            Err(mpsc::error::TryRecvError::Disconnected) => break true,
+            Err(mpsc::error::TryRecvError::Empty) => break false,
+        }
+    };
+    let confirmed_receipt = managed_process::confirmed_exit(&state_dir, generation);
+    let artifact = PathBuf::from(
+        env::var_os("INFINISHELL_CODEX_LIVE_ARTIFACT").expect("必须指定验收证据文件"),
+    );
+    // 先保留结果和回执，再执行断言；失败不能只剩 libtest 的退出码。
+    let observed = json!({
+        "event": "missing_session_probe_observed", "passed": false,
+        "native_session_id": native_session_id, "generation": generation,
+        "runtime_result": format!("{result:?}"), "runtime_events": observed_events,
+        "event_channel_closed": event_channel_closed,
+        "exit_receipt": confirmed_receipt.as_ref().ok().and_then(Option::as_ref),
+        "receipt_error": confirmed_receipt.as_ref().err().map(ToString::to_string),
+        "credentials_provided": false, "model_commands_sent": 0,
+        "native_exit_code_origin_verified": false,
+    });
+    fs::write(&artifact, format!("{observed}\n")).unwrap();
+    let result = result.expect("真实缺失会话恢复及监督退出超时");
     let Err(RuntimeError::Protocol(native_error)) = result else {
         panic!("必须收到原生缺失会话错误，而不是成功或其他启动失败：{result:?}");
     };
     assert_eq!(native_error, expected_error);
-    let disconnected = events.try_recv().expect("必须收到连接终止事件");
+    assert_eq!(observed_events.len(), 1, "必须仅收到连接终止事件");
+    let disconnected = &observed_events[0];
     assert_eq!(disconnected.generation, generation);
     assert!(disconnected.native_session_id.is_none());
     assert_eq!(
@@ -493,30 +520,90 @@ async fn live_codex_missing_session_is_not_replaced() {
             reason: format!("CLI protocol error: {expected_error}"),
         }
     );
-    assert!(matches!(
-        events.try_recv(),
-        Err(mpsc::error::TryRecvError::Disconnected)
-    ));
+    assert!(event_channel_closed);
     drop(controller);
-    let receipt = managed_process::confirmed_exit(&state_dir, generation)
+    let receipt = confirmed_receipt
         .expect("必须核对真实监督退出证明")
         .expect("必须存在真实监督退出回执");
     assert_eq!(receipt.generation, generation);
     assert!(receipt.cleanup_confirmed);
-    assert_eq!(receipt.exit_code, Some(0));
+    assert!(
+        missing_session_exit_is_expected(
+            receipt.exit_code,
+            receipt.exit_reason,
+            &receipt.containment,
+            cfg!(windows),
+        ),
+        "缺失会话后的退出不符合受控收尾契约：{receipt:?}"
+    );
     assert_ne!(receipt.containment, "not_started");
     assert!(!codex_home.join("auth.json").exists());
-    let artifact = PathBuf::from(
-        env::var_os("INFINISHELL_CODEX_LIVE_ARTIFACT").expect("必须指定验收证据文件"),
-    );
     let evidence = json!({
         "event": "missing_session_probe_finished", "passed": true,
         "native_session_id": native_session_id, "native_error": native_error,
         "generation": generation, "credentials_provided": false,
         "model_commands_sent": 0, "runtime_event_count": 1,
         "exit_receipt": receipt,
+        "native_exit_code_origin_verified": false,
     });
-    fs::write(artifact, format!("{evidence}\n")).unwrap();
+    fs::write(artifact, format!("{observed}\n{evidence}\n")).unwrap();
+}
+
+fn missing_session_exit_is_expected(
+    exit_code: Option<i32>,
+    reason: ExitReason,
+    containment: &str,
+    windows: bool,
+) -> bool {
+    match reason {
+        ExitReason::HostDisconnected => false,
+        ExitReason::NativeExit => exit_code == Some(0),
+        ExitReason::StopRequested | ExitReason::StdioClosed => {
+            // Windows Job 清理指定终止码 1；回执未区分此码与自然退出，不能声称原生成功。
+            exit_code == Some(0)
+                || (windows && containment == "windows_job" && exit_code == Some(1))
+        }
+    }
+}
+
+#[test]
+fn missing_session_exit_allows_only_known_windows_job_cleanup_status() {
+    // 预期值直接列出，避免在测试里复制退出判定表达式。
+    let cases = [
+        (Some(0), NativeExit, "windows_job", true, true),
+        (Some(1), NativeExit, "windows_job", true, false),
+        (Some(0), StopRequested, "windows_job", true, true),
+        (Some(1), StopRequested, "windows_job", true, true),
+        (Some(1), StdioClosed, "windows_job", true, true),
+        (Some(1), StopRequested, "windows_job", false, false),
+        (Some(1), StopRequested, "linux_subtree", true, false),
+        (
+            Some(1),
+            StdioClosed,
+            "macos_resource_coalition",
+            false,
+            false,
+        ),
+        (
+            Some(0),
+            StdioClosed,
+            "macos_resource_coalition",
+            false,
+            true,
+        ),
+        (None, StopRequested, "windows_job", true, false),
+        (Some(-1), StopRequested, "windows_job", true, false),
+        (Some(37), StdioClosed, "windows_job", true, false),
+        (Some(0), HostDisconnected, "windows_job", true, false),
+        (Some(1), HostDisconnected, "windows_job", true, false),
+    ];
+    for (exit_code, reason, containment, windows, expected) in cases {
+        assert_eq!(
+            missing_session_exit_is_expected(exit_code, reason, containment, windows),
+            expected,
+            "{exit_code:?}, {reason:?}, {containment}, windows={windows}",
+        );
+    }
 }
 
 #[test]

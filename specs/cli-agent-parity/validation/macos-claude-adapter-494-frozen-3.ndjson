@@ -1,0 +1,2 @@
+{"credential_files_read_by_probe": false, "event": "acceptance_started", "permission_policy": "Inherit", "scope": "rust_adapter_process_restart"}
+{"event": "acceptance_failed", "reason": "Claude 初始化失败：Disconnected { reason: \"CLI process I/O failed: Resource temporarily unavailable (os error 35)\" }"}

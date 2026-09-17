@@ -1,0 +1,64 @@
+{
+  "base_commit": "49456958279cc193392b2d09118e680fc0b14ea4",
+  "worktree_dirty": true,
+  "source_manifest": "/tmp/infinishell-cli-parity-ninth-inputs-1.json",
+  "source_manifest_sha256": "f96f80b190e17101ed803d00a21bf7c387d318b203b9a06dcab92b1e79ddbd82",
+  "target_directory": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 58.327,
+      "log": "/tmp/infinishell-cli-parity-ninth-2-check.log",
+      "log_sha256": "1276f5d5fd8817c6da15f96ccf8386438f07aa6489e00aeb1643f070aed2af00"
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 143.857,
+      "log": "/tmp/infinishell-cli-parity-ninth-2-i18n.log",
+      "log_sha256": "910e99d77608a33354128fd863005e28a94acac2a0d558cec88f0c57c9832222"
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::) | test(ai::agent_providers::chat_stream::) | test(ai::blocklist::action_model::execute::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 16.131,
+      "log": "/tmp/infinishell-cli-parity-ninth-2-focused.log",
+      "log_sha256": "71397f1ff286c3335830368ac90a2ed11ef5709f1e2bf85f1a2b82331a5956d7"
+    }
+  ],
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "96fd3b339e0e6b6f22fc8e7bd59cac8006f6b75d3a87a92cc0f28a704a177086"
+  },
+  "source_unchanged_after_gates": true
+}

@@ -1,0 +1,27 @@
+{
+  "base_commit": "49456958279cc193392b2d09118e680fc0b14ea4",
+  "worktree_dirty": true,
+  "scope": "rust_adapter_process_restart",
+  "source_manifest": "macos-api-cancel-1-inputs.json",
+  "gate_report": "macos-api-cancel-1-gates.json",
+  "test_binary_sha256": "6a91c29760760d098e34ad312f13335739b07ae76d9e6b6ffc138ad1285ff991",
+  "supervisor_binary_sha256": "ebcb5289835e503aa851cfe6141928bebb6156967ce4d9f7d53bace4f9449b08",
+  "supervisor_internal_disk_copy_byte_identical": true,
+  "acceptance_passed": true,
+  "app_restart_and_ui_verified": false,
+  "parent_permission_ceiling_verified": false,
+  "files": [
+    {
+      "path": "macos-claude-api-cancel-1.ndjson",
+      "sha256": "42637a4b5cca831ef893f23075b6d15af6517a67220c6cbf7b47ecfd6c47a283"
+    },
+    {
+      "path": "macos-claude-api-cancel-1.metadata.json",
+      "sha256": "3c5456b8e4a0f32c116b048dfc02a29c66d615a5a559d9c2d8d4d7b0cdba0e4c"
+    },
+    {
+      "path": "macos-claude-api-cancel-1.test-output.txt",
+      "sha256": "412120c11ae10ac581b9c36703f3462aff82076fc7ba30a5e08ac63fbaf1e6ae"
+    }
+  ]
+}
