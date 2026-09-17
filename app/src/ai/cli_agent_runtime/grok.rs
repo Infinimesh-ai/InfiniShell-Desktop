@@ -194,7 +194,12 @@ async fn run_transport(
     mut commands: mpsc::Receiver<RuntimeCommand>,
     events: &mpsc::Sender<RuntimeEvent>,
 ) -> Result<(), RuntimeError> {
-    write_message(stdin, &protocol.initialize()).await?;
+    let initialize = protocol.initialize();
+    write_message(stdin, &initialize).await?;
+    #[cfg(test)]
+    if let Some(probe) = &protocol.sdk_origin_probe {
+        probe.observe_outbound_transaction(&initialize, protocol.transaction_context());
+    }
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 8192];
     loop {
@@ -441,6 +446,10 @@ async fn flush_effects(
     }
     for message in effects.writes {
         write_message(stdin, &message).await?;
+        #[cfg(test)]
+        if let Some(probe) = &protocol.sdk_origin_probe {
+            probe.observe_outbound_transaction(&message, protocol.transaction_context());
+        }
     }
     for kind in after_write {
         publish(kind)?;
@@ -594,6 +603,23 @@ struct GrokProtocol {
 }
 
 impl GrokProtocol {
+    #[cfg(test)]
+    fn transaction_context(&self) -> Value {
+        let kind = self.pending.as_ref().map(|pending| match &pending.kind {
+            PendingKind::Initialize => "initialize",
+            PendingKind::Authenticate => "authenticate",
+            PendingKind::OpenSession { requested_id: None } => "new_session",
+            PendingKind::OpenSession {
+                requested_id: Some(_),
+            } => "load_session",
+            PendingKind::Prompt => "prompt",
+            PendingKind::FinalOutput => "final_output",
+            PendingKind::CloseSession => "close_session",
+        });
+        json!({"generation":self.options.generation,"next_request_id":self.next_id,
+            "pending_id":self.pending.as_ref().map(|pending|pending.id),"pending_kind":kind})
+    }
+
     fn new(options: SessionOptions) -> Self {
         Self {
             options,
@@ -1541,7 +1567,13 @@ impl GrokProtocol {
         #[cfg(test)]
         if let Some(probe) = &self.sdk_origin_probe {
             // 在版本与身份前置校验之前保存安全形状，畸形帧也不能丢失终止诊断。
-            probe.observe_response_diagnostic(&message);
+            let unexpected = message.get("method").is_none()
+                && message.get("id").is_some()
+                && message["id"].as_u64().is_none_or(|id| {
+                    self.pending.as_ref().is_none_or(|pending| pending.id != id)
+                        && !self.responses.contains_key(&id)
+                });
+            probe.observe_response_diagnostic(&message, self.transaction_context(), unexpected);
         }
         if self.responses.len() >= MAX_NATIVE_IDENTITIES
             || self.notification_ids.len() >= MAX_NATIVE_IDENTITIES

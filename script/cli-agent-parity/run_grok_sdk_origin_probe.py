@@ -5,6 +5,7 @@ import argparse
 from contextlib import contextmanager
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -28,7 +29,8 @@ MAX_EVIDENCE_BYTES = 16 * 1024 * 1024
 MAX_PRIVATE_ERROR_BYTES = 64 * 1024
 ORIGIN_STATES = {"unknown", "missing_native_origin", "candidate_mapping_only", "verified_native_fields"}
 EVENTS = {"probe_started", "probe_initialize_observed", "registration_received", "sdk_request_received",
-    "native_tool_update_received", "native_mcp_status_observed", "probe_approval_observed", "probe_finished"}
+    "native_tool_update_received", "native_mcp_status_observed", "probe_approval_observed", "probe_finished",
+    "outbound_transaction_observed"}
 SDK_WIRE_METHODS = {"x.ai/mcp/sdk_call", "_x.ai/mcp/sdk_call"}
 JSON_TYPES = {"absent", "null", "absent_or_null", "boolean", "number", "string", "array", "object"}
 MCP_STATUS_METHODS = {"_x.ai/mcp/init_progress", "_x.ai/mcp_initialized", "_x.ai/mcp/server_status"}
@@ -48,8 +50,13 @@ PROTOCOL_FAILURE_KINDS = {"invalid_response_id", "invalid_jsonrpc_version", "uns
 NATIVE_ERROR_CATEGORIES = {"http_401", "http_402", "http_403", "http_429", "http_4xx", "http_5xx", "unknown"}
 FAILURE_DIAGNOSTIC_KEYS = {"transport_task_status", "transport_error", "transport_join_error",
     "last_native_response_diagnostic", "failure_source", "private_error_capture_status",
-    "private_error_response_bytes"}
+    "private_error_response_bytes", "private_response_envelope_status", "private_response_envelope_bytes",
+    "private_response_envelope_sha256"}
 PRIVATE_ERROR_CAPTURE_STATES = {"not_observed", "captured", "budget_rejected", "encoding_failed", "write_failed"}
+PRIVATE_ENVELOPE_STATES = PRIVATE_ERROR_CAPTURE_STATES | {"scope_rejected"}
+TRANSACTION_METHODS = {"initialize", "authenticate", "session/new", "session/load", "session/prompt",
+    "session/cancel", "x.ai/session/info", "x.ai/session/close"}
+PENDING_KINDS = {"initialize", "authenticate", "new_session", "load_session", "prompt", "final_output", "close_session"}
 DIAGNOSTIC_SUMMARY_KEYS = {"error_message", "error_data_message", "runtime_error_message",
     "result_stop_reason", "response_id", "transport_join_error"}
 MCP_REASONS = {"transport_closed", "handshake_failed", "config_added", "config_removed", "config_changed",
@@ -58,7 +65,7 @@ TYPE_KEYS = {"sdk_capability_type", "params_type", "session_id_type", "total_typ
     "mcp_tool_count_type", "elapsed_ms_type", "name_type", "detail_type", "native_tool_name_type",
     "error_type", "error_code_type", "result_type"}
 COUNTER_KEYS = {"total", "connected", "mcp_tool_count", "elapsed_ms", "bytes", "response_id_number",
-    "private_error_response_bytes"}
+    "private_error_response_bytes", "private_response_envelope_bytes", "id_number"}
 FIXED_VALUES = EVENTS | ORIGIN_STATES | {SCOPE, "sdk_mcp", "initialize", "tools/list", "tools/call", "ping", "server/discover",
     "unknown", "other", "absent", "null", "boolean", "number", "string", "array", "object",
     "absent_or_null", "unknown_or_absent", "outer_meta", "sdk_params", "sdk_params_meta",
@@ -98,7 +105,8 @@ KEYS = {"event", "scope", "max_native_inputs", "origin_verification", "credentia
     "error_present", "error_type", "error_code", "error_code_type", "error_message", "error_data_message",
     "result_present", "result_type", "result_stop_reason", "result_error_conflict", "bytes",
     "runtime_error_kind", "protocol_failure_kind", "runtime_error_message",
-    "native_error_http_status", "native_error_category"} | FAILURE_DIAGNOSTIC_KEYS
+    "native_error_http_status", "native_error_category", "transaction_context", "generation", "next_request_id",
+    "pending_id", "pending_kind", "id_number", "inner_response_id"} | FAILURE_DIAGNOSTIC_KEYS
 ID_KEYS = {"outer_id", "inner_id", "session_id", "prompt_id", "event_id", "tool_call_id",
     "native_session_id", "native_prompt_id", "request_id"}
 KEY_SET_KEYS = {"outer_keys", "params_keys", "inner_keys", "tool_params_keys", "metadata_keys"}
@@ -194,11 +202,55 @@ def safe_id(value):
     return {"type": type(value).__name__, "value_omitted": True}
 
 
+def diagnostic_summary(value):
+    if not isinstance(value, dict):
+        return False
+    if value == {"type": "absent"}:
+        return True
+    return (set(value) == {"type", "bytes", "sha256"} and isinstance(value["type"], str)
+        and value["type"] in JSON_TYPES - {"absent", "absent_or_null"}
+        and type(value["bytes"]) is int and 0 <= value["bytes"] <= MAX_EVIDENCE_BYTES
+        and isinstance(value["sha256"], str) and re.fullmatch(r"[0-9a-f]{64}", value["sha256"]) is not None)
+
+
+def transaction_context_valid(value):
+    if not isinstance(value, dict) or set(value) != {"generation", "next_request_id", "pending_id", "pending_kind"}:
+        return False
+    generation = value["generation"]
+    if not isinstance(generation, str) or re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", generation) is None:
+        return False
+    numeric = lambda item: type(item) is int and 0 <= item < 2 ** 63
+    return (numeric(value["next_request_id"]) and (value["pending_id"] is None or numeric(value["pending_id"]))
+        and (value["pending_kind"] is None or isinstance(value["pending_kind"], str) and value["pending_kind"] in PENDING_KINDS)
+        and (value["pending_id"] is None) == (value["pending_kind"] is None))
+
+
+def outbound_transaction_valid(value):
+    fields = {"event", "sequence", "transaction_context", "method", "id", "id_number", "inner_response_id",
+        "method_present", "result_present", "error_present"}
+    return (isinstance(value, dict) and set(value) == fields and value["event"] == "outbound_transaction_observed"
+        and type(value["sequence"]) is int and 0 < value["sequence"] < 2 ** 63
+        and transaction_context_valid(value["transaction_context"])
+        and (isinstance(value["method"], str) and value["method"] in TRANSACTION_METHODS or diagnostic_summary(value["method"]))
+        and diagnostic_summary(value["id"]) and diagnostic_summary(value["inner_response_id"])
+        and (value["id_number"] is None or type(value["id_number"]) is int and 0 <= value["id_number"] < 2 ** 63)
+        and all(type(value[key]) is bool for key in ("method_present", "result_present", "error_present"))
+        and (value["id_number"] is None or value["id"]["type"] == "number")
+        and (value["method_present"] == (value["method"] != {"type": "absent"}))
+        and (value["result_present"] or value["inner_response_id"] == {"type": "absent"}))
+
+
 def projection(value, key=None, depth=0):
     if depth > 5:
         return {"value_omitted": True}
     if key in ID_KEYS:
         return safe_id(value)
+    if key == "transaction_context":
+        return value if transaction_context_valid(value) else {"type": type(value).__name__, "sha256": sha(json.dumps(value, sort_keys=True).encode())}
+    if key in {"method", "id", "inner_response_id"}:
+        if key == "method" and isinstance(value, str) and value in TRANSACTION_METHODS | {"tools/list", "tools/call", "server/discover", "ping"} or diagnostic_summary(value):
+            return value
+        return {"type": type(value).__name__, "sha256": sha(json.dumps(value, sort_keys=True).encode())}
     if key in DIAGNOSTIC_SUMMARY_KEYS:
         if value is None:
             return None
@@ -216,7 +268,8 @@ def projection(value, key=None, depth=0):
             if key == "transport_error" else {"jsonrpc", "jsonrpc_is_2_0", "response_id", "response_id_number",
                 "method_present", "error_present", "error_type", "error_code", "error_code_type",
                 "error_message", "error_data_message", "result_present", "result_type",
-                "result_stop_reason", "result_error_conflict", "native_error_http_status", "native_error_category"})
+                "result_stop_reason", "result_error_conflict", "native_error_http_status", "native_error_category",
+                "transaction_context"})
         return {safe_key(str(name)): (projection(item, "runtime_error_message" if name == "jsonrpc" else name,
             depth + 1) if name in allowed else {"type": type(item).__name__, "sha256": sha(json.dumps(item,
                 sort_keys=True, ensure_ascii=False).encode("utf-8"))}) for name, item in value.items()}
@@ -226,13 +279,16 @@ def projection(value, key=None, depth=0):
         return value if type(value) is int and -(2 ** 63) <= value < 2 ** 63 else None
     if key == "native_error_http_status":
         return value if type(value) is int and 100 <= value <= 599 else None
+    if key == "private_response_envelope_sha256":
+        return value if value is None or isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) else None
     if key in {"transport_task_status", "failure_source", "runtime_error_kind", "protocol_failure_kind",
-            "private_error_capture_status", "native_error_category"}:
+            "private_error_capture_status", "private_response_envelope_status", "native_error_category"}:
         if key == "failure_source" and value is None:
             return None
         allowed = {"transport_task_status": TRANSPORT_TASK_STATES, "failure_source": FAILURE_SOURCES,
             "runtime_error_kind": RUNTIME_ERROR_KINDS, "protocol_failure_kind": PROTOCOL_FAILURE_KINDS,
             "private_error_capture_status": PRIVATE_ERROR_CAPTURE_STATES,
+            "private_response_envelope_status": PRIVATE_ENVELOPE_STATES,
             "native_error_category": NATIVE_ERROR_CATEGORIES}[key]
         return value if isinstance(value, str) and value in allowed else {"type": type(value).__name__,
             "sha256": sha(json.dumps(value, sort_keys=True, ensure_ascii=False).encode("utf-8"))}
@@ -301,7 +357,8 @@ def projection(value, key=None, depth=0):
 def public_events(events):
     result = []
     for event in events:
-        if not isinstance(event.get("event"), str) or event["event"] not in EVENTS:
+        if (not isinstance(event.get("event"), str) or event["event"] not in EVENTS
+                or event["event"] == "outbound_transaction_observed" and not outbound_transaction_valid(event)):
             result.append({"event": "unrecognized_private_event", "sha256": sha(json.dumps(event,
                 sort_keys=True, ensure_ascii=False).encode("utf-8"))})
             continue
@@ -355,6 +412,81 @@ def private_error_audit(path):
     # 原文仅留在独占侧文件；公开 metadata 只有文件长度、数量与摘要。
     return {"private_native_error_response_bytes": len(raw), "private_native_error_response_count": len(records),
         "private_native_error_response_sha256": sha(raw), "private_native_error_response_scope_verified": True}
+
+
+def private_response_envelope_audit(path):
+    # 精确ID仅在当前用户独占目录/文件中校验，公开元数据只保存文件摘要。
+    if os.name != "posix":
+        raise ValueError("私有信封独占权限尚未验证此平台")
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        attributes = os.fstat(directory)
+        if attributes.st_uid != os.getuid() or stat.S_IMODE(attributes.st_mode) != 0o700:
+            raise ValueError("私有信封目录权限不匹配")
+        descriptor = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory)
+        try:
+            attributes = os.fstat(descriptor)
+            if (not stat.S_ISREG(attributes.st_mode) or attributes.st_uid != os.getuid()
+                    or stat.S_IMODE(attributes.st_mode) != 0o600 or attributes.st_nlink != 1
+                    or attributes.st_size > MAX_PRIVATE_ERROR_BYTES):
+                raise ValueError("私有信封文件范围不匹配")
+            with os.fdopen(os.dup(descriptor), "rb") as file:
+                raw = file.read(MAX_PRIVATE_ERROR_BYTES + 1)
+        finally:
+            os.close(descriptor)
+    finally:
+        os.close(directory)
+    if len(raw) > MAX_PRIVATE_ERROR_BYTES:
+        raise ValueError("私有信封超过预算")
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("私有信封重复字段")
+            result[key] = value
+        return result
+    def reject_constant(value):
+        raise ValueError("私有信封非有限数字")
+    records = [json.loads(line, object_pairs_hook=unique_object, parse_constant=reject_constant)
+        for line in raw.splitlines() if line.strip()]
+    if len(records) > 1:
+        raise ValueError("私有信封只允许一个响应")
+    for envelope in records:
+        fields = {"jsonrpc", "id", "result_type", "result_field_count", "result_fields", "error_present"}
+        if not isinstance(envelope, dict) or set(envelope) != fields:
+            raise ValueError("私有信封出现额外字段")
+        if (envelope["id"] is not None and type(envelope["id"]) not in (str, int, float)
+                or type(envelope["id"]) is float and not math.isfinite(envelope["id"])
+                or envelope["jsonrpc"] != "2.0" and not diagnostic_summary(envelope["jsonrpc"])
+                or not isinstance(envelope["result_type"], str) or envelope["result_type"] not in JSON_TYPES - {"absent_or_null"}
+                or type(envelope["result_field_count"]) is not int or not 0 <= envelope["result_field_count"] < 2 ** 63
+                or type(envelope["error_present"]) is not bool):
+            raise ValueError("私有信封字段形状无效")
+        rows = envelope["result_fields"]
+        if envelope["result_type"] != "object":
+            if rows is not None or envelope["result_field_count"] != 0:
+                raise ValueError("私有信封结果类型不匹配")
+        elif (not isinstance(rows, list) or len(rows) != min(envelope["result_field_count"], 128)
+                or any(not isinstance(row, dict) or set(row) != {"key", "value_type"}
+                    or not diagnostic_summary(row["key"]) or row["key"]["type"] != "string"
+                    or not isinstance(row["value_type"], str) or row["value_type"] not in JSON_TYPES - {"absent", "absent_or_null"} for row in rows)):
+            raise ValueError("私有信封结果字段范围无效")
+    return {"private_native_response_envelope_bytes": len(raw), "private_native_response_envelope_count": len(records),
+        "private_native_response_envelope_sha256": sha(raw), "private_native_response_envelope_scope_verified": True}
+
+
+def response_envelope_ledger_matches(audit, events):
+    finishes = [event for event in events if event.get("event") == "probe_finished"]
+    if len(finishes) != 1:
+        return False
+    finish = finishes[0]
+    status = finish.get("private_response_envelope_status")
+    size = finish.get("private_response_envelope_bytes")
+    digest = finish.get("private_response_envelope_sha256")
+    return (isinstance(status, str) and status in {"not_observed", "captured"} and type(size) is int
+        and audit["private_native_response_envelope_bytes"] == size
+        and audit["private_native_response_envelope_count"] == int(status == "captured")
+        and (digest == audit["private_native_response_envelope_sha256"] if status == "captured" else size == 0 and digest is None))
 
 
 def exact_approval_observation(finish, events):
@@ -477,6 +609,7 @@ def probe_observation(exit_code, output, events):
         and isinstance(state, str) and state in ORIGIN_STATES and finish.get("passed") is True
         and finish.get("transport_task_status", "ok") == "ok"
         and finish.get("transport_error") is None and finish.get("transport_join_error") is None
+        and all(outbound_transaction_valid(event) for event in events if event.get("event") == "outbound_transaction_observed")
         and exit_code == 0 and "1 passed; 0 failed" in output and "test result: FAILED" not in output)
     verified = (state == "verified_native_fields" and finish.get("full_native_origin_fields_observed") is True
         and finish.get("native_origin_ledger_relation_verified") is True
@@ -638,6 +771,17 @@ def run(args):
                 metadata["native_origin_verified"] = False
             except (OSError, ValueError) as error:
                 metadata["private_native_error_response_audit_error_type"] = type(error).__name__
+                metadata["probe_passed"] = False
+                metadata["native_origin_verified"] = False
+            try:
+                metadata.update(private_response_envelope_audit(root / "private-native-response-envelope.ndjson"))
+                metadata["private_native_response_envelope_ledger_matches"] = response_envelope_ledger_matches(metadata, events)
+                if not metadata["private_native_response_envelope_ledger_matches"]:
+                    metadata["probe_passed"] = False
+                    metadata["native_origin_verified"] = False
+            except (OSError, ValueError, TypeError) as error:
+                metadata["private_native_response_envelope_audit_error_type"] = type(error).__name__
+                metadata["private_native_response_envelope_ledger_matches"] = False
                 metadata["probe_passed"] = False
                 metadata["native_origin_verified"] = False
             if not events:

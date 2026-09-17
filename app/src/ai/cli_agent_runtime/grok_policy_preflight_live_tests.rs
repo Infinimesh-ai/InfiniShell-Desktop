@@ -1,5 +1,6 @@
 //! 固定 Grok 的无模型接口调查；只复用生产进程监督，不建立权限上限。
 
+use std::collections::HashMap;
 use std::env;
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
@@ -295,6 +296,13 @@ impl Evidence {
             json!({"event":"probe_failed","reason_sha256":hash(bytes),"reason_bytes":bytes.len()}),
         )
     }
+
+    fn phase_failure(&mut self, generation: Uuid, stage: &str, reason: &str) -> ProbeResult<()> {
+        self.record(
+            json!({"event":"phase_failure","generation":generation,"stage":stage,
+            "reason_sha256":hash(reason.as_bytes()),"reason_bytes":reason.len()}),
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -443,9 +451,41 @@ impl<R: AsyncRead + Unpin> WireReader<R> {
 struct Observations {
     native_session: Option<String>,
     received_notifications: usize,
+    pending_response: Option<(usize, RequestKind)>,
+    completed_responses: HashMap<usize, ([u8; 32], RequestKind)>,
 }
 
 impl Observations {
+    fn response_transaction(&mut self, frame: &Value) -> ProbeResult<Option<RequestKind>> {
+        check(
+            frame.as_object().is_some_and(|object| object.len() == 3)
+                && frame["jsonrpc"] == "2.0"
+                && frame.get("method").is_none()
+                && ((frame.get("result").is_some_and(Value::is_object)
+                    && frame.get("error").is_none())
+                    || (frame.get("error").is_some_and(Value::is_object)
+                        && frame.get("result").is_none())),
+            "native_response_uncorrelated",
+        )?;
+        let id = frame["id"]
+            .as_u64()
+            .and_then(|id| usize::try_from(id).ok())
+            .ok_or("native_response_uncorrelated")?;
+        let fingerprint: [u8; 32] = Sha256::digest(encoded(frame)?).into();
+        if let Some((previous, _)) = self.completed_responses.get(&id) {
+            check(*previous == fingerprint, "native_response_conflict")?;
+            return Ok(None);
+        }
+        let (pending, kind) = self
+            .pending_response
+            .ok_or("native_response_uncorrelated")?;
+        check(pending == id, "native_response_uncorrelated")?;
+        // 只消费本进程已实际发出的事务；迟到回复不补成权限或历史验证成功。
+        self.pending_response = None;
+        self.completed_responses.insert(id, (fingerprint, kind));
+        Ok(Some(kind))
+    }
+
     fn bind(&mut self, session: &str) -> ProbeResult<()> {
         check(
             is_session_id(session)
@@ -512,6 +552,37 @@ impl Observations {
         self.received_notifications += 1;
         Ok(())
     }
+}
+
+fn notification_diagnostic(frame: &Value, generation: Uuid) -> Value {
+    let method = match frame["method"].as_str() {
+        Some(
+            "session/update"
+            | "_x.ai/mcp_initialized"
+            | "_x.ai/mcp/init_progress"
+            | "_x.ai/mcp/server_status",
+        ) => frame["method"].clone(),
+        Some(_) | None => super::diagnostic_value(frame.get("method")),
+    };
+    json!({"event":"native_notification_diagnostic","generation":generation,"method":method,
+        "method_summary":super::diagnostic_value(frame.get("method")),
+        "frame_type":super::diagnostic_value_type(Some(frame)),
+        "params_type":super::diagnostic_value_type(frame.get("params")),
+        "id_present":frame.get("id").is_some(),"result_present":frame.get("result").is_some(),
+        "error_present":frame.get("error").is_some(),
+        "session_id":super::diagnostic_value(frame.get("params").and_then(|params|params.get("sessionId")))})
+}
+
+fn phase_outcome<T>(
+    primary: ProbeResult<T>,
+    cleanup: ProbeResult<()>,
+    drained: ProbeResult<()>,
+) -> ProbeResult<T> {
+    // 收尾失败独立报告；已有语义失败始终优先，清理成功也不能升级为接口通过。
+    let value = primary?;
+    cleanup?;
+    drained?;
+    Ok(value)
 }
 
 fn response_body(frame: &Value, id: usize, kind: RequestKind) -> ProbeResult<&Value> {
@@ -642,6 +713,10 @@ async fn rpc<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
         &paths.cwd,
         observations.native_session.as_deref(),
     )?;
+    check(
+        observations.pending_response.is_none(),
+        "native_request_already_pending",
+    )?;
     let mut bytes = encoded(&message)?;
     bytes.push(b'\n');
     check(
@@ -660,14 +735,19 @@ async fn rpc<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
     .await
     .map_err(|_| "native_write_timeout")?
     .map_err(|_| "native_write_failed")?;
+    observations.pending_response = Some((id, kind));
     let incoming = tokio::time::timeout(budget.remaining(Duration::from_secs(30))?, async {
         loop {
             let (frame, raw) = reader.next().await?.ok_or("native_eof_before_response")?;
             if frame.get("method").is_some() {
+                evidence.record(notification_diagnostic(&frame, generation))?;
                 if let Err(reason) = observations.notification(&frame) {
                     evidence.failure(&raw)?;
                     return Err(reason);
                 }
+                continue;
+            }
+            if observations.response_transaction(&frame)?.is_none() {
                 continue;
             }
             return Ok((frame, raw));
@@ -819,13 +899,28 @@ async fn phase(
     }.await;
     if let Err(reason) = &result {
         evidence.failure(reason.as_bytes())?;
+        evidence.phase_failure(generation, "primary", reason)?;
     }
     drop(stdin);
     let drain = async {
         while let Some((frame, raw)) = reader.next().await? {
-            if let Err(reason) = observations.notification(&frame) {
-                evidence.failure(&raw)?;
-                return Err(reason);
+            if frame.get("method").is_some() {
+                evidence.record(notification_diagnostic(&frame, generation))?;
+                if let Err(reason) = observations.notification(&frame) {
+                    evidence.failure(&raw)?;
+                    return Err(reason);
+                }
+            } else {
+                let kind = observations.response_transaction(&frame)?;
+                if let Some(kind) = kind {
+                    let id = frame["id"].as_u64().ok_or("native_response_uncorrelated")? as usize;
+                    response_body(&frame, id, kind)?;
+                }
+                evidence.record(
+                    json!({"event":"drain_response_observed","generation":generation,
+                    "rpc_id":frame["id"],"duplicate":kind.is_none(),
+                    "response_bytes":raw.len(),"response_sha256":hash(&raw)}),
+                )?;
             }
         }
         Ok(())
@@ -838,24 +933,43 @@ async fn phase(
             child.finish().await
         }
     };
-    let (receipt, drained) =
-        tokio::time::timeout(budget.remaining(Duration::from_secs(30))?, async {
-            futures::join!(finish, drain)
-        })
-        .await
-        .map_err(|_| "production_cleanup_timeout")?;
+    let finish_and_drain = async { futures::join!(finish, drain) };
+    let finished = match budget.remaining(Duration::from_secs(30)) {
+        Ok(remaining) => tokio::time::timeout(remaining, finish_and_drain)
+            .await
+            .map_err(|_| "production_cleanup_timeout"),
+        Err(reason) => {
+            drop(finish_and_drain);
+            Err(reason)
+        }
+    };
     budget.native_bytes += reader.bytes;
     budget.native_frames += reader.frames;
-    let receipt = receipt.map_err(|_| "production_cleanup_failed")?;
-    let confirmed = managed_process::confirmed_exit(&paths.state, generation)
-        .map_err(|_| "production_receipt_invalid")?
-        .ok_or("production_receipt_missing")?;
-    check(receipt == confirmed, "production_receipt_changed")?;
-    evidence.record(cleanup_event(&receipt)?)?;
-    // 原失败优先；StopRequested 回执只保留真实清理事实，绝不升级成正常 EOF。
-    let session = result?;
-    drained?;
-    normal_receipt(&receipt, generation)?;
+    let (cleanup, drained) = match finished {
+        Ok((receipt, drained)) => {
+            let cleanup = (|| {
+                let receipt = receipt.map_err(|_| "production_cleanup_failed")?;
+                let confirmed = managed_process::confirmed_exit(&paths.state, generation)
+                    .map_err(|_| "production_receipt_invalid")?
+                    .ok_or("production_receipt_missing")?;
+                check(receipt == confirmed, "production_receipt_changed")?;
+                evidence.record(cleanup_event(&receipt)?)?;
+                if result.is_ok() {
+                    normal_receipt(&receipt, generation)?;
+                }
+                Ok(())
+            })();
+            (cleanup, drained)
+        }
+        Err(reason) => (Err(reason), Ok(())),
+    };
+    if let Err(reason) = cleanup {
+        evidence.phase_failure(generation, "cleanup", reason)?;
+    }
+    if let Err(reason) = drained {
+        evidence.phase_failure(generation, "drain", reason)?;
+    }
+    let session = phase_outcome(result, cleanup, drained)?;
     paths.verify_snapshots(plan)?;
     Ok(session)
 }

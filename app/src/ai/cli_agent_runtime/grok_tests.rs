@@ -13,7 +13,7 @@ use crate::ai::cli_agent_runtime::{
     RuntimeEventKind, SessionOptions, SessionTarget, TurnOutcome,
 };
 
-fn options() -> SessionOptions {
+pub(super) fn options() -> SessionOptions {
     SessionOptions {
         executable: std::env::current_exe().unwrap(),
         cwd: std::env::temp_dir(),
@@ -285,6 +285,97 @@ fn unknown_string_response_cannot_replace_a_numeric_pending_request() {
     assert_eq!(protocol.pending.as_ref().unwrap().id, 1);
     assert!(protocol.responses.is_empty());
     assert!(protocol.session_id.is_none());
+    let context = protocol.transaction_context();
+    assert_eq!(context["pending_id"], 1);
+    assert_eq!(context["pending_kind"], "initialize");
+    assert_eq!(context["generation"], json!(protocol.options.generation));
+}
+
+#[tokio::test]
+async fn outbound_diagnostic_records_written_identity_without_parameters() {
+    let mut protocol = GrokProtocol::new(options());
+    let probe = super::sdk_origin_live_tests::SdkOriginProbe::new(protocol.options.generation);
+    protocol.sdk_origin_probe = Some(probe.clone());
+    let request = protocol.request(
+        super::PendingKind::Prompt,
+        "session/prompt",
+        json!({"prompt":"OFFLINE_PRIVATE_PROMPT","sessionId":"OFFLINE_PRIVATE_SESSION"}),
+    );
+    let (sender, _) = mpsc::channel(4);
+    let mut stdin = Cursor::new(Vec::new());
+    flush_effects(
+        &protocol,
+        &mut stdin,
+        &sender,
+        super::Effects {
+            writes: vec![request.clone()],
+            events: Vec::new(),
+        },
+    )
+    .await
+    .unwrap();
+
+    let report = probe.report(None, None);
+    let diagnostic = &report["frames"][0];
+    assert_eq!(diagnostic["event"], "outbound_transaction_observed");
+    assert_eq!(diagnostic["method"], "session/prompt");
+    assert_eq!(diagnostic["id"]["type"], "number");
+    assert_eq!(diagnostic["id_number"], request["id"]);
+    assert_eq!(diagnostic["transaction_context"]["pending_kind"], "prompt");
+    assert!(!report.to_string().contains("OFFLINE_PRIVATE_PROMPT"));
+    assert!(!report.to_string().contains("OFFLINE_PRIVATE_SESSION"));
+    let actual: Value = serde_json::from_slice(stdin.get_ref()).unwrap();
+    assert_eq!(actual, request);
+}
+
+#[tokio::test]
+async fn failed_write_does_not_claim_an_outbound_transaction() {
+    let mut protocol = GrokProtocol::new(options());
+    let probe = super::sdk_origin_live_tests::SdkOriginProbe::new(protocol.options.generation);
+    protocol.sdk_origin_probe = Some(probe.clone());
+    let request = protocol.initialize();
+    let (sender, _) = mpsc::channel(4);
+    let mut storage = [];
+    let mut stdin = Cursor::new(&mut storage[..]);
+    assert!(
+        flush_effects(
+            &protocol,
+            &mut stdin,
+            &sender,
+            super::Effects {
+                writes: vec![request],
+                events: Vec::new(),
+            }
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(probe.report(None, None)["frames"], json!([]));
+    assert_eq!(protocol.pending.as_ref().unwrap().id, 1);
+}
+
+#[test]
+fn transaction_context_does_not_expose_history_session_or_recovery_arguments() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.session_id = Some("OFFLINE_PRIVATE_NATIVE_SESSION".into());
+    protocol.request(
+        super::PendingKind::OpenSession {
+            requested_id: Some("OFFLINE_PRIVATE_RECOVERY_ID".into()),
+        },
+        "session/load",
+        json!({}),
+    );
+    let context = protocol.transaction_context();
+    assert_eq!(context["pending_kind"], "load_session");
+    assert_eq!(context["pending_id"], 1);
+    assert!(
+        !context
+            .to_string()
+            .contains("OFFLINE_PRIVATE_NATIVE_SESSION")
+    );
+    assert!(!context.to_string().contains("OFFLINE_PRIVATE_RECOVERY_ID"));
+    protocol.pending = None;
+    assert_eq!(protocol.transaction_context()["pending_kind"], Value::Null);
 }
 
 #[test]

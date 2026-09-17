@@ -73,6 +73,12 @@ struct ProbeState {
     private_error_response_written: bool,
     private_error_response_bytes: usize,
     private_error_capture_status: Option<&'static str>,
+    private_response_envelope: Option<File>,
+    private_response_envelope_written: bool,
+    private_response_envelope_bytes: usize,
+    private_response_envelope_sha256: Option<String>,
+    private_response_envelope_status: Option<&'static str>,
+    outbound_transaction_count: usize,
 }
 
 #[derive(Default)]
@@ -125,7 +131,7 @@ pub(super) struct SdkOriginProbe {
 }
 
 impl SdkOriginProbe {
-    fn new(generation: Uuid) -> Self {
+    pub(super) fn new(generation: Uuid) -> Self {
         Self {
             server_id: format!("infinishell-sdk-origin-{generation}"),
             state: Arc::new(Mutex::new(ProbeState::default())),
@@ -227,10 +233,37 @@ impl SdkOriginProbe {
         result
     }
 
-    pub(super) fn observe_response_diagnostic(&self, message: &Value) {
+    pub(super) fn observe_response_diagnostic(
+        &self,
+        message: &Value,
+        context: Value,
+        unexpected: bool,
+    ) {
         let mut state = self.state.lock().expect("探针状态锁未被破坏");
-        state.last_native_response_diagnostic = Some(super::native_response_diagnostic(message));
+        let mut diagnostic = super::native_response_diagnostic(message);
+        diagnostic["transaction_context"] = context;
+        state.last_native_response_diagnostic = Some(diagnostic);
         capture_private_error_response(&mut state, message);
+        if unexpected {
+            capture_private_response_envelope(&mut state, message);
+        }
+    }
+
+    pub(super) fn observe_outbound_transaction(&self, message: &Value, context: Value) {
+        let mut state = self.state.lock().expect("探针状态锁未被破坏");
+        if state.outbound_transaction_count >= MAX_RECORDS {
+            return;
+        }
+        state.outbound_transaction_count += 1;
+        let sequence = state.frames.len() + 1;
+        // 只在真实写入成功后保存事务身份；不复制提示、审批入参或 MCP 结果。
+        state.frames.push(json!({"event":"outbound_transaction_observed","sequence":sequence,
+            "transaction_context":context,"method":transaction_method(message.get("method")),
+            "id":super::diagnostic_value(message.get("id")),
+            "id_number":message["id"].as_u64().filter(|id| *id <= i64::MAX as u64),
+            "inner_response_id":super::diagnostic_value(message.get("result").and_then(|result|result.get("id"))),
+            "method_present":message.get("method").is_some(),
+            "result_present":message.get("result").is_some(),"error_present":message.get("error").is_some()}));
     }
 
     fn check(&self) -> Result<(), String> {
@@ -241,7 +274,7 @@ impl SdkOriginProbe {
             .map_or(Ok(()), |reason| Err(reason.into()))
     }
 
-    fn report(&self, session_id: Option<&str>, prompt_id: Option<&str>) -> Value {
+    pub(super) fn report(&self, session_id: Option<&str>, prompt_id: Option<&str>) -> Value {
         let state = self.state.lock().expect("探针状态锁未被破坏");
         // 已确认的身份只用于核对，绝不写回缺失来源的 SDK 请求。
         let complete_fields = !state.origins.is_empty()
@@ -332,6 +365,114 @@ impl SdkOriginProbe {
             "frames":state.frames
         })
     }
+}
+
+fn transaction_method(method: Option<&Value>) -> Value {
+    match method.and_then(Value::as_str) {
+        Some(
+            "initialize" | "authenticate" | "session/new" | "session/load" | "session/prompt"
+            | "session/cancel" | "x.ai/session/info" | "x.ai/session/close",
+        ) => method.cloned().unwrap(),
+        Some(_) | None => super::diagnostic_value(method),
+    }
+}
+
+fn open_private_response_envelope(root: &Path) -> Result<File, String> {
+    let metadata = fs::symlink_metadata(root).map_err(|_| "私有信封目录不可读取")?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err("私有信封目录必须为非链接目录".into());
+    }
+    #[cfg(unix)]
+    {
+        if metadata.uid() != Uid::current().as_raw() || metadata.mode() & 0o777 != 0o700 {
+            return Err("私有信封目录必须为当前用户的 0700 目录".into());
+        }
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(root.join("private-native-response-envelope.ndjson"))
+            .map_err(|_| "私有信封文件不可安全创建")?;
+        let metadata = file.metadata().map_err(|_| "私有信封文件不可核对")?;
+        if !metadata.is_file()
+            || metadata.uid() != Uid::current().as_raw()
+            || metadata.mode() & 0o777 != 0o600
+            || metadata.nlink() != 1
+        {
+            return Err("私有信封必须为当前用户的独占 0600 普通文件".into());
+        }
+        Ok(file)
+    }
+    #[cfg(not(unix))]
+    {
+        Err("私有响应信封尚未验证此平台的独占文件权限".into())
+    }
+}
+
+fn private_response_envelope(message: &Value) -> Option<Value> {
+    if message.get("method").is_some() {
+        return None;
+    }
+    let id = message
+        .get("id")
+        .filter(|id| id.is_string() || id.is_number() || id.is_null())?;
+    let result = message.get("result").and_then(Value::as_object);
+    // 精确 ID 只留在独占私有文件；结果只保留键指纹和字段类型，绝不保留字段值。
+    Some(
+        json!({"jsonrpc":if message["jsonrpc"] == "2.0" {json!("2.0")} else {super::diagnostic_value(message.get("jsonrpc"))},
+        "id":id,"result_type":super::diagnostic_value_type(message.get("result")),
+        "result_field_count":result.map_or(0,|fields|fields.len()),
+        "result_fields":result.map(|fields|fields.iter().take(MAX_RECORDS).map(|(key,value)|json!({
+            "key":super::diagnostic_value(Some(&Value::String(key.clone()))),
+            "value_type":super::diagnostic_value_type(Some(value))})).collect::<Vec<_>>()),
+        "error_present":message.get("error").is_some()}),
+    )
+}
+
+fn capture_private_response_envelope(state: &mut ProbeState, message: &Value) {
+    if state.private_response_envelope_written || state.private_response_envelope.is_none() {
+        return;
+    }
+    let Some(envelope) = private_response_envelope(message) else {
+        return;
+    };
+    state.private_response_envelope_written = true;
+    let Ok(mut bytes) = serde_json::to_vec(&envelope) else {
+        state.private_response_envelope_status = Some("encoding_failed");
+        return;
+    };
+    bytes.push(b'\n');
+    if bytes.len() > MAX_PRIVATE_ERROR_BYTES {
+        state.private_response_envelope_status = Some("budget_rejected");
+        return;
+    }
+    let file = state
+        .private_response_envelope
+        .as_mut()
+        .expect("私有信封文件已准备");
+    #[cfg(unix)]
+    if file.metadata().map_or(true, |metadata| {
+        !metadata.is_file()
+            || metadata.uid() != Uid::current().as_raw()
+            || metadata.mode() & 0o777 != 0o600
+            || metadata.nlink() != 1
+            || metadata.len() != 0
+    }) {
+        state.private_response_envelope_status = Some("scope_rejected");
+        return;
+    }
+    if file
+        .write_all(&bytes)
+        .and_then(|()| file.sync_all())
+        .is_err()
+    {
+        state.private_response_envelope_status = Some("write_failed");
+        return;
+    }
+    state.private_response_envelope_bytes = bytes.len();
+    state.private_response_envelope_sha256 = Some(format!("{:x}", Sha256::digest(&bytes)));
+    state.private_response_envelope_status = Some("captured");
 }
 
 fn open_private_error_response(root: &Path) -> Result<File, String> {
@@ -1354,6 +1495,11 @@ async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
         .lock()
         .expect("探针状态锁未被破坏")
         .private_error_response = Some(open_private_error_response(root)?);
+    probe
+        .state
+        .lock()
+        .expect("探针状态锁未被破坏")
+        .private_response_envelope = Some(open_private_response_envelope(root)?);
     let mut private_options = OpenOptions::new();
     private_options.write(true).create_new(true);
     #[cfg(unix)]
@@ -1620,6 +1766,13 @@ async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
         report["private_error_capture_status"] =
             json!(state.private_error_capture_status.unwrap_or("not_observed"));
         report["private_error_response_bytes"] = json!(state.private_error_response_bytes);
+        report["private_response_envelope_status"] = json!(
+            state
+                .private_response_envelope_status
+                .unwrap_or("not_observed")
+        );
+        report["private_response_envelope_bytes"] = json!(state.private_response_envelope_bytes);
+        report["private_response_envelope_sha256"] = json!(state.private_response_envelope_sha256);
     }
     report["failure_source"] = if passed {
         Value::Null
@@ -1728,6 +1881,187 @@ fn malformed_response_shape_is_saved_before_the_jsonrpc_guard() {
     );
     assert_eq!(state.sdk_requests, 0);
     assert_eq!(state.inspect_calls, 0);
+}
+
+#[test]
+fn response_envelope_retains_only_exact_id_and_result_field_shapes() {
+    let envelope =
+        private_response_envelope(&json!({"jsonrpc":"2.0","id":"OFFLINE_TRANSACTION_ID",
+        "result":{"OFFLINE_PRIVATE_KEY":{"body":"OFFLINE_MODEL_BODY"},"text":"OFFLINE_RESULT_TEXT"},
+        "error":{"message":"OFFLINE_ERROR_BODY"},"prompt":"OFFLINE_PROMPT_BODY"}))
+        .unwrap();
+    assert_eq!(envelope["id"], "OFFLINE_TRANSACTION_ID");
+    assert_eq!(envelope["jsonrpc"], "2.0");
+    assert_eq!(envelope["result_field_count"], 2);
+    assert_eq!(envelope["result_type"], "object");
+    assert_eq!(envelope["error_present"], true);
+    assert_eq!(envelope["result_fields"].as_array().unwrap().len(), 2);
+    for forbidden in [
+        "OFFLINE_PRIVATE_KEY",
+        "OFFLINE_MODEL_BODY",
+        "OFFLINE_RESULT_TEXT",
+        "OFFLINE_ERROR_BODY",
+        "OFFLINE_PROMPT_BODY",
+    ] {
+        assert!(!envelope.to_string().contains(forbidden));
+    }
+    assert!(private_response_envelope(&json!({"method":"session/update","id":1})).is_none());
+    assert!(private_response_envelope(&json!({"id":{"body":"OFFLINE_BODY"}})).is_none());
+}
+
+#[cfg(unix)]
+#[test]
+fn unknown_response_is_captured_before_id_guard_without_consuming_pending() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut protocol = GrokProtocol::new(super::tests::options());
+    let probe = SdkOriginProbe::new(protocol.options.generation);
+    probe.state.lock().unwrap().private_response_envelope =
+        Some(open_private_response_envelope(root.path()).unwrap());
+    protocol.sdk_origin_probe = Some(probe.clone());
+    protocol.initialize();
+    let response = json!({"jsonrpc":"2.0","id":"OFFLINE_UNKNOWN_RESPONSE",
+        "result":{"text":"OFFLINE_MODEL_BODY"}});
+    for _ in 0..2 {
+        let error = protocol.receive(response.clone()).err().unwrap();
+        assert_eq!(
+            super::runtime_error_diagnostic(&error)["protocol_failure_kind"],
+            "invalid_response_id"
+        );
+    }
+    assert_eq!(protocol.pending.as_ref().unwrap().id, 1);
+    assert!(protocol.responses.is_empty());
+    let state = probe.state.lock().unwrap();
+    let diagnostic = state.last_native_response_diagnostic.as_ref().unwrap();
+    assert_eq!(diagnostic["transaction_context"]["pending_id"], 1);
+    assert_eq!(
+        diagnostic["transaction_context"]["pending_kind"],
+        "initialize"
+    );
+    assert!(!diagnostic.to_string().contains("OFFLINE_UNKNOWN_RESPONSE"));
+    assert!(!diagnostic.to_string().contains("OFFLINE_MODEL_BODY"));
+    assert_eq!(state.private_response_envelope_status, Some("captured"));
+    let raw =
+        fs::read_to_string(root.path().join("private-native-response-envelope.ndjson")).unwrap();
+    assert_eq!(raw.lines().count(), 1);
+    assert!(raw.contains("OFFLINE_UNKNOWN_RESPONSE"));
+    assert!(!raw.contains("OFFLINE_MODEL_BODY"));
+    let sha256 = format!("{:x}", Sha256::digest(raw.as_bytes()));
+    assert_eq!(
+        state.private_response_envelope_sha256.as_deref(),
+        Some(sha256.as_str())
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn private_response_envelope_is_first_only_and_preserves_an_empty_file_on_budget_rejection() {
+    let private = NamedTempFile::new().unwrap();
+    let mut state = ProbeState {
+        private_response_envelope: Some(private.as_file().try_clone().unwrap()),
+        ..ProbeState::default()
+    };
+    capture_private_response_envelope(
+        &mut state,
+        &json!({"jsonrpc":"2.0","id":"first","result":{"x":1}}),
+    );
+    capture_private_response_envelope(
+        &mut state,
+        &json!({"jsonrpc":"2.0","id":"second","result":{"x":2}}),
+    );
+    let raw = fs::read_to_string(private.path()).unwrap();
+    assert_eq!(raw.lines().count(), 1);
+    assert_eq!(
+        serde_json::from_str::<Value>(raw.trim()).unwrap()["id"],
+        "first"
+    );
+
+    let oversized = NamedTempFile::new().unwrap();
+    let mut rejected = ProbeState {
+        private_response_envelope: Some(oversized.as_file().try_clone().unwrap()),
+        ..ProbeState::default()
+    };
+    capture_private_response_envelope(
+        &mut rejected,
+        &json!({"id":"x".repeat(MAX_PRIVATE_ERROR_BYTES)}),
+    );
+    capture_private_response_envelope(&mut rejected, &json!({"id":"later"}));
+    assert_eq!(
+        rejected.private_response_envelope_status,
+        Some("budget_rejected")
+    );
+    assert_eq!(rejected.private_response_envelope_bytes, 0);
+    assert_eq!(fs::metadata(oversized.path()).unwrap().len(), 0);
+}
+
+#[cfg(unix)]
+#[test]
+fn private_envelope_directory_and_file_refuse_links_existing_files_and_shared_permissions() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let root = tempfile::tempdir().unwrap();
+    fs::set_permissions(root.path(), fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(open_private_response_envelope(root.path()).is_err());
+    fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let target = NamedTempFile::new().unwrap();
+    let path = root.path().join("private-native-response-envelope.ndjson");
+    symlink(target.path(), &path).unwrap();
+    assert!(open_private_response_envelope(root.path()).is_err());
+    assert_eq!(fs::metadata(target.path()).unwrap().len(), 0);
+    fs::remove_file(&path).unwrap();
+    drop(open_private_response_envelope(root.path()).unwrap());
+    assert!(open_private_response_envelope(root.path()).is_err());
+    assert_eq!(fs::metadata(&path).unwrap().mode() & 0o777, 0o600);
+    let alias = root.path().join("linked-directory");
+    symlink(root.path(), &alias).unwrap();
+    assert!(open_private_response_envelope(&alias).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn private_envelope_rechecks_hardlink_and_permissions_before_writing() {
+    use std::os::unix::fs::PermissionsExt;
+    for hardlink in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let file = open_private_response_envelope(root.path()).unwrap();
+        let path = root.path().join("private-native-response-envelope.ndjson");
+        if hardlink {
+            fs::hard_link(&path, root.path().join("second-link")).unwrap();
+        } else {
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
+        }
+        let mut state = ProbeState {
+            private_response_envelope: Some(file),
+            ..ProbeState::default()
+        };
+        capture_private_response_envelope(&mut state, &json!({"id":"OFFLINE_ID","result":{}}));
+        assert_eq!(
+            state.private_response_envelope_status,
+            Some("scope_rejected")
+        );
+        assert_eq!(fs::metadata(&path).unwrap().len(), 0);
+    }
+}
+
+#[test]
+fn private_envelope_field_budget_does_not_copy_arbitrary_keys() {
+    let fields = (0..MAX_RECORDS + 2)
+        .map(|index| {
+            (
+                format!("OFFLINE_KEY_{index}"),
+                json!({"body":"OFFLINE_MODEL"}),
+            )
+        })
+        .collect::<serde_json::Map<String, Value>>();
+    let envelope = private_response_envelope(&json!({"id":9,"result":fields})).unwrap();
+    assert_eq!(envelope["result_field_count"], MAX_RECORDS + 2);
+    assert_eq!(
+        envelope["result_fields"].as_array().unwrap().len(),
+        MAX_RECORDS
+    );
+    assert!(!envelope.to_string().contains("OFFLINE_KEY_"));
+    assert!(!envelope.to_string().contains("OFFLINE_MODEL"));
 }
 
 #[test]

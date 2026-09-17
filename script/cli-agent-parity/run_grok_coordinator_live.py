@@ -2,6 +2,7 @@
 """以官方隔离链验证 Grok 根任务生产协调器；需要下一快照的已验证历史安全事件。"""
 
 import argparse
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -164,7 +165,7 @@ def message_projection(message):
 def sqlite_projection(path):
     # 只读取本次隔离任务数据库，不将完整配置、正文或消息体写入公开报告。
     require(path.is_file() and not path.is_symlink())
-    with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
         tasks = [json.loads(row[0]) for row in connection.execute("SELECT data FROM local_cli_tasks")]
         history = [json.loads(row[0]) for row in connection.execute(
             "SELECT data FROM local_cli_task_generations ORDER BY generation")]

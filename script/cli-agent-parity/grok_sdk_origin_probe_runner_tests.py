@@ -592,8 +592,13 @@ class ProbeRunnerTests(unittest.TestCase):
 
         def launch(command, **_kwargs):
             self.assertEqual(command[1], runner.TEST_NAME)
-            (private / "private-evidence.ndjson").write_text("".join(json.dumps(event) + "\n" for event in evidence()), encoding="utf-8")
+            rows = evidence()
+            # 新运行器mock补齐当前Rust诊断账本；保留旧合成fixture本身的读取兼容。
+            rows[-1].update(private_response_envelope_status="not_observed", private_response_envelope_bytes=0,
+                private_response_envelope_sha256=None)
+            (private / "private-evidence.ndjson").write_text("".join(json.dumps(event) + "\n" for event in rows), encoding="utf-8")
             (private / "private-native-error-response.ndjson").touch(mode=0o600)
+            (private / "private-native-response-envelope.ndjson").touch(mode=0o600)
             (private / "wrapper-audit.ndjson").write_text("".join(json.dumps({"event": "native_launch", "kind": kind,
                 "arguments_unchanged": True}) + "\n" for kind in
                 ["version"] * version_launches + [agent_kind] + (["unexpected"] if extra_launch else [])), encoding="utf-8")
@@ -1128,6 +1133,141 @@ class SafeTerminationDiagnosticTests(unittest.TestCase):
             os.link(path, hardlink)
             with self.assertRaises(ValueError):
                 runner.private_error_audit(path)
+
+
+class TransactionEnvelopeDiagnosticTests(unittest.TestCase):
+    def summary(self, value="OFFLINE_ID"):
+        raw = json.dumps(value).encode()
+        return {"type": "string" if isinstance(value, str) else "number", "bytes": len(raw), "sha256": runner.sha(raw)}
+
+    def context(self):
+        return {"generation": "11111111-1111-4111-8111-111111111111", "next_request_id": 2,
+            "pending_id": 1, "pending_kind": "initialize"}
+
+    def outbound(self):
+        return {"event": "outbound_transaction_observed", "sequence": 1, "transaction_context": self.context(),
+            "method": "initialize", "id": self.summary(1), "id_number": 1, "inner_response_id": {"type": "absent"},
+            "method_present": True, "result_present": False, "error_present": False}
+
+    def envelope(self):
+        return {"jsonrpc": "2.0", "id": "OFFLINE_EXACT_PRIVATE_ID", "result_type": "object", "result_field_count": 1,
+            "result_fields": [{"key": self.summary("OFFLINE_PRIVATE_KEY"), "value_type": "string"}], "error_present": False}
+
+    def test_outbound_closed_context_and_summaries_are_retained_without_id_body(self):
+        row = self.outbound()
+        self.assertEqual(runner.public_events([row]), [row])
+        self.assertNotIn("OFFLINE_ID", json.dumps(runner.public_events([row])))
+        for kind in runner.PENDING_KINDS:
+            context = self.context() | {"pending_kind": kind}
+            self.assertTrue(runner.transaction_context_valid(context))
+        self.assertTrue(runner.transaction_context_valid(self.context() | {"pending_id": None, "pending_kind": None}))
+
+    def test_unknown_outbound_fields_raw_ids_and_boolean_counters_are_rejected(self):
+        for patching in ({"prompt": "OFFLINE_BODY"}, {"id": "initialize"}, {"sequence": True},
+                {"method": "OFFLINE_METHOD"}, {"id_number": True}):
+            row = self.outbound() | patching
+            self.assertFalse(runner.outbound_transaction_valid(row))
+            public = runner.public_events([row])
+            self.assertEqual(public[0]["event"], "unrecognized_private_event")
+            self.assertNotIn("OFFLINE", json.dumps(public))
+
+    def test_bad_transaction_context_is_hashed_and_cannot_pass_forged_success(self):
+        for patching in ({"pending_kind": "OFFLINE_BODY"}, {"pending_id": True}, {"generation": "OFFLINE_BODY"},
+                {"pending_id": None}, {"extra": "OFFLINE_BODY"}):
+            context = self.context() | patching
+            self.assertFalse(runner.transaction_context_valid(context))
+            self.assertNotIn("OFFLINE_BODY", json.dumps(runner.projection(context, "transaction_context")))
+        events = evidence()
+        events.insert(-1, self.outbound() | {"transaction_context": self.context() | {"next_request_id": True}})
+        self.assertFalse(runner.probe_observation(0, "1 passed; 0 failed", events)["probe_passed"])
+
+    def test_response_transaction_context_and_capture_status_survive_failure_metadata(self):
+        events = evidence()
+        events[-1].update(passed=False, last_native_response_diagnostic={"transaction_context": self.context()},
+            private_response_envelope_status="captured", private_response_envelope_bytes=20,
+            private_response_envelope_sha256="a" * 64)
+        result = runner.probe_observation(101, "", events)
+        self.assertEqual(result["failure_diagnostics"]["last_native_response_diagnostic"]["transaction_context"], self.context())
+        self.assertEqual(result["failure_diagnostics"]["private_response_envelope_status"], "captured")
+        self.assertFalse(result["probe_passed"])
+        self.assertIsNone(runner.projection("OFFLINE_BODY", "private_response_envelope_sha256"))
+
+    @unittest.skipUnless(os.name == "posix", "私有信封权限只验证Unix")
+    def test_private_envelope_exports_only_file_digest_and_matches_captured_ledger(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "envelope.ndjson"
+            path.touch(mode=0o600)
+            path.write_text(json.dumps(self.envelope()) + "\n")
+            audit = runner.private_response_envelope_audit(path)
+            self.assertEqual(audit["private_native_response_envelope_count"], 1)
+            self.assertNotIn("OFFLINE", json.dumps(audit))
+            events = [{"event": "probe_finished", "private_response_envelope_status": "captured",
+                "private_response_envelope_bytes": path.stat().st_size, "private_response_envelope_sha256": runner.shared.digest(path)}]
+            self.assertTrue(runner.response_envelope_ledger_matches(audit, events))
+            for key, value in (("private_response_envelope_bytes", True), ("private_response_envelope_bytes", 0),
+                    ("private_response_envelope_sha256", "b" * 64), ("private_response_envelope_status", "not_observed")):
+                self.assertFalse(runner.response_envelope_ledger_matches(audit, [events[0] | {key: value}]))
+
+    @unittest.skipUnless(os.name == "posix", "私有信封权限只验证Unix")
+    def test_empty_envelope_is_not_an_API_error_or_a_failed_capture_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "envelope.ndjson"
+            path.touch(mode=0o600)
+            audit = runner.private_response_envelope_audit(path)
+            row = {"event": "probe_finished", "private_response_envelope_status": "not_observed",
+                "private_response_envelope_bytes": 0, "private_response_envelope_sha256": None}
+            self.assertTrue(runner.response_envelope_ledger_matches(audit, [row]))
+            for status in runner.PRIVATE_ENVELOPE_STATES - {"not_observed"}:
+                self.assertFalse(runner.response_envelope_ledger_matches(audit, [row | {"private_response_envelope_status": status}]))
+            self.assertFalse(runner.response_envelope_ledger_matches(audit, [row, row]))
+
+    @unittest.skipUnless(os.name == "posix", "私有信封权限只验证Unix")
+    def test_private_envelope_refuses_extra_body_duplicate_fields_multiple_and_oversized_records(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "envelope.ndjson"
+            path.touch(mode=0o600)
+            for row in (self.envelope() | {"result": {"prompt": "OFFLINE_BODY"}}, self.envelope() | {"id": True},
+                    self.envelope() | {"result_fields": [{"key": "OFFLINE_BODY", "value_type": "string"}]},
+                    self.envelope() | {"result_field_count": True}):
+                path.write_text(json.dumps(row))
+                with self.assertRaises(ValueError): runner.private_response_envelope_audit(path)
+            for body in ('{"id":1,"id":2}', json.dumps(self.envelope()) + "\n" + json.dumps(self.envelope()),
+                    json.dumps(self.envelope()).replace('"OFFLINE_EXACT_PRIVATE_ID"', '1e999'),
+                    "x" * (runner.MAX_PRIVATE_ERROR_BYTES + 1)):
+                path.write_text(body)
+                with self.assertRaises(ValueError): runner.private_response_envelope_audit(path)
+
+    @unittest.skipUnless(os.name == "posix", "私有信封权限只验证Unix")
+    def test_private_envelope_refuses_public_permissions_symlinks_hardlinks_and_public_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "envelope.ndjson"
+            path.touch(mode=0o600)
+            path.chmod(0o644)
+            with self.assertRaises(ValueError): runner.private_response_envelope_audit(path)
+            path.chmod(0o600)
+            alias = Path(directory) / "alias"
+            alias.symlink_to(path)
+            with self.assertRaises(OSError): runner.private_response_envelope_audit(alias)
+            alias.unlink()
+            os.link(path, alias)
+            with self.assertRaises(ValueError): runner.private_response_envelope_audit(path)
+            alias.unlink()
+            Path(directory).chmod(0o755)
+            with self.assertRaises(ValueError): runner.private_response_envelope_audit(path)
+            Path(directory).chmod(0o700)
+
+    @unittest.skipUnless(os.name == "posix", "私有信封权限只验证Unix")
+    def test_envelope_field_fingerprints_are_bounded_at_128_without_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "envelope.ndjson"
+            path.touch(mode=0o600)
+            row = self.envelope() | {"result_field_count": 129,
+                "result_fields": [{"key": self.summary(str(index)), "value_type": "object"} for index in range(128)]}
+            path.write_text(json.dumps(row))
+            self.assertEqual(runner.private_response_envelope_audit(path)["private_native_response_envelope_count"], 1)
+            row["result_fields"].append({"key": self.summary("OFFLINE_EXTRA"), "value_type": "object"})
+            path.write_text(json.dumps(row))
+            with self.assertRaises(ValueError): runner.private_response_envelope_audit(path)
 
 
 if __name__ == "__main__":

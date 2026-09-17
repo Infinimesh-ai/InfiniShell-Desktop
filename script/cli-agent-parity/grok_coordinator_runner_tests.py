@@ -2,6 +2,7 @@
 """审核 Grok 协调器证据的离线拒绝路径；不调用 CLI、网络、模型或图形界面。"""
 
 import copy
+from contextlib import closing
 import json
 from pathlib import Path
 import shutil
@@ -352,7 +353,7 @@ class GrokCoordinatorRunnerTests(unittest.TestCase):
             self.assertEqual(projection["project_file_count"], 4)
             self.assertEqual(projection["unexpected_project_file_count"], 2)
             self.assertEqual(projection["unexpected_project_file_name_sha256"], sorted([
-                runner.sha(canary), runner.sha("nested/approval-allow.txt")]))
+                runner.sha(canary), runner.sha(str(Path("nested") / "approval-allow.txt"))]))
             self.assertNotIn(canary, json.dumps(projection))
 
     def test_actual_sqlite_projection_uses_safe_json_and_body_hashes(self):
@@ -369,16 +370,32 @@ class GrokCoordinatorRunnerTests(unittest.TestCase):
             "state": "acknowledged", "receipt_kind": "native_protocol"}
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "coordinator.sqlite"
-            with sqlite3.connect(path) as connection:
+            with closing(sqlite3.connect(path)) as connection, connection:
                 connection.executescript("CREATE TABLE local_cli_tasks(data TEXT); CREATE TABLE local_cli_task_generations(generation INTEGER,data TEXT); CREATE TABLE local_cli_messages(sequence INTEGER,data TEXT);")
                 connection.execute("INSERT INTO local_cli_tasks VALUES (?)", (json.dumps(task),))
                 connection.execute("INSERT INTO local_cli_task_generations VALUES (?,?)", (1, json.dumps(task)))
                 connection.execute("INSERT INTO local_cli_messages VALUES (?,?)", (1, json.dumps(message)))
-            projection = runner.sqlite_projection(path)
+            with self.assertRaises(sqlite3.ProgrammingError):
+                connection.execute("SELECT 1")
+            # 保留真实连接引用，避免垃圾回收掩盖 Windows 清理时的文件占用。
+            read_connection = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
+            with patch.object(runner.sqlite3, "connect", return_value=read_connection):
+                projection = runner.sqlite_projection(path)
+            with self.assertRaises(sqlite3.ProgrammingError):
+                read_connection.execute("SELECT 1")
             self.assertEqual(projection["messages"][0]["body_sha256"], runner.sha(message["body"]))
             self.assertEqual(projection["task"]["terminal_native_session_id"], uid(800))
             self.assertNotIn("private-body", json.dumps(projection))
             self.assertNotIn("config_json", json.dumps(projection))
+            with closing(sqlite3.connect(path)) as writer, writer:
+                writer.execute("UPDATE local_cli_tasks SET data = ?", ("not-json",))
+            error_connection = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
+            with patch.object(runner.sqlite3, "connect", return_value=error_connection):
+                with self.assertRaises(json.JSONDecodeError):
+                    runner.sqlite_projection(path)
+            with self.assertRaises(sqlite3.ProgrammingError):
+                error_connection.execute("SELECT 1")
+            path.unlink()
         task["parent_task_id"] = uid(99)
         with self.assertRaises(ValueError):
             runner.task_projection(task)
@@ -437,15 +454,23 @@ class GrokCoordinatorRunnerTests(unittest.TestCase):
         def copy_auth(source, target):
             (target / "auth.json").write_text("opaque offline auth fixture")
 
+        create_directory = tempfile.mkdtemp
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+
+            def private_directory(**kwargs):
+                self.assertEqual(kwargs["dir"], "/private/tmp")
+                kwargs["dir"] = root
+                return create_directory(**kwargs)
+
             for name in ("libtest", "grok", "supervisor"):
                 (root / name).write_text("offline binary fixture")
             args = SimpleNamespace(output=root / "evidence.ndjson", timeout=900,
                 test_binary=root / "libtest", grok=root / "grok", supervisor=root / "supervisor",
                 official_grok_home=root / "offline-auth-source")
             process = SimpleNamespace(returncode=101, communicate=lambda **kwargs: ("offline process failed\n", None))
-            with patch.object(runner.official, "OfficialTunnel", return_value=Tunnel()), \
+            with patch.object(runner.tempfile, "mkdtemp", side_effect=private_directory), \
+                    patch.object(runner.official, "OfficialTunnel", return_value=Tunnel()), \
                     patch.object(runner.official, "copy_private_auth", side_effect=copy_auth), \
                     patch.object(runner.official, "prepare_native", side_effect=prepare), \
                     patch.object(runner.official.shared, "network_canary", return_value={"offline_mock": True}), \

@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use super::{
     ALLOWED_METHODS, DIAGNOSTIC_METHODS, MAX_BYTES, MAX_FRAMES, Observations, Plan, RequestKind,
-    SCOPE, WireReader, confirm_info, guard_outbound, hash, mcp_counts, normal_receipt, outbound,
-    response_body,
+    SCOPE, WireReader, confirm_info, guard_outbound, hash, mcp_counts, normal_receipt,
+    notification_diagnostic, outbound, phase_outcome, response_body,
 };
 use crate::ai::cli_agent_runtime::managed_process::ExitReceipt;
 
@@ -272,6 +272,182 @@ fn initial_available_commands_do_not_prove_any_permission_mode() {
     observations.notification(&metadata).unwrap();
     assert_eq!(observations.received_notifications, 1);
     assert_eq!(observations.native_session.as_deref(), Some(SESSION));
+}
+
+#[test]
+fn unknown_notification_diagnostic_hashes_method_without_accepting_it() {
+    let generation = Uuid::new_v4();
+    let frame = json!({"jsonrpc":"2.0","method":"OFFLINE_PRIVATE_METHOD",
+        "params":{"sessionId":SESSION,"body":"OFFLINE_MODEL_BODY"}});
+    let diagnostic = notification_diagnostic(&frame, generation);
+    assert_eq!(diagnostic["method"]["type"], "string");
+    assert_eq!(
+        diagnostic["method"]["sha256"],
+        hash(b"OFFLINE_PRIVATE_METHOD")
+    );
+    assert_eq!(diagnostic["generation"], json!(generation));
+    for forbidden in ["OFFLINE_PRIVATE_METHOD", "OFFLINE_MODEL_BODY", SESSION] {
+        assert!(!diagnostic.to_string().contains(forbidden));
+    }
+    assert_eq!(
+        Observations::default().notification(&frame),
+        Err("native_unknown_notification_rejected")
+    );
+}
+
+#[test]
+fn known_mcp_initialization_diagnostic_does_not_expand_policy_white_list() {
+    let frame = json!({"jsonrpc":"2.0","method":"_x.ai/mcp/init_progress",
+        "params":{"sessionId":SESSION,"total":0,"connected":0}});
+    let diagnostic = notification_diagnostic(&frame, Uuid::nil());
+    assert_eq!(diagnostic["method"], "_x.ai/mcp/init_progress");
+    assert_eq!(diagnostic["method_summary"]["type"], "string");
+    assert_eq!(
+        Observations::default().notification(&frame),
+        Err("native_unknown_notification_rejected")
+    );
+}
+
+#[test]
+fn late_declared_response_and_exact_replay_do_not_complete_another_pending_rpc() {
+    let mut observations = Observations {
+        pending_response: Some((2, RequestKind::New)),
+        ..Observations::default()
+    };
+    let late = json!({"jsonrpc":"2.0","id":2,"result":{"sessionId":SESSION}});
+    assert_eq!(
+        observations.response_transaction(&late),
+        Ok(Some(RequestKind::New))
+    );
+    response_body(&late, 2, RequestKind::New).unwrap();
+    assert!(observations.pending_response.is_none());
+    // 已失败调查的迟到回复只闭合事务，不将其会话或权限补成通过。
+    assert!(observations.native_session.is_none());
+    observations.pending_response = Some((3, RequestKind::Info));
+    assert_eq!(observations.response_transaction(&late), Ok(None));
+    assert_eq!(observations.pending_response, Some((3, RequestKind::Info)));
+}
+
+#[test]
+fn future_string_and_unowned_response_ids_preserve_declared_pending_rpc() {
+    for id in [
+        json!(1),
+        json!(3),
+        json!("2"),
+        json!("OFFLINE_UNKNOWN_ID"),
+        Value::Null,
+    ] {
+        let mut observations = Observations {
+            pending_response: Some((2, RequestKind::New)),
+            ..Observations::default()
+        };
+        let frame = json!({"jsonrpc":"2.0","id":id,"result":{}});
+        assert_eq!(
+            observations.response_transaction(&frame),
+            Err("native_response_uncorrelated")
+        );
+        assert_eq!(observations.pending_response, Some((2, RequestKind::New)));
+        assert!(observations.completed_responses.is_empty());
+    }
+    assert_eq!(
+        Observations::default().response_transaction(&json!({"jsonrpc":"2.0","id":2,"result":{}})),
+        Err("native_response_uncorrelated")
+    );
+}
+
+#[test]
+fn conflicting_replay_cannot_replace_a_new_rpc_or_completed_fingerprint() {
+    let mut observations = Observations {
+        pending_response: Some((1, RequestKind::Initialize)),
+        ..Observations::default()
+    };
+    let first = json!({"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1}});
+    observations.response_transaction(&first).unwrap();
+    observations.pending_response = Some((2, RequestKind::New));
+    let fingerprint = observations.completed_responses[&1].0;
+    let conflict = json!({"jsonrpc":"2.0","id":1,"result":{"protocolVersion":99}});
+    assert_eq!(
+        observations.response_transaction(&conflict),
+        Err("native_response_conflict")
+    );
+    assert_eq!(observations.pending_response, Some((2, RequestKind::New)));
+    assert_eq!(observations.completed_responses[&1].0, fingerprint);
+}
+
+#[test]
+fn malformed_late_response_cannot_consume_the_owned_request() {
+    for frame in [
+        json!({"jsonrpc":"1.0","id":2,"result":{}}),
+        json!({"jsonrpc":"2.0","id":2,"result":[]}),
+        json!({"jsonrpc":"2.0","id":2,"error":"OFFLINE_ERROR"}),
+        json!({"jsonrpc":"2.0","id":2,"body":{}}),
+        json!({"jsonrpc":"2.0","id":2,"result":{},"error":{}}),
+    ] {
+        let mut observations = Observations {
+            pending_response: Some((2, RequestKind::New)),
+            ..Observations::default()
+        };
+        assert_eq!(
+            observations.response_transaction(&frame),
+            Err("native_response_uncorrelated")
+        );
+        assert_eq!(observations.pending_response, Some((2, RequestKind::New)));
+        assert!(observations.completed_responses.is_empty());
+    }
+}
+
+#[test]
+fn native_rpc_error_closes_only_its_declared_transaction_without_becoming_success() {
+    let mut observations = Observations {
+        pending_response: Some((2, RequestKind::New)),
+        ..Observations::default()
+    };
+    let frame =
+        json!({"jsonrpc":"2.0","id":2,"error":{"code":-32603,"message":"OFFLINE_PRIVATE_ERROR"}});
+    assert_eq!(
+        observations.response_transaction(&frame),
+        Ok(Some(RequestKind::New))
+    );
+    assert_eq!(response_body(&frame, 2, RequestKind::New), Err("rpc_error"));
+    assert!(observations.native_session.is_none());
+}
+
+#[test]
+fn primary_failure_survives_missing_exit_code_cleanup_timeout_and_drain_error() {
+    let generation = Uuid::new_v4();
+    let mut exit = receipt(
+        "stop_requested",
+        "macos_resource_coalition",
+        &generation.to_string(),
+    );
+    exit.exit_code = None;
+    let cleanup = super::cleanup_event(&exit).map(|_| ());
+    assert_eq!(cleanup, Err("native_exit_code_missing"));
+    assert_eq!(
+        phase_outcome::<()>(
+            Err("native_unknown_notification_rejected"),
+            cleanup,
+            Err("native_response_uncorrelated")
+        ),
+        Err("native_unknown_notification_rejected")
+    );
+    assert_eq!(
+        phase_outcome::<()>(
+            Err("native_unknown_notification_rejected"),
+            Err("production_cleanup_timeout"),
+            Ok(())
+        ),
+        Err("native_unknown_notification_rejected")
+    );
+    assert_eq!(
+        phase_outcome(Ok("session"), Err("production_cleanup_timeout"), Ok(())),
+        Err("production_cleanup_timeout")
+    );
+    assert_eq!(
+        phase_outcome(Ok("session"), Ok(()), Err("native_response_uncorrelated")),
+        Err("native_response_uncorrelated")
+    );
+    assert_eq!(phase_outcome(Ok("session"), Ok(()), Ok(())), Ok("session"));
 }
 
 #[test]

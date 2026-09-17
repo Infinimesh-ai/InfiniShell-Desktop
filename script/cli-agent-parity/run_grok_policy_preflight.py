@@ -39,6 +39,8 @@ DIAGNOSTIC_METHODS = (
 )
 ALLOWED_METHODS = ("initialize", "session/new", "session/load", *DIAGNOSTIC_METHODS)
 RESPONSE_STATES = {"ok", "method_not_found", "auth_required", "rpc_error", "timeout"}
+NOTIFICATION_METHODS = {"session/update", "_x.ai/mcp_initialized", "_x.ai/mcp/init_progress", "_x.ai/mcp/server_status"}
+JSON_TYPES = {"absent", "null", "boolean", "number", "string", "array", "object"}
 LIMITATIONS = (
     "candidate_source_differs_from_binary", "no_effective_builtin_catalog_interface_verified",
     "profile_loading_unknown", "effective_mode_unknown", "configuration_sources_unknown",
@@ -78,6 +80,12 @@ def valid_uuid(value):
 
 def integer(value, maximum=MAX_EVIDENCE_BYTES):
     return type(value) is int and 0 <= value <= maximum
+
+
+def diagnostic_summary(value):
+    return (isinstance(value, dict) and (value == {"type": "absent"}
+        or set(value) == {"type", "bytes", "sha256"} and isinstance(value["type"], str) and value["type"] in JSON_TYPES - {"absent"}
+            and integer(value["bytes"]) and digest(value["sha256"])))
 
 
 def make_plan(profile_sha256, config_sha256, request_budget=MAX_REQUESTS):
@@ -188,6 +196,14 @@ def event_schemas():
             "exit_reason": choice("stdio_closed", "native_exit", "stop_requested", "host_disconnected"),
             "cleanup_confirmed": flag, "receipt_sha256": digest},
         "probe_failed": {"reason_sha256": digest, "reason_bytes": count},
+        "native_notification_diagnostic": {"generation": valid_uuid,
+            "method": lambda value: isinstance(value, str) and value in NOTIFICATION_METHODS or diagnostic_summary(value),
+            "method_summary": diagnostic_summary, "frame_type": choice(*JSON_TYPES), "params_type": choice(*JSON_TYPES),
+            "id_present": flag, "result_present": flag, "error_present": flag, "session_id": diagnostic_summary},
+        "phase_failure": {"generation": valid_uuid, "stage": choice("primary", "cleanup", "drain"),
+            "reason_bytes": count, "reason_sha256": digest},
+        "drain_response_observed": {"generation": valid_uuid, "rpc_id": count, "duplicate": flag,
+            "response_bytes": count, "response_sha256": digest},
         "probe_finished": {"scope": choice(SCOPE), "native_inputs": zero, "tool_exec_count": zero,
             "unexpected_native_activity": count, "protocol_request_count": count,
             "guard_before_native_write": flag, "transport_closed": flag,
@@ -218,16 +234,25 @@ def project_events(events):
     return projected, failures
 
 
+def failure_diagnostics(public):
+    return {"notifications": [row for row in public if row["event"] == "native_notification_diagnostic"],
+        "phase_failures": [row for row in public if row["event"] == "phase_failure"],
+        "drain_responses": [row for row in public if row["event"] == "drain_response_observed"]}
+
+
 def audit_events(exit_code, stdout, events):
     public, failures = project_events(events)
     result = {"execution_boundary_passed": False, "interface_investigation_completed": False,
         "policy": unknown_policy(), "events": public + failures, "stdout": stdout_summary(stdout)}
+    diagnostics = failure_diagnostics(public)
+    if any(diagnostics.values()):
+        result["failure_diagnostics"] = diagnostics
     try:
         require(not failures and exit_code == 0 and result["stdout"]["test_success_summary_count"] == 1
             and not any(result["stdout"]["credential_shape_counts"].values()), "test_or_projection_failed")
         one = lambda name: [row for row in public if row["event"] == name]
         require(len(one("probe_started")) == 1 and len(one("probe_finished")) == 1
-            and not one("probe_failed"), "probe_incomplete")
+            and not one("probe_failed") and not one("phase_failure"), "probe_incomplete")
         start, finish = one("probe_started")[0], one("probe_finished")[0]
         require(start["allowed_methods_sha256"] == sha(canonical(list(ALLOWED_METHODS)))
             and start["guard_before_native_write"] and start["production_supervision"]
@@ -236,6 +261,11 @@ def audit_events(exit_code, stdout, events):
         require(len(launches) == MAX_PROCESSES and [row["phase"] for row in launches] == ["new", "resume"], "launch_count_invalid")
         generations = [row["generation"] for row in launches]
         require(len(set(generations)) == MAX_PROCESSES, "generation_reused")
+        # 摘要只保留安全诊断；未知通知或异常帧不能靠成功finish覆盖。
+        require(all(isinstance(row["method"], str) and row["method"] in NOTIFICATION_METHODS
+            and row["frame_type"] == row["params_type"] == "object" and row["session_id"]["type"] == "string"
+            and not any(row[key] for key in ("id_present", "result_present", "error_present"))
+            for row in one("native_notification_diagnostic")), "notification_unproved")
         require(public[0] is start and public[-1] is finish
             and all(row.get("generation") in generations for row in public if "generation" in row),
             "event_generation_invalid")
@@ -250,6 +280,8 @@ def audit_events(exit_code, stdout, events):
         require(len(set(identities)) == len(identities) and all(row["generation"] in generations
             and row["request_bytes"] > 0 and row["guard_checked_before_write"] for row in sent), "request_identity_invalid")
         require(len(responses) == len(sent), "response_missing")
+        require(all((row["generation"], row["rpc_id"]) in identities and row["duplicate"] is True
+            and row["response_bytes"] > 0 for row in one("drain_response_observed")), "drain_response_uncorrelated")
         for request, response in zip(sent, responses):
             require((response["generation"], response["rpc_id"], response["sequence"])
                 == (request["generation"], request["rpc_id"], request["sequence"]), "response_uncorrelated")
@@ -527,6 +559,9 @@ def run(args):
     metadata["execution_boundary_passed"] &= metadata["runner_cleanup_confirmed"]
     metadata["interface_investigation_completed"] &= metadata["execution_boundary_passed"]
     metadata["policy"] = unknown_policy()
+    diagnostics = failure_diagnostics(public)
+    if any(diagnostics.values()):
+        metadata["failure_diagnostics"] = diagnostics
     args.output.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in public), encoding="utf-8")
     args.output.with_suffix(".metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     args.output.with_suffix(".network.json").write_text(json.dumps(network, indent=2) + "\n", encoding="utf-8")

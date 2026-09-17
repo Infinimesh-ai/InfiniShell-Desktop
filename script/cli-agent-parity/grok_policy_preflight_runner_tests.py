@@ -399,5 +399,89 @@ class PolicyPreflightRunnerTests(unittest.TestCase):
         self.assertTrue(any(row["event"] == "probe_failed" for row in result["events"]))
 
 
+class NativeFailureDiagnosticTests(unittest.TestCase):
+    def summary(self, value="OFFLINE_NOTIFICATION_BODY"):
+        raw = runner.canonical(value)
+        return {"type": "string", "bytes": len(raw), "sha256": runner.sha(raw)}
+
+    def notification(self):
+        return {"event": "native_notification_diagnostic", "generation": FIRST, "method": "session/update",
+            "method_summary": self.summary(), "frame_type": "object", "params_type": "object", "id_present": False,
+            "result_present": False, "error_present": False, "session_id": self.summary("OFFLINE_SESSION")}
+
+    def insert(self, row):
+        rows = fixture()
+        rows.insert(rows.index(event(rows, "process_cleanup", FIRST)), row)
+        return rows
+
+    def test_four_notification_methods_and_typed_summaries_have_closed_public_projection(self):
+        for method in runner.NOTIFICATION_METHODS:
+            row = self.notification() | {"method": method}
+            public, faults = runner.project_events([row])
+            self.assertEqual(public, [row])
+            self.assertEqual(faults, [])
+            self.assertNotIn("OFFLINE_NOTIFICATION_BODY", json.dumps(public))
+            result = runner.audit_events(0, SUMMARY, self.insert(row))
+            self.assertTrue(result["execution_boundary_passed"])
+            self.assertEqual(result["policy"], runner.unknown_policy())
+
+    def test_unknown_method_summary_survives_failure_without_becoming_interface_success(self):
+        row = self.notification() | {"method": self.summary("OFFLINE_UNKNOWN_METHOD")}
+        result = runner.audit_events(0, SUMMARY, self.insert(row))
+        self.assertFalse(result["execution_boundary_passed"])
+        self.assertEqual(result["failure_code"], "notification_unproved")
+        self.assertEqual(result["failure_diagnostics"]["notifications"], [row])
+        self.assertNotIn("OFFLINE_UNKNOWN_METHOD", json.dumps(result))
+
+    def test_extra_fields_raw_session_body_and_invalid_summary_are_rejected_without_text(self):
+        for patching in ({"body": "OFFLINE_BODY"}, {"session_id": "OFFLINE_BODY"},
+                {"method_summary": self.summary() | {"body": "OFFLINE_BODY"}}, {"id_present": 1},
+                {"method_summary": {"type": {}, "bytes": 1, "sha256": "a" * 64}}):
+            public, faults = runner.project_events([self.notification() | patching])
+            self.assertEqual(public, [])
+            self.assertEqual(len(faults), 1)
+            self.assertNotIn("OFFLINE_BODY", json.dumps(faults))
+
+    def test_phase_failure_each_stage_cannot_be_overwritten_by_a_forged_success_finish(self):
+        for stage in ("primary", "cleanup", "drain"):
+            row = {"event": "phase_failure", "generation": FIRST, "stage": stage,
+                "reason_bytes": 13, "reason_sha256": runner.sha(b"OFFLINE_CAUSE")}
+            result = runner.audit_events(0, SUMMARY, self.insert(row))
+            self.assertFalse(result["interface_investigation_completed"])
+            self.assertEqual(result["failure_code"], "probe_incomplete")
+            self.assertEqual(result["failure_diagnostics"]["phase_failures"], [row])
+            self.assertNotIn("OFFLINE_CAUSE", json.dumps(result))
+
+    def test_unknown_phase_stage_or_generation_is_strictly_rejected(self):
+        row = {"event": "phase_failure", "generation": FIRST, "stage": "primary", "reason_bytes": 1,
+            "reason_sha256": "a" * 64}
+        for patching in ({"stage": "OFFLINE_STAGE"}, {"generation": "OFFLINE_GENERATION"}, {"reason_bytes": True}):
+            public, faults = runner.project_events([row | patching])
+            self.assertEqual(public, [])
+            self.assertEqual(len(faults), 1)
+
+    def test_drain_duplicate_is_correlated_and_unknown_old_or_new_response_cannot_pass(self):
+        row = {"event": "drain_response_observed", "generation": FIRST, "rpc_id": 1, "duplicate": True,
+            "response_bytes": 50, "response_sha256": runner.sha(b"OFFLINE_RESPONSE")}
+        result = runner.audit_events(0, SUMMARY, self.insert(row))
+        self.assertTrue(result["execution_boundary_passed"])
+        self.assertEqual(result["failure_diagnostics"]["drain_responses"], [row])
+        for patching in ({"rpc_id": 99}, {"generation": FOREIGN}, {"duplicate": False}):
+            result = runner.audit_events(0, SUMMARY, self.insert(row | patching))
+            self.assertFalse(result["execution_boundary_passed"])
+            self.assertEqual(result["policy"], runner.unknown_policy())
+
+    def test_failed_test_retains_notification_phase_and_drain_summaries_in_metadata(self):
+        rows = self.insert(self.notification())
+        rows.insert(-1, {"event": "phase_failure", "generation": FIRST, "stage": "drain",
+            "reason_bytes": 13, "reason_sha256": runner.sha(b"OFFLINE_CAUSE")})
+        result = runner.audit_events(101, b"", rows)
+        self.assertFalse(result["execution_boundary_passed"])
+        self.assertFalse(result["interface_investigation_completed"])
+        self.assertEqual(len(result["failure_diagnostics"]["notifications"]), 1)
+        self.assertEqual(len(result["failure_diagnostics"]["phase_failures"]), 1)
+        self.assertEqual(runner.failure_diagnostics(result["events"]), result["failure_diagnostics"])
+
+
 if __name__ == "__main__":
     unittest.main()
