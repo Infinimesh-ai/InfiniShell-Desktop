@@ -24,8 +24,14 @@ struct NativeHook {
     current_hash: String,
 }
 
-const CONTRACT: &str =
-    include_str!("../../../../assets/bundled/cli-agent-plugins/codex/NATIVE_HOOK_TRUST.json");
+// commandWindows 的原生摘要与 Unix command 不同，必须使用该平台正式五 hook 的实测契约。
+const CONTRACT: &str = if cfg!(windows) {
+    include_str!(
+        "../../../../assets/bundled/cli-agent-plugins/codex/NATIVE_HOOK_TRUST_WINDOWS.json"
+    )
+} else {
+    include_str!("../../../../assets/bundled/cli-agent-plugins/codex/NATIVE_HOOK_TRUST.json")
+};
 static HOOKS: LazyLock<NativeContract> =
     LazyLock::new(|| serde_json::from_str(CONTRACT).expect("随附原生 Hook 信任契约必须有效"));
 

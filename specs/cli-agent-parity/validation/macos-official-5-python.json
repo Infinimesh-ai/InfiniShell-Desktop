@@ -1,0 +1,74 @@
+{
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "scope": "official-5 根工作区受影响 Python 协议/隐私/网络守卫测试；不是原生 CLI 验收。",
+  "argv": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "claude_coordinator_runner_tests",
+    "claude_profile_runner_tests",
+    "codex_source_runner_tests",
+    "grok_adapter_runner_tests",
+    "grok_official_adapter_runner_tests"
+  ],
+  "working_directory": "script/cli-agent-parity",
+  "tests_passed": 92,
+  "tests_failed": 0,
+  "reported_test_seconds": 2.309,
+  "exit_code": 0,
+  "source_files": [
+    {
+      "path": "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+      "sha256": "379ff9dae1af1b653d4ef1949a452586bb74f81af67e1348acbd9f0d768a3684"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_profile_runner_tests.py",
+      "sha256": "6bd8681209b5971b8889686e0bd487455b96a4fc33891737258b30f2f47ae1a9"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_source_runner_tests.py",
+      "sha256": "6a92532370b48f52ceab79e112fb9e0f599ac23a269011f088bae5e27a7f9a36"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_adapter_runner_tests.py",
+      "sha256": "0000df0631a2a01cf87330159b862f1bfc8646fdfb3b3b8f246a7658ca8faece"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+      "sha256": "de4b23fb81ce7f68e7f65fec920aceb2ccb17553cfabe505a8853ee7e1e43f7b"
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_coordinator_live.py",
+      "sha256": "d8626e25c85781a0c6c6818f73127d0629829ee1503579d2dbf77c0317f625f8"
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_profile_live.py",
+      "sha256": "22441975639ecd328bc7be780907c1b27325931b6d6a922c6b6672335eaa021e"
+    },
+    {
+      "path": "script/cli-agent-parity/run_codex_source_live.py",
+      "sha256": "6d8bf45c8d05eaaa834a8f106f576993d69e3b2118b5e0853e51e62677ade02a"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_adapter_live.py",
+      "sha256": "05576927db2cbd64b7408bdb9a0bf089347288faf5cffbe27676899e9fcaada7"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_official_adapter_live.py",
+      "sha256": "7ab22cf9e05a3eac5b937d634467e40e77595450ce010d0cd94fe0cfcc59ab55"
+    }
+  ],
+  "earlier_invocation_error": {
+    "argv": [
+      "python3",
+      "-B",
+      "-m",
+      "unittest",
+      "script/cli-agent-parity/claude_coordinator_runner_tests.py"
+    ],
+    "working_directory": "repository root",
+    "exit_code": 1,
+    "classification": "测试模块导入路径错误；改在所属目录执行后通过49项，随后92项总门禁通过。"
+  }
+}

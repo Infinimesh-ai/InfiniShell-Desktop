@@ -1,0 +1,358 @@
+{
+  "scope": "production_process_transport_with_runtime_commands",
+  "attempt": 7,
+  "acceptance_passed": true,
+  "official_grok_model_tested": true,
+  "public_product_gate_open": false,
+  "public_coordinator_entry_verified": false,
+  "parent_permission_ceiling_verified": false,
+  "app_restart_and_ui_verified": false,
+  "final_clean_commit_verified": false,
+  "final_same_commit_cross_platform_verified": false,
+  "goal_completed": false,
+  "same_intermediate_source_snapshot_library_and_main_reported": true,
+  "input_snapshot": {
+    "scope": "Grok官方第七轮：source11 lib/main同冻结67文件；生产runtimecommands及最终历史安全诊断。仍非干净提交/协调器/GUI验收",
+    "library": {
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+      "sha256": "8f0e7063c37e7f110d3c022ccb932ca9cc73514b1675592ed8570b59b84ef484"
+    },
+    "supervisor": {
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+      "sha256": "8026e131aad657207690144d31e3e5c01b654039c4ed60eb1d5502dc9cb14fbb"
+    },
+    "source_manifest_sha256": "31619a72300d6a38e82ade3d40e2329039cee864e5c0ca38c29ceb38037e504a",
+    "sdk_pure_tests_passed": 16,
+    "whole_snapshot_passed": true,
+    "production_runtime_commands": true,
+    "test_only_internal_command_switch": false,
+    "public_coordinator_entry_verified": false,
+    "locale_resources_immutable_in_binary": true
+  },
+  "original_public_artifacts": {
+    "ndjson": {
+      "source": "/tmp/infinishell-grok-official-adapter-7.ndjson",
+      "sha256": "3297b109786d458577142873e5c7443222d8cc04f791cc490f36fbc2b77d6470",
+      "bytes": 15932
+    },
+    "metadata.json": {
+      "source": "/tmp/infinishell-grok-official-adapter-7.metadata.json",
+      "sha256": "6de2ecc65373b0d0ffb8ad59a920bc60c8d7ac0ce7bddbaf54e7c98de54580e4",
+      "bytes": 3630
+    },
+    "network.json": {
+      "source": "/tmp/infinishell-grok-official-adapter-7.network.json",
+      "sha256": "9b3f591a420426431a6f94619f633b9389f5d0741fc59faad29f60d233de4b79",
+      "bytes": 38046
+    },
+    "inputs.json": {
+      "source": "/tmp/infinishell-grok-official-adapter-7-inputs.json",
+      "sha256": "20bb0547292fce0614c729fadfa8bff740a77d42e773ba3aa34f1d85ab4fabf0",
+      "bytes": 981
+    }
+  },
+  "original_public_artifacts_credential_scan": {
+    "ndjson": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "email": 0,
+      "credential_assignment": 0
+    },
+    "metadata.json": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "email": 0,
+      "credential_assignment": 0
+    },
+    "network.json": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "email": 0,
+      "credential_assignment": 0
+    },
+    "inputs.json": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "email": 0,
+      "credential_assignment": 0
+    }
+  },
+  "private_source_hashes": {
+    "evidence_sha256": "04ab323513ad25276581865c06ae7ea78e2e2da8c879b85906422ec4cc811308",
+    "test_output_sha256": "546aa11e27762bfc1cb7000ca6a353b271cd03a73305634f02982cf6fee8c2e0"
+  },
+  "lifecycle": {
+    "native_input_acknowledgements": 8,
+    "native_started_count": 8,
+    "verified_history_result_count": 8,
+    "unique_native_turn_count": 8,
+    "outcomes": {
+      "Completed": 6,
+      "Cancelled": 2
+    },
+    "two_text_rounds_exact_literals_verified": true,
+    "allow_once_actual_file_and_completed_verified": true,
+    "deny_cancelled_and_no_file_verified": true,
+    "approval_resolved_native_receipt": false,
+    "queued_followup_native_acknowledgement_and_result_verified": true,
+    "same_turn_steering_supported": false,
+    "actual_cancel_after_real_text_and_cancelled_verified": true,
+    "new_process_native_session_continue_verified": true,
+    "same_native_session_across_two_processes": true,
+    "distinct_runtime_generations": 2,
+    "desktop_app_restart_verified": false,
+    "active_runtime_reassociation_verified": false,
+    "parent_child_result_collection_verified": false
+  },
+  "native_final_history_receipts": [
+    {
+      "ordinal": 1,
+      "native_session_id": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f",
+      "native_turn_id": "1ec441b6-b595-4328-ad32-b2e1aa47d39c",
+      "history_completion_watermark": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f-45",
+      "outcome": "Completed",
+      "receipt_source": "verified_native_final_history",
+      "history_verified": true,
+      "product_full_output_preserved": true,
+      "output_truncated": false,
+      "full_output_bytes": 10,
+      "full_output_sha256": "302464a7105ce3a162b06e47cbb626f964b20fd73910fef5923dd2f7aa5ac1db",
+      "final_response_bytes": 10,
+      "final_response_sha256": "302464a7105ce3a162b06e47cbb626f964b20fd73910fef5923dd2f7aa5ac1db",
+      "full_output_sha256_independently_recomputed": true,
+      "final_response_sha256_independently_recomputed": true,
+      "snapshot_native_turn_sha256_matches": true,
+      "snapshot_watermark_sha256_matches": true,
+      "snapshot_output_bytes_match": true
+    },
+    {
+      "ordinal": 2,
+      "native_session_id": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f",
+      "native_turn_id": "1036d10b-3793-4e7e-907d-f05706426543",
+      "history_completion_watermark": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f-73",
+      "outcome": "Completed",
+      "receipt_source": "verified_native_final_history",
+      "history_verified": true,
+      "product_full_output_preserved": true,
+      "output_truncated": false,
+      "full_output_bytes": 10,
+      "full_output_sha256": "18158bc7ca2af04c25d5cebf605c42a5b81bde2a93fc136404a06215e9d9a890",
+      "final_response_bytes": 10,
+      "final_response_sha256": "18158bc7ca2af04c25d5cebf605c42a5b81bde2a93fc136404a06215e9d9a890",
+      "full_output_sha256_independently_recomputed": true,
+      "final_response_sha256_independently_recomputed": true,
+      "snapshot_native_turn_sha256_matches": true,
+      "snapshot_watermark_sha256_matches": true,
+      "snapshot_output_bytes_match": true
+    },
+    {
+      "ordinal": 3,
+      "native_session_id": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f",
+      "native_turn_id": "34d00ec9-6bd3-401b-bd85-2bfff4bae1bc",
+      "history_completion_watermark": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f-152",
+      "outcome": "Completed",
+      "receipt_source": "verified_native_final_history",
+      "history_verified": true,
+      "product_full_output_preserved": true,
+      "output_truncated": false,
+      "full_output_bytes": 62,
+      "full_output_sha256": "275abfe75c4e562259b7647ea624db44c86f3b32d423351d979a985fbaa592b5",
+      "final_response_bytes": 8,
+      "final_response_sha256": "f1995216dcfbca4efddfa35f22f1deceaa1d31ee7a829f9d6d72ed78a1aa258a",
+      "full_output_sha256_independently_recomputed": true,
+      "final_response_sha256_independently_recomputed": true,
+      "snapshot_native_turn_sha256_matches": true,
+      "snapshot_watermark_sha256_matches": true,
+      "snapshot_output_bytes_match": true
+    },
+    {
+      "ordinal": 4,
+      "native_session_id": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f",
+      "native_turn_id": "61b9d8f9-f84f-4b2a-a0ef-3c9c2b250c7b",
+      "history_completion_watermark": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f-216",
+      "outcome": "Cancelled",
+      "receipt_source": "verified_native_final_history",
+      "history_verified": true,
+      "product_full_output_preserved": true,
+      "output_truncated": false,
+      "full_output_bytes": 54,
+      "full_output_sha256": "99eb1cda150e5c755a60455fa06b8f7092de3a3996777320383cbcc80e5c9a63",
+      "final_response_bytes": 54,
+      "final_response_sha256": "99eb1cda150e5c755a60455fa06b8f7092de3a3996777320383cbcc80e5c9a63",
+      "full_output_sha256_independently_recomputed": true,
+      "final_response_sha256_independently_recomputed": true,
+      "snapshot_native_turn_sha256_matches": true,
+      "snapshot_watermark_sha256_matches": true,
+      "snapshot_output_bytes_match": true
+    },
+    {
+      "ordinal": 5,
+      "native_session_id": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f",
+      "native_turn_id": "6395288d-932e-4a06-a3ac-295c77d56b1d",
+      "history_completion_watermark": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f-857",
+      "outcome": "Completed",
+      "receipt_source": "verified_native_final_history",
+      "history_verified": true,
+      "product_full_output_preserved": true,
+      "output_truncated": false,
+      "full_output_bytes": 1109,
+      "full_output_sha256": "cdb063746aee5d67cf3d0755490a01174ea52750325d3c3fc9db2a1196b139ac",
+      "final_response_bytes": 1109,
+      "final_response_sha256": "cdb063746aee5d67cf3d0755490a01174ea52750325d3c3fc9db2a1196b139ac",
+      "full_output_sha256_independently_recomputed": true,
+      "final_response_sha256_independently_recomputed": true,
+      "snapshot_native_turn_sha256_matches": true,
+      "snapshot_watermark_sha256_matches": true,
+      "snapshot_output_bytes_match": true
+    },
+    {
+      "ordinal": 6,
+      "native_session_id": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f",
+      "native_turn_id": "326096cb-438f-44b9-a4eb-73822b4f37ad",
+      "history_completion_watermark": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f-909",
+      "outcome": "Completed",
+      "receipt_source": "verified_native_final_history",
+      "history_verified": true,
+      "product_full_output_preserved": true,
+      "output_truncated": false,
+      "full_output_bytes": 47,
+      "full_output_sha256": "cc9f1d13eb8996061a52ded6374d262d32b0961da386afbc27e9c02c0aec4d89",
+      "final_response_bytes": 47,
+      "final_response_sha256": "cc9f1d13eb8996061a52ded6374d262d32b0961da386afbc27e9c02c0aec4d89",
+      "full_output_sha256_independently_recomputed": true,
+      "final_response_sha256_independently_recomputed": true,
+      "snapshot_native_turn_sha256_matches": true,
+      "snapshot_watermark_sha256_matches": true,
+      "snapshot_output_bytes_match": true
+    },
+    {
+      "ordinal": 7,
+      "native_session_id": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f",
+      "native_turn_id": "ada83155-8c42-455c-aab7-005d2f61cfdf",
+      "history_completion_watermark": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f-943",
+      "outcome": "Cancelled",
+      "receipt_source": "verified_native_final_history",
+      "history_verified": true,
+      "product_full_output_preserved": true,
+      "output_truncated": false,
+      "full_output_bytes": 6,
+      "full_output_sha256": "3dfa3fb239f56c778a1e9b33eb31328349edd155a95806dac4378904e88527e5",
+      "final_response_bytes": 6,
+      "final_response_sha256": "3dfa3fb239f56c778a1e9b33eb31328349edd155a95806dac4378904e88527e5",
+      "full_output_sha256_independently_recomputed": true,
+      "final_response_sha256_independently_recomputed": true,
+      "snapshot_native_turn_sha256_matches": true,
+      "snapshot_watermark_sha256_matches": true,
+      "snapshot_output_bytes_match": true
+    },
+    {
+      "ordinal": 8,
+      "native_session_id": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f",
+      "native_turn_id": "ddcff2e9-982f-4138-91ad-a22b2445fbf4",
+      "history_completion_watermark": "01a0afa7-f6ea-72e2-bfce-53cabeb25b3f-1024",
+      "outcome": "Completed",
+      "receipt_source": "verified_native_final_history",
+      "history_verified": true,
+      "product_full_output_preserved": true,
+      "output_truncated": false,
+      "full_output_bytes": 47,
+      "full_output_sha256": "cc9f1d13eb8996061a52ded6374d262d32b0961da386afbc27e9c02c0aec4d89",
+      "final_response_bytes": 47,
+      "final_response_sha256": "cc9f1d13eb8996061a52ded6374d262d32b0961da386afbc27e9c02c0aec4d89",
+      "full_output_sha256_independently_recomputed": true,
+      "final_response_sha256_independently_recomputed": true,
+      "snapshot_native_turn_sha256_matches": true,
+      "snapshot_watermark_sha256_matches": true,
+      "snapshot_output_bytes_match": true
+    }
+  ],
+  "native_final_snapshot_diagnostics": {
+    "archive": "grok-official-adapter-7.final-snapshot-diagnostics.json",
+    "snapshot_count": 16,
+    "pending_count": 8,
+    "verified_count": 8,
+    "rejected_count": 0,
+    "unverified_count": 0,
+    "native_turn_watermark_and_output_bytes_all_matched": true,
+    "attempt6_root_cause_determined": false
+  },
+  "project_effect": {
+    "expected_file": "approval-allow.txt",
+    "bytes": 15,
+    "sha256": "f798dce6c3641f8ef768c8f34eafc743ea5cf37c581fee64d69f79e689cdb2c9",
+    "exact_PARITY_APPROVAL_verified": true,
+    "only_expected_file_present": true,
+    "deny_file_absent": true
+  },
+  "cleanup": {
+    "two_production_exits_confirmed": true,
+    "exit_reasons": [
+      "stdio_closed",
+      "stdio_closed"
+    ],
+    "exit_codes": [
+      0,
+      0
+    ],
+    "all_cleanup_confirmed": true,
+    "all_macos_jobs_removed": true,
+    "all_macos_resource_cids_destroyed": true,
+    "native_wait_statuses": [
+      0,
+      0
+    ],
+    "tunnels_stopped": true,
+    "private_auth_copy_removed_reported": true,
+    "private_auth_copy_absent_independently_checked": true
+  },
+  "settings_audit": {
+    "source": "原runner元数据，未读取配置原文或独立重建前值",
+    "private_settings_unchanged": false,
+    "private_settings_audit": {
+      "bytes_unchanged": false,
+      "before_sha256": "8b51690ac09910a6975d9a06dd138d6722e669bf10618a700c636812a4097bd6",
+      "after_sha256": "eededaf9df6afedbd8e81a759a44a85a349d18cadccdc18d926a14ee48674794",
+      "toml_parse_succeeded": true,
+      "permission_section_unchanged": true,
+      "native_marketplace_initialization_only": true,
+      "settings_scope_verified": true,
+      "changed_top_level_tables": [
+        "marketplace"
+      ]
+    }
+  },
+  "network": {
+    "tls_connections_attempted": 15,
+    "tls_bytes": 6645222,
+    "event_counts": {
+      "official_connect_attempt": 15,
+      "official_tunnel_opened": 15,
+      "rejected_nonofficial_origin": 191
+    },
+    "network_budget_exhausted": false,
+    "tls_decrypted": false,
+    "http_model_calls_observable": false,
+    "cost_budget_enforced": false
+  },
+  "production_runtime_commands": true,
+  "test_only_internal_command_switch": false,
+  "credential_content_read_by_archive": false,
+  "manifest_contents_read_by_archive": false,
+  "raw_stdout_or_stderr_archived": false,
+  "binary_read_by_archive": false,
+  "evidence_limits": [
+    "第7轮通过固定8输入macOS生产链夹具；第6轮历史失败原因仍未知，不删除旧失败、不据本轮通过宣称修好第6轮具体history bug。",
+    "所有正文只在内存复算SHA/长度和固定结果比较，未归档私有模型正文、思考、认证、配置或原stdout。",
+    "16条历史诊断只证明本轮8个pending→verified及同回合水位/长度关联，不代替协调器、SQLite父子回收、SDK来源或父权限上限。",
+    "同67文件source11lib/main是已通过本地门禁的脏中间快照，不计最终干净提交、同提交跨平台、GUI、应用重启或SSH/tmux验收。",
+    "审批resolved没有独立原生ACK；本轮允许/拒绝结果由实际文件效应与原生最终历史终态确认。"
+  ]
+}

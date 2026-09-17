@@ -1,0 +1,28 @@
+{
+  "files": [
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/script/cli-agent-parity/prepare_codex_cli.py",
+      "bytes": 14038,
+      "sha256": "e48682fb8816aa2400f66621fcd68b3bb4e9a9a2b291c72738c95f255796bd3b"
+    },
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/script/cli-agent-parity/prepare_codex_cli_tests.py",
+      "bytes": 17242,
+      "sha256": "ab571410ba157cbee5b91bb31b5e20a09e84554449863fd050462faf0920a9a7"
+    },
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/specs/cli-agent-parity/CODEX_FIXED_RUNTIME_PREPARATION.md",
+      "bytes": 5390,
+      "sha256": "8810267f6bf8548ae814f755338a47f8ba87686220de05f15d2d40b60cc0e7a9"
+    }
+  ],
+  "offline_tests": {
+    "command": "python3 -B script/cli-agent-parity/prepare_codex_cli_tests.py -v",
+    "passed": 22,
+    "failed": 0,
+    "seconds": 0.142
+  },
+  "static_archive_evidence": "/tmp/infinishell-codex-0147-full-runtime/static-validation-final.json",
+  "native_cli_executed": false,
+  "cargo_executed": false
+}

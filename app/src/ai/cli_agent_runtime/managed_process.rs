@@ -2,10 +2,11 @@
 
 use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
+use std::future::Future;
 use std::io::{self, Read as _, Write as _};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::process::{ExitStatus, Stdio};
 #[cfg(not(target_os = "macos"))]
 use std::sync::mpsc;
 use std::thread;
@@ -77,13 +78,32 @@ impl ManagedChild {
             let _ = control.shutdown(Shutdown::Both);
         }
         self.control.take();
+        self.wait_for_exit().await
+    }
+
+    /// 调用方先释放已经取出的 stdin；保留控制连接，让监督者据真实 stdin EOF 或原生退出收尾。
+    pub async fn finish_after_stdin_close(mut self) -> io::Result<ExitReceipt> {
+        self.stdin.take();
+        self.wait_for_exit().await
+    }
+
+    async fn wait_for_exit(mut self) -> io::Result<ExitReceipt> {
         let mut child = self
             .process
             .take()
             .ok_or_else(|| io::Error::other("监督进程已被回收"))?;
-        let status = child
-            .status()
-            .with_timeout(CLEANUP_TIMEOUT + HANDSHAKE_TIMEOUT)
+        self.wait_for_confirmed_exit(child.status(), CLEANUP_TIMEOUT + HANDSHAKE_TIMEOUT)
+            .await
+    }
+
+    async fn wait_for_confirmed_exit(
+        self,
+        status: impl Future<Output = io::Result<ExitStatus>>,
+        timeout: Duration,
+    ) -> io::Result<ExitReceipt> {
+        // 正常关闭时控制连接随 self 保留至退出与回执核验完成；超时或取消仍由 Drop 通知清理。
+        let status = status
+            .with_timeout(timeout)
             .await
             .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "监督进程退出未确认"))??;
         if !status.success() {

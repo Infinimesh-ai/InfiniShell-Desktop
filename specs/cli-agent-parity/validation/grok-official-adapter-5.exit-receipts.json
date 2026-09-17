@@ -1,0 +1,27 @@
+{
+  "scope": "两运行代生产退出安全投影",
+  "receipts": [
+    {
+      "version": 1,
+      "generation": "1360a845-5874-40ec-8028-461908d96088",
+      "cleanup_confirmed": true,
+      "exit_reason": "stdio_closed",
+      "exit_code": 0,
+      "manifest_sha256": "381cb8f210b5baa91bb86177f8592a89432ca8e655f2e15af6106df8733c777e",
+      "source_sha256": "658666e95ce6cb89690948385e0a90130d19640955533d42bc3d48ed7c311499",
+      "manifest_contents_not_read": true,
+      "containment_details_omitted": true
+    },
+    {
+      "version": 1,
+      "generation": "da5a4470-cb07-42bd-aba6-ff05c8829d0c",
+      "cleanup_confirmed": true,
+      "exit_reason": "stdio_closed",
+      "exit_code": 0,
+      "manifest_sha256": "363216b3c55aa0cde171ea0bde226e0090692045762a4bdc5c112db442354f48",
+      "source_sha256": "3dd878b3f3c41f3c7211062eb43b03dcfe2f03d38770d40a77e6b85778bd1d2a",
+      "manifest_contents_not_read": true,
+      "containment_details_omitted": true
+    }
+  ]
+}

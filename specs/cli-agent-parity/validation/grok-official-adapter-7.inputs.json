@@ -1,0 +1,18 @@
+{
+  "scope": "Grok官方第七轮：source11 lib/main同冻结67文件；生产runtimecommands及最终历史安全诊断。仍非干净提交/协调器/GUI验收",
+  "library": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "8f0e7063c37e7f110d3c022ccb932ca9cc73514b1675592ed8570b59b84ef484"
+  },
+  "supervisor": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "sha256": "8026e131aad657207690144d31e3e5c01b654039c4ed60eb1d5502dc9cb14fbb"
+  },
+  "source_manifest_sha256": "31619a72300d6a38e82ade3d40e2329039cee864e5c0ca38c29ceb38037e504a",
+  "sdk_pure_tests_passed": 16,
+  "whole_snapshot_passed": true,
+  "production_runtime_commands": true,
+  "test_only_internal_command_switch": false,
+  "public_coordinator_entry_verified": false,
+  "locale_resources_immutable_in_binary": true
+}

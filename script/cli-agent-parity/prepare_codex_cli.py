@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""在 RUNNER_TEMP 中准备固定 Codex 0.147.0，只向标准输出返回绝对可执行文件路径。"""
+"""在 RUNNER_TEMP 中准备固定 Codex 0.147.0 完整运行包，只输出绝对入口路径。"""
 
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path, PurePosixPath
 import platform
-import json
 import shutil
 import stat
 import subprocess
@@ -87,15 +87,35 @@ MAX_MEMBERS = 32
 MAX_FILE_BYTES = 512 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
 
-def directory_without_links(path):
+
+def directory_without_links(path, *, private=False):
     information = path.lstat()
+    # 仅认可 macOS 的 root 自有系统临时目录别名，不放宽任意缓存或运行包链接。
+    if (sys.platform == "darwin" and path == Path("/tmp") and
+            stat.S_ISLNK(information.st_mode) and information.st_uid == 0 and
+            path.resolve(strict=True) == Path("/private/tmp")):
+        path = Path("/private/tmp")
+        information = path.lstat()
     require(stat.S_ISDIR(information.st_mode) and not path.is_symlink() and
             not (getattr(information, "st_file_attributes", 0) & 0x400),
             "运行时目录不能是链接、重解析点或其它文件类型")
+    if os.name != "nt":
+        owner = os.geteuid()
+        mode = stat.S_IMODE(information.st_mode)
+        if private:
+            require(information.st_uid == owner and mode == 0o700,
+                    "运行时和下载目录必须由当前用户拥有且权限为0700")
+        else:
+            # 系统祖先可属于 root；共享临时根必须有 sticky 位，保护已有的自有子目录。
+            require(information.st_uid in (0, owner) and
+                    (mode & 0o022 == 0 or mode & stat.S_ISVTX != 0),
+                    "父目录不能由其他用户拥有或允许其他用户替换已有子目录")
+    # Windows 的 mode 不能证明 ACL；此处只校验目录类型和重解析点。
 
 
 def check_parent_chain(path):
-    for parent in [path, *path.parents]:
+    directory_without_links(path, private=True)
+    for parent in path.parents:
         directory_without_links(parent)
 
 
@@ -106,12 +126,12 @@ def expected_metadata(package):
 
 
 def verify_runtime_tree(directory, package):
-    directory_without_links(directory)
+    directory_without_links(directory, private=True)
     observed_files, observed_directories = set(), set()
     for root, directories, files in os.walk(directory, followlinks=False):
         for name in directories:
             path = Path(root) / name
-            directory_without_links(path)
+            directory_without_links(path, private=True)
             observed_directories.add(path.relative_to(directory).as_posix())
         for name in files:
             path = Path(root) / name
@@ -189,9 +209,24 @@ def extract_runtime_package(archive, destination, target):
         staging = None
         return verify_runtime_tree(destination, package)
     finally:
+        original_error = sys.exc_info()[1]
+        cleanup_errors = []
         if staging is not None:
-            shutil.rmtree(staging)
-        lock.rmdir()
+            try:
+                shutil.rmtree(staging)
+            except OSError as error:
+                cleanup_errors.append(error)
+        try:
+            lock.rmdir()
+        except OSError as error:
+            cleanup_errors.append(error)
+        if cleanup_errors:
+            # 清理失败须保留，但不能把原来的校验或文件事务错误替换成次生异常。
+            if original_error is not None:
+                for error in cleanup_errors:
+                    original_error.add_note(f"运行包准备清理失败: {error}")
+            else:
+                raise cleanup_errors[0]
 
 
 def verified_version(executable, runner_temp):
@@ -235,7 +270,8 @@ def main():
     directory = unresolved.resolve()
     require(directory.is_relative_to(runner_temp) and not directory.is_relative_to(repository),
             "下载目录必须位于 RUNNER_TEMP 且不能写入仓库")
-    directory.mkdir(parents=True, exist_ok=True)
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    check_parent_chain(directory)
     package = PACKAGES[target]
     name = package["archive"]
     archive = directory / name

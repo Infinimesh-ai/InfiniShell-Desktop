@@ -1,0 +1,179 @@
+{
+  "attempt": 1,
+  "scope": "固定 Grok 1.0.30 单输入 SDK 来源探针真实失败记录",
+  "probe_passed": false,
+  "origin_verification": "unknown",
+  "native_origin_verified": false,
+  "public_product_gate_open": false,
+  "full_goal_acceptance_passed": false,
+  "original_public_artifacts": {
+    ".ndjson": {
+      "sha256": "455510f424a8e7b1ce6c5bf0ef41d9923c5fc16dd1a5dfa537fde4291b10e09c",
+      "bytes": 1915,
+      "archive_bytes_unchanged": true
+    },
+    ".metadata.json": {
+      "sha256": "1898dc20e0d204e4692d2c4e711b0d4b3e2e09ab979951e3b59b6d86b3a58fdd",
+      "bytes": 3917,
+      "archive_bytes_unchanged": true
+    },
+    ".network.json": {
+      "sha256": "eadb6c87412877a2cbb9ad3730b5741d47cffead3d10325c40934ec194967dc9",
+      "bytes": 10799,
+      "archive_bytes_unchanged": true
+    }
+  },
+  "fixed_binaries": {
+    "grok_version": "grok 1.0.30 (04b7ffed98c6)",
+    "grok_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+    "test_binary_sha256": "8decb11d70665c86e60f4e3039702b80f218718400c19ff4c5c5258575984b40",
+    "supervisor_sha256": "6e1801d768bdcb3e4ae9e2de2dba2137386631294baa79c2e262efc29f8abb78"
+  },
+  "source_snapshot": "与官方第5轮相同source8冻结二进制；dirty开发快照",
+  "probe_started_count": 1,
+  "probe_finished_count": 1,
+  "submitted_native_inputs": 1,
+  "native_accepted_inputs_by_fixture": 1,
+  "native_session_id": "01a0af68-fdc6-7b92-9918-4d98e45b1ee0",
+  "native_prompt_id": "9d1a087e-2fd5-430f-a453-ecc8fce96c42",
+  "counters": {
+    "initialization_count": 0,
+    "tools_list_count": 0,
+    "sdk_request_count": 0,
+    "inspect_call_count": 0,
+    "permission_request_count": 0,
+    "unexpected_tool_count": 0,
+    "duplicate_request_count": 0,
+    "unsafe_key_name_count": 0
+  },
+  "failure": {
+    "class": "fixture_total_deadline_exhausted",
+    "reason_sha256": "350f5ab49b229c734d2127fe52aa6bb2ecbddead7b92f45105da88ec73990e7d",
+    "fixture_deadline_seconds": 180,
+    "outer_deadline_seconds": 450,
+    "origin_absence_proved": false,
+    "permission_requirement_proved": false,
+    "native_protocol_unimplemented_proved": false
+  },
+  "effects": {
+    "no_project_files": true,
+    "no_side_effects": false,
+    "no_side_effects_flag_changed": false,
+    "approval_all_denied": true,
+    "approval_requests": 0
+  },
+  "production_cleanup": {
+    "cleanup_confirmed": true,
+    "cleanup_receipt_read": true,
+    "transport_closed": true,
+    "exit_code": 0,
+    "exit_reason": "stdio_closed",
+    "job_removed": true,
+    "resource_cid_destroyed": true,
+    "native_wait_status": 0,
+    "tunnels_stopped": true,
+    "private_auth_copy_removed": true
+  },
+  "network": {
+    "tls_budget": 8,
+    "tls_connections_attempted": 8,
+    "tls_bytes": 4134220,
+    "budget_exhausted": true,
+    "budget_rejected_count": 12,
+    "rejected_origin_kind_counts": {
+      "unknown": 38,
+      "xai_api": 5
+    },
+    "http_model_request_count_observable": false,
+    "cost_budget_enforced": false
+  },
+  "registration_contract_review": {
+    "public_candidate_source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+    "public_candidate_source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+    "tested_native_revision": "04b7ffed98c6",
+    "candidate_is_exact_tested_binary_source": false,
+    "session_registration_key": "x.ai/mcp/servers",
+    "array_name_serverId_shape_matches_current_test_code": true,
+    "initialize_capability_key": "x.ai/mcp/sdk",
+    "capability_key_name_matches": true,
+    "complete_client_initialize_placement_independently_rechecked_from_local_candidate_text": false,
+    "candidate_source_fulltext_not_available_locally": true,
+    "native_expected_registration_payload_verified": false,
+    "native_sdk_registration_success_verified": false,
+    "native_mcp_progress_methods_observed": true,
+    "native_mcp_progress_detail_verified": false,
+    "protocol_fields_changed_based_on_candidate_guess": false,
+    "official_public_candidate_fulltext_independently_read": true,
+    "candidate_initialize_advertisement_carrier": "initialize.response._meta",
+    "current_client_capabilities_injection_is_probe_extra": true,
+    "candidate_client_capabilities_requirement_proved": false,
+    "candidate_wire_method_after_acp_serialization": "_x.ai/mcp/sdk_call",
+    "candidate_locked_acp_version": "0.10.4",
+    "candidate_locked_acp_crate_checksum_verified": true,
+    "candidate_serialization_is_tested_native_sdk_request_evidence": false,
+    "sdk_method_either_spelling_in_attempt1_native_trace": false,
+    "tested_native_initialize_sdk_advertisement_observed": true,
+    "tested_native_initialize_evidence_sha256": "814c97c02c9a0d5fad4d83bc7e8abc7039b42e0fd0e0143dc9381e630f0457a6",
+    "source_hashes": [
+      {
+        "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs",
+        "sha256": "f9d0400c2d72a8bd2288a56842b1c18bdda571d315b0c6c34f5fb42977e3edda",
+        "lines": "528-568"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_mcp.rs",
+        "sha256": "233912e891371a197c90b2b7de698d2c2d728cf84ca23e5a7e2490b378450995",
+        "lines": "23-47,65-84"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-mcp/src/wire.rs",
+        "sha256": "45f9b7c46ad685da069043727afb238e456c00f3d39eea2f1bda9b9a72d7d571",
+        "lines": "15-21"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/Cargo.lock",
+        "sha256": "73088da69937bcc0bd8239dcc969cf4a703e836593cd5c7c35aa3a9cea393d0c",
+        "lines": "agent-client-protocol package"
+      },
+      {
+        "url": "https://static.crates.io/crates/agent-client-protocol/agent-client-protocol-0.10.4.crate",
+        "sha256": "10eeef5e80864f9c3c148a3f395c3e35a66d37ec7561c7845b2bffae8e841759",
+        "file": "src/lib.rs",
+        "file_sha256": "c0fed4a1d911b10b715cde480ceb1b37ea4621f02690e7e20cc65ca85c6dfd5b",
+        "lines": "285-289,527-534"
+      }
+    ]
+  },
+  "sensitive_shape_scan": {
+    "api_key": 0,
+    "jwt": 0,
+    "bearer": 0,
+    "private_key": 0,
+    "credential_assignment": 0,
+    "email": 0
+  },
+  "next_probe_policy": {
+    "max_native_inputs": 1,
+    "max_tls_connections": 32,
+    "max_tls_bytes": 33554432,
+    "outer_deadline_seconds": 450,
+    "fixture_deadline_seconds": 180,
+    "same_narrow_official_hosts": true,
+    "http_cost_budget_claimed": false,
+    "native_sdk_origin_verified": false,
+    "next_actual_probe_passed": false,
+    "strict_native_launch_counters": {
+      "version": 2,
+      "private_leader": 1
+    },
+    "offline_runner_tests_passed": 39
+  },
+  "limits": [
+    "8 次 opaque TLS CONNECT 后 12 次连接被预算拒绝，存在真实网络预算干扰；0 SDK请求不能证明无 origin、必须审批或不支持 SDK。",
+    "mcp/init_progress、mcp_initialized 和 mcp/server_status 方法各1帧不等于已成功注册该 SDK服务；当前安全trace没有通知完整状态。",
+    "来源状态保持 unknown；full_native_origin_fields_observed=false 是零请求观察结果，不作缺字段结论。",
+    "失败时 no_side_effects=false 原样保留；空项目、0审批及清理成功不能把未完成探针改为通过。",
+    "候选SOURCE_REV与二进制不同；公开全文已核对候选响应能力位置及下划线序列化规则，固定native既有初始化也宣告SDK能力，但本轮目标服务注册、请求协议和来源仍未验证。",
+    "下一轮仅缩减网络预算干扰，不改协议字段、不开放权限或产品SDK/子任务执行。"
+  ]
+}

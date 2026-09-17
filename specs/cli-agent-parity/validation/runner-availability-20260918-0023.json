@@ -1,0 +1,32 @@
+{
+  "recorded_utc": "2026-09-17T16:22:15.519679+00:00",
+  "observation_boundary": "开始只读 API 请求前的本机 UTC；API 未提供服务端观察时间。分发之前仍需复核。",
+  "runners": [
+    {
+      "name": "infinishell-linux-x64",
+      "os": "Linux",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "Linux",
+        "X64",
+        "infinishell-ci"
+      ]
+    },
+    {
+      "name": "infinishell-windows-x64",
+      "os": "Windows",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "X64",
+        "infinishell-ci",
+        "Windows"
+      ]
+    }
+  ],
+  "workflow_dispatched": false,
+  "validation_passed_claimed": false
+}

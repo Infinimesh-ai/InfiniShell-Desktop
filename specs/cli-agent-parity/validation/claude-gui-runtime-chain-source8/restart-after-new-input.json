@@ -1,0 +1,69 @@
+{
+  "observed_at": "2026-09-17T12:53:22.982493+00:00",
+  "task_id": "90319eee-f61f-4ecf-bcfd-beca68d58d59",
+  "generation": 7,
+  "state": "completed",
+  "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+  "result": "GUI_RESTART_RESUMED",
+  "terminal_evidence": {
+    "event": {
+      "TurnFinished": {
+        "outcome": "Completed",
+        "output": "GUI_RESTART_RESUMED",
+        "turn_id": "66713b63-5863-4846-9e57-9f18cd2a9acc"
+      }
+    },
+    "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c"
+  },
+  "messages": [
+    {
+      "message_id": "f51e81e7-fb9f-4bbe-9232-26c68fa48a4f",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "recipient_generation": 1
+    },
+    {
+      "message_id": "24d9edca-a93d-4063-a688-b0a14a9b9145",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "recipient_generation": 2
+    },
+    {
+      "message_id": "1ca238c3-9659-4bb2-8e18-1ffe08e7a530",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "recipient_generation": 3
+    },
+    {
+      "message_id": "5623d8b5-10fb-45e1-a014-13854a498a5d",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "recipient_generation": 3
+    },
+    {
+      "message_id": "689d980b-992c-4d74-b140-52f2711bb439",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "recipient_generation": 4
+    },
+    {
+      "message_id": "1bc61f7c-d813-40ea-a93c-590911942f72",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "recipient_generation": 5
+    },
+    {
+      "message_id": "c7c888ff-998e-4f1c-b0a0-f537db643956",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "recipient_generation": 5
+    },
+    {
+      "message_id": "66713b63-5863-4846-9e57-9f18cd2a9acc",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "recipient_generation": 7
+    }
+  ],
+  "profile_same_as_before": true
+}

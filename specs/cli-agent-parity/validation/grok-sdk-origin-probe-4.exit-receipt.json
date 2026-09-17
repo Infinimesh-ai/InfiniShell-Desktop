@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "generation": "34614325-3061-46c8-82c7-e5b39d69a942",
+  "cleanup_confirmed": true,
+  "exit_reason": "stop_requested",
+  "exit_code": 0,
+  "manifest_sha256": "3adca5d8b3acffa2b3c47dcc40abc083ba6d604909993d348bf39d8184a7610d",
+  "manifest_contents_not_read": true,
+  "containment_details_omitted": true,
+  "source_sha256": "d8782e091a2b4f1f6deacb7dd0d01f14efbff14f620771ef4f818ef1f4b163ed",
+  "source_bytes": 261,
+  "source_credential_scan": {
+    "api_key": 0,
+    "jwt": 0,
+    "bearer": 0,
+    "private_key": 0,
+    "email": 0,
+    "credential_assignment": 0
+  },
+  "safe_fields_independently_verified": true
+}

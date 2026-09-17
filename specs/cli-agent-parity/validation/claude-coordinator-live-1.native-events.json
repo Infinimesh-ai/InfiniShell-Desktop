@@ -1,0 +1,264 @@
+{
+  "scope": "原生协议只保留固定类型、关联 ID、工具名称和生命周期；不保存模型正文、工具输入或权限观测树",
+  "credential_values_recorded": false,
+  "test_output_source_sha256": "cba9aa026dfa1d1fb666402e5d13e0e24572abeefebc1bbc1f92cd631e34d33b",
+  "frame_count": 152,
+  "type_counts": {
+    "control_request": 11,
+    "control_response": 52,
+    "system": 70,
+    "command_lifecycle": 6,
+    "user": 6,
+    "assistant": 7
+  },
+  "selected_protocol_ids": [
+    {
+      "line": 13,
+      "request_id": "e7d5d516-0bd3-4a3a-9262-2793006a8b9e",
+      "request_subtype": "mcp_message",
+      "type": "control_request"
+    },
+    {
+      "line": 15,
+      "request_id": "219fcead-542f-44db-9b51-90268c5dcb5a",
+      "request_subtype": "mcp_message",
+      "type": "control_request"
+    },
+    {
+      "line": 19,
+      "request_id": "ad1e615a-84ec-4500-84e7-9a5f0eb2e743",
+      "request_subtype": "mcp_message",
+      "type": "control_request"
+    },
+    {
+      "line": 32,
+      "command_uuid": "c0058c1c-8de2-48a7-879b-5e29e0d65d16",
+      "session_id": "0ab4cb40-32af-43e9-87b1-a73a447bcc71",
+      "state": "queued",
+      "type": "command_lifecycle",
+      "uuid": "e2625a36-936e-4c6e-b1cb-6845cccfb63f"
+    },
+    {
+      "line": 33,
+      "command_uuid": "c0058c1c-8de2-48a7-879b-5e29e0d65d16",
+      "session_id": "0ab4cb40-32af-43e9-87b1-a73a447bcc71",
+      "state": "started",
+      "type": "command_lifecycle",
+      "uuid": "a51fbe37-102e-46fa-a3eb-1e34c9d11c52"
+    },
+    {
+      "line": 73,
+      "session_id": "0ab4cb40-32af-43e9-87b1-a73a447bcc71",
+      "type": "user",
+      "uuid": "c0058c1c-8de2-48a7-879b-5e29e0d65d16"
+    },
+    {
+      "line": 75,
+      "message_id": "msg_011Cf8wxYhi1t4RcZq9tgs52",
+      "session_id": "0ab4cb40-32af-43e9-87b1-a73a447bcc71",
+      "tools": [
+        {
+          "id": "toolu_01Qj8pVkFdfWWtP3AFNrzCS4",
+          "name": "mcp__infinishell-local-tasks__run_agents"
+        }
+      ],
+      "type": "assistant",
+      "uuid": "3d9df1a3-76db-41f2-bc02-730e03800108"
+    },
+    {
+      "line": 76,
+      "request_id": "d0f584f3-0184-4e76-bd0b-64a6d2d3e4d1",
+      "request_subtype": "can_use_tool",
+      "tool_use_id": "toolu_01Qj8pVkFdfWWtP3AFNrzCS4",
+      "type": "control_request"
+    },
+    {
+      "line": 84,
+      "request_id": "11773dc6-e35d-49c4-8716-9e654a8655b4",
+      "request_subtype": "mcp_message",
+      "type": "control_request"
+    },
+    {
+      "line": 103,
+      "message_id": "msg_011Cf8wy4mxcpqYGpniwwR75",
+      "session_id": "0ab4cb40-32af-43e9-87b1-a73a447bcc71",
+      "tools": [
+        {
+          "id": "toolu_01Js9yCz8CsLsrrV7u2npStw",
+          "name": "mcp__infinishell-local-tasks__send_message_to_agent"
+        }
+      ],
+      "type": "assistant",
+      "uuid": "97c603bb-78b2-450b-b391-1c2fad68112c"
+    },
+    {
+      "line": 104,
+      "request_id": "16aa548f-37bd-4fd8-b444-581d363da2a4",
+      "request_subtype": "can_use_tool",
+      "tool_use_id": "toolu_01Js9yCz8CsLsrrV7u2npStw",
+      "type": "control_request"
+    },
+    {
+      "line": 105,
+      "request_id": "62cb7a22-cad4-4791-aaee-8b40b0746c21",
+      "request_subtype": "mcp_message",
+      "type": "control_request"
+    },
+    {
+      "line": 107,
+      "request_id": "aed66d22-4e79-46b4-9ba0-95a665f03ad4",
+      "request_subtype": "mcp_message",
+      "type": "control_request"
+    },
+    {
+      "line": 111,
+      "request_id": "71f10519-be81-47d5-9259-e4d4fa7fbc13",
+      "request_subtype": "mcp_message",
+      "type": "control_request"
+    },
+    {
+      "line": 124,
+      "command_uuid": "5f32d62f-7584-4812-9202-7914bbd8d8d4",
+      "session_id": "0a2b7db5-604c-49d7-9cd0-fec13ff6c9af",
+      "state": "queued",
+      "type": "command_lifecycle",
+      "uuid": "97154fb9-18dd-400b-a0a1-c9df980effcb"
+    },
+    {
+      "line": 125,
+      "command_uuid": "5f32d62f-7584-4812-9202-7914bbd8d8d4",
+      "session_id": "0a2b7db5-604c-49d7-9cd0-fec13ff6c9af",
+      "state": "started",
+      "type": "command_lifecycle",
+      "uuid": "5148ff61-ad34-4c51-abfd-1e69b8a71585"
+    },
+    {
+      "line": 134,
+      "session_id": "0a2b7db5-604c-49d7-9cd0-fec13ff6c9af",
+      "type": "user",
+      "uuid": "5f32d62f-7584-4812-9202-7914bbd8d8d4"
+    },
+    {
+      "line": 136,
+      "message_id": "msg_011Cf8wyYjDiapPiH3tT9S1C",
+      "session_id": "0a2b7db5-604c-49d7-9cd0-fec13ff6c9af",
+      "tools": [
+        {
+          "id": "toolu_015TQUr2yQQC75jbbviktQ3X",
+          "name": "Read"
+        }
+      ],
+      "type": "assistant",
+      "uuid": "27c420af-3791-4e65-be35-41f1bb35610d"
+    },
+    {
+      "line": 138,
+      "message_id": "msg_011Cf8wyikERbDsmiKTfPWz1",
+      "session_id": "0a2b7db5-604c-49d7-9cd0-fec13ff6c9af",
+      "tools": [
+        {
+          "id": "toolu_01VqTxUfCEs8g1ka8hJmqV4r",
+          "name": "Edit"
+        }
+      ],
+      "type": "assistant",
+      "uuid": "cde3849b-2493-4089-9948-6a5d7116b975"
+    },
+    {
+      "line": 139,
+      "request_id": "e428e97c-1d82-4ccc-902c-5ca84543bc42",
+      "request_subtype": "can_use_tool",
+      "tool_use_id": "toolu_01VqTxUfCEs8g1ka8hJmqV4r",
+      "type": "control_request"
+    },
+    {
+      "line": 147,
+      "request_id": "366708fc-4951-4c4b-9ac8-078262032b90",
+      "request_subtype": "mcp_message",
+      "type": "control_request"
+    },
+    {
+      "line": 154,
+      "command_uuid": "52f3a2ea-39aa-c5c6-3cae-3b8470db97f3",
+      "session_id": "0a2b7db5-604c-49d7-9cd0-fec13ff6c9af",
+      "state": "queued",
+      "type": "command_lifecycle",
+      "uuid": "57ea25c6-a3a9-4aee-b030-119c1853e32f"
+    },
+    {
+      "line": 163,
+      "session_id": "0a2b7db5-604c-49d7-9cd0-fec13ff6c9af",
+      "type": "user",
+      "uuid": "52f3a2ea-39aa-c5c6-3cae-3b8470db97f3"
+    },
+    {
+      "line": 164,
+      "command_uuid": "52f3a2ea-39aa-c5c6-3cae-3b8470db97f3",
+      "session_id": "0a2b7db5-604c-49d7-9cd0-fec13ff6c9af",
+      "state": "started",
+      "type": "command_lifecycle",
+      "uuid": "f02845e1-3f6a-4b63-8490-2878447798d6"
+    }
+  ],
+  "native_session_logs": [
+    {
+      "native_session_id": "0a2b7db5-604c-49d7-9cd0-fec13ff6c9af",
+      "source_sha256": "5bbd78491cfc25eb82c2bbbfb4985132e031a5890e4a0de5e7b8650acb92c67d",
+      "type_counts": {
+        "last-prompt": 1,
+        "atis-latch": 2,
+        "attachment": 3,
+        "queue-operation": 4,
+        "user": 3,
+        "assistant": 3
+      },
+      "result_count": 0,
+      "tool_results": [
+        {
+          "line": 11,
+          "tool_use_id": "toolu_015TQUr2yQQC75jbbviktQ3X",
+          "is_error_present": false,
+          "is_error": null,
+          "content_sha256": "8eca3cfc39f16723feed608b0d8dce8f794dafa936ef10da7ed244c38b1a0e91"
+        },
+        {
+          "line": 14,
+          "tool_use_id": "toolu_01VqTxUfCEs8g1ka8hJmqV4r",
+          "is_error_present": false,
+          "is_error": null,
+          "content_sha256": "87af4e00969c4a4c487c424fbcacc65c70a561fd2c84f92b87fc5b9c56a0c95e"
+        }
+      ]
+    },
+    {
+      "native_session_id": "0ab4cb40-32af-43e9-87b1-a73a447bcc71",
+      "source_sha256": "09b32a0f293e7aa66db9574c42498a0481254e14de1232ff3a8b81ae137a3c68",
+      "type_counts": {
+        "last-prompt": 1,
+        "atis-latch": 2,
+        "attachment": 2,
+        "queue-operation": 2,
+        "user": 3,
+        "assistant": 4
+      },
+      "result_count": 0,
+      "tool_results": [
+        {
+          "line": 11,
+          "tool_use_id": "toolu_01Qj8pVkFdfWWtP3AFNrzCS4",
+          "is_error_present": false,
+          "is_error": null,
+          "content_sha256": "0da84f24b3f374157a943a7bc9420da038cd36eae59be02629f6134b093de070"
+        },
+        {
+          "line": 14,
+          "tool_use_id": "toolu_01Js9yCz8CsLsrrV7u2npStw",
+          "is_error_present": true,
+          "is_error": true,
+          "content_sha256": "d341754d27f868a99e9c3349c3b40559196359a0e07f73b133c848384cd13df1"
+        }
+      ]
+    }
+  ],
+  "native_result_count": 0
+}

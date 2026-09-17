@@ -1,0 +1,63 @@
+{
+  "method": [
+    "逐张人工视觉检查",
+    "Apple Vision accurate OCR（en-US、zh-Hans）后检查凭据模式，未输出或保存 OCR 全文",
+    "JSON 递归键名与字符串凭据模式检查"
+  ],
+  "patterns": [
+    "API key/token/password/authorization 字段",
+    "sk- / GitHub token 前缀",
+    "Bearer 凭据",
+    "私钥 PEM 标记"
+  ],
+  "screenshots": [
+    {
+      "file": "00-before-fix-en.jpg",
+      "recognized_lines": 44,
+      "credential_pattern_findings": 0
+    },
+    {
+      "file": "01-after-fix-above-en.jpg",
+      "recognized_lines": 43,
+      "credential_pattern_findings": 0
+    },
+    {
+      "file": "02-after-fix-partial-en.jpg",
+      "recognized_lines": 39,
+      "credential_pattern_findings": 0
+    },
+    {
+      "file": "03-after-fix-below-en.jpg",
+      "recognized_lines": 34,
+      "credential_pattern_findings": 0
+    },
+    {
+      "file": "04-multiline-end-en.jpg",
+      "recognized_lines": 74,
+      "credential_pattern_findings": 0
+    },
+    {
+      "file": "05-multiline-scroll-select-en.jpg",
+      "recognized_lines": 68,
+      "credential_pattern_findings": 0
+    },
+    {
+      "file": "06-after-fix-above-zh-CN.jpg",
+      "recognized_lines": 42,
+      "credential_pattern_findings": 0
+    },
+    {
+      "file": "07-after-fix-partial-zh-CN.jpg",
+      "recognized_lines": 30,
+      "credential_pattern_findings": 0
+    },
+    {
+      "file": "08-after-fix-below-zh-CN.jpg",
+      "recognized_lines": 14,
+      "credential_pattern_findings": 0
+    }
+  ],
+  "json_credential_findings": 0,
+  "sensitive_configuration_copied": false,
+  "scope_limit": "模式扫描和人工检查不构成不存在所有可能秘密的数学证明；未读取凭据文件。"
+}

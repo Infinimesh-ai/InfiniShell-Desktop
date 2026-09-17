@@ -1,0 +1,297 @@
+{
+  "events": [
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    },
+    {
+      "event": "rejected_nonofficial_origin"
+    }
+  ],
+  "tls_connections_attempted": 9,
+  "tls_bytes": 5061973
+}

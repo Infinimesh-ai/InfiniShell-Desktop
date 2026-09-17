@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "scope": "source20_intermediate_bundle_signature_archive_only",
+  "source_manifest_sha256": "b3b3e7a61530b1314ef5e4f8de5f2c2b5bfb62f883e7b3e6109d42d2590fc693",
+  "bundle_manifest_object_matches_inputs": true,
+  "signature_manifest_sha256_matches_inputs": true,
+  "worktree_clean_before": false,
+  "worktree_clean_after": false,
+  "reports": {
+    "bundle": {
+      "source": "/tmp/infinishell-cli-parity-official-20-bundle.json",
+      "archive": "macos-official-20-bundle.json",
+      "bytes": 16614,
+      "sha256": "68e0f6ccc81a2f1f7ed754e226e62d68af7de1a661f755a30278b16cec54cb04",
+      "byte_exact": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    },
+    "signature": {
+      "source": "/tmp/infinishell-cli-parity-official-20-signature.json",
+      "archive": "macos-official-20-signature.json",
+      "bytes": 675,
+      "sha256": "066d185c9e5a5e72027b71be1bc6e26096a25cf1e04fd77486b3331b16dbecbe",
+      "byte_exact": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      }
+    }
+  },
+  "input_manifest": {
+    "source": "/tmp/infinishell-cli-parity-official-20-inputs.json",
+    "bytes": 14565,
+    "sha256": "b3b3e7a61530b1314ef5e4f8de5f2c2b5bfb62f883e7b3e6109d42d2590fc693",
+    "credential_shape_counts": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "credential_assignment": 0,
+      "email": 0
+    }
+  },
+  "independent_build_log_check": {
+    "path": "/tmp/infinishell-cli-parity-official-20-bundle.log",
+    "bytes": 4181,
+    "sha256": "10650e3dd0cc81980f2de80f18c4fe42d0dcb72359aa2f5caa06451cb04c418b",
+    "sha256_matches_source_report": true,
+    "summaries": [
+      "Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 27s"
+    ],
+    "log_archived": false
+  },
+  "worker_identity": {
+    "sha256": "8b1ad22b400b71b13e08ca6d9f8fdcc3b78da69c965d3fd9366a8cfa1ed3ddea",
+    "source": "根代理实际构建原报告；未读取二进制"
+  },
+  "locale_resources": {
+    "embedded_locale_resources": [
+      {
+        "locale": "en",
+        "sha256": "2dad34fc7ba6ef63d9bf072e5464719fd650d931206038a147aca4e153d614b9",
+        "bytes": 374753,
+        "exact_bytes_found_in_binary": true
+      },
+      {
+        "locale": "zh-CN",
+        "sha256": "2ffab1ab84d464d06288f2f9f278c297dd3ed0575e2ee39c2a267cde2b62d4b9",
+        "bytes": 361658,
+        "exact_bytes_found_in_binary": true
+      }
+    ],
+    "hashes_match_input_manifest": true,
+    "exact_bytes_in_binary_claim_source": "根代理实际构建原报告；本次未独立扫描二进制"
+  },
+  "signature_check": {
+    "argv": [
+      "codesign",
+      "--verify",
+      "--deep",
+      "--strict",
+      "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app"
+    ],
+    "reported_exit_code": 0,
+    "reported_wall_seconds": 0.480609,
+    "reported_stdout_bytes": 0,
+    "reported_stderr_bytes": 0,
+    "empty_output_sha256_matches": true,
+    "source": "根代理实际 codesign 原报告；归档代理未重执行"
+  },
+  "own_doc_append": {
+    "path": "OFFICIAL_20_LOCAL_GATES.md",
+    "prior_sha256": "054513ae768894488238752e39cb08174ca51a26d2a011b977e22db3d99bac51",
+    "new_sha256": "9e88906c6f4278650bd1cb39e1c81d93e09b553665f43915c4656217f44b9f34",
+    "preserves_entire_prior_bytes_as_prefix": true,
+    "credential_shape_counts": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "credential_assignment": 0,
+      "email": 0
+    }
+  },
+  "read_target": false,
+  "read_frozen": false,
+  "read_private_files": false,
+  "ran_cargo": false,
+  "ran_cli": false,
+  "ran_model": false,
+  "ran_gui": false,
+  "ran_git": false,
+  "ran_network": false,
+  "unfinished_native_run_archived": false,
+  "publisher_identity_verified": false,
+  "notarization_verified": false,
+  "public_release_verified": false,
+  "real_cli_verified_by_this_archive": false,
+  "bilingual_gui_verified_by_this_archive": false,
+  "final_same_commit_cross_platform_verified": false,
+  "credential_scan_scope": "三份原报告与本次全部新增档案、追加后的自有文档；固定六类形态扫描零匹配不能保证识别未知凭据格式"
+}

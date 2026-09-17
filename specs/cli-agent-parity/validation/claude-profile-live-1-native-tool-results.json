@@ -1,0 +1,42 @@
+{
+  "acceptance_passed": false,
+  "scope": "真实API失败的原生会话工具结果投影与生产清理回执",
+  "transcript_sha256": "2282c79a95f2faf8df1fc56541f907b897c486b243ea9d36abfdc3a3d974333f",
+  "credential_values_recorded": false,
+  "tool_events": [
+    {
+      "type": "tool_use",
+      "name": "Read",
+      "id": "toolu_01M6JdFCoqmG3i8Tf78BQTk1"
+    },
+    {
+      "type": "tool_result",
+      "tool_use_id": "toolu_01M6JdFCoqmG3i8Tf78BQTk1",
+      "content": "1\tPROFILE_BEFORE"
+    },
+    {
+      "type": "tool_use",
+      "name": "Edit",
+      "id": "toolu_012ZtduGC1Nd3oY8vEFL1EW5"
+    },
+    {
+      "type": "tool_result",
+      "tool_use_id": "toolu_012ZtduGC1Nd3oY8vEFL1EW5",
+      "is_error": true,
+      "content": "Tool permission request failed: Error: tool approval does not match this running command"
+    }
+  ],
+  "fixture_contents_after": {
+    "edit-allow.txt": "PROFILE_BEFORE",
+    "edit-deny.txt": "PROFILE_BEFORE"
+  },
+  "process_exit_receipt": {
+    "version": 1,
+    "generation": "2f5d7916-674c-4b86-9a46-f2a0e10dbef8",
+    "cleanup_confirmed": true,
+    "containment": "macos_resource_coalition",
+    "exit_reason": "stdio_closed",
+    "exit_code": 0,
+    "manifest_sha256": "05394d18f607eab74a93178722b6f0449846983db0b5312533c16c4e4613ae9c"
+  }
+}

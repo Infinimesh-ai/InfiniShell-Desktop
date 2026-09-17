@@ -1,0 +1,612 @@
+{
+  "schema_version": 1,
+  "cli_version": "1.0.30",
+  "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+  "source_derived": true,
+  "native_cli_executed": false,
+  "model_requests": 0,
+  "verification_boundary": "公开候选源码契约，版本与受测二进制不完全对应；SDK 注册、反向帧、MCP 版本、请求 origin 与创建权限上限均未完成实际 1.0.30 原生回路验证。",
+  "sources": [
+    {
+      "path": "crates/codegen/xai-grok-mcp/src/wire.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-mcp/src/wire.rs",
+      "sha256": "45f9b7c46ad685da069043727afb238e456c00f3d39eea2f1bda9b9a72d7d571"
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/session/acp_mcp.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_mcp.rs",
+      "sha256": "233912e891371a197c90b2b7de698d2c2d728cf84ca23e5a7e2490b378450995"
+    },
+    {
+      "path": "crates/codegen/xai-grok-mcp/src/acp_transport.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-mcp/src/acp_transport.rs",
+      "sha256": "76faec6afccc78d6ff6dbafd66ba6a5ef3b58ae15b07df53d35b7e9e2f646b1d"
+    },
+    {
+      "path": "crates/codegen/xai-grok-mcp/src/servers.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-mcp/src/servers.rs",
+      "sha256": "38d5eda9917781ae188f3c73d9536e2fd103d381626a081b61516f2dd358027b"
+    },
+    {
+      "path": "Cargo.lock",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/Cargo.lock",
+      "sha256": "73088da69937bcc0bd8239dcc969cf4a703e836593cd5c7c35aa3a9cea393d0c"
+    }
+  ],
+  "mcp_dependency": {
+    "crate": "rmcp",
+    "version": "3.2.0",
+    "default_protocol": "2025-11-25",
+    "source_url": "https://docs.rs/rmcp/3.2.0/src/rmcp/model.rs.html",
+    "verification_boundary": "仅公开候选源码依赖与原始 rmcp 包默认值；候选源码版本与受测官方 1.0.30 不完全对应，不能证明实际二进制内依赖或 SDK 协议版本。",
+    "original_package_url": "https://crates.io/api/v1/crates/rmcp/3.2.0/download",
+    "original_package_sha256": "42b6914fac0be956fe704a38239c3f44a9f841d1b06a5713d2f638065593f5b5",
+    "original_package_path": "rmcp-3.2.0/src/model.rs",
+    "verified_line_ranges": [
+      [
+        175,
+        175
+      ],
+      [
+        1011,
+        1011
+      ]
+    ],
+    "verification_kind": "原始公开 crate 归档在内存中解包核对；无 CLI 执行"
+  },
+  "initialize_capability_key": "x.ai/mcp/sdk",
+  "session_registration_key": "x.ai/mcp/servers",
+  "session_registration": [
+    {
+      "name": "infinishell-local-tasks",
+      "serverId": "infinishell-00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "initialize_request": {
+    "jsonrpc": "2.0",
+    "id": "reverse-init-1",
+    "method": "x.ai/mcp/sdk_call",
+    "params": {
+      "serverId": "infinishell-00000000-0000-0000-0000-000000000000",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 17,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2025-11-25",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "source-derived-grok-mcp-client",
+            "version": "3.2.0"
+          }
+        }
+      }
+    }
+  },
+  "initialize_response": {
+    "jsonrpc": "2.0",
+    "id": "reverse-init-1",
+    "result": {
+      "jsonrpc": "2.0",
+      "id": 17,
+      "result": {
+        "protocolVersion": "2025-11-25",
+        "capabilities": {
+          "tools": {}
+        },
+        "serverInfo": {
+          "name": "infinishell-local-tasks",
+          "version": "0.1.0"
+        }
+      }
+    }
+  },
+  "inspect_request": {
+    "jsonrpc": "2.0",
+    "id": "reverse-tool-2",
+    "method": "x.ai/mcp/sdk_call",
+    "params": {
+      "serverId": "infinishell-00000000-0000-0000-0000-000000000000",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 18,
+        "method": "tools/call",
+        "params": {
+          "name": "inspect_local_tasks",
+          "arguments": {}
+        }
+      }
+    }
+  },
+  "tool_error_response": {
+    "jsonrpc": "2.0",
+    "id": "reverse-tool-2",
+    "result": {
+      "jsonrpc": "2.0",
+      "id": 18,
+      "result": {
+        "isError": true,
+        "content": [
+          {
+            "type": "text",
+            "text": "本地工具已取消"
+          }
+        ]
+      }
+    }
+  },
+  "response_shape": "ACP result 直接包含完整 MCP JSON-RPC 响应，不增加 message 包装；外层 ACP ID 与内层 MCP ID 分别回传。",
+  "half_duplex_boundary": "只支持请求/响应；未声明原生通知转发、sampling、roots 或 elicitation。",
+  "source_hashes": [
+    {
+      "path": "crates/codegen/xai-grok-mcp/src/wire.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-mcp/src/wire.rs",
+      "sha256": "45f9b7c46ad685da069043727afb238e456c00f3d39eea2f1bda9b9a72d7d571",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "line_ranges": [],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/session/acp_mcp.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_mcp.rs",
+      "sha256": "233912e891371a197c90b2b7de698d2c2d728cf84ca23e5a7e2490b378450995",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "line_ranges": [
+        [
+          65,
+          68
+        ],
+        [
+          79,
+          84
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-grok-mcp/src/acp_transport.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-mcp/src/acp_transport.rs",
+      "sha256": "76faec6afccc78d6ff6dbafd66ba6a5ef3b58ae15b07df53d35b7e9e2f646b1d",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "line_ranges": [
+        [
+          127,
+          139
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-grok-mcp/src/servers.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-mcp/src/servers.rs",
+      "sha256": "38d5eda9917781ae188f3c73d9536e2fd103d381626a081b61516f2dd358027b",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "line_ranges": [
+        [
+          1779,
+          1780
+        ],
+        [
+          2038,
+          2058
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "Cargo.lock",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/Cargo.lock",
+      "sha256": "73088da69937bcc0bd8239dcc969cf4a703e836593cd5c7c35aa3a9cea393d0c",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "line_ranges": [],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-acp-lib/src/gateway.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-acp-lib/src/gateway.rs",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "sha256": "13d154a54d2285d65bd168c3616ec78cbef369e128083c85428ffafba6034153",
+      "line_ranges": [
+        [
+          158,
+          160
+        ],
+        [
+          361,
+          381
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/session/acp_session_impl/tool_calls.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_session_impl/tool_calls.rs",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "sha256": "5d470ccabfc29bed9f256c694e3865dcae349767e660cd9c2bd8a967dc1f071d",
+      "line_ranges": [
+        [
+          1397,
+          1407
+        ],
+        [
+          1533,
+          1536
+        ],
+        [
+          2516,
+          2531
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/session/acp_types.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_types.rs",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "sha256": "3576669c4c17e300872efb3fb1d2bed05973d04ff14103bd306825f0d0f83e96",
+      "line_ranges": [
+        [
+          625,
+          629
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-grok-workspace/src/permission/resolution.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-workspace/src/permission/resolution.rs",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "sha256": "28faac4ec1c8021c5eb7bad6009f3256bc9bfd5eb12e42019120c8f756b256a6",
+      "line_ranges": [
+        [
+          299,
+          326
+        ],
+        [
+          511,
+          515
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/agent/handlers/config_option.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/handlers/config_option.rs",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "sha256": "073b73b6ef08c5012a36b23edd729c2e082388ba4f7b5b9ff2f5b5772dc7cde0",
+      "line_ranges": [
+        [
+          18,
+          46
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-grok-tools/src/types/compat.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-tools/src/types/compat.rs",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "sha256": "72b6e89d06b61c253531e66d440d58887100704e03a51dd0cdd8715a1008ae02",
+      "line_ranges": [
+        [
+          217,
+          245
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/inspect/compat.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/inspect/compat.rs",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "sha256": "dd36eb7a7bdf13c4ae42baba957b7be4db8a06c71f24d2978eb5ff664f180e20",
+      "line_ranges": [
+        [
+          287,
+          305
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/agent/mvp_agent/agent_ops.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/mvp_agent/agent_ops.rs",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "sha256": "5c1d3182780e92724445fc08f6c78f6d008d115d4a59ab35cbf155c159fc26cd",
+      "line_ranges": [
+        [
+          4372,
+          4384
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_setup.rs",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_setup.rs",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "sha256": "de2d373a19bfac413d08f1195cf8a43313e0aa0731493dd5ef3ba0c32f8bdde1",
+      "line_ranges": [
+        [
+          343,
+          353
+        ]
+      ],
+      "verified_from": "公开候选源码提交的原始文件；仅哈希及路径行投影，不证明受测二进制执行相同代码。",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "path": "SOURCE_REV",
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/SOURCE_REV",
+      "source_commit": "482711333c7195dc16a272777f86086d615e2afb",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false,
+      "sha256": "f42d40d90d620527204dd41d9a0bb4a585d69dc8525ad5e81633f33a83c7d6e4",
+      "git_blob_sha1": "0c594fbe842905b9db14f523b7acaa5ebc9a853a",
+      "line_ranges": [
+        [
+          1,
+          1
+        ]
+      ],
+      "verified_from": "已知 revision 文本加 LF 的 SHA-256；41 字节 Git blob SHA-1 与本地公开索引匹配，根代理以官方 raw 页面确认文本；本子任务没有原始全文文件。"
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "source_version_mismatch",
+      "source_verified": true,
+      "native_verified": false,
+      "verification_kind": "本地公开源码索引与受测版本报告投影；根代理官方 raw 确认",
+      "source_observation": "公开 snapshot 的 SOURCE_REV 为 be7ce6e8cffe46d20bef9834b211616082ee866b；受测官方版本为 grok 1.0.30 (04b7ffed98c6)，两者不对应。",
+      "source_refs": [
+        {
+          "path": "SOURCE_REV",
+          "lines": [
+            1,
+            1
+          ]
+        }
+      ],
+      "inference_boundary": "这是公开候选源码契约，不是精确 1.0.30 原生源码。缺 origin、ask 提示、取消转发和兼容继承等源码观察不可替代实际二进制的接口验证或验收。"
+    },
+    {
+      "id": "sdk_request_origin",
+      "source_verified": true,
+      "native_verified": false,
+      "source_observation": "候选源码：SDK 反向参数结构只包含 serverId/message；MCP tools/call 构造只填名称与 arguments，超时请求选项未注入 toolCallId/promptId；ExtRequest 没有标准 meta 字段。",
+      "source_refs": [
+        {
+          "path": "crates/codegen/xai-grok-shell/src/session/acp_mcp.rs",
+          "lines": [
+            65,
+            68
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-shell/src/session/acp_mcp.rs",
+          "lines": [
+            79,
+            84
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-mcp/src/servers.rs",
+          "lines": [
+            1779,
+            1780
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-mcp/src/servers.rs",
+          "lines": [
+            2049,
+            2053
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-acp-lib/src/gateway.rs",
+          "lines": [
+            158,
+            160
+          ]
+        }
+      ],
+      "inference_boundary": "候选源码版本与受测官方 1.0.30 二进制不完全对应；尚无真实 SDK reverse frame，也没有已验证 SDK 请求与原生工具及回合的一一对应；不能断言已发布二进制的所有额外字段均不存在，不能用当前活跃回合补缺失 origin。 受测二进制是否已有可验证的 SDK origin 字段未知，不能由候选结构缺字段断言它没有 origin。",
+      "verification_kind": "公开候选源码观察",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "id": "pre_tool_use_rewrite",
+      "source_verified": true,
+      "native_verified": false,
+      "source_observation": "候选源码：先行 Pending ToolCall 携带原生 ID、名称和早期 rawInput；PreToolUse 有条件改写 tool_input/raw_arguments/raw_input；之后发出含最终 rawInput 的 ToolCallUpdate。",
+      "source_refs": [
+        {
+          "path": "crates/codegen/xai-grok-shell/src/session/acp_session_impl/tool_calls.rs",
+          "lines": [
+            1397,
+            1407
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-shell/src/session/acp_session_impl/tool_calls.rs",
+          "lines": [
+            1533,
+            1536
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-shell/src/session/acp_session_impl/tool_calls.rs",
+          "lines": [
+            2516,
+            2531
+          ]
+        }
+      ],
+      "inference_boundary": "候选源码版本与受测官方 1.0.30 二进制不完全对应；尚未运行真实 SDK 与 hooks 参数改写联动验收；早期指纹不保证等于最终 SDK arguments，并行、同参数和旧回调跨回合关联均未通过。",
+      "verification_kind": "公开候选源码观察",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "id": "mcp_cancel_notification_dropped",
+      "source_verified": true,
+      "native_verified": false,
+      "source_observation": "候选源码：MCP 工具请求的 CancelOnDrop 发送 notifications/cancelled；半双工 ACP MCP 转发丢弃没有 ID 的通知。",
+      "source_refs": [
+        {
+          "path": "crates/codegen/xai-grok-mcp/src/servers.rs",
+          "lines": [
+            2038,
+            2058
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-mcp/src/acp_transport.rs",
+          "lines": [
+            127,
+            139
+          ]
+        }
+      ],
+      "inference_boundary": "候选源码版本与受测官方 1.0.30 二进制不完全对应；未验证实际 native SDK 取消及回合终结时序；宿主不能依赖收到 MCP 取消通知，需要可靠原生回合终结与断线撤销链。",
+      "verification_kind": "公开候选源码观察",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "id": "permission_creation_ceiling",
+      "source_verified": true,
+      "native_verified": false,
+      "source_observation": "候选源码：startupHints.permissionMode 只接受 alwaysAllow，配置 defaultMode 与 bypass pin 可以阻止它；ask/default hint 不构成 ask 策略。configOptions 只支持 model/reasoning_effort；yoloMode/autoMode 可请求关闭，但不回传有效权限全集或 sandbox 证明。",
+      "source_refs": [
+        {
+          "path": "crates/codegen/xai-grok-shell/src/session/acp_types.rs",
+          "lines": [
+            625,
+            629
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-workspace/src/permission/resolution.rs",
+          "lines": [
+            299,
+            326
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-shell/src/agent/handlers/config_option.rs",
+          "lines": [
+            18,
+            46
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_setup.rs",
+          "lines": [
+            343,
+            353
+          ]
+        }
+      ],
+      "inference_boundary": "候选源码版本与受测官方 1.0.30 二进制不完全对应；没有经过真实新建会话查询核对、重连及恢复验证的创建权限上限；静态 inspect 来源列表、当前 ask 状态和未知 sandbox 均不能授予 run_agents。 受测二进制是否支持 ask/default 启动提示尚未验证，不能由候选源码的忽略行为断言实际 1.0.30 行为。",
+      "verification_kind": "公开候选源码观察",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "id": "compat_permission_env_independent",
+      "source_verified": true,
+      "native_verified": false,
+      "source_observation": "候选源码：[compat.claude] 提供独立 mcps/hooks 可选布尔开关，源码测试展示 hooks=false 的配置来源；权限 resolver 的 Claude settings fallback 独立依据 Claude import marker，创建会话路径还独立加载 Claude env。",
+      "source_refs": [
+        {
+          "path": "crates/codegen/xai-grok-tools/src/types/compat.rs",
+          "lines": [
+            217,
+            245
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-shell/src/inspect/compat.rs",
+          "lines": [
+            287,
+            305
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-workspace/src/permission/resolution.rs",
+          "lines": [
+            511,
+            515
+          ]
+        },
+        {
+          "path": "crates/codegen/xai-grok-shell/src/agent/mvp_agent/agent_ops.rs",
+          "lines": [
+            4372,
+            4384
+          ]
+        }
+      ],
+      "inference_boundary": "候选源码版本与受测官方 1.0.30 二进制不完全对应；关闭 compat hooks/MCP 不能证明不会继承 Claude permission defaultMode/env；未做 native 兼容开关、全局和项目来源、权限及 env 联合验收。",
+      "verification_kind": "公开候选源码观察",
+      "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+      "source_is_exact_binary_build": false
+    },
+    {
+      "id": "production_acceptance",
+      "source_verified": false,
+      "native_verified": false,
+      "source_observation": "纯转换器和 Grok 回复目标仅 cfg(test) 编译、没有生产重导出；测试人工提供 verified_turn_id。",
+      "inference_boundary": "生产 SDK 入口保持关闭，run_agents 保持拒绝。official-6 拟纳入测试专用候选协议与纯回归产物，不能计作 P3 或副作用安全验收；实际二进制 origin、创建上限仍未验证。"
+    }
+  ],
+  "contract_kind": "public_candidate_source_contract",
+  "source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+  "tested_binary_version": "grok 1.0.30 (04b7ffed98c6)",
+  "tested_binary_revision": "04b7ffed98c6",
+  "source_is_exact_binary_build": false,
+  "filename_boundary": "文件名 1.0.30 表示研究目标；该公开候选源码 revision 与受测官方二进制不完全对应。",
+  "source_revision_verification": {
+    "local_index_file": "infinishell-grok-source-tree.json",
+    "snapshot_commit": "482711333c7195dc16a272777f86086d615e2afb",
+    "source_rev_path": "SOURCE_REV",
+    "source_rev_git_blob_sha1": "0c594fbe842905b9db14f523b7acaa5ebc9a853a",
+    "source_rev_bytes": 41,
+    "expected_source_rev_text_matches_local_blob_sha": true,
+    "full_source_rev_file_available_in_this_subtask": false,
+    "primary_url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/SOURCE_REV",
+    "root_primary_raw_value_confirmed": true,
+    "verification_kind": "子任务读取本地公开源码树索引，将已知 revision 加 LF 的 41 字节 Git blob SHA-1 与索引匹配；根代理另以官方 raw 页面确认文本。"
+  }
+}

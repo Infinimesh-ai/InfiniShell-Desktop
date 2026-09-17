@@ -10,6 +10,11 @@ use warp_multi_agent_api as api;
 
 use crate::ai::agent_providers::tools::local_orchestration::{RUN_AGENTS, SEND_MESSAGE};
 
+// 真实 SDK 请求的回合来源尚未验证，协议准备只随纯回归编译，生产不暴露入口。
+#[cfg(test)]
+#[path = "grok_local_tools.rs"]
+mod grok;
+
 pub(crate) const MCP_SERVER_NAME: &str = "infinishell-local-tasks";
 const INSPECT_TOOL_NAME: &str = "inspect_local_tasks";
 const MAX_ARGUMENT_BYTES: usize = 1024 * 1024;
@@ -22,8 +27,18 @@ pub(crate) struct LocalToolPermissions {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum LocalToolReplyTarget {
-    Codex { request_id: Value },
-    Claude { request_id: String, mcp_id: Value },
+    Codex {
+        request_id: Value,
+    },
+    Claude {
+        request_id: String,
+        mcp_id: Value,
+    },
+    #[cfg(test)]
+    Grok {
+        request_id: Value,
+        mcp_id: Value,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -345,6 +360,14 @@ pub(crate) fn tool_reply(target: LocalToolReplyTarget, result: Result<Value, Str
             json!({"jsonrpc":"2.0","id":mcp_id,"result":{
                 "isError":!success,"content":[{"type":"text","text":text}]}}),
         ),
+        #[cfg(test)]
+        LocalToolReplyTarget::Grok { request_id, mcp_id } => json!({
+            "jsonrpc":"2.0","id":request_id,"result":{
+                "jsonrpc":"2.0","id":mcp_id,"result":{
+                    "isError":!success,"content":[{"type":"text","text":text}]
+                }
+            }
+        }),
     }
 }
 

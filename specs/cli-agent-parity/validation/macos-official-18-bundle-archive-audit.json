@@ -1,0 +1,18 @@
+{
+  "source_manifest_sha256": "3d539cc6282dc098346011f900140e2006af993aad93c7285e23fe4eedb2d3cf",
+  "archives": [
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-18-bundle.json",
+      "original": "/tmp/infinishell-cli-parity-official-18-bundle.json",
+      "sha256": "91c711946d8801174869aea0c8c6a091f501555eebc9aa795eced1644752f95a",
+      "byte_exact": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-18-signature.json",
+      "original": "/tmp/infinishell-cli-parity-official-18-signature.json",
+      "sha256": "d90bf361b4608e107cc828a03bdc8a588ceeb8dbe937f7222015f580eae61c8c",
+      "byte_exact": true
+    }
+  ],
+  "scope": "source18 中间脏快照的真实构建与严格验证；不计完整产品、同提交或跨平台验收。"
+}

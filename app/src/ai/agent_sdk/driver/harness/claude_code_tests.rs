@@ -2,9 +2,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use std::ffi::OsString;
 use tempfile::TempDir;
-use uuid::Uuid;
 
+use serde_json::json;
+
+use super::super::ManagedSecretValue;
 use super::*;
 use crate::ai::agent_events::MessageHydrator;
 
@@ -44,34 +47,6 @@ fn write_surfaced_parent_bridge_message(state_dir: &Path, record: &MessageBridge
         serde_json::to_vec(record).unwrap(),
     )
     .unwrap();
-}
-
-#[test]
-fn claude_command_uses_session_id_when_not_resuming() {
-    let uuid = Uuid::new_v4();
-    let cmd = claude_command("claude", &uuid, "/tmp/prompt.txt", None);
-    assert!(
-        cmd.contains(&format!("--session-id {uuid}")),
-        "expected --session-id flag, got: {cmd}"
-    );
-    assert!(
-        !cmd.contains("--resume"),
-        "command should not contain --resume, got: {cmd}"
-    );
-}
-
-#[test]
-fn claude_command_pipes_prompt_path() {
-    let uuid = Uuid::new_v4();
-    let cmd = claude_command("claude", &uuid, "/tmp/prompt with spaces.txt", None);
-    assert!(
-        cmd.contains("< '/tmp/prompt with spaces.txt'"),
-        "expected single-quoted stdin redirect of the prompt path, got: {cmd}"
-    );
-    assert!(
-        cmd.contains("--dangerously-skip-permissions"),
-        "expected --dangerously-skip-permissions, got: {cmd}"
-    );
 }
 
 #[test]
@@ -271,251 +246,97 @@ async fn acknowledge_parent_bridge_hook_output_ignores_missing_ack_marker() {
     assert!(parent_bridge_surfaced_message_path(&state_dir, 42, "msg-123").exists());
 }
 
-#[test]
-fn prepare_claude_config_creates_config_file_without_api_suffix() {
-    let tmp = TempDir::new().unwrap();
-    let claude_json_path = tmp.path().join(".claude.json");
-    let working_dir = tmp.path().join("workspace/project");
+// 测试只在临时 HOME 与配置目录内放置合成配置，退出时还原原环境。
+struct IsolatedClaudeEnvironment {
+    previous: [(&'static str, Option<OsString>); 3],
+}
 
-    prepare_claude_config(&claude_json_path, &working_dir, None).unwrap();
+impl IsolatedClaudeEnvironment {
+    fn new(home: &Path, config: &Path) -> Self {
+        let previous = [
+            ("HOME", std::env::var_os("HOME")),
+            ("USERPROFILE", std::env::var_os("USERPROFILE")),
+            ("CLAUDE_CONFIG_DIR", std::env::var_os("CLAUDE_CONFIG_DIR")),
+        ];
+        // 本组测试使用 serial_test，与同组环境修改串行执行。
+        unsafe {
+            std::env::set_var("HOME", home);
+            std::env::set_var("USERPROFILE", home);
+            std::env::set_var("CLAUDE_CONFIG_DIR", config);
+        }
+        Self { previous }
+    }
+}
 
-    let claude_config: Value =
-        serde_json::from_slice(&fs::read(claude_json_path).unwrap()).unwrap();
-    assert_eq!(claude_config["hasCompletedOnboarding"], Value::Bool(true));
-    assert_eq!(
-        claude_config["lspRecommendationDisabled"],
-        Value::Bool(true)
-    );
-    let working_dir_key = working_dir.to_string_lossy().to_string();
-    assert_eq!(
-        claude_config["projects"][working_dir_key]["hasTrustDialogAccepted"],
-        Value::Bool(true)
-    );
-    assert_eq!(claude_config.get("customApiKeyResponses"), None);
+impl Drop for IsolatedClaudeEnvironment {
+    fn drop(&mut self) {
+        for (name, previous) in &self.previous {
+            // 与构造时相同的串行测试约束，包含断言失败后的环境恢复。
+            unsafe {
+                match previous {
+                    Some(value) => std::env::set_var(name, value),
+                    None => std::env::remove_var(name),
+                }
+            }
+        }
+    }
 }
 
 #[test]
-fn prepare_claude_config_creates_config_file_with_api_suffix() {
-    let tmp = TempDir::new().unwrap();
-    let claude_json_path = tmp.path().join(".claude.json");
-    let working_dir = tmp.path().join("workspace/project");
-
-    prepare_claude_config(
-        &claude_json_path,
-        &working_dir,
-        Some("QLWn-dUnuwQ-hIhDiAAA"),
-    )
+#[serial_test::serial]
+fn claude_environment_preparation_preserves_user_configuration_bytes() {
+    let temp = TempDir::new().unwrap();
+    let home = temp.path().join("home");
+    let config = temp.path().join("custom-claude");
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(&config).unwrap();
+    let _environment = IsolatedClaudeEnvironment::new(&home, &config);
+    let global = home.join(".claude.json");
+    let settings = config.join("settings.json");
+    let global_bytes = serde_json::to_vec_pretty(&json!({
+        "hasCompletedOnboarding":false,"lspRecommendationDisabled":false,
+        "projects":{"project":{"hasTrustDialogAccepted":false}},
+        "customApiKeyResponses":{"approved":[],"rejected":["合成拒绝记录"]},
+        "unknownUserConfig":{"enabled":true}
+    }))
     .unwrap();
-
-    let claude_config: Value =
-        serde_json::from_slice(&fs::read(claude_json_path).unwrap()).unwrap();
-    assert_eq!(
-        claude_config["customApiKeyResponses"]["approved"],
-        serde_json::json!(["QLWn-dUnuwQ-hIhDiAAA"]),
-    );
-}
-
-#[test]
-fn prepare_claude_config_merges_existing_config() {
-    let tmp = TempDir::new().unwrap();
-    let claude_json_path = tmp.path().join(".claude.json");
-    fs::write(
-        &claude_json_path,
-        r#"{"theme":"dark","projects":{"/existing/project":{"allowedTools":["Bash"],"nested":{"value":2}}},"customApiKeyResponses":{"approved":["existing-suffix-12345"]}}"#,
-    )
-    .unwrap();
-
-    let working_dir = tmp.path().join("workspace/project");
-    prepare_claude_config(
-        &claude_json_path,
-        &working_dir,
-        Some("new-suffix-1234567890"),
-    )
-    .unwrap();
-
-    let claude_config: Value =
-        serde_json::from_slice(&fs::read(claude_json_path).unwrap()).unwrap();
-    assert_eq!(claude_config["theme"], "dark");
-    assert_eq!(
-        claude_config["lspRecommendationDisabled"],
-        Value::Bool(true)
-    );
-    assert_eq!(
-        claude_config["projects"]["/existing/project"]["allowedTools"],
-        serde_json::json!(["Bash"])
-    );
-    assert_eq!(
-        claude_config["projects"]["/existing/project"]["nested"]["value"],
-        2
-    );
-    // Both existing and new suffixes should be present.
-    assert_eq!(
-        claude_config["customApiKeyResponses"]["approved"],
-        serde_json::json!(["existing-suffix-12345", "new-suffix-1234567890"]),
-    );
-    let working_dir_key = working_dir.to_string_lossy().to_string();
-    assert_eq!(
-        claude_config["projects"][working_dir_key]["hasTrustDialogAccepted"],
-        Value::Bool(true)
-    );
-}
-
-#[test]
-fn prepare_claude_config_no_duplicate_suffix() {
-    let tmp = TempDir::new().unwrap();
-    let claude_json_path = tmp.path().join(".claude.json");
-    fs::write(
-        &claude_json_path,
-        r#"{"customApiKeyResponses":{"approved":["QLWn-dUnuwQ-hIhDiAAA"]}}"#,
-    )
-    .unwrap();
-
-    let working_dir = tmp.path().join("workspace/project");
-    prepare_claude_config(
-        &claude_json_path,
-        &working_dir,
-        Some("QLWn-dUnuwQ-hIhDiAAA"),
-    )
-    .unwrap();
-
-    let claude_config: Value =
-        serde_json::from_slice(&fs::read(claude_json_path).unwrap()).unwrap();
-    assert_eq!(
-        claude_config["customApiKeyResponses"]["approved"],
-        serde_json::json!(["QLWn-dUnuwQ-hIhDiAAA"]),
-    );
-}
-
-#[test]
-fn prepare_claude_config_none_suffix_preserves_existing_responses() {
-    let tmp = TempDir::new().unwrap();
-    let claude_json_path = tmp.path().join(".claude.json");
-    fs::write(
-        &claude_json_path,
-        r#"{"customApiKeyResponses":{"approved":["existing-suffix-12345"],"rejected":["bad-key"]}}"#,
-    )
-    .unwrap();
-
-    let working_dir = tmp.path().join("workspace/project");
-    prepare_claude_config(&claude_json_path, &working_dir, None).unwrap();
-
-    let claude_config: Value =
-        serde_json::from_slice(&fs::read(claude_json_path).unwrap()).unwrap();
-    assert_eq!(
-        claude_config["customApiKeyResponses"]["approved"],
-        serde_json::json!(["existing-suffix-12345"]),
-    );
-    assert_eq!(
-        claude_config["customApiKeyResponses"]["rejected"],
-        serde_json::json!(["bad-key"]),
-    );
-}
-
-#[test]
-fn resolve_suffix_from_raw_value_secret() {
-    let key = "sk-ant-api03-abcdefghij1234567890ABCDEFGHIJ1234567890abcdefghij1234567890QLWn-dUnuwQ-hIhDiAAA";
+    let settings_bytes = serde_json::to_vec_pretty(&json!({
+        "skipDangerousModePermissionPrompt":false,
+        "enabledPlugins":{"warp@claude-code-warp":false,"user-plugin":true},
+        "hooks":{"UserPromptSubmit":[{"matcher":"","hooks":[{"type":"command","command":"user-hook"}]}]},
+        "permissions":{"defaultMode":"default","deny":["Bash(*)"]}
+    })).unwrap();
+    fs::write(&global, &global_bytes).unwrap();
+    fs::write(&settings, &settings_bytes).unwrap();
     let secrets = HashMap::from([(
         "ANTHROPIC_API_KEY".to_string(),
-        ManagedSecretValue::raw_value(key),
+        ManagedSecretValue::raw_value("synthetic-unit-test-only-key"),
     )]);
-    let suffix = resolve_anthropic_api_key_suffix(&secrets);
-    assert_eq!(suffix.as_deref(), Some("QLWn-dUnuwQ-hIhDiAAA"));
+
+    ClaudeHarness
+        .prepare_environment_config(&home.join("project"), Some("合成系统提示"), &secrets)
+        .unwrap();
+
+    assert_eq!(fs::read(global).unwrap(), global_bytes);
+    assert_eq!(fs::read(settings).unwrap(), settings_bytes);
+    assert!(!home.join(".claude").exists());
 }
 
 #[test]
-fn resolve_suffix_from_anthropic_api_key_secret() {
-    let key = "sk-ant-api03-abcdefghij1234567890ABCDEFGHIJ1234567890abcdefghij1234567890QLWn-dUnuwQ-hIhDiAAA";
-    let secrets = HashMap::from([(
-        "ANTHROPIC_API_KEY".to_string(),
-        ManagedSecretValue::anthropic_api_key(key),
-    )]);
-    let suffix = resolve_anthropic_api_key_suffix(&secrets);
-    assert_eq!(suffix.as_deref(), Some("QLWn-dUnuwQ-hIhDiAAA"));
-}
+#[serial_test::serial]
+fn claude_environment_preparation_does_not_create_global_configuration() {
+    let temp = TempDir::new().unwrap();
+    let home = temp.path().join("home");
+    let config = temp.path().join("custom-claude");
+    fs::create_dir_all(&home).unwrap();
+    let _environment = IsolatedClaudeEnvironment::new(&home, &config);
 
-#[test]
-fn resolve_suffix_from_anthropic_api_key_with_different_secret_name() {
-    let key = "sk-ant-api03-abcdefghij1234567890ABCDEFGHIJ1234567890abcdefghij1234567890QLWn-dUnuwQ-hIhDiAAA";
-    // Secret name doesn't match the env var, but the AnthropicApiKey variant
-    // should still be found by iterating all secrets.
-    let secrets = HashMap::from([(
-        "my-anthropic-key".to_string(),
-        ManagedSecretValue::anthropic_api_key(key),
-    )]);
-    let suffix = resolve_anthropic_api_key_suffix(&secrets);
-    assert_eq!(suffix.as_deref(), Some("QLWn-dUnuwQ-hIhDiAAA"));
-}
+    ClaudeHarness
+        .prepare_environment_config(&home.join("project"), None, &HashMap::new())
+        .unwrap();
 
-#[test]
-fn resolve_suffix_prefers_anthropic_api_key_variant_over_raw_value() {
-    let anthropic_key = "sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-anthropic-suffix";
-    let raw_key = "sk-ant-api03-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB-raw-suffix";
-    let secrets = HashMap::from([
-        (
-            "my-anthropic-key".to_string(),
-            ManagedSecretValue::anthropic_api_key(anthropic_key),
-        ),
-        (
-            "ANTHROPIC_API_KEY".to_string(),
-            ManagedSecretValue::raw_value(raw_key),
-        ),
-    ]);
-    let suffix = resolve_anthropic_api_key_suffix(&secrets);
-    // AnthropicApiKey variant should be preferred.
-    assert_eq!(suffix.as_deref(), Some("AAA-anthropic-suffix"));
-}
-
-#[test]
-fn resolve_suffix_returns_none_for_short_key() {
-    let secrets = HashMap::from([(
-        "ANTHROPIC_API_KEY".to_string(),
-        ManagedSecretValue::raw_value("short"),
-    )]);
-    assert_eq!(resolve_anthropic_api_key_suffix(&secrets), None);
-}
-
-#[test]
-fn resolve_suffix_returns_none_for_short_anthropic_api_key() {
-    let secrets = HashMap::from([(
-        "ANTHROPIC_API_KEY".to_string(),
-        ManagedSecretValue::anthropic_api_key("short"),
-    )]);
-    assert_eq!(resolve_anthropic_api_key_suffix(&secrets), None);
-}
-
-#[test]
-fn prepare_claude_settings_creates_settings_file() {
-    let tmp = TempDir::new().unwrap();
-    let claude_settings_path = tmp.path().join(".claude/settings.json");
-
-    prepare_claude_settings(&claude_settings_path).unwrap();
-
-    let claude_settings: Value =
-        serde_json::from_slice(&fs::read(claude_settings_path).unwrap()).unwrap();
-    assert_eq!(
-        claude_settings["skipDangerousModePermissionPrompt"],
-        Value::Bool(true)
-    );
-}
-
-#[test]
-fn prepare_claude_settings_merges_existing_settings() {
-    let tmp = TempDir::new().unwrap();
-    let claude_settings_path = tmp.path().join("settings.json");
-    fs::write(
-        &claude_settings_path,
-        r#"{"editor":"vim","nested":{"value":1}}"#,
-    )
-    .unwrap();
-
-    prepare_claude_settings(&claude_settings_path).unwrap();
-
-    let claude_settings: Value =
-        serde_json::from_slice(&fs::read(claude_settings_path).unwrap()).unwrap();
-    assert_eq!(claude_settings["editor"], "vim");
-    assert_eq!(claude_settings["nested"]["value"], 1);
-    assert_eq!(
-        claude_settings["skipDangerousModePermissionPrompt"],
-        Value::Bool(true)
-    );
+    assert!(!home.join(".claude.json").exists());
+    assert!(!home.join(".claude").exists());
+    assert!(!config.exists());
+    assert!(!home.join("project").exists());
 }

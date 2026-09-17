@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "generation": "4906740a-fc04-438a-927b-8821f2e9427f",
+  "cleanup_confirmed": true,
+  "exit_reason": "stop_requested",
+  "exit_code": 0,
+  "manifest_sha256": "118aaba7ebb082b2ca747665c23bec408a64d8604b3ed9669efa444e46a99844",
+  "source_sha256": "f4f763a45da5b3db8378dc37622cb3e5c28c0d364de736ac6fd71dd408096694",
+  "manifest_contents_not_read": true,
+  "containment_details_omitted": true
+}

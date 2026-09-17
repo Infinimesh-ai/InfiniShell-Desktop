@@ -1,4 +1,97 @@
 use super::*;
+use std::task::Context;
+
+use futures::executor::block_on;
+use futures::task::noop_waker_ref;
+
+fn child_with_tcp_control(state: &Path) -> (ManagedChild, TcpStream) {
+    let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let control = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+    let (peer, _) = listener.accept().unwrap();
+    peer.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+    (
+        ManagedChild {
+            stdin: None,
+            stdout: None,
+            process: None,
+            control: Some(control),
+            state_dir: state.to_owned(),
+            generation: Uuid::new_v4(),
+        },
+        peer,
+    )
+}
+
+#[test]
+fn normal_exit_wait_keeps_control_open_until_cancelled() {
+    let state = tempfile::tempdir().unwrap();
+    let (child, mut peer) = child_with_tcp_control(state.path());
+    let generation = child.generation;
+    // 只让真实等待逻辑停在未返回的状态，不伪造进程退出或内核清理回执。
+    let mut waiting = Box::pin(child.wait_for_confirmed_exit(
+        futures::future::pending(),
+        CLEANUP_TIMEOUT + HANDSHAKE_TIMEOUT,
+    ));
+    let mut ctx = Context::from_waker(noop_waker_ref());
+    assert!(waiting.as_mut().poll(&mut ctx).is_pending());
+
+    peer.set_nonblocking(true).unwrap();
+    let mut byte = [0];
+    assert_eq!(
+        peer.peek(&mut byte).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    peer.set_nonblocking(false).unwrap();
+    drop(waiting);
+
+    assert_eq!(peer.read(&mut byte).unwrap(), 0);
+    assert!(confirmed_exit(state.path(), generation).unwrap().is_none());
+}
+
+#[test]
+fn normal_exit_wait_timeout_closes_control_without_claiming_cleanup() {
+    let state = tempfile::tempdir().unwrap();
+    let (child, mut peer) = child_with_tcp_control(state.path());
+    let generation = child.generation;
+
+    let error = block_on(child.wait_for_confirmed_exit(futures::future::pending(), Duration::ZERO))
+        .unwrap_err();
+
+    assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+    let mut byte = [0];
+    assert_eq!(peer.read(&mut byte).unwrap(), 0);
+    assert!(confirmed_exit(state.path(), generation).unwrap().is_none());
+}
+
+#[test]
+fn forced_finish_writes_stop_before_control_eof() {
+    let state = tempfile::tempdir().unwrap();
+    let (child, mut peer) = child_with_tcp_control(state.path());
+    let generation = child.generation;
+
+    let error = block_on(child.finish()).unwrap_err();
+
+    assert_eq!(error.kind(), io::ErrorKind::Other);
+    let mut byte = [0];
+    peer.read_exact(&mut byte).unwrap();
+    assert_eq!(byte, [2]);
+    assert_eq!(peer.read(&mut byte).unwrap(), 0);
+    assert!(confirmed_exit(state.path(), generation).unwrap().is_none());
+}
+
+#[test]
+fn normal_finish_without_a_process_never_writes_stop_or_claims_exit() {
+    let state = tempfile::tempdir().unwrap();
+    let (child, mut peer) = child_with_tcp_control(state.path());
+    let generation = child.generation;
+
+    let error = block_on(child.finish_after_stdin_close()).unwrap_err();
+
+    assert_eq!(error.kind(), io::ErrorKind::Other);
+    let mut byte = [0];
+    assert_eq!(peer.read(&mut byte).unwrap(), 0);
+    assert!(confirmed_exit(state.path(), generation).unwrap().is_none());
+}
 
 fn fixture(state: &Path, generation: Uuid) -> (PathBuf, ExitReceipt) {
     let directory = create_generation_directory(state, generation).unwrap();

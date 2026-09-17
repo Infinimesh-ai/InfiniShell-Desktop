@@ -128,8 +128,8 @@ impl CliAgentPluginManager for CodexPluginManager {
         if !FeatureFlag::CodexPlugin.is_enabled() || !self.is_installed() {
             return NativeAuthorizationStatus::NotApplicable;
         }
-        if cfg!(windows) {
-            // rev4 的正式 Windows 五 hook 摘要尚待采集，不能采用 Unix 配置推断已授权。
+        if cfg!(all(windows, not(target_arch = "x86_64"))) {
+            // 正式 Windows 原生契约只验证了 x64，其他架构仍保持未知。
             return NativeAuthorizationStatus::Unknown;
         }
         match codex_home_dir() {

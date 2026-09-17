@@ -1,0 +1,27 @@
+{
+  "scope": "两运行代 macOS 清理安全投影",
+  "receipts": [
+    {
+      "version": 1,
+      "generation": "1360a845-5874-40ec-8028-461908d96088",
+      "claim_sha256": "b61d21e711cca6116e8eed26768cd1e938270a4c2977e0db8cadec9852eff68f",
+      "native_sha256": "ef428f97051097bce09bdc64211ce7c891caa28dc6669f50d1200e3a6edd115f",
+      "job_removed": true,
+      "resource_cid_destroyed": true,
+      "native_wait_status": 0,
+      "execution_failed": false,
+      "source_sha256": "e1c4ecfd238facc4d585a0b3f0b136480f10b2031353ec9cd1567cc2b3331598"
+    },
+    {
+      "version": 1,
+      "generation": "da5a4470-cb07-42bd-aba6-ff05c8829d0c",
+      "claim_sha256": "bd1c21413558cb231685d4b13319361711ff6dfb23d71584b7305539abcc97b7",
+      "native_sha256": "ff34193bccd5028cc1f4f43900b9796c26cc133f2805a1c4ea1e143412441d02",
+      "job_removed": true,
+      "resource_cid_destroyed": true,
+      "native_wait_status": 0,
+      "execution_failed": false,
+      "source_sha256": "c072e73396d77b614014358b89d94b9083d459ce3d3090b097366a5f217119c5"
+    }
+  ]
+}

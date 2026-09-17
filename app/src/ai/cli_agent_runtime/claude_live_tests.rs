@@ -1,5 +1,14 @@
 //! 真实 Claude 适配器验收；只通过隔离运行器显式启动，不属于默认单元测试。
 
+#[path = "claude_profile_live_tests.rs"]
+mod profile_live_tests;
+
+#[path = "claude_batch_cancel_live_tests.rs"]
+mod batch_cancel_live_tests;
+
+#[path = "claude_managed_image_live_tests.rs"]
+mod managed_image_live_tests;
+
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs::{self, File};
@@ -277,6 +286,23 @@ async fn run_turn(
                     }
                 }
             }
+            RuntimeEventKind::InputJoined {
+                message_id,
+                turn_id,
+            } => {
+                let input_id = message_id.to_string();
+                if queued_id.as_ref() != Some(&input_id)
+                    || turn_id != primary.to_string()
+                    || !acknowledged.contains(&message_id)
+                    || !started.contains(&turn_id)
+                    || finished.contains_key(&turn_id)
+                    || !started.insert(input_id.clone())
+                {
+                    return Err("合并输入没有先行原生确认或错误绑定了执行".into());
+                }
+                evidence.record(json!({"event":"input_joined", "phase":phase,
+                    "message_id":message_id, "turn_id":turn_id, "native_session_id":native_id}))?;
+            }
             RuntimeEventKind::ApprovalRequested {
                 approval_id,
                 turn_id,
@@ -412,6 +438,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         generation: Uuid::new_v4(),
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
+        claude_profile: None,
         model: env::var("INFINISHELL_CLAUDE_LIVE_MODEL").ok(),
         local_tools: None,
         selected_skills: Vec::new(),
@@ -617,3 +644,6 @@ fn approval_fixture_accepts_only_exact_write_input() {
         "PARITY_APPROVAL"
     ));
 }
+
+#[path = "claude_image_probe_live_tests.rs"]
+mod image_probe_live_tests;

@@ -972,8 +972,9 @@ impl AgentDriver {
             }
             HarnessKind::Unsupported(harness) => Err(AgentDriverError::HarnessSetupFailed {
                 harness: harness.to_string(),
-                reason: format!(
-                    "The {harness} harness is only supported for local child agent launches."
+                reason: crate::t!(
+                    "cli-agent-standalone-harness-unavailable",
+                    cli = harness.to_string()
                 ),
             }),
         }

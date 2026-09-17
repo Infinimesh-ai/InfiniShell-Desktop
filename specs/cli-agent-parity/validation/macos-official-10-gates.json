@@ -1,0 +1,59 @@
+{
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "worktree_dirty": true,
+  "source_manifest": "/tmp/infinishell-cli-parity-official-10-inputs.json",
+  "source_manifest_sha256": "e544e075ca84e5546fd8d70f25c4f69430b27c9d102b79173f37f767ea11c5ef",
+  "target_directory": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 93.84,
+      "log": "/tmp/infinishell-cli-parity-official-10-check.log",
+      "log_sha256": "04cb61973d32b72b95dfd6d81e6f4ca45109098eec04fd1997ea721bdee1aad5"
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 207.362,
+      "log": "/tmp/infinishell-cli-parity-official-10-i18n.log",
+      "log_sha256": "5fff36394cb1c59df758368ab1f7bc5608e59d063468a75a1d9fa0cacf8aeb22"
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::) | test(ai::agent_providers::chat_stream::) | test(ai::blocklist::action_model::execute::)"
+      ],
+      "exit_code": 100,
+      "wall_seconds": 18.1,
+      "log": "/tmp/infinishell-cli-parity-official-10-focused.log",
+      "log_sha256": "fbcd07abbe88429e93ab06dad5ae2e90497f7ce7ba85e9c280df1863fdae8f8d"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "scope": "仅固定 Claude 文件审批策略的中英文静态说明布局",
+  "source_snapshot": "macos-official-1-inputs.json",
+  "source_worker_sha256": "ade1e8aa69c26c900b72a8697e71f2942f07813084b209cd45f973e2f8ce1c10",
+  "private_copy_sha256": "11f153d40ec19ea7c7b06365bf1f57d09ccdedd2761d8daac7e59546465353fb",
+  "source_binary_currently_overwritten": true,
+  "model_input_submitted": false,
+  "permission_execution_verified": false,
+  "app_restart_recovery_verified": false,
+  "screenshots": [
+    {
+      "language": "zh-CN",
+      "file": "zh-CN.jpg",
+      "sha256": "bd0b8981e3e0c74621672175d5effce75fe23766439cd8c7addc6453605deb65",
+      "source_path": "/private/tmp/infinishell-gui-wheel-1/21-zh-fixed-file-policy-help.jpg",
+      "manual_layout_review": "通过：完整策略说明、按钮与控件无截断或重叠",
+      "manual_privacy_review": "无凭据或账号资料"
+    },
+    {
+      "language": "en",
+      "file": "en.jpg",
+      "sha256": "ee30155b2dffca6b7cc0391d3cfff8f53d029e5497240eb5dbe304fd53428cbe",
+      "source_path": "/private/tmp/infinishell-gui-wheel-1/22-en-new-claude-fixed-policy.jpg",
+      "manual_layout_review": "通过：完整策略说明、按钮与控件无截断或重叠",
+      "manual_privacy_review": "无凭据或账号资料"
+    }
+  ]
+}

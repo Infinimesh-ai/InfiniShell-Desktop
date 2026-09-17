@@ -183,16 +183,6 @@ fn unsupported_cli_and_missing_skills_do_not_silently_remove_content() {
     let image = image_context();
     assert!(
         prepare_managed_input(
-            Harness::Claude,
-            "保留文本和图片".to_owned(),
-            &[image.clone()],
-            Vec::new(),
-            &store
-        )
-        .is_err()
-    );
-    assert!(
-        prepare_managed_input(
             Harness::Grok,
             "Grok gate".to_owned(),
             &[image.clone()],
@@ -224,6 +214,149 @@ fn unsupported_cli_and_missing_skills_do_not_silently_remove_content() {
         .is_err()
     );
     assert!(!store.exists());
+}
+
+#[test]
+fn claude_png_preparation_preserves_multiline_context_and_durable_asset() {
+    let directory = TempDir::new().unwrap();
+    let store = directory.path().join("local-cli-attachments");
+    let original = image_context();
+    let text = "中文图片说明\nEnglish file context: /project/a.rs\nReview: 修正边界";
+    let input = prepare_managed_input(
+        Harness::Claude,
+        text.to_owned(),
+        &[original.clone()],
+        Vec::new(),
+        &store,
+    )
+    .unwrap();
+    assert_eq!(input.len(), 2);
+    assert_eq!(input[0], InputContent::Text(text.to_owned()));
+    let path = local_image(&input).to_owned();
+    let envelope = serde_json::to_string(&super::super::RuntimeAction::Submit { input }).unwrap();
+    assert!(!envelope.contains(&original.data));
+    let restored = restore_managed_images(vec![path.clone()], &store).unwrap();
+    assert_eq!(restored[0].data, original.data);
+    assert_eq!(restored[0].mime_type, "image/png");
+    assert_eq!(fs::read_dir(store).unwrap().count(), 1);
+    assert_eq!(
+        fs::read(path).unwrap(),
+        STANDARD.decode(original.data).unwrap()
+    );
+}
+
+#[test]
+fn claude_unsupported_image_batches_fail_before_creating_assets() {
+    let directory = TempDir::new().unwrap();
+    let store = directory.path().join("local-cli-attachments");
+    let original = image_context();
+    let mut jpeg_bytes = Cursor::new(Vec::new());
+    image::DynamicImage::new_rgb8(2, 2)
+        .write_to(&mut jpeg_bytes, ImageFormat::Jpeg)
+        .unwrap();
+    let mut jpeg = original.clone();
+    jpeg.data = STANDARD.encode(jpeg_bytes.into_inner());
+    jpeg.mime_type = "image/jpeg".into();
+    assert!(
+        prepare_managed_input(
+            Harness::Claude,
+            "保留全部图片".into(),
+            &[original.clone(), jpeg],
+            Vec::new(),
+            &store,
+        )
+        .is_err()
+    );
+    assert!(!store.exists());
+    assert!(
+        prepare_managed_input(
+            Harness::Claude,
+            "说明".into(),
+            &[original.clone()],
+            vec![skill(directory.path())],
+            &store,
+        )
+        .is_err()
+    );
+    assert!(!store.exists());
+    assert!(
+        prepare_managed_input(
+            Harness::Claude,
+            " \n\t".into(),
+            &[original.clone()],
+            Vec::new(),
+            &store,
+        )
+        .is_err()
+    );
+    assert!(!store.exists());
+    let mut damaged = original.clone();
+    damaged.data = "破损base64".into();
+    assert!(
+        prepare_managed_input(
+            Harness::Claude,
+            "保留全部图片".into(),
+            &[original, damaged],
+            Vec::new(),
+            &store,
+        )
+        .is_err()
+    );
+    assert!(!store.exists());
+}
+
+#[test]
+fn claude_total_frame_and_text_limits_fail_before_persisting_assets() {
+    use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    let directory = TempDir::new().unwrap();
+    let store = directory.path().join("local-cli-attachments");
+    let mut pixels = vec![0u8; 1024 * 1100 * 3];
+    StdRng::seed_from_u64(602).fill_bytes(&mut pixels);
+    let image = image::RgbImage::from_raw(1024, 1100, pixels).unwrap();
+    let mut encoded = Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgb8(image)
+        .write_to(&mut encoded, ImageFormat::Png)
+        .unwrap();
+    let bytes = encoded.into_inner();
+    assert!(bytes.len() < MAX_IMAGE_SIZE_BYTES);
+    let image = ImageContext {
+        data: STANDARD.encode(bytes),
+        mime_type: "image/png".into(),
+        file_name: "两张合格图片.png".into(),
+        is_figma: false,
+    };
+    assert!(
+        prepare_managed_input(
+            Harness::Claude,
+            "总帧预算".into(),
+            &[image.clone(), image],
+            Vec::new(),
+            &store,
+        )
+        .is_err()
+    );
+    assert!(!store.exists());
+    assert!(
+        prepare_managed_input(
+            Harness::Claude,
+            "中".repeat(1024 * 1024 / 3 + 1),
+            &[image_context()],
+            Vec::new(),
+            &store,
+        )
+        .is_err()
+    );
+    assert!(!store.exists());
+    let prepared = prepare_managed_input(
+        Harness::Claude,
+        "中".repeat(1024 * 1024 / 3),
+        &[image_context()],
+        Vec::new(),
+        &store,
+    )
+    .unwrap();
+    assert!(local_image(&prepared).exists());
 }
 
 #[test]
@@ -436,4 +569,37 @@ fn restoring_images_rejects_symlink_assets_and_store() {
         )
         .is_err()
     );
+}
+
+#[test]
+fn grok_preserves_text_context_but_rejects_unverified_attachments_before_writing() {
+    let directory = TempDir::new().unwrap();
+    let store = directory.path().join("local-cli-attachments");
+    let text = "中文与 English\n文件上下文：note.txt\n评审意见：保留末尾换行";
+    assert_eq!(
+        prepare_managed_input(Harness::Grok, text.into(), &[], Vec::new(), &store).unwrap(),
+        vec![InputContent::Text(text.into())]
+    );
+    assert!(
+        prepare_managed_input(
+            Harness::Grok,
+            text.into(),
+            &[],
+            vec![skill(directory.path())],
+            &store
+        )
+        .is_err()
+    );
+    assert!(!store.exists());
+    assert!(
+        prepare_managed_input(
+            Harness::Grok,
+            text.into(),
+            &[image_context()],
+            Vec::new(),
+            &store
+        )
+        .is_err()
+    );
+    assert!(!store.exists());
 }

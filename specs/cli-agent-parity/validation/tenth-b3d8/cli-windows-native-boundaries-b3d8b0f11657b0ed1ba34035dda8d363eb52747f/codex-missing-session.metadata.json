@@ -1,0 +1,17 @@
+{
+  "test": "ai::cli_agent_runtime::codex::tests::live_codex_missing_session_is_not_replaced",
+  "test_case": "missing-session",
+  "scope": "rust_adapter_missing_session",
+  "credentials_provided": false,
+  "model_requests_expected": false,
+  "app_restart_and_ui_verified": false,
+  "test_binary_sha256": "dadaa583278fe00ee289daf821c2ae07d90b92764c050cf312b9fa47134ac33e",
+  "supervisor_binary_sha256": "067da6d2c420a4fff2a62a901d619c5404a4dcd2db4ffac83e9d799fcf6fd96e",
+  "supervised_process_lifecycle": true,
+  "platform": "win32",
+  "commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "worktree_dirty": false,
+  "cli_version": "codex-cli 0.147.0",
+  "test_exit_code": 0,
+  "acceptance_passed": true
+}

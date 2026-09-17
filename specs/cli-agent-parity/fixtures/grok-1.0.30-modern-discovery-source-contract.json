@@ -1,0 +1,145 @@
+{
+  "source_derived": true,
+  "synthetic_example": true,
+  "native_cli_executed": false,
+  "protocol_version": "2026-07-28",
+  "rmcp_version": "3.2.0",
+  "rmcp_crate_checksum_verified": true,
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/f56f204f6290f6531b14d5734eb3e0a10f0eb201/schema/2026-07-28/schema.json",
+      "sha256": "ef70b61f99b6d2e5e3b46863822eab08dff6a45bedc7a08914e0e5b133f40203",
+      "bytes": 181474
+    },
+    {
+      "url": "https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/f56f204f6290f6531b14d5734eb3e0a10f0eb201/schema/2026-07-28/schema.ts",
+      "sha256": "742750af0bb8c716e7030c4977c992b55d1adc4407e9e66997db5846baedc2cd",
+      "bytes": 98426
+    },
+    {
+      "url": "https://static.crates.io/crates/rmcp/rmcp-3.2.0.crate",
+      "sha256": "42b6914fac0be956fe704a38239c3f44a9f841d1b06a5713d2f638065593f5b5",
+      "bytes": 541362
+    },
+    {
+      "url": "https://raw.githubusercontent.com/modelcontextprotocol/rust-sdk/51ccb42993d6eb5075399672ce7a0c21a0e55eea/crates/rmcp/src/model.rs",
+      "sha256": "fc49cdae250ff899812be8b9efb3a33a03ba445603df699df7bedaa33dc004e0",
+      "bytes": 188009
+    },
+    {
+      "url": "https://raw.githubusercontent.com/modelcontextprotocol/rust-sdk/51ccb42993d6eb5075399672ce7a0c21a0e55eea/crates/rmcp/src/service/client.rs",
+      "sha256": "6cef7f5b935922efeff379d56954f1735ea4268046ded332916930aa58bf9c99",
+      "bytes": 94085
+    },
+    {
+      "url": "https://raw.githubusercontent.com/modelcontextprotocol/rust-sdk/51ccb42993d6eb5075399672ce7a0c21a0e55eea/crates/rmcp/src/model/meta.rs",
+      "sha256": "2a6081a34f31486f227522d6f9d6efc334b5ee62ed371104db66c1e020ed8dcc",
+      "bytes": 29376
+    }
+  ],
+  "fixed_binary_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "sdk7_public_observation": {
+    "method": "server/discover",
+    "outer_params_keys": [
+      "message",
+      "serverId"
+    ],
+    "inner_params_keys": [
+      "_meta"
+    ],
+    "metadata_key_sha256": {
+      "io.modelcontextprotocol/protocolVersion": "36a1291978954a62f85d49ec52bde2e81aaf359dd2c893b627c459d5339b8430",
+      "io.modelcontextprotocol/clientCapabilities": "d837de9870326fad496dda7994cb174ad12e9d86b8538f496d2d7d7196dafb32",
+      "io.modelcontextprotocol/clientInfo": "3a8b66fbee3a7182a2137c684e4aaa22c4a0bcb9d3f14742238f3e513bb35f7b"
+    },
+    "metadata_key_names_verified_by_public_hash": true,
+    "native_protocol_version_value_verified": false,
+    "native_metadata_values_copied": false,
+    "native_prompt_acknowledged": false,
+    "native_origin_verified": false,
+    "passed": false
+  },
+  "required_request_metadata": [
+    "io.modelcontextprotocol/protocolVersion",
+    "io.modelcontextprotocol/clientCapabilities"
+  ],
+  "optional_request_metadata": [
+    "io.modelcontextprotocol/clientInfo"
+  ],
+  "required_discovery_result": [
+    "resultType",
+    "supportedVersions",
+    "capabilities",
+    "ttlMs",
+    "cacheScope"
+  ],
+  "required_list_result": [
+    "resultType",
+    "tools",
+    "ttlMs",
+    "cacheScope"
+  ],
+  "required_tool_result": [
+    "resultType",
+    "content"
+  ],
+  "diagnostic_only_fields": [
+    "negotiatedProtocolVersion",
+    "servedToolNames"
+  ],
+  "discovery_request": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "method": "_x.ai/mcp/sdk_call",
+    "params": {
+      "serverId": "infinishell-00000000-0000-0000-0000-000000000000",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "server/discover",
+        "params": {
+          "_meta": {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities": {},
+            "io.modelcontextprotocol/clientInfo": {
+              "name": "public-conformance-fixture",
+              "version": "1.0.0"
+            }
+          }
+        }
+      }
+    }
+  },
+  "discovery_response": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "result": {
+      "jsonrpc": "2.0",
+      "id": 0,
+      "result": {
+        "resultType": "complete",
+        "supportedVersions": [
+          "2026-07-28"
+        ],
+        "capabilities": {
+          "tools": {}
+        },
+        "ttlMs": 0,
+        "cacheScope": "private",
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "infinishell-local-tasks",
+            "version": "0.1.0"
+          }
+        }
+      }
+    }
+  },
+  "boundaries": [
+    "SDK7 只核对公开字段名摘要，不能据此推断实际版本值；此示例日期来自官方规范。",
+    "现代 discovery 不要求 session/prompt/tool 来源，真实 tools/call 来源与父权限门禁仍关闭。",
+    "legacy initialize 仍限 2025-11-25；不能把现代 discovery 计为 initialize。",
+    "此源码夹具不是原生验收；SDK6/SDK7 的失败证据保持原值。",
+    "连接内全期保留 inner-id 与 native fresh transport 重建/fallback 的关系尚未实测，本候选不改变身份缓存架构。"
+  ]
+}

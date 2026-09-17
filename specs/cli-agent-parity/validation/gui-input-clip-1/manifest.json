@@ -1,0 +1,136 @@
+{
+  "evidence_version": 1,
+  "platform": "macOS Apple Silicon",
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "source_snapshot_file_count": 9,
+  "clean_commit_validation": false,
+  "current_full_worktree_validation": false,
+  "files": [
+    {
+      "file": "00-before-fix-en.jpg",
+      "source_file": "00-before-fix-en.png",
+      "sha256": "245ec4ef0de9dc30c84a3a96328d126ca0f5e54b0a283f7f048e7e1c89bc4355",
+      "bytes": 138065,
+      "width": 1229,
+      "height": 768,
+      "image_format": "JPEG",
+      "transcoded": false
+    },
+    {
+      "file": "01-after-fix-above-en.jpg",
+      "source_file": "01-after-fix-above-en.png",
+      "sha256": "93a2bcac66fa00efbfdfc37a232bbb0a9ec981df26071980c142b475c433c158",
+      "bytes": 135624,
+      "width": 1229,
+      "height": 768,
+      "image_format": "JPEG",
+      "transcoded": false
+    },
+    {
+      "file": "02-after-fix-partial-en.jpg",
+      "source_file": "02-after-fix-partial-en.png",
+      "sha256": "47f4e5b25d60f85a68717182ae1a59ad383a4bd2653c0442d488e48533dde1f3",
+      "bytes": 118015,
+      "width": 1229,
+      "height": 768,
+      "image_format": "JPEG",
+      "transcoded": false
+    },
+    {
+      "file": "03-after-fix-below-en.jpg",
+      "source_file": "03-after-fix-below-en.png",
+      "sha256": "d5e583e6bd27cbe9e527788cbd22646508cd2fa72a82febc2e6c68865004fa93",
+      "bytes": 141243,
+      "width": 1229,
+      "height": 768,
+      "image_format": "JPEG",
+      "transcoded": false
+    },
+    {
+      "file": "04-multiline-end-en.jpg",
+      "source_file": "04-multiline-end-en.png",
+      "sha256": "cfbddc988426ef4b2465aedcf31c0ba3c11aceb1982dbe40434db9151c8de1dc",
+      "bytes": 123473,
+      "width": 1229,
+      "height": 768,
+      "image_format": "JPEG",
+      "transcoded": false
+    },
+    {
+      "file": "05-multiline-scroll-select-en.jpg",
+      "source_file": "05-multiline-scroll-select-en.png",
+      "sha256": "9d4dce14965447499b5887833b450e9ee871cbf1186bd44f26e03dd0983c81a0",
+      "bytes": 124164,
+      "width": 1229,
+      "height": 768,
+      "image_format": "JPEG",
+      "transcoded": false
+    },
+    {
+      "file": "06-after-fix-above-zh-CN.jpg",
+      "source_file": "06-after-fix-above-zh-CN.png",
+      "sha256": "04a25eb7fa22b60903e985728c53deb136c89456fe2a3c395d8ccba1fbed104b",
+      "bytes": 146786,
+      "width": 1229,
+      "height": 768,
+      "image_format": "JPEG",
+      "transcoded": false
+    },
+    {
+      "file": "07-after-fix-partial-zh-CN.jpg",
+      "source_file": "07-after-fix-partial-zh-CN.png",
+      "sha256": "f55089ff12be1e0ada7217f1769f2c98d795fb4c84bd1fe5514d363548e45789",
+      "bytes": 123264,
+      "width": 1229,
+      "height": 768,
+      "image_format": "JPEG",
+      "transcoded": false
+    },
+    {
+      "file": "08-after-fix-below-zh-CN.jpg",
+      "source_file": "08-after-fix-below-zh-CN.png",
+      "sha256": "062dd31deb9a6c53196bbee58d980ec86ead65eb7a6b00358ed434dea09895e8",
+      "bytes": 126984,
+      "width": 1229,
+      "height": 768,
+      "image_format": "JPEG",
+      "transcoded": false
+    },
+    {
+      "file": "source-inputs.json",
+      "sha256": "8ec523b0decaa2a30e2e1431e5b58ec2b186b59ee44aae0f75ec8269ff501649",
+      "bytes": 1588
+    },
+    {
+      "file": "gates.json",
+      "sha256": "4bf400566392107256338a8508ab9b8ff61447d28bbafd101fa34d49be8d9e57",
+      "bytes": 2182
+    },
+    {
+      "file": "bundle.json",
+      "sha256": "39e54a6ca8c7ed6a9b34552882cd72d5955b8c789ab8c37282d323c26a09ceb1",
+      "bytes": 2472
+    },
+    {
+      "file": "runtime-binaries.json",
+      "sha256": "6c37ba1f1def892ed70603c18d07b2365e16d79ce3fa770cf4c1ff30523ea733",
+      "bytes": 1969
+    },
+    {
+      "file": "task-state.json",
+      "sha256": "eb973fa3d30220dc889c331f4c80cf2b3f918602ae8cac4bdef60205bba540b2",
+      "bytes": 901
+    },
+    {
+      "file": "privacy-check.json",
+      "sha256": "71862f1528898b6e9f163accd6919c4a84d100d8c4df8498259c6266907c197e",
+      "bytes": 1729
+    }
+  ],
+  "limits": [
+    "输入区 wheel 同时带动外层滚动，未证明滚轮独立消费。",
+    "英文 GUI 验证了中英混排 24 行草稿及 14–24 行选择；简体中文 GUI 验证上方、部分和下方裁剪。",
+    "归档不是当前含固定权限配置的完整根工作区验收，也不是同一干净提交跨平台验收。",
+    "没有发送测试草稿；历史第 9 次 Completed 不能替代当前第 13 次 Disconnected。"
+  ]
+}

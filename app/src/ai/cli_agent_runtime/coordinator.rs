@@ -1,6 +1,7 @@
 //! 托管 CLI 的本地协调器：先提交状态与输入记录，再驱动协议；重启仅加载记录。
 
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 use std::time::{Duration, Instant};
 
@@ -21,17 +22,20 @@ use warpui::r#async::Timer;
 use warpui::{Entity, ModelContext, ModelSpawner, SingletonEntity};
 
 use super::{
-    InputContent, RuntimeAction, RuntimeCommand, RuntimeConnection, RuntimeController,
-    RuntimeError, RuntimeEvent, RuntimeEventKind, SessionOptions, SessionTarget, TurnOutcome,
+    InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand, RuntimeConnection,
+    RuntimeController, RuntimeError, RuntimeEvent, RuntimeEventKind, SessionOptions, SessionTarget,
+    TurnOutcome,
 };
-use crate::ai::local_cli_mailbox::{acknowledge_runtime_message, send_prepared_result};
+use crate::ai::local_cli_mailbox::{
+    acknowledge_runtime_message, dispatch_prepared_result_once, send_prepared_result,
+};
 use crate::persistence::ModelEvent;
 use crate::persistence::local_cli_tasks::{
     LocalCliEnqueueOutcome, acknowledge_message, checkpoint_task, checkpoint_task_with_message,
     enqueue_message, enqueue_task_result, load_messages, load_task_generations, load_tasks,
 };
 use crate::persistence::model::{
-    LocalCliMessage, LocalCliMessageState, LocalCliTask, LocalCliTaskState,
+    LocalCliMessage, LocalCliMessageState, LocalCliReceiptKind, LocalCliTask, LocalCliTaskState,
 };
 
 #[derive(Clone)]
@@ -46,9 +50,14 @@ pub(crate) struct ManagedTaskEndpoint {
 
 impl ManagedTaskEndpoint {
     /// 邮箱落盘期间任务可能已经换代；必须在协议写入前重新核对。
-    pub(crate) async fn send(&self, command: RuntimeCommand) -> Result<(), String> {
-        self.prepare_send(command)
-            .await?
+    pub(crate) async fn send_result(
+        &self,
+        command: RuntimeCommand,
+        message: LocalCliMessage,
+    ) -> Result<(), String> {
+        let mut prepared = self.prepare_send(command).await?;
+        prepared.request.prepared_result = Some(message);
+        prepared
             .commit()
             .await
             .map_err(|_| crate::t!("cli-agent-status-disconnected"))?
@@ -75,6 +84,7 @@ impl ManagedTaskEndpoint {
             request: ManagedRequest {
                 expected_generation: self.generation,
                 from_mailbox: true,
+                prepared_result: None,
                 message_id: command.message_id,
                 action: command.action,
                 reply,
@@ -156,6 +166,167 @@ fn set_claude_pending_input(
     Ok(())
 }
 
+// 原生当前请求加最多 32 条本地等待输入；不删除旧关联后把迟到 ACK 当成新输入。
+const MAX_GROK_PENDING_INPUTS: usize = 33;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct GrokInputLink {
+    message_id: Uuid,
+    submission_generation: i64,
+    runtime_generation: Uuid,
+    native_turn_id: Option<String>,
+}
+
+#[derive(Default)]
+struct GrokInputLinks {
+    pending: Vec<GrokInputLink>,
+    current: Option<GrokInputLink>,
+}
+
+fn grok_input_links(task: &LocalCliTask) -> Result<GrokInputLinks, String> {
+    if task.harness != "grok" {
+        return Ok(GrokInputLinks::default());
+    }
+    let config: serde_json::Value =
+        serde_json::from_str(&task.config_json).map_err(|error| error.to_string())?;
+    let pending: Vec<GrokInputLink> = config
+        .get("grok_pending_inputs")
+        .filter(|value| !value.is_null())
+        .map(|value| serde_json::from_value(value.clone()))
+        .transpose()
+        .map_err(|error| error.to_string())?
+        .unwrap_or_default();
+    let current: Option<GrokInputLink> = config
+        .get("grok_current_input")
+        .filter(|value| !value.is_null())
+        .map(|value| serde_json::from_value(value.clone()))
+        .transpose()
+        .map_err(|error| error.to_string())?;
+    let runtime_generation = config
+        .get("runtime_generation")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|generation| Uuid::parse_str(generation).ok())
+        .filter(|generation| !generation.is_nil());
+    let mut messages = HashSet::new();
+    let mut turns = HashSet::new();
+    if pending.len() + usize::from(current.is_some()) > MAX_GROK_PENDING_INPUTS
+        || current
+            .as_ref()
+            .is_some_and(|input| input.native_turn_id.is_none())
+        || pending.iter().chain(current.iter()).any(|input| {
+            input.submission_generation < 1
+                || input.submission_generation > task.generation
+                || Some(input.runtime_generation) != runtime_generation
+                || !messages.insert(input.message_id)
+                || input.native_turn_id.as_ref().is_some_and(|turn| {
+                    turn.trim().is_empty()
+                        || turn.len() > 4096
+                        || turn.chars().any(char::is_control)
+                        || !turns.insert(turn.clone())
+                })
+        })
+    {
+        return Err(crate::t!("cli-agent-task-invalid-launch"));
+    }
+    Ok(GrokInputLinks { pending, current })
+}
+
+fn set_grok_input_links(task: &mut LocalCliTask, links: &GrokInputLinks) -> Result<(), String> {
+    let mut config: serde_json::Value =
+        serde_json::from_str(&task.config_json).map_err(|error| error.to_string())?;
+    let object = config.as_object_mut().ok_or("本地任务配置无效")?;
+    object.insert("grok_pending_inputs".into(), json!(links.pending));
+    if let Some(current) = &links.current {
+        object.insert("grok_current_input".into(), json!(current));
+    } else {
+        object.remove("grok_current_input");
+    }
+    task.config_json = config.to_string();
+    Ok(())
+}
+
+/// 关联必须指向原提交代的真实消息；待启动回合另外核对已提交的原生 ACK。
+async fn verify_grok_input_message(
+    sender: &SyncSender<ModelEvent>,
+    task: &LocalCliTask,
+    input: &GrokInputLink,
+    require_ack: bool,
+) -> Result<LocalCliMessageState, String> {
+    let messages = load_messages(sender, task.task_id.clone(), input.submission_generation)?
+        .await
+        .map_err(|_| crate::t!("cli-agent-task-save-failed"))??;
+    let message = messages
+        .iter()
+        .find(|message| message.message_id == input.message_id.to_string())
+        .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?;
+    if task.version != 1
+        || message.version != 1
+        || message.sender_task_id != task.task_id
+        || message.recipient_task_id != task.task_id
+        || message.sender_generation != input.submission_generation
+        || message.recipient_generation != input.submission_generation
+        || message.subject != "user_input"
+        || !matches!(
+            serde_json::from_str::<RuntimeAction>(&message.body),
+            Ok(RuntimeAction::Submit { .. })
+        )
+        || !matches!(
+            message.state,
+            LocalCliMessageState::Sent | LocalCliMessageState::Acknowledged
+        )
+        || (message.state == LocalCliMessageState::Acknowledged
+            && (message.receipt_kind != Some(LocalCliReceiptKind::NativeProtocol)
+                || input.native_turn_id.is_none()))
+        || (message.state == LocalCliMessageState::Sent && message.receipt_kind.is_some())
+        || (require_ack && message.state != LocalCliMessageState::Acknowledged)
+    {
+        return Err(crate::t!("cli-agent-task-invalid-launch"));
+    }
+    let original = if input.submission_generation == task.generation {
+        task.clone()
+    } else {
+        load_task_generations(sender, task.task_id.clone())?
+            .await
+            .map_err(|_| crate::t!("cli-agent-task-save-failed"))??
+            .into_iter()
+            .find(|original| original.generation == input.submission_generation)
+            .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?
+    };
+    let original_config: serde_json::Value =
+        serde_json::from_str(&original.config_json).map_err(|error| error.to_string())?;
+    if original.version != 1
+        || original.harness != "grok"
+        || task.native_session_id.as_ref().is_none_or(|session| {
+            session.trim().is_empty()
+                || session.len() > 4096
+                || session.chars().any(char::is_control)
+        })
+        || original.native_session_id != task.native_session_id
+        || original_config["runtime_generation"]
+            .as_str()
+            .and_then(|runtime| Uuid::parse_str(runtime).ok())
+            != Some(input.runtime_generation)
+    {
+        return Err(crate::t!("cli-agent-task-invalid-launch"));
+    }
+    Ok(message.state)
+}
+
+async fn verify_grok_pending_inputs(
+    sender: &SyncSender<ModelEvent>,
+    task: &LocalCliTask,
+    links: &GrokInputLinks,
+    runtime_generation: Uuid,
+) -> Result<(), String> {
+    for input in &links.pending {
+        if input.runtime_generation != runtime_generation {
+            return Err(crate::t!("cli-agent-task-invalid-launch"));
+        }
+        verify_grok_input_message(sender, task, input, false).await?;
+    }
+    Ok(())
+}
+
 pub(crate) enum LocalCLITaskCoordinatorEvent {
     Changed,
     /// 相关消息已尝试持久提交；界面重新读取状态，不从此通知推断原生接收。
@@ -189,6 +360,7 @@ struct ManagedTaskEntry {
 struct ManagedRequest {
     expected_generation: i64,
     from_mailbox: bool,
+    prepared_result: Option<LocalCliMessage>,
     message_id: Uuid,
     action: RuntimeAction,
     reply: oneshot::Sender<Result<(), String>>,
@@ -415,6 +587,15 @@ impl LocalCLITaskCoordinator {
                     }
                     None => None,
                 };
+                options.claude_profile = serde_json::from_value(
+                    config.get("claude_profile").cloned().unwrap_or_default(),
+                )
+                .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+                if options.permission_policy == PermissionPolicy::ClaudeRestrictedFilesV1
+                    && options.claude_profile.is_none()
+                {
+                    return Err(crate::t!("cli-agent-task-invalid-launch"));
+                }
             }
         }
         let sender = self
@@ -424,14 +605,13 @@ impl LocalCLITaskCoordinator {
         let connection = match Harness::parse_orchestration_harness(&task.harness) {
             Some(Harness::Codex) => super::codex::connect(options.clone()),
             Some(Harness::Claude) => super::claude::connect(options.clone()),
-            Some(
-                Harness::Grok
-                | Harness::Oz
-                | Harness::Gemini
-                | Harness::OpenCode
-                | Harness::Unknown,
-            )
-            | None => {
+            Some(Harness::Grok) => {
+                if task.parent_task_id.is_some() || task.parent_generation.is_some() {
+                    return Err(crate::t!("cli-agent-grok-managed-unverified"));
+                }
+                super::grok::connect(options.clone())
+            }
+            Some(Harness::Oz | Harness::Gemini | Harness::OpenCode | Harness::Unknown) | None => {
                 return Err(crate::t!("cli-agent-managed-version-unavailable"));
             }
         }
@@ -519,6 +699,7 @@ impl LocalCLITaskCoordinator {
             .try_send(ManagedRequest {
                 expected_generation: entry.snapshot.task.generation,
                 from_mailbox: false,
+                prepared_result: None,
                 message_id,
                 action,
                 reply,
@@ -546,14 +727,17 @@ impl LocalCLITaskCoordinator {
 
     /// 只向当前活跃连接首次投递已提交的子任务结果；恢复记录不会自动启动父任务。
     fn deliver_result(&mut self, message: LocalCliMessage, ctx: &mut ModelContext<Self>) {
-        let Some(sender) = self.sender.clone() else {
+        if self.sender.is_none() {
             return;
-        };
+        }
         let Some(endpoint) = self.endpoint(&message.recipient_task_id) else {
             return;
         };
         if endpoint.generation != message.recipient_generation
-            || (endpoint.harness == Harness::Claude && endpoint.active_turn_id.is_some())
+            || self
+                .entries
+                .get(&endpoint.task_id)
+                .is_some_and(|entry| claude_input_pending(&entry.snapshot.task))
         {
             return;
         }
@@ -563,7 +747,7 @@ impl LocalCLITaskCoordinator {
         let sender_task_id = message.sender_task_id.clone();
         let recipient_task_id = message.recipient_task_id.clone();
         ctx.spawn(
-            async move { send_prepared_result(&sender, endpoint, message).await },
+            async move { send_prepared_result(endpoint, message).await },
             move |model, result, ctx| {
                 if let Err(error) = result
                     && let Some(entry) = model.entries.get_mut(&task_id)
@@ -578,6 +762,59 @@ impl LocalCLITaskCoordinator {
                 });
                 ctx.emit(LocalCLITaskCoordinatorEvent::Changed);
                 ctx.notify();
+            },
+        );
+    }
+
+    /// 仅重试从未领取的结果；原生已接收或交付不确定的消息不能自动重发。
+    fn retry_pending_results(&mut self, task_id: &str, ctx: &mut ModelContext<Self>) {
+        let Some(endpoint) = self.endpoint(task_id) else {
+            return;
+        };
+        if self
+            .entries
+            .get(task_id)
+            .is_some_and(|entry| claude_input_pending(&entry.snapshot.task))
+        {
+            return;
+        }
+        let Some(sender) = self.sender.clone() else {
+            return;
+        };
+        let task_id = endpoint.task_id;
+        let error_task_id = task_id.clone();
+        let generation = endpoint.generation;
+        let token = endpoint.runtime_generation;
+        ctx.spawn(
+            async move {
+                let messages = load_messages(&sender, task_id.clone(), generation)?
+                    .await
+                    .map_err(|_| "结果信箱读取确认已关闭".to_owned())??;
+                Ok::<_, String>((
+                    task_id,
+                    messages.into_iter().find(|message| {
+                        message.subject == "local_task_result"
+                            && message.state == LocalCliMessageState::Queued
+                    }),
+                ))
+            },
+            move |model, result, ctx| {
+                if result.is_err()
+                    && let Some(entry) = model.entries.get_mut(&error_task_id)
+                    && entry.token == token
+                    && entry.snapshot.task.generation == generation
+                {
+                    entry.snapshot.error = Some(crate::t!("cli-agent-message-delivery-failed"));
+                    ctx.emit(LocalCLITaskCoordinatorEvent::Changed);
+                    ctx.notify();
+                }
+                if let Ok((task_id, Some(message))) = result
+                    && model.entries.get(&task_id).is_some_and(|entry| {
+                        entry.token == token && entry.snapshot.task.generation == generation
+                    })
+                {
+                    model.deliver_result(message, ctx);
+                }
             },
         );
     }
@@ -599,6 +836,15 @@ impl LocalCLITaskCoordinator {
         let task = snapshot.task.clone();
         let previous_turn = entry.snapshot.active_turn_id.clone();
         entry.snapshot = snapshot;
+        let retry_results = event.as_ref().is_some_and(|event| {
+            matches!(
+                event.kind,
+                RuntimeEventKind::SessionReady { .. }
+                    | RuntimeEventKind::TurnStarted { .. }
+                    | RuntimeEventKind::InputJoined { .. }
+                    | RuntimeEventKind::RequestFailed { .. }
+            )
+        });
         if let Some(event) = &event {
             match &event.kind {
                 RuntimeEventKind::LocalToolRequested { request } => {
@@ -625,6 +871,10 @@ impl LocalCLITaskCoordinator {
         }
         if let Some(event) = event {
             ctx.emit(LocalCLITaskCoordinatorEvent::Runtime { task, event });
+        }
+        if retry_results {
+            let task_id = entry.snapshot.task.task_id.clone();
+            self.retry_pending_results(&task_id, ctx);
         }
         ctx.emit(LocalCLITaskCoordinatorEvent::Changed);
         ctx.notify();
@@ -655,7 +905,7 @@ async fn run_managed_task(
     initial_input: Option<(Uuid, Vec<InputContent>)>,
     token: Uuid,
     sender: SyncSender<ModelEvent>,
-    options: SessionOptions,
+    mut options: SessionOptions,
     connection: RuntimeConnection,
     mut commands: mpsc::Receiver<ManagedRequest>,
     spawner: ModelSpawner<LocalCLITaskCoordinator>,
@@ -688,12 +938,19 @@ async fn run_managed_task(
         serde_json::to_value(options.permission_policy).map_err(|error| error.to_string())?;
     config["permission_ceiling"] =
         serde_json::to_value(&options.permission_ceiling).map_err(|error| error.to_string())?;
+    config["claude_profile"] =
+        serde_json::to_value(&options.claude_profile).map_err(|error| error.to_string())?;
     config["runtime_generation"] = json!(options.generation);
     // 旧进程已确认退出后才能走到这里；旧输入保留在消息表，恢复不会自动重投。
     if snapshot.task.harness == "claude" {
         let object = config.as_object_mut().ok_or("本地任务配置无效")?;
         object.remove("claude_pending_input");
         object.remove("claude_current_input");
+    } else if snapshot.task.harness == "grok" {
+        let object = config.as_object_mut().ok_or("本地任务配置无效")?;
+        // 原进程的等待输入只留在历史记录；新进程继续历史不自动投递它们。
+        object.remove("grok_pending_inputs");
+        object.remove("grok_current_input");
     }
     snapshot.task.config_json = config.to_string();
     commit_transition(&sender, &mut snapshot.task, &unclaimed).await?;
@@ -792,8 +1049,13 @@ async fn run_managed_task(
                                 AbortHandle::abort(&handle);
                             }
                         }
-                        RuntimeEventKind::TurnFinished { .. }
-                        | RuntimeEventKind::Disconnected { .. } => {
+                        RuntimeEventKind::TurnFinished { turn_id, .. }
+                            if snapshot.active_turn_id.as_ref() == Some(turn_id) =>
+                        {
+                            tool_abort_handles.clear();
+                            tool_calls.clear();
+                        }
+                        RuntimeEventKind::Disconnected { .. } => {
                             tool_abort_handles.clear();
                             tool_calls.clear();
                         }
@@ -810,19 +1072,27 @@ async fn run_managed_task(
                     {
                         continue;
                     }
-                    if matches!(event.kind, RuntimeEventKind::SessionReady { .. })
-                        && let Some((message_id, action)) = initial_request.take()
-                    {
-                        send_user_request(
-                            &sender,
-                            &mut snapshot,
-                            &controller,
-                            token,
-                            message_id,
-                            action,
-                            true,
+                    if matches!(event.kind, RuntimeEventKind::SessionReady { .. }) {
+                        // 固定策略已随就绪记录提交，后续子任务只能继承这份已验证策略。
+                        let config: serde_json::Value =
+                            serde_json::from_str(&snapshot.task.config_json)
+                                .map_err(|error| error.to_string())?;
+                        options.claude_profile = serde_json::from_value(
+                            config.get("claude_profile").cloned().unwrap_or_default(),
                         )
-                        .await?;
+                        .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+                        if let Some((message_id, action)) = initial_request.take() {
+                            send_user_request(
+                                &sender,
+                                &mut snapshot,
+                                &controller,
+                                token,
+                                message_id,
+                                action,
+                                true,
+                            )
+                            .await?;
+                        }
                     }
                     if matches!(event.kind, RuntimeEventKind::TurnFinished { .. })
                         && snapshot.task.state.is_terminal()
@@ -947,6 +1217,7 @@ async fn run_managed_task(
                                 token,
                                 request.message_id,
                                 request.action,
+                                request.prepared_result,
                             )
                             .await
                         }
@@ -1132,13 +1403,22 @@ async fn send_user_request(
         RuntimeAction::Submit { .. } | RuntimeAction::Steer { .. }
     );
     if is_input {
-        let messages = load_messages(
-            sender,
-            snapshot.task.task_id.clone(),
-            snapshot.task.generation,
-        )?
-        .await
-        .map_err(|_| "输入记录读取确认已关闭".to_owned())??;
+        let receipt_generation = if snapshot.task.harness == "grok" {
+            let links = grok_input_links(&snapshot.task)?;
+            links
+                .pending
+                .iter()
+                .chain(links.current.iter())
+                .find(|input| input.message_id == message_id)
+                .map_or(snapshot.task.generation, |input| {
+                    input.submission_generation
+                })
+        } else {
+            snapshot.task.generation
+        };
+        let messages = load_messages(sender, snapshot.task.task_id.clone(), receipt_generation)?
+            .await
+            .map_err(|_| "输入记录读取确认已关闭".to_owned())??;
         if let Some(previous) = messages
             .iter()
             .find(|message| message.message_id == message_id.to_string())
@@ -1153,7 +1433,46 @@ async fn send_user_request(
         }
     }
     let mut input_prepared = allow_prepared;
-    if snapshot.task.harness == "claude" && matches!(action, RuntimeAction::Submit { .. }) {
+    if snapshot.task.harness == "grok" && matches!(action, RuntimeAction::Submit { .. }) {
+        let previous = snapshot.task.clone();
+        let mut links = grok_input_links(&previous)?;
+        let limit = if snapshot.active_turn_id.is_some() {
+            MAX_GROK_PENDING_INPUTS - 1
+        } else {
+            MAX_GROK_PENDING_INPUTS
+        };
+        if links.pending.len() >= limit {
+            return Err(crate::t!("cli-agent-grok-managed-unverified"));
+        }
+        let mut updated = if previous.state.is_terminal() {
+            // 新代会取消旧 Queued 消息，只有已派发的等待输入才可以保留。
+            verify_grok_pending_inputs(sender, &previous, &links, token).await?;
+            links.current = None;
+            next_task_generation(&previous)?
+        } else {
+            previous.clone()
+        };
+        links.pending.push(GrokInputLink {
+            message_id,
+            submission_generation: updated.generation,
+            runtime_generation: token,
+            native_turn_id: None,
+        });
+        set_grok_input_links(&mut updated, &links)?;
+        if updated.generation == previous.generation {
+            updated.revision = previous.revision.checked_add(1).ok_or("任务修订号已耗尽")?;
+        }
+        let message = input_message(&updated, message_id, &action)?;
+        // 初始准备输入和队列关联在同一事务核对，不把已有消息改投到新代。
+        checkpoint_task_with_message(sender, updated.clone(), Some(previous.generation), message)?
+            .await
+            .map_err(|_| crate::t!("cli-agent-task-save-failed"))??;
+        snapshot.task = updated;
+        if snapshot.task.generation != previous.generation {
+            snapshot.output.clear();
+        }
+        input_prepared = true;
+    } else if snapshot.task.harness == "claude" && matches!(action, RuntimeAction::Submit { .. }) {
         if claude_input_pending(&snapshot.task) {
             return Err(crate::t!("cli-agent-claude-queue-full"));
         }
@@ -1230,6 +1549,13 @@ async fn send_user_request(
             )?
             .await
             .map_err(|_| "输入失败记录确认已关闭".to_owned())??;
+            if snapshot.task.harness == "grok" {
+                let previous = snapshot.task.clone();
+                let mut links = grok_input_links(&previous)?;
+                links.pending.retain(|input| input.message_id != message_id);
+                set_grok_input_links(&mut snapshot.task, &links)?;
+                commit_transition(sender, &mut snapshot.task, &previous).await?;
+            }
         }
         return Err(error.to_string());
     }
@@ -1243,11 +1569,67 @@ async fn send_mailbox_request(
     token: Uuid,
     message_id: Uuid,
     action: RuntimeAction,
+    prepared_result: Option<LocalCliMessage>,
+) -> Result<(), String> {
+    if let Some(message) = &prepared_result {
+        if message.subject != "local_task_result"
+            || message.state != LocalCliMessageState::Queued
+            || message.recipient_task_id != snapshot.task.task_id
+            || message.recipient_generation != snapshot.task.generation
+            || message.message_id != message_id.to_string()
+        {
+            return Err(crate::t!("cli-agent-task-invalid-launch"));
+        }
+        let mut stored = load_messages(
+            sender,
+            snapshot.task.task_id.clone(),
+            snapshot.task.generation,
+        )?
+        .await
+        .map_err(|_| "结果状态读取确认已关闭".to_owned())??
+        .into_iter()
+        .find(|stored| stored.message_id == message.message_id)
+        .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?;
+        let state = stored.state;
+        stored.state = LocalCliMessageState::Queued;
+        stored.receipt_kind = None;
+        if stored != *message {
+            return Err(crate::t!("cli-agent-task-invalid-launch"));
+        }
+        // 同一结果的重复派发不占新槽，也不能把真实待启动输入误报成失败。
+        if state != LocalCliMessageState::Queued {
+            return Ok(());
+        }
+    }
+    // 队列占用与结果领取在同一 worker 中处理；明确未写入的结果仍保留 Queued。
+    if snapshot.task.harness == "claude"
+        && matches!(action, RuntimeAction::Submit { .. })
+        && claude_input_pending(&snapshot.task)
+    {
+        if prepared_result.is_some() {
+            // 自动结果等待原生 started/joined 清槽后重试；延期不代表接收或失败。
+            return Ok(());
+        }
+        return Err(crate::t!("cli-agent-claude-queue-full"));
+    }
+    if let Some(message) = prepared_result {
+        return dispatch_prepared_result_once(sender, message, || {
+            send_mailbox_action(sender, snapshot, controller, token, message_id, action)
+        })
+        .await;
+    }
+    send_mailbox_action(sender, snapshot, controller, token, message_id, action).await
+}
+
+async fn send_mailbox_action(
+    sender: &SyncSender<ModelEvent>,
+    snapshot: &mut ManagedTaskSnapshot,
+    controller: &RuntimeController,
+    token: Uuid,
+    message_id: Uuid,
+    action: RuntimeAction,
 ) -> Result<(), String> {
     if snapshot.task.harness == "claude" && matches!(action, RuntimeAction::Submit { .. }) {
-        if claude_input_pending(&snapshot.task) {
-            return Err(crate::t!("cli-agent-claude-queue-full"));
-        }
         let previous = snapshot.task.clone();
         let pending = ClaudePendingInput {
             message_id,
@@ -1303,13 +1685,38 @@ fn runtime_event_is_stale(
     finished_turns: &HashSet<String>,
 ) -> Result<bool, String> {
     let pending = claude_pending_input(&snapshot.task)?;
+    let joined_result = match &event.kind {
+        RuntimeEventKind::TurnFinished { turn_id, .. } => {
+            claude_input_is_joined(snapshot, turn_id)?
+        }
+        _ => false,
+    };
     Ok(
         matches!(&event.kind, RuntimeEventKind::TurnStarted { turn_id }
         if snapshot.active_turn_id.as_ref() == Some(turn_id) || finished_turns.contains(turn_id))
             || matches!(&event.kind, RuntimeEventKind::TurnFinished { turn_id, .. }
             if snapshot.active_turn_id.as_ref() != Some(turn_id)
-                && !pending.as_ref().is_some_and(|input| input.message_id.to_string() == *turn_id)),
+                && !pending.as_ref().is_some_and(|input| input.message_id.to_string() == *turn_id)
+                && !joined_result),
     )
+}
+
+fn claude_input_is_joined(snapshot: &ManagedTaskSnapshot, input_id: &str) -> Result<bool, String> {
+    if snapshot.task.harness != "claude" {
+        return Ok(false);
+    }
+    let config: serde_json::Value =
+        serde_json::from_str(&snapshot.task.config_json).map_err(|error| error.to_string())?;
+    Ok(config
+        .get("claude_joined_inputs")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|inputs| {
+            inputs.iter().any(|input| {
+                input["message_id"].as_str() == Some(input_id)
+                    && input["turn_id"].as_str() == snapshot.active_turn_id.as_deref()
+                    && input.get("outcome").is_none()
+            })
+        }))
 }
 
 async fn commit_runtime_event(
@@ -1319,8 +1726,146 @@ async fn commit_runtime_event(
     accepted_turns: &mut HashSet<String>,
     finished_turns: &mut HashSet<String>,
 ) -> Result<bool, String> {
-    if runtime_event_is_stale(snapshot, event, finished_turns)? {
+    let mut grok_links = grok_input_links(&snapshot.task)?;
+    let mut grok_failed_before_start = false;
+    if snapshot.task.harness == "grok"
+        && snapshot.connected
+        && snapshot.ready
+        && snapshot.active_turn_id.is_none()
+        && let RuntimeEventKind::TurnFinished {
+            turn_id,
+            outcome: TurnOutcome::Failed { .. },
+            ..
+        } = &event.kind
+        && let Some(input) = grok_links
+            .pending
+            .first()
+            .filter(|input| input.native_turn_id.as_ref() == Some(turn_id))
+    {
+        if input.runtime_generation != event.generation
+            || event.native_session_id.is_none()
+            || event.native_session_id != snapshot.task.native_session_id
+            || finished_turns.contains(turn_id)
+            || matches!(
+                snapshot.task.state,
+                LocalCliTaskState::Disconnected
+                    | LocalCliTaskState::Unconfirmed
+                    | LocalCliTaskState::Unknown
+            )
+        {
+            return Ok(false);
+        }
+        // 队首已被原生确认后也可能在 started 前失败；不能丢弃失败或虚构开始。
+        verify_grok_input_message(sender, &snapshot.task, input, true).await?;
+        grok_links.current = Some(grok_links.pending.remove(0));
+        grok_failed_before_start = true;
+    }
+    if !grok_failed_before_start && runtime_event_is_stale(snapshot, event, finished_turns)? {
         return Ok(false);
+    }
+    let mut grok_receipt_generation = None;
+    let mut grok_started = false;
+    let mut grok_failed_input = None;
+    if snapshot.task.harness == "grok" {
+        if let RuntimeEventKind::MessageAccepted {
+            message_id,
+            turn_id,
+        } = &event.kind
+        {
+            let turn_id = turn_id
+                .as_ref()
+                .filter(|turn| {
+                    !turn.trim().is_empty()
+                        && turn.len() <= 4096
+                        && !turn.chars().any(char::is_control)
+                })
+                .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?;
+            if finished_turns.contains(turn_id) {
+                return Ok(false);
+            }
+            let input = if let Some(index) = grok_links
+                .pending
+                .iter()
+                .position(|input| input.message_id == *message_id)
+            {
+                if index != 0
+                    || grok_links
+                        .current
+                        .as_ref()
+                        .is_some_and(|input| input.native_turn_id.as_ref() == Some(turn_id))
+                    || grok_links.pending[index]
+                        .native_turn_id
+                        .as_ref()
+                        .is_some_and(|previous| previous != turn_id)
+                {
+                    return Err(crate::t!("cli-agent-task-invalid-launch"));
+                }
+                &mut grok_links.pending[index]
+            } else if let Some(input) = grok_links
+                .current
+                .as_mut()
+                .filter(|input| input.message_id == *message_id)
+            {
+                if input.native_turn_id.as_ref() != Some(turn_id) {
+                    return Err(crate::t!("cli-agent-task-invalid-launch"));
+                }
+                if snapshot.task.state.is_terminal() {
+                    return Ok(false);
+                }
+                input
+            } else {
+                return Err(crate::t!("cli-agent-task-invalid-launch"));
+            };
+            if input.runtime_generation != event.generation {
+                return Ok(false);
+            }
+            if event.native_session_id.is_none()
+                || event.native_session_id != snapshot.task.native_session_id
+            {
+                return Err(crate::t!("cli-agent-task-invalid-launch"));
+            }
+            let state = verify_grok_input_message(sender, &snapshot.task, input, false).await?;
+            if state == LocalCliMessageState::Acknowledged {
+                if input.native_turn_id.as_ref() != Some(turn_id) {
+                    return Err(crate::t!("cli-agent-task-invalid-launch"));
+                }
+                // 原生重复确认只核对已提交的原回执，不能跨代再次变更消息状态。
+                return Ok(false);
+            }
+            grok_receipt_generation = Some(input.submission_generation);
+            input.native_turn_id = Some(turn_id.clone());
+        } else if let RuntimeEventKind::TurnStarted { turn_id } = &event.kind {
+            let input = grok_links
+                .pending
+                .first()
+                .filter(|input| input.native_turn_id.as_ref() == Some(turn_id))
+                .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?;
+            if input.runtime_generation != event.generation {
+                return Ok(false);
+            }
+            if !snapshot.connected
+                || !snapshot.ready
+                || snapshot.active_turn_id.is_some()
+                || event.native_session_id.is_none()
+                || event.native_session_id != snapshot.task.native_session_id
+            {
+                return Err(crate::t!("cli-agent-task-invalid-launch"));
+            }
+            verify_grok_input_message(sender, &snapshot.task, input, true).await?;
+            grok_links.current = Some(grok_links.pending.remove(0));
+            grok_started = true;
+        } else if let RuntimeEventKind::RequestFailed { message_id, .. } = &event.kind
+            && let Some(index) = grok_links
+                .pending
+                .iter()
+                .position(|input| input.message_id == *message_id)
+        {
+            if grok_links.pending[index].runtime_generation != event.generation {
+                return Ok(false);
+            }
+            grok_receipt_generation = Some(grok_links.pending[index].submission_generation);
+            grok_failed_input = Some(*message_id);
+        }
     }
     let pending = claude_pending_input(&snapshot.task)?;
     // 已接收而尚未 started 的下一轮不能被当成当前轮的完成或取消。
@@ -1362,19 +1907,54 @@ async fn commit_runtime_event(
             return Err(crate::t!("cli-agent-claude-queue-uncertain"));
         }
         if snapshot.task.state.is_terminal() {
-            if !accepted_turns.contains(turn_id) {
+            if !grok_started && !accepted_turns.contains(turn_id) {
                 return Err("未经确认的新回合不能重新打开任务".to_owned());
             }
             let previous = snapshot.task.clone();
             let mut next = next_task_generation(&previous)?;
+            if grok_started {
+                verify_grok_pending_inputs(sender, &previous, &grok_links, event.generation)
+                    .await?;
+                // 自动开新代与真实回合关联一起落盘，崩溃后也保留原提交身份。
+                set_grok_input_links(&mut next, &grok_links)?;
+            }
             commit_transition(sender, &mut next, &previous).await?;
             snapshot.task = next;
         }
         accepted_turns.remove(turn_id);
     }
+    if grok_failed_before_start && snapshot.task.state.is_terminal() {
+        let previous = snapshot.task.clone();
+        verify_grok_pending_inputs(sender, &previous, &grok_links, event.generation).await?;
+        let mut next = next_task_generation(&previous)?;
+        set_grok_input_links(&mut next, &grok_links)?;
+        commit_transition(sender, &mut next, &previous).await?;
+        snapshot.task = next;
+    }
+    if let RuntimeEventKind::InputJoined {
+        message_id,
+        turn_id,
+    } = &event.kind
+    {
+        if snapshot.task.harness != "claude"
+            || !snapshot.connected
+            || !snapshot.ready
+            || snapshot.active_turn_id.as_ref() != Some(turn_id)
+            || !accepted_turns.contains(&message_id.to_string())
+            || !pending.as_ref().is_some_and(|input| {
+                input.message_id == *message_id
+                    && input.submission_generation == snapshot.task.generation
+            })
+        {
+            return Err(crate::t!("cli-agent-claude-queue-uncertain"));
+        }
+        accepted_turns.remove(&message_id.to_string());
+    }
     let previous = snapshot.task.clone();
     let mut updated = snapshot.clone();
-    if snapshot.task.harness == "claude" {
+    if snapshot.task.harness == "grok" {
+        set_grok_input_links(&mut updated.task, &grok_links)?;
+    } else if snapshot.task.harness == "claude" {
         if let RuntimeEventKind::TurnStarted { turn_id } = &event.kind {
             set_claude_pending_input(&mut updated.task, None)?;
             let mut config: serde_json::Value = serde_json::from_str(&updated.task.config_json)
@@ -1385,28 +1965,90 @@ async fn commit_runtime_event(
                 "submission_generation": pending.as_ref().map(|input| input.submission_generation),
             });
             updated.task.config_json = config.to_string();
+        } else if matches!(&event.kind, RuntimeEventKind::InputJoined { .. }) {
+            set_claude_pending_input(&mut updated.task, None)?;
         } else if matches!(&event.kind, RuntimeEventKind::RequestFailed { message_id, .. }
             if pending.as_ref().is_some_and(|input| input.message_id == *message_id))
         {
             set_claude_pending_input(&mut updated.task, None)?;
         }
     }
-    apply_runtime_event(&mut updated, event)?;
+    if grok_failed_before_start && let RuntimeEventKind::TurnFinished { output, .. } = &event.kind {
+        // 此结果只保存真实失败及原提交关联，不生成 TurnStarted，也不改已确认的消息。
+        updated.task.state = LocalCliTaskState::Failed;
+        updated.task.result = Some(output.clone());
+        updated.task.terminal_evidence = Some(
+            json!({"native_session_id":event.native_session_id,"event":event.kind}).to_string(),
+        );
+        updated.output = output.clone();
+        updated.approvals.clear();
+    } else {
+        apply_runtime_event(&mut updated, event)?;
+    }
     if updated.task != previous {
         commit_transition(sender, &mut updated.task, &previous).await?;
     }
     *snapshot = updated;
-    acknowledge_runtime_message(
+    let receipt = acknowledge_runtime_message(
         sender,
         &snapshot.task.task_id,
-        snapshot.task.generation,
+        grok_receipt_generation.unwrap_or(snapshot.task.generation),
         &event.kind,
     )
     .await?;
+    if grok_receipt_generation.is_some() && receipt.is_none() {
+        return Err(crate::t!("cli-agent-task-invalid-launch"));
+    }
+    if let Some(message_id) = grok_failed_input {
+        // 先以仍然持久的等待关联核验失败回执，再清槽；跨代失败不能借无关联写回。
+        let previous = snapshot.task.clone();
+        grok_links
+            .pending
+            .retain(|input| input.message_id != message_id);
+        set_grok_input_links(&mut snapshot.task, &grok_links)?;
+        commit_transition(sender, &mut snapshot.task, &previous).await?;
+    }
     if let RuntimeEventKind::TurnFinished { turn_id, .. } = &event.kind {
+        if grok_failed_before_start {
+            accepted_turns.remove(turn_id);
+        }
         finished_turns.insert(turn_id.clone());
     }
     Ok(true)
+}
+
+fn verified_claude_profile(
+    task: &LocalCliTask,
+    config: &serde_json::Value,
+    effective_permissions: &serde_json::Value,
+) -> Result<super::permissions::ClaudeRestrictedFilesV1, String> {
+    let reject = || crate::t!("cli-agent-task-invalid-launch");
+    if task.harness != "claude"
+        || effective_permissions.get("fixedProfileVerified") != Some(&json!(true))
+        || effective_permissions.get("permissionMode") != Some(&json!("plan"))
+    {
+        return Err(reject());
+    }
+    let profile: super::permissions::ClaudeRestrictedFilesV1 = serde_json::from_value(
+        effective_permissions
+            .get("claudeRestrictedFilesV1")
+            .cloned()
+            .ok_or_else(reject)?,
+    )
+    .map_err(|_| reject())?;
+    profile
+        .validate(&PathBuf::from(&task.working_directory))
+        .map_err(|error| error.to_string())?;
+    let previous: Option<super::permissions::ClaudeRestrictedFilesV1> =
+        serde_json::from_value(config.get("claude_profile").cloned().unwrap_or_default())
+            .map_err(|_| reject())?;
+    if previous
+        .as_ref()
+        .is_some_and(|previous| !profile.same_scope(previous))
+    {
+        return Err(reject());
+    }
+    Ok(profile)
 }
 
 fn apply_runtime_event(
@@ -1432,10 +2074,19 @@ fn apply_runtime_event(
             let version = match snapshot.task.harness.as_str() {
                 "codex" => "0.147.0",
                 "claude" => "2.1.273",
+                "grok" => "1.0.30",
                 _ => return Err("未验证的 CLI 不得进入托管就绪状态".to_owned()),
             };
             let mut config: serde_json::Value = serde_json::from_str(&snapshot.task.config_json)
                 .map_err(|error| error.to_string())?;
+            if config.get("permission_policy")
+                == Some(&json!(PermissionPolicy::ClaudeRestrictedFilesV1))
+            {
+                let profile =
+                    verified_claude_profile(&snapshot.task, &config, effective_permissions)?;
+                config["claude_profile"] =
+                    serde_json::to_value(profile).map_err(|error| error.to_string())?;
+            }
             let object = config.as_object_mut().ok_or("本地任务配置无效")?;
             object.insert("cli_version".into(), version.into());
             object.insert(
@@ -1445,6 +2096,30 @@ fn apply_runtime_event(
             snapshot.task.config_json = config.to_string();
         }
         RuntimeEventKind::MessageAccepted { .. } | RuntimeEventKind::CommandDispatched { .. } => {}
+        RuntimeEventKind::InputJoined {
+            message_id,
+            turn_id,
+        } => {
+            let mut config: serde_json::Value = serde_json::from_str(&snapshot.task.config_json)
+                .map_err(|error| error.to_string())?;
+            let inputs = config
+                .as_object_mut()
+                .ok_or("本地任务配置无效")?
+                .entry("claude_joined_inputs")
+                .or_insert_with(|| json!([]))
+                .as_array_mut()
+                .ok_or("本地任务合并输入记录无效")?;
+            if inputs.len() >= 1024
+                || inputs
+                    .iter()
+                    .any(|input| input["message_id"] == message_id.to_string())
+            {
+                return Err("本地任务合并输入身份重复或超过记录限制".to_owned());
+            }
+            inputs.push(json!({"message_id":message_id,"turn_id":turn_id,
+                "submission_generation":snapshot.task.generation}));
+            snapshot.task.config_json = config.to_string();
+        }
         RuntimeEventKind::TurnStarted { turn_id } => {
             if snapshot.active_turn_id.as_ref() == Some(turn_id) {
                 return Ok(());
@@ -1508,8 +2183,38 @@ fn apply_runtime_event(
             outcome,
             output,
         } => {
+            if claude_input_is_joined(snapshot, turn_id)? {
+                let mut config: serde_json::Value =
+                    serde_json::from_str(&snapshot.task.config_json)
+                        .map_err(|error| error.to_string())?;
+                let input = config["claude_joined_inputs"]
+                    .as_array_mut()
+                    .and_then(|inputs| {
+                        inputs
+                            .iter_mut()
+                            .find(|input| input["message_id"] == *turn_id)
+                    })
+                    .ok_or("本地任务合并输入记录丢失")?;
+                // 只记录明确关联此输入的原生结果，不将它当作另一个执行回合。
+                input["outcome"] = json!(outcome);
+                snapshot.task.config_json = config.to_string();
+                return Ok(());
+            }
             if snapshot.active_turn_id.as_ref() != Some(turn_id) {
                 return Ok(());
+            }
+            let config: serde_json::Value = serde_json::from_str(&snapshot.task.config_json)
+                .map_err(|error| error.to_string())?;
+            if config
+                .get("claude_joined_inputs")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|inputs| {
+                    inputs.iter().any(|input| {
+                        input["turn_id"].as_str() == Some(turn_id) && input.get("outcome").is_none()
+                    })
+                })
+            {
+                return Err(crate::t!("cli-agent-claude-queue-uncertain"));
             }
             snapshot.task.state = match outcome {
                 TurnOutcome::Completed => LocalCliTaskState::Completed,
@@ -1560,3 +2265,11 @@ async fn commit_transition(
 #[cfg(test)]
 #[path = "coordinator_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "claude_coordinator_live_tests.rs"]
+mod claude_live_tests;
+
+#[cfg(test)]
+#[path = "grok_coordinator_live_tests.rs"]
+mod grok_live_tests;

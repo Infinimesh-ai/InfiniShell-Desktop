@@ -132,7 +132,8 @@ impl fmt::Debug for HarnessKind {
 pub(crate) fn harness_kind(harness: Harness) -> Result<HarnessKind, AgentDriverError> {
     match harness {
         Harness::Oz => Ok(HarnessKind::Oz),
-        Harness::Claude => Ok(HarnessKind::ThirdParty(Box::new(ClaudeHarness))),
+        // 旧独立 Claude TUI driver 没有可信审批回路；普通终端和托管任务走各自入口。
+        Harness::Claude => Ok(HarnessKind::Unsupported(Harness::Claude)),
         // Zap:Codex 走本地子 pane 直启路径(见
         // `pane_group::pane::local_harness_launch`),不接 AgentDriver 的
         // 第三方 harness runner——上游的 CodexHarness 依赖已剥离的服务端
@@ -147,10 +148,12 @@ pub(crate) fn harness_kind(harness: Harness) -> Result<HarnessKind, AgentDriverE
 
 /// Auth-verification command for the harness's CLI, if it has one.
 ///
-/// Returns `None` for [`Harness::Oz`], for unsupported harnesses, and
-/// for any third-party harness whose `auth_check_command` returns `None`
-/// (e.g. Gemini today).
+/// 身份检测独立于独立 driver 的启动能力；Claude 保留原生 auth status 检测。
+/// 其他没有检测命令的 harness 返回 `None`。
 pub(crate) fn auth_check_command_for(harness: Harness) -> Option<String> {
+    if harness == Harness::Claude {
+        return ClaudeHarness.auth_check_command();
+    }
     let HarnessKind::ThirdParty(third_party) = harness_kind(harness).ok()? else {
         return None;
     };

@@ -1,0 +1,151 @@
+{
+  "scope": "source15 原始本地 macOS 构建与根代理实际 deep/strict 签名报告的独立安全归档；只读报告、非模型构建日志及已归档 manifest，没有读取 target/main/lib、重跑构建或验签，也没有纳入 SDK 第五轮真实结果。",
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "worktree_dirty": true,
+  "source_manifest_sha256": "6830223673d39301f2b9884d02661f22a4a19e5df27c85dbccdda4542fccdba2",
+  "source_file_count": 75,
+  "source_before_after_verification_audit": "macos-official-15-archive-audit.json",
+  "source_before_after_verification_audit_sha256": "774cc243a64295eeea047035a0872227aed1ff66c83bf44e3e6d6bf6dd3f0a64",
+  "frozen_reads_done_before_scope_advance": true,
+  "subsequent_frozen_tree_reads_by_bundle_archive": false,
+  "original_bundle_report": {
+    "source": "/tmp/infinishell-cli-parity-official-15-bundle.json",
+    "archive": "macos-official-15-bundle.json",
+    "sha256": "d5d9a912a4e1aa7bc6e5756de60fdc330b594b816f056f484995c7570404475b",
+    "bytes": 14861,
+    "byte_for_byte_copy": true,
+    "privacy_scan": {
+      "method": "八类定向凭据格式扫描；只记录命中数，不归档扫描正文或原日志",
+      "hits": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "email": 0,
+        "credential_assignment": 0,
+        "private_endpoint": 0,
+        "private_api_path": 0
+      },
+      "total_hits": 0
+    }
+  },
+  "original_signature_report": {
+    "source": "/tmp/infinishell-cli-parity-official-15-signature.json",
+    "archive": "macos-official-15-signature.json",
+    "sha256": "5ce58b7ddce19c8d1d09055f34d92c6285bd4b8bcd2fbbdc2781ede4b1b42493",
+    "bytes": 597,
+    "byte_for_byte_copy": true,
+    "privacy_scan": {
+      "method": "八类定向凭据格式扫描；只记录命中数，不归档扫描正文或原日志",
+      "hits": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "email": 0,
+        "credential_assignment": 0,
+        "private_endpoint": 0,
+        "private_api_path": 0
+      },
+      "total_hits": 0
+    }
+  },
+  "build_log": {
+    "name": "bundle",
+    "source": "/tmp/infinishell-cli-parity-official-15-bundle.log",
+    "sha256": "51f08d78a13b50c621006cc662345f2ad4b6e60169e98c5024d734ec2198af50",
+    "bytes": 4063,
+    "sha256_matches_original_report": true,
+    "raw_log_archived": false,
+    "privacy_scan": {
+      "method": "八类定向凭据格式扫描；只记录命中数，不归档扫描正文或原日志",
+      "hits": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "email": 0,
+        "credential_assignment": 0,
+        "private_endpoint": 0,
+        "private_api_path": 0
+      },
+      "total_hits": 0
+    },
+    "dev_profile_completion_line_independently_observed": true,
+    "app_signing_line_independently_observed": true,
+    "app_signing_target_observed": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app"
+  },
+  "build": {
+    "argv_from_report": [
+      "./script/run",
+      "--dont-open",
+      "--features",
+      "local_cli_managed_tasks,rust-embed/debug-embed"
+    ],
+    "exit_code_from_report": 0,
+    "wall_seconds_from_report": 30.427,
+    "source_manifest_matches_archived_inputs": true,
+    "worker_path_from_report": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "main_sha256_from_report": "d9a5590cc68c303aca53f5912df861b008063959d3c5ba002999776781d4e3db",
+    "main_binary_read_by_archive": false,
+    "main_hash_recomputed_by_archive": false,
+    "build_reexecuted_by_archive": false
+  },
+  "signature": {
+    "argv_from_root_execution_report": [
+      "codesign",
+      "--verify",
+      "--deep",
+      "--strict",
+      "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app"
+    ],
+    "exit_code_from_root_execution_report": 0,
+    "wall_seconds_from_root_execution_report": 0.484381,
+    "stdout_bytes_from_report": 0,
+    "stderr_bytes_from_report": 0,
+    "empty_stdout_and_stderr_hashes_match": true,
+    "verification_target_matches_recorded_build_app_path": true,
+    "evidence_source": "根代理实际执行 source15",
+    "signature_reexecuted_by_archive": false,
+    "target_read_by_archive": false
+  },
+  "explicit_debug_embed_feature_reported": true,
+  "locale_resources": [
+    {
+      "path": "app/i18n/en/warp.ftl",
+      "locale": "en",
+      "sha256": "9442a4b062945cf3f5fbc5160193f4a14ae715ae9d35b7f5d5bc14be55980c3c",
+      "bytes": 374280,
+      "frozen_sha_and_bytes_independently_verified_before_scope_advance": true,
+      "same_as_source14": true,
+      "full_bytes_in_main_binary_reported_by_root": true,
+      "binary_embedding_rechecked_by_archive": false
+    },
+    {
+      "path": "app/i18n/zh-CN/warp.ftl",
+      "locale": "zh-CN",
+      "sha256": "2291d0796862e703a2869e174d38138f014183730d380d56d6d97ce4772a0d98",
+      "bytes": 361234,
+      "frozen_sha_and_bytes_independently_verified_before_scope_advance": true,
+      "same_as_source14": true,
+      "full_bytes_in_main_binary_reported_by_root": true,
+      "binary_embedding_rechecked_by_archive": false
+    }
+  ],
+  "full_locale_bytes_embedding_proof_source": "根代理原始 bundle 报告的二进制扫描；归档代理仅读取冻结 FTL 核对 SHA/bytes，没有再读取 main。",
+  "production_claude_png_changes_included": false,
+  "new_claude_png_ftl_keys_included": false,
+  "sdk_fifth_actual_native_acceptance_included": false,
+  "claude_image_actual_native_acceptance_included": false,
+  "ordinary_grok_pty_native_verified": false,
+  "source13_grok_coordinator_success_counted_as_source15_acceptance": false,
+  "gui_layout_verified_by_this_archive": false,
+  "online_cli_lifecycle_verified_by_this_archive": false,
+  "app_restart_recovery_verified_by_this_archive": false,
+  "clean_commit_verified": false,
+  "same_commit_cross_platform_verified": false,
+  "full_workspace_tests_verified": false,
+  "notarization_verified": false,
+  "release_or_install_verified": false,
+  "goal_completed": false
+}

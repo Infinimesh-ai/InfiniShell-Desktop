@@ -1,0 +1,48 @@
+{
+  "argv": [
+    "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+    "agent",
+    "--help"
+  ],
+  "executable_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "exit_code": 0,
+  "stdout_sha256": "056e71951a4badab3948a351143cfc170beb12daf6708ed1bff2e0ed92189079",
+  "stdout_bytes": 2096,
+  "stderr_bytes": 0,
+  "matches": [
+    {
+      "line": 6,
+      "text": "Commands:\n  stdio     Run the agent over stdio\n  headless  Run the agent headlessly over the Grok WebSocket relay\n  serve     Run the agent as a WebSocket server"
+    },
+    {
+      "line": 9,
+      "text": "  serve     Run the agent as a WebSocket server\n  leader    Run as the shared leader process for other clients\n  help      Print this message or the help of the given subcommand(s)\n"
+    },
+    {
+      "line": 25,
+      "text": "          Load a plugin from this directory for this process only (repeatable). Highest-priority plugin scope; always trusted: hooks and MCP servers activate without a prompt. Used by the Agent SDKs to inject per-connection plugins\n      --leader\n          Connect to a shared leader process instead of starting a new agent. Allows multiple clients to share one backend. Defaults to [cli] use_leader in config.toml\n      --no-leader"
+    },
+    {
+      "line": 26,
+      "text": "      --leader\n          Connect to a shared leader process instead of starting a new agent. Allows multiple clients to share one backend. Defaults to [cli] use_leader in config.toml\n      --no-leader\n          Start a new agent even when config enables leader mode"
+    },
+    {
+      "line": 27,
+      "text": "          Connect to a shared leader process instead of starting a new agent. Allows multiple clients to share one backend. Defaults to [cli] use_leader in config.toml\n      --no-leader\n          Start a new agent even when config enables leader mode\n      --grok-ws-origin <GROK_WS_ORIGIN>"
+    },
+    {
+      "line": 28,
+      "text": "      --no-leader\n          Start a new agent even when config enables leader mode\n      --grok-ws-origin <GROK_WS_ORIGIN>\n          "
+    },
+    {
+      "line": 43,
+      "text": "          Print help\n      --leader-socket <PATH>\n          Use a custom leader socket path instead of the default `~/.grok/leader.sock`. A local/branch build can thus run an isolated leader without colliding with the default one already running on the machine Name it `~/.grok/leader-*.sock` to keep `grok leader list/kill` able to find it; any other location works but won't be auto-discovered"
+    },
+    {
+      "line": 44,
+      "text": "      --leader-socket <PATH>\n          Use a custom leader socket path instead of the default `~/.grok/leader.sock`. A local/branch build can thus run an isolated leader without colliding with the default one already running on the machine Name it `~/.grok/leader-*.sock` to keep `grok leader list/kill` able to find it; any other location works but won't be auto-discovered"
+    }
+  ],
+  "model_inputs": 0,
+  "isolated_help_only": true
+}

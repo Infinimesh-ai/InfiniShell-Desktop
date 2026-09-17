@@ -1,0 +1,118 @@
+{
+  "scope": "source13 macOS构建、根代理严格签名报告与固定本地化资源独立归档；仅buildscope",
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "worktree_dirty": true,
+  "clean_commit_verified": false,
+  "final_same_commit_verified": false,
+  "cross_platform_verified": false,
+  "gui_layout_verified": false,
+  "online_cli_lifecycle_verified_by_this_archive": false,
+  "new_live_fixtures_verified_by_this_archive": false,
+  "goal_completed": false,
+  "bundle_build_passed": true,
+  "signature_strict_verify_report_passed": true,
+  "signature_verification_evidence_origin": "root_task_message",
+  "signature_independently_reexecuted_by_archive": false,
+  "worker_binary_read_by_archive": false,
+  "worker_binary_independently_hashed_by_archive": false,
+  "worker_sha256_reported": "0c9e05fe2c75aaf909e31c2dfb4508e5f7ea3ee9da6c7a8e167713ae8205d77f",
+  "source_manifest_sha256": "419e6a6fac30237c4577061cb753078360fdf42e5833de29266363e3cdd5dd82",
+  "source_manifest_file_count": 73,
+  "source_files_all_matched_at_bundle_archive": true,
+  "bundle_source_manifest_identical_to_archived_inputs": true,
+  "previous_gate_archive_audit_sha256": "d28386bdf99827dc56e6e5dd32bd1fb8a3b5c19c03066038942fc14c04267669",
+  "original_reports": {
+    "bundle": {
+      "source": "/tmp/infinishell-cli-parity-official-13-bundle.json",
+      "archive": "macos-official-13-bundle.json",
+      "sha256": "d49f3180dc1f2f697ebfeb0e4b405185a8907bb8ca529cf02b918b6610a68cd6",
+      "bytes": 14454,
+      "byte_for_byte_match": true,
+      "credential_pattern_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "email": 0,
+        "credential_assignment": 0
+      }
+    },
+    "signature": {
+      "source": "根代理本轮任务消息：codesign --verify --deep --strict exit0且无输出",
+      "archive": "macos-official-13-signature.json",
+      "sha256": "7910bb43596d60cd7be04431a6de3e4f0013bd93cd59a48f3883de02911e6760",
+      "bytes": 937,
+      "original_file_report_available": false,
+      "credential_pattern_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "email": 0,
+        "credential_assignment": 0
+      }
+    }
+  },
+  "build_argv": [
+    "./script/run",
+    "--dont-open",
+    "--features",
+    "local_cli_managed_tasks,rust-embed/debug-embed"
+  ],
+  "bundle_reported_wall_seconds": 187.054,
+  "signature_reported_wall_seconds": null,
+  "build_log": {
+    "source": "/tmp/infinishell-cli-parity-official-13-bundle.log",
+    "sha256": "07e8579e75aa4e286abfca6758ac3552fc9d5aa174e622b71db5e89c43cfa12e",
+    "bytes": 4181,
+    "reported_sha256_matches": true,
+    "raw_log_archived": false,
+    "credential_pattern_scan": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "email": 0,
+      "credential_assignment": 0
+    }
+  },
+  "signature_report_checks": {
+    "strict": true,
+    "deep": true,
+    "exit_code": 0,
+    "no_output_reported": true,
+    "worker_sha256_matches_bundle_report": true,
+    "manifest_sha256_matches_archived_inputs": true
+  },
+  "locale_resources": [
+    {
+      "locale": "en",
+      "source_path": "app/i18n/en/warp.ftl",
+      "source_sha256": "9442a4b062945cf3f5fbc5160193f4a14ae715ae9d35b7f5d5bc14be55980c3c",
+      "source_bytes": 374280,
+      "source_matches_bundle_report": true,
+      "source_matches_frozen_manifest": true,
+      "binary_exact_bytes_found_reported": true,
+      "binary_independently_read_or_scanned_by_archive": false
+    },
+    {
+      "locale": "zh-CN",
+      "source_path": "app/i18n/zh-CN/warp.ftl",
+      "source_sha256": "2291d0796862e703a2869e174d38138f014183730d380d56d6d97ce4772a0d98",
+      "source_bytes": 361234,
+      "source_matches_bundle_report": true,
+      "source_matches_frozen_manifest": true,
+      "binary_exact_bytes_found_reported": true,
+      "binary_independently_read_or_scanned_by_archive": false
+    }
+  ],
+  "locale_resources_immutable_in_binary_reported": true,
+  "evidence_limits": [
+    "bundle原报告逐字节归档；构建日志SHA与73文件冻结manifest、完整英中FTL源文件SHA及字节数独立核对，不重跑构建。",
+    "完整FTL字节确实嵌入二进制的结论取根代理原始扫描报告；本归档任务未读取大main重新计算SHA或扫描资源。",
+    "签名JSON来自根代理本轮明确确认的严格深层codesign退出码0和无输出，未独立重跑；原核验耗时未提供，保留null。",
+    "签名通过只证明本地严格验证通过，不代替公证、发布、安装、GUI布局或真实CLI生命周期验收。",
+    "本次为同73文件manifest的脏中间构建，baseline b3d8…不是包含实际修改的干净提交，不能计最终同提交跨平台门禁。",
+    "运行中的SDK4及其它真实CLI runner结果不纳入本构建归档，不从资源嵌入或签名推定图片/SDK来源/权限能力通过。"
+  ]
+}

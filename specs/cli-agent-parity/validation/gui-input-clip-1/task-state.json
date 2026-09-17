@@ -1,0 +1,30 @@
+{
+  "observed_at_utc": "2026-09-17T07:14:20.211629+00:00",
+  "access": "SQLite mode=ro; PRAGMA query_only=ON",
+  "current": {
+    "task_id": "f13f4d58-7cf8-4690-9399-41de3bf11b87",
+    "harness": "claude",
+    "generation": 13,
+    "state": "disconnected",
+    "native_session_id": "4ce7cdad-d9a4-48fa-9e8c-eee8fc7761da"
+  },
+  "messages_total": 14,
+  "message_states": {
+    "acknowledged": 14
+  },
+  "saved_generations": [
+    {
+      "generation": 9,
+      "state": "completed",
+      "native_session_id": "4ce7cdad-d9a4-48fa-9e8c-eee8fc7761da"
+    },
+    {
+      "generation": 13,
+      "state": "disconnected",
+      "native_session_id": "4ce7cdad-d9a4-48fa-9e8c-eee8fc7761da"
+    }
+  ],
+  "draft_sent": false,
+  "draft_cleared": "操作者确认 24 行测试草稿在检查后通过 Cmd+A、Backspace 清空；只读数据库复核消息总数仍为 14。",
+  "selected_history_generation": 9
+}

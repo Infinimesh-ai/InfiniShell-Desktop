@@ -189,6 +189,9 @@ async fn run_turn(
             .await
             .map_err(|_| "真实模型回合超过总时限".to_owned())??;
         match event.kind {
+            RuntimeEventKind::InputJoined { .. } => {
+                return Err("Codex 不支持 Claude 合并输入事件".into());
+            }
             RuntimeEventKind::CommandDispatched {
                 message_id,
                 turn_id,
@@ -433,6 +436,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         generation: Uuid::new_v4(),
         permission_policy: PermissionPolicy::WorkspaceWrite,
         permission_ceiling: None,
+        claude_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
@@ -661,6 +665,9 @@ async fn run_inspect_tool_turn(
             }
             RuntimeEventKind::RequestFailed { message, .. }
             | RuntimeEventKind::Disconnected { reason: message } => return Err(message),
+            RuntimeEventKind::InputJoined { .. } => {
+                return Err("Codex 本地工具收到其他协议的合并事件".into());
+            }
             RuntimeEventKind::MessageAccepted { .. }
             | RuntimeEventKind::CommandDispatched { .. }
             | RuntimeEventKind::TextDelta { .. }
@@ -703,6 +710,7 @@ async fn real_codex_local_tool_restore() {
             generation: Uuid::new_v4(),
             permission_policy: PermissionPolicy::WorkspaceWrite,
             permission_ceiling: None,
+            claude_profile: None,
             model: None,
             local_tools: Some(super::local_tools::LocalToolPermissions::default()),
             selected_skills: Vec::new(),
@@ -771,6 +779,7 @@ async fn real_codex_image_input() {
             generation: Uuid::new_v4(),
             permission_policy: PermissionPolicy::WorkspaceWrite,
             permission_ceiling: None,
+            claude_profile: None,
             model: None,
             local_tools: None,
             selected_skills: Vec::new(),

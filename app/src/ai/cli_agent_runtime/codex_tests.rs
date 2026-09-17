@@ -29,6 +29,7 @@ fn options() -> SessionOptions {
         generation: Uuid::from_u128(1),
         permission_policy: PermissionPolicy::WorkspaceWrite,
         permission_ceiling: None,
+        claude_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),

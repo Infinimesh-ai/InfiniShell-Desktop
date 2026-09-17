@@ -1,0 +1,19 @@
+{
+  "task_id": "90319eee-f61f-4ecf-bcfd-beca68d58d59",
+  "generation": 8,
+  "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+  "joined_inputs": [
+    {
+      "message_id": "5623d8b5-10fb-45e1-a014-13854a498a5d",
+      "turn_id": "1ca238c3-9659-4bb2-8e18-1ffe08e7a530",
+      "submission_generation": 3,
+      "outcome": "Completed"
+    },
+    {
+      "message_id": "9a0d3871-fef3-459c-be9c-198a05faf175",
+      "turn_id": "0a69b7e5-15a7-49f5-951b-a50b21ee1f63",
+      "submission_generation": 8,
+      "outcome": "Completed"
+    }
+  ]
+}

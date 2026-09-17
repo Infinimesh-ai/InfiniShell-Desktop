@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use super::{GrokProtocol, REQUEST_TIMEOUT, flush_effects, validate_options, verified_version};
+use crate::ai::cli_agent_runtime::local_tools::LocalToolPermissions;
 use crate::ai::cli_agent_runtime::{
     ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand,
     RuntimeEventKind, SessionOptions, SessionTarget, TurnOutcome,
@@ -21,6 +22,7 @@ fn options() -> SessionOptions {
         generation: Uuid::new_v4(),
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
+        claude_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
@@ -63,7 +65,7 @@ fn only_the_observed_cli_version_is_accepted() {
 }
 
 #[test]
-fn real_handshake_preserves_reported_capabilities_without_opening_unverified_operations() {
+fn real_handshake_reports_verified_text_lifecycle_and_preserves_permission_limits() {
     let mut protocol = GrokProtocol::new(options());
     let initialize = protocol.initialize();
     assert_eq!(initialize["jsonrpc"], "2.0");
@@ -100,12 +102,15 @@ fn real_handshake_preserves_reported_capabilities_without_opening_unverified_ope
     );
     assert_eq!(
         effective_permissions["verifiedCapabilities"]["resume"],
-        false
+        true
     );
     assert_eq!(
         effective_permissions["verifiedCapabilities"]["submit"],
-        false
+        true
     );
+    for key in ["steer", "localTools", "childTasks"] {
+        assert_eq!(effective_permissions["verifiedCapabilities"][key], false);
+    }
     assert_eq!(
         effective_permissions["permissionEnforcementVerified"],
         false
@@ -276,12 +281,9 @@ fn native_quota_error_and_session_activity_never_become_completion() {
 }
 
 #[test]
-fn all_unverified_lifecycle_commands_are_rejected_without_delivery_or_acknowledgement() {
+fn unsupported_or_unrelated_controls_are_rejected_without_delivery_or_acknowledgement() {
     let mut protocol = ready_protocol();
     let actions = [
-        RuntimeAction::Submit {
-            input: vec![InputContent::Text("第一行\nsecond line".into())],
-        },
         RuntimeAction::Steer {
             expected_turn_id: "turn".into(),
             input: vec![InputContent::Text("追加".into())],
@@ -307,11 +309,18 @@ fn all_unverified_lifecycle_commands_are_rejected_without_delivery_or_acknowledg
         let first = protocol.command(command.clone());
         let replay = protocol.command(command);
         assert!(first.writes.is_empty());
+        assert!(replay.writes.is_empty());
         assert!(matches!(
             first.events.as_slice(),
             [RuntimeEventKind::RequestFailed { .. }]
         ));
-        assert_eq!(first.events, replay.events);
+        // 无效控制重投可以被去重，但不能出现派发或原生确认。
+        assert!(
+            replay
+                .events
+                .iter()
+                .all(|event| matches!(event, RuntimeEventKind::RequestFailed { .. }))
+        );
     }
 }
 
@@ -356,12 +365,23 @@ fn stale_generation_and_incomplete_native_identity_do_not_open_a_task() {
 }
 
 #[test]
-fn resume_and_sandbox_claims_fail_before_spawning_a_new_process() {
+fn root_history_resume_is_valid_but_unverified_policies_fail_before_spawning() {
     let mut options = options();
     options.target = SessionTarget::Resume {
         native_session_id: "existing-session".into(),
     };
-    assert!(validate_options(&options).is_err());
+    // ACP 会话身份是有界 opaque 字符串，不能擅自限定为 UUID。
+    assert!(validate_options(&options).is_ok());
+    for invalid in ["".to_owned(), "session\nother".to_owned(), "x".repeat(4097)] {
+        options.target = SessionTarget::Resume {
+            native_session_id: invalid,
+        };
+        assert!(validate_options(&options).is_err());
+    }
+    options.target = SessionTarget::Resume {
+        native_session_id: Uuid::new_v4().to_string(),
+    };
+    assert!(validate_options(&options).is_ok());
     options.target = SessionTarget::New;
     for policy in [PermissionPolicy::ReadOnly, PermissionPolicy::WorkspaceWrite] {
         options.permission_policy = policy;
@@ -398,13 +418,63 @@ fn prompt_complete_notifications() -> Vec<Value> {
 }
 
 fn internal_submit(protocol: &mut GrokProtocol, message_id: Uuid, text: &str) -> super::Effects {
-    protocol.acp_command(RuntimeCommand {
+    protocol.command(RuntimeCommand {
         generation: protocol.options.generation,
         message_id,
         action: RuntimeAction::Submit {
             input: vec![InputContent::Text(text.to_owned())],
         },
     })
+}
+
+// 旧生命周期实录没有查询历史；这些合成响应仅用于原有状态测试，不计作原生查询证据。
+fn unit_history(protocol: &GrokProtocol, output: &str) -> Value {
+    let prompt = protocol.prompt.as_ref().unwrap();
+    let session = protocol.session_id.as_ref().unwrap();
+    let turn = prompt.native_id.as_ref().unwrap();
+    let reason = match prompt.completion.as_ref().unwrap().outcome {
+        TurnOutcome::Completed => "end_turn",
+        TurnOutcome::Cancelled => "cancelled",
+        TurnOutcome::Failed { .. } => panic!("失败回合不查询最终文本"),
+    };
+    json!({"updates": [
+        {"method":"session/update", "params":{"sessionId":session,
+            "update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":output}},
+            "_meta":{"eventId":format!("{session}-900000"),"promptId":turn}}},
+        {"method":"_x.ai/session/update", "params":{"sessionId":session,
+            "update":{"sessionUpdate":"turn_completed","prompt_id":turn,"stop_reason":reason},
+            "_meta":{"eventId":format!("{session}-900001")}}}
+    ],"totalCount":2,"hasMore":false,"lastEventId":format!("{session}-900001")})
+}
+
+fn finish_with_unit_history(protocol: &mut GrokProtocol, response: Value) -> super::Effects {
+    let mut effects = protocol.receive(response).unwrap();
+    if effects
+        .writes
+        .first()
+        .is_some_and(|request| request["method"] == "_x.ai/session/updates")
+    {
+        let output = protocol.prompt.as_ref().unwrap().output.clone();
+        let snapshot = unit_history(protocol, &output);
+        let request = effects.writes.remove(0);
+        let recovered = protocol
+            .receive(json!({"jsonrpc":"2.0","id":request["id"],"result":snapshot}))
+            .unwrap();
+        effects.events.extend(recovered.events);
+        effects.writes.extend(recovered.writes);
+    }
+    effects
+}
+
+fn receive_recorded_with_unit_history(
+    protocol: &mut GrokProtocol,
+    mut message: Value,
+) -> super::Effects {
+    if message.get("method").is_none() && message.get("id").is_some() {
+        // 新增只读查询会改变客户端 RPC 序号，原生 prompt/event/tool 身份保持原样。
+        message["id"] = json!(protocol.pending.as_ref().unwrap().id);
+    }
+    finish_with_unit_history(protocol, message)
 }
 
 #[test]
@@ -689,8 +759,7 @@ fn real_empty_load_retains_the_requested_identity_and_closes_without_a_turn() {
     options.target = SessionTarget::Resume {
         native_session_id: "01a0a8ef-22d4-70f2-91d3-0cd052d7e80f".into(),
     };
-    // 内部协议验证不能解除 public connect 的真实历史恢复门禁。
-    assert!(validate_options(&options).is_err());
+    assert!(validate_options(&options).is_ok());
     let mut protocol = GrokProtocol::new(options);
     protocol.initialize();
     protocol.receive(records[0].clone()).unwrap();
@@ -959,7 +1028,7 @@ fn pending_native_approval() -> (GrokProtocol, Value) {
             if message["method"] == "session/request_permission" {
                 return (protocol, message.clone());
             }
-            protocol.receive(message.clone()).unwrap();
+            receive_recorded_with_unit_history(&mut protocol, message.clone());
         }
     }
     panic!("真实夹具必须包含审批请求")
@@ -990,7 +1059,8 @@ fn native_byok_fixture_recovers_two_round_results_and_distinct_approval_outcomes
                 Uuid::new_v4(),
                 message["params"]["prompt"][0]["text"].as_str().unwrap(),
             );
-            assert_eq!(effects.writes.as_slice(), &[message.clone()]);
+            assert_eq!(effects.writes[0]["method"], message["method"]);
+            assert_eq!(effects.writes[0]["params"], message["params"]);
             assert!(effects.events.is_empty());
         } else if record["direction"] == "stdin" && message.get("result").is_some() {
             let (approval_id, decision) = match message["id"].as_u64().unwrap() {
@@ -1009,7 +1079,8 @@ fn native_byok_fixture_recovers_two_round_results_and_distinct_approval_outcomes
             assert_eq!(effects.writes.as_slice(), &[message.clone()]);
             events.extend(effects.events);
         } else if record["direction"] == "stdout" {
-            events.extend(protocol.receive(message.clone()).unwrap().events);
+            events
+                .extend(receive_recorded_with_unit_history(&mut protocol, message.clone()).events);
         }
     }
     let finished: Vec<_> = events
@@ -1178,7 +1249,7 @@ fn text_chunks_wait_for_missing_predecessors_and_duplicate_output_is_not_emitted
             .is_empty()
     );
     protocol.receive(chunks[2].clone()).unwrap();
-    let finished = protocol.receive(byok_response(4)).unwrap();
+    let finished = finish_with_unit_history(&mut protocol, byok_response(4));
     assert_eq!(
         finished.events,
         vec![RuntimeEventKind::TurnFinished {
@@ -1197,10 +1268,131 @@ fn text_chunks_wait_for_missing_predecessors_and_duplicate_output_is_not_emitted
 }
 
 #[test]
-fn missing_text_chunks_prevent_a_successful_result() {
+fn missing_text_chunks_prevent_success_without_verified_history() {
     let mut protocol = active_byok_prompt();
     protocol.receive(byok_text_chunks()[1].clone()).unwrap();
-    assert!(protocol.receive(byok_response(4)).is_err());
+    let effects = protocol.receive(byok_response(4)).unwrap();
+    assert!(effects.events.is_empty());
+    assert_eq!(effects.writes[0]["method"], "_x.ai/session/updates");
+    assert!(protocol.prompt.as_ref().unwrap().completion.is_some());
+}
+
+fn shared_chunk(kind: &str, stream: i64, chunk: u64, sequence: u64, text: &str) -> Value {
+    let mut message = byok_text_chunks()[0].clone();
+    let session_id = message["params"]["sessionId"].as_str().unwrap().to_owned();
+    message["params"]["_meta"]["eventId"] = json!(format!("{session_id}-{sequence}"));
+    message["params"]["_meta"]["streamStartMs"] = json!(stream);
+    message["params"]["_meta"]["chunkId"] = json!(chunk);
+    message["params"]["update"]["sessionUpdate"] = json!(kind);
+    message["params"]["update"]["content"]["text"] = json!(text);
+    message
+}
+
+#[test]
+fn shared_thought_chunk_unblocks_body_without_publishing_thought_text() {
+    let mut protocol = active_byok_prompt();
+    let body = shared_chunk("agent_message_chunk", 100, 2, 101, "BODY");
+    assert!(protocol.receive(body.clone()).unwrap().events.is_empty());
+    let thought = shared_chunk(
+        "agent_thought_chunk",
+        100,
+        1,
+        100,
+        "PRIVATE_THOUGHT_FIXTURE",
+    );
+    let effects = protocol.receive(thought.clone()).unwrap();
+    assert!(
+        matches!(effects.events.as_slice(), [RuntimeEventKind::TextDelta { text, .. }] if text == "BODY")
+    );
+    assert!(protocol.receive(thought).unwrap().events.is_empty());
+    assert!(protocol.receive(body).unwrap().events.is_empty());
+    assert_eq!(protocol.prompt.as_ref().unwrap().output, "BODY");
+}
+
+#[test]
+fn official_thought_and_body_numbering_survives_a_tool_response_boundary() {
+    let (mut protocol, after) = multistream_before_final_text();
+    let mut thought = after.clone();
+    thought["params"]["update"]["sessionUpdate"] = json!("agent_thought_chunk");
+    thought["params"]["update"]["content"]["text"] = json!("PRIVATE_THOUGHT_FIXTURE");
+    assert!(protocol.receive(thought).unwrap().events.is_empty());
+    let mut body = after;
+    body["params"]["_meta"]["chunkId"] = json!(2);
+    let session_id = body["params"]["sessionId"].as_str().unwrap().to_owned();
+    body["params"]["_meta"]["eventId"] = json!(format!("{session_id}-1000"));
+    assert!(
+        matches!(protocol.receive(body).unwrap().events.as_slice(), [RuntimeEventKind::TextDelta { text, .. }] if text == "AFTER_TOOL")
+    );
+    assert_eq!(
+        protocol.prompt.as_ref().unwrap().output,
+        "BEFORE_TOOLAFTER_TOOL"
+    );
+}
+
+#[test]
+fn missing_thought_predecessor_cannot_be_hidden_by_a_new_stream() {
+    let mut protocol = active_byok_prompt();
+    protocol
+        .receive(shared_chunk("agent_message_chunk", 100, 2, 101, "BODY"))
+        .unwrap();
+    assert!(
+        protocol
+            .receive(shared_chunk(
+                "agent_thought_chunk",
+                200,
+                1,
+                102,
+                "PRIVATE_THOUGHT_FIXTURE"
+            ))
+            .is_err()
+    );
+}
+
+#[test]
+fn thought_identity_cannot_be_reused_as_visible_body() {
+    let mut protocol = active_byok_prompt();
+    protocol
+        .receive(shared_chunk(
+            "agent_thought_chunk",
+            100,
+            1,
+            100,
+            "PRIVATE_THOUGHT_FIXTURE",
+        ))
+        .unwrap();
+    assert!(
+        protocol
+            .receive(shared_chunk("agent_message_chunk", 100, 1, 101, "BODY"))
+            .is_err()
+    );
+}
+
+#[test]
+fn unseen_thought_fragment_from_a_closed_stream_is_rejected() {
+    let mut protocol = active_byok_prompt();
+    protocol
+        .receive(shared_chunk(
+            "agent_thought_chunk",
+            100,
+            1,
+            100,
+            "PRIVATE_THOUGHT_FIXTURE",
+        ))
+        .unwrap();
+    protocol
+        .receive(shared_chunk("agent_message_chunk", 200, 1, 101, "BODY"))
+        .unwrap();
+    assert!(
+        protocol
+            .receive(shared_chunk(
+                "agent_thought_chunk",
+                100,
+                2,
+                102,
+                "PRIVATE_THOUGHT_FIXTURE"
+            ))
+            .is_err()
+    );
 }
 
 #[test]
@@ -1322,7 +1514,7 @@ fn queued_next_round_is_not_acknowledged_until_native_queue_identifies_it() {
             .writes
             .is_empty()
     );
-    let complete = protocol.receive(byok_response(4)).unwrap();
+    let complete = finish_with_unit_history(&mut protocol, byok_response(4));
     assert_eq!(complete.writes[0]["method"], "session/prompt");
     assert_eq!(
         complete.writes[0]["params"]["prompt"],
@@ -1420,7 +1612,7 @@ fn native_cancel_continue_and_process_restart_recover_the_original_session_marke
                         unexpected => panic!("夹具中出现未知响应：{unexpected}"),
                     });
                 }
-                let effects = protocol.receive(message.clone()).unwrap();
+                let effects = receive_recorded_with_unit_history(&mut protocol, message.clone());
                 if process == "second" && message["id"] == 2 {
                     assert_eq!(effects.writes[0]["method"], "session/load");
                     assert_eq!(
@@ -1511,7 +1703,7 @@ fn advertised_resume_without_load_does_not_replace_the_verified_recovery_method(
 async fn next_prompt_write_failure_preserves_the_previous_terminal_result() {
     let mut protocol = active_byok_prompt();
     internal_submit(&mut protocol, Uuid::new_v4(), "下一轮");
-    let effects = protocol.receive(byok_response(4)).unwrap();
+    let effects = finish_with_unit_history(&mut protocol, byok_response(4));
     let (sender, mut receiver) = mpsc::channel(4);
     let mut storage = [];
     let mut stdin = Cursor::new(&mut storage[..]);
@@ -1627,7 +1819,7 @@ fn native_text_tool_text_uses_distinct_streams_and_preserves_the_complete_result
         );
     }
     assert_eq!(
-        protocol.receive(multistream_terminal()).unwrap().events,
+        finish_with_unit_history(&mut protocol, multistream_terminal()).events,
         vec![RuntimeEventKind::TurnFinished {
             turn_id: "b0c42eab-53e4-4d9e-9f88-02c3c86ad155".into(),
             outcome: TurnOutcome::Completed,
@@ -1658,7 +1850,7 @@ fn second_stream_chunks_are_buffered_in_chunk_order_without_sorting_timestamps()
         .collect();
     assert_eq!(text, ["AFTER", "_TOOL"]);
     assert!(
-        matches!(protocol.receive(multistream_terminal()).unwrap().events.as_slice(),
+        matches!(finish_with_unit_history(&mut protocol, multistream_terminal()).events.as_slice(),
         [RuntimeEventKind::TurnFinished { outcome: TurnOutcome::Completed, output, .. }] if output == "BEFORE_TOOLAFTER_TOOL")
     );
 }
@@ -1693,4 +1885,410 @@ fn changing_streams_cannot_hide_a_known_missing_fragment() {
     next_stream["params"]["_meta"]["streamStartMs"] = json!(2);
     next_stream["params"]["_meta"]["chunkId"] = json!(1);
     assert!(protocol.receive(next_stream).is_err());
+}
+
+fn multistream_history() -> Value {
+    // 把真实增量及终态按已核验的磁盘 envelope 形式组合；这是故障注入数据，非真实查询回执。
+    let updates: Vec<_> = multistream_fixture()
+        .into_iter()
+        .filter_map(|record| {
+            let message = &record["message"];
+            let update = &message["params"]["update"];
+            if record["direction"] != "stdout" {
+                return None;
+            }
+            let method = match update["sessionUpdate"].as_str() {
+                Some("agent_message_chunk") => "session/update",
+                Some("turn_completed") => "_x.ai/session/update",
+                Some(_) | None => return None,
+            };
+            Some(json!({"method":method,"params":message["params"]}))
+        })
+        .collect();
+    json!({"lastEventId":updates.last().unwrap()["params"]["_meta"]["eventId"],
+        "totalCount":updates.len(),"hasMore":false,"updates":updates})
+}
+
+fn reply_history(protocol: &mut GrokProtocol, result: Value) -> super::Effects {
+    protocol
+        .receive(
+            json!({"jsonrpc":"2.0","id":protocol.pending.as_ref().unwrap().id,"result":result}),
+        )
+        .unwrap()
+}
+
+#[test]
+fn native_offline_query_proves_empty_snapshot_is_not_a_completion_watermark() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../../../specs/cli-agent-parity/fixtures/grok-1.0.30-final-history-offline.json"
+    ))
+    .unwrap();
+    let result = &fixture["builtinTurn"]["result"];
+    let session = result["_meta"]["sessionId"].as_str().unwrap();
+    let turn = result["_meta"]["promptId"].as_str().unwrap();
+    assert_eq!(
+        super::verified_final_snapshot(
+            &fixture["immediateSnapshot"]["result"],
+            session,
+            turn,
+            &TurnOutcome::Completed
+        )
+        .unwrap(),
+        None
+    );
+    let (text, watermark) = super::verified_final_snapshot(
+        &fixture["verifiedSnapshot"]["result"],
+        session,
+        turn,
+        &TurnOutcome::Completed,
+    )
+    .unwrap()
+    .unwrap();
+    assert!(text.contains(session));
+    assert_eq!(watermark, format!("{session}-4"));
+}
+
+#[test]
+fn prompt_rpc_before_an_unknown_text_stream_waits_for_authoritative_history() {
+    let (mut protocol, after) = multistream_before_final_text();
+    let response = protocol.receive(multistream_terminal()).unwrap();
+    assert!(response.events.is_empty());
+    assert_eq!(response.writes[0]["method"], "_x.ai/session/updates");
+    assert!(protocol.receive(after).unwrap().events.iter().any(
+        |event| matches!(event,RuntimeEventKind::TextDelta { text, .. } if text=="AFTER_TOOL")
+    ));
+    let completed = reply_history(&mut protocol, multistream_history());
+    assert!(
+        matches!(completed.events.as_slice(),[RuntimeEventKind::TurnFinished {outcome:TurnOutcome::Completed,output,..}] if output=="BEFORE_TOOLAFTER_TOOL")
+    );
+}
+
+#[test]
+fn authoritative_history_recovers_an_unseen_stream_and_late_transport_cannot_duplicate_it() {
+    let (mut protocol, after) = multistream_before_final_text();
+    protocol.receive(multistream_terminal()).unwrap();
+    let id = protocol.pending.as_ref().unwrap().id;
+    let result = multistream_history();
+    let completed = reply_history(&mut protocol, result.clone());
+    assert!(matches!(completed.events.as_slice(),[
+        RuntimeEventKind::TextDelta{text,..},RuntimeEventKind::TurnFinished{outcome:TurnOutcome::Completed,output,..}
+    ] if text=="AFTER_TOOL" && output=="BEFORE_TOOLAFTER_TOOL"));
+    assert!(protocol.receive(after).unwrap().events.is_empty());
+    assert!(
+        protocol
+            .receive(json!({"jsonrpc":"2.0","id":id,"result":result}))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert!(protocol.prompt.is_none());
+}
+
+#[tokio::test]
+async fn recovered_text_is_published_before_the_terminal_event() {
+    let (mut protocol, _) = multistream_before_final_text();
+    protocol.receive(multistream_terminal()).unwrap();
+    let effects = reply_history(&mut protocol, multistream_history());
+    let (sender, mut receiver) = mpsc::channel(4);
+    let mut stdin = Cursor::new(Vec::new());
+    flush_effects(&protocol, &mut stdin, &sender, effects)
+        .await
+        .unwrap();
+    assert!(
+        matches!(receiver.try_recv().unwrap().kind,RuntimeEventKind::TextDelta{text,..} if text=="AFTER_TOOL")
+    );
+    assert!(matches!(
+        receiver.try_recv().unwrap().kind,
+        RuntimeEventKind::TurnFinished {
+            outcome: TurnOutcome::Completed,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn empty_snapshot_retries_without_acking_or_sending_the_queued_prompt() {
+    let (mut protocol, _) = multistream_before_final_text();
+    protocol.receive(multistream_terminal()).unwrap();
+    let empty = json!({"updates":[],"totalCount":0,"hasMore":false});
+    let first_id = protocol.pending.as_ref().unwrap().id;
+    let first = reply_history(&mut protocol, empty.clone());
+    assert!(first.events.is_empty() && first.writes.is_empty());
+    let queued_id = Uuid::new_v4();
+    let queued = internal_submit(&mut protocol, queued_id, "下一轮");
+    assert!(queued.events.is_empty() && queued.writes.is_empty());
+    protocol
+        .prompt
+        .as_mut()
+        .unwrap()
+        .completion
+        .as_mut()
+        .unwrap()
+        .retry_at = Some(Instant::now());
+    let retry = protocol.poll_final_output();
+    assert_eq!(retry.writes[0]["method"], "_x.ai/session/updates");
+    let retry_id = protocol.pending.as_ref().unwrap().id;
+    assert!(retry_id > first_id);
+    assert!(
+        protocol
+            .receive(json!({"jsonrpc":"2.0","id":first_id,"result":empty}))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert_eq!(protocol.pending.as_ref().unwrap().id, retry_id);
+    let completed = reply_history(&mut protocol, multistream_history());
+    assert_eq!(completed.writes[0]["method"], "session/prompt");
+    assert_eq!(protocol.prompt.as_ref().unwrap().message_id, queued_id);
+    assert!(!completed.events.iter().any(|event|matches!(event,RuntimeEventKind::MessageAccepted{message_id,..} if *message_id==queued_id)));
+}
+
+#[test]
+fn an_old_prompt_watermark_never_completes_the_current_prompt() {
+    let (mut protocol, _) = multistream_before_final_text();
+    protocol.receive(multistream_terminal()).unwrap();
+    let mut result = multistream_history();
+    result["updates"]
+        .as_array_mut()
+        .unwrap()
+        .last_mut()
+        .unwrap()["params"]["update"]["prompt_id"] = json!("old-prompt");
+    let effects = reply_history(&mut protocol, result);
+    assert!(effects.events.is_empty());
+    assert!(
+        protocol
+            .prompt
+            .as_ref()
+            .unwrap()
+            .completion
+            .as_ref()
+            .unwrap()
+            .retry_at
+            .is_some()
+    );
+}
+
+#[test]
+fn inconsistent_or_truncated_snapshots_explicitly_fail_output_recovery() {
+    for mutation in 0..8 {
+        let (mut protocol, _) = multistream_before_final_text();
+        protocol.receive(multistream_terminal()).unwrap();
+        let mut result = multistream_history();
+        match mutation {
+            0 => result["hasMore"] = json!(true),
+            1 => result["totalCount"] = json!(super::MAX_NATIVE_IDENTITIES + 1),
+            2 => result["lastEventId"] = json!("different-session-16"),
+            3 => result["updates"][0]["params"]["sessionId"] = json!("different-session"),
+            4 => result["updates"][0]["params"]["update"]["content"]["text"] = json!("conflicting"),
+            5 => result["updates"][3]["params"]["update"]["stop_reason"] = json!("cancelled"),
+            6 => {
+                result["updates"][1]["params"]["_meta"]["eventId"] =
+                    result["updates"][0]["params"]["_meta"]["eventId"].clone()
+            }
+            7 => result["updates"].as_array_mut().unwrap().swap(2, 3),
+            unexpected => panic!("未知变体：{unexpected}"),
+        }
+        let effects = reply_history(&mut protocol, result);
+        assert!(
+            matches!(effects.events.as_slice(),[RuntimeEventKind::TurnFinished{outcome:TurnOutcome::Failed{..},output,..}] if output=="BEFORE_TOOL")
+        );
+        assert!(protocol.prompt.is_none());
+    }
+}
+
+#[test]
+fn unsupported_history_query_preserves_partial_text_and_never_reports_success() {
+    let (mut protocol, _) = multistream_before_final_text();
+    protocol.receive(multistream_terminal()).unwrap();
+    let effects=protocol.receive(json!({"jsonrpc":"2.0","id":protocol.pending.as_ref().unwrap().id,"error":{"code":-32601,"message":"unsupported"}})).unwrap();
+    assert!(
+        matches!(effects.events.as_slice(),[RuntimeEventKind::TurnFinished{outcome:TurnOutcome::Failed{..},output,..}] if output=="BEFORE_TOOL")
+    );
+}
+
+#[test]
+fn malformed_history_response_reports_output_recovery_failure() {
+    let (mut protocol, _) = multistream_before_final_text();
+    protocol.receive(multistream_terminal()).unwrap();
+    let effects = protocol
+        .receive(json!({"jsonrpc":"2.0","id":protocol.pending.as_ref().unwrap().id,"result":null}))
+        .unwrap();
+    assert!(
+        matches!(effects.events.as_slice(),[RuntimeEventKind::TurnFinished{outcome:TurnOutcome::Failed{..},output,..}] if output=="BEFORE_TOOL")
+    );
+    assert!(protocol.prompt.is_none());
+}
+
+#[test]
+fn missing_watermark_deadline_fails_and_closes_without_reexecuting_queued_work() {
+    let (mut protocol, _) = multistream_before_final_text();
+    protocol.receive(multistream_terminal()).unwrap();
+    internal_submit(&mut protocol, Uuid::new_v4(), "排队但不允许重复执行");
+    protocol
+        .prompt
+        .as_mut()
+        .unwrap()
+        .completion
+        .as_mut()
+        .unwrap()
+        .started_at = Instant::now() - REQUEST_TIMEOUT - Duration::from_secs(1);
+    let effects = protocol.poll_final_output();
+    assert!(effects.writes.is_empty());
+    assert!(matches!(
+        effects.events.as_slice(),
+        [
+            RuntimeEventKind::TurnFinished {
+                outcome: TurnOutcome::Failed { .. },
+                ..
+            },
+            RuntimeEventKind::RequestFailed { .. }
+        ]
+    ));
+    assert!(protocol.closed && protocol.prompt.is_none() && protocol.queued.is_empty());
+}
+
+#[test]
+fn a_native_completed_turn_cannot_receive_a_new_approval_or_cancel() {
+    let (mut protocol, request) = pending_native_approval();
+    let turn = protocol.prompt.as_ref().unwrap().native_id.clone().unwrap();
+    let id = protocol.pending.as_ref().unwrap().id;
+    protocol.receive(json!({"jsonrpc":"2.0","id":id,"result":{"stopReason":"end_turn","_meta":{"sessionId":protocol.session_id,"promptId":turn}}})).unwrap();
+    assert_eq!(
+        protocol.receive(request).unwrap().writes[0]["result"]["outcome"]["outcome"],
+        "cancelled"
+    );
+    let cancelled = internal_action(
+        &mut protocol,
+        Uuid::new_v4(),
+        RuntimeAction::Interrupt { turn_id: turn },
+    );
+    assert!(cancelled.writes.is_empty());
+    assert!(matches!(
+        cancelled.events.as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+}
+
+#[test]
+fn shutdown_during_final_history_reports_partial_failure_exactly_once() {
+    let (mut protocol, late_text) = multistream_before_final_text();
+    protocol.receive(multistream_terminal()).unwrap();
+    let queued = [Uuid::new_v4(), Uuid::new_v4()];
+    for id in queued {
+        internal_submit(&mut protocol, id, "尚未发送的排队请求");
+    }
+    let mut effects = internal_action(&mut protocol, Uuid::new_v4(), RuntimeAction::Shutdown);
+    assert!(protocol.closed);
+    let cleanup = protocol.finish_transport(&Ok(()));
+    effects.events.extend(cleanup.events);
+    effects.writes.extend(cleanup.writes);
+    assert!(effects.writes.is_empty());
+    assert_eq!(
+        effects
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                RuntimeEventKind::TurnFinished {
+                    outcome, output, ..
+                } => Some((outcome, output.as_str())),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .as_slice(),
+        &[(
+            &TurnOutcome::Failed {
+                message: crate::t!("cli-agent-grok-output-unverified"),
+            },
+            "BEFORE_TOOL"
+        )]
+    );
+    for id in queued {
+        assert_eq!(effects.events.iter().filter(|event| matches!(event,RuntimeEventKind::RequestFailed {message_id,..} if message_id==&id)).count(), 1);
+    }
+    assert!(protocol.pending.is_none() && protocol.prompt.is_none() && protocol.queued.is_empty());
+    assert!(protocol.finish_transport(&Ok(())).events.is_empty());
+    assert!(protocol.receive(late_text).unwrap().events.is_empty());
+}
+
+#[test]
+fn normal_transport_exit_during_final_history_rejects_all_unsent_work() {
+    let (mut protocol, _) = multistream_before_final_text();
+    protocol.receive(multistream_terminal()).unwrap();
+    let queued = [Uuid::new_v4(), Uuid::new_v4()];
+    for id in queued {
+        internal_submit(&mut protocol, id, "控制器关闭后不得执行");
+    }
+    // 控制通道关闭走传输的正常返回，必须与错误退出一样收束未核验的输出。
+    let effects = protocol.finish_transport(&Ok(()));
+    assert!(effects.writes.is_empty());
+    assert!(
+        matches!(effects.events.first(),Some(RuntimeEventKind::TurnFinished {outcome:TurnOutcome::Failed {..}, output,..}) if output=="BEFORE_TOOL")
+    );
+    assert_eq!(effects.events.len(), 1 + queued.len());
+    for id in queued {
+        assert_eq!(effects.events.iter().filter(|event| matches!(event,RuntimeEventKind::RequestFailed {message_id,..} if message_id==&id)).count(), 1);
+    }
+    assert!(
+        protocol.closed
+            && protocol.pending.is_none()
+            && protocol.prompt.is_none()
+            && protocol.queued.is_empty()
+    );
+    assert!(protocol.finish_transport(&Ok(())).events.is_empty());
+}
+
+#[test]
+fn production_text_command_dispatches_before_native_ack_and_queues_without_claiming_receipt() {
+    let mut protocol = ready_protocol();
+    let first = Uuid::new_v4();
+    let second = Uuid::new_v4();
+    let input = "中文与English\n第二行";
+    let dispatch = internal_submit(&mut protocol, first, input);
+    assert_eq!(dispatch.writes.len(), 1);
+    assert_eq!(dispatch.writes[0]["method"], "session/prompt");
+    assert_eq!(
+        dispatch.writes[0]["params"]["prompt"],
+        json!([{"type":"text", "text":input}])
+    );
+    assert!(
+        !dispatch
+            .events
+            .iter()
+            .any(|event| matches!(event, RuntimeEventKind::MessageAccepted { .. }))
+    );
+    let queued = internal_submit(&mut protocol, second, "只在后续回合执行");
+    assert!(queued.writes.is_empty());
+    assert!(queued.events.is_empty());
+    assert_eq!(protocol.queued.len(), 1);
+    assert!(
+        internal_submit(&mut protocol, second, "只在后续回合执行")
+            .writes
+            .is_empty()
+    );
+    assert_eq!(protocol.queued.len(), 1);
+    assert!(matches!(
+        internal_submit(&mut protocol, second, "禁止复用消息ID改变内容")
+            .events
+            .as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+}
+
+#[test]
+fn root_only_adapter_rejects_parent_ceiling_and_local_tools_before_spawn() {
+    let mut launch = options();
+    let ceiling = serde_json::from_value(json!({
+        "parent_task_id":"parent", "parent_generation":1,
+        "parent_native_session_id":"native-parent", "working_directory":launch.cwd,
+        "permissions":{"approvalPolicy":"on-request", "approvalsReviewer":"user",
+            "sandbox":{"type":"readOnly", "networkAccess":false}}
+    }))
+    .unwrap();
+    launch.permission_ceiling = Some(ceiling);
+    assert!(validate_options(&launch).is_err());
+    launch.permission_ceiling = None;
+    launch.local_tools = Some(LocalToolPermissions::default());
+    assert!(validate_options(&launch).is_err());
+    launch.local_tools = None;
+    assert!(validate_options(&launch).is_ok());
 }

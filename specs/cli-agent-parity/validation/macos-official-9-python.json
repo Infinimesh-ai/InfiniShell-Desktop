@@ -1,0 +1,91 @@
+{
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "source_manifest_sha256": "3cfc5c4bbc5ce69f51dbd706b2178c11f470818f417a1a323f4f2018b9305e34",
+  "groups": [
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.103
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_profile_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.099
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.161
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.117
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/codex_source_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.311
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.108
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 2.144
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.709
+    }
+  ],
+  "wall_seconds": 3.754,
+  "log_sha256": "679a18690f62a3276a6de8e1a59e473e67c66bdbcfc2d57cc53dc36bb906be75",
+  "log": "/tmp/infinishell-cli-parity-official-9-python.log",
+  "all_passed": true,
+  "scope": "冻结source9的8组离线运行器回归，不计真实CLI生命周期。"
+}

@@ -1,7 +1,8 @@
 use std::time::Duration;
 
+use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
 use futures::executor::block_on;
-use serde_json::json;
+use serde_json::{Value, json};
 use uuid::Uuid;
 use warpui::App;
 use warpui::r#async::Timer;
@@ -15,6 +16,7 @@ use crate::ai::llms::LLMId;
 use crate::ai::local_cli_mailbox::send_local_message_if_current;
 use crate::persistence::local_cli_tasks::load_task_generations;
 use crate::persistence::model::LocalCliReceiptKind;
+use crate::persistence::schema::{local_cli_messages, local_cli_task_generations};
 use crate::test_util::terminal::{add_window_with_terminal, initialize_app_for_terminal_view};
 
 #[test]
@@ -68,6 +70,7 @@ fn parent_message_validation_after_sent_and_capacity_wait_cannot_enqueue_an_old_
             .try_send(ManagedRequest {
                 expected_generation: 1,
                 from_mailbox: false,
+                prepared_result: None,
                 message_id: Uuid::new_v4(),
                 action: RuntimeAction::Shutdown,
                 reply,
@@ -206,6 +209,7 @@ fn resume_claims_unstarted_generation_but_rejects_incomplete_process_records() {
         generation: Uuid::new_v4(),
         permission_policy: super::super::PermissionPolicy::Inherit,
         permission_ceiling: None,
+        claude_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
@@ -656,6 +660,7 @@ fn sqlite_parent_ceiling_uses_the_creation_generation_after_parent_resume() {
                 .map(serde_json::from_value)
                 .transpose()
                 .unwrap(),
+            claude_profile: None,
             model: None,
             local_tools: None,
             selected_skills: Vec::new(),
@@ -714,6 +719,153 @@ async fn persisted_running_claude(sender: &SyncSender<ModelEvent>) -> ManagedTas
         .await
         .unwrap();
     state
+}
+
+#[test]
+fn result_blocked_by_a_native_pending_input_stays_queued_and_is_written_once_after_join() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("result.sqlite")).unwrap();
+    block_on(async {
+        let mut state = persisted_running_claude(&writer.sender).await;
+        let mut child = snapshot().task;
+        child.parent_task_id = Some(state.task.task_id.clone());
+        child.parent_generation = Some(1);
+        checkpoint_task(&writer.sender, child.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        child.revision = 1;
+        child.state = LocalCliTaskState::Completed;
+        child.result = Some("子任务结果".into());
+        child.terminal_evidence = Some("turn/completed:child-1".into());
+        checkpoint_task(&writer.sender, child.clone(), Some(1))
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let result = enqueue_task_result(&writer.sender, child.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let token = Uuid::new_v4();
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let user_id = Uuid::from_u128(11);
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            user_id,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Text("先入队的用户输入".into())],
+            },
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().message_id, user_id);
+        let result_id = Uuid::parse_str(&result.message_id).unwrap();
+        let action = RuntimeAction::Submit {
+            input: vec![InputContent::Text("自动结果".into())],
+        };
+        send_mailbox_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            result_id,
+            action.clone(),
+            Some(result.clone()),
+        )
+        .await
+        .unwrap();
+        assert!(commands.try_recv().is_err());
+        let stored = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            stored
+                .iter()
+                .find(|message| message.message_id == result.message_id)
+                .unwrap()
+                .state,
+            LocalCliMessageState::Queued
+        );
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        for id in [user_id, result_id] {
+            if id == result_id {
+                send_mailbox_request(
+                    &writer.sender,
+                    &mut state,
+                    &controller,
+                    token,
+                    result_id,
+                    action.clone(),
+                    Some(result.clone()),
+                )
+                .await
+                .unwrap();
+                assert_eq!(commands.try_recv().unwrap().message_id, result_id);
+                let pending = claude_pending_input(&state.task).unwrap();
+                send_mailbox_request(
+                    &writer.sender,
+                    &mut state,
+                    &controller,
+                    token,
+                    result_id,
+                    action.clone(),
+                    Some(result.clone()),
+                )
+                .await
+                .unwrap();
+                assert!(commands.try_recv().is_err());
+                assert_eq!(claude_pending_input(&state.task).unwrap(), pending);
+            }
+            for kind in [
+                RuntimeEventKind::MessageAccepted {
+                    message_id: id,
+                    turn_id: Some(id.to_string()),
+                },
+                RuntimeEventKind::InputJoined {
+                    message_id: id,
+                    turn_id: Uuid::from_u128(10).to_string(),
+                },
+            ] {
+                let native = event(&state, kind);
+                commit_runtime_event(
+                    &writer.sender,
+                    &mut state,
+                    &native,
+                    &mut accepted,
+                    &mut finished,
+                )
+                .await
+                .unwrap();
+            }
+        }
+        send_mailbox_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            result_id,
+            action,
+            Some(result.clone()),
+        )
+        .await
+        .unwrap();
+        assert!(commands.try_recv().is_err(), "已领取的结果不能再次写入协议");
+        assert!(!claude_input_pending(&state.task));
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
 }
 
 #[test]
@@ -919,6 +1071,144 @@ fn claude_queued_input_commits_receipt_before_advancing_the_execution_generation
             .unwrap();
         assert_eq!(saved[0].state, LocalCliMessageState::Acknowledged);
         assert_eq!(saved[0].recipient_generation, 1);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn native_joined_input_keeps_the_execution_generation_and_requires_its_result() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("joined.sqlite")).unwrap();
+    block_on(async {
+        let mut state = persisted_running_claude(&writer.sender).await;
+        let token = Uuid::new_v4();
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let id = Uuid::from_u128(11);
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            id,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Text("追加输入".into())],
+            },
+            false,
+        )
+        .await
+        .unwrap();
+        commands.try_recv().unwrap();
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let joined = event(
+            &state,
+            RuntimeEventKind::InputJoined {
+                message_id: id,
+                turn_id: Uuid::from_u128(10).to_string(),
+            },
+        );
+        assert!(
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &joined,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err()
+        );
+        let ack = event(
+            &state,
+            RuntimeEventKind::MessageAccepted {
+                message_id: id,
+                turn_id: Some(id.to_string()),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &ack,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &joined,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert!(!claude_input_pending(&state.task));
+        assert_eq!(state.task.generation, 1);
+        assert_eq!(state.output, "当前回合输出");
+        assert_eq!(state.active_turn_id, Some(Uuid::from_u128(10).to_string()));
+        let execution_result = event(
+            &state,
+            RuntimeEventKind::TurnFinished {
+                turn_id: Uuid::from_u128(10).to_string(),
+                outcome: TurnOutcome::Completed,
+                output: "共同结果".into(),
+            },
+        );
+        assert!(
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &execution_result,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task.state, LocalCliTaskState::Running);
+        let input_result = event(
+            &state,
+            RuntimeEventKind::TurnFinished {
+                turn_id: id.to_string(),
+                outcome: TurnOutcome::Completed,
+                output: "共同结果".into(),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &input_result,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.state, LocalCliTaskState::Running);
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &execution_result,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.state, LocalCliTaskState::Completed);
+        assert_eq!(state.task.generation, 1);
+        let saved = load_task_generations(&writer.sender, state.task.task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.len(), 1);
+        let config: serde_json::Value = serde_json::from_str(&saved[0].config_json).unwrap();
+        assert_eq!(
+            config["claude_joined_inputs"],
+            json!([{"message_id":id,"turn_id":Uuid::from_u128(10),"submission_generation":1,"outcome":"Completed"}])
+        );
     });
     writer.sender.send(ModelEvent::Terminate).unwrap();
     writer.handle.join().unwrap();
@@ -1211,4 +1501,2226 @@ fn premature_claude_queue_terminal_or_overlapping_start_cannot_replace_the_activ
     });
     writer.sender.send(ModelEvent::Terminate).unwrap();
     writer.handle.join().unwrap();
+}
+
+#[test]
+fn claude_fixed_profile_is_committed_before_ready_and_cannot_change_on_repeated_ready() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("profile.sqlite")).unwrap();
+    block_on(async {
+        let mut state = snapshot();
+        state.ready = false;
+        state.task.harness = "claude".into();
+        state.task.working_directory = directory.path().to_string_lossy().into();
+        state.task.config_json = json!({"permission_policy":"ClaudeRestrictedFilesV1"}).to_string();
+        checkpoint_task(&writer.sender, state.task.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let profile = json!({
+            "version":1,
+            "workingDirectory":state.task.working_directory,
+            "canonicalWorkingDirectory":std::fs::canonicalize(&state.task.working_directory).unwrap(),
+            "executableSha256":"953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
+            "denyRules":[], "sourceRules":[], "localTools":null,
+        });
+        let permissions = json!({
+            "permissionMode":"plan",
+            "fixedProfileVerified":true,
+            "claudeRestrictedFilesV1":profile,
+        });
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let ready = event(
+            &state,
+            RuntimeEventKind::SessionReady {
+                effective_permissions: permissions.clone(),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &ready,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert!(state.ready);
+        let stored = load_tasks(&writer.sender, false)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored, [state.task.clone()]);
+        let config: serde_json::Value = serde_json::from_str(&stored[0].config_json).unwrap();
+        assert_eq!(config["claude_profile"], profile);
+        assert!(
+            load_messages(&writer.sender, state.task.task_id.clone(), 1)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap()
+                .is_empty()
+        );
+
+        for replacement in [
+            json!({"fixedProfileVerified":false,"claudeRestrictedFilesV1":profile}),
+            json!({"fixedProfileVerified":true}),
+            {
+                let mut changed = permissions.clone();
+                changed["permissionMode"] = json!("bypassPermissions");
+                changed
+            },
+            {
+                let mut changed = permissions.clone();
+                changed["claudeRestrictedFilesV1"]["localTools"] =
+                    json!({"allow_spawn":true,"allow_message":true});
+                changed
+            },
+            {
+                let mut changed = permissions.clone();
+                changed["claudeRestrictedFilesV1"]["workingDirectory"] = json!("relative/path");
+                changed
+            },
+        ] {
+            let before = state.task.clone();
+            let invalid = event(
+                &state,
+                RuntimeEventKind::SessionReady {
+                    effective_permissions: replacement,
+                },
+            );
+            assert!(
+                commit_runtime_event(
+                    &writer.sender,
+                    &mut state,
+                    &invalid,
+                    &mut accepted,
+                    &mut finished
+                )
+                .await
+                .is_err()
+            );
+            assert_eq!(state.task, before);
+            assert_eq!(
+                load_tasks(&writer.sender, false)
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                [before]
+            );
+        }
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn grok_ready_commits_verified_version_without_claiming_fixed_permissions_or_local_tools() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("grok-ready.sqlite")).unwrap();
+    block_on(async {
+        let mut state = snapshot();
+        state.task.harness = "grok".into();
+        state.ready = false;
+        state.task.config_json =
+            json!({"permission_policy":"Inherit", "local_tools":null}).to_string();
+        checkpoint_task(&writer.sender, state.task.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let permissions = json!({"requestedPolicy":"inherit", "effectiveNativePolicy":null,
+            "permissionEnforcementVerified":false, "verifiedCapabilities":{"submit":true,
+                "queuedSubmit":true, "approval":true, "cancel":true, "resume":true,
+                "steer":false, "localTools":false, "childTasks":false}});
+        let ready = event(
+            &state,
+            RuntimeEventKind::SessionReady {
+                effective_permissions: permissions.clone(),
+            },
+        );
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &ready,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        let stored = load_tasks(&writer.sender, false)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(state.ready);
+        assert_eq!(stored, [state.task.clone()]);
+        let config: Value = serde_json::from_str(&stored[0].config_json).unwrap();
+        assert_eq!(config["cli_version"], "1.0.30");
+        assert_eq!(config["effective_permissions"], permissions);
+        assert!(config["permission_ceiling"].is_null());
+        assert!(config["local_tools"].is_null());
+        assert!(accepted.is_empty());
+        assert!(finished.is_empty());
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+async fn persisted_grok_runtime(
+    sender: &SyncSender<ModelEvent>,
+    token: Uuid,
+) -> ManagedTaskSnapshot {
+    let mut state = snapshot();
+    state.task.harness = "grok".into();
+    state.task.config_json = json!({"runtime_generation":token}).to_string();
+    checkpoint_task(sender, state.task.clone(), None)
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+    state
+}
+
+async fn commit_grok_kind(
+    sender: &SyncSender<ModelEvent>,
+    state: &mut ManagedTaskSnapshot,
+    token: Uuid,
+    kind: RuntimeEventKind,
+    accepted: &mut HashSet<String>,
+    finished: &mut HashSet<String>,
+) -> Result<bool, String> {
+    let mut native_event = event(state, kind);
+    native_event.generation = token;
+    commit_runtime_event(sender, state, &native_event, accepted, finished).await
+}
+
+async fn submit_grok_input(
+    sender: &SyncSender<ModelEvent>,
+    state: &mut ManagedTaskSnapshot,
+    controller: &RuntimeController,
+    token: Uuid,
+    message_id: Uuid,
+) {
+    send_user_request(
+        sender,
+        state,
+        controller,
+        token,
+        message_id,
+        RuntimeAction::Submit {
+            input: vec![InputContent::Text("相同正文不用于关联输入".into())],
+        },
+        false,
+    )
+    .await
+    .unwrap();
+}
+
+#[test]
+fn grok_queued_inputs_keep_original_receipts_and_native_links_across_generations_and_restart() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("grok-queue.sqlite");
+    let writer = crate::persistence::start_test_writer(&database).unwrap();
+    let token = Uuid::new_v4();
+    let a = Uuid::from_u128(101);
+    let b = Uuid::from_u128(102);
+    let c = Uuid::from_u128(103);
+    let task_id = block_on(async {
+        let mut state = persisted_grok_runtime(&writer.sender, token).await;
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        submit_grok_input(&writer.sender, &mut state, &controller, token, a).await;
+        commands.try_recv().unwrap();
+        for kind in [
+            RuntimeEventKind::MessageAccepted {
+                message_id: a,
+                turn_id: Some("native-a".into()),
+            },
+            RuntimeEventKind::TurnStarted {
+                turn_id: "native-a".into(),
+            },
+        ] {
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                kind,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap();
+        }
+        submit_grok_input(&writer.sender, &mut state, &controller, token, b).await;
+        commands.try_recv().unwrap();
+        submit_grok_input(&writer.sender, &mut state, &controller, token, b).await;
+        assert!(commands.try_recv().is_err());
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::TurnFinished {
+                turn_id: "native-a".into(),
+                outcome: TurnOutcome::Completed,
+                output: "第一轮完整结果".into(),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::MessageAccepted {
+                message_id: b,
+                turn_id: Some("native-b".into()),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        // 终态提交 C 创建 Queued 代 2；FIFO 中 B 先绑定执行 2，C 原提交代仍为 2。
+        submit_grok_input(&writer.sender, &mut state, &controller, token, c).await;
+        commands.try_recv().unwrap();
+        assert_eq!(state.task.generation, 2);
+        assert_eq!(state.task.state, LocalCliTaskState::Queued);
+        assert!(grok_input_links(&state.task).unwrap().current.is_none());
+        let queued = grok_input_links(&state.task).unwrap().pending;
+        assert_eq!(queued[0].message_id, b);
+        assert_eq!(queued[0].submission_generation, 1);
+        assert_eq!(queued[1].message_id, c);
+        assert_eq!(queued[1].submission_generation, 2);
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::TurnStarted {
+                turn_id: "native-b".into(),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.generation, 2);
+        let link = grok_input_links(&state.task).unwrap().current.unwrap();
+        assert_eq!(link.message_id, b);
+        assert_eq!(link.submission_generation, 1);
+        assert_eq!(link.native_turn_id.as_deref(), Some("native-b"));
+        submit_grok_input(&writer.sender, &mut state, &controller, token, b).await;
+        assert!(commands.try_recv().is_err(), "跨代重投不能再写原生协议");
+        for kind in [
+            RuntimeEventKind::MessageAccepted {
+                message_id: a,
+                turn_id: Some("native-a".into()),
+            },
+            RuntimeEventKind::TurnStarted {
+                turn_id: "native-a".into(),
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: "native-a".into(),
+                outcome: TurnOutcome::Completed,
+                output: "过时结果".into(),
+            },
+        ] {
+            assert!(
+                !commit_grok_kind(
+                    &writer.sender,
+                    &mut state,
+                    token,
+                    kind,
+                    &mut accepted,
+                    &mut finished
+                )
+                .await
+                .unwrap()
+            );
+        }
+        for kind in [
+            RuntimeEventKind::TurnFinished {
+                turn_id: "native-b".into(),
+                outcome: TurnOutcome::Cancelled,
+                output: "原生确认取消 B".into(),
+            },
+            RuntimeEventKind::MessageAccepted {
+                message_id: c,
+                turn_id: Some("native-c".into()),
+            },
+        ] {
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                kind,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap();
+        }
+        assert!(
+            !commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                RuntimeEventKind::MessageAccepted {
+                    message_id: c,
+                    turn_id: Some("native-c".into())
+                },
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .unwrap()
+        );
+        for kind in [
+            RuntimeEventKind::TurnStarted {
+                turn_id: "native-c".into(),
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: "native-c".into(),
+                outcome: TurnOutcome::Completed,
+                output: "取消后等待的 C 完成".into(),
+            },
+        ] {
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                kind,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap();
+        }
+        assert_eq!(state.task.generation, 3);
+        let saved = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.len(), 2);
+        assert!(saved.iter().all(|message| message.recipient_generation == 1
+            && message.sender_generation == 1
+            && message.state == LocalCliMessageState::Acknowledged
+            && message.receipt_kind == Some(LocalCliReceiptKind::NativeProtocol)));
+        let saved_c = load_messages(&writer.sender, state.task.task_id.clone(), 2)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved_c.len(), 1);
+        assert_eq!(saved_c[0].message_id, c.to_string());
+        assert_eq!(saved_c[0].recipient_generation, 2);
+        assert_eq!(saved_c[0].state, LocalCliMessageState::Acknowledged);
+        state.task.task_id
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+    let restarted = crate::persistence::start_test_writer(&database).unwrap();
+    block_on(async {
+        let history = load_task_generations(&restarted.sender, task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(history.len(), 3);
+        for (record, id, turn, original_generation) in [
+            (&history[0], a, "native-a", 1),
+            (&history[1], b, "native-b", 1),
+            (&history[2], c, "native-c", 2),
+        ] {
+            let links = grok_input_links(record).unwrap();
+            let input = links.current.unwrap();
+            assert_eq!(input.message_id, id);
+            assert_eq!(input.submission_generation, original_generation);
+            assert_eq!(input.runtime_generation, token);
+            assert_eq!(input.native_turn_id.as_deref(), Some(turn));
+            assert!(record.terminal_evidence.is_some());
+        }
+        assert_eq!(history[0].result.as_deref(), Some("第一轮完整结果"));
+        assert_eq!(history[1].state, LocalCliTaskState::Cancelled);
+        assert_eq!(history[2].result.as_deref(), Some("取消后等待的 C 完成"));
+        let current = load_tasks(&restarted.sender, false)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(current, [history[2].clone()]);
+        assert!(grok_input_links(&current[0]).unwrap().pending.is_empty());
+    });
+    restarted.sender.send(ModelEvent::Terminate).unwrap();
+    restarted.handle.join().unwrap();
+}
+
+#[test]
+fn grok_prepared_input_is_linked_once_and_unknown_or_stale_receipts_cannot_start_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("grok-proof.sqlite")).unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let mut state = persisted_grok_runtime(&writer.sender, token).await;
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let id = Uuid::new_v4();
+        let action = RuntimeAction::Submit {
+            input: vec![InputContent::Text("初始准备输入".into())],
+        };
+        enqueue_message(
+            &writer.sender,
+            input_message(&state.task, id, &action).unwrap(),
+        )
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            id,
+            action.clone(),
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().action, action);
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            id,
+            action,
+            true,
+        )
+        .await
+        .unwrap();
+        assert!(commands.try_recv().is_err());
+        assert_eq!(grok_input_links(&state.task).unwrap().pending.len(), 1);
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let before = state.task.clone();
+        assert!(
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                RuntimeEventKind::TurnStarted {
+                    turn_id: "unacknowledged".into()
+                },
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            !commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                Uuid::new_v4(),
+                RuntimeEventKind::MessageAccepted {
+                    message_id: id,
+                    turn_id: Some("native-proof".into())
+                },
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .unwrap()
+        );
+        assert!(
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                RuntimeEventKind::MessageAccepted {
+                    message_id: Uuid::new_v4(),
+                    turn_id: Some("native-proof".into())
+                },
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::MessageAccepted {
+                message_id: id,
+                turn_id: Some("native-proof".into()),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        let after_ack = state.task.clone();
+        assert!(
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                RuntimeEventKind::MessageAccepted {
+                    message_id: id,
+                    turn_id: Some("conflicting-native-id".into())
+                },
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, after_ack);
+        // 清空内存关联后，原生 started 仍需 SQLite 中实际 ACK 与持久回合映射共同证明。
+        accepted.clear();
+        state.task = load_tasks(&writer.sender, false)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap()
+            .remove(0);
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::TurnStarted {
+                turn_id: "native-proof".into(),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.generation, 1);
+        assert_eq!(state.task.state, LocalCliTaskState::Running);
+        assert_eq!(
+            grok_input_links(&state.task)
+                .unwrap()
+                .current
+                .unwrap()
+                .message_id,
+            id
+        );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn grok_pending_queue_is_bounded_and_closed_delivery_does_not_leave_a_live_link() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("grok-limit.sqlite")).unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let mut state = persisted_grok_runtime(&writer.sender, token).await;
+        let (controller, mut commands, _sender, _events) = channels(token);
+        for _ in 0..MAX_GROK_PENDING_INPUTS {
+            submit_grok_input(
+                &writer.sender,
+                &mut state,
+                &controller,
+                token,
+                Uuid::new_v4(),
+            )
+            .await;
+            commands.try_recv().unwrap();
+        }
+        let before = state.task.clone();
+        assert!(
+            send_user_request(
+                &writer.sender,
+                &mut state,
+                &controller,
+                token,
+                Uuid::new_v4(),
+                RuntimeAction::Submit {
+                    input: vec![InputContent::Text("超出等待容量".into())]
+                },
+                false
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        assert!(commands.try_recv().is_err());
+        let mut rejected = persisted_grok_runtime(&writer.sender, token).await;
+        let id = Uuid::new_v4();
+        drop(commands);
+        assert!(
+            send_user_request(
+                &writer.sender,
+                &mut rejected,
+                &controller,
+                token,
+                id,
+                RuntimeAction::Submit {
+                    input: vec![InputContent::Text("保留失败输入".into())]
+                },
+                false
+            )
+            .await
+            .is_err()
+        );
+        assert!(grok_input_links(&rejected.task).unwrap().pending.is_empty());
+        let stored = load_messages(&writer.sender, rejected.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored[0].state, LocalCliMessageState::Failed);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn grok_old_submission_failure_commits_before_clearing_only_its_pending_link() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("grok-failure.sqlite"))
+            .unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let mut state = persisted_grok_runtime(&writer.sender, token).await;
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let a = Uuid::from_u128(201);
+        let b = Uuid::from_u128(202);
+        let c = Uuid::from_u128(203);
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        submit_grok_input(&writer.sender, &mut state, &controller, token, a).await;
+        commands.try_recv().unwrap();
+        for kind in [
+            RuntimeEventKind::MessageAccepted {
+                message_id: a,
+                turn_id: Some("failure-a".into()),
+            },
+            RuntimeEventKind::TurnStarted {
+                turn_id: "failure-a".into(),
+            },
+        ] {
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                kind,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap();
+        }
+        for id in [b, c] {
+            submit_grok_input(&writer.sender, &mut state, &controller, token, id).await;
+            commands.try_recv().unwrap();
+        }
+        for kind in [
+            RuntimeEventKind::TurnFinished {
+                turn_id: "failure-a".into(),
+                outcome: TurnOutcome::Completed,
+                output: "A 结果".into(),
+            },
+            RuntimeEventKind::MessageAccepted {
+                message_id: b,
+                turn_id: Some("failure-b".into()),
+            },
+            RuntimeEventKind::TurnStarted {
+                turn_id: "failure-b".into(),
+            },
+        ] {
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                kind,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap();
+        }
+        assert_eq!(state.task.generation, 2);
+        let stale_failure = RuntimeEventKind::RequestFailed {
+            message_id: c,
+            message: "旧运行失败".into(),
+        };
+        let before = state.task.clone();
+        assert!(
+            !commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                Uuid::new_v4(),
+                stale_failure,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .unwrap()
+        );
+        assert_eq!(state.task, before);
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::RequestFailed {
+                message_id: c,
+                message: "原生明确拒绝 C".into(),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert!(grok_input_links(&state.task).unwrap().pending.is_empty());
+        assert_eq!(
+            grok_input_links(&state.task)
+                .unwrap()
+                .current
+                .unwrap()
+                .message_id,
+            b
+        );
+        assert_eq!(state.task.generation, 2);
+        assert_eq!(state.task.state, LocalCliTaskState::Running);
+        let saved = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let failed = saved
+            .iter()
+            .find(|message| message.message_id == c.to_string())
+            .unwrap();
+        assert_eq!(failed.recipient_generation, 1);
+        assert_eq!(failed.state, LocalCliMessageState::Failed);
+        assert_eq!(failed.receipt_kind, None);
+        assert!(
+            !commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                RuntimeEventKind::TurnFinished {
+                    turn_id: "failure-c".into(),
+                    outcome: TurnOutcome::Completed,
+                    output: "未启动回合不能收回成功".into()
+                },
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .unwrap()
+        );
+        assert_eq!(state.task.state, LocalCliTaskState::Running);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn grok_native_ack_requires_matching_session_fifo_and_committed_delivery_proof() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("grok-identity.sqlite"))
+            .unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let mut state = persisted_grok_runtime(&writer.sender, token).await;
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let a = Uuid::from_u128(301);
+        let b = Uuid::from_u128(302);
+        for id in [a, b] {
+            submit_grok_input(&writer.sender, &mut state, &controller, token, id).await;
+            commands.try_recv().unwrap();
+        }
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let before = state.task.clone();
+        assert!(
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                RuntimeEventKind::MessageAccepted {
+                    message_id: b,
+                    turn_id: Some("wrong-first".into())
+                },
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err()
+        );
+        let mut wrong_session = event(
+            &state,
+            RuntimeEventKind::MessageAccepted {
+                message_id: a,
+                turn_id: Some("native-identity-a".into()),
+            },
+        );
+        wrong_session.generation = token;
+        wrong_session.native_session_id = Some("other-session".into());
+        assert!(
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &wrong_session,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        // 只伪造持久 native turn 不足以 started；原消息仍 Sent，必须拒绝而保持 Queued。
+        let previous = state.task.clone();
+        let mut links = grok_input_links(&state.task).unwrap();
+        links.pending[0].native_turn_id = Some("native-identity-a".into());
+        set_grok_input_links(&mut state.task, &links).unwrap();
+        commit_transition(&writer.sender, &mut state.task, &previous)
+            .await
+            .unwrap();
+        let before = state.task.clone();
+        accepted.insert("native-identity-a".into());
+        assert!(
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                RuntimeEventKind::TurnStarted {
+                    turn_id: "native-identity-a".into()
+                },
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        assert_eq!(state.task.state, LocalCliTaskState::Queued);
+        let mut invalid = state.task.clone();
+        let mut links = grok_input_links(&invalid).unwrap();
+        links.pending.push(links.pending[0].clone());
+        set_grok_input_links(&mut invalid, &links).unwrap();
+        assert!(grok_input_links(&invalid).is_err());
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn grok_terminal_gap_preserves_multiple_inputs_with_or_without_head_ack() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("grok-terminal-gap.sqlite");
+    let writer = crate::persistence::start_test_writer(&database).unwrap();
+    let task_ids = block_on(async {
+        let mut ids = Vec::new();
+        for ack_before_gap in [false, true] {
+            for outcome in [
+                TurnOutcome::Completed,
+                TurnOutcome::Cancelled,
+                TurnOutcome::Failed {
+                    message: "原生 A 失败".into(),
+                },
+            ] {
+                let token = Uuid::new_v4();
+                let mut state = persisted_grok_runtime(&writer.sender, token).await;
+                let (controller, mut commands, _sender, _events) = channels(token);
+                let inputs = [
+                    Uuid::new_v4(),
+                    Uuid::new_v4(),
+                    Uuid::new_v4(),
+                    Uuid::new_v4(),
+                ];
+                let mut accepted = HashSet::new();
+                let mut finished = HashSet::new();
+                submit_grok_input(&writer.sender, &mut state, &controller, token, inputs[0]).await;
+                commands.try_recv().unwrap();
+                for kind in [
+                    RuntimeEventKind::MessageAccepted {
+                        message_id: inputs[0],
+                        turn_id: Some("gap-a".into()),
+                    },
+                    RuntimeEventKind::TurnStarted {
+                        turn_id: "gap-a".into(),
+                    },
+                ] {
+                    commit_grok_kind(
+                        &writer.sender,
+                        &mut state,
+                        token,
+                        kind,
+                        &mut accepted,
+                        &mut finished,
+                    )
+                    .await
+                    .unwrap();
+                }
+                submit_grok_input(&writer.sender, &mut state, &controller, token, inputs[1]).await;
+                commands.try_recv().unwrap();
+                commit_grok_kind(
+                    &writer.sender,
+                    &mut state,
+                    token,
+                    RuntimeEventKind::TurnFinished {
+                        turn_id: "gap-a".into(),
+                        outcome,
+                        output: "A 原生结果".into(),
+                    },
+                    &mut accepted,
+                    &mut finished,
+                )
+                .await
+                .unwrap();
+                let b_ack = RuntimeEventKind::MessageAccepted {
+                    message_id: inputs[1],
+                    turn_id: Some("gap-b".into()),
+                };
+                if ack_before_gap {
+                    commit_grok_kind(
+                        &writer.sender,
+                        &mut state,
+                        token,
+                        b_ack.clone(),
+                        &mut accepted,
+                        &mut finished,
+                    )
+                    .await
+                    .unwrap();
+                }
+                for id in [inputs[2], inputs[3]] {
+                    submit_grok_input(&writer.sender, &mut state, &controller, token, id).await;
+                    commands.try_recv().unwrap();
+                }
+                assert_eq!(state.task.generation, 2);
+                assert_eq!(state.task.state, LocalCliTaskState::Queued);
+                let links = grok_input_links(&state.task).unwrap();
+                assert!(links.current.is_none());
+                assert_eq!(
+                    links
+                        .pending
+                        .iter()
+                        .map(|input| (input.message_id, input.submission_generation))
+                        .collect::<Vec<_>>(),
+                    [(inputs[1], 1), (inputs[2], 2), (inputs[3], 2)]
+                );
+                if !ack_before_gap {
+                    commit_grok_kind(
+                        &writer.sender,
+                        &mut state,
+                        token,
+                        b_ack,
+                        &mut accepted,
+                        &mut finished,
+                    )
+                    .await
+                    .unwrap();
+                }
+                for (id, turn, execution_generation) in [
+                    (inputs[1], "gap-b", 2),
+                    (inputs[2], "gap-c", 3),
+                    (inputs[3], "gap-d", 4),
+                ] {
+                    if id != inputs[1] {
+                        commit_grok_kind(
+                            &writer.sender,
+                            &mut state,
+                            token,
+                            RuntimeEventKind::MessageAccepted {
+                                message_id: id,
+                                turn_id: Some(turn.into()),
+                            },
+                            &mut accepted,
+                            &mut finished,
+                        )
+                        .await
+                        .unwrap();
+                    }
+                    commit_grok_kind(
+                        &writer.sender,
+                        &mut state,
+                        token,
+                        RuntimeEventKind::TurnStarted {
+                            turn_id: turn.into(),
+                        },
+                        &mut accepted,
+                        &mut finished,
+                    )
+                    .await
+                    .unwrap();
+                    assert_eq!(state.task.generation, execution_generation);
+                    assert_eq!(
+                        grok_input_links(&state.task)
+                            .unwrap()
+                            .current
+                            .unwrap()
+                            .message_id,
+                        id
+                    );
+                    submit_grok_input(&writer.sender, &mut state, &controller, token, id).await;
+                    assert!(commands.try_recv().is_err());
+                    commit_grok_kind(
+                        &writer.sender,
+                        &mut state,
+                        token,
+                        RuntimeEventKind::TurnFinished {
+                            turn_id: turn.into(),
+                            outcome: TurnOutcome::Completed,
+                            output: format!("真实结果 {turn}"),
+                        },
+                        &mut accepted,
+                        &mut finished,
+                    )
+                    .await
+                    .unwrap();
+                }
+                for (generation, expected) in [
+                    (1, vec![inputs[0], inputs[1]]),
+                    (2, vec![inputs[2], inputs[3]]),
+                ] {
+                    let messages =
+                        load_messages(&writer.sender, state.task.task_id.clone(), generation)
+                            .unwrap()
+                            .await
+                            .unwrap()
+                            .unwrap();
+                    assert_eq!(messages.len(), expected.len());
+                    assert!(messages.iter().all(|message| {
+                        message.recipient_generation == generation
+                            && message.state == LocalCliMessageState::Acknowledged
+                            && expected
+                                .iter()
+                                .any(|id| id.to_string() == message.message_id)
+                    }));
+                }
+                ids.push(state.task.task_id);
+            }
+        }
+        ids
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+    let reopened = crate::persistence::start_test_writer(&database).unwrap();
+    block_on(async {
+        for id in task_ids {
+            let history = load_task_generations(&reopened.sender, id)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(history.len(), 4);
+            for (record, turn, original_generation) in [
+                (&history[1], "gap-b", 1),
+                (&history[2], "gap-c", 2),
+                (&history[3], "gap-d", 2),
+            ] {
+                let link = grok_input_links(record).unwrap().current.unwrap();
+                assert_eq!(link.native_turn_id.as_deref(), Some(turn));
+                assert_eq!(link.submission_generation, original_generation);
+                assert!(record.result.is_some());
+            }
+        }
+    });
+    reopened.sender.send(ModelEvent::Terminate).unwrap();
+    reopened.handle.join().unwrap();
+}
+
+#[test]
+fn grok_acknowledged_head_failure_before_started_is_persisted_without_rewriting_ack() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("grok-prestart-failure.sqlite");
+    let writer = crate::persistence::start_test_writer(&database).unwrap();
+    let task_ids = block_on(async {
+        let mut ids = Vec::new();
+        for open_gap_generation in [false, true] {
+            let token = Uuid::new_v4();
+            let mut state = persisted_grok_runtime(&writer.sender, token).await;
+            let (controller, mut commands, _sender, _events) = channels(token);
+            let a = Uuid::new_v4();
+            let b = Uuid::new_v4();
+            let c = Uuid::new_v4();
+            let mut accepted = HashSet::new();
+            let mut finished = HashSet::new();
+            submit_grok_input(&writer.sender, &mut state, &controller, token, a).await;
+            commands.try_recv().unwrap();
+            for kind in [
+                RuntimeEventKind::MessageAccepted {
+                    message_id: a,
+                    turn_id: Some("prestart-a".into()),
+                },
+                RuntimeEventKind::TurnStarted {
+                    turn_id: "prestart-a".into(),
+                },
+            ] {
+                commit_grok_kind(
+                    &writer.sender,
+                    &mut state,
+                    token,
+                    kind,
+                    &mut accepted,
+                    &mut finished,
+                )
+                .await
+                .unwrap();
+            }
+            submit_grok_input(&writer.sender, &mut state, &controller, token, b).await;
+            commands.try_recv().unwrap();
+            if !open_gap_generation {
+                submit_grok_input(&writer.sender, &mut state, &controller, token, c).await;
+                commands.try_recv().unwrap();
+            }
+            for kind in [
+                RuntimeEventKind::TurnFinished {
+                    turn_id: "prestart-a".into(),
+                    outcome: TurnOutcome::Completed,
+                    output: "A 完成".into(),
+                },
+                RuntimeEventKind::MessageAccepted {
+                    message_id: b,
+                    turn_id: Some("prestart-b".into()),
+                },
+            ] {
+                commit_grok_kind(
+                    &writer.sender,
+                    &mut state,
+                    token,
+                    kind,
+                    &mut accepted,
+                    &mut finished,
+                )
+                .await
+                .unwrap();
+            }
+            if open_gap_generation {
+                submit_grok_input(&writer.sender, &mut state, &controller, token, c).await;
+                commands.try_recv().unwrap();
+            }
+            assert!(state.active_turn_id.is_none());
+            let failed = RuntimeEventKind::TurnFinished {
+                turn_id: "prestart-b".into(),
+                outcome: TurnOutcome::Failed {
+                    message: "原生 RPC 失败".into(),
+                },
+                output: "B 原生失败结果".into(),
+            };
+            assert!(
+                commit_grok_kind(
+                    &writer.sender,
+                    &mut state,
+                    token,
+                    failed.clone(),
+                    &mut accepted,
+                    &mut finished
+                )
+                .await
+                .unwrap()
+            );
+            assert_eq!(state.task.generation, 2);
+            assert_eq!(state.task.state, LocalCliTaskState::Failed);
+            assert!(state.active_turn_id.is_none());
+            assert_eq!(state.task.result.as_deref(), Some("B 原生失败结果"));
+            let links = grok_input_links(&state.task).unwrap();
+            assert_eq!(links.current.unwrap().message_id, b);
+            assert_eq!(links.pending.len(), 1);
+            assert_eq!(links.pending[0].message_id, c);
+            let original_c = if open_gap_generation { 2 } else { 1 };
+            assert_eq!(links.pending[0].submission_generation, original_c);
+            let messages = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+            let b_message = messages
+                .iter()
+                .find(|message| message.message_id == b.to_string())
+                .unwrap();
+            assert_eq!(b_message.state, LocalCliMessageState::Acknowledged);
+            assert_eq!(
+                b_message.receipt_kind,
+                Some(LocalCliReceiptKind::NativeProtocol)
+            );
+            assert_eq!(b_message.recipient_generation, 1);
+            assert!(
+                !commit_grok_kind(
+                    &writer.sender,
+                    &mut state,
+                    token,
+                    failed,
+                    &mut accepted,
+                    &mut finished
+                )
+                .await
+                .unwrap()
+            );
+            for kind in [
+                RuntimeEventKind::MessageAccepted {
+                    message_id: c,
+                    turn_id: Some("prestart-c".into()),
+                },
+                RuntimeEventKind::TurnStarted {
+                    turn_id: "prestart-c".into(),
+                },
+                RuntimeEventKind::TurnFinished {
+                    turn_id: "prestart-c".into(),
+                    outcome: TurnOutcome::Completed,
+                    output: "C 后续真实完成".into(),
+                },
+            ] {
+                commit_grok_kind(
+                    &writer.sender,
+                    &mut state,
+                    token,
+                    kind,
+                    &mut accepted,
+                    &mut finished,
+                )
+                .await
+                .unwrap();
+            }
+            assert_eq!(state.task.generation, 3);
+            assert_eq!(
+                grok_input_links(&state.task)
+                    .unwrap()
+                    .current
+                    .unwrap()
+                    .submission_generation,
+                original_c
+            );
+            ids.push(state.task.task_id);
+        }
+        ids
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+    let reopened = crate::persistence::start_test_writer(&database).unwrap();
+    block_on(async {
+        for id in task_ids {
+            let history = load_task_generations(&reopened.sender, id)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(history.len(), 3);
+            assert_eq!(history[1].state, LocalCliTaskState::Failed);
+            assert_eq!(
+                grok_input_links(&history[1])
+                    .unwrap()
+                    .current
+                    .unwrap()
+                    .native_turn_id
+                    .as_deref(),
+                Some("prestart-b")
+            );
+            let evidence: Value =
+                serde_json::from_str(history[1].terminal_evidence.as_deref().unwrap()).unwrap();
+            assert!(matches!(
+                serde_json::from_value::<RuntimeEventKind>(evidence["event"].clone()).unwrap(),
+                RuntimeEventKind::TurnFinished {
+                    outcome: TurnOutcome::Failed { .. },
+                    ..
+                }
+            ));
+            assert_eq!(history[2].result.as_deref(), Some("C 后续真实完成"));
+        }
+    });
+    reopened.sender.send(ModelEvent::Terminate).unwrap();
+    reopened.handle.join().unwrap();
+}
+
+#[test]
+fn grok_failure_before_started_requires_real_ack_fifo_and_current_connection() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("grok-prestart-reject.sqlite");
+    let writer = crate::persistence::start_test_writer(&database).unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let mut state = persisted_grok_runtime(&writer.sender, token).await;
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let a = Uuid::new_v4();
+        let b = Uuid::new_v4();
+        let c = Uuid::new_v4();
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        submit_grok_input(&writer.sender, &mut state, &controller, token, a).await;
+        commands.try_recv().unwrap();
+        for kind in [
+            RuntimeEventKind::MessageAccepted {
+                message_id: a,
+                turn_id: Some("reject-a".into()),
+            },
+            RuntimeEventKind::TurnStarted {
+                turn_id: "reject-a".into(),
+            },
+        ] {
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                kind,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap();
+        }
+        submit_grok_input(&writer.sender, &mut state, &controller, token, b).await;
+        commands.try_recv().unwrap();
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::TurnFinished {
+                turn_id: "reject-a".into(),
+                outcome: TurnOutcome::Completed,
+                output: "A 已提交结果".into(),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        let b_failure = RuntimeEventKind::TurnFinished {
+            turn_id: "reject-b".into(),
+            outcome: TurnOutcome::Failed {
+                message: "未启动的原生失败".into(),
+            },
+            output: "拒绝此结果".into(),
+        };
+        let before = state.task.clone();
+        assert!(
+            !commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                b_failure.clone(),
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .unwrap()
+        );
+        assert_eq!(state.task, before);
+        // 映射和内存 ACK 都不能代替 SQLite 中实际的 NativeProtocol 回执。
+        let mut links = grok_input_links(&state.task).unwrap();
+        links.pending[0].native_turn_id = Some("reject-b".into());
+        set_grok_input_links(&mut state.task, &links).unwrap();
+        commit_transition(&writer.sender, &mut state.task, &before)
+            .await
+            .unwrap();
+        accepted.insert("reject-b".into());
+        let before = state.task.clone();
+        assert!(
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                b_failure.clone(),
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        links.pending[0].native_turn_id = None;
+        set_grok_input_links(&mut state.task, &links).unwrap();
+        commit_transition(&writer.sender, &mut state.task, &before)
+            .await
+            .unwrap();
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::MessageAccepted {
+                message_id: b,
+                turn_id: Some("reject-b".into()),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        // 保留原生 ACK 和完整关联，仅损坏消息版本；任何结果或换代均不得信任它。
+        let mut database_connection =
+            SqliteConnection::establish(database.to_str().unwrap()).unwrap();
+        let stored_ack: String = local_cli_messages::table
+            .filter(local_cli_messages::message_id.eq(b.to_string()))
+            .select(local_cli_messages::data)
+            .first(&mut database_connection)
+            .unwrap();
+        let mut incompatible_ack: LocalCliMessage = serde_json::from_str(&stored_ack).unwrap();
+        incompatible_ack.version = 2;
+        let damaged_ack = serde_json::to_string(&incompatible_ack).unwrap();
+        diesel::update(
+            local_cli_messages::table.filter(local_cli_messages::message_id.eq(b.to_string())),
+        )
+        .set(local_cli_messages::data.eq(&damaged_ack))
+        .execute(&mut database_connection)
+        .unwrap();
+        let before_incompatible = state.task.clone();
+        for kind in [
+            RuntimeEventKind::TurnStarted {
+                turn_id: "reject-b".into(),
+            },
+            b_failure.clone(),
+        ] {
+            assert!(
+                commit_grok_kind(
+                    &writer.sender,
+                    &mut state,
+                    token,
+                    kind,
+                    &mut accepted,
+                    &mut finished
+                )
+                .await
+                .is_err()
+            );
+            assert_eq!(state.task, before_incompatible);
+        }
+        assert!(
+            send_user_request(
+                &writer.sender,
+                &mut state,
+                &controller,
+                token,
+                Uuid::new_v4(),
+                RuntimeAction::Submit {
+                    input: vec![InputContent::Text("损坏回执禁止换代".into())]
+                },
+                false
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before_incompatible);
+        assert!(state.active_turn_id.is_none());
+        assert!(commands.try_recv().is_err());
+        let unchanged_ack: String = local_cli_messages::table
+            .filter(local_cli_messages::message_id.eq(b.to_string()))
+            .select(local_cli_messages::data)
+            .first(&mut database_connection)
+            .unwrap();
+        assert_eq!(unchanged_ack, damaged_ack, "拒绝事件不能回写损坏原消息");
+        assert_eq!(
+            load_task_generations(&writer.sender, state.task.task_id.clone())
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap()
+                .len(),
+            1
+        );
+        diesel::update(
+            local_cli_messages::table.filter(local_cli_messages::message_id.eq(b.to_string())),
+        )
+        .set(local_cli_messages::data.eq(stored_ack))
+        .execute(&mut database_connection)
+        .unwrap();
+        let mut incompatible_task = state.clone();
+        incompatible_task.task.version = 2;
+        let incompatible_task_before = incompatible_task.task.clone();
+        for kind in [
+            RuntimeEventKind::TurnStarted {
+                turn_id: "reject-b".into(),
+            },
+            b_failure.clone(),
+        ] {
+            assert!(
+                commit_grok_kind(
+                    &writer.sender,
+                    &mut incompatible_task,
+                    token,
+                    kind,
+                    &mut accepted,
+                    &mut finished
+                )
+                .await
+                .is_err()
+            );
+            assert_eq!(incompatible_task.task, incompatible_task_before);
+        }
+        assert!(
+            send_user_request(
+                &writer.sender,
+                &mut incompatible_task,
+                &controller,
+                token,
+                Uuid::new_v4(),
+                RuntimeAction::Submit {
+                    input: vec![InputContent::Text("未来任务版本禁止换代".into())]
+                },
+                false
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(incompatible_task.task, incompatible_task_before);
+        assert!(commands.try_recv().is_err());
+        submit_grok_input(&writer.sender, &mut state, &controller, token, c).await;
+        commands.try_recv().unwrap();
+        // 跨代关联还须读取原任务版本；不能因当前任务为版本 1 而信任未来历史格式。
+        let stored_history: String = local_cli_task_generations::table
+            .filter(local_cli_task_generations::task_id.eq(&state.task.task_id))
+            .filter(local_cli_task_generations::generation.eq(1_i64))
+            .select(local_cli_task_generations::data)
+            .first(&mut database_connection)
+            .unwrap();
+        let mut incompatible_history: LocalCliTask = serde_json::from_str(&stored_history).unwrap();
+        incompatible_history.version = 2;
+        let damaged_history = serde_json::to_string(&incompatible_history).unwrap();
+        diesel::update(
+            local_cli_task_generations::table
+                .filter(local_cli_task_generations::task_id.eq(&state.task.task_id))
+                .filter(local_cli_task_generations::generation.eq(1_i64)),
+        )
+        .set(local_cli_task_generations::data.eq(&damaged_history))
+        .execute(&mut database_connection)
+        .unwrap();
+        let before_incompatible_history = state.task.clone();
+        for kind in [
+            RuntimeEventKind::TurnStarted {
+                turn_id: "reject-b".into(),
+            },
+            b_failure.clone(),
+        ] {
+            assert!(
+                commit_grok_kind(
+                    &writer.sender,
+                    &mut state,
+                    token,
+                    kind,
+                    &mut accepted,
+                    &mut finished
+                )
+                .await
+                .is_err()
+            );
+            assert_eq!(state.task, before_incompatible_history);
+        }
+        assert!(
+            verify_grok_pending_inputs(
+                &writer.sender,
+                &state.task,
+                &grok_input_links(&state.task).unwrap(),
+                token
+            )
+            .await
+            .is_err()
+        );
+        assert!(state.active_turn_id.is_none());
+        assert!(commands.try_recv().is_err());
+        let unchanged_history: String = local_cli_task_generations::table
+            .filter(local_cli_task_generations::task_id.eq(&state.task.task_id))
+            .filter(local_cli_task_generations::generation.eq(1_i64))
+            .select(local_cli_task_generations::data)
+            .first(&mut database_connection)
+            .unwrap();
+        assert_eq!(unchanged_history, damaged_history);
+        assert_eq!(
+            load_task_generations(&writer.sender, state.task.task_id.clone())
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap()
+                .len(),
+            2
+        );
+        diesel::update(
+            local_cli_task_generations::table
+                .filter(local_cli_task_generations::task_id.eq(&state.task.task_id))
+                .filter(local_cli_task_generations::generation.eq(1_i64)),
+        )
+        .set(local_cli_task_generations::data.eq(stored_history))
+        .execute(&mut database_connection)
+        .unwrap();
+        // 给非队首映射一个候选 turn；其失败仍不得越过真实已确认的队首。
+        let previous = state.task.clone();
+        let mut links = grok_input_links(&state.task).unwrap();
+        links.pending[1].native_turn_id = Some("reject-c".into());
+        set_grok_input_links(&mut state.task, &links).unwrap();
+        commit_transition(&writer.sender, &mut state.task, &previous)
+            .await
+            .unwrap();
+        let before = state.task.clone();
+        for kind in [
+            RuntimeEventKind::TurnFinished {
+                turn_id: "reject-b".into(),
+                outcome: TurnOutcome::Completed,
+                output: "尚未开始不能报告完成".into(),
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: "reject-b".into(),
+                outcome: TurnOutcome::Cancelled,
+                output: "尚未开始不能报告取消".into(),
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: "reject-c".into(),
+                outcome: TurnOutcome::Failed {
+                    message: "非队首失败".into(),
+                },
+                output: "不能越过 B".into(),
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: "reject-a".into(),
+                outcome: TurnOutcome::Failed {
+                    message: "旧 A 回调".into(),
+                },
+                output: "不能覆盖结果".into(),
+            },
+        ] {
+            assert!(
+                !commit_grok_kind(
+                    &writer.sender,
+                    &mut state,
+                    token,
+                    kind,
+                    &mut accepted,
+                    &mut finished
+                )
+                .await
+                .unwrap()
+            );
+            assert_eq!(state.task, before);
+        }
+        let mut stale_runtime = event(&state, b_failure.clone());
+        stale_runtime.generation = Uuid::new_v4();
+        let mut stale_session = event(&state, b_failure.clone());
+        stale_session.generation = token;
+        stale_session.native_session_id = Some("其他会话".into());
+        let mut missing_session = event(&state, b_failure.clone());
+        missing_session.generation = token;
+        missing_session.native_session_id = None;
+        for callback in [stale_runtime, stale_session, missing_session] {
+            assert!(
+                !commit_runtime_event(
+                    &writer.sender,
+                    &mut state,
+                    &callback,
+                    &mut accepted,
+                    &mut finished
+                )
+                .await
+                .unwrap()
+            );
+            assert_eq!(state.task, before);
+        }
+        for (connected, ready, task_state) in [
+            (false, true, LocalCliTaskState::Queued),
+            (true, false, LocalCliTaskState::Queued),
+            (true, true, LocalCliTaskState::Disconnected),
+            (true, true, LocalCliTaskState::Unknown),
+            (true, true, LocalCliTaskState::Unconfirmed),
+        ] {
+            let mut unavailable = state.clone();
+            unavailable.connected = connected;
+            unavailable.ready = ready;
+            unavailable.task.state = task_state;
+            let unavailable_task = unavailable.task.clone();
+            assert!(
+                !commit_grok_kind(
+                    &writer.sender,
+                    &mut unavailable,
+                    token,
+                    b_failure.clone(),
+                    &mut accepted,
+                    &mut finished
+                )
+                .await
+                .unwrap()
+            );
+            assert_eq!(unavailable.task, unavailable_task);
+        }
+        finished.insert("reject-b".into());
+        assert!(
+            !commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                b_failure,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .unwrap()
+        );
+        assert_eq!(state.task, before);
+        assert!(state.active_turn_id.is_none());
+        let messages = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let b_message = messages
+            .iter()
+            .find(|message| message.message_id == b.to_string())
+            .unwrap();
+        assert_eq!(b_message.state, LocalCliMessageState::Acknowledged);
+        assert_eq!(
+            b_message.receipt_kind,
+            Some(LocalCliReceiptKind::NativeProtocol)
+        );
+        let history = load_task_generations(&writer.sender, state.task.task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].result.as_deref(), Some("A 已提交结果"));
+        assert!(history[1].result.is_none());
+        assert!(commands.try_recv().is_err());
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn grok_terminal_gap_request_failure_preserves_other_original_submissions_after_restart() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("grok-gap-request-failure.sqlite");
+    let writer = crate::persistence::start_test_writer(&database).unwrap();
+    let b = Uuid::new_v4();
+    let c = Uuid::new_v4();
+    let d = Uuid::new_v4();
+    let task_id = block_on(async {
+        let token = Uuid::new_v4();
+        let mut state = persisted_grok_runtime(&writer.sender, token).await;
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let a = Uuid::new_v4();
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        submit_grok_input(&writer.sender, &mut state, &controller, token, a).await;
+        commands.try_recv().unwrap();
+        for kind in [
+            RuntimeEventKind::MessageAccepted {
+                message_id: a,
+                turn_id: Some("request-a".into()),
+            },
+            RuntimeEventKind::TurnStarted {
+                turn_id: "request-a".into(),
+            },
+        ] {
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                kind,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap();
+        }
+        submit_grok_input(&writer.sender, &mut state, &controller, token, b).await;
+        commands.try_recv().unwrap();
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::TurnFinished {
+                turn_id: "request-a".into(),
+                outcome: TurnOutcome::Completed,
+                output: "A 完成".into(),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        for id in [c, d] {
+            submit_grok_input(&writer.sender, &mut state, &controller, token, id).await;
+            commands.try_recv().unwrap();
+        }
+        assert_eq!(state.task.generation, 2);
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::RequestFailed {
+                message_id: b,
+                message: "B 未被原生接收".into(),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.state, LocalCliTaskState::Queued);
+        let links = grok_input_links(&state.task).unwrap();
+        assert!(links.current.is_none());
+        assert_eq!(
+            links
+                .pending
+                .iter()
+                .map(|input| (input.message_id, input.submission_generation))
+                .collect::<Vec<_>>(),
+            [(c, 2), (d, 2)]
+        );
+        let b_messages = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let b_message = b_messages
+            .iter()
+            .find(|message| message.message_id == b.to_string())
+            .unwrap();
+        assert_eq!(b_message.recipient_generation, 1);
+        assert_eq!(b_message.state, LocalCliMessageState::Failed);
+        assert_eq!(b_message.receipt_kind, None);
+        for (id, turn, generation) in [(c, "request-c", 2), (d, "request-d", 3)] {
+            for kind in [
+                RuntimeEventKind::MessageAccepted {
+                    message_id: id,
+                    turn_id: Some(turn.into()),
+                },
+                RuntimeEventKind::TurnStarted {
+                    turn_id: turn.into(),
+                },
+                RuntimeEventKind::TurnFinished {
+                    turn_id: turn.into(),
+                    outcome: TurnOutcome::Completed,
+                    output: format!("已验证结果 {turn}"),
+                },
+            ] {
+                assert!(
+                    commit_grok_kind(
+                        &writer.sender,
+                        &mut state,
+                        token,
+                        kind,
+                        &mut accepted,
+                        &mut finished
+                    )
+                    .await
+                    .unwrap()
+                );
+            }
+            assert_eq!(state.task.generation, generation);
+            assert_eq!(
+                grok_input_links(&state.task)
+                    .unwrap()
+                    .current
+                    .unwrap()
+                    .message_id,
+                id
+            );
+            submit_grok_input(&writer.sender, &mut state, &controller, token, id).await;
+            assert!(commands.try_recv().is_err());
+        }
+        state.task.task_id
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+    let reopened = crate::persistence::start_test_writer(&database).unwrap();
+    block_on(async {
+        let history = load_task_generations(&reopened.sender, task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(history.len(), 3);
+        for (record, id, turn) in [(&history[1], c, "request-c"), (&history[2], d, "request-d")] {
+            let link = grok_input_links(record).unwrap().current.unwrap();
+            assert_eq!(link.message_id, id);
+            assert_eq!(link.submission_generation, 2);
+            assert_eq!(link.native_turn_id.as_deref(), Some(turn));
+            assert!(record.result.is_some());
+        }
+        let messages = load_messages(&reopened.sender, task_id, 2)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(messages.len(), 2);
+        assert!(
+            messages
+                .iter()
+                .all(|message| message.recipient_generation == 2
+                    && message.state == LocalCliMessageState::Acknowledged
+                    && message.receipt_kind == Some(LocalCliReceiptKind::NativeProtocol))
+        );
+    });
+    reopened.sender.send(ModelEvent::Terminate).unwrap();
+    reopened.handle.join().unwrap();
+}
+
+#[test]
+fn grok_terminal_submit_rejects_any_pending_input_without_committed_delivery() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("grok-gap-prepared.sqlite"))
+            .unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let mut state = persisted_grok_runtime(&writer.sender, token).await;
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let a = Uuid::new_v4();
+        let b = Uuid::new_v4();
+        let prepared = Uuid::new_v4();
+        let new_input = Uuid::new_v4();
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        submit_grok_input(&writer.sender, &mut state, &controller, token, a).await;
+        commands.try_recv().unwrap();
+        for kind in [
+            RuntimeEventKind::MessageAccepted {
+                message_id: a,
+                turn_id: Some("prepared-a".into()),
+            },
+            RuntimeEventKind::TurnStarted {
+                turn_id: "prepared-a".into(),
+            },
+        ] {
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                kind,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap();
+        }
+        submit_grok_input(&writer.sender, &mut state, &controller, token, b).await;
+        commands.try_recv().unwrap();
+        // 模拟准备输入已落盘、尚未交付的中断；后面的异常也必须挡住整个换代。
+        let action = RuntimeAction::Submit {
+            input: vec![InputContent::Text("准备但未派发".into())],
+        };
+        let previous = state.task.clone();
+        let mut links = grok_input_links(&state.task).unwrap();
+        links.pending.push(GrokInputLink {
+            message_id: prepared,
+            submission_generation: 1,
+            runtime_generation: token,
+            native_turn_id: None,
+        });
+        set_grok_input_links(&mut state.task, &links).unwrap();
+        let message = input_message(&state.task, prepared, &action).unwrap();
+        state.task.revision = previous.revision + 1;
+        checkpoint_task_with_message(&writer.sender, state.task.clone(), Some(1), message)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::TurnFinished {
+                turn_id: "prepared-a".into(),
+                outcome: TurnOutcome::Completed,
+                output: "A 原生完成".into(),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        let before = state.task.clone();
+        assert!(
+            send_user_request(
+                &writer.sender,
+                &mut state,
+                &controller,
+                token,
+                new_input,
+                RuntimeAction::Submit {
+                    input: vec![InputContent::Text("不得覆盖异常关联".into())]
+                },
+                false
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        assert!(commands.try_recv().is_err());
+        let history = load_task_generations(&writer.sender, state.task.task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(history.len(), 1);
+        let messages = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(messages.len(), 3);
+        assert_eq!(
+            messages
+                .iter()
+                .find(|message| message.message_id == b.to_string())
+                .unwrap()
+                .state,
+            LocalCliMessageState::Sent
+        );
+        assert_eq!(
+            messages
+                .iter()
+                .find(|message| message.message_id == prepared.to_string())
+                .unwrap()
+                .state,
+            LocalCliMessageState::Cancelled
+        );
+        assert!(
+            messages
+                .iter()
+                .all(|message| message.message_id != new_input.to_string())
+        );
+        assert_eq!(grok_input_links(&state.task).unwrap().pending.len(), 2);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn grok_terminal_gap_closed_delivery_preserves_sent_fifo_without_retransmission() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("grok-gap-closed.sqlite");
+    let writer = crate::persistence::start_test_writer(&database).unwrap();
+    let b = Uuid::new_v4();
+    let c = Uuid::new_v4();
+    let task_id = block_on(async {
+        let token = Uuid::new_v4();
+        let mut state = persisted_grok_runtime(&writer.sender, token).await;
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let a = Uuid::new_v4();
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        submit_grok_input(&writer.sender, &mut state, &controller, token, a).await;
+        commands.try_recv().unwrap();
+        for kind in [
+            RuntimeEventKind::MessageAccepted {
+                message_id: a,
+                turn_id: Some("closed-a".into()),
+            },
+            RuntimeEventKind::TurnStarted {
+                turn_id: "closed-a".into(),
+            },
+        ] {
+            commit_grok_kind(
+                &writer.sender,
+                &mut state,
+                token,
+                kind,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap();
+        }
+        submit_grok_input(&writer.sender, &mut state, &controller, token, b).await;
+        commands.try_recv().unwrap();
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::TurnFinished {
+                turn_id: "closed-a".into(),
+                outcome: TurnOutcome::Cancelled,
+                output: "A 原生取消".into(),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        drop(commands);
+        assert!(
+            send_user_request(
+                &writer.sender,
+                &mut state,
+                &controller,
+                token,
+                c,
+                RuntimeAction::Submit {
+                    input: vec![InputContent::Text("连接关闭后的输入".into())]
+                },
+                false
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task.generation, 2);
+        let links = grok_input_links(&state.task).unwrap();
+        assert!(links.current.is_none());
+        assert_eq!(links.pending.len(), 1);
+        assert_eq!(links.pending[0].message_id, b);
+        assert_eq!(links.pending[0].submission_generation, 1);
+        commit_grok_kind(
+            &writer.sender,
+            &mut state,
+            token,
+            RuntimeEventKind::Disconnected {
+                reason: "原生连接关闭".into(),
+            },
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.state, LocalCliTaskState::Disconnected);
+        assert!(!state.connected);
+        assert!(!state.ready);
+        state.task.task_id
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+    let reopened = crate::persistence::start_test_writer(&database).unwrap();
+    block_on(async {
+        let history = load_task_generations(&reopened.sender, task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].state, LocalCliTaskState::Cancelled);
+        assert_eq!(history[0].result.as_deref(), Some("A 原生取消"));
+        assert_eq!(history[1].state, LocalCliTaskState::Disconnected);
+        let links = grok_input_links(&history[1]).unwrap();
+        assert_eq!(links.pending[0].message_id, b);
+        assert!(links.pending[0].native_turn_id.is_none());
+        for (generation, id, expected) in [
+            (1, b, LocalCliMessageState::Sent),
+            (2, c, LocalCliMessageState::Failed),
+        ] {
+            let messages = load_messages(&reopened.sender, task_id.clone(), generation)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+            let message = messages
+                .iter()
+                .find(|message| message.message_id == id.to_string())
+                .unwrap();
+            assert_eq!(message.recipient_generation, generation);
+            assert_eq!(message.state, expected);
+            assert_eq!(message.receipt_kind, None);
+        }
+    });
+    reopened.sender.send(ModelEvent::Terminate).unwrap();
+    reopened.handle.join().unwrap();
 }

@@ -1,0 +1,489 @@
+{
+  "credential_pattern_hits" : {
+    "bearer_token" : 0,
+    "credential_assignment" : 0,
+    "jwt" : 0,
+    "private_api_endpoint" : 0,
+    "private_api_file" : 0,
+    "private_key" : 0,
+    "provider_key" : 0
+  },
+  "images" : [
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-01-en-picker.jpg",
+      "recognized_segment_count" : 44
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-02-en-new-draft.jpg",
+      "recognized_segment_count" : 44
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-03-en-draft-corrected.jpg",
+      "recognized_segment_count" : 42
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-04-en-start.jpg",
+      "recognized_segment_count" : 42
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-05-en-first-result.jpg",
+      "recognized_segment_count" : 44
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-06-en-chinese-multiline-draft.jpg",
+      "recognized_segment_count" : 44
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-07-en-second-result.jpg",
+      "recognized_segment_count" : 42
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-08-en-approval-request.jpg",
+      "recognized_segment_count" : 41
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-09-en-approval-full.jpg",
+      "recognized_segment_count" : 41
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-10-en-approval-tool.jpg",
+      "recognized_segment_count" : 46
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-11-en-approval-exact.jpg",
+      "recognized_segment_count" : 46
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-12-en-allow-once.jpg",
+      "recognized_segment_count" : 41
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-13-en-allow-result.jpg",
+      "recognized_segment_count" : 43
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-14-en-deny-approval.jpg",
+      "recognized_segment_count" : 41
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-15-en-deny-exact.jpg",
+      "recognized_segment_count" : 44
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-16-en-deny-once.jpg",
+      "recognized_segment_count" : 40
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-17-en-deny-result.jpg",
+      "recognized_segment_count" : 42
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-18-en-queue-draft.jpg",
+      "recognized_segment_count" : 38
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-19-en-queue-ack.jpg",
+      "recognized_segment_count" : 40
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-20-en-queue-receipt.jpg",
+      "recognized_segment_count" : 39
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-21-en-queue-result.jpg",
+      "recognized_segment_count" : 41
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-22-en-cancel-live-output.jpg",
+      "recognized_segment_count" : 41
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-23-en-cancel-request.jpg",
+      "recognized_segment_count" : 41
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-24-en-after-cancel-draft.jpg",
+      "recognized_segment_count" : 37
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-25-en-after-cancel-result.jpg",
+      "recognized_segment_count" : 42
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-26-zh-after-restart.jpg",
+      "recognized_segment_count" : 14
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-27-zh-picker-restart.jpg",
+      "recognized_segment_count" : 24
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-28-zh-selected-history.jpg",
+      "recognized_segment_count" : 9
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-29-zh-continue-history.jpg",
+      "recognized_segment_count" : 9
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-30-zh-history-handshake.jpg",
+      "recognized_segment_count" : 14
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-31-zh-recovery-draft.jpg",
+      "recognized_segment_count" : 13
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-32-zh-recovery-ack.jpg",
+      "recognized_segment_count" : 12
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-33-zh-recovery-result.jpg",
+      "recognized_segment_count" : 13
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-34-zh-saved-full-result.jpg",
+      "recognized_segment_count" : 14
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-35-zh-clean-disconnect.jpg",
+      "recognized_segment_count" : 14
+    },
+    {
+      "credential_pattern_hits" : {
+        "bearer_token" : 0,
+        "credential_assignment" : 0,
+        "jwt" : 0,
+        "private_api_endpoint" : 0,
+        "private_api_file" : 0,
+        "private_key" : 0,
+        "provider_key" : 0
+      },
+      "file" : "figure-36-zh-closed.jpg",
+      "recognized_segment_count" : 13
+    }
+  ],
+  "images_checked" : 36,
+  "languages" : [
+    "en-US",
+    "zh-Hans"
+  ],
+  "method" : "本机 Swift Vision VNRecognizeTextRequest 静态图片 OCR，accurate，关闭语言修正；逐行全文及去空白拼接文本扫描，不保存 OCR 全文",
+  "network_or_ui_operation" : false,
+  "ocr_full_text_recorded" : false
+}

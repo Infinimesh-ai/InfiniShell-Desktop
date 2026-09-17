@@ -1,0 +1,161 @@
+{
+  "attempt": 5,
+  "scope": "官方 Grok 生产监督链 8 输入生命周期通过；不等于完整 Goal",
+  "source_snapshot": "macos-official-8-inputs.json",
+  "repository_baseline": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "worktree_dirty": true,
+  "test_exit_code": 0,
+  "acceptance_passed": true,
+  "public_product_gate_open": false,
+  "app_restart_and_ui_verified": false,
+  "same_turn_steering_supported": false,
+  "parent_permission_ceiling_verified": false,
+  "sdk_origin_probe_passed": false,
+  "sdk_probe_status": "本轮不覆盖 SDK 探针；独立探针仍未通过",
+  "original_public_artifacts": {
+    ".ndjson": {
+      "sha256": "1574c0b022fdbf06b9761fd2e0d6d72956cbfe5001335d8e370439abd6634a77",
+      "bytes": 15882,
+      "archive_bytes_unchanged": true
+    },
+    ".metadata.json": {
+      "sha256": "7c5a54ee042d101d22527fd6a8317cebb3424de9963ca8e395dd7353f62d8bb4",
+      "bytes": 3551,
+      "archive_bytes_unchanged": true
+    },
+    ".network.json": {
+      "sha256": "5f70a8978f98f9056322e9a42fbb56e6d49e197113dd572f61d2d5a0d09eb42e",
+      "bytes": 39178,
+      "archive_bytes_unchanged": true
+    }
+  },
+  "private_evidence_sha256": "193e7377f1cbbaf4f6f368fefb4e7a1ea6ce82ebd59b9aed65b7762075adee27",
+  "private_evidence_row_count": 56,
+  "event_counts": {
+    "acceptance_started": 1,
+    "session_ready": 2,
+    "phase_started": 7,
+    "message_accepted": 8,
+    "turn_started": 8,
+    "real_text_started": 7,
+    "turn_finished": 8,
+    "approval_requested": 2,
+    "command_dispatched": 3,
+    "approval_resolved": 2,
+    "file_effect_verified": 2,
+    "queued_input_submitted": 1,
+    "queued_input_result_verified": 1,
+    "cancel_submitted": 1,
+    "connection_shutdown": 2,
+    "acceptance_passed": 1
+  },
+  "native_inputs": 8,
+  "native_message_acceptances": 8,
+  "unique_native_turns": 8,
+  "true_terminal_counts": {
+    "Completed": 6,
+    "Cancelled": 2
+  },
+  "phases": {
+    "first_turn": "Completed/PARITY_ONE",
+    "second_turn": "Completed/PARITY_TWO",
+    "approval_allow": "精确 Write AllowOnce 后原生 Completed；最后响应 APPROVED",
+    "approval_deny": "精确 Write DenyOnce 后原生 Cancelled；夹具确认目标文件未产生",
+    "queued_input": "正在输出时追加下一轮输入；两个独立原生接收/回合/结果；不等于同轮 steer",
+    "cancel": "真实正文开始后发送取消；真实原生 Cancelled",
+    "resume_result": "关闭第一运行代并确认清理后，新生产进程继续相同原生 session；最后响应精确返回此前排队标记"
+  },
+  "file_effects": {
+    "verification_source": "原生托管夹具 file_effect_verified 与公开 metadata project_files；本独立归档不读取项目内容",
+    "allow_verified_by_fixture": true,
+    "deny_absence_verified_by_fixture": true,
+    "project_files_from_metadata": [
+      "approval-allow.txt"
+    ]
+  },
+  "approval_ack_boundary": {
+    "application_resolved_native_receipt": false,
+    "native_approval_ack_separately_verified": false,
+    "allow_and_deny_effects_and_native_terminal_verified": true
+  },
+  "queue": {
+    "submitted_after_real_text": true,
+    "native_acknowledgement_verified": true,
+    "distinct_next_turn_verified": true,
+    "same_turn_steering_verified": false,
+    "queued_inside_first_adapter": 1
+  },
+  "native_final_history": {
+    "receipt_source": "verified_native_final_history",
+    "verified_receipt_count": 8,
+    "full_output_preserved_count": 8,
+    "private_recorded_output_hashes_verified_count": 8,
+    "private_final_response_hashes_verified_count": 8,
+    "unique_same_session_completion_watermarks": [
+      55,
+      91,
+      184,
+      250,
+      892,
+      942,
+      973,
+      1038
+    ],
+    "body_values_archived": false,
+    "independent_native_history_file_replay_read": false
+  },
+  "new_process_continue": {
+    "same_native_session": "01a0af68-fcbe-70f3-a31a-ce6c477ceb03",
+    "first_generation": "1360a845-5874-40ec-8028-461908d96088",
+    "second_generation": "da5a4470-cb07-42bd-aba6-ff05c8829d0c",
+    "distinct_generations": true,
+    "distinct_private_leader_sockets": true,
+    "first_cleanup_before_continued_result": true,
+    "active_task_reassociation_tested": false,
+    "desktop_app_restart_tested": false
+  },
+  "production_cleanup": {
+    "running_generations": 2,
+    "confirmed_exit_receipts": 2,
+    "exit_code_zero_count": 2,
+    "native_wait_status_zero_count": 2,
+    "launchd_job_removed_count": 2,
+    "resource_cid_destroyed_count": 2,
+    "tunnels_stopped": true,
+    "private_auth_copy_removed": true
+  },
+  "settings_scope": {
+    "bytes_unchanged": false,
+    "permission_section_unchanged": true,
+    "native_marketplace_initialization_only": true,
+    "raw_configuration_archived": false
+  },
+  "network": {
+    "tls_connections_attempted": 15,
+    "tls_bytes": 6756402,
+    "rejected_origin_kind_counts": {
+      "unknown": 190,
+      "xai_api": 7
+    },
+    "http_model_requests_observable": false,
+    "cost_budget_enforced": false,
+    "unknown_rejects_all_telemetry": false
+  },
+  "sensitive_shape_scan": {
+    "api_key": 0,
+    "jwt": 0,
+    "bearer": 0,
+    "private_key": 0,
+    "credential_assignment": 0,
+    "email": 0
+  },
+  "limits": [
+    "通过范围为 macOS 官方生产监督链的固定 8 输入夹具；dirty 中间冻结快照未计入包含实际修改的正式提交跨平台验收。",
+    "运行中追加指令是下一轮排队输入，具有独立原生 ACK 和结果，不声明同轮 steer 支持。",
+    "继续是启动新进程继续历史原生 session；不是重连重新关联活跃任务，也不是桌面应用重启恢复。",
+    "原生最终 history 结构、同 session/turn 完成水位与完整正文均由生产适配器校验；归档独立复算事件中正文长度及 SHA，不读取原生 chat_history 或思考日志。",
+    "模型最终回复只比较已验证最后正文响应；产品完整累计正文仍保留，不使用 endswith 证明成功。",
+    "本轮无 SQLite 父子任务、SDK工具来源、父权限上限、GUI、跨平台、SSH/tmux 或桌面重启恢复完整验收。",
+    "第 4 轮原始失败证据不修改或追认为通过。"
+  ]
+}

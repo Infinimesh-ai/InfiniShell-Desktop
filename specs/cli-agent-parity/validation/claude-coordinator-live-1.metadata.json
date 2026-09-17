@@ -1,0 +1,51 @@
+{
+  "test": "ai::cli_agent_runtime::coordinator::claude_live_tests::real_claude_fixed_profile_parent_child",
+  "scope": "real_claude_production_coordinator",
+  "platform": "darwin",
+  "cli": {
+    "platform": "darwin-arm64",
+    "binary": "claude",
+    "bytes": 212228880,
+    "sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
+    "url": "https://downloads.claude.ai/claude-code-releases/2.1.273/darwin-arm64/claude"
+  },
+  "model": "claude-sonnet-4-6",
+  "test_binary_sha256": "1484200b4959a7c498f7d02f6d7bace7ea11b9e16ba4f0f2876c80021b90c630",
+  "supervisor_binary_sha256": "c39eb6998f21ead9eb73155f3bfaa15e81a7715568eda37ca4f6d8586953a723",
+  "private_workspace": "<private-workspace>",
+  "project_settings_sha256": "9599cc79907423063d6e7361cbb2cff094194dd9165b64c2c8b65315d95f4b07",
+  "private_workspace_preserved": true,
+  "runner_modifies_auth_configuration": false,
+  "fresh_private_auth_home": true,
+  "authentication_source": "explicit_api_environment",
+  "native_credential_files_read_or_copied": false,
+  "api_environment_values_recorded": false,
+  "native_cli_may_refresh_credentials": true,
+  "real_gui_verified": false,
+  "automatic_result_delivery_ack_verified": false,
+  "model_requests_expected": true,
+  "max_native_tools": 4,
+  "max_native_turns": 4,
+  "max_test_seconds": 450,
+  "http_request_count_verified": false,
+  "runner_timeout_seconds": 600,
+  "acceptance_passed": false,
+  "commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "worktree_dirty": true,
+  "test_exit_code": 101,
+  "project_settings_unchanged": true,
+  "denied_read_fixture_unchanged": true,
+  "archive_source_sha256": {
+    "public_ndjson": "b3aa12a74ba9467bf51d9aff5a0f6b39ec944b810bad30e940f3a5b10a77137f",
+    "metadata": "8233ccc29f91b452b87e0addf8d2a68b3023e82d8761375b4b55b4e49086f0d3",
+    "test_output": "cba9aa026dfa1d1fb666402e5d13e0e24572abeefebc1bbc1f92cd631e34d33b"
+  },
+  "snapshot": {
+    "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+    "worktree_dirty": true,
+    "source_manifest": "macos-official-3-inputs.json",
+    "source_manifest_sha256": "6ffedeabcb03acc931ccb09de3c442b9a3dc2f672d52cb35c46631db14ae952a",
+    "file_count": 48,
+    "same_commit_formal_acceptance": false
+  }
+}

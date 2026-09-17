@@ -5,10 +5,16 @@ import hashlib
 import io
 import json
 import os
+from contextlib import redirect_stdout
+from copy import deepcopy
 from pathlib import Path
+import shutil
 import stat
+import subprocess
+import sys
 import tarfile
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -78,6 +84,28 @@ class RuntimeExtractionTests(unittest.TestCase):
         self.assertEqual(self.extract(), self.destination / "bin/codex")
         self.assertEqual(before, {p: p.stat().st_mtime_ns for p in before})
 
+    def test_all_three_official_layouts_keep_every_helper_and_resource(self):
+        for target in ("linux-x64", "windows-x64", "windows-arm64"):
+            with self.subTest(target=target):
+                self.target = target
+                self.destination = self.root / target
+                self.package = deepcopy(prepare.PACKAGES[target])
+                bodies = {name: (json.dumps(prepare.expected_metadata(self.package)).encode()
+                                 if name == "codex-package.json" else ("fixture:" + name).encode())
+                          for name in self.package["files"]}
+                self.package["files"] = {name: (len(body), hashlib.sha256(body).hexdigest(),
+                                              self.package["files"][name][2])
+                                         for name, body in bodies.items()}
+                entries = [(name, tarfile.DIRTYPE, b"", mode)
+                           for name, mode in self.package["directories"].items()]
+                entries += [(name, tarfile.REGTYPE, body, self.package["files"][name][2])
+                            for name, body in bodies.items()]
+                self.write_archive(entries)
+                with patch.dict(prepare.PACKAGES, {target: self.package}):
+                    self.assertEqual(self.extract(), self.destination / self.package["entrypoint"])
+                self.assertEqual({p.relative_to(self.destination).as_posix(): p.read_bytes()
+                                  for p in self.destination.rglob("*") if p.is_file()}, bodies)
+
     def test_missing_tool_host_is_rejected_even_when_main_program_is_present(self):
         self.write_archive([entry for entry in self.entries if entry[0] != "bin/codex-code-mode-host"])
         self.assert_rejected_without_partial_publication()
@@ -127,6 +155,79 @@ class RuntimeExtractionTests(unittest.TestCase):
             self.extract()
         self.assertEqual(host.read_bytes(), b"locally-modified")
 
+    @unittest.skipIf(os.name == "nt", "Windows ACL 不能由 POSIX mode 回归证明")
+    def test_world_writable_runtime_root_or_bin_cache_is_rejected_unchanged(self):
+        self.extract()
+        files_before = {name: (self.destination / name).read_bytes() for name in self.bodies}
+        for directory in (self.destination, self.destination / "bin"):
+            with self.subTest(directory=directory.name):
+                directory.chmod(0o777)
+                try:
+                    with self.assertRaisesRegex(ValueError, "权限为0700"):
+                        self.extract()
+                    self.assertEqual(stat.S_IMODE(directory.stat().st_mode), 0o777)
+                    self.assertEqual({name: (self.destination / name).read_bytes()
+                                      for name in self.bodies}, files_before)
+                finally:
+                    directory.chmod(0o700)
+
+    @unittest.skipIf(os.name == "nt", "Windows ACL 不能由 POSIX mode 回归证明")
+    def test_world_writable_download_parent_rejects_existing_runtime_unchanged(self):
+        self.extract()
+        self.root.chmod(0o777)
+        try:
+            with self.assertRaisesRegex(ValueError, "权限为0700"):
+                self.extract()
+            self.assertEqual(stat.S_IMODE(self.root.stat().st_mode), 0o777)
+            self.assertEqual((self.destination / "bin/codex").read_bytes(), self.bodies["bin/codex"])
+        finally:
+            self.root.chmod(0o700)
+
+    @unittest.skipIf(os.name == "nt", "Windows ACL 不能由 POSIX mode 回归证明")
+    def test_writable_ancestor_requires_sticky_protection_for_owned_child(self):
+        ancestor = self.root / "shared"
+        ancestor.mkdir()
+        download = ancestor / "private-download"
+        download.mkdir(mode=0o700)
+        self.destination = download / "runtime"
+        ancestor.chmod(0o777)
+        with self.assertRaisesRegex(ValueError, "父目录"):
+            self.extract()
+        self.assertFalse(self.destination.exists())
+        self.assertEqual(stat.S_IMODE(ancestor.stat().st_mode), 0o777)
+        ancestor.chmod(0o1777)
+        self.assertEqual(self.extract(), self.destination / "bin/codex")
+
+    @unittest.skipIf(os.name == "nt", "Windows 所有者需要真实 ACL 证据")
+    def test_foreign_directory_owner_is_rejected_even_with_private_or_sticky_mode(self):
+        original_lstat = Path.lstat
+        foreign_uid = os.geteuid() + 1
+        observed_mode = 0o700
+
+        def observed_lstat(path, *args, **kwargs):
+            result = original_lstat(path, *args, **kwargs)
+            if path == self.root:
+                return SimpleNamespace(st_mode=stat.S_IFDIR | observed_mode, st_uid=foreign_uid)
+            return result
+
+        with patch.object(Path, "lstat", observed_lstat):
+            for observed_mode in (0o700, 0o1777):
+                with self.subTest(mode=observed_mode):
+                    with self.assertRaisesRegex(ValueError, "当前用户拥有"):
+                        prepare.directory_without_links(self.root, private=True)
+                    with self.assertRaisesRegex(ValueError, "父目录"):
+                        prepare.directory_without_links(self.root)
+        self.assertFalse(self.destination.exists())
+
+    @unittest.skipUnless(sys.platform == "darwin", "只验证 macOS 已知系统 /tmp 别名")
+    def test_macos_system_tmp_alias_keeps_private_cache_usable(self):
+        with tempfile.TemporaryDirectory(prefix="codex-system-tmp-", dir="/tmp") as temporary:
+            self.destination = Path(temporary) / "runtime"
+            entry = self.extract()
+            self.assertEqual(entry, self.destination / "bin/codex")
+            self.assertEqual(self.extract(), entry)
+            self.assertEqual(entry.read_bytes(), self.bodies["bin/codex"])
+
     def test_missing_or_extra_cached_entries_are_rejected_without_repair(self):
         self.extract()
         host = self.destination / "bin/codex-code-mode-host"
@@ -152,6 +253,26 @@ class RuntimeExtractionTests(unittest.TestCase):
         self.assertEqual(marker.read_bytes(), b"other-preparer")
         self.assertFalse(self.destination.exists())
 
+    def test_old_standalone_binary_is_never_adopted_or_changed(self):
+        old = self.root / "codex.exe"
+        old.write_bytes(b"old-incomplete-runtime")
+        self.assertEqual(self.extract(), self.destination / "bin/codex")
+        self.assertEqual(old.read_bytes(), b"old-incomplete-runtime")
+
+    def test_write_failure_does_not_publish_partial_runtime(self):
+        with patch.object(prepare.os, "fsync", side_effect=OSError("fixture-write-failed")):
+            self.assert_rejected_without_partial_publication()
+
+    def test_cleanup_failure_keeps_original_error_and_releases_owned_lock(self):
+        self.write_archive([entry for entry in self.entries if entry[0] != "bin/codex-code-mode-host"])
+        with patch.object(prepare.shutil, "rmtree", side_effect=OSError("fixture-cleanup-failed")):
+            with self.assertRaisesRegex(ValueError, "完整归档有缺失成员") as failure:
+                self.extract()
+        self.assertIn("fixture-cleanup-failed", " ".join(failure.exception.__notes__))
+        self.assertFalse(self.destination.exists())
+        self.assertFalse(self.destination.with_name("runtime.prepare-lock").exists())
+        self.assertEqual(len(list(self.root.glob(".codex-package-*"))), 1)
+
     def test_metadata_must_describe_actual_fixed_layout(self):
         body = b'{"layoutVersion":2}'
         self.package["files"]["codex-package.json"] = (len(body), hashlib.sha256(body).hexdigest(), 0o644)
@@ -173,6 +294,97 @@ class RuntimeExtractionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.extract()
         self.assertEqual(list(outside.iterdir()), [])
+
+    @unittest.skipIf(os.name == "nt", "真实 Windows 重解析点由原生平台单独验证，不假定有建链接权限")
+    def test_cached_symlink_and_hardlink_are_rejected_without_modifying_target(self):
+        self.extract()
+        host = self.destination / "bin/codex-code-mode-host"
+        outside = self.root / "retained-helper"
+        outside.write_bytes(host.read_bytes())
+        host.unlink()
+        host.symlink_to(outside)
+        with self.assertRaises(ValueError):
+            self.extract()
+        host.unlink()
+        os.link(outside, host)
+        with self.assertRaises(ValueError):
+            self.extract()
+        self.assertEqual(outside.read_bytes(), self.bodies["bin/codex-code-mode-host"])
+
+    def test_main_returns_complete_runtime_entrypoint_on_supported_architectures(self):
+        for platform_name, machine, target in (("linux", "x86_64", "linux-x64"),
+                                                ("win32", "AMD64", "windows-x64"),
+                                                ("win32", "ARM64", "windows-arm64")):
+            with self.subTest(target=target):
+                download = self.root / target
+                package = dict(self.package, archive="fixture.tar.gz")
+
+                def fetch(url, destination, digest, size):
+                    self.assertEqual(url, "https://github.com/openai/codex/releases/download/rust-v0.147.0/fixture.tar.gz")
+                    self.assertEqual((digest, size), (package["sha256"], package["bytes"]))
+                    shutil.copyfile(self.archive, destination)
+
+                stdout = io.StringIO()
+                with patch.dict(prepare.PACKAGES, {target: package}), \
+                        patch.object(prepare.sys, "platform", platform_name), \
+                        patch.object(prepare.platform, "machine", return_value=machine), \
+                        patch.dict(os.environ, {"RUNNER_TEMP": str(self.root)}, clear=True), \
+                        patch.object(sys, "argv", ["prepare_codex_cli.py", "--download-dir", str(download)]), \
+                        patch.object(prepare, "fetch_file", side_effect=fetch), \
+                        patch.object(prepare, "verified_version") as version, redirect_stdout(stdout):
+                    prepare.main()
+                executable = download / f"runtime-0.147.0-{target}/bin/codex"
+                self.assertEqual(stdout.getvalue(), f"{executable}\n")
+                version.assert_called_once_with(executable, self.root)
+                self.assertTrue(executable.with_name("codex-code-mode-host").is_file())
+
+
+class FixedRuntimeVersionTests(unittest.TestCase):
+    def test_windows_main_digests_match_previous_fixed_native_inputs(self):
+        from codex_windows_hook_inputs import RELEASE_ASSETS
+        for target, architecture in (("windows-x64", "x86_64"), ("windows-arm64", "aarch64")):
+            with self.subTest(target=target):
+                size, digest = RELEASE_ASSETS[architecture][1:]
+                self.assertEqual(prepare.PACKAGES[target]["files"]["bin/codex.exe"][:2], (size, digest))
+
+    def test_version_call_uses_only_private_configuration_without_credentials(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            executable = root / "runtime/bin/codex"
+            observed = []
+
+            def run(argv, **options):
+                self.assertEqual(argv, [str(executable), "--version"])
+                env = options["env"]
+                observed.append(Path(env["HOME"]).parent)
+                for name in ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "CODEX_HOME",
+                             "TMPDIR", "TEMP", "TMP"):
+                    self.assertTrue(Path(env[name]).is_relative_to(root))
+                    self.assertTrue(Path(env[name]).is_dir())
+                for name in ("OPENAI_API_KEY", "CODEX_API_KEY", "HTTPS_PROXY", "LD_LIBRARY_PATH"):
+                    self.assertNotIn(name, env)
+                self.assertEqual({key.upper(): value for key, value in env.items() if key.upper() == "SYSTEMROOT"},
+                                 {"SYSTEMROOT": "fixture-system-root"})
+                self.assertEqual((Path(env["CODEX_HOME"]) / "config.toml").read_text(encoding="utf-8"),
+                                 'cli_auth_credentials_store = "file"\n')
+                self.assertFalse((Path(env["CODEX_HOME"]) / "auth.json").exists())
+                self.assertEqual(options["cwd"], observed[0])
+                self.assertEqual(options["timeout"], 10)
+                return subprocess.CompletedProcess(argv, 0, "codex-cli 0.147.0\n", "")
+
+            inherited = {"PATH": "fixture-path", "SystemRoot": "fixture-system-root",
+                         "HOME": "user-home", "CODEX_HOME": "user-codex",
+                         "OPENAI_API_KEY": "never-used", "CODEX_API_KEY": "never-used",
+                         "HTTPS_PROXY": "never-used", "LD_LIBRARY_PATH": "never-used"}
+            with patch.dict(os.environ, inherited, clear=True), patch.object(prepare.subprocess, "run", side_effect=run):
+                prepare.verified_version(executable, root)
+            self.assertFalse(observed[0].exists())
+
+    def test_unexpected_reported_version_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(prepare.subprocess, "run") as run:
+            run.return_value = subprocess.CompletedProcess([], 0, "codex-cli 0.154.0\n", "")
+            with self.assertRaises(ValueError):
+                prepare.verified_version(Path(temporary) / "codex", Path(temporary))
 
 
 

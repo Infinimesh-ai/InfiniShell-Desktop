@@ -229,3 +229,22 @@ fn failures_remain_native_tool_errors_on_both_protocols() {
     );
     assert_eq!(claude["response"]["response"]["mcp_response"]["id"], 9);
 }
+
+#[test]
+fn grok_tool_error_remains_a_nested_mcp_error_without_claiming_native_receipt() {
+    // Grok 回复目标和转换模块只存在于测试编译，不代表生产适配器已接线。
+    let response = tool_reply(
+        LocalToolReplyTarget::Grok {
+            request_id: json!("reverse-7"),
+            mcp_id: json!(9),
+        },
+        Err("父任务权限上限未验证".to_owned()),
+    );
+    assert_eq!(response["jsonrpc"], "2.0");
+    assert_eq!(response["id"], "reverse-7");
+    assert_eq!(response["result"]["jsonrpc"], "2.0");
+    assert_eq!(response["result"]["id"], 9);
+    assert_eq!(response["result"]["result"]["isError"], true);
+    assert!(response["result"].get("message").is_none());
+    assert!(response.get("native_receipt").is_none());
+}

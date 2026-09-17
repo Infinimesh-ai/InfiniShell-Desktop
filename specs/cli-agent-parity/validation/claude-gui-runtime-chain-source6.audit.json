@@ -1,0 +1,464 @@
+{
+  "schema": "claude_gui_source6_runtime_chain_projection_v1",
+  "audited_at_utc": "2026-09-17T12:51:05.279843+00:00",
+  "source_references": {
+    "lifecycle_state": {
+      "filename": "gui-lifecycle-state-1.json",
+      "sha256": "b897a1aa597b08e56449a29b0120ead76fdd008f57d8acf37ddeb729674458f0",
+      "bytes": 9897,
+      "original_content_archived": false
+    },
+    "private_manifest": {
+      "filename": "manifest.json",
+      "sha256": "080383b7064496fd19d5c0647a0f04260923fb1f16d94a60012da4ccddca7177",
+      "bytes": 8312,
+      "original_content_archived": false,
+      "environment_or_config_archived": false
+    },
+    "native_receipts": {
+      "filename": "native-receipts-1.json",
+      "sha256": "0cc4b12c29505c3a168561cf6449fd28e6962502ce382aeb3e8d3241eba5e61a",
+      "bytes": 1555,
+      "archive_filename": "claude-gui-runtime-chain-source6.native-receipts.json",
+      "byte_identical": true
+    }
+  },
+  "application_manifest_projection": {
+    "app": "/private/tmp/infinishell-gui-queue-2-jctnocxc/InfiniShellParityQueue2.app",
+    "bundle_id": "dev.infinishell.InfiniShellParityE473Claude",
+    "commit": "a245c639d307ababbc9b26e604e71318b8ee9522",
+    "source_binary_sha256": "091fe9364cec79601d539fe436d24d4a375b7928548cfde8d9e343e31fb61d4a",
+    "resigned_binary_sha256": "26ac0170f95c2714e054f26c497cf40016b4684be3233d3a0b647877bd7e68d6",
+    "source_manifest": "/tmp/infinishell-cli-parity-official-6-inputs.json",
+    "source_snapshot": {
+      "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+      "files": [
+        {
+          "path": "app/i18n/en/warp.ftl",
+          "sha256": "7e59476c012fe83159ca13c85774a6074075340efe138e98d33f500ecdb467fc"
+        },
+        {
+          "path": "app/i18n/zh-CN/warp.ftl",
+          "sha256": "6208f6386951304e212dac0cd8c4a541bc30a2fe3bca50e9f9f8981d5d0097ad"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/claude.rs",
+          "sha256": "49599ce4f285fcc35d3af3ce4a21f101438698acc1abd837da9e345b23685101"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/claude_live_tests.rs",
+          "sha256": "da4da3c0b996f58f4c390c137a0d59960698a84b02212d42d25df465b6f70ca7"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/claude_profile.rs",
+          "sha256": "f41c1269724c259e465f31907ac0c0a8d73cdea5a903cdb936fdfa001124fd7b"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/claude_profile_live_tests.rs",
+          "sha256": "41dd83345d483dfac7e144993d8d79bd673778c8279c53fb81611bc58fbc315c"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/claude_profile_preflight.rs",
+          "sha256": "60ab9584b943ee7187806e0ef8c7dd2d137b5c335426573471e7cae9d7de0900"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/claude_profile_protocol_tests.rs",
+          "sha256": "8d7101dafeee361af35ace20c366b17172cf65dfa5d49963d3e8e70b71327443"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/claude_profile_tests.rs",
+          "sha256": "8fcddf70ff909b05c75ac6bc04f0d2a40e4479766d3806f2b77736195e19c96f"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/claude_tests.rs",
+          "sha256": "ca2657ca56479d7d0620f5a96753f3775d078458356fbb089190c4245e647bd6"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/codex.rs",
+          "sha256": "0fa21f9382a0d84ad688f55e73862d2799e3b12ab48705480be827193f8fe1cc"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/codex_live_tests.rs",
+          "sha256": "6ecfe317b61457356c7e2ffbc47acb879035b9926b5ee984440713402f1ffe06"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/codex_tests.rs",
+          "sha256": "be66787fa98076fe672564e7bfdb57d0cf345a0802111997eddefee4cd12bd30"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/coordinator.rs",
+          "sha256": "be2cea4740192fc1a2939b53556892a4cdfd82ffaeb38f0aaac76b1615267559"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/coordinator_tests.rs",
+          "sha256": "0838d35f3b0491e0852ee3dc004e1b6239fe9cf09a191b649ebd7a91b2756b9c"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/coordinator_tools.rs",
+          "sha256": "9e54fe0e8985094f0ed7ebe0be727051c60959f0553e26c0024273e4903ba2bd"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/grok.rs",
+          "sha256": "9b4b8bb80b57f50000774e85a4509e22184528c530a52aa24f493e5e205a26a4"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/grok_live_tests.rs",
+          "sha256": "1f27347fe10a92c46cab9c4627c2c093f404f5fa3720b83e054b20d24446f6db"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/grok_tests.rs",
+          "sha256": "d4f0b44a1ede90e5ab7e85477e69c222faeb0f139e8be4a358333ab304e994ea"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/mod.rs",
+          "sha256": "e60f7ffa284bc09682314a67e860b457ae2a370385230c62bf098221f632fb80"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/permissions.rs",
+          "sha256": "f1ddf87888057f53e634c89df1cf5e3b030a895c24e47a2b8185a1e5014e5f2b"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/permissions_tests.rs",
+          "sha256": "11a0154b72411c16d64700143212797158b007e83fc409446f05a7c4f6f2da6d"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/task_manager_input.rs",
+          "sha256": "b2c61b2bd6518c20e1308df355fd5fdce4b365cdeb123d9ec6d6c39cee8462a8"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/task_manager_view.rs",
+          "sha256": "012d29333f5cd899916e5a71005227982ea173d519ca21864d7dbe0243625aee"
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/task_manager_view_tests.rs",
+          "sha256": "a5a439a36e49139405f50dc912f0c3da99bf0160796d2d5aad0b23d1ba6a6a91"
+        },
+        {
+          "path": "app/src/pane_group/pane/terminal_pane.rs",
+          "sha256": "f15b4fc18c4da172fed9403af0d8de3239d7ac750008d2d70dacdc1669418b03"
+        },
+        {
+          "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_live_tests.rs",
+          "sha256": "28bcaf7e63a6440dc2ec8fd82d86fa09322eae27aa7965a810e71b97b3c598de"
+        },
+        {
+          "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_tests.rs",
+          "sha256": "45bd1411d7ea9282a428aa9900108b02d19aa32d307885f74cfa82b150ff5e08"
+        },
+        {
+          "path": "script/cli-agent-parity/claude_profile_runner_tests.py",
+          "sha256": "6bd8681209b5971b8889686e0bd487455b96a4fc33891737258b30f2f47ae1a9"
+        },
+        {
+          "path": "script/cli-agent-parity/codex_source_runner_tests.py",
+          "sha256": "6a92532370b48f52ceab79e112fb9e0f599ac23a269011f088bae5e27a7f9a36"
+        },
+        {
+          "path": "script/cli-agent-parity/grok_adapter_runner_tests.py",
+          "sha256": "0000df0631a2a01cf87330159b862f1bfc8646fdfb3b3b8f246a7658ca8faece"
+        },
+        {
+          "path": "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+          "sha256": "096399a37f5953bcee36cfbb6a49362f64eef3523c63a394abc292926dca0764"
+        },
+        {
+          "path": "script/cli-agent-parity/run_claude_profile_live.py",
+          "sha256": "22441975639ecd328bc7be780907c1b27325931b6d6a922c6b6672335eaa021e"
+        },
+        {
+          "path": "script/cli-agent-parity/run_codex_source_live.py",
+          "sha256": "6d8bf45c8d05eaaa834a8f106f576993d69e3b2118b5e0853e51e62677ade02a"
+        },
+        {
+          "path": "script/cli-agent-parity/run_grok_adapter_live.py",
+          "sha256": "05576927db2cbd64b7408bdb9a0bf089347288faf5cffbe27676899e9fcaada7"
+        },
+        {
+          "path": "script/cli-agent-parity/run_grok_official_adapter_live.py",
+          "sha256": "3806fecb52ae5b79bbddc5656a164c82c8c1c5d3a768a1177a14ef219e5571c8"
+        },
+        {
+          "path": "specs/cli-agent-parity/fixtures/claude-2.1.273-fixed-profile-control.json",
+          "sha256": "fb7c0fe39c3fea7d4b721ace8e62e034b8059f4e4492d80ad51981c056e88dbb"
+        },
+        {
+          "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-final-history-offline.json",
+          "sha256": "a71da4851785ce794205fa5b13247961685c364d490510fd1834b67a15512731"
+        }
+      ]
+    },
+    "worktree_dirty": true,
+    "claude_wrapper_sha256": "5674b766b239a83c1609a6e9405c24dde5ed6e6871132ba84a164dbbc53a4765",
+    "credential_values_in_manifest": false
+  },
+  "app_sha_source": "私有应用创建manifest所记录的重签主二进制摘要；本代理未重新读取或执行二进制，不声明完整app目录摘要。",
+  "manifest_models_executed_at_creation": 0,
+  "manifest_models_executed_scope": "创建时静态值，不能用它否认随后根代理实际GUI API执行。",
+  "observed_at": "2026-09-17T12:48:14.284095+00:00",
+  "task_id": "90319eee-f61f-4ecf-bcfd-beca68d58d59",
+  "read_only_database": true,
+  "generations": [
+    {
+      "generation": 1,
+      "state": "completed",
+      "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+      "turn_id": "f51e81e7-fb9f-4bbe-9232-26c68fa48a4f",
+      "native_outcome": "Completed",
+      "result_utf8_bytes": 1019,
+      "result_utf8_sha256": "2dae985cab4ae80290a19ac1d9d2ff80d5342b96c0d20bf0eb3efe785c0e2722",
+      "terminal_evidence_utf8_bytes": null,
+      "terminal_evidence_utf8_sha256": null,
+      "expected_markers": [
+        "GUI_ONE"
+      ],
+      "expected_markers_present": {
+        "GUI_ONE": true
+      },
+      "pending_input": null,
+      "current_generation_joined_inputs": [],
+      "older_joined_input_records_preserved": [],
+      "exact_GUI_ONE": false,
+      "fixture_passed": false,
+      "failure_classification": "模型拒绝伪造策略指令；GUI_ONE仅出现在解释正文中，未按夹具精确回复。",
+      "failure_classification_source": "根代理GUI观察，原结果仅私有保存，其摘要与字节数在此关联。"
+    },
+    {
+      "generation": 2,
+      "state": "completed",
+      "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+      "turn_id": "24d9edca-a93d-4063-a688-b0a14a9b9145",
+      "native_outcome": "Completed",
+      "result_utf8_bytes": 7,
+      "result_utf8_sha256": "48cc94d6f0952a8fd3cc5e724352f1341feb3fac60f4e9b0f752be07eac0729b",
+      "terminal_evidence_utf8_bytes": null,
+      "terminal_evidence_utf8_sha256": null,
+      "expected_markers": [
+        "GUI_TWO"
+      ],
+      "expected_markers_present": {
+        "GUI_TWO": true
+      },
+      "pending_input": null,
+      "current_generation_joined_inputs": [],
+      "older_joined_input_records_preserved": [],
+      "exact_GUI_TWO": true
+    },
+    {
+      "generation": 3,
+      "state": "completed",
+      "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+      "turn_id": "1ca238c3-9659-4bb2-8e18-1ffe08e7a530",
+      "native_outcome": "Completed",
+      "result_utf8_bytes": 30,
+      "result_utf8_sha256": "456a6f4f354171baeded318fff1c92538cc07b9aa915b892656c2d8f32e51dbf",
+      "terminal_evidence_utf8_bytes": null,
+      "terminal_evidence_utf8_sha256": null,
+      "expected_markers": [
+        "GUI_ALLOWED_DONE",
+        "GUI_QUEUED_3"
+      ],
+      "expected_markers_present": {
+        "GUI_ALLOWED_DONE": true,
+        "GUI_QUEUED_3": true
+      },
+      "pending_input": null,
+      "current_generation_joined_inputs": [
+        {
+          "message_id": "5623d8b5-10fb-45e1-a014-13854a498a5d",
+          "outcome": "Completed",
+          "submission_generation": 3,
+          "turn_id": "1ca238c3-9659-4bb2-8e18-1ffe08e7a530"
+        }
+      ],
+      "older_joined_input_records_preserved": []
+    },
+    {
+      "generation": 4,
+      "state": "completed",
+      "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+      "turn_id": "689d980b-992c-4d74-b140-52f2711bb439",
+      "native_outcome": "Completed",
+      "result_utf8_bytes": 18,
+      "result_utf8_sha256": "337580cc941c7bd2067de5909d528b77bdd766769ab6d60da32d90f02910c241",
+      "terminal_evidence_utf8_bytes": null,
+      "terminal_evidence_utf8_sha256": null,
+      "expected_markers": [
+        "GUI_DENY_CONFIRMED"
+      ],
+      "expected_markers_present": {
+        "GUI_DENY_CONFIRMED": true
+      },
+      "pending_input": null,
+      "current_generation_joined_inputs": [],
+      "older_joined_input_records_preserved": [
+        {
+          "message_id": "5623d8b5-10fb-45e1-a014-13854a498a5d",
+          "outcome": "Completed",
+          "submission_generation": 3,
+          "turn_id": "1ca238c3-9659-4bb2-8e18-1ffe08e7a530"
+        }
+      ],
+      "exact_GUI_DENY_CONFIRMED": true
+    },
+    {
+      "generation": 5,
+      "state": "failed",
+      "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+      "turn_id": "1bc61f7c-d813-40ea-a93c-590911942f72",
+      "native_outcome": {
+        "Failed": {
+          "message": "[ede_diagnostic] result_type=user last_content_type=n/a stop_reason=tool_use"
+        }
+      },
+      "result_utf8_bytes": 0,
+      "result_utf8_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "terminal_evidence_utf8_bytes": null,
+      "terminal_evidence_utf8_sha256": null,
+      "expected_markers": [],
+      "expected_markers_present": {},
+      "pending_input": {
+        "message_id": "c7c888ff-998e-4f1c-b0a0-f537db643956",
+        "submission_generation": 5
+      },
+      "current_generation_joined_inputs": [],
+      "older_joined_input_records_preserved": [
+        {
+          "message_id": "5623d8b5-10fb-45e1-a014-13854a498a5d",
+          "outcome": "Completed",
+          "submission_generation": 3,
+          "turn_id": "1ca238c3-9659-4bb2-8e18-1ffe08e7a530"
+        }
+      ],
+      "cancel_acceptance_passed": false,
+      "joined_batch_cancel_verified": false
+    },
+    {
+      "generation": 6,
+      "state": "completed",
+      "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+      "turn_id": "c7c888ff-998e-4f1c-b0a0-f537db643956",
+      "native_outcome": "Completed",
+      "result_utf8_bytes": 85,
+      "result_utf8_sha256": "b0f270bd4e44226dfbf842a545bd9f3e4f471f33bb0ae2350e9342b81d3f15d9",
+      "terminal_evidence_utf8_bytes": null,
+      "terminal_evidence_utf8_sha256": null,
+      "expected_markers": [
+        "GUI_CANCEL_BATCH_QUEUED"
+      ],
+      "expected_markers_present": {
+        "GUI_CANCEL_BATCH_QUEUED": true
+      },
+      "pending_input": null,
+      "current_generation_joined_inputs": [],
+      "older_joined_input_records_preserved": [
+        {
+          "message_id": "5623d8b5-10fb-45e1-a014-13854a498a5d",
+          "outcome": "Completed",
+          "submission_generation": 3,
+          "turn_id": "1ca238c3-9659-4bb2-8e18-1ffe08e7a530"
+        }
+      ]
+    }
+  ],
+  "persisted_native_receipts": [
+    {
+      "message_id": "f51e81e7-fb9f-4bbe-9232-26c68fa48a4f",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "sender_generation": 1,
+      "recipient_generation": 1
+    },
+    {
+      "message_id": "24d9edca-a93d-4063-a688-b0a14a9b9145",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "sender_generation": 2,
+      "recipient_generation": 2
+    },
+    {
+      "message_id": "1ca238c3-9659-4bb2-8e18-1ffe08e7a530",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "sender_generation": 3,
+      "recipient_generation": 3
+    },
+    {
+      "message_id": "5623d8b5-10fb-45e1-a014-13854a498a5d",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "sender_generation": 3,
+      "recipient_generation": 3
+    },
+    {
+      "message_id": "689d980b-992c-4d74-b140-52f2711bb439",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "sender_generation": 4,
+      "recipient_generation": 4
+    },
+    {
+      "message_id": "1bc61f7c-d813-40ea-a93c-590911942f72",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "sender_generation": 5,
+      "recipient_generation": 5
+    },
+    {
+      "message_id": "c7c888ff-998e-4f1c-b0a0-f537db643956",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "sender_generation": 5,
+      "recipient_generation": 5
+    }
+  ],
+  "acknowledged_native_input_count": 7,
+  "actual_execution_generations": 6,
+  "current_generation_joined_input_count": 1,
+  "file_proof": {
+    "bytes": 12,
+    "sha256": "acfa758900501297030a7b3a7d376dc34455046b045cb6c7582f10f87cdafcbf",
+    "unchanged_after_deny_and_cancel": true
+  },
+  "root_gui_observations": {
+    "source": "根代理任务指令与追加确认，不冒充本代理操作GUI或读取其他私人日志。",
+    "g3_Edit_allow_selected": true,
+    "g3_InputJoined_observed": true,
+    "g4_Edit_deny_selected": true,
+    "g5_cancel_requested": true,
+    "private_app_disconnect_and_quit_reported": true
+  },
+  "queued_after_failed_execution": {
+    "message_id": "c7c888ff-998e-4f1c-b0a0-f537db643956",
+    "ack_recipient_generation": 5,
+    "joined_to_generation5": false,
+    "actual_following_execution_generation": 6,
+    "actual_following_execution_completed": true,
+    "does_not_prove_cancel_success": true
+  },
+  "privacy": {
+    "method": "只读取指定状态、创建manifest与追加SQLite回执投影；manifest按字段白名单投影，结果和terminal evidence只保留UTF-8字节数、摘要、标记、ID及原生outcome；不复制原环境、配置、第一代长正文，不读取认证/API文件或其他私人日志。",
+    "patterns": [
+      "provider_key",
+      "bearer_token",
+      "credential_assignment",
+      "private_api_endpoint",
+      "private_api_file"
+    ],
+    "native_receipt_source_match_counts": {
+      "provider_key": 0,
+      "bearer_token": 0,
+      "credential_assignment": 0,
+      "private_api_endpoint": 0,
+      "private_api_file": 0
+    },
+    "scope_limit": "定向签名扫描不等于通用秘密检测。"
+  },
+  "limitations": [
+    "第一代原生Completed但GUI_ONE夹具失败，不能计两轮精确交互全部通过。",
+    "第五代取消请求得到原生Failed，不能计取消成功或joined批次取消通过；第六代后续Completed只证明J实际继续执行。",
+    "source6私有副本使用较早38文件快照，与official8的60文件中间门禁分开，不能据此称新版GUI全部通过。",
+    "创建manifest工作区为dirty；commit与source_snapshot.base_commit分别保留，不冒充包含实际修改的干净提交验证。",
+    "本轮尚未证明应用重启、继续历史原生会话、重新关联活跃任务或恢复结果；根代理后续追加证据另行审核。",
+    "本轮未通过完整英文/简体中文GUI布局链路，也没有Linux、Windows、SSH或tmux真实平台验收。"
+  ]
+}

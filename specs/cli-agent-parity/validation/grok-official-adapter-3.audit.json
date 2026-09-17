@@ -1,0 +1,176 @@
+{
+  "scope": "第 3 轮官方生产托管流程失败，冻结中间快照",
+  "acceptance_passed": false,
+  "public_product_gate_open": false,
+  "completed_text_turns": [
+    {
+      "event": "turn_finished",
+      "native_session_id": "01a0af2a-e28e-7500-b572-c478668b697e",
+      "outcome": "Completed",
+      "output": "PARITY_ONE",
+      "phase": "first_turn",
+      "turn_id": "34a03ffa-b92e-4525-b579-268932ee4625"
+    },
+    {
+      "event": "turn_finished",
+      "native_session_id": "01a0af2a-e28e-7500-b572-c478668b697e",
+      "outcome": "Completed",
+      "output": "PARITY_TWO",
+      "phase": "second_turn",
+      "turn_id": "745c96d7-0139-4a0c-93a1-95e5837f23e8"
+    }
+  ],
+  "approval_application_events": [
+    {
+      "approval_id": "<省略非固定文本>",
+      "decision": "AllowOnce",
+      "event": "approval_requested",
+      "exact_write_fixture": true,
+      "phase": "approval_allow"
+    },
+    {
+      "event": "command_dispatched",
+      "message_id": "2801857f-0955-467c-bf1f-10c21decd582",
+      "native_receipt": false,
+      "phase": "approval_allow",
+      "turn_id": "fa9be140-0403-4127-8b5d-c958425ba082"
+    },
+    {
+      "approval_id": "<省略非固定文本>",
+      "decision": "AllowOnce",
+      "event": "approval_resolved",
+      "native_receipt": false,
+      "phase": "approval_allow"
+    }
+  ],
+  "approval_native_receipt_confirmed": false,
+  "approval_limit": "应用 AllowOnce 派发和文件写入不能替代原生审批 ACK；该审批回合没有真实最终完成。",
+  "write_fixture": {
+    "path": "project/approval-allow.txt",
+    "size_bytes": 15,
+    "sha256": "f798dce6c3641f8ef768c8f34eafc743ea5cf37c581fee64d69f79e689cdb2c9",
+    "exact_expected_content": true,
+    "expected_content": "PARITY_APPROVAL"
+  },
+  "primary_failure": "Grok 连接断开：CLI protocol error: Grok text stream arrived across an unresolved or closed boundary",
+  "new_response_stream": {
+    "streamStartMs": 1789645228367,
+    "thought_chunk_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "message_chunk_ids": [
+      21
+    ],
+    "limit": "两个通道共用同一个原生 chunk 计数序列；不能按各通道独立连续编号解释。"
+  },
+  "private_settings_audit": {
+    "bytes_unchanged": false,
+    "before_sha256": "8b51690ac09910a6975d9a06dd138d6722e669bf10618a700c636812a4097bd6",
+    "after_sha256": "eededaf9df6afedbd8e81a759a44a85a349d18cadccdc18d926a14ee48674794",
+    "toml_parse_succeeded": true,
+    "permission_section_unchanged": true,
+    "native_marketplace_initialization_only": true,
+    "settings_scope_verified": true,
+    "changed_top_level_tables": [
+      "marketplace"
+    ]
+  },
+  "settings_limit": "运行前保存的实际初始字节用于严格 TOML 比较；bytes_unchanged=false 仍保留。仅允许原生 marketplace 的固定初始化，权限和其他配置必须相同。",
+  "network_summary": {
+    "tls_connections_attempted": 9,
+    "tls_bytes": 5011565,
+    "event_counts": {
+      "official_connect_attempt": 9,
+      "official_tunnel_opened": 9,
+      "rejected_nonofficial_origin": 73,
+      "official_tunnel_io_failed": 1
+    },
+    "rejected_origin_kind_counts": {
+      "unknown": 70,
+      "xai_api": 3
+    }
+  },
+  "network_limit": "TLS 未解密，未核对 HTTP 模型请求数或成本；unknown 来源不能解释为遥测。白名单没有扩展。",
+  "production_cleanup": [
+    {
+      "exit_receipt": {
+        "version": 1,
+        "generation": "78e088f7-a1f5-4b54-8e82-fbd73ab28421",
+        "cleanup_confirmed": true,
+        "containment": "macos_resource_coalition",
+        "exit_reason": "stop_requested",
+        "exit_code": 0,
+        "manifest_sha256": "79f251557d61c720522f8c219bcc74264c54e0e90b5666a7a0d8d079cccf589d"
+      },
+      "macos_cleanup": {
+        "version": 1,
+        "generation": "78e088f7-a1f5-4b54-8e82-fbd73ab28421",
+        "claim_sha256": "9e5929bb6749d61e8dcd5a1dea395b97cc8f9313a3b1b8c0e0c7c01493c1af38",
+        "native_sha256": "71fd1a425ee3706830d266ea7f54f4943f2b1093e71a30942dc22bf6900bb86b",
+        "job_removed": true,
+        "resource_cid_destroyed": true,
+        "native_wait_status": 0,
+        "execution_failed": false
+      },
+      "source_sha256": {
+        "exit_receipt": "c053515dcec3a714fd2c298ea9ffcc78170b5f70ea2866d02c469b0b841a6103",
+        "macos_cleanup": "eb0607e43a0e555cf1e46420ab1ed2e42bcc1cfb88d8c183e451f95a6358e616",
+        "manifest": "79f251557d61c720522f8c219bcc74264c54e0e90b5666a7a0d8d079cccf589d"
+      }
+    }
+  ],
+  "cleanup_limit": "清理成功和 exit_code=0 不表示任务成功。",
+  "source_sha256": {
+    "public_ndjson": "f4995bdf28e7326a692881713f44061c1bd175003dd5dbae41de5f82856ed8e7",
+    "metadata": "48a1852e1af9ee2ab55d1c14392caa1383bb4ed3c6759fc9cc38241bb7999cdf",
+    "network": "feaddcde2b5d3885e5210ec838b01b8ef8a795dfd5ff4a82e57f8d86dd70735f",
+    "private_evidence": "770e5d9246eba71c9cfe438da1786f1d6b952f1a121d9cc2c2d072c01a2ae243",
+    "private_test_output": "d2345bff0a0e8cdbd943cce93ec1da623aef87ae87cbe94e99f1f9cd379505dd",
+    "config_toml": "eededaf9df6afedbd8e81a759a44a85a349d18cadccdc18d926a14ee48674794"
+  },
+  "snapshot": {
+    "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+    "worktree_dirty": true,
+    "source_manifest": "macos-official-3-inputs.json",
+    "source_manifest_sha256": "6ffedeabcb03acc931ccb09de3c442b9a3dc2f672d52cb35c46631db14ae952a",
+    "file_count": 48,
+    "same_commit_formal_acceptance": false
+  },
+  "remaining_acceptance": [
+    "审批回合完成",
+    "审批拒绝",
+    "追加指令",
+    "取消",
+    "继续",
+    "应用重启恢复",
+    "结果回收"
+  ],
+  "credential_values_recorded": false,
+  "credential_shape_scan": {
+    "api_key_shape": 0,
+    "jwt_shape": 0,
+    "bearer_value": 0,
+    "private_key": 0,
+    "credential_assignment": 0,
+    "email_identity": 0
+  }
+}

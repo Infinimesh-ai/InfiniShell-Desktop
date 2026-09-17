@@ -1,0 +1,119 @@
+{
+  "source_manifest": "/tmp/infinishell-cli-parity-official-13-inputs.json",
+  "source_manifest_sha256": "419e6a6fac30237c4577061cb753078360fdf42e5833de29266363e3cdd5dd82",
+  "groups": [
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 11,
+      "wall_seconds": 0.1
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_profile_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 7,
+      "wall_seconds": 0.094
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 56,
+      "wall_seconds": 0.156
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 18,
+      "wall_seconds": 0.116
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_image_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 23,
+      "wall_seconds": 0.109
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/codex_source_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 10,
+      "wall_seconds": 0.303
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 13,
+      "wall_seconds": 0.107
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 27,
+      "wall_seconds": 0.193
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 19,
+      "wall_seconds": 2.149
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 47,
+      "wall_seconds": 0.706
+    }
+  ],
+  "wall_seconds": 4.035,
+  "log": "/tmp/infinishell-cli-parity-official-13-python.log",
+  "log_sha256": "e26e7af1d3b8e25e8dccac0a875cf4d692125c0ff90729d34f9b073db7768aaa"
+}

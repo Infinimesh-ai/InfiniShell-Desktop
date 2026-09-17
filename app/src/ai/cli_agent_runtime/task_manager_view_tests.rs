@@ -111,7 +111,14 @@ fn running_codex_steers_and_claude_submits_a_separate_turn() {
         input_action(Harness::Codex, None, text).unwrap(),
         RuntimeAction::Submit { .. }
     ));
-    assert!(input_action(Harness::Grok, None, text).is_err());
+    for active in [None, Some("turn-1")] {
+        assert_eq!(
+            input_action(Harness::Grok, active, text).unwrap(),
+            RuntimeAction::Submit {
+                input: vec![InputContent::Text(text.into())],
+            }
+        );
+    }
 }
 
 #[test]
@@ -132,9 +139,13 @@ fn installed_or_newer_versions_do_not_automatically_enable_managed_launch() {
         Harness::Claude,
         &CLIAgentVersionStatus::Unknown
     ));
-    assert!(!verified_version(
+    assert!(verified_version(
         Harness::Grok,
         &CLIAgentVersionStatus::Detected("1.0.30".into())
+    ));
+    assert!(!verified_version(
+        Harness::Grok,
+        &CLIAgentVersionStatus::Detected("1.0.31".into())
     ));
 }
 
@@ -232,9 +243,11 @@ fn saved_tool_permissions_default_off_and_round_trip_without_escalation() {
     let old: SavedLaunchOptions =
         serde_json::from_str(r#"{"permission_policy":"Inherit","model":null}"#).unwrap();
     assert!(old.local_tools.is_none());
+    assert!(old.claude_profile.is_none());
     let saved = SavedLaunchOptions {
         permission_policy: PermissionPolicy::ReadOnly,
         permission_ceiling: None,
+        claude_profile: None,
         model: None,
         selected_skills: Vec::new(),
         local_tools: Some(LocalToolPermissions {
@@ -275,6 +288,34 @@ fn composer_snapshot(view: &LocalCLITaskManagerView, ctx: &AppContext) -> Compos
         attachments_revision: view.managed_input.attachments.revision,
         input_generation: view.input_generation,
     }
+}
+
+#[test]
+fn managed_image_entry_uses_verified_harnesses_and_retains_processing_limits() {
+    warpui::App::test((), |mut app| async move {
+        let manager = manager_view(&mut app);
+        manager.update(&mut app, |view, ctx| {
+            for (harness, enabled) in [
+                (Harness::Codex, true),
+                (Harness::Claude, true),
+                (Harness::Grok, false),
+            ] {
+                view.harness = harness;
+                view.refresh_managed_input(ctx);
+                assert_eq!(
+                    view.prompt.as_ref(ctx).image_context_options.is_enabled(),
+                    enabled
+                );
+            }
+            view.harness = Harness::Claude;
+            view.managed_input.processing_images = true;
+            view.refresh_managed_input(ctx);
+            assert!(!view.prompt.as_ref(ctx).image_context_options.is_enabled());
+            view.managed_input.processing_images = false;
+            view.refresh_managed_input(ctx);
+            assert!(view.prompt.as_ref(ctx).image_context_options.is_enabled());
+        });
+    });
 }
 
 #[test]

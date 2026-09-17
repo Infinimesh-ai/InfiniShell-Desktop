@@ -1,0 +1,146 @@
+{
+  "commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "run": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35190750961",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "c46619c2516e9f3e0ec47346cacb65673c2e517381af913dc606c157b7b92e4b"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/claude-21273-inputs/claude-fixed-inputs.json",
+      "sha256": "ab39a24c8e2cec7703fb49c3993c72e06a077379eeabc4db71df9c3c2ac68bc6"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/claude-initialize-idle-eof.json",
+      "sha256": "a4a382c5bbc0a4ed3f1c09a15ff1efb6376e7a60b8fbd2ef8f023968c5f03cfb"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/claude-permission-observation.json",
+      "sha256": "1c5b6ab70c173d440f44d24177ad84f31a62608318ed4b0289414e070924119c"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-idle-crash.metadata.json",
+      "sha256": "e43b07c2598f24faf3135e49592a14d30da3ada7be65db8e1f173964dd0c8d2a"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-idle-crash.ndjson",
+      "sha256": "15b01f3ee808d0aae5bbad847eccff0d1c902e980467f3aae98dd08e141fec62"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-idle-crash.test-output.txt",
+      "sha256": "a93e1bd60b94525941673d34a6ed0e1c81abf0d3ac633a8120487c625403c5f5"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-missing-session.metadata.json",
+      "sha256": "8417df2bfc4c62004e69e2863b6e948b8a0395c936abba4d78bdeff420523ce0"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-missing-session.ndjson",
+      "sha256": "fa6e31d142c316262c63d9b04d164a7d8ab5424fc3eea57a84efd3b4941fa15c"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-missing-session.test-output.txt",
+      "sha256": "41162fef7a3001fa9085a7634d463234ae78c790fe32c24e66e80621ea3cd6ba"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-plugin-cache-refresh.json",
+      "sha256": "045879eaa483103410b82585a11def6aa20bdde4905dfc49744c800bf209d9e0"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-plugin-lifecycle.json",
+      "sha256": "7d1ebdbb51c6179317f2a3009df20e78c88ce69fdc4abc29f3eadd33d1e1ff29"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/grok-cli-fixed/grok-fixed-inputs.json",
+      "sha256": "a5400e8e9fb8e3e14d0e16430823aeadcd7318d002fddc9bf45bb13147c80740"
+    },
+    {
+      "path": "cli-linux-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/grok-fixed-acp.json",
+      "sha256": "6f98d50ac6d2144ab3bc5149ab98d2186ec85e9b2e07a95319e2263e6b1e4e3e"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/claude-21273-inputs/claude-fixed-inputs.json",
+      "sha256": "d24604d73edffafc0d49d4e1de5e758f03e35e539dc4083e312c4b5ce132888f"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/claude-initialize-idle-eof.json",
+      "sha256": "a09411c42a88870dc2da95afc85c327997918fd0d6f7fe1cfce4ea40193270c3"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/claude-permission-observation.json",
+      "sha256": "984a8ce0f5d5f2a6a887ba88dd42a668781ecdd776a1011b82fd432331384494"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-idle-crash.metadata.json",
+      "sha256": "503c52c86283dcd5c7fbcc193e38021f3d288e709b24e86d049cb44c51881b99"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-idle-crash.ndjson",
+      "sha256": "00ce3f7474654d9e1a400abbf7f19fd36b4cec5db5d369d30a81d1932e100b86"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-idle-crash.test-output.txt",
+      "sha256": "776766adf0364c711c7dc555878dab80bcede1e6d8449b7cdc23441ef489fb18"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-missing-session-cmd.metadata.json",
+      "sha256": "7d278e11e4790cd733237921ec7f343a7e34c2dec5abb3cddcf66a30ad5dd5ea"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-missing-session-cmd.ndjson",
+      "sha256": "add3fe6aeea2be67a68b53f610c5607e381ae43e4d9ddcfb8e4d61ef0eaf67c5"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-missing-session-cmd.test-output.txt",
+      "sha256": "23067b7b1f0e9911684dac3f355092e095bdfaa56d9e11e976b4663fd08afe56"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-missing-session.metadata.json",
+      "sha256": "7d278e11e4790cd733237921ec7f343a7e34c2dec5abb3cddcf66a30ad5dd5ea"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-missing-session.ndjson",
+      "sha256": "6e1dd64627b44e2476b4f8a00fcd82e29bff27408354127205da0e1afe3675c2"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-missing-session.test-output.txt",
+      "sha256": "ada80c6e322d61d3a56a6dde97b616c8113fe79b095b37afbc6577d1b2038c04"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-plugin-cache-refresh.json",
+      "sha256": "7059e3975fd2fc3367e37e170450fa8933767b85174a040dbecccb14bf925853"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-plugin-lifecycle.json",
+      "sha256": "20ef4c347679198ba12de82e9cd802e3483f8835017e58cffae6e4f5f43cff06"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/grok-cli-fixed/grok-fixed-inputs.json",
+      "sha256": "b63784c0ff6a65ee4904271740d39913895afea441218bbe3aa9a9cd98d84028"
+    },
+    {
+      "path": "cli-windows-native-boundaries-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/grok-fixed-acp.json",
+      "sha256": "fadfa9572c45c3b374d2c697ee077aa621eacd648b81f4dc06d23b2ec3fb2460"
+    },
+    {
+      "path": "codex-windows-conpty-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-windows-conpty.json",
+      "sha256": "aff55c06911a3718d41130709846ef6a9070b1f30d050cc3f383d8d749b204c3"
+    },
+    {
+      "path": "codex-windows-conpty-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-windows-conpty.native.json",
+      "sha256": "8e7a1a83c11700137579fb94e753caecc2233e09c95e58c82c88a22c16129cc0"
+    },
+    {
+      "path": "codex-windows-conpty-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-windows-conpty.pty.bin",
+      "sha256": "df0dbdda09d6aeeddcb0c3b6b1ba1c1052ccd53a649309dc2655af563fc1cd1c"
+    },
+    {
+      "path": "codex-windows-native-hooks-b3d8b0f11657b0ed1ba34035dda8d363eb52747f/codex-windows-native-hooks.json",
+      "sha256": "803db5ecf876ea79aae8fb4f1d27ae206fabba746c482ae3d64174a49943bb5e"
+    },
+    {
+      "path": "run.json",
+      "sha256": "89a95c3d341e32ca4951bdeeb1082a7d8058f5a9a088996441ae9d69c5280e18"
+    }
+  ]
+}

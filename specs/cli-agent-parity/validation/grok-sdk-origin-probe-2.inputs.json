@@ -1,0 +1,14 @@
+{
+  "scope": "独立 SDK 探针：source10 lib 与 source8 main 的未变监督组件；不计快照门禁或最终同提交",
+  "library": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "05ec980d8e0906d7dee608253385c7c11b48bdf68e1d19ab87f3b61557257fcd"
+  },
+  "supervisor": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "sha256": "6e1801d768bdcb3e4ae9e2de2dba2137386631294baa79c2e262efc29f8abb78"
+  },
+  "source_manifest_sha256": "e544e075ca84e5546fd8d70f25c4f69430b27c9d102b79173f37f767ea11c5ef",
+  "sdk_pure_tests_passed": 13,
+  "whole_snapshot_passed": false
+}

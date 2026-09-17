@@ -49,18 +49,11 @@ where
 }
 
 pub(crate) async fn send_prepared_result(
-    sender: &SyncSender<ModelEvent>,
     endpoint: ManagedTaskEndpoint,
     message: LocalCliMessage,
 ) -> Result<(), String> {
     let command = message_command(&endpoint, &message)?;
-    dispatch_prepared_result_once(sender, message, || async move {
-        endpoint
-            .send(command)
-            .await
-            .map_err(|error| error.to_string())
-    })
-    .await
+    endpoint.send_result(command, message).await
 }
 
 fn message_command(
@@ -122,7 +115,7 @@ where
     Ok(LocalCliMessageState::Sent)
 }
 
-async fn dispatch_prepared_result_once<F, Fut>(
+pub(crate) async fn dispatch_prepared_result_once<F, Fut>(
     sender: &SyncSender<ModelEvent>,
     message: LocalCliMessage,
     dispatch: F,
@@ -177,6 +170,7 @@ pub(crate) async fn acknowledge_runtime_message(
             (message_id, LocalCliMessageState::Failed)
         }
         RuntimeEventKind::SessionReady { .. }
+        | RuntimeEventKind::InputJoined { .. }
         | RuntimeEventKind::CommandDispatched { .. }
         | RuntimeEventKind::TurnStarted { .. }
         | RuntimeEventKind::TextDelta { .. }

@@ -1,0 +1,228 @@
+{
+  "scope": "claude_native_image_input_probe",
+  "attempt": 1,
+  "result": "failed",
+  "test_exit_code": 101,
+  "acceptance_passed": false,
+  "native_image_input_verified": false,
+  "production_image_gate_open": false,
+  "native_framing_only": true,
+  "full_cli_parity_acceptance_passed": false,
+  "final_clean_commit_verified": false,
+  "input_snapshot": {
+    "scope": "claude_native_image_input_probe",
+    "source_snapshot": 13,
+    "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+    "worktree_dirty": true,
+    "source_manifest": "specs/cli-agent-parity/validation/macos-official-13-inputs.json",
+    "source_manifest_sha256": "419e6a6fac30237c4577061cb753078360fdf42e5833de29266363e3cdd5dd82",
+    "source_file_count": 73,
+    "source_manifest_initial_read_verified_file_count": 73,
+    "frozen_tree_later_read_advanced_from_manifest": true,
+    "later_read_mismatched_file_count": 4,
+    "later_read_mismatched_files": [
+      ".github/workflows/cross-platform-preflight.yml",
+      "app/src/ai/cli_agent_runtime/claude_image_probe_live_tests.rs",
+      "script/cli-agent-parity/claude_image_probe_runner_tests.py",
+      "script/cli-agent-parity/run_claude_image_probe.py"
+    ],
+    "archive_read_boundary": "首轮只读核对冻结73文件全部匹配source13；归档准备阶段冻结树继续前进，后续源码不当作这两轮运行来源",
+    "library_sha256": "a857fbb82541ff572591bb9ab526a187e1a96325063636a7f72f928d6864e471",
+    "supervisor_sha256": "0c9e05fe2c75aaf909e31c2dfb4508e5f7ea3ee9da6c7a8e167713ae8205d77f",
+    "binary_hash_source": "两原runner元数据与已归档source13门禁/构建报告一致；本次不重新读取大二进制",
+    "final_clean_commit_verified": false,
+    "same_commit_verified_by_runner": false,
+    "production_runtime_commands": true,
+    "test_only_internal_command_switch": false,
+    "public_coordinator_entry_verified": false,
+    "app_restart_and_ui_verified": false,
+    "full_cli_parity_acceptance_passed": false,
+    "cross_platform_native_acceptance_verified": false,
+    "source_manifest_read_only": true,
+    "frozen_tree_or_target_mutated": false,
+    "snapshot_advanced": true,
+    "later_snapshot_number_reported_by_parent": 14,
+    "later_snapshot_manifest_sha256_reported": "587c446d737259bc48a913256008558c87b450d5f29304015a10841ed31eec93",
+    "later_snapshot_source_file_count_reported": 75,
+    "later_snapshot_evidence_origin": "根代理确认source13两runner执行完成后才前进source14；后续树与lib不替换本轮来源身份"
+  },
+  "derived_source_binding": {
+    "sha256": "4d22a11ee2c3665ac5959ddd80fdcfdcda10304a6745ae65bc0bce83b73fade9",
+    "bytes": 2117,
+    "credential_scan": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "email": 0,
+      "credential_assignment": 0
+    }
+  },
+  "original_public_artifacts": {
+    "ndjson": {
+      "sha256": "e689310a687a75084f4755ec8824f1040223ff7d4cfa82ab65c9820f43c56c69",
+      "bytes": 11056,
+      "credential_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "email": 0,
+        "credential_assignment": 0
+      }
+    },
+    "metadata.json": {
+      "sha256": "34d8049ce3a9e24976352f8542cbf6a7edf571805321512c69e4b67ef863174a",
+      "bytes": 1867,
+      "credential_scan": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "email": 0,
+        "credential_assignment": 0
+      }
+    }
+  },
+  "public_artifacts_copied_byte_exact": true,
+  "public_event_counts": {
+    "acceptance_started": 1,
+    "native_protocol_ids": 9,
+    "png_generated": 1,
+    "input_submitted": 1,
+    "cleanup_checked": 1,
+    "acceptance_failed": 1
+  },
+  "private_test_output": {
+    "sha256": "2e50b7263600ddce40a33eed9d6d64c59a29b75733b29160d86c754c18f80d53",
+    "bytes": 651,
+    "credential_scan": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "email": 0,
+      "credential_assignment": 0
+    },
+    "raw_contents_copied": false,
+    "raw_contents_printed": false,
+    "hash_and_credential_scan_only": true
+  },
+  "native_image_protocol_observation": {
+    "protocol_roundtrip_observed": true,
+    "overall_native_acceptance_passed": false,
+    "generation": "81a54086-a17a-41e3-ab1a-e4a3c216d56b",
+    "native_session_id": "b5576cf1-431c-42e3-a23b-3abfc3800330",
+    "input_uuid": "9acbdb87-4e59-4bfb-9575-49b9752926f7",
+    "input_count": 1,
+    "content_shape": "array",
+    "user_content_replay_exact_projection_match": true,
+    "replay_array_sha256": "e636f86fc89c86f457f5ff83f9ba4e6f4ac65f2267bd4124eeaf614dcbafa08e",
+    "blocks": [
+      {
+        "text_bytes": 310,
+        "text_sha256": "356737d1060e0761b76a4b7cb20ffb253b4b3d0209229def05c63e0d150f0c06",
+        "type": "text"
+      },
+      {
+        "image_bytes": 12420,
+        "image_sha256": "427acf9b875f380ccff526a3841fcd96117edf890e551438b05cf84e4da169e5",
+        "media_type": "image/png",
+        "source_type": "base64",
+        "type": "image"
+      }
+    ],
+    "png_generation": {
+      "event": "png_generated",
+      "expected_reply_sha256": "eb2bb99544bcf25a042403af71b64fac362c1d4abe748e81bfd79e82f94cc69a",
+      "height": 64,
+      "image_bytes": 12420,
+      "image_sha256": "427acf9b875f380ccff526a3841fcd96117edf890e551438b05cf84e4da169e5",
+      "prompt_sha256": "356737d1060e0761b76a4b7cb20ffb253b4b3d0209229def05c63e0d150f0c06",
+      "quadrants": 4,
+      "width": 64
+    },
+    "native_queued_and_started_for_exact_input": true,
+    "assistant_exact_single_input_relation": true,
+    "result_exact_single_input_relation": true,
+    "result_terminal_reason": "completed",
+    "result_is_error": false,
+    "assistant_and_result_full_text_sha256_match_expected": true,
+    "expected_reply_sha256": "eb2bb99544bcf25a042403af71b64fac362c1d4abe748e81bfd79e82f94cc69a",
+    "assistant_reply_bytes": 21,
+    "system_native_version": "2.1.273",
+    "system_tool_count": 0,
+    "system_mcp_count": 0,
+    "permission_mode": "default",
+    "native_tool_or_extra_permission_request_count": 0,
+    "initialize_success_control_ack_observed": true
+  },
+  "failure": {
+    "reason": "native_cleanup_not_confirmed",
+    "transport_closed": false,
+    "combined_probe_cleanup_confirmed": false,
+    "child_finish_returned_error": true,
+    "child_finish_error_evidence_origin": "根代理任务消息；本次原始test-output仅扫描与散列，不复读正文"
+  },
+  "cleanup": {
+    "production_generation": "81a54086-a17a-41e3-ab1a-e4a3c216d56b",
+    "production_receipt_cleanup_confirmed": true,
+    "production_exit_reason": "stdio_closed",
+    "production_exit_code": 0,
+    "job_removed": true,
+    "resource_cid_destroyed": true,
+    "native_wait_status": 0,
+    "probe_transport_closed": false,
+    "probe_cleanup_confirmed": false,
+    "probe_cleanup_receipt_read": true,
+    "production_receipt_projection_artifacts": {
+      "exit-receipt.json": {
+        "sha256": "143cf099822d3e56ed3709da9c3776a2f3903a4ce459ecbb4d64446c97a0d675",
+        "bytes": 630,
+        "credential_scan": {
+          "api_key": 0,
+          "jwt": 0,
+          "bearer": 0,
+          "private_key": 0,
+          "email": 0,
+          "credential_assignment": 0
+        }
+      },
+      "macos-cleanup.json": {
+        "sha256": "8c53041e9ad637c748585c1abe1a8a37c8ff2b973d4d29aebcb1de342bd10528",
+        "bytes": 670,
+        "credential_scan": {
+          "api_key": 0,
+          "jwt": 0,
+          "bearer": 0,
+          "private_key": 0,
+          "email": 0,
+          "credential_assignment": 0
+        }
+      }
+    }
+  },
+  "settings_audit": {
+    "project_settings_unchanged": true,
+    "project_settings_sha256": "ce5198ef78167f1a993ea8f4442d310641ad5bf8ee7a352798c2b543cb4ebfd3",
+    "source": "原runner元数据；本次未读取项目或用户配置"
+  },
+  "side_effect_boundaries": {
+    "credential_content_read": false,
+    "private_test_output_archived": false,
+    "raw_png_or_base64_archived": false,
+    "assistant_or_model_body_archived": false,
+    "manifest_contents_read": false,
+    "binary_independently_read_by_archive": false,
+    "production_image_capability_expanded": false,
+    "app_restart_or_persistence_verified": false,
+    "http_model_request_count_verified": false
+  },
+  "evidence_limits": [
+    "一张自生成PNG的数组输入/原生完整回放、ACK/Started、assistant和单UUID result得到真实协议对应；不计整体PASSED。",
+    "生产退出收据是stdio_closed/0/cleanup=true，macOS job与resource CID已清理；child.finish错误及transport_closed=false使整体native_cleanup_not_confirmed。",
+    "原始test-output仅记录SHA/字节数/凭据形态计数，不复制、不打印正文。",
+    "本夹具走生产进程监督与Codec的test-only原生图片framing，未验证现有字符串adapter图片路径，生产门禁仍关闭。",
+    "source13 lib/main绑定73文件dirty中间快照；冻结后来前进source14不改变本轮来源，不计UI、重启、持久化、HTTP请求数、跨平台或最终同提交验收。"
+  ]
+}

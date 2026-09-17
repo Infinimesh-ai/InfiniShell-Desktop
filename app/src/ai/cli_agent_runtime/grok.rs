@@ -27,6 +27,7 @@ const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_LINE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_NATIVE_IDENTITIES: usize = 16_384;
 const MAX_QUEUED_PROMPTS: usize = 32;
+const SNAPSHOT_RETRY_INTERVAL: Duration = Duration::from_millis(250);
 
 /// 仅验证连接、新建与能力来源；产品入口仍须关闭未通过真实验收的托管回合。
 pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeError> {
@@ -55,12 +56,19 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
             "executable and cwd must be absolute".into(),
         ));
     }
-    // Grok 的权限模式不等同于 Codex 沙箱；no-leader 实证不能打开产品 leader 恢复门禁。
+    if matches!(&options.target, SessionTarget::Resume { native_session_id } if !valid_native_id(native_session_id))
+    {
+        return Err(RuntimeError::InvalidConfiguration(crate::t!(
+            "cli-agent-grok-managed-unverified"
+        )));
+    }
+    // Grok 根任务继承原生配置；尚未证明创建时固定的子任务权限上限。
     if options.permission_policy != PermissionPolicy::Inherit
+        || options.permission_ceiling.is_some()
+        || options.claude_profile.is_some()
         || options.model.is_some()
         || options.local_tools.is_some()
         || !options.selected_skills.is_empty()
-        || matches!(options.target, SessionTarget::Resume { .. })
     {
         return Err(RuntimeError::InvalidConfiguration(crate::t!(
             "cli-agent-grok-managed-unverified"
@@ -100,13 +108,32 @@ async fn run_process(
     }
 
     // 独立 leader socket 防止此次连接意外关联用户已有的 Grok 进程。
-    let directory = tempfile::tempdir()?;
-    let arguments = [
-        OsString::from("agent"),
-        OsString::from("stdio"),
-        OsString::from("--leader-socket"),
-        directory.path().join("leader.sock").into_os_string(),
-    ];
+    let mut directory_builder = tempfile::Builder::new();
+    directory_builder.prefix("infinishell-grok-");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        directory_builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    let directory = directory_builder.tempdir()?;
+    // SDK 反向请求不携带会话路由字段；独立 stdio 连接避免依赖 leader 会话路由。
+    let direct_sdk = protocol.options.local_tools.is_some();
+    #[cfg(test)]
+    let direct_sdk = direct_sdk || protocol.sdk_origin_probe.is_some();
+    let arguments = if direct_sdk {
+        vec![
+            OsString::from("agent"),
+            OsString::from("--no-leader"),
+            OsString::from("stdio"),
+        ]
+    } else {
+        vec![
+            OsString::from("agent"),
+            OsString::from("stdio"),
+            OsString::from("--leader-socket"),
+            directory.path().join("leader.sock").into_os_string(),
+        ]
+    };
     let mut child = super::managed_process::spawn(
         &protocol.options.state_dir,
         protocol.options.generation,
@@ -124,10 +151,40 @@ async fn run_process(
         .take()
         .ok_or_else(|| RuntimeError::Protocol("missing Grok stdout".into()))?;
     let result = run_transport(protocol, &mut stdin, &mut stdout, commands, events).await;
+    let effects = protocol.finish_transport(&result);
+    for kind in effects.events {
+        let _ = events.try_send(protocol.event(kind));
+    }
     drop(stdin);
-    drop(stdout);
-    child.finish().await?;
-    result
+    // 保留读端至有界 EOF；丢弃退出尾部字节，不生成新的原生事件或保存正文。
+    let drain = async move {
+        let mut budget = MAX_LINE_BYTES;
+        let mut bytes = [0u8; 8192];
+        loop {
+            let limit = budget.saturating_add(1).min(bytes.len());
+            let count = stdout.read(&mut bytes[..limit]).await?;
+            if count == 0 {
+                return Ok::<(), RuntimeError>(());
+            }
+            budget = budget.checked_sub(count).ok_or_else(|| {
+                RuntimeError::Protocol(crate::t!("cli-agent-runtime-data-too-large"))
+            })?;
+        }
+    };
+    let graceful = result.is_ok();
+    let finish = async move {
+        if graceful {
+            child.finish_after_stdin_close().await
+        } else {
+            child.finish().await
+        }
+    };
+    let (finished, drained) = futures::join!(finish, drain.with_timeout(Duration::from_secs(30)));
+    // 清理和读取均结束后保留原传输失败；正常成功还必须具有可信回执及预算内 EOF。
+    result?;
+    finished?;
+    drained.map_err(|_| RuntimeError::RequestTimedOut)??;
+    Ok(())
 }
 
 async fn run_transport(
@@ -141,6 +198,11 @@ async fn run_transport(
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 8192];
     loop {
+        let effects = protocol.poll_final_output();
+        flush_effects(protocol, stdin, events, effects).await?;
+        if protocol.closed {
+            return Ok(());
+        }
         if protocol.request_timed_out() {
             return Err(RuntimeError::RequestTimedOut);
         }
@@ -179,6 +241,8 @@ async fn run_transport(
                     let line = buffer.drain(..=newline).collect::<Vec<_>>();
                     let message = serde_json::from_slice(&line)
                         .map_err(|error| RuntimeError::Protocol(error.to_string()))?;
+                    #[cfg(test)]
+                    trace_live_protocol_ids(&message);
                     let effects = protocol.receive(message)?;
                     flush_effects(protocol, stdin, events, effects).await?;
                     if protocol.closed {
@@ -201,6 +265,25 @@ async fn run_transport(
             return Ok(());
         }
     }
+}
+
+#[cfg(test)]
+fn trace_live_protocol_ids(message: &Value) {
+    if std::env::var_os("INFINISHELL_GROK_LIVE_ROOT").is_none() {
+        return;
+    }
+    // 隔离验收仅记录协议身份和状态；不记录提示、输出、工具参数或凭据。
+    let params = &message["params"];
+    let update = &params["update"];
+    eprintln!(
+        "GROK_NATIVE_PROTOCOL_IDS {}",
+        json!({"id":message.get("id"),"method":message.get("method"),
+            "sessionId":params.get("sessionId"),"sessionUpdate":update.get("sessionUpdate"),
+            "eventId":params["_meta"].get("eventId"),"promptId":params["_meta"].get("promptId"),
+            "streamStartMs":params["_meta"].get("streamStartMs"),"chunkId":params["_meta"].get("chunkId"),
+            "toolCallId":update.get("toolCallId"),"status":update.get("status"),
+            "stopReason":message["result"].get("stopReason")})
+    );
 }
 
 async fn write_message(
@@ -241,6 +324,7 @@ async fn flush_effects(
         matches!(
             kind,
             RuntimeEventKind::TurnFinished { .. }
+                | RuntimeEventKind::TextDelta { .. }
                 | RuntimeEventKind::RequestFailed { .. }
                 | RuntimeEventKind::ApprovalCancelled { .. }
         )
@@ -270,6 +354,7 @@ enum PendingKind {
     Authenticate,
     OpenSession { requested_id: Option<String> },
     Prompt,
+    FinalOutput,
     CloseSession,
 }
 
@@ -286,12 +371,19 @@ struct PendingPrompt {
     finished: bool,
     stream_id: Option<i64>,
     closed_streams: HashSet<i64>,
-    last_text_sequence: Option<u64>,
-    chunks: BTreeMap<u64, (u64, String)>,
+    last_chunk_sequence: Option<u64>,
+    chunks: BTreeMap<u64, (u64, [u8; 32], Option<String>)>,
     next_chunk: u64,
     retained_text_bytes: usize,
     output: String,
     cancel_sent: Option<Instant>,
+    completion: Option<PendingCompletion>,
+}
+
+struct PendingCompletion {
+    outcome: TurnOutcome,
+    started_at: Instant,
+    retry_at: Option<Instant>,
 }
 
 struct QueuedPrompt {
@@ -387,6 +479,12 @@ struct GrokProtocol {
     reported_capabilities: Value,
     reported_metadata: ReportedMetadata,
     closed: bool,
+    #[cfg(test)]
+    queued_submissions: usize,
+    #[cfg(test)]
+    sdk_origin_probe: Option<sdk_origin_live_tests::SdkOriginProbe>,
+    #[cfg(test)]
+    verified_final_histories_for_live: Option<live_tests::VerifiedFinalHistories>,
 }
 
 impl GrokProtocol {
@@ -409,6 +507,12 @@ impl GrokProtocol {
             reported_capabilities: Value::Null,
             reported_metadata: ReportedMetadata::default(),
             closed: false,
+            #[cfg(test)]
+            queued_submissions: 0,
+            #[cfg(test)]
+            sdk_origin_probe: None,
+            #[cfg(test)]
+            verified_final_histories_for_live: None,
         }
     }
 
@@ -431,7 +535,7 @@ impl GrokProtocol {
     }
 
     fn initialize(&mut self) -> Value {
-        self.request(
+        let message = self.request(
             PendingKind::Initialize,
             "initialize",
             json!({
@@ -440,7 +544,14 @@ impl GrokProtocol {
                     "fs": {"readTextFile": false, "writeTextFile": false}, "terminal": false
                 }
             }),
-        )
+        );
+        #[cfg(test)]
+        if let Some(probe) = &self.sdk_origin_probe {
+            let mut message = message;
+            probe.decorate_initialize(&mut message);
+            return message;
+        }
+        message
     }
 
     fn request_timed_out(&self) -> bool {
@@ -467,17 +578,11 @@ impl GrokProtocol {
                 RuntimeError::StaleGeneration.to_string(),
             );
         }
-        // 产品门禁不随独立 no-leader 协议验收改变；产品 leader 路径尚待真实验证。
-        if command.action != RuntimeAction::Shutdown {
-            return rejected_command(
-                command.message_id,
-                crate::t!("cli-agent-grok-managed-unverified"),
-            );
-        }
+        // 固定版本的 leader 链已验证；追加输入只排队到后续回合，技能与 SDK 仍不开放。
         self.acp_command(command)
     }
 
-    /// 已有真实夹具覆盖的 ACP 子集；调用方的产品执行门禁独立保留。
+    /// 已由官方 leader 验收覆盖的 ACP 子集；协调器另行限制根任务及版本。
     fn acp_command(&mut self, command: RuntimeCommand) -> Effects {
         if command.generation != self.options.generation {
             return rejected_command(
@@ -554,10 +659,9 @@ impl GrokProtocol {
                 if self.closed
                     || self.session_id.is_none()
                     || self.controls.contains_key(&command.message_id)
-                    || self
-                        .pending
-                        .as_ref()
-                        .is_some_and(|request| !matches!(request.kind, PendingKind::Prompt))
+                    || self.pending.as_ref().is_some_and(|request| {
+                        !matches!(request.kind, PendingKind::Prompt | PendingKind::FinalOutput)
+                    })
                     || self.queued.len() >= MAX_QUEUED_PROMPTS
                     || self.submitted_messages.len() >= MAX_NATIVE_IDENTITIES
                 {
@@ -592,9 +696,13 @@ impl GrokProtocol {
                     message_id: command.message_id,
                     content,
                 };
-                if self.pending.is_some() {
+                if self.pending.is_some() || self.prompt.is_some() {
                     // 本地等待不代表原生接收，也不向正在运行的回合发送第二个 prompt。
                     self.queued.push_back(prompt);
+                    #[cfg(test)]
+                    {
+                        self.queued_submissions += 1;
+                    }
                     Effects::default()
                 } else {
                     self.start_prompt(prompt)
@@ -607,7 +715,9 @@ impl GrokProtocol {
                     return effects;
                 }
                 let Some(prompt) = self.prompt.as_mut().filter(|prompt| {
-                    !prompt.finished && prompt.native_id.as_deref() == Some(turn_id.as_str())
+                    !prompt.finished
+                        && prompt.completion.is_none()
+                        && prompt.native_id.as_deref() == Some(turn_id.as_str())
                 }) else {
                     return rejected_command(
                         command.message_id,
@@ -644,6 +754,7 @@ impl GrokProtocol {
                 if approval.resolved
                     || !self.prompt.as_ref().is_some_and(|prompt| {
                         !prompt.finished
+                            && prompt.completion.is_none()
                             && prompt.cancel_sent.is_none()
                             && prompt.native_id.as_deref() == Some(approval.turn_id.as_str())
                     })
@@ -695,12 +806,13 @@ impl GrokProtocol {
             finished: false,
             stream_id: None,
             closed_streams: HashSet::new(),
-            last_text_sequence: None,
+            last_chunk_sequence: None,
             chunks: BTreeMap::new(),
             next_chunk: 1,
             retained_text_bytes: 0,
             output: String::new(),
             cancel_sent: None,
+            completion: None,
         });
         Effects {
             writes: vec![self.request(
@@ -778,7 +890,9 @@ impl GrokProtocol {
         let turn_id = self
             .prompt
             .as_ref()
-            .filter(|prompt| !prompt.finished && prompt.cancel_sent.is_none())
+            .filter(|prompt| {
+                !prompt.finished && prompt.completion.is_none() && prompt.cancel_sent.is_none()
+            })
             .and_then(|prompt| prompt.native_id.as_deref());
         let correlated = params["sessionId"].as_str() == self.session_id.as_deref()
             && self.session_id.is_some()
@@ -903,25 +1017,226 @@ impl GrokProtocol {
                 "Grok prompt completion does not match the active turn".into(),
             ));
         }
-        if prompt
-            .chunks
-            .keys()
-            .next_back()
-            .is_some_and(|last| *last >= prompt.next_chunk)
-        {
-            return Err(RuntimeError::Protocol(
-                "Grok prompt completed with missing text chunks".into(),
-            ));
+        // RPC 结束不代表 gateway 已发送全部文本；保留当前回合，直到原生历史包含对应终态。
+        prompt.completion = Some(PendingCompletion {
+            outcome,
+            started_at: Instant::now(),
+            retry_at: None,
+        });
+        let mut effects = Effects::default();
+        self.cancel_approvals(&mut effects.events);
+        effects.writes.push(self.request_final_output());
+        Ok(effects)
+    }
+
+    fn request_final_output(&mut self) -> Value {
+        self.request(
+            PendingKind::FinalOutput,
+            "_x.ai/session/updates",
+            json!({
+                "sessionId": self.session_id, "cwd": self.options.cwd,
+                "offset": 0, "limit": MAX_NATIVE_IDENTITIES
+            }),
+        )
+    }
+
+    fn poll_final_output(&mut self) -> Effects {
+        let Some(completion) = self
+            .prompt
+            .as_ref()
+            .and_then(|prompt| prompt.completion.as_ref())
+        else {
+            return Effects::default();
+        };
+        if completion.started_at.elapsed() >= REQUEST_TIMEOUT {
+            // 收束期限失败只能降级，不能以安静或超时证明成功；退出防止迟到查询污染下一轮。
+            self.closed = true;
+            self.pending = None;
+            let mut effects = self.unverified_final_output("native history watermark timed out");
+            effects.events.extend(self.queued.drain(..).map(|queued| {
+                RuntimeEventKind::RequestFailed {
+                    message_id: queued.message_id,
+                    message: RuntimeError::ControllerClosed.to_string(),
+                }
+            }));
+            return effects;
         }
+        if self.pending.is_none() && completion.retry_at.is_some_and(|at| Instant::now() >= at) {
+            if let Some(completion) = self
+                .prompt
+                .as_mut()
+                .and_then(|prompt| prompt.completion.as_mut())
+            {
+                completion.retry_at = None;
+            }
+            return Effects {
+                writes: vec![self.request_final_output()],
+                events: Vec::new(),
+            };
+        }
+        Effects::default()
+    }
+
+    fn finish_transport(&mut self, result: &Result<(), RuntimeError>) -> Effects {
+        if !self
+            .prompt
+            .as_ref()
+            .is_some_and(|prompt| prompt.completion.is_some())
+        {
+            return Effects::default();
+        }
+        // 正常断开也可能打断最终快照；关闭连接不等于结果已完整，更不等于原生取消。
+        self.closed = true;
+        self.pending = None;
+        let reason = match result {
+            Ok(()) => "native history collection stopped",
+            Err(_) => "native history connection lost",
+        };
+        let mut effects = self.unverified_final_output(reason);
+        effects.events.extend(self.queued.drain(..).map(|queued| {
+            RuntimeEventKind::RequestFailed {
+                message_id: queued.message_id,
+                message: RuntimeError::ControllerClosed.to_string(),
+            }
+        }));
+        effects
+    }
+
+    fn unverified_final_output(&mut self, reason: &'static str) -> Effects {
+        log::debug!("Grok final history verification failed: reason={reason}");
+        #[cfg(test)]
+        if std::env::var_os("INFINISHELL_GROK_LIVE_ROOT").is_some() {
+            // 隔离验收仅记录内部固定原因，不记录模型正文、工具参数或凭据。
+            eprintln!(
+                "GROK_FINAL_HISTORY_UNVERIFIED {}",
+                json!({"reason": reason, "reason_sha256": format!("{:x}", Sha256::digest(reason)),
+                    "received_output_bytes": self.prompt.as_ref().map(|prompt| prompt.output.len()),
+                    "received_output_sha256": self.prompt.as_ref().map(|prompt| format!("{:x}", Sha256::digest(&prompt.output)))})
+            );
+        }
+        let Some(prompt) = self.prompt.as_mut() else {
+            return Effects::default();
+        };
+        let Some(turn_id) = prompt.native_id.clone() else {
+            return Effects::default();
+        };
         prompt.finished = true;
-        Ok(Effects {
+        let mut effects = Effects {
             writes: Vec::new(),
             events: vec![RuntimeEventKind::TurnFinished {
-                turn_id: native_id.expect("已校验原生回合 ID").to_owned(),
-                outcome,
+                turn_id,
+                outcome: TurnOutcome::Failed {
+                    message: crate::t!("cli-agent-grok-output-unverified"),
+                },
+                // 原生已经结束但结果完整性未知，保留实际收到的部分文本供用户查看。
                 output: prompt.output.clone(),
             }],
-        })
+        };
+        self.complete_rpc(&mut effects);
+        effects
+    }
+
+    fn final_output_result(&mut self, result: &Value) -> Effects {
+        let Some(prompt) = self.prompt.as_ref() else {
+            return Effects::default();
+        };
+        let Some(completion) = prompt.completion.as_ref() else {
+            return Effects::default();
+        };
+        let Some(turn_id) = prompt.native_id.clone() else {
+            return Effects::default();
+        };
+        let outcome = completion.outcome.clone();
+        let snapshot = verified_final_snapshot(
+            result,
+            self.session_id.as_deref().unwrap_or_default(),
+            &turn_id,
+            &outcome,
+        );
+        #[cfg(test)]
+        if std::env::var_os("INFINISHELL_GROK_LIVE_ROOT").is_some() {
+            // 只保留回放边界、数量与摘要，用于定位历史继续失败；正文不进入验收日志。
+            let (verdict, reason, output_bytes) = match &snapshot {
+                Ok(Some((output, _))) if output.starts_with(&prompt.output) => {
+                    ("verified", None, Some(output.len()))
+                }
+                Ok(Some((output, _))) => (
+                    "rejected",
+                    Some("native history conflicts with received text"),
+                    Some(output.len()),
+                ),
+                Ok(None) => ("pending", None, None),
+                Err(reason) => ("rejected", Some(*reason), None),
+            };
+            eprintln!(
+                "GROK_FINAL_HISTORY_SNAPSHOT {}",
+                json!({"verdict":verdict,"reason":reason,
+                    "update_count":result["updates"].as_array().map(Vec::len),
+                    "has_more":result["hasMore"].as_bool(),"total_count":result["totalCount"].as_u64(),
+                    "last_event_id_sha256":result["lastEventId"].as_str().map(|id|format!("{:x}",Sha256::digest(id))),
+                    "native_turn_id_sha256":format!("{:x}",Sha256::digest(&turn_id)),
+                    "received_output_bytes":prompt.output.len(),"collected_output_bytes":output_bytes})
+            );
+        }
+        let (output, watermark) = match snapshot {
+            Ok(Some(snapshot)) => snapshot,
+            Ok(None) => {
+                self.prompt
+                    .as_mut()
+                    .and_then(|prompt| prompt.completion.as_mut())
+                    .expect("正在等待终态回放")
+                    .retry_at = Some(Instant::now() + SNAPSHOT_RETRY_INTERVAL);
+                return Effects::default();
+            }
+            Err(reason) => return self.unverified_final_output(reason),
+        };
+        if !output.starts_with(&prompt.output) {
+            return self.unverified_final_output("native history conflicts with received text");
+        }
+        #[cfg(test)]
+        if std::env::var_os("INFINISHELL_GROK_LIVE_ROOT").is_some() {
+            // 协调器验收只记录真实历史完成水位与输出摘要，不记录模型正文。
+            eprintln!(
+                "GROK_NATIVE_FINAL_HISTORY_VERIFIED {}",
+                json!({"runtime_generation":self.options.generation,
+                    "session_id":self.session_id,"turn_id":turn_id,
+                    "completion_watermark":watermark,"outcome":outcome,
+                    "full_output_bytes":output.len(),
+                    "full_output_sha256":format!("{:x}",Sha256::digest(&output))})
+            );
+        }
+        #[cfg(test)]
+        if let Some(histories) = &self.verified_final_histories_for_live {
+            histories.lock().expect("原生最终回放锁未被破坏").insert(
+                turn_id.clone(),
+                live_tests::NativeFinalHistory {
+                    session_id: self.session_id.clone().expect("最终回放已有会话身份"),
+                    turn_id: turn_id.clone(),
+                    completion_watermark: watermark.clone(),
+                    replay: result.clone(),
+                },
+            );
+        }
+        let suffix = output[prompt.output.len()..].to_owned();
+        let mut events = Vec::new();
+        if !suffix.is_empty() {
+            events.push(RuntimeEventKind::TextDelta {
+                turn_id: turn_id.clone(),
+                item_id: format!("{turn_id}:history:{watermark}"),
+                text: suffix,
+            });
+        }
+        events.push(RuntimeEventKind::TurnFinished {
+            turn_id,
+            outcome,
+            output,
+        });
+        let mut effects = Effects {
+            writes: Vec::new(),
+            events,
+        };
+        self.complete_rpc(&mut effects);
+        effects
     }
 
     fn session_update(&mut self, params: &Value) -> Result<Effects, RuntimeError> {
@@ -938,7 +1253,7 @@ impl GrokProtocol {
         }
         let mut effects = Effects::default();
         match update["sessionUpdate"].as_str() {
-            Some("agent_message_chunk") => {
+            Some("agent_message_chunk" | "agent_thought_chunk") => {
                 let event_id = params["_meta"]["eventId"]
                     .as_str()
                     .filter(|id| valid_native_id(id));
@@ -961,6 +1276,10 @@ impl GrokProtocol {
                         "Grok text chunk has no verified identity".into(),
                     ));
                 };
+                // 官方模型的思考与正文共用分片编号；思考仅保留摘要参与排序，不保留或展示正文。
+                let fingerprint = message_fingerprint(update)?;
+                let visible_text =
+                    (update["sessionUpdate"] == "agent_message_chunk").then(|| text.to_owned());
                 if let Some(previous) = prompt.stream_id.filter(|previous| *previous != stream_id) {
                     // streamStartMs 只标识响应，不参与排序；已实测 eventId 的计数后缀保持递增。
                     if prompt.closed_streams.contains(&stream_id)
@@ -970,7 +1289,7 @@ impl GrokProtocol {
                             .next_back()
                             .is_some_and(|last| *last >= prompt.next_chunk)
                         || prompt
-                            .last_text_sequence
+                            .last_chunk_sequence
                             .is_some_and(|last| sequence <= last)
                     {
                         return Err(RuntimeError::Protocol(
@@ -984,7 +1303,7 @@ impl GrokProtocol {
                 }
                 prompt.stream_id = Some(stream_id);
                 if let Some(previous) = prompt.chunks.get(&chunk_id) {
-                    return if previous.0 == sequence && previous.1 == text {
+                    return if previous.0 == sequence && previous.1 == fingerprint {
                         Ok(Effects::default())
                     } else {
                         Err(RuntimeError::Protocol(
@@ -993,7 +1312,7 @@ impl GrokProtocol {
                     };
                 }
                 if prompt
-                    .last_text_sequence
+                    .last_chunk_sequence
                     .is_some_and(|last| sequence <= last)
                 {
                     return Err(RuntimeError::Protocol(
@@ -1001,36 +1320,41 @@ impl GrokProtocol {
                     ));
                 }
                 if prompt.chunks.len() >= MAX_NATIVE_IDENTITIES
-                    || prompt.retained_text_bytes + text.len() > MAX_LINE_BYTES
+                    || prompt.retained_text_bytes + visible_text.as_ref().map_or(0, String::len)
+                        > MAX_LINE_BYTES
                 {
                     return Err(RuntimeError::Protocol(
                         "Grok output retention limit reached".into(),
                     ));
                 }
-                prompt.retained_text_bytes += text.len();
-                prompt.chunks.insert(chunk_id, (sequence, text.to_owned()));
+                prompt.retained_text_bytes += visible_text.as_ref().map_or(0, String::len);
+                prompt
+                    .chunks
+                    .insert(chunk_id, (sequence, fingerprint, visible_text));
                 if !prompt.started {
                     prompt.started = true;
                     effects.events.push(RuntimeEventKind::TurnStarted {
                         turn_id: turn_id.to_owned(),
                     });
                 }
-                while let Some((sequence, text)) = prompt.chunks.get(&prompt.next_chunk) {
+                while let Some((sequence, _, text)) = prompt.chunks.get(&prompt.next_chunk) {
                     if prompt
-                        .last_text_sequence
+                        .last_chunk_sequence
                         .is_some_and(|last| *sequence <= last)
                     {
                         return Err(RuntimeError::Protocol(
                             "Grok chunk order conflicts with native event order".into(),
                         ));
                     }
-                    prompt.last_text_sequence = Some(*sequence);
-                    prompt.output.push_str(text);
-                    effects.events.push(RuntimeEventKind::TextDelta {
-                        turn_id: turn_id.to_owned(),
-                        item_id: format!("{turn_id}:{stream_id}"),
-                        text: text.clone(),
-                    });
+                    prompt.last_chunk_sequence = Some(*sequence);
+                    if let Some(text) = text {
+                        prompt.output.push_str(text);
+                        effects.events.push(RuntimeEventKind::TextDelta {
+                            turn_id: turn_id.to_owned(),
+                            item_id: format!("{turn_id}:{stream_id}"),
+                            text: text.clone(),
+                        });
+                    }
                     prompt.next_chunk += 1;
                 }
             }
@@ -1100,6 +1424,10 @@ impl GrokProtocol {
         if let Some(id) = &requested_id {
             params["sessionId"] = json!(id);
         }
+        #[cfg(test)]
+        if let Some(probe) = &self.sdk_origin_probe {
+            probe.decorate_open_session(&mut params);
+        }
         Ok(self.request(PendingKind::OpenSession { requested_id }, method, params))
     }
 
@@ -1119,6 +1447,12 @@ impl GrokProtocol {
             return Err(RuntimeError::Protocol(
                 "Grok response is not JSON-RPC 2.0".into(),
             ));
+        }
+        #[cfg(test)]
+        if let Some(probe) = self.sdk_origin_probe.as_mut()
+            && let Some(effects) = probe.receive(&message)?
+        {
+            return Ok(effects);
         }
         if let Some(method) = message.get("method") {
             if !method.is_string()
@@ -1179,15 +1513,27 @@ impl GrokProtocol {
                 self.complete_rpc(&mut effects);
                 return Ok(effects);
             }
+            if matches!(kind, PendingKind::FinalOutput) {
+                return Ok(self.unverified_final_output("native history query failed"));
+            }
             // 认证、恢复和关闭失败都不重新新建会话或继续尝试其他请求。
             return Err(RuntimeError::Protocol(format!(
                 "Grok ACP request failed (code {code:?})"
             )));
         }
-        let result = message
-            .get("result")
-            .filter(|value| value.is_object())
-            .ok_or_else(|| RuntimeError::Protocol("Grok response has no result object".into()))?;
+        let result = match message.get("result").filter(|value| value.is_object()) {
+            Some(result) => result,
+            None if matches!(kind, PendingKind::FinalOutput) => {
+                self.pending = None;
+                self.responses.insert(id, fingerprint);
+                return Ok(self.unverified_final_output("native history response is malformed"));
+            }
+            None => {
+                return Err(RuntimeError::Protocol(
+                    "Grok response has no result object".into(),
+                ));
+            }
+        };
         self.pending = None;
         self.responses.insert(id, fingerprint);
         let mut effects = Effects::default();
@@ -1267,16 +1613,20 @@ impl GrokProtocol {
                         "reportedMetadata": self.reported_metadata,
                         "verifiedCapabilities": {
                             "newSession": true, "emptyHistoryRecovery": true, "closeSession": true,
-                            "submit": false, "steer": false, "approval": false,
-                            "cancel": false, "resume": false
+                            "submit": true, "queuedSubmit": true, "steer": false, "approval": true,
+                            "cancel": true, "resume": self.reported_capabilities["loadSession"] == true,
+                            "localTools": false, "childTasks": false
                         }
                     }),
                 });
             }
             PendingKind::Prompt => {
                 effects = self.prompt_result(result)?;
-                self.complete_rpc(&mut effects);
+                if self.prompt.as_ref().is_some_and(|prompt| prompt.finished) {
+                    self.complete_rpc(&mut effects);
+                }
             }
+            PendingKind::FinalOutput => effects = self.final_output_result(result),
             PendingKind::CloseSession => {
                 if result["_meta"]["x.ai/closeOutcome"] != "closed" {
                     return Err(RuntimeError::Protocol(
@@ -1516,6 +1866,87 @@ impl GrokProtocol {
     }
 }
 
+/// 持久化文本会合并并复用最后一个分片 ID，因此以完整回放和同回合终态核对，不重放增量分片。
+fn verified_final_snapshot(
+    result: &Value,
+    session_id: &str,
+    turn_id: &str,
+    outcome: &TurnOutcome,
+) -> Result<Option<(String, String)>, &'static str> {
+    let updates = result["updates"]
+        .as_array()
+        .ok_or("native history has no updates")?;
+    if updates.len() > MAX_NATIVE_IDENTITIES
+        || result["hasMore"] != false
+        || result["totalCount"].as_u64() != Some(updates.len() as u64)
+    {
+        return Err("native history is truncated or exceeds the verified limit");
+    }
+    let expected_reason = match outcome {
+        TurnOutcome::Completed => "end_turn",
+        TurnOutcome::Cancelled => "cancelled",
+        TurnOutcome::Failed { .. } => return Err("invalid native history completion state"),
+    };
+    let mut output = String::new();
+    let mut last_sequence = None;
+    let mut last_event_id = None;
+    let mut watermark = None;
+    for record in updates {
+        let params = &record["params"];
+        if params["sessionId"].as_str() != Some(session_id) {
+            return Err("native history changed the session id");
+        }
+        let event_id = params["_meta"]["eventId"]
+            .as_str()
+            .ok_or("native history has no event identity")?;
+        let sequence = event_id
+            .strip_prefix(session_id)
+            .and_then(|id| id.strip_prefix('-'))
+            .and_then(|suffix| {
+                suffix
+                    .parse::<u64>()
+                    .ok()
+                    .filter(|sequence| sequence.to_string() == suffix)
+            })
+            .ok_or("native history has an invalid event identity")?;
+        if last_sequence.is_some_and(|previous| previous >= sequence) {
+            return Err("native history event order is inconsistent");
+        }
+        last_sequence = Some(sequence);
+        last_event_id = Some(event_id);
+        let update = &params["update"];
+        if record["method"] == "session/update"
+            && update["sessionUpdate"] == "agent_message_chunk"
+            && params["_meta"]["promptId"].as_str() == Some(turn_id)
+        {
+            if watermark.is_some() {
+                return Err("native history contains text after its completion watermark");
+            }
+            let text = update["content"]["text"]
+                .as_str()
+                .filter(|_| update["content"]["type"] == "text")
+                .ok_or("native history contains unsupported output")?;
+            if output.len().saturating_add(text.len()) > MAX_LINE_BYTES {
+                return Err("native history output exceeds the verified limit");
+            }
+            output.push_str(text);
+        }
+        if record["method"] == "_x.ai/session/update"
+            && update["sessionUpdate"] == "turn_completed"
+            && update["prompt_id"].as_str() == Some(turn_id)
+        {
+            if watermark.is_some() || update["stop_reason"].as_str() != Some(expected_reason) {
+                return Err("native history completion does not match the RPC result");
+            }
+            watermark = Some(event_id.to_owned());
+        }
+    }
+    if result["lastEventId"].as_str() != last_event_id {
+        return Err("native history last event identity is inconsistent");
+    }
+    Ok(watermark.map(|watermark| (output, watermark)))
+}
+
 fn cancelled_permission(id: &Value) -> Effects {
     Effects {
         writes: vec![
@@ -1554,3 +1985,11 @@ fn decode_metadata<T: serde::de::DeserializeOwned>(value: &Value) -> Result<T, R
 #[cfg(test)]
 #[path = "grok_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "grok_live_tests.rs"]
+mod live_tests;
+
+#[cfg(test)]
+#[path = "grok_sdk_origin_live_tests.rs"]
+mod sdk_origin_live_tests;

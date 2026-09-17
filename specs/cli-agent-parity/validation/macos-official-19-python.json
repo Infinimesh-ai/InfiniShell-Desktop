@@ -1,0 +1,168 @@
+{
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "source_manifest_sha256": "e1621ea312d45cc7b52b9e843b107020713dd7952a9c90767c46eecf506fe4ea",
+  "worktree_dirty": true,
+  "gates": [
+    {
+      "module": "claude_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.097,
+      "tests": 11
+    },
+    {
+      "module": "claude_profile_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_profile_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.128,
+      "tests": 7
+    },
+    {
+      "module": "claude_coordinator_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.156,
+      "tests": 56
+    },
+    {
+      "module": "claude_batch_cancel_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.112,
+      "tests": 18
+    },
+    {
+      "module": "claude_image_probe_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_image_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.109,
+      "tests": 25
+    },
+    {
+      "module": "claude_managed_image_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_managed_image_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.134,
+      "tests": 19
+    },
+    {
+      "module": "codex_source_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/codex_source_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.304,
+      "tests": 10
+    },
+    {
+      "module": "grok_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.105,
+      "tests": 13
+    },
+    {
+      "module": "grok_coordinator_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.19,
+      "tests": 27
+    },
+    {
+      "module": "grok_official_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 2.137,
+      "tests": 19
+    },
+    {
+      "module": "grok_sdk_origin_probe_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.706,
+      "tests": 72
+    },
+    {
+      "module": "grok_official_pty_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_official_pty_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.12,
+      "tests": 20
+    },
+    {
+      "module": "prepare_codex_cli_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/prepare_codex_cli_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.259,
+      "tests": 27
+    }
+  ],
+  "total_tests": 324,
+  "wall_seconds": 4.563,
+  "source_unchanged_after_gates": true,
+  "log": "/tmp/infinishell-cli-parity-official-19-python.log",
+  "log_sha256": "7e5b2eafe4ded1f1ae6e23d151d686999719563f6611295ecfff494764c6d321"
+}

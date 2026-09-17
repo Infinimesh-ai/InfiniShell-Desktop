@@ -144,3 +144,59 @@ fn restored_ceiling_keeps_original_parent_generation_and_directory() {
         .is_err()
     );
 }
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn fixed_claude_profile_is_bound_to_the_saved_parent_generation_and_same_child_scope() {
+    let mut task = parent(json!({}));
+    task.harness = "claude".into();
+    let profile = json!({"version":1,"workingDirectory":task.working_directory,
+        "canonicalWorkingDirectory":std::fs::canonicalize(&task.working_directory).unwrap(),
+        "executableSha256":"953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
+        "denyRules":[],"sourceRules":[],"localTools":{"allow_spawn":true,"allow_message":true}});
+    let effective = json!({"permissionMode":"plan","fixedProfileVerified":true,"claudeRestrictedFilesV1":profile});
+    task.config_json =
+        json!({"cli_version":"2.1.273","permission_policy":"ClaudeRestrictedFilesV1",
+        "claude_profile":profile,"effective_permissions":effective})
+        .to_string();
+    let ceiling = ceiling_from_parent(&task, "claude").unwrap();
+    assert!(ceiling.claude_profile().is_some());
+    verify_effective_permissions(
+        Some(&ceiling),
+        "claude",
+        Path::new(&task.working_directory),
+        &effective,
+    )
+    .unwrap();
+    let mut widened = effective.clone();
+    widened["claudeRestrictedFilesV1"]["workingDirectory"] =
+        json!(std::env::temp_dir().join("other"));
+    assert!(
+        verify_effective_permissions(
+            Some(&ceiling),
+            "claude",
+            Path::new(&task.working_directory),
+            &widened
+        )
+        .is_err()
+    );
+    let mut child = task.clone();
+    child.task_id = "child".into();
+    child.parent_task_id = Some(task.task_id.clone());
+    child.parent_generation = Some(task.generation);
+    verify_parent_binding(Some(&ceiling), &task, &child).unwrap();
+    child.parent_generation = Some(task.generation + 1);
+    assert!(verify_parent_binding(Some(&ceiling), &task, &child).is_err());
+    assert!(ceiling_from_parent(&task, "codex").is_err());
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn fixed_claude_profile_requires_the_saved_policy_and_cannot_be_inferred_from_mode() {
+    let mut task = parent(json!({"permissionMode":"plan","fixedProfileVerified":true}));
+    task.harness = "claude".into();
+    task.config_json = json!({"cli_version":"2.1.273","permission_policy":"Inherit",
+        "effective_permissions":{"permissionMode":"plan","fixedProfileVerified":true}})
+    .to_string();
+    assert!(ceiling_from_parent(&task, "claude").is_err());
+}

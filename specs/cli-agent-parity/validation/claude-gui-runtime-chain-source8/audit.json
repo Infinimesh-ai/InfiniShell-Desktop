@@ -1,0 +1,417 @@
+{
+  "archive_actions": {
+    "authentication_or_api_files_read": false,
+    "cargo_run": false,
+    "cli_run": false,
+    "full_user_configuration_archived": false,
+    "git_run": false,
+    "gui_operated": false,
+    "model_called": false,
+    "ocr_full_text_archived": false,
+    "raw_private_manifest_archived": false
+  },
+  "archived_at": "2026-09-17T13:19:37.313240+00:00",
+  "chinese_denial_and_queued_input": {
+    "after": {
+      "exact_result": "GUI_ZH_DENIED\n\nGUI_ZH_QUEUED",
+      "generation": 8,
+      "native_outcome": "Completed",
+      "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+      "observed_at": "2026-09-17T13:09:52.643192+00:00",
+      "output_bytes": 28,
+      "output_sha256": "5e613441cca36594be22c2df05d5706c234f3f59bf4ef7615e5f2591a2880635",
+      "state": "completed",
+      "task_id": "90319eee-f61f-4ecf-bcfd-beca68d58d59",
+      "turn_id": "0a69b7e5-15a7-49f5-951b-a50b21ee1f63"
+    },
+    "historical_join_generations": [
+      3
+    ],
+    "join_boundary": "实际配置的安全投影包含本代 J→A 的已完成合并记录；第3代历史 join 不计为本代新增；该投影未提供原生结果完整批次 UUID 数组，不单独称全量原生协议 ledger 审计。",
+    "joined_inputs_source": "zh-deny-queued-joined-inputs.json",
+    "native_ack_count": 2,
+    "native_ack_message_ids": [
+      "0a69b7e5-15a7-49f5-951b-a50b21ee1f63",
+      "9a0d3871-fef3-459c-be9c-198a05faf175"
+    ],
+    "new_join": {
+      "message_id": "9a0d3871-fef3-459c-be9c-198a05faf175",
+      "outcome": "Completed",
+      "submission_generation": 8,
+      "turn_id": "0a69b7e5-15a7-49f5-951b-a50b21ee1f63"
+    },
+    "new_join_count": 1,
+    "note_sha256": "acfa758900501297030a7b3a7d376dc34455046b045cb6c7582f10f87cdafcbf",
+    "note_unchanged": true,
+    "permission_profile_same_as_generation7": true,
+    "persisted_input_joined_verified": true,
+    "profile_field_present": true,
+    "profile_sha256": "ea736674ac91f01ae4b9adf3249e82918b074c0abc3d64286183f449d92a9a75",
+    "whole_batch_native_result_uuids_in_this_safe_projection": false
+  },
+  "configuration_rejections": [
+    {
+      "generation": 1,
+      "message_count": 1,
+      "message_id": "7a5435ad-ad3f-446f-aa4f-0d6c561ca7bd",
+      "message_state": "cancelled",
+      "model_turn_verified": false,
+      "native_session_id": null,
+      "receipt_kind": null,
+      "result": "无法验证 Claude 文件任务策略。请先检查 CLI 权限设置，再新建或继续任务。",
+      "source": "zh-config-rejection.json",
+      "state": "failed",
+      "task_id": "673415dc-a9ff-468b-8b80-50f3b180534c"
+    },
+    {
+      "generation": 1,
+      "message_count": 1,
+      "message_id": "f5feede7-5ba0-426b-a371-ce51ff4cecb0",
+      "message_state": "cancelled",
+      "model_turn_verified": false,
+      "native_session_id": null,
+      "receipt_kind": null,
+      "result": "Cannot verify the Claude file task policy. Check the CLI permission settings before starting or continuing a task.",
+      "source": "en-config-rejection.json",
+      "state": "failed",
+      "task_id": "27ec3bee-4987-4003-9aa9-9ec6d03f48ca"
+    }
+  ],
+  "generated_artifacts": [
+    {
+      "archive": "manifest.safe.json",
+      "bytes": 1539,
+      "preservation": "transformed_safe_projection",
+      "sha256": "1814000196ebe96b6011a0c967e1e9ac158b255547d54865cd45bc1ac5971b6f"
+    },
+    {
+      "archive": "native-receipts.json",
+      "bytes": 3251,
+      "preservation": "transformed_safe_projection",
+      "sha256": "eedba5739d181755a7d76b195b30f36856c7ab06b727f1023bf975f7982642c9"
+    },
+    {
+      "archive": "privacy-json-scan.json",
+      "bytes": 3293,
+      "preservation": "transformed_safe_projection",
+      "sha256": "15965668b6b302a18d407cc776803e2d80640f0484c28921df929b7ddd340abd"
+    },
+    {
+      "archive": "privacy-ocr-scan.json",
+      "bytes": 5464,
+      "preservation": "transformed_safe_projection",
+      "sha256": "2de4796289d6211a8c9587ff4bb99fc162568c2ad3e3a50769228a45ee7e02ec"
+    }
+  ],
+  "layout_observations": {
+    "chinese_active_input_queue_help_visible": true,
+    "chinese_native_approval_buttons_visible": true,
+    "config_rejection_draft_uncertain_delivery_hint_observed": true,
+    "config_rejection_error_text_visible_languages": [
+      "zh",
+      "en"
+    ],
+    "english_and_simplified_chinese_permissions_collapsed_expanded_checked": true,
+    "entire_gui_feature_matrix_verified": false,
+    "fixed_policy_help_and_toggle_controls_visible": true,
+    "screenshots_individually_viewed": 14,
+    "scroll_viewport_edges_are_not_full_document_visibility": true
+  },
+  "not_verified": [
+    "historical_generation1_GUI_ONE_exact_result",
+    "historical_generation5_native_cancel_success",
+    "source8_active_process_reattachment",
+    "source8_explicit_batch_cancel_with_all_native_signals",
+    "all_GUI_feature_matrix_and_attachments_skills",
+    "codex_and_grok_complete_GUI_lifecycle",
+    "linux_windows_ssh_tmux",
+    "same_clean_modified_commit_cross_platform_final_acceptance",
+    "complete_goal_P0_P5_acceptance"
+  ],
+  "original_byte_copies": [
+    {
+      "archive": "restart-before-new-input.json",
+      "bytes": 626,
+      "preservation": "original_bytes",
+      "sha256": "18c3b9eed6f8133cbd57558688ac9aa0376b24677518841b96ba689f36bd9666",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/restart-before-new-input.json"
+    },
+    {
+      "archive": "restart-after-new-input.json",
+      "bytes": 1999,
+      "preservation": "original_bytes",
+      "sha256": "87241a1f32b2a9998bd0f490fd3b0d723cc90eb8fb206f4fedbe3c292501db49",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/restart-after-new-input.json"
+    },
+    {
+      "archive": "zh-deny-queued-after.json",
+      "bytes": 1207,
+      "preservation": "original_bytes",
+      "sha256": "05a835434d1a7334b38ba3130fe6e397eff6bbd690c8559be48745ef69246756",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/zh-deny-queued-after.json"
+    },
+    {
+      "archive": "zh-config-rejection.json",
+      "bytes": 638,
+      "preservation": "original_bytes",
+      "sha256": "9c3f4cb046a3533223fa5c022410d882e1d60e619fb9f630903e6b5fafd684ce",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/zh-config-rejection.json"
+    },
+    {
+      "archive": "zh-deny-queued-joined-inputs.json",
+      "bytes": 549,
+      "preservation": "original_bytes",
+      "sha256": "f1e4f48bd493a876d77bc34751b018fc81ff47f224a9ef9f3dce9e5b9d1c055d",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/zh-deny-queued-joined-inputs.json"
+    },
+    {
+      "archive": "en-config-rejection.json",
+      "bytes": 721,
+      "preservation": "original_bytes",
+      "sha256": "5f382466b8fdc263b1edc151f939629f716e555afabdef40dab78020813f23bc",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/en-config-rejection.json"
+    },
+    {
+      "archive": "screenshots/01-en-reloaded-task-list.jpg",
+      "bytes": 112426,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "41bc7d1267bd12f8653fbfc0658ea8fc0fa0099169c3d2c7cff01f4640f1729e",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/01-en-reloaded-task-list.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/02-en-permissions-collapsed.jpg",
+      "bytes": 128277,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "45fb2289d267d5143a99205ecb43825bc966d6d73e9fdae6672caaf6b6a7a227",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/02-en-permissions-collapsed.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/03-en-permissions-expanded.jpg",
+      "bytes": 111333,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "6ccc0fe831e56e373c6df576e01a0806c82e1ecd0b5419ef1f77b007525feaef",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/03-en-permissions-expanded.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/04-en-restored-failure-and-result.jpg",
+      "bytes": 91593,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "0a6eed486b778941c73a277077c177d77a33b24b3d4c87e9551bcae23e36d3c9",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/04-en-restored-failure-and-result.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/05-en-restart-new-input-completed.jpg",
+      "bytes": 113821,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "c7fa8dc7ac97ae189706ceac0ba69a6d6703a274481456562dcd3d359d8670bd",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/05-en-restart-new-input-completed.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/06-zh-reloaded-task-list.jpg",
+      "bytes": 102963,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "105b633ea028d15ede458716e7be687c874931be5d59a5d471b7a2c95c8476bd",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/06-zh-reloaded-task-list.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/07-zh-permissions-collapsed.jpg",
+      "bytes": 122085,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "9a91712c748b9425837da2c9f9e77390ed5cc971e64b4ce3b3e185283f3412e1",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/07-zh-permissions-collapsed.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/08-zh-permissions-expanded.jpg",
+      "bytes": 101068,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "92f509e31be36c47f8b2f2a84242480fdb03a0361603acff6af8964c8ac09e8b",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/08-zh-permissions-expanded.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/09-zh-restored-result.jpg",
+      "bytes": 86203,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "bcb3250b016656e5ed1788b0fd1a66805b1118923d05c0785faf08c5d1228a08",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/09-zh-restored-result.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/10-zh-approval-request.jpg",
+      "bytes": 107822,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "ef77b1c570368c6f8ccc5ffa56ee19ee0b44cc8c8b030eb69d0c5d8cf0390dee",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/10-zh-approval-request.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/11-zh-queue-help.jpg",
+      "bytes": 99642,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "41b105361276930160d4a2a443a264a2448250b6c4d100f201f69936759695bc",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/11-zh-queue-help.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/12-zh-denial-and-queued-result.jpg",
+      "bytes": 85654,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "a1bc2d5d4a46598c8b445306d69165981d6f3cfd15dce795eb37744494fe56b1",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/12-zh-denial-and-queued-result.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/13-zh-config-rejection.jpg",
+      "bytes": 100795,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "6448b0d79854c56c0caeca9fdcb9d5a0e695ff0b43aeb78dacfff3004acb1e6f",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/13-zh-config-rejection.jpg",
+      "transcoded": false
+    },
+    {
+      "archive": "screenshots/14-en-config-rejection.jpg",
+      "bytes": 113876,
+      "individually_viewed": true,
+      "ocr_checked": true,
+      "preservation": "original_bytes",
+      "sha256": "1f137e6cd48d48405c717a919a8cbc1088a8c6568ec2c9b5a538181144db35d4",
+      "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/evidence/14-en-config-rejection.jpg",
+      "transcoded": false
+    }
+  ],
+  "parent_reports": [
+    {
+      "action": "disconnect_cli_and_quit_source8_pid63178_then_restart_english_pid64825",
+      "source": "root message",
+      "verified_by_archive_agent_execution": false
+    },
+    {
+      "action": "quit_english_source8_pid64825_and_confirm_process_exit",
+      "source": "root final message",
+      "verified_by_archive_agent_execution": false
+    }
+  ],
+  "privacy": {
+    "images_original_bytes_preserved": true,
+    "json_scan": "privacy-json-scan.json",
+    "ocr_scan": "privacy-ocr-scan.json",
+    "targeted_pattern_hits": 0
+  },
+  "recovery": {
+    "active_process_reattachment_verified": false,
+    "after": {
+      "exact_result": "GUI_RESTART_RESUMED",
+      "generation": 7,
+      "native_outcome": "Completed",
+      "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+      "observed_at": "2026-09-17T12:53:22.982493+00:00",
+      "output_bytes": 19,
+      "output_sha256": "7066f208f85779698c041e29f6b059e7d3efe6381a441ed7c08a26ccd3698507",
+      "state": "completed",
+      "task_id": "90319eee-f61f-4ecf-bcfd-beca68d58d59",
+      "turn_id": "66713b63-5863-4846-9e57-9f18cd2a9acc"
+    },
+    "automatic_input_replay_observed": false,
+    "automatic_replay_observation_source": "根代理安全状态投影；归档代理未读取完整原生流，SQLite 消息增量为一个显式输入。",
+    "before": {
+      "active_process_reattachment_verified": false,
+      "automatic_input_replay_observed": false,
+      "generation": 7,
+      "message_count_before_new_input": 7,
+      "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+      "observed_at": "2026-09-17T12:53:03.420661+00:00",
+      "profile_digest": "ea736674ac91f01ae4b9adf3249e82918b074c0abc3d64286183f449d92a9a75",
+      "recovery_mode": "new_process_continue_native_history",
+      "result_before_new_input": null,
+      "same_native_session": true,
+      "same_profile": true,
+      "state": "queued",
+      "task_id": "90319eee-f61f-4ecf-bcfd-beca68d58d59",
+      "terminal_evidence_before_new_input": null
+    },
+    "historical_receipts_unchanged": true,
+    "message_count_after_explicit_new_input": 8,
+    "message_count_before_explicit_new_input": 7,
+    "new_input_native_ack_count": 1,
+    "profile_sha256": "ea736674ac91f01ae4b9adf3249e82918b074c0abc3d64286183f449d92a9a75",
+    "recovery_mode": "new_process_continue_native_history",
+    "same_profile_digest_verified": true
+  },
+  "runtime_resource_boundary": {
+    "claude_rejection_message_id": "cli-agent-claude-file-policy-unverified",
+    "english_image14_scope": "source8 immutable main binary plus source9 dynamically loaded English FTL",
+    "entire_locale_files_identical": false,
+    "ftl_loaded_from_compile_time_path": true,
+    "images_01_to_13_locale_window": "source8 locale loaded before source9 freeze, or old Chinese locale cache remained active",
+    "later_english_grok_summary_is_not_grok_entry_validation": true,
+    "later_english_pid64825_locale_source": "source9 after freeze",
+    "main_binary_immutable_reported": true,
+    "root_correction": "旧 source8 FTL 内容未独立字节比对，不能将相同错误 code key 或现有截图当作 source8/9 文本已逐字核对。",
+    "rust_embed_debug_embed_enabled": false,
+    "source": "root read-only inspection report",
+    "source8_locale_file_sha256": {
+      "app/i18n/en/warp.ftl": "3739c972001cfbae58707bb435f2e36bfe577f2227f8e6101a26ffd83f8202fe",
+      "app/i18n/zh-CN/warp.ftl": "99d3a4d06fa02fb33256efb48197d0ea6183949d96468842aee109bcfa425a75"
+    },
+    "source8_source9_rejection_text_independent_byte_comparison_verified": false,
+    "source9_locale_file_sha256": {
+      "app/i18n/en/warp.ftl": "c05e1652c5523fe73738bd176ec3f0691c5f79d28a99dc875e771aee058e08f9",
+      "app/i18n/zh-CN/warp.ftl": "ca875bd2741dbc82c80727063dbef92bbe58320b041c2318eca07fd23a710a1f"
+    },
+    "source9_locale_snapshot_sha256": "3cfc5c4bbc5ce69f51dbd706b2178c11f470818f417a1a323f4f2018b9305e34",
+    "source9_locale_snapshot_source": "/tmp/infinishell-cli-parity-official-9-inputs.json",
+    "verified_by_archive_agent_execution": false,
+    "whole_bundle_runtime_resources_immutable_verified": false
+  },
+  "scope": "source8_immutable_main_binary_claude_gui_recovery_and_bilingual_permissions_stage_evidence",
+  "source_manifest": {
+    "bundle_archive": "../macos-official-8-bundle.json",
+    "bundle_sha256": "6ff471be32c1b7b791abc25a6e673fdef82e7ba878c7dd6b2de6fcf0618e89a3",
+    "bytes": 1924,
+    "clean_modified_commit_verified": false,
+    "current_source_rehashed": false,
+    "projection": "manifest.safe.json",
+    "sha256": "4312bf3edc5c8eeb7a9fb7edccd1a0642f2935697c45828112624091a13193cd",
+    "snapshot_archive": "../macos-official-8-inputs.json",
+    "snapshot_equals_bundle_source_manifest": true,
+    "snapshot_file_count": 60,
+    "snapshot_has_unique_paths": true,
+    "snapshot_paths_and_digests_structurally_valid": true,
+    "snapshot_sha256": "5302b0dee495aa82b081e7d08bcaa7a8ba12416fe1008ac3083e93444e2c0af0",
+    "source": "/private/tmp/infinishell-gui-recovery-3-0vq529i5/manifest.json",
+    "source_binary_sha256_matches_bundle_worker": true
+  }
+}

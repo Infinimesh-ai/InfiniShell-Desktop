@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "audit_date": "2026-09-17",
+  "runtimeSource": "e48682fb8816aa2400f66621fcd68b3bb4e9a9a2b291c72738c95f255796bd3b",
+  "status": "历史版本，未包含后续 Unix 目录权限修复",
+  "report": {
+    "path": "codex-0.147.0-full-runtime-static-final.json",
+    "sha256": "04bae5e237662b6a51c9d318ee36a55fdd9f8b0ae7c0c5d70a8c572939550d35",
+    "bytes": 2758,
+    "copied_byte_for_byte": true
+  },
+  "inputs": {
+    "path": "codex-0.147.0-full-runtime-static-final.inputs.json",
+    "sha256": "fb9677721ea4a09d29a2785dd5ac2829a7153bf90adbf4738b83b435da54dc94",
+    "bytes": 1045,
+    "copied_byte_for_byte": true
+  },
+  "source_binding": {
+    "report_matches_preparation_input": true,
+    "matches_current_root_source": false,
+    "verification": "旧版 source/test 的根文件摘要在本次权限修复前已核对；新版在归档时重新核对。未用新版摘要追认旧版执行。",
+    "source": {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/script/cli-agent-parity/prepare_codex_cli.py",
+      "bytes": 14038,
+      "sha256": "e48682fb8816aa2400f66621fcd68b3bb4e9a9a2b291c72738c95f255796bd3b"
+    },
+    "tests": {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/script/cli-agent-parity/prepare_codex_cli_tests.py",
+      "bytes": 17242,
+      "sha256": "ab571410ba157cbee5b91bb31b5e20a09e84554449863fd050462faf0920a9a7"
+    }
+  },
+  "document_snapshot": {
+    "input_sha256": "8810267f6bf8548ae814f755338a47f8ba87686220de05f15d2d40b60cc0e7a9",
+    "archived_current_sha256": "57ddfbc2bed02b25777731328ef8c70514804e8a4c2f5b2c0c1ef5d7bf709550",
+    "meaning": "旧 inputs 的 Doc SHA 是报告链接更新前的准备输入，不代表后来文档版本。新版 inputs 对应本次更新归档链接后的文档。"
+  },
+  "static_platform_results": [
+    {
+      "target": "linux-x64",
+      "actual_archive_extraction": true,
+      "fixed_member_hashes_verified": true,
+      "cache_reuse_preserved_mtimes": true,
+      "extraction_and_cache_check_total_seconds": 2.677,
+      "target_native_command_executed": false
+    },
+    {
+      "target": "windows-x64",
+      "actual_archive_extraction": true,
+      "fixed_member_hashes_verified": true,
+      "cache_reuse_preserved_mtimes": true,
+      "extraction_and_cache_check_total_seconds": 2.846,
+      "target_native_command_executed": false
+    },
+    {
+      "target": "windows-arm64",
+      "actual_archive_extraction": true,
+      "fixed_member_hashes_verified": true,
+      "cache_reuse_preserved_mtimes": true,
+      "extraction_and_cache_check_total_seconds": 2.375,
+      "target_native_command_executed": false
+    }
+  ],
+  "offline_tests": {
+    "command": "python3 -B script/cli-agent-parity/prepare_codex_cli_tests.py -v",
+    "passed": 22,
+    "failed": 0,
+    "seconds": 0.142,
+    "provenance": "launch_safety 在本轮工作实际执行的离线 Python 单元测试；不是从旧13项推算。",
+    "rerun_during_archiving": false
+  },
+  "boundaries": {
+    "archive_validation_host": "macOS",
+    "unix_directory_permission_regressions_verified": false,
+    "windows_acl_verified": false,
+    "additional_macos_acl_verified": false,
+    "target_native_commands_executed": false,
+    "library_tests_executed_by_this_task": false,
+    "same_commit_ci_verified": false,
+    "model_workflow_verified": false,
+    "model_requests": 0,
+    "download_or_extraction_during_archiving": false,
+    "older_13_test_evidence_preserved": true,
+    "older_evidence_reclassified": false
+  },
+  "public_data_audit": {
+    "scope": "仅两份归档输入 JSON；不读取认证文件或模型帧",
+    "json_documents": 2,
+    "credential_shape_counts": {
+      "bearer_values": 0,
+      "known_key_prefix_values": 0,
+      "private_key_values": 0,
+      "jwt_values": 0,
+      "sensitive_field_names": 0
+    },
+    "links": {
+      "count": 3,
+      "https_count": 3,
+      "hosts": [
+        "github.com"
+      ],
+      "fixed_official_release_only": true
+    },
+    "limitations": "形态计数只描述这些公开报告，不是全仓库或宿主凭据审计"
+  }
+}

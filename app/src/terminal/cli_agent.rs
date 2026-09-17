@@ -995,6 +995,17 @@ pub struct CLIAgentInstallModel {
 
 impl CLIAgentInstallModel {
     #[cfg(test)]
+    pub(crate) fn with_installation_for_test(
+        agent: CLIAgent,
+        installation: CLIAgentInstallation,
+    ) -> Self {
+        Self {
+            cache: Some(HashMap::from([(agent, installation)])),
+            scan_generation: 0,
+        }
+    }
+
+    #[cfg(test)]
     pub(crate) fn empty_for_test() -> Self {
         Self {
             cache: Some(HashMap::new()),

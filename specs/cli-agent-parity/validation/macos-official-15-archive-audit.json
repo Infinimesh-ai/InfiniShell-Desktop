@@ -1,0 +1,1026 @@
+{
+  "scope": "source15 本地 check/i18n/受影响模块/Python 的独立安全归档。只读冻结75文件的前后 SHA 核对和语言资源字节核对已完成并发送 frozen_reads_done；后续允许根代理推进下一快照，归档不再读取冻结树。不是最终干净提交，也不包含运行中的 SDK 第五轮真实验收。",
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "base_commit_from_reports_only": true,
+  "worktree_dirty": true,
+  "source_manifest_sha256": "6830223673d39301f2b9884d02661f22a4a19e5df27c85dbccdda4542fccdba2",
+  "source_file_count": 75,
+  "source_paths_unique": true,
+  "frozen_source_directory": "/Users/zhishi/Tools/github/InfiniShell-Desktop/.worktrees/cli-agent-parity-validation",
+  "source_file_checks": [
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "manifest_sha256": "5c18297bd76933dca5035e68c8d2e5ab60c316d57acfd6b5780da75174a88399",
+      "observed_before_readonly_checks_sha256": "5c18297bd76933dca5035e68c8d2e5ab60c316d57acfd6b5780da75174a88399",
+      "observed_after_readonly_checks_sha256": "5c18297bd76933dca5035e68c8d2e5ab60c316d57acfd6b5780da75174a88399",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/codex/NATIVE_HOOK_TRUST_WINDOWS.json",
+      "manifest_sha256": "e1531b5cbb8d331d06a3627b68ee5d20a4af00501657609670ebb99cf2bf42a0",
+      "observed_before_readonly_checks_sha256": "e1531b5cbb8d331d06a3627b68ee5d20a4af00501657609670ebb99cf2bf42a0",
+      "observed_after_readonly_checks_sha256": "e1531b5cbb8d331d06a3627b68ee5d20a4af00501657609670ebb99cf2bf42a0",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/i18n/en/warp.ftl",
+      "manifest_sha256": "9442a4b062945cf3f5fbc5160193f4a14ae715ae9d35b7f5d5bc14be55980c3c",
+      "observed_before_readonly_checks_sha256": "9442a4b062945cf3f5fbc5160193f4a14ae715ae9d35b7f5d5bc14be55980c3c",
+      "observed_after_readonly_checks_sha256": "9442a4b062945cf3f5fbc5160193f4a14ae715ae9d35b7f5d5bc14be55980c3c",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/i18n/zh-CN/warp.ftl",
+      "manifest_sha256": "2291d0796862e703a2869e174d38138f014183730d380d56d6d97ce4772a0d98",
+      "observed_before_readonly_checks_sha256": "2291d0796862e703a2869e174d38138f014183730d380d56d6d97ce4772a0d98",
+      "observed_after_readonly_checks_sha256": "2291d0796862e703a2869e174d38138f014183730d380d56d6d97ce4772a0d98",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude.rs",
+      "manifest_sha256": "5d37f34d76597e234f977e874bf9e14b9bcf1b28dc18e73c257f9ac238445f8d",
+      "observed_before_readonly_checks_sha256": "5d37f34d76597e234f977e874bf9e14b9bcf1b28dc18e73c257f9ac238445f8d",
+      "observed_after_readonly_checks_sha256": "5d37f34d76597e234f977e874bf9e14b9bcf1b28dc18e73c257f9ac238445f8d",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_batch_cancel_live_tests.rs",
+      "manifest_sha256": "c2997cf0f250dc2712d7b07aabb8307ad66c380f5b2bfcc45092aa7ca0c0313e",
+      "observed_before_readonly_checks_sha256": "c2997cf0f250dc2712d7b07aabb8307ad66c380f5b2bfcc45092aa7ca0c0313e",
+      "observed_after_readonly_checks_sha256": "c2997cf0f250dc2712d7b07aabb8307ad66c380f5b2bfcc45092aa7ca0c0313e",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_coordinator_live_tests.rs",
+      "manifest_sha256": "3c12e2574c420dede08a8fdfe34788fa75c0d2aed0771a707c05f077a6297de5",
+      "observed_before_readonly_checks_sha256": "3c12e2574c420dede08a8fdfe34788fa75c0d2aed0771a707c05f077a6297de5",
+      "observed_after_readonly_checks_sha256": "3c12e2574c420dede08a8fdfe34788fa75c0d2aed0771a707c05f077a6297de5",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_image_probe_live_tests.rs",
+      "manifest_sha256": "185b9842ff6ba1e7221d9c7b77dd271a04d98a879a5f876aaafeebeabaa7c508",
+      "observed_before_readonly_checks_sha256": "185b9842ff6ba1e7221d9c7b77dd271a04d98a879a5f876aaafeebeabaa7c508",
+      "observed_after_readonly_checks_sha256": "185b9842ff6ba1e7221d9c7b77dd271a04d98a879a5f876aaafeebeabaa7c508",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_live_tests.rs",
+      "manifest_sha256": "6a09d750955d1ac0248504a2b75811a3f7f0f36fa96c87b7c926149f795b260c",
+      "observed_before_readonly_checks_sha256": "6a09d750955d1ac0248504a2b75811a3f7f0f36fa96c87b7c926149f795b260c",
+      "observed_after_readonly_checks_sha256": "6a09d750955d1ac0248504a2b75811a3f7f0f36fa96c87b7c926149f795b260c",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile.rs",
+      "manifest_sha256": "d96d8ef12cd91e4bb9ea81023b8328d3f375d7399105f29f771c1763700b24b0",
+      "observed_before_readonly_checks_sha256": "d96d8ef12cd91e4bb9ea81023b8328d3f375d7399105f29f771c1763700b24b0",
+      "observed_after_readonly_checks_sha256": "d96d8ef12cd91e4bb9ea81023b8328d3f375d7399105f29f771c1763700b24b0",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_live_tests.rs",
+      "manifest_sha256": "dd10f9a2373931244a8d3ba6c469f8bf8aa0169307d20b049325b19ce1552104",
+      "observed_before_readonly_checks_sha256": "dd10f9a2373931244a8d3ba6c469f8bf8aa0169307d20b049325b19ce1552104",
+      "observed_after_readonly_checks_sha256": "dd10f9a2373931244a8d3ba6c469f8bf8aa0169307d20b049325b19ce1552104",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_preflight.rs",
+      "manifest_sha256": "60ab9584b943ee7187806e0ef8c7dd2d137b5c335426573471e7cae9d7de0900",
+      "observed_before_readonly_checks_sha256": "60ab9584b943ee7187806e0ef8c7dd2d137b5c335426573471e7cae9d7de0900",
+      "observed_after_readonly_checks_sha256": "60ab9584b943ee7187806e0ef8c7dd2d137b5c335426573471e7cae9d7de0900",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_protocol_tests.rs",
+      "manifest_sha256": "234b82e830fce3b436b3ad5a43b2b685d296267c7db7f4ba075922f295b36116",
+      "observed_before_readonly_checks_sha256": "234b82e830fce3b436b3ad5a43b2b685d296267c7db7f4ba075922f295b36116",
+      "observed_after_readonly_checks_sha256": "234b82e830fce3b436b3ad5a43b2b685d296267c7db7f4ba075922f295b36116",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_tests.rs",
+      "manifest_sha256": "1de1a4cb8c23449ff7be0f58412fe33fdff89ae971f31919fe54b701b032ee6d",
+      "observed_before_readonly_checks_sha256": "1de1a4cb8c23449ff7be0f58412fe33fdff89ae971f31919fe54b701b032ee6d",
+      "observed_after_readonly_checks_sha256": "1de1a4cb8c23449ff7be0f58412fe33fdff89ae971f31919fe54b701b032ee6d",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_tests.rs",
+      "manifest_sha256": "001526674ede4f98fe39c0777db242cede47b06ed4b0205f41adae5e10f07b75",
+      "observed_before_readonly_checks_sha256": "001526674ede4f98fe39c0777db242cede47b06ed4b0205f41adae5e10f07b75",
+      "observed_after_readonly_checks_sha256": "001526674ede4f98fe39c0777db242cede47b06ed4b0205f41adae5e10f07b75",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex.rs",
+      "manifest_sha256": "3ca786dcc9ab6470db25784ea572f1561b14caf368b2c4adc5f9645a856305a7",
+      "observed_before_readonly_checks_sha256": "3ca786dcc9ab6470db25784ea572f1561b14caf368b2c4adc5f9645a856305a7",
+      "observed_after_readonly_checks_sha256": "3ca786dcc9ab6470db25784ea572f1561b14caf368b2c4adc5f9645a856305a7",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex_live_tests.rs",
+      "manifest_sha256": "788cce2656fc68d2a77ea6c446a7e0c3ffb5604db08992810d5906fbb964cff1",
+      "observed_before_readonly_checks_sha256": "788cce2656fc68d2a77ea6c446a7e0c3ffb5604db08992810d5906fbb964cff1",
+      "observed_after_readonly_checks_sha256": "788cce2656fc68d2a77ea6c446a7e0c3ffb5604db08992810d5906fbb964cff1",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex_tests.rs",
+      "manifest_sha256": "be66787fa98076fe672564e7bfdb57d0cf345a0802111997eddefee4cd12bd30",
+      "observed_before_readonly_checks_sha256": "be66787fa98076fe672564e7bfdb57d0cf345a0802111997eddefee4cd12bd30",
+      "observed_after_readonly_checks_sha256": "be66787fa98076fe672564e7bfdb57d0cf345a0802111997eddefee4cd12bd30",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator.rs",
+      "manifest_sha256": "54af5b87d7d5e8fa3be7eac8c258cb0c38334d427c6f495d936163f02c944a5a",
+      "observed_before_readonly_checks_sha256": "54af5b87d7d5e8fa3be7eac8c258cb0c38334d427c6f495d936163f02c944a5a",
+      "observed_after_readonly_checks_sha256": "54af5b87d7d5e8fa3be7eac8c258cb0c38334d427c6f495d936163f02c944a5a",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator_tests.rs",
+      "manifest_sha256": "6872766d722b4fd6b981942dc08a6b276df247705b58f6c3cb78acf8dee9a1ad",
+      "observed_before_readonly_checks_sha256": "6872766d722b4fd6b981942dc08a6b276df247705b58f6c3cb78acf8dee9a1ad",
+      "observed_after_readonly_checks_sha256": "6872766d722b4fd6b981942dc08a6b276df247705b58f6c3cb78acf8dee9a1ad",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator_tools.rs",
+      "manifest_sha256": "9e54fe0e8985094f0ed7ebe0be727051c60959f0553e26c0024273e4903ba2bd",
+      "observed_before_readonly_checks_sha256": "9e54fe0e8985094f0ed7ebe0be727051c60959f0553e26c0024273e4903ba2bd",
+      "observed_after_readonly_checks_sha256": "9e54fe0e8985094f0ed7ebe0be727051c60959f0553e26c0024273e4903ba2bd",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok.rs",
+      "manifest_sha256": "15f8c3eb1b49372f02bd877b554d9ff372e69aa9c19be7d3f3931aebabebde76",
+      "observed_before_readonly_checks_sha256": "15f8c3eb1b49372f02bd877b554d9ff372e69aa9c19be7d3f3931aebabebde76",
+      "observed_after_readonly_checks_sha256": "15f8c3eb1b49372f02bd877b554d9ff372e69aa9c19be7d3f3931aebabebde76",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_coordinator_live_tests.rs",
+      "manifest_sha256": "055b6aae62ad81afebff901470ccca8f301f57b907988671650c5393e0cf9aa1",
+      "observed_before_readonly_checks_sha256": "055b6aae62ad81afebff901470ccca8f301f57b907988671650c5393e0cf9aa1",
+      "observed_after_readonly_checks_sha256": "055b6aae62ad81afebff901470ccca8f301f57b907988671650c5393e0cf9aa1",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_live_tests.rs",
+      "manifest_sha256": "b4944504e9d85923a118cd120eaef1e6db4190b7422a1cb35db387b35bcb888a",
+      "observed_before_readonly_checks_sha256": "b4944504e9d85923a118cd120eaef1e6db4190b7422a1cb35db387b35bcb888a",
+      "observed_after_readonly_checks_sha256": "b4944504e9d85923a118cd120eaef1e6db4190b7422a1cb35db387b35bcb888a",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_local_tools.rs",
+      "manifest_sha256": "9ccd38748a6cfd221ecc19f54e099fc3e2565515f59e27c24b5549114bf61f06",
+      "observed_before_readonly_checks_sha256": "9ccd38748a6cfd221ecc19f54e099fc3e2565515f59e27c24b5549114bf61f06",
+      "observed_after_readonly_checks_sha256": "9ccd38748a6cfd221ecc19f54e099fc3e2565515f59e27c24b5549114bf61f06",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_local_tools_tests.rs",
+      "manifest_sha256": "2a42701187b95b563d03b54e89b64ed5af69ebe4794f029aa603c80c7650a31a",
+      "observed_before_readonly_checks_sha256": "2a42701187b95b563d03b54e89b64ed5af69ebe4794f029aa603c80c7650a31a",
+      "observed_after_readonly_checks_sha256": "2a42701187b95b563d03b54e89b64ed5af69ebe4794f029aa603c80c7650a31a",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_sdk_origin_live_tests.rs",
+      "manifest_sha256": "189a366753eeea84b64d7279a13d4954937453f7bde71e345d0d6553cc20c941",
+      "observed_before_readonly_checks_sha256": "189a366753eeea84b64d7279a13d4954937453f7bde71e345d0d6553cc20c941",
+      "observed_after_readonly_checks_sha256": "189a366753eeea84b64d7279a13d4954937453f7bde71e345d0d6553cc20c941",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_tests.rs",
+      "manifest_sha256": "9d9a8b26e76156d90fa019ecac5e3c88c21a900338196e436e3e130c3582056a",
+      "observed_before_readonly_checks_sha256": "9d9a8b26e76156d90fa019ecac5e3c88c21a900338196e436e3e130c3582056a",
+      "observed_after_readonly_checks_sha256": "9d9a8b26e76156d90fa019ecac5e3c88c21a900338196e436e3e130c3582056a",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/local_tools.rs",
+      "manifest_sha256": "460c250327a3d524573d8ba59eb462e07bbfdfa4cdc1b8fa69cd583cdeb89a67",
+      "observed_before_readonly_checks_sha256": "460c250327a3d524573d8ba59eb462e07bbfdfa4cdc1b8fa69cd583cdeb89a67",
+      "observed_after_readonly_checks_sha256": "460c250327a3d524573d8ba59eb462e07bbfdfa4cdc1b8fa69cd583cdeb89a67",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/local_tools_tests.rs",
+      "manifest_sha256": "a34609bd2cc85a820f75c1c832fa0dc94f1590b5581c23302fbcee26047fc045",
+      "observed_before_readonly_checks_sha256": "a34609bd2cc85a820f75c1c832fa0dc94f1590b5581c23302fbcee26047fc045",
+      "observed_after_readonly_checks_sha256": "a34609bd2cc85a820f75c1c832fa0dc94f1590b5581c23302fbcee26047fc045",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_input.rs",
+      "manifest_sha256": "a2d1cdd2592ba213795639351e43e67b139ccf56639d638b90017fc1a6f3195d",
+      "observed_before_readonly_checks_sha256": "a2d1cdd2592ba213795639351e43e67b139ccf56639d638b90017fc1a6f3195d",
+      "observed_after_readonly_checks_sha256": "a2d1cdd2592ba213795639351e43e67b139ccf56639d638b90017fc1a6f3195d",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_input_tests.rs",
+      "manifest_sha256": "347fa8cb30c4dee93374047e15608fdcf423ae5f8af2c0da2fafdbee29775b3d",
+      "observed_before_readonly_checks_sha256": "347fa8cb30c4dee93374047e15608fdcf423ae5f8af2c0da2fafdbee29775b3d",
+      "observed_after_readonly_checks_sha256": "347fa8cb30c4dee93374047e15608fdcf423ae5f8af2c0da2fafdbee29775b3d",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/mod.rs",
+      "manifest_sha256": "824c117f9a342ab1234c51c4688d6ac54216e4ae9d51d19578886476916f0eb6",
+      "observed_before_readonly_checks_sha256": "824c117f9a342ab1234c51c4688d6ac54216e4ae9d51d19578886476916f0eb6",
+      "observed_after_readonly_checks_sha256": "824c117f9a342ab1234c51c4688d6ac54216e4ae9d51d19578886476916f0eb6",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions.rs",
+      "manifest_sha256": "f1ddf87888057f53e634c89df1cf5e3b030a895c24e47a2b8185a1e5014e5f2b",
+      "observed_before_readonly_checks_sha256": "f1ddf87888057f53e634c89df1cf5e3b030a895c24e47a2b8185a1e5014e5f2b",
+      "observed_after_readonly_checks_sha256": "f1ddf87888057f53e634c89df1cf5e3b030a895c24e47a2b8185a1e5014e5f2b",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions_tests.rs",
+      "manifest_sha256": "11a0154b72411c16d64700143212797158b007e83fc409446f05a7c4f6f2da6d",
+      "observed_before_readonly_checks_sha256": "11a0154b72411c16d64700143212797158b007e83fc409446f05a7c4f6f2da6d",
+      "observed_after_readonly_checks_sha256": "11a0154b72411c16d64700143212797158b007e83fc409446f05a7c4f6f2da6d",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_input.rs",
+      "manifest_sha256": "b2c61b2bd6518c20e1308df355fd5fdce4b365cdeb123d9ec6d6c39cee8462a8",
+      "observed_before_readonly_checks_sha256": "b2c61b2bd6518c20e1308df355fd5fdce4b365cdeb123d9ec6d6c39cee8462a8",
+      "observed_after_readonly_checks_sha256": "b2c61b2bd6518c20e1308df355fd5fdce4b365cdeb123d9ec6d6c39cee8462a8",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_view.rs",
+      "manifest_sha256": "dde148a2b48eae787200864f3c0393ac8a83559005adb2074659d2f61a3548a2",
+      "observed_before_readonly_checks_sha256": "dde148a2b48eae787200864f3c0393ac8a83559005adb2074659d2f61a3548a2",
+      "observed_after_readonly_checks_sha256": "dde148a2b48eae787200864f3c0393ac8a83559005adb2074659d2f61a3548a2",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_view_tests.rs",
+      "manifest_sha256": "23809550edb62e708f2f0701510a80b6a26340dd7abd410f49a8a34f6d7c2eb7",
+      "observed_before_readonly_checks_sha256": "23809550edb62e708f2f0701510a80b6a26340dd7abd410f49a8a34f6d7c2eb7",
+      "observed_after_readonly_checks_sha256": "23809550edb62e708f2f0701510a80b6a26340dd7abd410f49a8a34f6d7c2eb7",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/ai/local_cli_mailbox.rs",
+      "manifest_sha256": "100d7c50e0efb4f9b249bae01dae8cdd9abcb58b3939064b6a68b901c5003728",
+      "observed_before_readonly_checks_sha256": "100d7c50e0efb4f9b249bae01dae8cdd9abcb58b3939064b6a68b901c5003728",
+      "observed_after_readonly_checks_sha256": "100d7c50e0efb4f9b249bae01dae8cdd9abcb58b3939064b6a68b901c5003728",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/pane_group/pane/terminal_pane.rs",
+      "manifest_sha256": "f15b4fc18c4da172fed9403af0d8de3239d7ac750008d2d70dacdc1669418b03",
+      "observed_before_readonly_checks_sha256": "f15b4fc18c4da172fed9403af0d8de3239d7ac750008d2d70dacdc1669418b03",
+      "observed_after_readonly_checks_sha256": "f15b4fc18c4da172fed9403af0d8de3239d7ac750008d2d70dacdc1669418b03",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/persistence/local_cli_tasks.rs",
+      "manifest_sha256": "122b11d43b6d75884880a1cb574243bedb7272baf23fd40774643db50826d272",
+      "observed_before_readonly_checks_sha256": "122b11d43b6d75884880a1cb574243bedb7272baf23fd40774643db50826d272",
+      "observed_after_readonly_checks_sha256": "122b11d43b6d75884880a1cb574243bedb7272baf23fd40774643db50826d272",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/persistence/local_cli_tasks_tests.rs",
+      "manifest_sha256": "f590db51f542dc111d258d9e62af49f0e2fe4ccf1152e4759cf2dad46fd2bb3e",
+      "observed_before_readonly_checks_sha256": "f590db51f542dc111d258d9e62af49f0e2fe4ccf1152e4759cf2dad46fd2bb3e",
+      "observed_after_readonly_checks_sha256": "f590db51f542dc111d258d9e62af49f0e2fe4ccf1152e4759cf2dad46fd2bb3e",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent.rs",
+      "manifest_sha256": "f0981820be46d63a4ebd34b367104c8d2dc127741d60766b2ee153942475f0b7",
+      "observed_before_readonly_checks_sha256": "f0981820be46d63a4ebd34b367104c8d2dc127741d60766b2ee153942475f0b7",
+      "observed_after_readonly_checks_sha256": "f0981820be46d63a4ebd34b367104c8d2dc127741d60766b2ee153942475f0b7",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex.rs",
+      "manifest_sha256": "367d861d32001b881342461b2c85108e31edadcd733eabbca9fc37bcdfe26d6e",
+      "observed_before_readonly_checks_sha256": "367d861d32001b881342461b2c85108e31edadcd733eabbca9fc37bcdfe26d6e",
+      "observed_after_readonly_checks_sha256": "367d861d32001b881342461b2c85108e31edadcd733eabbca9fc37bcdfe26d6e",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_hook_trust.rs",
+      "manifest_sha256": "db168ba04f009bf42e1bf5445919ab6999e5901e9c2b235dfaec5c309ed6bac7",
+      "observed_before_readonly_checks_sha256": "db168ba04f009bf42e1bf5445919ab6999e5901e9c2b235dfaec5c309ed6bac7",
+      "observed_after_readonly_checks_sha256": "db168ba04f009bf42e1bf5445919ab6999e5901e9c2b235dfaec5c309ed6bac7",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_hook_trust_tests.rs",
+      "manifest_sha256": "64012376a4e5f0eacce4f0f2e43cb40a1489a68e638582662879ec9b6387b8c9",
+      "observed_before_readonly_checks_sha256": "64012376a4e5f0eacce4f0f2e43cb40a1489a68e638582662879ec9b6387b8c9",
+      "observed_after_readonly_checks_sha256": "64012376a4e5f0eacce4f0f2e43cb40a1489a68e638582662879ec9b6387b8c9",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_live_tests.rs",
+      "manifest_sha256": "28bcaf7e63a6440dc2ec8fd82d86fa09322eae27aa7965a810e71b97b3c598de",
+      "observed_before_readonly_checks_sha256": "28bcaf7e63a6440dc2ec8fd82d86fa09322eae27aa7965a810e71b97b3c598de",
+      "observed_after_readonly_checks_sha256": "28bcaf7e63a6440dc2ec8fd82d86fa09322eae27aa7965a810e71b97b3c598de",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_tests.rs",
+      "manifest_sha256": "45bd1411d7ea9282a428aa9900108b02d19aa32d307885f74cfa82b150ff5e08",
+      "observed_before_readonly_checks_sha256": "45bd1411d7ea9282a428aa9900108b02d19aa32d307885f74cfa82b150ff5e08",
+      "observed_after_readonly_checks_sha256": "45bd1411d7ea9282a428aa9900108b02d19aa32d307885f74cfa82b150ff5e08",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_tests.rs",
+      "manifest_sha256": "51af6d44d1822a604d8082d550d7f6042aebaa3c053a985179222ae412e1cb8f",
+      "observed_before_readonly_checks_sha256": "51af6d44d1822a604d8082d550d7f6042aebaa3c053a985179222ae412e1cb8f",
+      "observed_after_readonly_checks_sha256": "51af6d44d1822a604d8082d550d7f6042aebaa3c053a985179222ae412e1cb8f",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/claude_adapter_runner_tests.py",
+      "manifest_sha256": "af84604615918505247489d3f8ce74af3592caaec23791abb1113738d9bf4b2d",
+      "observed_before_readonly_checks_sha256": "af84604615918505247489d3f8ce74af3592caaec23791abb1113738d9bf4b2d",
+      "observed_after_readonly_checks_sha256": "af84604615918505247489d3f8ce74af3592caaec23791abb1113738d9bf4b2d",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+      "manifest_sha256": "1b205c1c1872c903830e9cfc2ce11f800a7d84911270c4c343b7d238b445a3aa",
+      "observed_before_readonly_checks_sha256": "1b205c1c1872c903830e9cfc2ce11f800a7d84911270c4c343b7d238b445a3aa",
+      "observed_after_readonly_checks_sha256": "1b205c1c1872c903830e9cfc2ce11f800a7d84911270c4c343b7d238b445a3aa",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+      "manifest_sha256": "02cf1e37bab3eabebad013346f619e128023744a9b6d96fd5deae15524125fc8",
+      "observed_before_readonly_checks_sha256": "02cf1e37bab3eabebad013346f619e128023744a9b6d96fd5deae15524125fc8",
+      "observed_after_readonly_checks_sha256": "02cf1e37bab3eabebad013346f619e128023744a9b6d96fd5deae15524125fc8",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/claude_image_probe_runner_tests.py",
+      "manifest_sha256": "28b731f4143494187b05a93f2d2a1863c1c651223add91d241fd7a39d9f91df8",
+      "observed_before_readonly_checks_sha256": "28b731f4143494187b05a93f2d2a1863c1c651223add91d241fd7a39d9f91df8",
+      "observed_after_readonly_checks_sha256": "28b731f4143494187b05a93f2d2a1863c1c651223add91d241fd7a39d9f91df8",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/claude_profile_runner_tests.py",
+      "manifest_sha256": "6bd8681209b5971b8889686e0bd487455b96a4fc33891737258b30f2f47ae1a9",
+      "observed_before_readonly_checks_sha256": "6bd8681209b5971b8889686e0bd487455b96a4fc33891737258b30f2f47ae1a9",
+      "observed_after_readonly_checks_sha256": "6bd8681209b5971b8889686e0bd487455b96a4fc33891737258b30f2f47ae1a9",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/codex_source_runner_tests.py",
+      "manifest_sha256": "6a92532370b48f52ceab79e112fb9e0f599ac23a269011f088bae5e27a7f9a36",
+      "observed_before_readonly_checks_sha256": "6a92532370b48f52ceab79e112fb9e0f599ac23a269011f088bae5e27a7f9a36",
+      "observed_after_readonly_checks_sha256": "6a92532370b48f52ceab79e112fb9e0f599ac23a269011f088bae5e27a7f9a36",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/grok_adapter_runner_tests.py",
+      "manifest_sha256": "347e1ab5a499c6dcca5391e77a7f1b92254cbfee1b4888277a952d0b9d00c191",
+      "observed_before_readonly_checks_sha256": "347e1ab5a499c6dcca5391e77a7f1b92254cbfee1b4888277a952d0b9d00c191",
+      "observed_after_readonly_checks_sha256": "347e1ab5a499c6dcca5391e77a7f1b92254cbfee1b4888277a952d0b9d00c191",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/grok_coordinator_runner_tests.py",
+      "manifest_sha256": "485b2e5a00bac79008aa865a359623d8b42bf13568dd288a8db6d4de5edacfcc",
+      "observed_before_readonly_checks_sha256": "485b2e5a00bac79008aa865a359623d8b42bf13568dd288a8db6d4de5edacfcc",
+      "observed_after_readonly_checks_sha256": "485b2e5a00bac79008aa865a359623d8b42bf13568dd288a8db6d4de5edacfcc",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+      "manifest_sha256": "de4b23fb81ce7f68e7f65fec920aceb2ccb17553cfabe505a8853ee7e1e43f7b",
+      "observed_before_readonly_checks_sha256": "de4b23fb81ce7f68e7f65fec920aceb2ccb17553cfabe505a8853ee7e1e43f7b",
+      "observed_after_readonly_checks_sha256": "de4b23fb81ce7f68e7f65fec920aceb2ccb17553cfabe505a8853ee7e1e43f7b",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/grok_official_pty_runner_tests.py",
+      "manifest_sha256": "86eead713462959ad8e57cd63f7de216baecffa8e458390f3cc7f30845b8b720",
+      "observed_before_readonly_checks_sha256": "86eead713462959ad8e57cd63f7de216baecffa8e458390f3cc7f30845b8b720",
+      "observed_after_readonly_checks_sha256": "86eead713462959ad8e57cd63f7de216baecffa8e458390f3cc7f30845b8b720",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+      "manifest_sha256": "1f506a6a76358a5d0ed64910c37f21369486492bd5c01f5dd391a24f5485a5d8",
+      "observed_before_readonly_checks_sha256": "1f506a6a76358a5d0ed64910c37f21369486492bd5c01f5dd391a24f5485a5d8",
+      "observed_after_readonly_checks_sha256": "1f506a6a76358a5d0ed64910c37f21369486492bd5c01f5dd391a24f5485a5d8",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_adapter_live.py",
+      "manifest_sha256": "52cb1c3071254dc031eab4b15c327d12a02d3f829035863094ebdec1225a3739",
+      "observed_before_readonly_checks_sha256": "52cb1c3071254dc031eab4b15c327d12a02d3f829035863094ebdec1225a3739",
+      "observed_after_readonly_checks_sha256": "52cb1c3071254dc031eab4b15c327d12a02d3f829035863094ebdec1225a3739",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_batch_cancel_live.py",
+      "manifest_sha256": "4a174c7c5d24751b128809f1c111f361b7d9baeca3a6481e14004c60266fd0ec",
+      "observed_before_readonly_checks_sha256": "4a174c7c5d24751b128809f1c111f361b7d9baeca3a6481e14004c60266fd0ec",
+      "observed_after_readonly_checks_sha256": "4a174c7c5d24751b128809f1c111f361b7d9baeca3a6481e14004c60266fd0ec",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_coordinator_live.py",
+      "manifest_sha256": "4f9d9940250da4489258cee039ff2394d1ea84036df92594b91b62ff3bab58fd",
+      "observed_before_readonly_checks_sha256": "4f9d9940250da4489258cee039ff2394d1ea84036df92594b91b62ff3bab58fd",
+      "observed_after_readonly_checks_sha256": "4f9d9940250da4489258cee039ff2394d1ea84036df92594b91b62ff3bab58fd",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_image_probe.py",
+      "manifest_sha256": "bbf2c41b7467289e18b262090a2125941f4477008bc9ad9b25773673baaff2cd",
+      "observed_before_readonly_checks_sha256": "bbf2c41b7467289e18b262090a2125941f4477008bc9ad9b25773673baaff2cd",
+      "observed_after_readonly_checks_sha256": "bbf2c41b7467289e18b262090a2125941f4477008bc9ad9b25773673baaff2cd",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_profile_live.py",
+      "manifest_sha256": "22441975639ecd328bc7be780907c1b27325931b6d6a922c6b6672335eaa021e",
+      "observed_before_readonly_checks_sha256": "22441975639ecd328bc7be780907c1b27325931b6d6a922c6b6672335eaa021e",
+      "observed_after_readonly_checks_sha256": "22441975639ecd328bc7be780907c1b27325931b6d6a922c6b6672335eaa021e",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_codex_source_live.py",
+      "manifest_sha256": "6d8bf45c8d05eaaa834a8f106f576993d69e3b2118b5e0853e51e62677ade02a",
+      "observed_before_readonly_checks_sha256": "6d8bf45c8d05eaaa834a8f106f576993d69e3b2118b5e0853e51e62677ade02a",
+      "observed_after_readonly_checks_sha256": "6d8bf45c8d05eaaa834a8f106f576993d69e3b2118b5e0853e51e62677ade02a",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_adapter_live.py",
+      "manifest_sha256": "b9b302bbbfdb1924b340e3cb8fee91633d5b5998904ec37ece98bf4894bd7f32",
+      "observed_before_readonly_checks_sha256": "b9b302bbbfdb1924b340e3cb8fee91633d5b5998904ec37ece98bf4894bd7f32",
+      "observed_after_readonly_checks_sha256": "b9b302bbbfdb1924b340e3cb8fee91633d5b5998904ec37ece98bf4894bd7f32",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_coordinator_live.py",
+      "manifest_sha256": "3a373865c28b60431c1c385d9473bd7efd6bdf6ddf098fa52116eb62c8203275",
+      "observed_before_readonly_checks_sha256": "3a373865c28b60431c1c385d9473bd7efd6bdf6ddf098fa52116eb62c8203275",
+      "observed_after_readonly_checks_sha256": "3a373865c28b60431c1c385d9473bd7efd6bdf6ddf098fa52116eb62c8203275",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_official_adapter_live.py",
+      "manifest_sha256": "3dd0ef8e495f02a7bdda681bc904759464924f24e97f55ceec0c7c6a7d55a06d",
+      "observed_before_readonly_checks_sha256": "3dd0ef8e495f02a7bdda681bc904759464924f24e97f55ceec0c7c6a7d55a06d",
+      "observed_after_readonly_checks_sha256": "3dd0ef8e495f02a7bdda681bc904759464924f24e97f55ceec0c7c6a7d55a06d",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_official_pty_live.py",
+      "manifest_sha256": "266589d48d0271bdee605349039f046066c2e8732ea919e21244c2bb71d1525c",
+      "observed_before_readonly_checks_sha256": "266589d48d0271bdee605349039f046066c2e8732ea919e21244c2bb71d1525c",
+      "observed_after_readonly_checks_sha256": "266589d48d0271bdee605349039f046066c2e8732ea919e21244c2bb71d1525c",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_sdk_origin_probe.py",
+      "manifest_sha256": "805c7c1e673e5e240bf33797ecec22e5d99ef73d84e4ec202be6851093bad14e",
+      "observed_before_readonly_checks_sha256": "805c7c1e673e5e240bf33797ecec22e5d99ef73d84e4ec202be6851093bad14e",
+      "observed_after_readonly_checks_sha256": "805c7c1e673e5e240bf33797ecec22e5d99ef73d84e4ec202be6851093bad14e",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/claude-2.1.273-fixed-profile-control.json",
+      "manifest_sha256": "fb7c0fe39c3fea7d4b721ace8e62e034b8059f4e4492d80ad51981c056e88dbb",
+      "observed_before_readonly_checks_sha256": "fb7c0fe39c3fea7d4b721ace8e62e034b8059f4e4492d80ad51981c056e88dbb",
+      "observed_after_readonly_checks_sha256": "fb7c0fe39c3fea7d4b721ace8e62e034b8059f4e4492d80ad51981c056e88dbb",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/codex-0.147.0-native-hook-trust-rev4-windows.json",
+      "manifest_sha256": "b8253c5faa631257aa6f50052b919fb29c04f9effb086fa766626f188f7f0a13",
+      "observed_before_readonly_checks_sha256": "b8253c5faa631257aa6f50052b919fb29c04f9effb086fa766626f188f7f0a13",
+      "observed_after_readonly_checks_sha256": "b8253c5faa631257aa6f50052b919fb29c04f9effb086fa766626f188f7f0a13",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-final-history-offline.json",
+      "manifest_sha256": "a71da4851785ce794205fa5b13247961685c364d490510fd1834b67a15512731",
+      "observed_before_readonly_checks_sha256": "a71da4851785ce794205fa5b13247961685c364d490510fd1834b67a15512731",
+      "observed_after_readonly_checks_sha256": "a71da4851785ce794205fa5b13247961685c364d490510fd1834b67a15512731",
+      "matches_before": true,
+      "matches_after": true
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-local-tools-source-contract.json",
+      "manifest_sha256": "819a7e8ecdb0a76ee39c4606f9149529e6f52cda9fc6460b982e71f2c01df0a9",
+      "observed_before_readonly_checks_sha256": "819a7e8ecdb0a76ee39c4606f9149529e6f52cda9fc6460b982e71f2c01df0a9",
+      "observed_after_readonly_checks_sha256": "819a7e8ecdb0a76ee39c4606f9149529e6f52cda9fc6460b982e71f2c01df0a9",
+      "matches_before": true,
+      "matches_after": true
+    }
+  ],
+  "source_files_all_matched_before_readonly_checks": true,
+  "source_files_all_matched_after_readonly_checks": true,
+  "frozen_reads_done_sent_to_root_before_scope_advance": true,
+  "subsequent_frozen_tree_reads_by_archive": false,
+  "source14_to_source15_changed_paths": [
+    "app/src/ai/cli_agent_runtime/grok_sdk_origin_live_tests.rs",
+    "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+    "script/cli-agent-parity/run_grok_sdk_origin_probe.py"
+  ],
+  "source14_to_source15_removed_paths": [],
+  "source15_only_updates_sdk_probe_files": true,
+  "production_claude_png_changes_included": false,
+  "new_claude_png_ftl_keys_included": false,
+  "original_reports": {
+    "inputs": {
+      "source": "/tmp/infinishell-cli-parity-official-15-inputs.json",
+      "archive": "macos-official-15-inputs.json",
+      "sha256": "6830223673d39301f2b9884d02661f22a4a19e5df27c85dbccdda4542fccdba2",
+      "bytes": 12920,
+      "byte_for_byte_copy": true,
+      "privacy_scan": {
+        "method": "八类定向凭据格式扫描；只记录命中数，不归档扫描正文或原日志",
+        "hits": {
+          "api_key": 0,
+          "jwt": 0,
+          "bearer": 0,
+          "private_key": 0,
+          "email": 0,
+          "credential_assignment": 0,
+          "private_endpoint": 0,
+          "private_api_path": 0
+        },
+        "total_hits": 0
+      }
+    },
+    "gates": {
+      "source": "/tmp/infinishell-cli-parity-official-15-gates.json",
+      "archive": "macos-official-15-gates.json",
+      "sha256": "2ac820b583ccf0332cc53c1d3034c5f9a0008d01573cad3aee3b08928371151a",
+      "bytes": 2107,
+      "byte_for_byte_copy": true,
+      "privacy_scan": {
+        "method": "八类定向凭据格式扫描；只记录命中数，不归档扫描正文或原日志",
+        "hits": {
+          "api_key": 0,
+          "jwt": 0,
+          "bearer": 0,
+          "private_key": 0,
+          "email": 0,
+          "credential_assignment": 0,
+          "private_endpoint": 0,
+          "private_api_path": 0
+        },
+        "total_hits": 0
+      }
+    },
+    "python": {
+      "source": "/tmp/infinishell-cli-parity-official-15-python.json",
+      "archive": "macos-official-15-python.json",
+      "sha256": "b1e28d73daa36c6d6c4527df5041c99c32ff0fc0383f8721f2bcdb6690b23ef8",
+      "bytes": 3450,
+      "byte_for_byte_copy": true,
+      "privacy_scan": {
+        "method": "八类定向凭据格式扫描；只记录命中数，不归档扫描正文或原日志",
+        "hits": {
+          "api_key": 0,
+          "jwt": 0,
+          "bearer": 0,
+          "private_key": 0,
+          "email": 0,
+          "credential_assignment": 0,
+          "private_endpoint": 0,
+          "private_api_path": 0
+        },
+        "total_hits": 0
+      }
+    }
+  },
+  "logs": {
+    "check": {
+      "name": "check",
+      "source": "/tmp/infinishell-cli-parity-official-15-check.log",
+      "sha256": "175cc62c3c7eccfd3961bf4c87707944e0286c48829b6902666cf59c81ddcf92",
+      "bytes": 359,
+      "sha256_matches_original_report": true,
+      "raw_log_archived": false,
+      "privacy_scan": {
+        "method": "八类定向凭据格式扫描；只记录命中数，不归档扫描正文或原日志",
+        "hits": {
+          "api_key": 0,
+          "jwt": 0,
+          "bearer": 0,
+          "private_key": 0,
+          "email": 0,
+          "credential_assignment": 0,
+          "private_endpoint": 0,
+          "private_api_path": 0
+        },
+        "total_hits": 0
+      },
+      "dev_profile_completion_line_independently_observed": true
+    },
+    "i18n": {
+      "name": "i18n",
+      "source": "/tmp/infinishell-cli-parity-official-15-i18n.log",
+      "sha256": "8506105f125cd3ee39102ab56b09a05dc476c11730e097385019dc34c2d9d5bd",
+      "bytes": 1259,
+      "sha256_matches_original_report": true,
+      "raw_log_archived": false,
+      "privacy_scan": {
+        "method": "八类定向凭据格式扫描；只记录命中数，不归档扫描正文或原日志",
+        "hits": {
+          "api_key": 0,
+          "jwt": 0,
+          "bearer": 0,
+          "private_key": 0,
+          "email": 0,
+          "credential_assignment": 0,
+          "private_endpoint": 0,
+          "private_api_path": 0
+        },
+        "total_hits": 0
+      },
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 6732,
+      "individual_ok_count": 11,
+      "test_elapsed_seconds": 4.7
+    },
+    "focused": {
+      "name": "focused",
+      "source": "/tmp/infinishell-cli-parity-official-15-focused.log",
+      "sha256": "16500a6094099fd7274c0afab0c2a5a9095efff1c9b26a3310904276261dcd29",
+      "bytes": 180225,
+      "sha256_matches_original_report": true,
+      "raw_log_archived": false,
+      "privacy_scan": {
+        "method": "八类定向凭据格式扫描；只记录命中数，不归档扫描正文或原日志",
+        "hits": {
+          "api_key": 0,
+          "jwt": 0,
+          "bearer": 0,
+          "private_key": 0,
+          "email": 0,
+          "credential_assignment": 0,
+          "private_endpoint": 0,
+          "private_api_path": 0
+        },
+        "total_hits": 0
+      },
+      "tests_run": 1211,
+      "passed": 1211,
+      "skipped": 5532,
+      "individual_pass_count": 1211,
+      "failure_line_count": 0,
+      "test_elapsed_seconds": 15.069
+    },
+    "python": {
+      "name": "python",
+      "source": "/tmp/infinishell-cli-parity-official-15-python.log",
+      "sha256": "5984271eb44cd359073bd11ead0362f0ce2ec3501806e83b9456e858471057e2",
+      "bytes": 44127,
+      "sha256_matches_original_report": true,
+      "raw_log_archived": false,
+      "privacy_scan": {
+        "method": "八类定向凭据格式扫描；只记录命中数，不归档扫描正文或原日志",
+        "hits": {
+          "api_key": 0,
+          "jwt": 0,
+          "bearer": 0,
+          "private_key": 0,
+          "email": 0,
+          "credential_assignment": 0,
+          "private_endpoint": 0,
+          "private_api_path": 0
+        },
+        "total_hits": 0
+      },
+      "group_counts": [
+        11,
+        7,
+        56,
+        18,
+        25,
+        10,
+        13,
+        27,
+        19,
+        62,
+        20
+      ],
+      "group_elapsed_seconds": [
+        0.008,
+        0.006,
+        0.048,
+        0.019,
+        0.015,
+        0.214,
+        0.007,
+        0.072,
+        2.043,
+        0.604,
+        0.015
+      ],
+      "group_ok_count": 11,
+      "individual_ok_count": 268,
+      "total_tests": 268
+    }
+  },
+  "rust_gate_execution_reported_by_root": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 57.752,
+      "log": "/tmp/infinishell-cli-parity-official-15-check.log",
+      "log_sha256": "175cc62c3c7eccfd3961bf4c87707944e0286c48829b6902666cf59c81ddcf92"
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 135.436,
+      "log": "/tmp/infinishell-cli-parity-official-15-i18n.log",
+      "log_sha256": "8506105f125cd3ee39102ab56b09a05dc476c11730e097385019dc34c2d9d5bd"
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::) | test(ai::agent_providers::chat_stream::) | test(ai::blocklist::action_model::execute::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 18.624,
+      "log": "/tmp/infinishell-cli-parity-official-15-focused.log",
+      "log_sha256": "16500a6094099fd7274c0afab0c2a5a9095efff1c9b26a3310904276261dcd29"
+    }
+  ],
+  "python_group_execution_reported_by_root": [
+    {
+      "module": "claude_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.125,
+      "tests": 11
+    },
+    {
+      "module": "claude_profile_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_profile_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.095,
+      "tests": 7
+    },
+    {
+      "module": "claude_coordinator_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.161,
+      "tests": 56
+    },
+    {
+      "module": "claude_batch_cancel_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.11,
+      "tests": 18
+    },
+    {
+      "module": "claude_image_probe_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_image_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.108,
+      "tests": 25
+    },
+    {
+      "module": "codex_source_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/codex_source_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.301,
+      "tests": 10
+    },
+    {
+      "module": "grok_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.111,
+      "tests": 13
+    },
+    {
+      "module": "grok_coordinator_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.195,
+      "tests": 27
+    },
+    {
+      "module": "grok_official_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 2.154,
+      "tests": 19
+    },
+    {
+      "module": "grok_sdk_origin_probe_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.714,
+      "tests": 62
+    },
+    {
+      "module": "grok_official_pty_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_official_pty_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.122,
+      "tests": 20
+    }
+  ],
+  "python_tests_passed": 268,
+  "python_wall_seconds_from_report": 4.201,
+  "local_gates_passed": true,
+  "cargo_or_python_tests_reexecuted_by_archive": false,
+  "test_binary_sha256_from_original_report_only": "71e42409bc656cea8d050b30a1e4408576c9e46e6e45c775bf1bfde3860b79bf",
+  "test_binary_read_by_archive": false,
+  "sdk_fifth_actual_native_acceptance_included": false,
+  "claude_image_actual_native_acceptance_included": false,
+  "ordinary_pty_live_refused_not_counted_as_native_verification": true,
+  "grok_source13_coordinator_success_counted_as_source15_acceptance": false,
+  "gui_layout_verified_by_this_archive": false,
+  "online_cli_lifecycle_verified_by_this_archive": false,
+  "app_restart_recovery_verified_by_this_archive": false,
+  "clean_commit_verified": false,
+  "same_commit_cross_platform_verified": false,
+  "full_workspace_tests_verified": false,
+  "goal_completed": false
+}

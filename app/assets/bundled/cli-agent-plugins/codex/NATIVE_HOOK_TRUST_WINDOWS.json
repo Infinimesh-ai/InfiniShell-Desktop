@@ -1,0 +1,79 @@
+{
+  "cli": "codex-cli 0.147.0",
+  "plugin": "warp@codex-warp",
+  "plugin_version": "0.4.0",
+  "patch_revision": 4,
+  "verified_platform": "windows",
+  "verified_architecture": "x86_64",
+  "passed": true,
+  "hooks_file_sha256": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
+  "source_metadata_sha256": "dc5754dbf7cc3a69ab5261216073bfb711c923082bf8f2b6a6bd5b391c49fa96",
+  "model_request_attempted": false,
+  "credentials_provided": false,
+  "native_config_restored": true,
+  "native_hook_lifecycle_verified": false,
+  "windows_product_enabled": false,
+  "native_artifact_sha256": "803db5ecf876ea79aae8fb4f1d27ae206fabba746c482ae3d64174a49943bb5e",
+  "hooks": [
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+      "eventName": "permissionRequest",
+      "handlerType": "command",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:44070d73fcbf068004c31131a2627104bf6c327a0a45cb2f3ea7a66c39eb1308",
+      "trustStatus": "untrusted",
+      "command_sha256": "5b9ac93652e1f28687d9e9dc48713718353441ad796f887396a5a4bf02be784a"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+      "eventName": "postToolUse",
+      "handlerType": "command",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:1b249d42206a018be2cab3f53d27b739b67c4997c8583c2ad883ff937f46509e",
+      "trustStatus": "untrusted",
+      "command_sha256": "7098783fca8d010f0511323d5c050a5f2d4d235b3444c76d074a2acd4accd29c"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+      "eventName": "sessionStart",
+      "handlerType": "command",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:84c9084a052e6efc4f8104ff953afdf1f8bde6613e87638ce5cf1f3fc6ab230d",
+      "trustStatus": "untrusted",
+      "command_sha256": "bc3fa419f01a499cb29a4a1ad5a1e2b44bdd92a529139d7747559f6623150fb7"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+      "eventName": "userPromptSubmit",
+      "handlerType": "command",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:c5e2c592551335a5dc0de1aa80273f4d3e6195da3209b3f313c3b5b4425c1c20",
+      "trustStatus": "untrusted",
+      "command_sha256": "e74a5ad1f2a0cf664fd4389aa8f98249e676c205987905babb540cb2a34864b2"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+      "eventName": "stop",
+      "handlerType": "command",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:7aca65d37ccae169a00489c40f6b130d5611c7774ca6fed130b3a5b6d19aa3cd",
+      "trustStatus": "untrusted",
+      "command_sha256": "f508f72c38e0b3e2c9367deb802778be20b88cdc3b4255e512faa8d87d77aee1"
+    }
+  ]
+}

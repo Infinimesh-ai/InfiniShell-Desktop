@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "generation": "34614325-3061-46c8-82c7-e5b39d69a942",
+  "claim_sha256": "d6a03faaeb1580fde2d3116b4b72c0ef809e71bc3f812f53eb140c4dd62f8803",
+  "native_sha256": "82c9655908457726917d83173bcc639c6516edfbf3746c39bb2381ed440a682e",
+  "job_removed": true,
+  "resource_cid_destroyed": true,
+  "native_wait_status": 0,
+  "execution_failed": false,
+  "source_sha256": "25641c597ac3d49bc631d5db6493dc295cb950fa47a87d72626c3e5cf108126a",
+  "source_bytes": 327,
+  "source_credential_scan": {
+    "api_key": 0,
+    "jwt": 0,
+    "bearer": 0,
+    "private_key": 0,
+    "email": 0,
+    "credential_assignment": 0
+  },
+  "safe_fields_independently_verified": true
+}

@@ -102,9 +102,35 @@ async fn run_process(
         .ok_or_else(|| RuntimeError::Protocol("missing stdout".into()))?;
     let result = run_transport(protocol, &mut stdin, &mut stdout, commands, events).await;
     drop(stdin);
-    drop(stdout);
-    child.finish().await?;
-    result
+    // 保留读端至有界 EOF；丢弃退出尾部字节，不生成新的原生事件或保存正文。
+    let drain = async move {
+        let mut budget = MAX_LINE_BYTES;
+        let mut bytes = [0u8; 8192];
+        loop {
+            let limit = budget.saturating_add(1).min(bytes.len());
+            let count = stdout.read(&mut bytes[..limit]).await?;
+            if count == 0 {
+                return Ok::<(), RuntimeError>(());
+            }
+            budget = budget.checked_sub(count).ok_or_else(|| {
+                RuntimeError::Protocol(crate::t!("cli-agent-runtime-data-too-large"))
+            })?;
+        }
+    };
+    let graceful = result.is_ok();
+    let finish = async move {
+        if graceful {
+            child.finish_after_stdin_close().await
+        } else {
+            child.finish().await
+        }
+    };
+    let (finished, drained) = futures::join!(finish, drain.with_timeout(Duration::from_secs(30)));
+    // 清理和读取均结束后保留原传输失败；正常成功还必须具有可信回执及预算内 EOF。
+    result?;
+    finished?;
+    drained.map_err(|_| RuntimeError::RequestTimedOut)??;
+    Ok(())
 }
 
 async fn run_transport(
@@ -533,6 +559,7 @@ impl CodexProtocol {
             | RuntimeEventKind::CommandDispatched { message_id, .. }
             | RuntimeEventKind::RequestFailed { message_id, .. } => Some(message_id),
             RuntimeEventKind::SessionReady { .. }
+            | RuntimeEventKind::InputJoined { .. }
             | RuntimeEventKind::TurnStarted { .. }
             | RuntimeEventKind::TextDelta { .. }
             | RuntimeEventKind::Progress { .. }
@@ -600,6 +627,11 @@ impl CodexProtocol {
                     params["model"] = json!(model);
                 }
                 match self.options.permission_policy {
+                    PermissionPolicy::ClaudeRestrictedFilesV1 => {
+                        return Err(RuntimeError::InvalidConfiguration(
+                            "Claude fixed file policy cannot be applied to Codex".into(),
+                        ));
+                    }
                     PermissionPolicy::Inherit => {}
                     PermissionPolicy::ReadOnly => {
                         params["approvalPolicy"] = json!("untrusted");
@@ -655,6 +687,11 @@ impl CodexProtocol {
                     return Err(RuntimeError::Protocol("resume target is active or cannot accept direct input; reattach its owning runtime".into()));
                 }
                 let expected_sandbox = match self.options.permission_policy {
+                    PermissionPolicy::ClaudeRestrictedFilesV1 => {
+                        return Err(RuntimeError::InvalidConfiguration(
+                            "Claude fixed file policy cannot be applied to Codex".into(),
+                        ));
+                    }
                     PermissionPolicy::Inherit => None,
                     PermissionPolicy::ReadOnly => Some("readOnly"),
                     PermissionPolicy::WorkspaceWrite => Some("workspaceWrite"),

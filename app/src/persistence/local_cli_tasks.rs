@@ -1,12 +1,17 @@
 //! 本地 CLI 任务和信箱复用应用 SQLite 写入线程；确认只在事务提交后返回。
 
+use std::collections::HashSet;
 use std::sync::mpsc::SyncSender;
 
 use anyhow::{Context, Result, bail};
 use diesel::prelude::*;
 use futures::channel::oneshot;
+use serde::Deserialize;
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
+
+use crate::ai::cli_agent_runtime::RuntimeAction;
 
 use super::ModelEvent;
 pub(crate) use super::model::{
@@ -1007,6 +1012,136 @@ fn update_message_state(
     update_message_state_with_receipt(connection, message_id, task_id, generation, state, receipt)
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PersistedGrokInputLink {
+    message_id: Uuid,
+    submission_generation: i64,
+    runtime_generation: Uuid,
+    native_turn_id: Option<String>,
+}
+
+/// 只接收同一原生进程已提交队列的旧任务代回执，不改原消息的投递身份。
+fn matches_grok_queued_input_receipt(
+    message: &LocalCliMessage,
+    original: &LocalCliTask,
+    current: &LocalCliTask,
+    state: LocalCliMessageState,
+    receipt: Option<LocalCliReceiptKind>,
+) -> bool {
+    let native_ack = state == LocalCliMessageState::Acknowledged
+        && receipt == Some(LocalCliReceiptKind::NativeProtocol);
+    if (!native_ack && !(state == LocalCliMessageState::Failed && receipt.is_none()))
+        || message.state != LocalCliMessageState::Sent
+        || message.receipt_kind.is_some()
+        || original.harness != "grok"
+        || current.harness != "grok"
+        || message.subject != "user_input"
+        || message.sender_task_id != current.task_id
+        || message.recipient_task_id != current.task_id
+        || original.task_id != current.task_id
+        || original.generation != message.sender_generation
+        || message.sender_generation != message.recipient_generation
+        || current.generation <= original.generation
+        || matches!(
+            current.state,
+            LocalCliTaskState::Disconnected
+                | LocalCliTaskState::Unknown
+                | LocalCliTaskState::Unconfirmed
+        )
+        || !matches!(
+            serde_json::from_str::<RuntimeAction>(&message.body),
+            Ok(RuntimeAction::Submit { .. })
+        )
+    {
+        return false;
+    }
+    let valid_native_id =
+        |id: &str| !id.trim().is_empty() && id.len() <= 4096 && !id.chars().any(char::is_control);
+    let Some(session) = original
+        .native_session_id
+        .as_deref()
+        .filter(|id| valid_native_id(id))
+    else {
+        return false;
+    };
+    if current.native_session_id.as_deref() != Some(session) {
+        return false;
+    }
+    let (Ok(original_config), Ok(config), Ok(message_id)) = (
+        serde_json::from_str::<Value>(&original.config_json),
+        serde_json::from_str::<Value>(&current.config_json),
+        Uuid::parse_str(&message.message_id),
+    ) else {
+        return false;
+    };
+    let runtime = |config: &Value| {
+        config["runtime_generation"]
+            .as_str()
+            .and_then(|id| Uuid::parse_str(id).ok())
+            .filter(|id| !id.is_nil())
+    };
+    let Some(runtime_generation) = runtime(&original_config) else {
+        return false;
+    };
+    if message_id.is_nil() || runtime(&config) != Some(runtime_generation) {
+        return false;
+    }
+    let pending: Vec<PersistedGrokInputLink> = match config
+        .get("grok_pending_inputs")
+        .filter(|value| !value.is_null())
+    {
+        Some(value) => match serde_json::from_value(value.clone()) {
+            Ok(pending) => pending,
+            Err(_) => return false,
+        },
+        None => Vec::new(),
+    };
+    let current_input: Option<PersistedGrokInputLink> = match config
+        .get("grok_current_input")
+        .filter(|value| !value.is_null())
+    {
+        Some(value) => match serde_json::from_value(value.clone()) {
+            Ok(input) => Some(input),
+            Err(_) => return false,
+        },
+        None => None,
+    };
+    if pending.len() + usize::from(current_input.is_some()) > 33
+        || current_input
+            .as_ref()
+            .is_some_and(|input| input.native_turn_id.is_none())
+    {
+        return false;
+    }
+    let mut messages = HashSet::new();
+    let mut turns = HashSet::new();
+    let mut matched = false;
+    for input in pending.iter().chain(current_input.iter()) {
+        if input.message_id.is_nil()
+            || input.runtime_generation != runtime_generation
+            || input.submission_generation < 1
+            || input.submission_generation > current.generation
+            || !messages.insert(input.message_id)
+            || input
+                .native_turn_id
+                .as_deref()
+                .is_some_and(|turn| !valid_native_id(turn) || !turns.insert(turn))
+        {
+            return false;
+        }
+        if input.message_id == message_id {
+            if input.submission_generation != original.generation
+                || (native_ack && input.native_turn_id.is_none())
+            {
+                return false;
+            }
+            matched = true;
+        }
+    }
+    matched
+}
+
 fn update_message_state_with_receipt(
     connection: &mut SqliteConnection,
     message_id: &str,
@@ -1022,7 +1157,7 @@ fn update_message_state_with_receipt(
             && receipt == Some(LocalCliReceiptKind::NativeProtocol);
         let is_delivery_outcome = is_native_ack || state == LocalCliMessageState::Failed;
         // 已派发消息的发送方可能先进入下一轮，回执仍属于原来的发送记录。
-        // 接收方必须保持当前 generation，不能让旧连接写入新运行。
+        // 仅 Grok 同一进程中有持久队列关联的自输入允许跨任务代，旧连接仍被拒绝。
         let sender = if is_delivery_outcome {
             read_task_generation(
                 connection,
@@ -1033,6 +1168,8 @@ fn update_message_state_with_receipt(
             read_task(connection, &message.sender_task_id)?
         }
         .context("消息发送运行不存在")?;
+        let same_grok_queue =
+            matches_grok_queued_input_receipt(&message, &sender, &recipient, state, receipt);
         if message.version != 1
             || recipient.version != 1
             || sender.version != 1
@@ -1040,7 +1177,7 @@ fn update_message_state_with_receipt(
             || recipient.parent_task_id.is_some() != recipient.parent_generation.is_some()
             || message.recipient_task_id != task_id
             || message.recipient_generation != generation
-            || recipient.generation != generation
+            || (recipient.generation != generation && !same_grok_queue)
             || (sender.generation != message.sender_generation
                 && message.subject != TASK_RESULT_SUBJECT)
         {

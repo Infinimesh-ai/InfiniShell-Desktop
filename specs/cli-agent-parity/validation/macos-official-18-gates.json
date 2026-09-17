@@ -1,0 +1,63 @@
+{
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "worktree_dirty": true,
+  "source_manifest_sha256": "3d539cc6282dc098346011f900140e2006af993aad93c7285e23fe4eedb2d3cf",
+  "target_directory": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 55.963,
+      "log": "/tmp/infinishell-cli-parity-official-18-check.log",
+      "log_sha256": "4fc16e4c40cb2420b94e9cfb0aa1b8037c3587e00195b7a22541a11449bfb778"
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 5.24,
+      "log": "/tmp/infinishell-cli-parity-official-18-i18n.log",
+      "log_sha256": "13e1728342b5bd6b468d2df2ef5bc96f96614f0af95668566f1b7653873f8289"
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::) | test(ai::agent_providers::chat_stream::) | test(ai::blocklist::action_model::execute::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 17.72,
+      "log": "/tmp/infinishell-cli-parity-official-18-focused.log",
+      "log_sha256": "b3202d5dbe55b9d713c03eacb7f88f8054f2b8fbcaadfbd2aac7cd65c9763bf4"
+    }
+  ],
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "cc12e15bd9209d9c4ca3c935ba89d23f5af13d9e685be16af65795e33fb3a153"
+  },
+  "source_unchanged_after_gates": true
+}

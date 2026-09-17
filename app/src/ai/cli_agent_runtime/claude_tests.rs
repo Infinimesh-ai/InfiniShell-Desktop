@@ -24,6 +24,7 @@ fn options() -> SessionOptions {
         generation: Uuid::from_u128(1),
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
+        claude_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
@@ -264,7 +265,7 @@ fn captured_missing_resume_fails_before_ready_and_never_creates_new_session() {
 }
 
 #[test]
-fn queued_ack_and_started_keep_the_same_command_uuid() {
+fn queued_ack_and_joined_input_keep_the_same_command_uuid() {
     let (mut protocol, running) = running_protocol();
     let queued = Uuid::from_u128(11);
     let input = submit(queued, "下一轮\nNext turn 🧪");
@@ -283,8 +284,10 @@ fn queued_ack_and_started_keep_the_same_command_uuid() {
     assert_eq!(replay.events, ack.events);
     let started = protocol.receive(lifecycle(queued, "started")).unwrap();
     assert!(
-        matches!(&started.events[0], RuntimeEventKind::TurnStarted { turn_id } if turn_id == &queued.to_string())
+        matches!(&started.events[0], RuntimeEventKind::InputJoined { message_id, turn_id }
+            if *message_id == queued && turn_id == &running.to_string())
     );
+    assert_eq!(protocol.active_turn, Some(running));
     assert!(
         protocol
             .receive(lifecycle(queued, "queued"))
@@ -292,6 +295,543 @@ fn queued_ack_and_started_keep_the_same_command_uuid() {
             .events
             .is_empty()
     );
+}
+
+#[test]
+fn joined_input_requires_a_native_result_for_the_complete_batch() {
+    let (mut protocol, running) = running_protocol();
+    let joined = Uuid::from_u128(11);
+    protocol.command(submit(joined, "追加输入"));
+    protocol.receive(lifecycle(joined, "started")).unwrap();
+    let result = json!({"type":"result","subtype":"success","is_error":false,
+        "user_message_uuid":joined,"user_message_uuids":[joined],"result":"JOINT_RESULT"});
+    assert!(protocol.receive(result).is_err());
+    assert!(!protocol.turns[&running].finished);
+    assert!(!protocol.turns[&joined].finished);
+}
+
+#[test]
+fn native_batch_result_finishes_joined_inputs_before_the_active_execution() {
+    let (mut protocol, running) = running_protocol();
+    let joined = Uuid::from_u128(11);
+    protocol.command(submit(joined, "追加输入"));
+    protocol.receive(lifecycle(joined, "started")).unwrap();
+    let result = json!({"type":"result","subtype":"success","is_error":false,
+        "user_message_uuid":joined,"user_message_uuids":[running,joined],"result":"JOINT_RESULT"});
+    let effects = protocol.receive(result).unwrap();
+    assert_eq!(
+        effects.events,
+        vec![
+            RuntimeEventKind::TurnFinished {
+                turn_id: joined.to_string(),
+                outcome: TurnOutcome::Completed,
+                output: "JOINT_RESULT".into()
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: running.to_string(),
+                outcome: TurnOutcome::Completed,
+                output: "JOINT_RESULT".into()
+            },
+        ]
+    );
+    assert_eq!(protocol.active_turn, None);
+}
+
+fn joined_cancellation_frames() -> (ClaudeProtocol, Value, Value, Value) {
+    let (mut protocol, running) = running_protocol();
+    let joined = Uuid::from_u128(11);
+    protocol.command(submit(joined, "合并输入"));
+    protocol.receive(lifecycle(joined, "started")).unwrap();
+    let request = interrupt(&mut protocol, running);
+    let mut result = aborted_result(running);
+    result["user_message_uuid"] = json!(joined);
+    result["user_message_uuids"] = json!([running, joined]);
+    let ack = control_response(request["request_id"].as_str().unwrap(), json!({}));
+    let cancelled = lifecycle(running, "cancelled");
+    (protocol, result, ack, cancelled)
+}
+
+// 这两种结果形态尚未被固定版本真实捕获；回归仅验证不能绕过取消证据门槛。
+fn terminal_cancellation_frames(reason: &str) -> (ClaudeProtocol, Value, Value, Value) {
+    let (protocol, mut result, ack, cancelled) = joined_cancellation_frames();
+    result["terminal_reason"] = json!(reason);
+    result["subtype"] = json!("success");
+    result["is_error"] = json!(false);
+    result["errors"] = Value::Null;
+    (protocol, result, ack, cancelled)
+}
+
+#[test]
+fn terminal_cancelled_joined_results_require_all_three_native_signals_in_any_order() {
+    for reason in ["interrupted", "cancelled"] {
+        for order in [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ] {
+            let (protocol, result, ack, cancelled) = terminal_cancellation_frames(reason);
+            let frames = [result, ack, cancelled];
+            assert_joined_cancellation_order(
+                protocol,
+                frames[order[0]].clone(),
+                frames[order[1]].clone(),
+                frames[order[2]].clone(),
+            );
+        }
+    }
+}
+
+#[test]
+fn terminal_cancelled_joined_results_missing_any_signal_fail_the_complete_batch() {
+    for reason in ["interrupted", "cancelled"] {
+        for missing in 0..3 {
+            let (mut protocol, result, ack, cancelled) = terminal_cancellation_frames(reason);
+            for (index, frame) in [result, ack, cancelled].into_iter().enumerate() {
+                if index != missing {
+                    assert!(finished_events(protocol.receive(frame).unwrap()).is_empty());
+                }
+            }
+            assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+        }
+    }
+}
+
+#[test]
+fn terminal_cancelled_joined_result_without_authorized_interrupt_is_failed() {
+    for reason in ["interrupted", "cancelled"] {
+        let (mut protocol, running) = running_protocol();
+        let joined = Uuid::from_u128(11);
+        protocol.command(submit(joined, "追加输入"));
+        protocol.receive(lifecycle(joined, "started")).unwrap();
+        let mut result = aborted_result(running);
+        result["terminal_reason"] = json!(reason);
+        result["subtype"] = json!("success");
+        result["is_error"] = json!(false);
+        result["user_message_uuid"] = json!(joined);
+        result["user_message_uuids"] = json!([running, joined]);
+        assert_joined_batch_failed(protocol.receive(result).unwrap());
+        assert!(
+            protocol
+                .receive(lifecycle(running, "cancelled"))
+                .unwrap()
+                .events
+                .is_empty()
+        );
+    }
+}
+
+#[test]
+fn terminal_cancelled_joined_input_lifecycle_cannot_confirm_execution_cancellation() {
+    for reason in ["interrupted", "cancelled"] {
+        let (mut protocol, result, ack, _) = terminal_cancellation_frames(reason);
+        protocol.receive(ack).unwrap();
+        assert!(finished_events(protocol.receive(result).unwrap()).is_empty());
+        assert!(
+            protocol
+                .receive(lifecycle(Uuid::from_u128(11), "cancelled"))
+                .unwrap()
+                .events
+                .is_empty()
+        );
+        assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+    }
+}
+
+#[test]
+fn terminal_cancelled_joined_result_cannot_override_rejected_interrupt() {
+    for reason in ["interrupted", "cancelled"] {
+        let (mut protocol, result, ack, cancelled) = terminal_cancellation_frames(reason);
+        assert!(finished_events(protocol.receive(result).unwrap()).is_empty());
+        protocol.receive(cancelled).unwrap();
+        let rejected = json!({"type":"control_response","response":{
+            "subtype":"error","request_id":ack["response"]["request_id"],
+            "error":"interrupt rejected"}});
+        assert_joined_batch_failed(protocol.receive(rejected.clone()).unwrap());
+        assert!(protocol.receive(rejected).unwrap().events.is_empty());
+    }
+}
+
+#[test]
+fn terminal_cancelled_joined_result_requires_each_input_uuid() {
+    for reason in ["interrupted", "cancelled"] {
+        let (mut protocol, mut result, ack, cancelled) = terminal_cancellation_frames(reason);
+        result["user_message_uuid"] = json!(Uuid::from_u128(11));
+        result["user_message_uuids"] = json!([Uuid::from_u128(11)]);
+        assert!(protocol.receive(result).is_err());
+        protocol.receive(ack).unwrap();
+        assert!(finished_events(protocol.receive(cancelled).unwrap()).is_empty());
+        assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+    }
+}
+
+#[test]
+fn confirmed_terminal_cancelled_batch_keeps_the_native_result_output() {
+    for reason in ["interrupted", "cancelled"] {
+        let (mut protocol, mut result, ack, cancelled) = terminal_cancellation_frames(reason);
+        result["result"] = json!("完整原生取消结果\nFull native cancelled result");
+        assert!(finished_events(protocol.receive(result).unwrap()).is_empty());
+        protocol.receive(ack).unwrap();
+        let finished = finished_events(protocol.receive(cancelled).unwrap());
+        assert_eq!(finished.len(), 2);
+        assert!(finished.iter().all(|event| matches!(event,
+            RuntimeEventKind::TurnFinished { outcome: TurnOutcome::Cancelled, output, .. }
+            if output == "完整原生取消结果\nFull native cancelled result")));
+    }
+}
+
+#[test]
+fn terminal_cancelled_batch_with_unknown_or_missing_outcome_fields_is_unverified() {
+    for reason in ["interrupted", "cancelled"] {
+        for missing in ["subtype", "is_error"] {
+            let (mut protocol, mut result, ack, cancelled) = terminal_cancellation_frames(reason);
+            result[missing] = Value::Null;
+            protocol.receive(ack).unwrap();
+            protocol.receive(cancelled).unwrap();
+            assert!(matches!(
+                protocol.receive(result),
+                Err(RuntimeError::Protocol(_))
+            ));
+            assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+        }
+        let (mut protocol, mut result, _, _) = terminal_cancellation_frames(reason);
+        result["subtype"] = json!("unrecognized_native_outcome");
+        assert!(matches!(
+            protocol.receive(result),
+            Err(RuntimeError::Protocol(_))
+        ));
+    }
+}
+
+#[test]
+fn terminal_cancelled_joined_old_result_cannot_finish_the_next_execution() {
+    for reason in ["interrupted", "cancelled"] {
+        let (protocol, result, ack, cancelled) = terminal_cancellation_frames(reason);
+        let mut protocol = assert_joined_cancellation_order(
+            protocol,
+            result.clone(),
+            ack.clone(),
+            cancelled.clone(),
+        );
+        let next = Uuid::from_u128(13);
+        protocol.command(submit(next, "继续会话"));
+        protocol.receive(lifecycle(next, "started")).unwrap();
+        for frame in [result, ack, cancelled] {
+            assert!(protocol.receive(frame).unwrap().events.is_empty());
+        }
+        assert_eq!(protocol.active_turn, Some(next));
+        assert!(!protocol.turns[&next].finished);
+    }
+}
+
+#[test]
+fn live_native_id_projection_keeps_cancellation_proofs_without_text_or_errors() {
+    let id = Uuid::from_u128(10);
+    let request_id = format!("infinishell-{}-3", Uuid::from_u128(1));
+    let frame = json!({"type":"result","subtype":"error_during_execution",
+        "uuid":Uuid::from_u128(20),"session_id":Uuid::from_u128(21),
+        "user_message_uuid":id,"user_message_uuids":[id,Uuid::from_u128(11)],
+        "terminal_reason":"aborted_streaming","is_error":true,
+        "errors":["PRIVATE_TEXT_CANARY"],"result":"PRIVATE_RESULT_CANARY",
+        "response":{"request_id":request_id,"subtype":"success","response":{"private":"PRIVATE_RESPONSE_CANARY"}}});
+    let ids = live_native_protocol_ids(&frame);
+    assert_eq!(ids["terminal_reason"], "aborted_streaming");
+    assert_eq!(ids["is_error"], true);
+    assert_eq!(ids["response_request_id"], request_id);
+    assert_eq!(ids["response_subtype"], "success");
+    assert_eq!(ids["user_message_uuids"], json!([id, Uuid::from_u128(11)]));
+    assert!(!ids.to_string().contains("PRIVATE_"));
+    let unknown = live_native_protocol_ids(&json!({"type":"PRIVATE_TYPE_CANARY",
+        "subtype":"PRIVATE_SUBTYPE_CANARY","state":"PRIVATE_STATE_CANARY",
+        "terminal_reason":"PRIVATE_REASON_CANARY",
+        "request":{"subtype":"PRIVATE_REQUEST_CANARY"},
+        "message":{"content":[{"type":"tool_use","id":"PRIVATE_TOOL_ID_CANARY",
+            "name":"PRIVATE_TOOL_NAME_CANARY","input":{"private":"PRIVATE_TOOL_INPUT_CANARY"}}]},
+        "response":{"request_id":"PRIVATE_ID_CANARY","subtype":"PRIVATE_STATUS_CANARY"}}));
+    assert_eq!(unknown["terminal_reason"], "unknown");
+    assert_eq!(unknown["response_subtype"], "unknown");
+    assert!(
+        unknown["response_request_id"]
+            .as_str()
+            .unwrap()
+            .starts_with("sha256:")
+    );
+    assert!(!unknown.to_string().contains("PRIVATE_"));
+}
+
+fn finished_events(effects: Effects) -> Vec<RuntimeEventKind> {
+    effects
+        .events
+        .into_iter()
+        .filter(|event| matches!(event, RuntimeEventKind::TurnFinished { .. }))
+        .collect()
+}
+
+fn assert_joined_cancellation_order(
+    mut protocol: ClaudeProtocol,
+    first: Value,
+    second: Value,
+    third: Value,
+) -> ClaudeProtocol {
+    assert!(finished_events(protocol.receive(first).unwrap()).is_empty());
+    assert!(finished_events(protocol.receive(second).unwrap()).is_empty());
+    let events = finished_events(protocol.receive(third).unwrap());
+    assert_eq!(
+        events,
+        vec![
+            RuntimeEventKind::TurnFinished {
+                turn_id: Uuid::from_u128(11).to_string(),
+                outcome: TurnOutcome::Cancelled,
+                output: String::new(),
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: Uuid::from_u128(10).to_string(),
+                outcome: TurnOutcome::Cancelled,
+                output: String::new(),
+            },
+        ]
+    );
+    assert_eq!(protocol.active_turn, None);
+    protocol
+}
+
+fn expire_joined_cancellation(protocol: &mut ClaudeProtocol) -> Effects {
+    protocol
+        .turns
+        .get_mut(&Uuid::from_u128(10))
+        .unwrap()
+        .cancellation
+        .as_mut()
+        .unwrap()
+        .started_at = Instant::now() - REQUEST_TIMEOUT;
+    protocol.expire_cancellations()
+}
+
+fn assert_joined_batch_failed(effects: Effects) {
+    let events = finished_events(effects);
+    assert!(matches!(events.as_slice(), [
+        RuntimeEventKind::TurnFinished { turn_id: joined, outcome: TurnOutcome::Failed { .. }, .. },
+        RuntimeEventKind::TurnFinished { turn_id: execution, outcome: TurnOutcome::Failed { .. }, .. },
+    ] if joined == &Uuid::from_u128(11).to_string()
+        && execution == &Uuid::from_u128(10).to_string()));
+}
+
+#[test]
+fn joined_cancellation_waits_for_result_ack_then_lifecycle() {
+    let (protocol, result, ack, cancelled) = joined_cancellation_frames();
+    assert_joined_cancellation_order(protocol, result, ack, cancelled);
+}
+
+#[test]
+fn joined_cancellation_waits_for_result_lifecycle_then_ack() {
+    let (protocol, result, ack, cancelled) = joined_cancellation_frames();
+    assert_joined_cancellation_order(protocol, result, cancelled, ack);
+}
+
+#[test]
+fn joined_cancellation_waits_for_ack_result_then_lifecycle() {
+    let (protocol, result, ack, cancelled) = joined_cancellation_frames();
+    assert_joined_cancellation_order(protocol, ack, result, cancelled);
+}
+
+#[test]
+fn joined_cancellation_waits_for_ack_lifecycle_then_result() {
+    let (protocol, result, ack, cancelled) = joined_cancellation_frames();
+    assert_joined_cancellation_order(protocol, ack, cancelled, result);
+}
+
+#[test]
+fn joined_cancellation_waits_for_lifecycle_result_then_ack() {
+    let (protocol, result, ack, cancelled) = joined_cancellation_frames();
+    assert_joined_cancellation_order(protocol, cancelled, result, ack);
+}
+
+#[test]
+fn joined_cancellation_waits_for_lifecycle_ack_then_result() {
+    let (protocol, result, ack, cancelled) = joined_cancellation_frames();
+    assert_joined_cancellation_order(protocol, cancelled, ack, result);
+}
+
+#[test]
+fn joined_cancellation_missing_execution_ack_fails_the_whole_batch() {
+    let (mut protocol, result, _, cancelled) = joined_cancellation_frames();
+    assert!(protocol.receive(result).unwrap().events.is_empty());
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+    assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+}
+
+#[test]
+fn joined_cancellation_missing_execution_lifecycle_fails_the_whole_batch() {
+    let (mut protocol, result, ack, _) = joined_cancellation_frames();
+    protocol.receive(ack).unwrap();
+    assert!(protocol.receive(result).unwrap().events.is_empty());
+    assert!(
+        protocol
+            .receive(lifecycle(Uuid::from_u128(11), "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+}
+
+#[test]
+fn joined_cancellation_missing_native_result_fails_the_whole_batch() {
+    let (mut protocol, _, ack, cancelled) = joined_cancellation_frames();
+    protocol.receive(ack).unwrap();
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+    assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+}
+
+#[test]
+fn joined_cancellation_rejects_a_result_missing_a_batch_input() {
+    let (mut protocol, mut result, ack, cancelled) = joined_cancellation_frames();
+    result["user_message_uuid"] = json!(Uuid::from_u128(10));
+    result["user_message_uuids"] = json!([Uuid::from_u128(10)]);
+    assert!(
+        matches!(protocol.receive(result), Err(RuntimeError::Protocol(message))
+        if message.contains("complete joined input batch"))
+    );
+    protocol.receive(ack).unwrap();
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+    assert_joined_batch_failed(expire_joined_cancellation(&mut protocol));
+}
+
+#[test]
+fn joined_cancellation_rejected_interrupt_fails_the_whole_batch() {
+    let (mut protocol, result, ack, cancelled) = joined_cancellation_frames();
+    assert!(protocol.receive(result).unwrap().events.is_empty());
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+    let request_id = &ack["response"]["request_id"];
+    let error = json!({"type":"control_response","response":{
+        "subtype":"error","request_id":request_id,"error":"interrupt rejected"}});
+    let effects = protocol.receive(error.clone()).unwrap();
+    assert_joined_batch_failed(effects);
+    assert!(protocol.receive(error).unwrap().events.is_empty());
+}
+
+#[test]
+fn joined_aborted_batch_without_an_interrupt_remains_failed() {
+    let (mut protocol, running) = running_protocol();
+    let joined = Uuid::from_u128(11);
+    protocol.command(submit(joined, "合并输入"));
+    protocol.receive(lifecycle(joined, "started")).unwrap();
+    let mut result = aborted_result(running);
+    result["user_message_uuid"] = json!(joined);
+    result["user_message_uuids"] = json!([running, joined]);
+    assert_joined_batch_failed(protocol.receive(result).unwrap());
+    assert!(
+        protocol
+            .receive(lifecycle(running, "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+}
+
+#[test]
+fn joined_api_error_after_deferred_abort_prevents_batch_cancellation() {
+    let (mut protocol, result, ack, cancelled) = joined_cancellation_frames();
+    protocol.receive(ack).unwrap();
+    assert!(protocol.receive(result).unwrap().events.is_empty());
+    let effects = protocol
+        .receive(json!({"type":"assistant", "uuid":"joined-api-error",
+        "user_message_uuid":Uuid::from_u128(10), "is_api_error_message":true,
+        "message":{"content":[{"type":"text","text":"Not logged in"}]}}))
+        .unwrap();
+    assert_eq!(
+        finished_events(effects),
+        vec![
+            RuntimeEventKind::TurnFinished {
+                turn_id: Uuid::from_u128(11).to_string(),
+                outcome: TurnOutcome::Failed {
+                    message: "Not logged in".into()
+                },
+                output: "Not logged in".into(),
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: Uuid::from_u128(10).to_string(),
+                outcome: TurnOutcome::Failed {
+                    message: "Not logged in".into()
+                },
+                output: "Not logged in".into(),
+            },
+        ]
+    );
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+}
+
+#[test]
+fn joined_cancellation_waits_for_a_result_covering_inputs_added_after_the_abort() {
+    let (mut protocol, result, ack, cancelled) = joined_cancellation_frames();
+    assert!(protocol.receive(result.clone()).unwrap().events.is_empty());
+    let later = Uuid::from_u128(13);
+    protocol.command(submit(later, "晚到的合并输入"));
+    protocol.receive(lifecycle(later, "started")).unwrap();
+    protocol.receive(ack).unwrap();
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+    assert!(protocol.turn_is_running(Uuid::from_u128(10)));
+    let mut complete_result = result;
+    complete_result["uuid"] = json!(Uuid::new_v4());
+    complete_result["user_message_uuid"] = json!(later);
+    complete_result["user_message_uuids"] =
+        json!([Uuid::from_u128(10), Uuid::from_u128(11), later,]);
+    assert_eq!(
+        finished_events(protocol.receive(complete_result).unwrap()),
+        vec![
+            RuntimeEventKind::TurnFinished {
+                turn_id: Uuid::from_u128(11).to_string(),
+                outcome: TurnOutcome::Cancelled,
+                output: String::new(),
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: later.to_string(),
+                outcome: TurnOutcome::Cancelled,
+                output: String::new(),
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: Uuid::from_u128(10).to_string(),
+                outcome: TurnOutcome::Cancelled,
+                output: String::new(),
+            },
+        ]
+    );
+}
+
+#[test]
+fn joined_cancellation_duplicate_and_old_callbacks_cannot_finish_a_new_execution() {
+    let (protocol, result, ack, cancelled) = joined_cancellation_frames();
+    let mut protocol =
+        assert_joined_cancellation_order(protocol, result.clone(), ack.clone(), cancelled.clone());
+    assert!(protocol.receive(result.clone()).unwrap().events.is_empty());
+    assert!(protocol.receive(ack).unwrap().events.is_empty());
+    assert!(protocol.receive(cancelled).unwrap().events.is_empty());
+    assert!(protocol.expire_cancellations().events.is_empty());
+
+    let next = Uuid::from_u128(13);
+    protocol.command(submit(next, "新的执行"));
+    protocol.receive(lifecycle(next, "started")).unwrap();
+    let mut old_result = result;
+    old_result["uuid"] = json!(Uuid::new_v4());
+    assert!(protocol.receive(old_result).unwrap().events.is_empty());
+    assert!(
+        protocol
+            .receive(lifecycle(Uuid::from_u128(11), "started"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert!(
+        protocol
+            .receive(lifecycle(Uuid::from_u128(10), "cancelled"))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert_eq!(protocol.active_turn, Some(next));
+    assert!(protocol.turn_is_running(next));
 }
 
 #[test]
@@ -775,7 +1315,7 @@ fn inherited_permissions_do_not_rewrite_cli_settings_or_pretend_to_be_a_sandbox(
 }
 
 #[test]
-fn text_preserves_utf8_multiline_and_unverified_images_and_steering_are_rejected() {
+fn text_preserves_utf8_multiline_and_invalid_images_and_steering_are_rejected() {
     let (mut protocol, turn_id) = running_protocol();
     let text = "中文🧪\nEnglish\n$(touch should-not-run)";
     let input = protocol.command(submit(Uuid::from_u128(12), text));
@@ -785,7 +1325,8 @@ fn text_preserves_utf8_multiline_and_unverified_images_and_steering_are_rejected
             vec![InputContent::LocalImage(
                 std::env::temp_dir().join("image.png")
             )],
-            None
+            None,
+            &options().state_dir.join("local-cli-attachments")
         )
         .is_err()
     );
@@ -973,7 +1514,8 @@ fn sdk_tool_calls_require_active_turn_and_single_bound_response() {
                 name: "review".into(),
                 path: std::env::temp_dir().join("SKILL.md")
             }],
-            None
+            None,
+            &options().state_dir.join("local-cli-attachments")
         )
         .is_err()
     );
@@ -1035,7 +1577,12 @@ fn captured_native_skill_arguments_replay_exactly_and_auth_failure_stays_failed(
     );
     assert_eq!(
         protocol.turns[&id].expected_replay,
-        native_user["message"]["content"].as_str().unwrap()
+        ExpectedReplay::Text(
+            native_user["message"]["content"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        )
     );
     let mut outcomes = Vec::new();
     for message in capture(&fixture)
@@ -1057,7 +1604,14 @@ fn captured_native_skill_arguments_replay_exactly_and_auth_failure_stays_failed(
         name: "review-local".into(),
         path,
     });
-    assert!(encode_input(multiple, protocol.skill_plugin.as_ref()).is_err());
+    assert!(
+        encode_input(
+            multiple,
+            protocol.skill_plugin.as_ref(),
+            &protocol.options.state_dir.join("local-cli-attachments")
+        )
+        .is_err()
+    );
     drop(protocol);
     assert!(!plugin_path.exists());
 }
@@ -1490,3 +2044,6 @@ fn runtime_mode_notification_invalidates_observation_without_finishing_any_turn(
         "default"
     );
 }
+
+#[path = "claude_image_tests.rs"]
+mod image_tests;

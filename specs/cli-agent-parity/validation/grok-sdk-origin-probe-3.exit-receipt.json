@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "generation": "65beee7e-d188-4971-80a1-d02c36913d7a",
+  "cleanup_confirmed": true,
+  "exit_reason": "stdio_closed",
+  "exit_code": 0,
+  "manifest_sha256": "592261084120e3d211cbb1494ea0b5ec9c0e4bcb7ac90437a8beb46191c9e124",
+  "source_sha256": "f995ef54ba33f0eae3010b3cc1cb4d1aa243bcff06ca02f66bacbc9ca1355733",
+  "manifest_contents_not_read": true,
+  "containment_details_omitted": true
+}

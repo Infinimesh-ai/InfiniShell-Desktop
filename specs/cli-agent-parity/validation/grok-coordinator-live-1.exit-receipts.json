@@ -1,0 +1,39 @@
+{
+  "scope": "safe_exit_receipt_projection",
+  "records": [
+    {
+      "runtime_generation": "018a035a-471a-4216-8e09-605bbe58952f",
+      "source": "/private/tmp/infinishell-grok-coordinator-qfp97wpr/home/Library/Application Support/dev.infinishell.InfiniShell/cli-agent-processes/018a035a-471a-4216-8e09-605bbe58952f/exit.json",
+      "source_bytes": 259,
+      "source_sha256": "606fec4d6b090dad56600b086857978894df234769c52d68cfc5048cff306d4e",
+      "source_mode": "0600",
+      "transformation": "explicit_safe_projection",
+      "projection": {
+        "version": 1,
+        "generation": "018a035a-471a-4216-8e09-605bbe58952f",
+        "cleanup_confirmed": true,
+        "containment": "macos_resource_coalition",
+        "exit_reason": "stdio_closed",
+        "exit_code": 0,
+        "manifest_sha256": "6bf23c5c15c3279ef8a5cee7c4790e72a5397d4e8a50789fb2fcc4bf1041dca9"
+      }
+    },
+    {
+      "runtime_generation": "5a445012-b8cc-4fae-8565-d972a2de4eb4",
+      "source": "/private/tmp/infinishell-grok-coordinator-qfp97wpr/home/Library/Application Support/dev.infinishell.InfiniShell/cli-agent-processes/5a445012-b8cc-4fae-8565-d972a2de4eb4/exit.json",
+      "source_bytes": 259,
+      "source_sha256": "404cbc55451735f47e388e7daf1500bcc8c9164624b29b0e2d63f6a54f96320a",
+      "source_mode": "0600",
+      "transformation": "explicit_safe_projection",
+      "projection": {
+        "version": 1,
+        "generation": "5a445012-b8cc-4fae-8565-d972a2de4eb4",
+        "cleanup_confirmed": true,
+        "containment": "macos_resource_coalition",
+        "exit_reason": "stdio_closed",
+        "exit_code": 0,
+        "manifest_sha256": "7809714116d390855c3a842e167503cb88d09105504f14d5f8112289d44f47c9"
+      }
+    }
+  ]
+}

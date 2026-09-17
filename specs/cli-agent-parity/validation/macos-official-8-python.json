@@ -1,0 +1,15 @@
+{
+  "source_manifest": "/tmp/infinishell-cli-parity-official-8-inputs.json",
+  "modules": [
+    "claude_adapter_runner_tests",
+    "claude_profile_runner_tests",
+    "claude_coordinator_runner_tests",
+    "codex_source_runner_tests",
+    "grok_adapter_runner_tests",
+    "grok_official_adapter_runner_tests",
+    "grok_sdk_origin_probe_runner_tests"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 3.176,
+  "log_sha256": "4507308fbc68436cff9fcefd9713d868bcba90d4ea4dad4c2924cd118b1f7a6e"
+}

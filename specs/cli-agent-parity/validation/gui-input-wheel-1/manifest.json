@@ -1,0 +1,152 @@
+{
+  "observed_at_utc": "2026-09-17T11:39:19.798279+00:00",
+  "scope": "38 文件中间 macOS 构建；既有断线任务的中英文 24 行输入框滚动、末行和父层裁剪；不计真实 CLI 模型／权限策略启动或最终干净提交平台验收",
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "source_files": 38,
+  "clean_commit": false,
+  "files": [
+    {
+      "path": "01-zh-before-wheel.jpg",
+      "sha256": "c7e9fad828219516fd81c6d4faef48310e697081846eedb617ba17b8e0cd8eb8",
+      "bytes": 125257
+    },
+    {
+      "path": "02-zh-after-inner-wheel.jpg",
+      "sha256": "4ad0b22eea04e7cbfa3086fbcaedfae6f43ba81dce29b5c80ec6463ec0a231e8",
+      "bytes": 127552
+    },
+    {
+      "path": "04-zh-last-line.jpg",
+      "sha256": "81364f5f07900b4d072249ea630762d9ad293fe4052bcf9d4143100e59666f48",
+      "bytes": 128670
+    },
+    {
+      "path": "05-zh-cleared.jpg",
+      "sha256": "fadfdde66ff3dc310a375ce3ba788904d179c029129d690e86ad0c7861e21a6c",
+      "bytes": 101531
+    },
+    {
+      "path": "06-en-task-header.jpg",
+      "sha256": "83581f18bedefc07df0a78a43481882676e34bf623c1b7f248109a4a62bfebc3",
+      "bytes": 113144
+    },
+    {
+      "path": "07-en-selected-task-header.jpg",
+      "sha256": "cdfb6236b56b463217cb245c2ea21971e18582366023358c4f94b8d6fff5d851",
+      "bytes": 112953
+    },
+    {
+      "path": "08-en-before-wheel.jpg",
+      "sha256": "981d8b04738293c9ff158778dd7482d5ccf8bccb019db86b53721a28c6ea507d",
+      "bytes": 128932
+    },
+    {
+      "path": "09-en-after-inner-wheel.jpg",
+      "sha256": "01970d259a329889f1ff98fdf82c0d486f0672b48f8058a4524f194604c241dd",
+      "bytes": 131285
+    },
+    {
+      "path": "10-en-last-line.jpg",
+      "sha256": "f42fa4afb93809afa81a7fc72fcb3bd4f90c0e653eae7431fc71da1feb1f70a8",
+      "bytes": 131295
+    },
+    {
+      "path": "12-en-partially-above.jpg",
+      "sha256": "31f13d250f11833d2ac0fc4643ec37b659522fb37559c45ab3ba4cb03d0d6a31",
+      "bytes": 140970
+    },
+    {
+      "path": "13-en-fully-above.jpg",
+      "sha256": "7e2bd7e5a7458f4d5529e05b1ab62cbd3988919d72ed43929f156f4096cb8dd9",
+      "bytes": 150033
+    },
+    {
+      "path": "15-en-fully-below.jpg",
+      "sha256": "1b35d8143c94678b1b14fc8fc6b457cdc47b4f2bd4ebd2aa26ef6a499129dd07",
+      "bytes": 148736
+    },
+    {
+      "path": "16-en-cleared.jpg",
+      "sha256": "6e43614c1e6460e5077b8b156e97a43819ac7243246c691bfabdbcd1f4a24a0f",
+      "bytes": 113379
+    },
+    {
+      "path": "17-zh-partial.jpg",
+      "sha256": "a3c20a62202051fa32667b4c142e2bec5891fa682822cb467a2cfa7b7a8760cc",
+      "bytes": 122496
+    },
+    {
+      "path": "18-zh-fully-above.jpg",
+      "sha256": "0549019a328b7e5af62cffb8a939277ad7c350c75b5b90f67c6b6ecc27f14cfa",
+      "bytes": 143652
+    },
+    {
+      "path": "19-zh-fully-below.jpg",
+      "sha256": "86fe9bb9708c6b0a387be5a5e31158148a804a8d2ec31fad4557cd39d680eb91",
+      "bytes": 126722
+    },
+    {
+      "path": "archive-origins.json",
+      "sha256": "95e417a9f8d7733ba6e4c85fd6046f8646fd540788d0bc1c1ab317071dc9f891",
+      "bytes": 6179
+    },
+    {
+      "path": "baseline-task-state.json",
+      "sha256": "eb973fa3d30220dc889c331f4c80cf2b3f918602ae8cac4bdef60205bba540b2",
+      "bytes": 901
+    },
+    {
+      "path": "binary-verification.json",
+      "sha256": "b09a0033c20ee27f908461902e8f31fcc6c6939b9d714e385b913cc07b61eeed",
+      "bytes": 1427
+    },
+    {
+      "path": "bundle.json",
+      "sha256": "d750a58505f95485adb62d62ec1aa9a8f188fd4088b9acee02e83e8650216500",
+      "bytes": 7404
+    },
+    {
+      "path": "gates.json",
+      "sha256": "a8c09eaa2adc990dd50de7299ad93324a6da8871892b9822550236f06968030d",
+      "bytes": 2179
+    },
+    {
+      "path": "gui-app-projection.json",
+      "sha256": "94e0a8cb72ef2bd894bc6267397d75b220d49be7173df67797c7e29b003b2b9d",
+      "bytes": 6960
+    },
+    {
+      "path": "privacy-json-scan.json",
+      "sha256": "3c5050cfafe7bbb02345d28575640d03f128cd50dc6fe8eae23627951546e122",
+      "bytes": 584
+    },
+    {
+      "path": "privacy-ocr-scan.json",
+      "sha256": "f8bacbd14f648be16e1d27d004313ace76568070a96562b71adeec0ba164e688",
+      "bytes": 5206
+    },
+    {
+      "path": "source-inputs.json",
+      "sha256": "5f6f6cf2f5014ec59dc0439282ffeb241bebb97c7fde317c3f4b7f1810337d86",
+      "bytes": 6288
+    },
+    {
+      "path": "task-comparison.json",
+      "sha256": "93bca88aa2aff6d62cd1f51fb90138d81512349e6e62fa8310a9f38cdababd7f",
+      "bytes": 675
+    },
+    {
+      "path": "task-state.json",
+      "sha256": "026717c933c4c2e0be3bb9690f4d7bf395923fc230a474c579408b5d4a232370",
+      "bytes": 455
+    }
+  ],
+  "report": {
+    "path": "../../GUI_INPUT_WHEEL.md",
+    "sha256": "72ebfb1dd3da1c40b57297e34bfc64654d9490afafc71805ae016c32cbaffe86"
+  },
+  "original_screenshots": 16,
+  "original_byte_copy_pairs": 21,
+  "credential_values_recorded": false,
+  "ocr_full_text_recorded": false
+}

@@ -1,0 +1,491 @@
+{
+  "passed": true,
+  "scope": "unauthenticated_fixed_acp_boundaries",
+  "cases": [
+    {
+      "method": "initialize",
+      "request_id": "25f74fa4-3715-486e-ac19-137fb0f5b234:initialize",
+      "status": "passed",
+      "protocol_version": 1,
+      "agent_version": "1.0.30",
+      "auth_method_ids": [
+        "grok.com"
+      ],
+      "reported_capabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {},
+        "_meta": {
+          "x.ai/fs_notify": true,
+          "x.ai/hooks": {
+            "blockingEvents": [
+              "pre_tool_use",
+              "stop",
+              "subagent_stop"
+            ],
+            "decisions": [
+              "deny",
+              "block"
+            ],
+            "stopSignals": [
+              "continue",
+              "stopReason",
+              "additionalContext"
+            ]
+          },
+          "x.ai/capabilities": {
+            "toolOverrides": {
+              "x_keyword_search": true,
+              "x_semantic_search": true,
+              "x_user_search": false,
+              "x_thread_fetch": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "session/new",
+      "request_id": "25f74fa4-3715-486e-ac19-137fb0f5b234:new",
+      "status": "blocked_by_auth",
+      "error": {
+        "code": -32000,
+        "message": "Authentication required",
+        "data": "no auth method id provided"
+      },
+      "session_created": false
+    },
+    {
+      "method": "session/cancel",
+      "request_id": null,
+      "status": "notification_sent_without_ack",
+      "session_exists": false,
+      "active_turn_exists": false,
+      "running_turn_cancelled": false
+    },
+    {
+      "method": "session/load",
+      "request_id": "25f74fa4-3715-486e-ac19-137fb0f5b234:load",
+      "status": "missing_session_rejected",
+      "error": {
+        "code": -32603,
+        "message": "Path not found.",
+        "data": {
+          "detail": "No such file or directory (os error 2)",
+          "code": "FS_NOT_FOUND"
+        }
+      },
+      "history_restored": false
+    },
+    {
+      "method": "session/resume",
+      "request_id": "25f74fa4-3715-486e-ac19-137fb0f5b234:resume",
+      "status": "missing_session_rejected",
+      "error": {
+        "code": -32603,
+        "message": "Path not found.",
+        "data": {
+          "detail": "No such file or directory (os error 2)",
+          "code": "FS_NOT_FOUND"
+        }
+      },
+      "history_restored": false
+    }
+  ],
+  "credentials_provided": false,
+  "authenticate_sent": false,
+  "model_input_submitted": false,
+  "running_approval_verified": false,
+  "running_cancel_verified": false,
+  "history_recovery_verified": false,
+  "model_http_traffic_measured": false,
+  "repository_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "worktree_dirty": false,
+  "binary": {
+    "platform": "linux-x64",
+    "artifact": "grok-1.0.30-linux-x86_64",
+    "binary": "grok",
+    "bytes": 161725088,
+    "sha256": "504dd6546ab991b75d36698242875ce461489cd1f8cd84285873cb55bd5c7d54",
+    "url": "https://x.ai/cli/grok-1.0.30-linux-x86_64",
+    "format": "elf64-x86-64"
+  },
+  "cli_version": "grok 1.0.30 (04b7ffed98c6)",
+  "endpoint": {
+    "kind": "unix_socket",
+    "path": "<isolated-probe>/leader.sock",
+    "inherited": false
+  },
+  "leader_pid": 3667140,
+  "phase": "complete",
+  "leader_identity_read_mode": "regular_read",
+  "stdio_pid": 3667173,
+  "private_leader_pid_confirmed": true,
+  "stdio_eof": {
+    "alive_before_stdin_eof": true,
+    "stdin_eof_exited_within_5s": true,
+    "exit_code_before_cleanup": 0,
+    "eof_elapsed_ms": 2120
+  },
+  "leader_after_stdio_eof": {
+    "exited_within_5s": false,
+    "exit_code_before_cleanup": null,
+    "elapsed_ms": 5000
+  },
+  "stdio_events": [
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "25f74fa4-3715-486e-ac19-137fb0f5b234:initialize",
+        "method": "initialize",
+        "params": {
+          "protocolVersion": 1,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": false,
+              "writeTextFile": false
+            },
+            "terminal": false
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "25f74fa4-3715-486e-ac19-137fb0f5b234:initialize",
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "promptCapabilities": {
+              "image": false,
+              "audio": false,
+              "embeddedContext": true
+            },
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "sessionCapabilities": {
+              "list": {},
+              "resume": {},
+              "close": {}
+            },
+            "auth": {},
+            "_meta": {
+              "x.ai/fs_notify": true,
+              "x.ai/hooks": {
+                "blockingEvents": [
+                  "pre_tool_use",
+                  "stop",
+                  "subagent_stop"
+                ],
+                "decisions": [
+                  "deny",
+                  "block"
+                ],
+                "stopSignals": [
+                  "continue",
+                  "stopReason",
+                  "additionalContext"
+                ]
+              },
+              "x.ai/capabilities": {
+                "toolOverrides": {
+                  "x_keyword_search": true,
+                  "x_semantic_search": true,
+                  "x_user_search": false,
+                  "x_thread_fetch": false
+                }
+              }
+            }
+          },
+          "authMethods": [
+            {
+              "id": "grok.com",
+              "name": "Grok",
+              "description": "Sign in with Grok"
+            }
+          ],
+          "_meta": {
+            "grokShell": true,
+            "defaultAuthMethodId": null,
+            "x.ai/mcp/sdk": true,
+            "x.ai/pluginDirs": true,
+            "currentWorkingDirectory": "<isolated-probe>/project",
+            "agentVersion": "1.0.30",
+            "agentId": "<redacted>",
+            "agentInstanceId": "<redacted>",
+            "hostname": "<redacted>",
+            "modelState": {
+              "currentModelId": "grok-4.6",
+              "availableModels": [
+                {
+                  "modelId": "grok-4.6",
+                  "name": "Grok 4.6",
+                  "description": "SpaceXAI's latest frontier model",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "xhigh",
+                        "value": "xhigh",
+                        "label": "Extra High Effort",
+                        "description": "Highest effort and reasoning level",
+                        "default": false
+                      },
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Higher implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "modelId": "grok-4.5",
+                  "name": "Grok 4.5",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Highest implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "mcpServers": [],
+            "mcpApps": false,
+            "metadata": null,
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              }
+            ],
+            "cancelRewind": true,
+            "sessionRecap": true,
+            "feedbackTraceOffer": false,
+            "voiceMode": true
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "25f74fa4-3715-486e-ac19-137fb0f5b234:new",
+        "method": "session/new",
+        "params": {
+          "cwd": "<isolated-probe>/project",
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/servers_updated",
+        "params": {
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "25f74fa4-3715-486e-ac19-137fb0f5b234:new",
+        "error": {
+          "code": -32000,
+          "message": "Authentication required",
+          "data": "no auth method id provided"
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/cancel",
+        "params": {
+          "sessionId": "00000000-0000-4000-8000-000000000000"
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "25f74fa4-3715-486e-ac19-137fb0f5b234:load",
+        "method": "session/load",
+        "params": {
+          "cwd": "<isolated-probe>/project",
+          "mcpServers": [],
+          "sessionId": "00000000-0000-4000-8000-000000000000"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "25f74fa4-3715-486e-ac19-137fb0f5b234:load",
+        "error": {
+          "code": -32603,
+          "message": "Path not found.",
+          "data": {
+            "detail": "No such file or directory (os error 2)",
+            "code": "FS_NOT_FOUND"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "25f74fa4-3715-486e-ac19-137fb0f5b234:resume",
+        "method": "session/resume",
+        "params": {
+          "cwd": "<isolated-probe>/project",
+          "mcpServers": [],
+          "sessionId": "00000000-0000-4000-8000-000000000000"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": "25f74fa4-3715-486e-ac19-137fb0f5b234:resume",
+        "error": {
+          "code": -32603,
+          "message": "Path not found.",
+          "data": {
+            "detail": "No such file or directory (os error 2)",
+            "code": "FS_NOT_FOUND"
+          }
+        }
+      }
+    }
+  ],
+  "leader_events": [],
+  "cleanup": {
+    "stdio": {
+      "forced_termination": false,
+      "exit_code": 0,
+      "owned_process_exited": true
+    },
+    "leader": {
+      "forced_termination": true,
+      "exit_code": -9,
+      "owned_process_exited": true
+    }
+  },
+  "endpoint_file_remaining": true,
+  "leader_lock_file_remaining": true,
+  "binary_unchanged": true,
+  "private_directory_removed": true
+}

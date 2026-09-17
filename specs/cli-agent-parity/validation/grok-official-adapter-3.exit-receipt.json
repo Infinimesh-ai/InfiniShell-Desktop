@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "generation": "78e088f7-a1f5-4b54-8e82-fbd73ab28421",
+  "cleanup_confirmed": true,
+  "containment": "macos_resource_coalition",
+  "exit_reason": "stop_requested",
+  "exit_code": 0,
+  "manifest_sha256": "79f251557d61c720522f8c219bcc74264c54e0e90b5666a7a0d8d079cccf589d"
+}

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "generation": "65beee7e-d188-4971-80a1-d02c36913d7a",
+  "claim_sha256": "5f3e7959a1211d00296ea09435516fe61cfc671ce2472ca167bb4df34a1c7fce",
+  "native_sha256": "25f2cfe763f0cd530668f27f4107ffb5c595f416b644d5825624795b1fd09eea",
+  "job_removed": true,
+  "resource_cid_destroyed": true,
+  "native_wait_status": 0,
+  "execution_failed": false,
+  "source_sha256": "5d5bf623d206d7543624da2bdfed0d5339e5367b71b7f05af06f74ffd85020da"
+}

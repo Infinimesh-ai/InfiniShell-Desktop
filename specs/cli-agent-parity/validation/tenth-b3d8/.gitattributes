@@ -1,0 +1,3 @@
+* -text whitespace=cr-at-eol
+*.bin -diff
+*.test-output.txt whitespace=cr-at-eol,-blank-at-eof

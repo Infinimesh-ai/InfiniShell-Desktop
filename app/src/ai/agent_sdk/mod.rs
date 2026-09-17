@@ -153,9 +153,10 @@ fn run_agent(
                 return Err(anyhow::anyhow!("unexpected argument '--harness' found"));
             }
             if args.harness == Harness::OpenCode {
-                return Err(anyhow::anyhow!(
-                    "The opencode harness is only supported for local child agent launches."
-                ));
+                return Err(anyhow::anyhow!(crate::t!(
+                    "cli-agent-standalone-harness-unavailable",
+                    cli = args.harness.to_string()
+                )));
             }
 
             // Start the agent driver runner, which will handle the rest of the setup steps
@@ -386,8 +387,9 @@ impl AgentDriverRunner {
                 HarnessKind::Unsupported(harness) => {
                     return Err(AgentDriverError::HarnessSetupFailed {
                         harness: harness.to_string(),
-                        reason: format!(
-                            "The {harness} harness is only supported for local child agent launches."
+                        reason: crate::t!(
+                            "cli-agent-standalone-harness-unavailable",
+                            cli = harness.to_string()
                         ),
                     });
                 }

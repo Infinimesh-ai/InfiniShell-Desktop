@@ -31,7 +31,7 @@ fn can_auto_install_is_false_without_codex_plugin() {
 #[cfg(windows)]
 #[test]
 #[serial_test::serial]
-fn windows_rev4_cannot_infer_native_trust_from_the_unix_contract() {
+fn windows_incomplete_plugin_tree_stays_unknown_and_auto_install_remains_disabled() {
     let _guard = FeatureFlag::CodexPlugin.override_enabled(true);
     let home = tempfile::tempdir().unwrap();
     write_plugin_config(home.path(), super::PLUGIN_KEY, true);

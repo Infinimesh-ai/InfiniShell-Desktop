@@ -1,0 +1,166 @@
+{
+  "scope": "仅保留原生诊断事件类型、键集合及已知写入工具成功状态；不是 stdout JSON-RPC 帧",
+  "credential_values_recorded": false,
+  "leader_log_sha256": "9ec5bcd51d47bb4f47c180a2ea5e4e1f98c3cf5547cb07d43f76c204aee13a72",
+  "unified_log_sha256": "f450c7a2702500221edac92dd95e77d56b48774f9296b573e9af0faa1b6079f4",
+  "leader_level_counts": {
+    "INFO": 95,
+    "WARN": 6
+  },
+  "events": [
+    {
+      "line": 103,
+      "event": "shell.turn.inference_start",
+      "source": "shell",
+      "level": "info",
+      "event_keys": [
+        "ts",
+        "src",
+        "pid",
+        "ver",
+        "lvl",
+        "sid",
+        "msg",
+        "ctx"
+      ],
+      "context_keys": [
+        "loop_index",
+        "elapsed_since_turn_start_ms",
+        "transient_retry_attempts"
+      ]
+    },
+    {
+      "line": 105,
+      "event": "shell.turn.inference_done",
+      "source": "shell",
+      "level": "info",
+      "event_keys": [
+        "ts",
+        "src",
+        "pid",
+        "ver",
+        "lvl",
+        "sid",
+        "msg",
+        "ctx"
+      ],
+      "context_keys": [
+        "loop_index",
+        "model_elapsed_ms",
+        "elapsed_since_turn_start_ms",
+        "ttft_ms",
+        "itl_p50_ms",
+        "attempts",
+        "prompt_tokens",
+        "cached_prompt_tokens",
+        "completion_tokens",
+        "reasoning_tokens",
+        "tokens_per_sec"
+      ]
+    },
+    {
+      "line": 106,
+      "event": "shell.tool.exec_done",
+      "source": "shell",
+      "level": "info",
+      "event_keys": [
+        "ts",
+        "src",
+        "pid",
+        "ver",
+        "lvl",
+        "sid",
+        "msg",
+        "ctx"
+      ],
+      "context_keys": [
+        "tool_name",
+        "tool_call_id",
+        "elapsed_ms",
+        "success",
+        "outcome"
+      ],
+      "tool_name": "write",
+      "tool_call_id": "call-3344a7cc-93af-432d-8d66-6e8481e952dc-0",
+      "success": true,
+      "outcome": "success"
+    },
+    {
+      "line": 108,
+      "event": "shell.turn.inference_start",
+      "source": "shell",
+      "level": "info",
+      "event_keys": [
+        "ts",
+        "src",
+        "pid",
+        "ver",
+        "lvl",
+        "sid",
+        "msg",
+        "ctx"
+      ],
+      "context_keys": [
+        "loop_index",
+        "elapsed_since_turn_start_ms",
+        "transient_retry_attempts"
+      ]
+    },
+    {
+      "line": 109,
+      "event": "leader.client.disconnected",
+      "source": "shell",
+      "level": "info",
+      "event_keys": [
+        "ts",
+        "src",
+        "pid",
+        "ver",
+        "lvl",
+        "msg",
+        "ctx"
+      ],
+      "context_keys": [
+        "client_id"
+      ]
+    },
+    {
+      "line": 110,
+      "event": "shell.turn.inference_done",
+      "source": "shell",
+      "level": "info",
+      "event_keys": [
+        "ts",
+        "src",
+        "pid",
+        "ver",
+        "lvl",
+        "sid",
+        "msg",
+        "ctx"
+      ],
+      "context_keys": [
+        "loop_index",
+        "model_elapsed_ms",
+        "elapsed_since_turn_start_ms",
+        "ttft_ms",
+        "itl_p50_ms",
+        "attempts",
+        "prompt_tokens",
+        "cached_prompt_tokens",
+        "completion_tokens",
+        "reasoning_tokens",
+        "tokens_per_sec"
+      ]
+    }
+  ],
+  "leader_disconnect_markers": {
+    "client_disconnected": true,
+    "kept_session_resident_live_work": true
+  },
+  "auxiliary_warning_summary": [
+    "api.x.ai tokenize-text 请求失败。",
+    "标题生成出现 404 并降级；两轮正文仍真实完成。"
+  ],
+  "limits": "无 ERROR/panic 日志不是完整的无崩溃证明；客户端断线与被保留的原始 transport 错误需由后续复验关联。拒绝 origin 的旧事件未记录域名，不能把所有拒绝解释为遥测。"
+}

@@ -1,0 +1,18 @@
+{"event": "acceptance_started", "native_credential_files_read_or_copied": false, "permission_policy": "ClaudeRestrictedFilesV1", "scope": "claude_restricted_files_process_restart"}
+{"event": "profile_verified", "filesystem_sandbox_verified": false, "fixed_profile_verified": true, "native_session_id": null, "permission_mode": "plan", "profile_sha256": "31ba6cfa9871612a97a3314aeaadcd29d041130a09aeb86244f62cbdf5ee2be2"}
+{"event": "phase_started", "message_id": "2fc26e2d-a323-42a2-ab6a-8dc6b5e508d5", "phase": "first_turn"}
+{"event": "message_accepted", "message_id": "2fc26e2d-a323-42a2-ab6a-8dc6b5e508d5", "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "phase": "first_turn", "turn_id": "2fc26e2d-a323-42a2-ab6a-8dc6b5e508d5"}
+{"event": "turn_started", "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "phase": "first_turn", "turn_id": "2fc26e2d-a323-42a2-ab6a-8dc6b5e508d5"}
+{"event": "profile_verified", "filesystem_sandbox_verified": false, "fixed_profile_verified": true, "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "permission_mode": "plan", "profile_sha256": "31ba6cfa9871612a97a3314aeaadcd29d041130a09aeb86244f62cbdf5ee2be2"}
+{"event": "turn_finished", "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "outcome": "Completed", "output": "PROFILE_ONE", "phase": "first_turn", "turn_id": "2fc26e2d-a323-42a2-ab6a-8dc6b5e508d5"}
+{"event": "phase_started", "message_id": "f4d9c3ee-69ad-4ac1-83a3-a6e1c35565e7", "phase": "second_turn"}
+{"event": "message_accepted", "message_id": "f4d9c3ee-69ad-4ac1-83a3-a6e1c35565e7", "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "phase": "second_turn", "turn_id": "f4d9c3ee-69ad-4ac1-83a3-a6e1c35565e7"}
+{"event": "turn_started", "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "phase": "second_turn", "turn_id": "f4d9c3ee-69ad-4ac1-83a3-a6e1c35565e7"}
+{"event": "profile_verified", "filesystem_sandbox_verified": false, "fixed_profile_verified": true, "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "permission_mode": "plan", "profile_sha256": "31ba6cfa9871612a97a3314aeaadcd29d041130a09aeb86244f62cbdf5ee2be2"}
+{"event": "turn_finished", "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "outcome": "Completed", "output": "PROFILE_TWO", "phase": "second_turn", "turn_id": "f4d9c3ee-69ad-4ac1-83a3-a6e1c35565e7"}
+{"event": "phase_started", "message_id": "0144b6e3-c254-45a7-be90-04e1a8f634db", "phase": "edit_allow"}
+{"event": "message_accepted", "message_id": "0144b6e3-c254-45a7-be90-04e1a8f634db", "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "phase": "edit_allow", "turn_id": "0144b6e3-c254-45a7-be90-04e1a8f634db"}
+{"event": "turn_started", "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "phase": "edit_allow", "turn_id": "0144b6e3-c254-45a7-be90-04e1a8f634db"}
+{"event": "profile_verified", "filesystem_sandbox_verified": false, "fixed_profile_verified": true, "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "permission_mode": "plan", "profile_sha256": "31ba6cfa9871612a97a3314aeaadcd29d041130a09aeb86244f62cbdf5ee2be2"}
+{"event": "turn_finished", "native_session_id": "9ee3768b-de79-408b-be8d-5717d3a84d3d", "outcome": "Completed", "output": "EDIT_DENIED", "phase": "edit_allow", "turn_id": "0144b6e3-c254-45a7-be90-04e1a8f634db"}
+{"event": "acceptance_failed", "reason": "固定策略回合未返回关联的预期完成结果"}

@@ -1,0 +1,132 @@
+{
+  "credential_pattern_hits": {
+    "bearer_token": 0,
+    "credential_assignment": 0,
+    "jwt": 0,
+    "private_api_endpoint": 0,
+    "private_api_file": 0,
+    "private_key": 0,
+    "provider_key": 0
+  },
+  "files": [
+    {
+      "credential_pattern_hits": {
+        "bearer_token": 0,
+        "credential_assignment": 0,
+        "jwt": 0,
+        "private_api_endpoint": 0,
+        "private_api_file": 0,
+        "private_key": 0,
+        "provider_key": 0
+      },
+      "file": "en-config-rejection.json"
+    },
+    {
+      "credential_pattern_hits": {
+        "bearer_token": 0,
+        "credential_assignment": 0,
+        "jwt": 0,
+        "private_api_endpoint": 0,
+        "private_api_file": 0,
+        "private_key": 0,
+        "provider_key": 0
+      },
+      "file": "manifest.safe.json"
+    },
+    {
+      "credential_pattern_hits": {
+        "bearer_token": 0,
+        "credential_assignment": 0,
+        "jwt": 0,
+        "private_api_endpoint": 0,
+        "private_api_file": 0,
+        "private_key": 0,
+        "provider_key": 0
+      },
+      "file": "native-receipts.json"
+    },
+    {
+      "credential_pattern_hits": {
+        "bearer_token": 0,
+        "credential_assignment": 0,
+        "jwt": 0,
+        "private_api_endpoint": 0,
+        "private_api_file": 0,
+        "private_key": 0,
+        "provider_key": 0
+      },
+      "file": "privacy-ocr-scan.json"
+    },
+    {
+      "credential_pattern_hits": {
+        "bearer_token": 0,
+        "credential_assignment": 0,
+        "jwt": 0,
+        "private_api_endpoint": 0,
+        "private_api_file": 0,
+        "private_key": 0,
+        "provider_key": 0
+      },
+      "file": "restart-after-new-input.json"
+    },
+    {
+      "credential_pattern_hits": {
+        "bearer_token": 0,
+        "credential_assignment": 0,
+        "jwt": 0,
+        "private_api_endpoint": 0,
+        "private_api_file": 0,
+        "private_key": 0,
+        "provider_key": 0
+      },
+      "file": "restart-before-new-input.json"
+    },
+    {
+      "credential_pattern_hits": {
+        "bearer_token": 0,
+        "credential_assignment": 0,
+        "jwt": 0,
+        "private_api_endpoint": 0,
+        "private_api_file": 0,
+        "private_key": 0,
+        "provider_key": 0
+      },
+      "file": "zh-config-rejection.json"
+    },
+    {
+      "credential_pattern_hits": {
+        "bearer_token": 0,
+        "credential_assignment": 0,
+        "jwt": 0,
+        "private_api_endpoint": 0,
+        "private_api_file": 0,
+        "private_key": 0,
+        "provider_key": 0
+      },
+      "file": "zh-deny-queued-after.json"
+    },
+    {
+      "credential_pattern_hits": {
+        "bearer_token": 0,
+        "credential_assignment": 0,
+        "jwt": 0,
+        "private_api_endpoint": 0,
+        "private_api_file": 0,
+        "private_key": 0,
+        "provider_key": 0
+      },
+      "file": "zh-deny-queued-joined-inputs.json"
+    }
+  ],
+  "method": "UTF-8 JSON 在内存中扫描七类定向凭据签名；只归档方法、文件名与命中数，不归档命中或 OCR 全文。",
+  "pattern_labels": [
+    "bearer_token",
+    "credential_assignment",
+    "jwt",
+    "private_api_endpoint",
+    "private_api_file",
+    "private_key",
+    "provider_key"
+  ],
+  "targeted_zero_hits_is_not_universal_secret_detection": true
+}

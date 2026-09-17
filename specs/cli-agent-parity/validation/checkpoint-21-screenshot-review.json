@@ -1,0 +1,1014 @@
+{
+  "scope": "existing_authorized_gui_screenshot_privacy_review",
+  "source_ocr_report_sha256": "15232f3b6908c02f98fc75afad01913df2d70b101775491cba0a0294d8cec44e",
+  "local_ocr_engine": "macOS Vision accurate en-US/zh-Hans",
+  "screenshots": [
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/01-en-reloaded-task-list.jpg",
+      "bytes": 112426,
+      "sha256": "41bc7d1267bd12f8653fbfc0658ea8fc0fa0099169c3d2c7cff01f4640f1729e",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/02-en-permissions-collapsed.jpg",
+      "bytes": 128277,
+      "sha256": "45fb2289d267d5143a99205ecb43825bc966d6d73e9fdae6672caaf6b6a7a227",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/03-en-permissions-expanded.jpg",
+      "bytes": 111333,
+      "sha256": "6ccc0fe831e56e373c6df576e01a0806c82e1ecd0b5419ef1f77b007525feaef",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/04-en-restored-failure-and-result.jpg",
+      "bytes": 91593,
+      "sha256": "0a6eed486b778941c73a277077c177d77a33b24b3d4c87e9551bcae23e36d3c9",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/05-en-restart-new-input-completed.jpg",
+      "bytes": 113821,
+      "sha256": "c7fa8dc7ac97ae189706ceac0ba69a6d6703a274481456562dcd3d359d8670bd",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/06-zh-reloaded-task-list.jpg",
+      "bytes": 102963,
+      "sha256": "105b633ea028d15ede458716e7be687c874931be5d59a5d471b7a2c95c8476bd",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/07-zh-permissions-collapsed.jpg",
+      "bytes": 122085,
+      "sha256": "9a91712c748b9425837da2c9f9e77390ed5cc971e64b4ce3b3e185283f3412e1",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/08-zh-permissions-expanded.jpg",
+      "bytes": 101068,
+      "sha256": "92f509e31be36c47f8b2f2a84242480fdb03a0361603acff6af8964c8ac09e8b",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/09-zh-restored-result.jpg",
+      "bytes": 86203,
+      "sha256": "bcb3250b016656e5ed1788b0fd1a66805b1118923d05c0785faf08c5d1228a08",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/10-zh-approval-request.jpg",
+      "bytes": 107822,
+      "sha256": "ef77b1c570368c6f8ccc5ffa56ee19ee0b44cc8c8b030eb69d0c5d8cf0390dee",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/11-zh-queue-help.jpg",
+      "bytes": 99642,
+      "sha256": "41b105361276930160d4a2a443a264a2448250b6c4d100f201f69936759695bc",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/12-zh-denial-and-queued-result.jpg",
+      "bytes": 85654,
+      "sha256": "a1bc2d5d4a46598c8b445306d69165981d6f3cfd15dce795eb37744494fe56b1",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/13-zh-config-rejection.jpg",
+      "bytes": 100795,
+      "sha256": "6448b0d79854c56c0caeca9fdcb9d5a0e695ff0b43aeb78dacfff3004acb1e6f",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/claude-gui-runtime-chain-source8/screenshots/14-en-config-rejection.jpg",
+      "bytes": 113876,
+      "sha256": "1f137e6cd48d48405c717a919a8cbc1088a8c6568ec2c9b5a538181144db35d4",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-01-en-picker.jpg",
+      "bytes": 108867,
+      "sha256": "6f01490ad18b867642dea27329a5cf2780490e74d03e23511b723ea1ea73f768",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-02-en-new-draft.jpg",
+      "bytes": 104531,
+      "sha256": "d3448d507e4fde163a3a8e536b7c3953bca404bf0df40fd3cb002f76847501f8",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-03-en-draft-corrected.jpg",
+      "bytes": 104979,
+      "sha256": "d32c40b05328650c03b850983666a0af1aa5a7bad48adb514bfa1228bf3e8e62",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-04-en-start.jpg",
+      "bytes": 106686,
+      "sha256": "dbe335bdd356c9ed87f5df624bfe21aa025e9885eebb2d53f85bc3e3247ebf03",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-05-en-first-result.jpg",
+      "bytes": 120724,
+      "sha256": "01584133063ae12de6906581049ca43a9aed1dbeeb424f03b88228ec7cb77c3b",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-06-en-chinese-multiline-draft.jpg",
+      "bytes": 91077,
+      "sha256": "40770010146af6d80e507e4265a5ad498af5ddb17feaca056e5790162273bd4c",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-07-en-second-result.jpg",
+      "bytes": 88417,
+      "sha256": "341225af7cb09d7ca980fb69c58f561695049cee0dc23cf5119925ff7d54ddfe",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-08-en-approval-request.jpg",
+      "bytes": 98549,
+      "sha256": "cebd21a82b9a7691eb9c1b7f34165535f8ce036dd2f53a40760bea007ddf5d51",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-09-en-approval-full.jpg",
+      "bytes": 98563,
+      "sha256": "5e66e6593a789e7a3925a46ccaf5b94bab5a7d2d525892484e616d77e72358dc",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-10-en-approval-tool.jpg",
+      "bytes": 83661,
+      "sha256": "8a61a15bab9c25f7568bd5a17e6d412d77cd76bae1c2085e6d1e2b456b966aee",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-11-en-approval-exact.jpg",
+      "bytes": 93255,
+      "sha256": "d92db9b821b7ba85036146303bb5eec34257160271ab2a93def61a83381b893d",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-12-en-allow-once.jpg",
+      "bytes": 97746,
+      "sha256": "0c954d861d2bf1ea3874fe9a2f359008e3dd63ab8063a6c2c095604e60ca33a3",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-13-en-allow-result.jpg",
+      "bytes": 90673,
+      "sha256": "f41796084041b516aba54d17795df52a5a54a5f4f1045885aa4b60dfa657062d",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-14-en-deny-approval.jpg",
+      "bytes": 98011,
+      "sha256": "af12c67434a8dfa6da84934bbc0c8c9c0ac411684ad946d3264fd146c5c82179",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-15-en-deny-exact.jpg",
+      "bytes": 97958,
+      "sha256": "239c0af0f26dfeaabf105836f233611b6c7319b0b372af9b0c661f75c3babfb7",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-16-en-deny-once.jpg",
+      "bytes": 97814,
+      "sha256": "87e9b3c9e9cd95e81341c4019c93e468210074f3b28d917c5d0bda5a3f851417",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-17-en-deny-result.jpg",
+      "bytes": 90114,
+      "sha256": "5a3911164c08fd63af785c5d7f012820a6ee6f38d0e05d6954ec82b6bab0e63b",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-18-en-queue-draft.jpg",
+      "bytes": 122507,
+      "sha256": "8ca690592f255e8d885f370a7468428ae769dc1da856c9963687411c9667e7d6",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-19-en-queue-ack.jpg",
+      "bytes": 134173,
+      "sha256": "91210915a1bbdbce7115fb7dec240e9ff467148da1a8782a54c50ca00de1a29e",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-20-en-queue-receipt.jpg",
+      "bytes": 123989,
+      "sha256": "1c58fd58208c1e0618ee92dc036535287ba03553542762bd35fc0052f0d44258",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-21-en-queue-result.jpg",
+      "bytes": 88505,
+      "sha256": "6d94ebe610dca3b85c00d89f286512816d243cfe23dcab4d65b192000ddc6a92",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-22-en-cancel-live-output.jpg",
+      "bytes": 111765,
+      "sha256": "ea08e6902e78b9c90c357161f330899d52356be21bae41065732d1d7516ece30",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-23-en-cancel-request.jpg",
+      "bytes": 98462,
+      "sha256": "876d462c61dcdab40df7b660d20c87de8f4825a4879319843f86049b0d2626af",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-24-en-after-cancel-draft.jpg",
+      "bytes": 104087,
+      "sha256": "5dc1fddd14a7b1a1df8441e2cf92a93f34ccaf9022f953b1bc3ad72e7cd4817f",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-25-en-after-cancel-result.jpg",
+      "bytes": 88855,
+      "sha256": "b0a8ceb58021f7dce7965582ca51d585c5d743b4d7cf1b682e07b1a617bc42ec",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-26-zh-after-restart.jpg",
+      "bytes": 96578,
+      "sha256": "0bb9a040a3b8f457085208a17a63826dadda1b4261751d8687340b0439d746cb",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-27-zh-picker-restart.jpg",
+      "bytes": 99413,
+      "sha256": "cb99ea09dd49d898895ab560c63df0ff5ea1ef9b536f2320683b99aa4ac83b7d",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-28-zh-selected-history.jpg",
+      "bytes": 64321,
+      "sha256": "c3aa09df4496ace30bcf3d8634501cd8d48050d533895c42d3c82906f372add4",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-29-zh-continue-history.jpg",
+      "bytes": 64312,
+      "sha256": "5d7b73872372e664d5db6fb77468a2e6025a94ef171b4bdfe89fa98325e09571",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-30-zh-history-handshake.jpg",
+      "bytes": 70734,
+      "sha256": "ec6156cfe347606d8920274c8daeadc871567dbca57b2909bb43de6fd4c23fae",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-31-zh-recovery-draft.jpg",
+      "bytes": 77561,
+      "sha256": "a47342e82ba7ee47537bfe0fa558416836fbd2ed851fe0954de56b02bbee75de",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-32-zh-recovery-ack.jpg",
+      "bytes": 93694,
+      "sha256": "0f494489ef474f4ef6831132503a9ddfdb1fd7a060fd60691b6fffd502b71eba",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-33-zh-recovery-result.jpg",
+      "bytes": 84531,
+      "sha256": "8c9a19f1c8691fbc36bf4dae37683449cd0f1ce7e4afde2563fc6179916eea70",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-34-zh-saved-full-result.jpg",
+      "bytes": 80677,
+      "sha256": "9a7434154207c977ce806f60e1dda6ed7e52a3768c63e26c97607993b694ddb9",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-35-zh-clean-disconnect.jpg",
+      "bytes": 80432,
+      "sha256": "73d6a464e8b8e1792c6fb387fa9db897ccf85d1b2b08627d5521bca6dbadf85d",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-gui-runtime-chain-source11/figure-36-zh-closed.jpg",
+      "bytes": 80098,
+      "sha256": "dfa465f042ebea471d7bce8ce449013464e2a53b8a9fb0a77edfa5c74414a790",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-claude-fixed-help-1/en.jpg",
+      "bytes": 116252,
+      "sha256": "ee30155b2dffca6b7cc0391d3cfff8f53d029e5497240eb5dbe304fd53428cbe",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-claude-fixed-help-1/zh-CN.jpg",
+      "bytes": 115121,
+      "sha256": "bd0b8981e3e0c74621672175d5effce75fe23766439cd8c7addc6453605deb65",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-clip-1/00-before-fix-en.jpg",
+      "bytes": 138065,
+      "sha256": "245ec4ef0de9dc30c84a3a96328d126ca0f5e54b0a283f7f048e7e1c89bc4355",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-clip-1/01-after-fix-above-en.jpg",
+      "bytes": 135624,
+      "sha256": "93a2bcac66fa00efbfdfc37a232bbb0a9ec981df26071980c142b475c433c158",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-clip-1/02-after-fix-partial-en.jpg",
+      "bytes": 118015,
+      "sha256": "47f4e5b25d60f85a68717182ae1a59ad383a4bd2653c0442d488e48533dde1f3",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-clip-1/03-after-fix-below-en.jpg",
+      "bytes": 141243,
+      "sha256": "d5e583e6bd27cbe9e527788cbd22646508cd2fa72a82febc2e6c68865004fa93",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-clip-1/04-multiline-end-en.jpg",
+      "bytes": 123473,
+      "sha256": "cfbddc988426ef4b2465aedcf31c0ba3c11aceb1982dbe40434db9151c8de1dc",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-clip-1/05-multiline-scroll-select-en.jpg",
+      "bytes": 124164,
+      "sha256": "9d4dce14965447499b5887833b450e9ee871cbf1186bd44f26e03dd0983c81a0",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-clip-1/06-after-fix-above-zh-CN.jpg",
+      "bytes": 146786,
+      "sha256": "04a25eb7fa22b60903e985728c53deb136c89456fe2a3c395d8ccba1fbed104b",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-clip-1/07-after-fix-partial-zh-CN.jpg",
+      "bytes": 123264,
+      "sha256": "f55089ff12be1e0ada7217f1769f2c98d795fb4c84bd1fe5514d363548e45789",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-clip-1/08-after-fix-below-zh-CN.jpg",
+      "bytes": 126984,
+      "sha256": "062dd31deb9a6c53196bbee58d980ec86ead65eb7a6b00358ed434dea09895e8",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/01-zh-before-wheel.jpg",
+      "bytes": 125257,
+      "sha256": "c7e9fad828219516fd81c6d4faef48310e697081846eedb617ba17b8e0cd8eb8",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/02-zh-after-inner-wheel.jpg",
+      "bytes": 127552,
+      "sha256": "4ad0b22eea04e7cbfa3086fbcaedfae6f43ba81dce29b5c80ec6463ec0a231e8",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/04-zh-last-line.jpg",
+      "bytes": 128670,
+      "sha256": "81364f5f07900b4d072249ea630762d9ad293fe4052bcf9d4143100e59666f48",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/05-zh-cleared.jpg",
+      "bytes": 101531,
+      "sha256": "fadfdde66ff3dc310a375ce3ba788904d179c029129d690e86ad0c7861e21a6c",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/06-en-task-header.jpg",
+      "bytes": 113144,
+      "sha256": "83581f18bedefc07df0a78a43481882676e34bf623c1b7f248109a4a62bfebc3",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/07-en-selected-task-header.jpg",
+      "bytes": 112953,
+      "sha256": "cdfb6236b56b463217cb245c2ea21971e18582366023358c4f94b8d6fff5d851",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/08-en-before-wheel.jpg",
+      "bytes": 128932,
+      "sha256": "981d8b04738293c9ff158778dd7482d5ccf8bccb019db86b53721a28c6ea507d",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/09-en-after-inner-wheel.jpg",
+      "bytes": 131285,
+      "sha256": "01970d259a329889f1ff98fdf82c0d486f0672b48f8058a4524f194604c241dd",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/10-en-last-line.jpg",
+      "bytes": 131295,
+      "sha256": "f42fa4afb93809afa81a7fc72fcb3bd4f90c0e653eae7431fc71da1feb1f70a8",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/12-en-partially-above.jpg",
+      "bytes": 140970,
+      "sha256": "31f13d250f11833d2ac0fc4643ec37b659522fb37559c45ab3ba4cb03d0d6a31",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/13-en-fully-above.jpg",
+      "bytes": 150033,
+      "sha256": "7e2bd7e5a7458f4d5529e05b1ab62cbd3988919d72ed43929f156f4096cb8dd9",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/15-en-fully-below.jpg",
+      "bytes": 148736,
+      "sha256": "1b35d8143c94678b1b14fc8fc6b457cdc47b4f2bd4ebd2aa26ef6a499129dd07",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/16-en-cleared.jpg",
+      "bytes": 113379,
+      "sha256": "6e43614c1e6460e5077b8b156e97a43819ac7243246c691bfabdbcd1f4a24a0f",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/17-zh-partial.jpg",
+      "bytes": 122496,
+      "sha256": "a3c20a62202051fa32667b4c142e2bec5891fa682822cb467a2cfa7b7a8760cc",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/18-zh-fully-above.jpg",
+      "bytes": 143652,
+      "sha256": "0549019a328b7e5af62cffb8a939277ad7c350c75b5b90f67c6b6ecc27f14cfa",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/gui-input-wheel-1/19-zh-fully-below.jpg",
+      "bytes": 126722,
+      "sha256": "86fe9bb9708c6b0a387be5a5e31158148a804a8d2ec31fad4557cd39d680eb91",
+      "ocr_completed": true,
+      "credential_shape_counts": {
+        "api_key": 0,
+        "bearer": 0,
+        "email": 0,
+        "jwt": 0,
+        "private_key": 0
+      }
+    }
+  ],
+  "recognized_text_saved": false,
+  "images_modified": false,
+  "user_excluded_gui_directory_not_read": true,
+  "native_runtime_reexecuted": false,
+  "final_commit_gui_verified": false,
+  "boundary": "原截图的界面/运行/持久化证据范围以原专报为准。OCR仅检查已知凭据形状，无法保证未知格式或漏识别；本审计没有重新进行GUI验收。"
+}

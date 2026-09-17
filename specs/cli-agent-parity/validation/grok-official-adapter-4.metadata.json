@@ -1,0 +1,65 @@
+{
+  "acp_budget_source": "固定 libtest 的 8 个输入",
+  "native_received_real_credential": true,
+  "test_exit_code": 101,
+  "deadline_seconds": 900,
+  "test_binary_sha256": "7838e9dfea308a3bcafcc2198cf43f740e8461296f46d55a1530c592cab9188c",
+  "acceptance_passed": false,
+  "tls_decrypted": false,
+  "cost_budget_enforced": false,
+  "max_acp_inputs": 8,
+  "model_path": "Grok Build + 官方缓存登录",
+  "private_settings_audit": {
+    "bytes_unchanged": false,
+    "before_sha256": "8b51690ac09910a6975d9a06dd138d6722e669bf10618a700c636812a4097bd6",
+    "after_sha256": "eededaf9df6afedbd8e81a759a44a85a349d18cadccdc18d926a14ee48674794",
+    "toml_parse_succeeded": true,
+    "permission_section_unchanged": true,
+    "native_marketplace_initialization_only": true,
+    "settings_scope_verified": true,
+    "changed_top_level_tables": [
+      "marketplace"
+    ]
+  },
+  "official_grok_model_tested": false,
+  "http_model_call_budget_enforced": false,
+  "repository_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "product_network_isolation_verified": false,
+  "worktree_dirty": true,
+  "tunnels_stopped": true,
+  "public_product_gate_open": false,
+  "grok_version": "grok 1.0.30 (04b7ffed98c6)",
+  "requested_model": "grok-4.6-build",
+  "private_auth_copy_removed": true,
+  "supervisor_sha256": "091fe9364cec79601d539fe436d24d4a375b7928548cfde8d9e343e31fb61d4a",
+  "sandbox_canary": {
+    "allowed_proxy": true,
+    "other_loopback": 1,
+    "external": 1,
+    "exact_unix": true,
+    "other_unix": 1,
+    "credential_read": 1
+  },
+  "auth_copy_method": "opaque_auth_json_only",
+  "allowed_https_hosts": [
+    "auth.x.ai",
+    "cli-chat-proxy.grok.com"
+  ],
+  "public_credential_values_recorded": false,
+  "max_tls_bytes": 33554432,
+  "grok_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "private_settings_unchanged": false,
+  "app_restart_and_ui_verified": false,
+  "max_tls_connections": 32,
+  "scope": "production_process_transport_with_test_only_acp_commands",
+  "archive_scope": "第 4 轮官方生产监督链真实失败记录；仅归档安全投影",
+  "original_public_metadata_sha256": "dde76bbdbb25d935d2cf80d2ffed19a7a7e72477a458e32d71e04cab7f76b4fc",
+  "private_workspace_path_omitted": true,
+  "native_launch_counts": {
+    "version": 2,
+    "private_leader": 1
+  },
+  "native_launch_arguments_unchanged": true,
+  "project_fixture_file_count": 1,
+  "original_failure_flags_preserved": true
+}

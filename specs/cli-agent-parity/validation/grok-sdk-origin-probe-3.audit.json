@@ -1,0 +1,207 @@
+{
+  "scope": "grok_native_sdk_origin_probe",
+  "attempt": 3,
+  "result": "failed",
+  "probe_passed": false,
+  "native_origin_verified": false,
+  "origin_verification": "unknown",
+  "public_product_gate_open": false,
+  "public_coordinator_entry_verified": false,
+  "app_restart_and_ui_verified": false,
+  "full_cli_parity_acceptance_passed": false,
+  "final_clean_commit_verified": false,
+  "same_source_snapshot_library_and_main_reported": true,
+  "whole_intermediate_snapshot_local_gates_passed_reported": true,
+  "input_snapshot": {
+    "scope": "Grok SDK第三轮：source11 lib/main同冻结67文件，仅增加原生工具封闭名称诊断，所有非探针工具与审批仍拒绝，SDK与子任务门禁未开放",
+    "library": {
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+      "sha256": "8f0e7063c37e7f110d3c022ccb932ca9cc73514b1675592ed8570b59b84ef484"
+    },
+    "supervisor": {
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+      "sha256": "8026e131aad657207690144d31e3e5c01b654039c4ed60eb1d5502dc9cb14fbb"
+    },
+    "source_manifest_sha256": "31619a72300d6a38e82ade3d40e2329039cee864e5c0ca38c29ceb38037e504a",
+    "sdk_pure_tests_passed": 16,
+    "whole_snapshot_passed": true,
+    "production_runtime_commands": true,
+    "test_only_internal_command_switch": false,
+    "public_coordinator_entry_verified": false,
+    "locale_resources_immutable_in_binary": true
+  },
+  "original_public_artifacts": {
+    "ndjson": {
+      "sha256": "2529052babfc6169a3f5acb7b08c1f294d61e41ae5cb3554dfc96f3188e9b976",
+      "bytes": 3761
+    },
+    "metadata.json": {
+      "sha256": "006cd878c3b8550bc535f8ac5e612dbff625657b50338cbd9a4fce427c7dffd7",
+      "bytes": 3858
+    },
+    "network.json": {
+      "sha256": "9561f0e59b7ac6cb637ae0f517f9648476baf8685b47c7f81bce0264cc72fb8d",
+      "bytes": 7499
+    },
+    "inputs.json": {
+      "sha256": "a83faa9dbc1cf828c5e4988e78f0394d2c47060ca91222d2f9ac155da66d7f8c",
+      "bytes": 1004
+    }
+  },
+  "original_public_artifacts_credential_scan": {
+    "ndjson": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "email": 0,
+      "credential_assignment": 0
+    },
+    "metadata.json": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "email": 0,
+      "credential_assignment": 0
+    },
+    "network.json": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "email": 0,
+      "credential_assignment": 0
+    },
+    "inputs.json": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "email": 0,
+      "credential_assignment": 0
+    }
+  },
+  "private_source_hashes": {
+    "evidence_sha256": "ee3ab1b0de47d5d85bfa81c5a2c4d53ad9855f557386f431ef053796fa87c51b",
+    "test_output_sha256": "2ef6b2a1dac5464849afb1be772d1ab344d25ec42d05497a3e895ef842921e4f"
+  },
+  "failure": {
+    "known_literal": "原生模型调用了探针之外的工具",
+    "failure_reason_sha256": "2f044e7029c4d0e74d93aac9027590adbf537d100b28134f2c4fc2526938a75b",
+    "unexpected_tool_update_count": 2,
+    "unique_observed_native_tool_call_count": 1,
+    "observed_native_tool_status_present": false,
+    "observed_native_tool_name_kind": "other",
+    "native_tool_name_json_sha256": "da33f17cc734196e200d8f091338c908fb0b3e1f1f2556d4a823ac95f1877ae0",
+    "static_name_exact_hash_match": {
+      "source": "specs/cli-agent-parity/fixtures/grok-1.0.30-empty-session-recovery.ndjson",
+      "source_sha256": "b6152ef9cc1eac7b05918e7b5d6fa8beaabe8002926cc0bcf81533ffb9180398",
+      "candidate_count": 27,
+      "algorithm": "SHA256(UTF8(JSON字符串值));与Rust name.to_string()字节一致",
+      "observed_name_json_sha256": "da33f17cc734196e200d8f091338c908fb0b3e1f1f2556d4a823ac95f1877ae0",
+      "exact_match": "use_tool",
+      "source_lines": [
+        12,
+        13,
+        26,
+        30,
+        50,
+        55
+      ],
+      "match_unique": true,
+      "raw_private_name_read": false,
+      "input_shape_proved": false,
+      "sdk_registration_proved": false,
+      "tool_search_required_proved": false
+    },
+    "sdk_unsupported_proved": false,
+    "sdk_origin_absence_proved": false,
+    "sdk_mock_approval_requirement_proved": false
+  },
+  "probe_counters": {
+    "native_inputs": 1,
+    "submitted_input_count": 1,
+    "sdk_request_count": 0,
+    "initialization_count": 0,
+    "tools_list_count": 0,
+    "inspect_call_count": 0,
+    "permission_request_count": 1,
+    "unexpected_tool_count": 2,
+    "duplicate_request_count": 0,
+    "mcp_status_observation_count": 0
+  },
+  "sdk_capability": {
+    "present": true,
+    "type": "boolean",
+    "enabled": true,
+    "source": "本轮真实initialize响应的安全观察事件；不代替注册或来源验证"
+  },
+  "network": {
+    "max_tls_connections": 32,
+    "observed_tls_connections": 8,
+    "tls_bytes": 4329163,
+    "network_budget_exhausted": false,
+    "event_counts": {
+      "official_connect_attempt": 8,
+      "official_tunnel_opened": 8,
+      "rejected_nonofficial_origin": 32
+    },
+    "http_model_calls_observable": false,
+    "cost_budget_enforced": false,
+    "tls_decrypted": false,
+    "allowed_hosts": [
+      "auth.x.ai",
+      "cli-chat-proxy.grok.com"
+    ]
+  },
+  "cleanup": {
+    "production_receipt_cleanup_confirmed": true,
+    "production_exit_reason": "stdio_closed",
+    "production_exit_code": 0,
+    "job_removed": true,
+    "resource_cid_destroyed": true,
+    "native_wait_status": 0,
+    "probe_transport_closed": false,
+    "probe_transport_closed_semantics": "仅当run_process task join为Ok(Ok(Ok(())))时为true；本轮false，具体错误未归档",
+    "probe_cleanup_receipt_read": true,
+    "tunnels_stopped": true,
+    "private_auth_copy_removed_reported": true,
+    "private_auth_copy_absent_independently_checked": true,
+    "project_empty_independently_checked": true
+  },
+  "settings_audit": {
+    "source": "原runner元数据；本次未读取配置原文，不独立重建前值",
+    "private_settings_unchanged": false,
+    "private_settings_audit": {
+      "bytes_unchanged": false,
+      "before_sha256": "8b51690ac09910a6975d9a06dd138d6722e669bf10618a700c636812a4097bd6",
+      "after_sha256": "eededaf9df6afedbd8e81a759a44a85a349d18cadccdc18d926a14ee48674794",
+      "toml_parse_succeeded": true,
+      "permission_section_unchanged": true,
+      "native_marketplace_initialization_only": true,
+      "settings_scope_verified": true,
+      "changed_top_level_tables": [
+        "marketplace"
+      ]
+    }
+  },
+  "side_effect_boundaries": {
+    "no_project_files": true,
+    "no_side_effects": false,
+    "approval_all_denied": true,
+    "credential_content_read": false,
+    "manifest_contents_read": false,
+    "stderr_archived": false,
+    "model_body_archived": false,
+    "thought_body_archived": false,
+    "binary_independently_read_by_archive": false
+  },
+  "evidence_limits": [
+    "use_tool仅由已公开原生静态名称字典精确命中散列；未读取私有name/title/input原文，不能判断调用参数、目标工具或SDK服务。",
+    "一次原生审批确实出现且探针全部拒绝，不证明inspect本身必需审批，不能据此放宽权限。",
+    "transport_closed=false表明transport task未正常返回，资源清理及native退出码0是独立证据；不能推断CLI崩溃或仍有活跃资源。",
+    "SDK能力宣告true和零请求不能证明SDK不被支持、缺少来源或注册成功。",
+    "source11lib/main同67manifest且本地中间快照门禁通过；baseline b3d8…仍dirty，不计最终同提交、GUI、应用重启、跨平台或Goal完成。"
+  ]
+}

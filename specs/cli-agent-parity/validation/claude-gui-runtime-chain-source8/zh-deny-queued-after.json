@@ -1,0 +1,37 @@
+{
+  "observed_at": "2026-09-17T13:09:52.643192+00:00",
+  "task_id": "90319eee-f61f-4ecf-bcfd-beca68d58d59",
+  "generation": 8,
+  "state": "completed",
+  "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c",
+  "result": "GUI_ZH_DENIED\n\nGUI_ZH_QUEUED",
+  "terminal_evidence": {
+    "event": {
+      "TurnFinished": {
+        "outcome": "Completed",
+        "output": "GUI_ZH_DENIED\n\nGUI_ZH_QUEUED",
+        "turn_id": "0a69b7e5-15a7-49f5-951b-a50b21ee1f63"
+      }
+    },
+    "native_session_id": "a815d581-b7ac-4a42-80bd-8c7f22ed397c"
+  },
+  "messages": [
+    {
+      "message_id": "0a69b7e5-15a7-49f5-951b-a50b21ee1f63",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "recipient_generation": 8
+    },
+    {
+      "message_id": "9a0d3871-fef3-459c-be9c-198a05faf175",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol",
+      "recipient_generation": 8
+    }
+  ],
+  "note_unchanged": true,
+  "note_sha256": "acfa758900501297030a7b3a7d376dc34455046b045cb6c7582f10f87cdafcbf",
+  "permission_profile_same_as_generation7": true,
+  "profile_field_present": true,
+  "profile_sha256": "ea736674ac91f01ae4b9adf3249e82918b074c0abc3d64286183f449d92a9a75"
+}

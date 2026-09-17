@@ -1,0 +1,134 @@
+{
+  "capture": {
+    "cliVersion": "2.1.273",
+    "platform": "darwin-arm64",
+    "credentialsProvided": false,
+    "modelCommandsSent": 0,
+    "networkDenied": true,
+    "projection": "只保留固定策略核验使用的原生字段；删除 toolsNarrowing 描述与本机路径。"
+  },
+  "settings": {
+    "effective": {
+      "permissions": {
+        "ask": [
+          "Edit"
+        ]
+      },
+      "sandbox": {
+        "enabled": false
+      }
+    },
+    "sources": [
+      {
+        "source": "flagSettings",
+        "settings": {
+          "permissions": {
+            "ask": [
+              "Edit"
+            ]
+          },
+          "sandbox": {
+            "enabled": false
+          }
+        }
+      }
+    ],
+    "applied": {
+      "model": "claude-opus-5[1m]",
+      "effort": "high",
+      "advisor": null,
+      "ultracode": false
+    }
+  },
+  "rules": {
+    "state": {
+      "originalCwd": "/FIXED_PROFILE_CWD",
+      "workspaceDirectories": [],
+      "managedOnly": false,
+      "rules": [
+        {
+          "behavior": "ask",
+          "source": "flagSettings",
+          "rule": "Edit"
+        },
+        {
+          "behavior": "deny",
+          "source": "cliArg",
+          "rule": "Bash"
+        },
+        {
+          "behavior": "deny",
+          "source": "cliArg",
+          "rule": "Agent"
+        },
+        {
+          "behavior": "deny",
+          "source": "cliArg",
+          "rule": "EnterPlanMode"
+        },
+        {
+          "behavior": "deny",
+          "source": "cliArg",
+          "rule": "ExitPlanMode"
+        },
+        {
+          "behavior": "deny",
+          "source": "cliArg",
+          "rule": "Skill"
+        },
+        {
+          "behavior": "deny",
+          "source": "cliArg",
+          "rule": "Write"
+        },
+        {
+          "behavior": "deny",
+          "source": "cliArg",
+          "rule": "NotebookEdit"
+        },
+        {
+          "behavior": "deny",
+          "source": "cliArg",
+          "rule": "WebFetch"
+        },
+        {
+          "behavior": "deny",
+          "source": "cliArg",
+          "rule": "WebSearch"
+        },
+        {
+          "behavior": "deny",
+          "source": "cliArg",
+          "rule": "Computer"
+        },
+        {
+          "behavior": "deny",
+          "source": "cliArg",
+          "rule": "mcp__*"
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "hooks": [],
+    "policy": {
+      "disabledByPolicy": false,
+      "managedOnly": false,
+      "pluginOnly": false,
+      "allDisabled": false,
+      "policyHookCount": 0
+    },
+    "bareMode": {
+      "exitHint": "restart without --bare"
+    }
+  },
+  "mcp": {
+    "mcpServers": []
+  },
+  "eof": {
+    "alive_before_stdin_eof": true,
+    "stdin_eof_exited_within_5s": true,
+    "exit_code_before_cleanup": 0,
+    "eof_elapsed_ms": 9
+  }
+}

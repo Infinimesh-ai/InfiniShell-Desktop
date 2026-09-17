@@ -5,6 +5,384 @@ use serde_json::json;
 
 use super::*;
 
+fn grok_cross_generation_input_fixture(
+    harness: &str,
+) -> (SqliteConnection, LocalCliMessage, LocalCliTask) {
+    let mut connection = connection();
+    let runtime = Uuid::new_v4();
+    let first_id = Uuid::new_v4();
+    let next_id = Uuid::new_v4();
+    let mut original = task("grok-queue", None);
+    original.harness = harness.into();
+    original.native_session_id = Some(Uuid::new_v4().to_string());
+    original.config_json = json!({"runtime_generation":runtime}).to_string();
+    checkpoint(&mut connection, original.clone(), None).unwrap();
+    let queued_input = |id: Uuid| LocalCliMessage {
+        version: 1,
+        message_id: id.to_string(),
+        sender_task_id: original.task_id.clone(),
+        recipient_task_id: original.task_id.clone(),
+        sender_generation: 1,
+        recipient_generation: 1,
+        subject: "user_input".into(),
+        body: json!({"Submit":{"input":[{"Text":id.to_string()}]}}).to_string(),
+        state: LocalCliMessageState::Queued,
+        receipt_kind: None,
+    };
+    let first = queued_input(first_id);
+    let mut next = queued_input(next_id);
+    for message in [&first, &next] {
+        insert_message(&mut connection, message.clone()).unwrap();
+        update_message_state(
+            &mut connection,
+            &message.message_id,
+            &original.task_id,
+            1,
+            LocalCliMessageState::Sent,
+        )
+        .unwrap();
+    }
+    update_message_state(
+        &mut connection,
+        &first.message_id,
+        &original.task_id,
+        1,
+        LocalCliMessageState::Acknowledged,
+    )
+    .unwrap();
+    next.state = LocalCliMessageState::Sent;
+    original.state = LocalCliTaskState::Completed;
+    original.revision = 1;
+    original.terminal_evidence = Some("native-result:previous-turn".into());
+    original.result = Some("上一轮完成".into());
+    checkpoint(&mut connection, original.clone(), Some(1)).unwrap();
+    let mut current = original;
+    current.generation = 2;
+    current.revision = 0;
+    current.state = LocalCliTaskState::Queued;
+    current.result = None;
+    current.terminal_evidence = None;
+    current.config_json = json!({"runtime_generation":runtime,
+        "grok_current_input":{"message_id":first_id,"submission_generation":1,"runtime_generation":runtime,"native_turn_id":"native-turn-b"},
+        "grok_pending_inputs":[{"message_id":next_id,"submission_generation":1,"runtime_generation":runtime,"native_turn_id":"native-turn-c"}]
+    }).to_string();
+    checkpoint(&mut connection, current.clone(), Some(1)).unwrap();
+    current.state = LocalCliTaskState::Running;
+    current.revision = 1;
+    checkpoint(&mut connection, current.clone(), Some(2)).unwrap();
+    (connection, next, current)
+}
+
+// 异常持久记录模拟不能通过正常 checkpoint 写入的损坏状态，验证回执仍拒绝。
+fn replace_current_task_record(connection: &mut SqliteConnection, task: &LocalCliTask) {
+    diesel::update(local_cli_tasks::table.filter(local_cli_tasks::task_id.eq(&task.task_id)))
+        .set(local_cli_tasks::data.eq(serde_json::to_string(task).unwrap()))
+        .execute(connection)
+        .unwrap();
+}
+
+#[test]
+fn grok_queue_native_ack_updates_only_the_original_sent_input_generation() {
+    let (mut connection, original, current) = grok_cross_generation_input_fixture("grok");
+    update_message_state(
+        &mut connection,
+        &original.message_id,
+        &current.task_id,
+        1,
+        LocalCliMessageState::Acknowledged,
+    )
+    .unwrap();
+    let saved = read_message(&mut connection, &original.message_id)
+        .unwrap()
+        .unwrap();
+    let mut expected = original;
+    expected.state = LocalCliMessageState::Acknowledged;
+    expected.receipt_kind = Some(LocalCliReceiptKind::NativeProtocol);
+    assert_eq!(saved, expected);
+    assert_eq!(
+        read_task(&mut connection, &current.task_id).unwrap(),
+        Some(current.clone())
+    );
+    assert!(
+        update_message_state(
+            &mut connection,
+            &saved.message_id,
+            &current.task_id,
+            1,
+            LocalCliMessageState::Acknowledged
+        )
+        .is_err()
+    );
+    assert!(
+        read_messages(&mut connection, &current.task_id, 2)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn grok_queue_terminal_previous_turn_can_ack_the_known_next_input() {
+    for state in [
+        LocalCliTaskState::Completed,
+        LocalCliTaskState::Cancelled,
+        LocalCliTaskState::Failed,
+    ] {
+        let (mut connection, original, mut current) = grok_cross_generation_input_fixture("grok");
+        current.state = state;
+        current.revision += 1;
+        current.result = Some("当前执行回合已结束，下一输入尚未 started".into());
+        current.terminal_evidence = Some("native-result:turn-b".into());
+        checkpoint(&mut connection, current.clone(), Some(2)).unwrap();
+        update_message_state(
+            &mut connection,
+            &original.message_id,
+            &current.task_id,
+            1,
+            LocalCliMessageState::Acknowledged,
+        )
+        .unwrap();
+        assert_eq!(
+            read_task(&mut connection, &current.task_id).unwrap(),
+            Some(current)
+        );
+    }
+}
+
+#[test]
+fn grok_queue_failure_without_a_native_turn_requires_the_same_persisted_sent_link() {
+    let (mut connection, original, mut current) = grok_cross_generation_input_fixture("grok");
+    let mut config: serde_json::Value = serde_json::from_str(&current.config_json).unwrap();
+    config["grok_pending_inputs"][0]["native_turn_id"] = serde_json::Value::Null;
+    current.config_json = config.to_string();
+    current.revision += 1;
+    checkpoint(&mut connection, current.clone(), Some(2)).unwrap();
+    update_message_state(
+        &mut connection,
+        &original.message_id,
+        &current.task_id,
+        1,
+        LocalCliMessageState::Failed,
+    )
+    .unwrap();
+    let saved = read_message(&mut connection, &original.message_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved.state, LocalCliMessageState::Failed);
+    assert_eq!(saved.receipt_kind, None);
+    assert_eq!(saved.recipient_generation, 1);
+    assert!(
+        update_message_state(
+            &mut connection,
+            &original.message_id,
+            &current.task_id,
+            1,
+            LocalCliMessageState::Failed
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn grok_queue_ack_can_use_the_exact_current_input_binding() {
+    let (mut connection, original, mut current) = grok_cross_generation_input_fixture("grok");
+    let mut config: serde_json::Value = serde_json::from_str(&current.config_json).unwrap();
+    config["grok_current_input"] = config["grok_pending_inputs"][0].clone();
+    config["grok_pending_inputs"] = json!([]);
+    current.config_json = config.to_string();
+    current.revision += 1;
+    checkpoint(&mut connection, current.clone(), Some(2)).unwrap();
+    update_message_state(
+        &mut connection,
+        &original.message_id,
+        &current.task_id,
+        1,
+        LocalCliMessageState::Acknowledged,
+    )
+    .unwrap();
+}
+
+#[test]
+fn grok_queue_receipts_reject_unknown_old_runtime_or_corrupted_bindings() {
+    for case in [
+        "runtime_changed",
+        "terminal_runtime_changed",
+        "historical_runtime_missing",
+        "runtime_missing",
+        "runtime_invalid",
+        "runtime_nil",
+        "link_runtime_changed",
+        "link_generation_changed",
+        "message_changed",
+        "link_missing",
+        "duplicate",
+        "turn_missing",
+        "turn_empty",
+        "turn_long",
+        "turn_control",
+        "session_changed",
+        "session_missing",
+    ] {
+        let (mut connection, original, mut current) = grok_cross_generation_input_fixture("grok");
+        let mut config: serde_json::Value = serde_json::from_str(&current.config_json).unwrap();
+        match case {
+            "runtime_changed" => config["runtime_generation"] = json!(Uuid::new_v4()),
+            "terminal_runtime_changed" => {
+                config["runtime_generation"] = json!(Uuid::new_v4());
+                current.state = LocalCliTaskState::Cancelled;
+            }
+            "historical_runtime_missing" => {
+                let mut historical = read_task_generation(&mut connection, &current.task_id, 1)
+                    .unwrap()
+                    .unwrap();
+                historical.config_json = "{}".into();
+                diesel::update(
+                    local_cli_task_generations::table
+                        .filter(local_cli_task_generations::task_id.eq(&current.task_id))
+                        .filter(local_cli_task_generations::generation.eq(1)),
+                )
+                .set(
+                    local_cli_task_generations::data
+                        .eq(serde_json::to_string(&historical).unwrap()),
+                )
+                .execute(&mut connection)
+                .unwrap();
+            }
+            "runtime_missing" => config["runtime_generation"] = serde_json::Value::Null,
+            "runtime_invalid" => config["runtime_generation"] = json!("unknown-runtime"),
+            "runtime_nil" => config["runtime_generation"] = json!(Uuid::nil()),
+            "link_runtime_changed" => {
+                config["grok_pending_inputs"][0]["runtime_generation"] = json!(Uuid::new_v4())
+            }
+            "link_generation_changed" => {
+                config["grok_pending_inputs"][0]["submission_generation"] = json!(2)
+            }
+            "message_changed" => {
+                config["grok_pending_inputs"][0]["message_id"] = json!(Uuid::new_v4())
+            }
+            "link_missing" => config["grok_pending_inputs"] = json!([]),
+            "duplicate" => {
+                config["grok_pending_inputs"] = json!([
+                    config["grok_pending_inputs"][0].clone(),
+                    config["grok_pending_inputs"][0].clone()
+                ])
+            }
+            "turn_missing" => {
+                config["grok_pending_inputs"][0]["native_turn_id"] = serde_json::Value::Null
+            }
+            "turn_empty" => config["grok_pending_inputs"][0]["native_turn_id"] = json!(" "),
+            "turn_long" => {
+                config["grok_pending_inputs"][0]["native_turn_id"] = json!("a".repeat(4097))
+            }
+            "turn_control" => config["grok_pending_inputs"][0]["native_turn_id"] = json!("turn\n"),
+            "session_changed" => current.native_session_id = Some(Uuid::new_v4().to_string()),
+            "session_missing" => current.native_session_id = None,
+            _ => panic!("测试分类不存在"),
+        }
+        current.config_json = config.to_string();
+        replace_current_task_record(&mut connection, &current);
+        assert!(
+            update_message_state(
+                &mut connection,
+                &original.message_id,
+                &current.task_id,
+                1,
+                LocalCliMessageState::Acknowledged
+            )
+            .is_err(),
+            "{case}"
+        );
+        assert_eq!(
+            read_message(&mut connection, &original.message_id).unwrap(),
+            Some(original)
+        );
+    }
+}
+
+#[test]
+fn grok_queue_receipts_do_not_relax_other_cli_kinds_states_or_receipt_sources() {
+    for harness in ["claude", "codex", "oz"] {
+        let (mut connection, original, current) = grok_cross_generation_input_fixture(harness);
+        assert!(
+            update_message_state(
+                &mut connection,
+                &original.message_id,
+                &current.task_id,
+                1,
+                LocalCliMessageState::Acknowledged
+            )
+            .is_err()
+        );
+    }
+    for task_state in [
+        LocalCliTaskState::Disconnected,
+        LocalCliTaskState::Unknown,
+        LocalCliTaskState::Unconfirmed,
+    ] {
+        let (mut connection, original, mut current) = grok_cross_generation_input_fixture("grok");
+        current.state = task_state;
+        replace_current_task_record(&mut connection, &current);
+        for outcome in [
+            LocalCliMessageState::Acknowledged,
+            LocalCliMessageState::Failed,
+        ] {
+            assert!(
+                update_message_state(
+                    &mut connection,
+                    &original.message_id,
+                    &current.task_id,
+                    1,
+                    outcome
+                )
+                .is_err()
+            );
+        }
+    }
+    for case in [
+        "queued",
+        "subject",
+        "action",
+        "application_history",
+        "wrong_generation",
+        "cancelled",
+    ] {
+        let (mut connection, mut original, current) = grok_cross_generation_input_fixture("grok");
+        match case {
+            "queued" => original.state = LocalCliMessageState::Queued,
+            "subject" => original.subject = "普通父子消息".into(),
+            "action" => original.body = json!("Shutdown").to_string(),
+            "application_history" | "wrong_generation" | "cancelled" => {}
+            _ => panic!("测试分类不存在"),
+        }
+        write_message_state(&mut connection, &original).unwrap();
+        let receipt = if case == "application_history" {
+            LocalCliReceiptKind::ApplicationHistory
+        } else {
+            LocalCliReceiptKind::NativeProtocol
+        };
+        let state = if case == "cancelled" {
+            LocalCliMessageState::Cancelled
+        } else {
+            LocalCliMessageState::Acknowledged
+        };
+        assert!(
+            update_message_state_with_receipt(
+                &mut connection,
+                &original.message_id,
+                &current.task_id,
+                if case == "wrong_generation" { 2 } else { 1 },
+                state,
+                Some(receipt)
+            )
+            .is_err(),
+            "{case}"
+        );
+        assert_eq!(
+            read_message(&mut connection, &original.message_id).unwrap(),
+            Some(original)
+        );
+    }
+}
+
 fn connection() -> SqliteConnection {
     let mut connection = SqliteConnection::establish(":memory:").unwrap();
     connection

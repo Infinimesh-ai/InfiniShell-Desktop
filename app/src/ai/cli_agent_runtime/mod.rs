@@ -10,6 +10,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 pub(crate) mod claude;
+mod claude_profile;
 pub(crate) mod codex;
 #[cfg(feature = "local_fs")]
 pub(crate) mod conversation_bridge;
@@ -45,6 +46,8 @@ pub enum PermissionPolicy {
     ReadOnly,
     /// 项目写入沙箱，对不可信操作保留用户审批。
     WorkspaceWrite,
+    /// 固定 Claude 文件工具及逐次审批，不等价于操作系统沙箱。
+    ClaudeRestrictedFilesV1,
 }
 
 #[derive(Clone, Debug)]
@@ -57,6 +60,7 @@ pub struct SessionOptions {
     pub generation: Uuid,
     pub permission_policy: PermissionPolicy,
     pub permission_ceiling: Option<permissions::ParentPermissionCeiling>,
+    pub claude_profile: Option<permissions::ClaudeRestrictedFilesV1>,
     pub model: Option<String>,
     pub local_tools: Option<local_tools::LocalToolPermissions>,
     pub selected_skills: Vec<local_skills::SelectedLocalSkill>,
@@ -144,6 +148,11 @@ pub enum RuntimeEventKind {
         turn_id: Option<String>,
     },
     TurnStarted {
+        turn_id: String,
+    },
+    /// 原生队列在工具轮次之间并入当前执行；不代表独立回合或上一轮完成。
+    InputJoined {
+        message_id: Uuid,
         turn_id: String,
     },
     TextDelta {

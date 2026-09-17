@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "codesign",
+    "--verify",
+    "--deep",
+    "--strict",
+    "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 0.484381,
+  "stdout_bytes": 0,
+  "stderr_bytes": 0,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "source": "根代理实际执行 source15",
+  "bundle_report_sha256": "d5d9a912a4e1aa7bc6e5756de60fdc330b594b816f056f484995c7570404475b"
+}

@@ -1,0 +1,29 @@
+{
+  "scope": "source13_grok_coordinator_actual_execution_identity",
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "dirty_snapshot": true,
+  "source_manifest_sha256": "419e6a6fac30237c4577061cb753078360fdf42e5833de29266363e3cdd5dd82",
+  "source_file_count": 73,
+  "libtest_sha256": "a857fbb82541ff572591bb9ab526a187e1a96325063636a7f72f928d6864e471",
+  "production_supervisor_sha256": "0c9e05fe2c75aaf909e31c2dfb4508e5f7ea3ee9da6c7a8e167713ae8205d77f",
+  "native_grok_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "source_reports": [
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-13-inputs.json",
+      "bytes": 12528,
+      "sha256": "419e6a6fac30237c4577061cb753078360fdf42e5833de29266363e3cdd5dd82"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-13-gates.json",
+      "bytes": 2181,
+      "sha256": "de4c4c5125e72f0b880ead11b9daf7223637d0edd86fde1de927870370f8d6f9"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-13-bundle.json",
+      "bytes": 14454,
+      "sha256": "d49f3180dc1f2f697ebfeb0e4b405185a8907bb8ca529cf02b918b6610a68cd6"
+    }
+  ],
+  "binary_hashes_independently_recomputed_by_archive": false,
+  "final_same_commit_verified": false
+}

@@ -23,7 +23,7 @@ SSH 或容器需用 `script/cli-agent-parity/apply_notification_patch.py --expor
 
 rev3 迁移按 `revisions/rev3/SOURCE_METADATA.json` 的全部 36 个文件、固定路径、元数据原文和模式位识别旧不可变来源，并按完整 10 文件树识别通知缓存。单独改版本号、伪造清单、混合不同修补版本或用户自定义脚本均不构成受控迁移来源。升级发布新 rev4 目录，旧 rev3 来源不变；升级后的旧缓存及 `state.json` 也保留在事务目录。回滚只恢复仍匹配此次事务的缓存和受影响配置，保留用户信任、显式禁用和无关配置。
 
-rev4 的 macOS 无凭据原生 `hooks/list` 已采集为 `NATIVE_HOOK_TRUST.json`：仅五个正式 hook，无测试阻断 hook、无插桩 wrapper、无输入回合及模型调用。这只证明注册与原生摘要。Windows 生产自动安装仍关闭，授权状态保持 Unknown；没有捏造 Windows 原生可信摘要。第九轮临时插桩候选即使通过，也不能替代正式五 hook 的原生注册表与 ConPTY 验证。
+rev4 的 macOS 无凭据原生 `hooks/list` 已采集为 `NATIVE_HOOK_TRUST.json`：仅五个正式 hook，无测试阻断 hook、无插桩 wrapper、无输入回合及模型调用。第十轮 b3d8 的 Windows x64 正式采集也已通过，独立摘要保存为 `NATIVE_HOOK_TRUST_WINDOWS.json`；应用据此只读判断 Required/Configured/Unknown，不把配置吻合显示为当前会话已生效。其他 Windows 架构及生产自动安装仍未开放。正式 ConPTY 证据只覆盖 SessionStart/UserPromptSubmit，剩余事件和完整生命周期仍待验；第九轮候选证据不替代正式记录。
 
 固定 macOS Codex 0.147.0 还通过 Python 安装器的无凭据来源迁移：起点是精确 rev3 受控夹具，暂存调用真实原生插件命令，结果保留旧树、信任和编排禁用状态；见 `specs/cli-agent-parity/fixtures/codex-plugin-rev3-rev4-macos.json`。此记录明确不证明 Rust 安装器、GUI 或 Windows 已通过。候选运输脚本生成的末尾空行在正式资源中收敛为一个 LF；所有正式文件使用新摘要，后续实际通知验收必须以正式字节为准。
 

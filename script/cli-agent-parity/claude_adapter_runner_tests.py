@@ -54,6 +54,41 @@ def complete_events():
 
 
 class AcceptanceTests(unittest.TestCase):
+    def joined_events(self):
+        events = complete_events()
+        parent = next(event for event in events if event.get("event") == "turn_finished" and event.get("turn_id") == "turn-4")
+        joined = next(event for event in events if event.get("event") == "turn_finished" and event.get("turn_id") == "turn-5")
+        parent["output"] = joined["output"]
+        events.remove(parent)
+        events.insert(events.index(joined) + 1, parent)
+        start = next(event for event in events if event.get("event") == "turn_started" and event.get("turn_id") == "turn-5")
+        start.update({"event":"input_joined", "message_id":"turn-5", "turn_id":"turn-4", "native_session_id":NATIVE_ID})
+        return events
+
+    def test_joined_input_requires_the_real_execution_and_ordered_batch_result(self):
+        events = self.joined_events()
+        self.assertTrue(verified_acceptance(0, SUMMARY, events))
+        for key, value in (("turn_id", "turn-3"), ("native_session_id", "other"), ("message_id", "unknown")):
+            changed = copy.deepcopy(events)
+            next(event for event in changed if event.get("event") == "input_joined")[key] = value
+            with self.subTest(key=key):
+                self.assertFalse(verified_acceptance(0, SUMMARY, changed))
+        changed = self.joined_events()
+        parent = next(event for event in changed if event.get("event") == "turn_finished" and event.get("turn_id") == "turn-4")
+        parent["output"] = "different-result"
+        self.assertFalse(verified_acceptance(0, SUMMARY, changed))
+        changed = self.joined_events()
+        joined = next(event for event in changed if event.get("event") == "input_joined")
+        changed.remove(joined)
+        changed.append(joined)
+        self.assertFalse(verified_acceptance(0, SUMMARY, changed))
+
+    def test_duplicate_or_unknown_join_cannot_replace_a_native_start(self):
+        events = self.joined_events()
+        joined = next(event for event in events if event.get("event") == "input_joined")
+        self.assertFalse(verified_acceptance(0, SUMMARY, events + [joined.copy()]))
+        self.assertFalse(verified_acceptance(0, SUMMARY, complete_events() + [joined.copy()]))
+
     def test_requires_one_matching_test_and_full_native_evidence(self):
         events = complete_events()
         self.assertTrue(verified_acceptance(0, SUMMARY, events))

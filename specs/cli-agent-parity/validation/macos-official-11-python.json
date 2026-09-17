@@ -1,0 +1,102 @@
+{
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "source_manifest_sha256": "31619a72300d6a38e82ade3d40e2329039cee864e5c0ca38c29ceb38037e504a",
+  "groups": [
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.099
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_profile_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.098
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.171
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.12
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/codex_source_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.307
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.113
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 2.154
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.715
+    }
+  ],
+  "group_counts": [
+    11,
+    7,
+    56,
+    18,
+    10,
+    13,
+    19,
+    47
+  ],
+  "scope": "冻结source11的8组离线运行器回归，不计真实CLI生命周期。",
+  "test_count_total": 181,
+  "wall_seconds": 3.776,
+  "log_sha256": "c44221500461d1fd2a2c5c0f7517780b150c3cb2d9f1da7834663d2869f90ab6",
+  "log": "/tmp/infinishell-cli-parity-official-11-python.log",
+  "all_passed": true
+}

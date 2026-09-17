@@ -1,0 +1,25 @@
+{
+  "runtime_generation": "f1958234-3bbc-4621-96ba-6de31f6b3e74",
+  "claim_files_retained": true,
+  "receipts": {
+    "exit.json": {
+      "version": 1,
+      "generation": "f1958234-3bbc-4621-96ba-6de31f6b3e74",
+      "cleanup_confirmed": true,
+      "exit_code": 0,
+      "exit_reason": "stdio_closed",
+      "source_sha256": "4443516a3a3a8ca2fe5b8692c007c6f7133358ff614e1350ec7d2d381889bd07"
+    },
+    "macos-cleanup.json": {
+      "version": 1,
+      "generation": "f1958234-3bbc-4621-96ba-6de31f6b3e74",
+      "job_removed": true,
+      "resource_cid_destroyed": true,
+      "native_wait_status": 0,
+      "execution_failed": false,
+      "claim_sha256": "f827acf994971708d01da517e601c13d618769daeafb65433f51c744143a5544",
+      "native_sha256": "91a645aeb79ffa709119cf93df968dfefe2b12b6af262040e750ec3b2fbb0336",
+      "source_sha256": "caf296e87a65207ba123cd8e86c821c75f2d12c8dea61374ffbba1f4036b8261"
+    }
+  }
+}

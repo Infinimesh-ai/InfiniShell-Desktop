@@ -20,6 +20,7 @@ use warpui::{AppContext, Element, SingletonEntity, ViewContext, ViewHandle};
 
 use super::{LocalCLITaskManagerEvent, LocalCLITaskManagerView, TaskManagerAction};
 use crate::ai::agent::ImageContext;
+use crate::ai::cli_agent_runtime::PermissionPolicy;
 use crate::ai::skills::SkillManager;
 use crate::appearance::Appearance;
 use crate::editor::{
@@ -134,7 +135,7 @@ impl LocalCLITaskManagerView {
 
     pub(super) fn refresh_managed_input(&mut self, ctx: &mut ViewContext<Self>) {
         let options = ImageContextOptions::Enabled {
-            unsupported_model: self.harness != Harness::Codex,
+            unsupported_model: !matches!(self.harness, Harness::Codex | Harness::Claude),
             is_processing_attached_images: self.managed_input.processing_images,
             num_images_attached: self.managed_input.attachments.images.len(),
             num_images_in_conversation: 0,
@@ -276,6 +277,9 @@ impl LocalCLITaskManagerView {
     }
 
     fn claude_skill_was_registered(&self, reference: &SkillReference, ctx: &AppContext) -> bool {
+        if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1 {
+            return false;
+        }
         if self.harness != Harness::Claude || self.selected_task.is_none() {
             return true;
         }
@@ -294,6 +298,11 @@ impl LocalCLITaskManagerView {
         &self,
         ctx: &AppContext,
     ) -> Result<Vec<ParsedSkill>, String> {
+        if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1
+            && !self.managed_input.attachments.skills.is_empty()
+        {
+            return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
+        }
         let manager = SkillManager::as_ref(ctx);
         self.managed_input
             .attachments
@@ -321,6 +330,9 @@ impl LocalCLITaskManagerView {
     ) -> Result<(), String> {
         if generation != self.input_generation {
             return Err(crate::t!("cli-agent-input-target-changed"));
+        }
+        if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1 {
+            return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
         }
         if !self.claude_skill_was_registered(reference, ctx) {
             return Err(crate::t!("cli-task-manager-skills-session-fixed"));
@@ -399,7 +411,12 @@ impl LocalCLITaskManagerView {
         let mut body = Flex::column();
         body.add_child(self.row(&["attach-files", "import-review"]));
         body.add_child(self.text(crate::t!("cli-task-manager-skills"), appearance));
-        if self.managed_input.available_skills {
+        if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1 {
+            body.add_child(self.text(
+                crate::t!("cli-task-manager-permission-claude-files-skills"),
+                appearance,
+            ));
+        } else if self.managed_input.available_skills {
             body.add_child(ChildView::new(&self.managed_input.skills).finish());
         } else {
             body.add_child(self.text(crate::t!("cli-task-manager-no-skills"), appearance));
@@ -445,13 +462,7 @@ impl LocalCLITaskManagerView {
             ));
         }
         if self.harness == Harness::Claude {
-            body.add_child(self.text(
-                crate::t!(
-                    "cli-task-manager-images-unverified-hint",
-                    cli = self.harness.display_name()
-                ),
-                appearance,
-            ));
+            body.add_child(self.text(crate::t!("cli-agent-claude-png-only"), appearance));
         }
         if self.managed_input.preparing.is_some() || self.managed_input.processing_images {
             body.add_child(self.text(crate::t!("cli-task-manager-preparing-input"), appearance));

@@ -1,0 +1,61 @@
+{
+  "source_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "worktree_clean_before": false,
+  "source_manifest": {
+    "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+    "files": [
+      {
+        "path": "app/src/ai/cli_agent_runtime/grok.rs",
+        "sha256": "8322cd58d3502c659f8071af151c0705962b4a188a7a67c38e8a4a3466292099"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/grok_live_tests.rs",
+        "sha256": "33c373f72e1e7df977c76a28337c43746f1665116a8c56ef91d9d31f87f8c14f"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/task_manager_view.rs",
+        "sha256": "86acc37a3f0311cf033369465badea80fe9c037111931b837b8097fb206d8cee"
+      },
+      {
+        "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_tests.rs",
+        "sha256": "45bd1411d7ea9282a428aa9900108b02d19aa32d307885f74cfa82b150ff5e08"
+      },
+      {
+        "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_live_tests.rs",
+        "sha256": "28bcaf7e63a6440dc2ec8fd82d86fa09322eae27aa7965a810e71b97b3c598de"
+      },
+      {
+        "path": "script/cli-agent-parity/run_grok_adapter_live.py",
+        "sha256": "ea315c6875e4a33bc5eeacd2045bdb3a84b3f05ca987fdd533448728f6d08e83"
+      },
+      {
+        "path": "script/cli-agent-parity/grok_adapter_runner_tests.py",
+        "sha256": "0000df0631a2a01cf87330159b862f1bfc8646fdfb3b3b8f246a7658ca8faece"
+      },
+      {
+        "path": "script/cli-agent-parity/run_codex_source_live.py",
+        "sha256": "6d8bf45c8d05eaaa834a8f106f576993d69e3b2118b5e0853e51e62677ade02a"
+      },
+      {
+        "path": "script/cli-agent-parity/codex_source_runner_tests.py",
+        "sha256": "6a92532370b48f52ceab79e112fb9e0f599ac23a269011f088bae5e27a7f9a36"
+      }
+    ]
+  },
+  "argv": [
+    "./script/run",
+    "--dont-open",
+    "--features",
+    "local_cli_managed_tasks"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 183.265,
+  "log": "/tmp/infinishell-cli-parity-live-clip-1-bundle.log",
+  "log_sha256": "49bc29b036c25a60bf827c342292ff4a72acb566eb0ba54fd089a3c9c1a8cb32",
+  "worktree_clean_after": false,
+  "scope": "冻结 9 文件的中间 GUI 构建与签名；不计干净提交或真实生命周期。",
+  "worker": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "sha256": "7395968450618673fa0e58dd7f838ba345f8b665c7199e212e5f1955906b2336"
+  }
+}

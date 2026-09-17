@@ -80,6 +80,32 @@ fn codex_maps_to_unsupported_harness_kind() {
 }
 
 #[test]
+fn claude_standalone_driver_is_unsupported() {
+    // 旧独立 driver 没有审批回路；阻断派发不会禁用普通终端或托管 Coordinator。
+    assert!(matches!(
+        harness_kind(Harness::Claude),
+        Ok(HarnessKind::Unsupported(Harness::Claude))
+    ));
+}
+
+#[test]
+fn grok_standalone_driver_is_unsupported() {
+    assert!(matches!(
+        harness_kind(Harness::Grok),
+        Ok(HarnessKind::Unsupported(Harness::Grok))
+    ));
+    assert!(auth_check_command_for(Harness::Grok).is_none());
+}
+
+#[test]
+fn claude_authentication_check_is_independent_of_standalone_driver() {
+    assert_eq!(
+        auth_check_command_for(Harness::Claude).as_deref(),
+        Some("claude auth status")
+    );
+}
+
+#[test]
 fn auth_check_command_for_unknown_is_none() {
     // Harness::Unknown causes harness_kind to return Err; the helper still
     // returns None instead of panicking.

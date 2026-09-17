@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "generation": "89877c46-ddb7-4a77-bde8-0c36d350b447",
+  "cleanup_confirmed": true,
+  "exit_reason": "stdio_closed",
+  "exit_code": 0,
+  "manifest_sha256": "2bd035782c8f7f648908af9127d20deb6535126a5b2f8657c130e17d31d27cd1",
+  "manifest_contents_not_read": true,
+  "containment_details_omitted": true,
+  "source_sha256": "5320119c1e3e1fda1059f061c64af9f915f71eb6bfa05f1d77479a6fb9af93b3",
+  "source_bytes": 259,
+  "source_credential_scan": {
+    "api_key": 0,
+    "jwt": 0,
+    "bearer": 0,
+    "private_key": 0,
+    "email": 0,
+    "credential_assignment": 0
+  },
+  "safe_fields_independently_verified": true
+}

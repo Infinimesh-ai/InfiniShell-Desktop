@@ -1,0 +1,149 @@
+{
+  "base_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "files": [
+    {
+      "path": "app/i18n/en/warp.ftl",
+      "sha256": "7e59476c012fe83159ca13c85774a6074075340efe138e98d33f500ecdb467fc"
+    },
+    {
+      "path": "app/i18n/zh-CN/warp.ftl",
+      "sha256": "6208f6386951304e212dac0cd8c4a541bc30a2fe3bca50e9f9f8981d5d0097ad"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude.rs",
+      "sha256": "49599ce4f285fcc35d3af3ce4a21f101438698acc1abd837da9e345b23685101"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_live_tests.rs",
+      "sha256": "da4da3c0b996f58f4c390c137a0d59960698a84b02212d42d25df465b6f70ca7"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile.rs",
+      "sha256": "f41c1269724c259e465f31907ac0c0a8d73cdea5a903cdb936fdfa001124fd7b"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_live_tests.rs",
+      "sha256": "41dd83345d483dfac7e144993d8d79bd673778c8279c53fb81611bc58fbc315c"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_preflight.rs",
+      "sha256": "60ab9584b943ee7187806e0ef8c7dd2d137b5c335426573471e7cae9d7de0900"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_protocol_tests.rs",
+      "sha256": "8d7101dafeee361af35ace20c366b17172cf65dfa5d49963d3e8e70b71327443"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_tests.rs",
+      "sha256": "8fcddf70ff909b05c75ac6bc04f0d2a40e4479766d3806f2b77736195e19c96f"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_tests.rs",
+      "sha256": "ca2657ca56479d7d0620f5a96753f3775d078458356fbb089190c4245e647bd6"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex.rs",
+      "sha256": "0fa21f9382a0d84ad688f55e73862d2799e3b12ab48705480be827193f8fe1cc"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex_live_tests.rs",
+      "sha256": "6ecfe317b61457356c7e2ffbc47acb879035b9926b5ee984440713402f1ffe06"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex_tests.rs",
+      "sha256": "be66787fa98076fe672564e7bfdb57d0cf345a0802111997eddefee4cd12bd30"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator.rs",
+      "sha256": "be2cea4740192fc1a2939b53556892a4cdfd82ffaeb38f0aaac76b1615267559"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator_tests.rs",
+      "sha256": "0838d35f3b0491e0852ee3dc004e1b6239fe9cf09a191b649ebd7a91b2756b9c"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator_tools.rs",
+      "sha256": "9e54fe0e8985094f0ed7ebe0be727051c60959f0553e26c0024273e4903ba2bd"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok.rs",
+      "sha256": "9b4b8bb80b57f50000774e85a4509e22184528c530a52aa24f493e5e205a26a4"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_live_tests.rs",
+      "sha256": "70355a229202c785820cc8d99dd84549f09fbcb869561dedb102aa37359282b7"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_tests.rs",
+      "sha256": "d4f0b44a1ede90e5ab7e85477e69c222faeb0f139e8be4a358333ab304e994ea"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/mod.rs",
+      "sha256": "e60f7ffa284bc09682314a67e860b457ae2a370385230c62bf098221f632fb80"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions.rs",
+      "sha256": "f1ddf87888057f53e634c89df1cf5e3b030a895c24e47a2b8185a1e5014e5f2b"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions_tests.rs",
+      "sha256": "11a0154b72411c16d64700143212797158b007e83fc409446f05a7c4f6f2da6d"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_input.rs",
+      "sha256": "b2c61b2bd6518c20e1308df355fd5fdce4b365cdeb123d9ec6d6c39cee8462a8"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_view.rs",
+      "sha256": "29db29519eba29e2d89fbd675f1702c83d3d1e6b279a02c3ad6c60c191d5775e"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_view_tests.rs",
+      "sha256": "a5a439a36e49139405f50dc912f0c3da99bf0160796d2d5aad0b23d1ba6a6a91"
+    },
+    {
+      "path": "app/src/pane_group/pane/terminal_pane.rs",
+      "sha256": "f15b4fc18c4da172fed9403af0d8de3239d7ac750008d2d70dacdc1669418b03"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_live_tests.rs",
+      "sha256": "28bcaf7e63a6440dc2ec8fd82d86fa09322eae27aa7965a810e71b97b3c598de"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_tests.rs",
+      "sha256": "45bd1411d7ea9282a428aa9900108b02d19aa32d307885f74cfa82b150ff5e08"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_profile_runner_tests.py",
+      "sha256": "6bd8681209b5971b8889686e0bd487455b96a4fc33891737258b30f2f47ae1a9"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_source_runner_tests.py",
+      "sha256": "6a92532370b48f52ceab79e112fb9e0f599ac23a269011f088bae5e27a7f9a36"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_adapter_runner_tests.py",
+      "sha256": "0000df0631a2a01cf87330159b862f1bfc8646fdfb3b3b8f246a7658ca8faece"
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_profile_live.py",
+      "sha256": "22441975639ecd328bc7be780907c1b27325931b6d6a922c6b6672335eaa021e"
+    },
+    {
+      "path": "script/cli-agent-parity/run_codex_source_live.py",
+      "sha256": "6d8bf45c8d05eaaa834a8f106f576993d69e3b2118b5e0853e51e62677ade02a"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_adapter_live.py",
+      "sha256": "ea315c6875e4a33bc5eeacd2045bdb3a84b3f05ca987fdd533448728f6d08e83"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/claude-2.1.273-fixed-profile-control.json",
+      "sha256": "fb7c0fe39c3fea7d4b721ace8e62e034b8059f4e4492d80ad51981c056e88dbb"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-final-history-offline.json",
+      "sha256": "a71da4851785ce794205fa5b13247961685c364d490510fd1834b67a15512731"
+    }
+  ]
+}

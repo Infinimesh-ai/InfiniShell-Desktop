@@ -1,0 +1,46 @@
+{
+  "apps": [
+    {
+      "role": "before",
+      "app_name": "InfiniShellParityQueue1.app",
+      "source_binary_sha256": "df7a9814b2cd3237d376aa032a22557bc8b18e353a954d7ce0ab64bf62d010e0",
+      "resigned_binary_sha256": "65a2fb4751d7e5775e464d07c41184e21fab1c7c146f9b1ef116a92543f71ff7",
+      "copied_worker_sha256_verified": "65a2fb4751d7e5775e464d07c41184e21fab1c7c146f9b1ef116a92543f71ff7",
+      "provenance": "从隔离 GUI manifest 仅投影 app 与源构建/二次签名摘要；未复制 environment 或旧 commit 标签"
+    },
+    {
+      "role": "after",
+      "app_name": "InfiniShellParityClip1.app",
+      "source_binary_sha256": "7395968450618673fa0e58dd7f838ba345f8b665c7199e212e5f1955906b2336",
+      "resigned_binary_sha256": "2e8f3fa68eae56358207f3b213792c08c197581d3d1cfa8b8360ef758aaa6a94",
+      "copied_worker_sha256_verified": "2e8f3fa68eae56358207f3b213792c08c197581d3d1cfa8b8360ef758aaa6a94",
+      "provenance": "从隔离 GUI manifest 仅投影 app 与源构建/二次签名摘要；未复制 environment 或旧 commit 标签"
+    }
+  ],
+  "build_logs_hash_verified": [
+    {
+      "file": "infinishell-cli-parity-live-clip-1-check.log",
+      "sha256": "d59f063fabd695808478e33f3d69bf19edfeae1da142907ba20692c6bcd095af",
+      "matches_recorded": true,
+      "archived": false
+    },
+    {
+      "file": "infinishell-cli-parity-live-clip-1-i18n.log",
+      "sha256": "c81a27cb0c3d4547a8d7a8e5f154bc29d5fb041adac7f3416549c3c654ad1f15",
+      "matches_recorded": true,
+      "archived": false
+    },
+    {
+      "file": "infinishell-cli-parity-live-clip-1-focused.log",
+      "sha256": "62eace168137a8bbb132b82042094b8ab80a95f72562b968895c364674f0d01b",
+      "matches_recorded": true,
+      "archived": false
+    },
+    {
+      "file": "infinishell-cli-parity-live-clip-1-bundle.log",
+      "sha256": "49bc29b036c25a60bf827c342292ff4a72acb566eb0ba54fd089a3c9c1a8cb32",
+      "matches_recorded": true,
+      "archived": false
+    }
+  ]
+}

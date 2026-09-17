@@ -1,0 +1,105 @@
+{
+  "scope": "第2轮官方生产托管流程失败；已有原生正文与写入证据不替代完整验收",
+  "acceptance_passed": false,
+  "credential_values_recorded": false,
+  "completed_text_turns": [
+    {
+      "phase": "first_turn",
+      "turn_id": "6c3d86a8-5144-415b-90ae-51f5642fceef",
+      "native_session_id": "01a0af1e-002c-7340-a67e-f8d56b7c9b1f",
+      "outcome": "Completed",
+      "output": "PARITY_ONE"
+    },
+    {
+      "phase": "second_turn",
+      "turn_id": "4848f75e-8181-460d-8fde-6b92ae032957",
+      "native_session_id": "01a0af1e-002c-7340-a67e-f8d56b7c9b1f",
+      "outcome": "Completed",
+      "output": "PARITY_TWO"
+    }
+  ],
+  "approval_application_events": [
+    {
+      "event": "approval_requested",
+      "phase": "approval_allow",
+      "decision": "AllowOnce"
+    },
+    {
+      "event": "command_dispatched",
+      "phase": "approval_allow",
+      "native_receipt": false,
+      "turn_id": "9f57646b-bea5-4d39-a939-84ae339c8d23"
+    },
+    {
+      "event": "approval_resolved",
+      "phase": "approval_allow",
+      "decision": "AllowOnce",
+      "native_receipt": false
+    }
+  ],
+  "approval_native_receipt_confirmed": false,
+  "approval_limit": "AllowOnce 已在应用侧派发及处理，native_receipt=false；不能将应用事件或文件出现解释为原生审批 ACK，也未验证同类下一次操作再次审批。",
+  "write_fixture": {
+    "path": "project/approval-allow.txt",
+    "size_bytes": 15,
+    "sha256": "f798dce6c3641f8ef768c8f34eafc743ea5cf37c581fee64d69f79e689cdb2c9",
+    "exact_expected_content": true,
+    "expected_content": "PARITY_APPROVAL"
+  },
+  "failure_message": "Grok 连接断开：CLI process I/O failed: 托管监督进程退出失败",
+  "production_exit_receipt": {
+    "version": 1,
+    "generation": "fbd1da08-1a72-4970-b913-b895a9eaf160",
+    "cleanup_confirmed": true,
+    "containment": "macos_resource_coalition",
+    "exit_reason": "stdio_closed",
+    "exit_code": 0,
+    "manifest_sha256": "a6f5262f58bbbc39bb38cc6eb4d0186e60621d1f87963226462633ce47417866"
+  },
+  "exit_limit": "exit_code=0、stdio_closed 是监督链清理回执；不能把应用 transport 错误转为任务完成。",
+  "private_settings_unchanged_as_original_runner_reported": false,
+  "posthoc_settings_diagnostic": {
+    "bytes_unchanged": false,
+    "before_sha256": "8b51690ac09910a6975d9a06dd138d6722e669bf10618a700c636812a4097bd6",
+    "after_sha256": "eededaf9df6afedbd8e81a759a44a85a349d18cadccdc18d926a14ee48674794",
+    "toml_parse_succeeded": true,
+    "permission_section_unchanged": true,
+    "native_marketplace_initialization_only": true,
+    "settings_scope_verified": true,
+    "changed_top_level_tables": [
+      "marketplace"
+    ]
+  },
+  "posthoc_settings_limit": "baseline 为相同固定 prepare_native 初始文本的重建值，非第2轮运行前保留快照；只审计 config.toml。新严格 marketplace 判据不会回溯改变本轮失败或原 metadata。",
+  "network_summary": {
+    "tls_connections_attempted": 9,
+    "tls_bytes": 5061973,
+    "event_counts": {
+      "official_connect_attempt": 9,
+      "official_tunnel_opened": 9,
+      "rejected_nonofficial_origin": 73
+    },
+    "rejected_origins_identifiable": false
+  },
+  "network_limit": "旧 rejected_nonofficial_origin 未保留域名，不能确定其全为遥测。原生日志显示另有 api.x.ai tokenize-text 辅助请求失败；网络白名单仍仅 auth.x.ai 和 cli-chat-proxy.grok.com。",
+  "primary_error_followup": "主代理发现 run_transport 原始错误被 child.finish 清理错误覆盖；已修复后待第3轮保存原始错误，当前记录不得推断被覆盖错误的具体内容。",
+  "source_sha256": {
+    "metadata": "6b92078d5b231343080b45bdc58db9dca949aa075770231856823f5ffc8967f3",
+    "public_ndjson": "90ae2e9e994e8cd09c7344d578942c350511b8c66ece2c2adc59c4244c59c20a",
+    "network": "a5bb19f622000f4952e9500e0fec6c129e5c3381701825b35c228c465c632bb5",
+    "exit_receipt": "f44614c9e0493e2850e355ab9aae87af9a72c2fc1be966c3f3138c3c400eede7",
+    "macos_cleanup": "ce1fc63809100529a379a21cd2f4ed44516474314a0cb608ff2c391f1966e22d",
+    "manifest": "a6f5262f58bbbc39bb38cc6eb4d0186e60621d1f87963226462633ce47417866",
+    "private_evidence": "080dad0e8ac767b411e555f5b7f87bceb8a03dbcfe6fbe5467f6db3c91ff26ef",
+    "private_test_output": "c5173c3558b0f80ab9a3821f2c0b27907fcef5b4eb29412f46207b1a2f8de8bc",
+    "config_toml": "eededaf9df6afedbd8e81a759a44a85a349d18cadccdc18d926a14ee48674794"
+  },
+  "snapshot": {
+    "repository_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+    "worktree_dirty": true,
+    "grok_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+    "test_binary_sha256": "226140bf3cd511960f810be0cb380a0eb65a1d4e2c912b718b6f97889e16c441",
+    "supervisor_sha256": "7e118a0ee3c5f2feeffd0b3a9f0a4d0c5b9ded6346a220bded7500061a614a34"
+  },
+  "remaining_acceptance": "审批回合最终完成、拒绝、追加指令、取消、继续、应用重启恢复和结果回收未由本轮验证"
+}

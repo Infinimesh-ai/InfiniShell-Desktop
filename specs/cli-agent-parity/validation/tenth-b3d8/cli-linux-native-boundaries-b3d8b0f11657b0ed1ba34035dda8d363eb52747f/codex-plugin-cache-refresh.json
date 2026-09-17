@@ -1,0 +1,1760 @@
+{
+  "passed": true,
+  "codex_source_commit": "be6e8eac029b183056b7e4402879f15d2c85f61b",
+  "plugin_source_commit": "31ce59d9011cfb1d78f265649a228dac5de58d76",
+  "host_os": "linux",
+  "commands": [
+    {
+      "arguments": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "codex-cli 0.147.0\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "https://github.com/warpdotdev/codex-warp.git",
+        "--ref",
+        "31ce59d9011cfb1d78f265649a228dac5de58d76",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"codex-warp\",\n  \"installedRoot\": \"/tmp/infinishell-cache-refresh-aj8ugwug/codex/.tmp/marketplaces/codex-warp\",\n  \"alreadyAdded\": false\n}\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "warp@codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"warp@codex-warp\",\n  \"name\": \"warp\",\n  \"marketplaceName\": \"codex-warp\",\n  \"version\": \"0.4.0\",\n  \"installedPath\": \"/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "orchestration@codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"orchestration@codex-warp\",\n  \"name\": \"orchestration\",\n  \"marketplaceName\": \"codex-warp\",\n  \"version\": \"0.4.0\",\n  \"installedPath\": \"/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/orchestration/0.4.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "/tmp/infinishell-cache-refresh-aj8ugwug/other-marketplace",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"fixture-other\",\n  \"installedRoot\": \"/tmp/infinishell-cache-refresh-aj8ugwug/other-marketplace\",\n  \"alreadyAdded\": false\n}\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "/tmp/infinishell-cache-refresh-aj8ugwug/owned-source/codex-0.147.0-rev3/codex-warp",
+        "--json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\nError: marketplace 'codex-warp' is already added from a different source; remove it before adding this source\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "remove",
+        "codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"codex-warp\",\n  \"installedRoot\": \"/tmp/infinishell-cache-refresh-aj8ugwug/codex/.tmp/marketplaces/codex-warp\"\n}\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "/tmp/infinishell-cache-refresh-aj8ugwug/owned-source/codex-0.147.0-rev3/codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"codex-warp\",\n  \"installedRoot\": \"/tmp/infinishell-cache-refresh-aj8ugwug/owned-source/codex-0.147.0-rev3/codex-warp\",\n  \"alreadyAdded\": false\n}\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "warp@codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"warp@codex-warp\",\n  \"name\": \"warp\",\n  \"marketplaceName\": \"codex-warp\",\n  \"version\": \"0.4.0\",\n  \"installedPath\": \"/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "upgrade",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"selectedMarketplaces\": [],\n  \"upgradedRoots\": [],\n  \"errors\": []\n}\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "warp@codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"warp@codex-warp\",\n  \"name\": \"warp\",\n  \"marketplaceName\": \"codex-warp\",\n  \"version\": \"0.4.0\",\n  \"installedPath\": \"/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "remove",
+        "codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"codex-warp\",\n  \"installedRoot\": null\n}\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "/tmp/infinishell-cache-refresh-aj8ugwug/missing-marketplace",
+        "--json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\nError: failed to resolve local marketplace source path: No such file or directory (os error 2)\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "/tmp/infinishell-cache-refresh-aj8ugwug/owned-source/codex-0.147.0-rev3/codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"codex-warp\",\n  \"installedRoot\": \"/tmp/infinishell-cache-refresh-aj8ugwug/owned-source/codex-0.147.0-rev3/codex-warp\",\n  \"alreadyAdded\": false\n}\n",
+      "stderr": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))\n"
+    }
+  ],
+  "app_server_traces": [
+    {
+      "stage": "cache_only_restart",
+      "events": [
+        {
+          "channel": "stderr",
+          "value": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))",
+          "observed_elapsed_ms": 8
+        },
+        {
+          "channel": "stderr",
+          "value": "\u001b[2m2026-09-17T06:41:49.824249Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+          "observed_elapsed_ms": 417
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_cache_refresh_probe/0.147.0 (Ubuntu 22.4.0; x86_64) unknown (infinishell_cache_refresh_probe; 0.1.0)",
+              "codexHome": "/tmp/infinishell-cache-refresh-aj8ugwug/codex",
+              "platformFamily": "unix",
+              "platformOs": "linux"
+            }
+          },
+          "observed_elapsed_ms": 539
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "configWarning",
+            "params": {
+              "summary": "Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+              "details": null
+            },
+            "emittedAtMs": 1789627309945
+          },
+          "observed_elapsed_ms": 539
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "ci-ubuntu",
+              "installationId": "9923dd1a-8a8e-41bb-b3ac-be6ccb1cfe92",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789627309945
+          },
+          "observed_elapsed_ms": 539
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 3,
+            "result": {
+              "data": [
+                {
+                  "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+                  "hooks": [
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                      "eventName": "permissionRequest",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-permission-request.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 0,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:60f3f1de21f20eb4f54007342338e7000b9dca06a111e776a37dcd62fdd7b215",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                      "eventName": "postToolUse",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-post-tool-use.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 1,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:4ff952d5bac454272cc8d3eec507954c8bab421066aaa2e60026e09920d20ed6",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-session-start.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 2,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:4524bbc6e5a9e4b2528f06432e7aa9829b42d7e7aa24d66b0c30aada912baf34",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-prompt-submit.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 3,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:122190ef9554a17967255480c31b7beb36e69e08353840c7ef947c145186ad91",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                      "eventName": "stop",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-stop.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 4,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:e206bdb01c8e380c7b5a4fa4ee1473c1f20338b9762bcfe0d0832ac7f99eb46c",
+                      "trustStatus": "untrusted"
+                    }
+                  ],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          },
+          "observed_elapsed_ms": 546
+        }
+      ],
+      "process_cleanup": {
+        "root_exited_naturally": true,
+        "root_forced": false,
+        "descendants_forced": false,
+        "readers_eof": true,
+        "cleanup_confirmed": true,
+        "root_exit_code": 0,
+        "reader_errors": [],
+        "elapsed_ms": 16
+      },
+      "hooks": {
+        "data": [
+          {
+            "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+            "hooks": [
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                "eventName": "permissionRequest",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-permission-request.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 0,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:60f3f1de21f20eb4f54007342338e7000b9dca06a111e776a37dcd62fdd7b215",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                "eventName": "postToolUse",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-post-tool-use.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 1,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:4ff952d5bac454272cc8d3eec507954c8bab421066aaa2e60026e09920d20ed6",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                "eventName": "sessionStart",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-session-start.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 2,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:4524bbc6e5a9e4b2528f06432e7aa9829b42d7e7aa24d66b0c30aada912baf34",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-prompt-submit.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 3,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:122190ef9554a17967255480c31b7beb36e69e08353840c7ef947c145186ad91",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                "eventName": "stop",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-stop.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 4,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:e206bdb01c8e380c7b5a4fa4ee1473c1f20338b9762bcfe0d0832ac7f99eb46c",
+                "trustStatus": "untrusted"
+              }
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      },
+      "background_reverted_to_upstream": true,
+      "background_revision_published": "31ce59d9011cfb1d78f265649a228dac5de58d76"
+    },
+    {
+      "stage": "explicit_orchestration_disable",
+      "events": [
+        {
+          "channel": "stderr",
+          "value": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))",
+          "observed_elapsed_ms": 10
+        },
+        {
+          "channel": "stderr",
+          "value": "\u001b[2m2026-09-17T06:41:52.387375Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+          "observed_elapsed_ms": 139
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_cache_refresh_probe/0.147.0 (Ubuntu 22.4.0; x86_64) unknown (infinishell_cache_refresh_probe; 0.1.0)",
+              "codexHome": "/tmp/infinishell-cache-refresh-aj8ugwug/codex",
+              "platformFamily": "unix",
+              "platformOs": "linux"
+            }
+          },
+          "observed_elapsed_ms": 267
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "configWarning",
+            "params": {
+              "summary": "Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+              "details": null
+            },
+            "emittedAtMs": 1789627312515
+          },
+          "observed_elapsed_ms": 267
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "ci-ubuntu",
+              "installationId": "9923dd1a-8a8e-41bb-b3ac-be6ccb1cfe92",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789627312515
+          },
+          "observed_elapsed_ms": 267
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 2,
+            "result": {
+              "status": "ok",
+              "version": "sha256:9e658b57b0bfb8a3cf8803ffb989bf5fea2cd7ca7bb9579e80b87ffe5cbf07e3",
+              "filePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/config.toml",
+              "overriddenMetadata": null
+            }
+          },
+          "observed_elapsed_ms": 272
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 3,
+            "result": {
+              "data": [
+                {
+                  "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+                  "hooks": [
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                      "eventName": "permissionRequest",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-permission-request.sh",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 0,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:a5f8b0ebc36bb459328ffeb5f62ff146dfb74e3d88d4c369cf0280f7b354e388",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                      "eventName": "postToolUse",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-post-tool-use.sh",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 1,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:be77e14a9094af2f521258e2bff1f5d777249bc50ce8eb0574a85bea9bd79e7f",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-session-start.sh",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 2,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:91587043033e7831d4d154fdef2e495f3113c3552a4529d8013f5546ffb2c140",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-prompt-submit.sh",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 3,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:2480a7db650a36e05d8005aabca58b9d106f3b7a46f7094d7747d0d77773f75c",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                      "eventName": "stop",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-stop.sh",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 4,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:6a3b3af655efa426e920425de93a830fe25b8b5a62ef7b9a699e7ff40d9ef351",
+                      "trustStatus": "untrusted"
+                    }
+                  ],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          },
+          "observed_elapsed_ms": 278
+        }
+      ],
+      "process_cleanup": {
+        "root_exited_naturally": true,
+        "root_forced": false,
+        "descendants_forced": false,
+        "readers_eof": true,
+        "cleanup_confirmed": true,
+        "root_exit_code": 0,
+        "reader_errors": [],
+        "elapsed_ms": 16
+      },
+      "hooks": {
+        "data": [
+          {
+            "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+            "hooks": [
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                "eventName": "permissionRequest",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-permission-request.sh",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 0,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:a5f8b0ebc36bb459328ffeb5f62ff146dfb74e3d88d4c369cf0280f7b354e388",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                "eventName": "postToolUse",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-post-tool-use.sh",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 1,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:be77e14a9094af2f521258e2bff1f5d777249bc50ce8eb0574a85bea9bd79e7f",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                "eventName": "sessionStart",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-session-start.sh",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 2,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:91587043033e7831d4d154fdef2e495f3113c3552a4529d8013f5546ffb2c140",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-prompt-submit.sh",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 3,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:2480a7db650a36e05d8005aabca58b9d106f3b7a46f7094d7747d0d77773f75c",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                "eventName": "stop",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/scripts/on-stop.sh",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 4,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:6a3b3af655efa426e920425de93a830fe25b8b5a62ef7b9a699e7ff40d9ef351",
+                "trustStatus": "untrusted"
+              }
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      }
+    },
+    {
+      "stage": "owned_source_restart",
+      "events": [
+        {
+          "channel": "stderr",
+          "value": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))",
+          "observed_elapsed_ms": 4
+        },
+        {
+          "channel": "stderr",
+          "value": "\u001b[2m2026-09-17T06:41:52.753849Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+          "observed_elapsed_ms": 42
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_cache_refresh_probe/0.147.0 (Ubuntu 22.4.0; x86_64) unknown (infinishell_cache_refresh_probe; 0.1.0)",
+              "codexHome": "/tmp/infinishell-cache-refresh-aj8ugwug/codex",
+              "platformFamily": "unix",
+              "platformOs": "linux"
+            }
+          },
+          "observed_elapsed_ms": 154
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "configWarning",
+            "params": {
+              "summary": "Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+              "details": null
+            },
+            "emittedAtMs": 1789627312865
+          },
+          "observed_elapsed_ms": 154
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "ci-ubuntu",
+              "installationId": "9923dd1a-8a8e-41bb-b3ac-be6ccb1cfe92",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789627312865
+          },
+          "observed_elapsed_ms": 155
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 3,
+            "result": {
+              "data": [
+                {
+                  "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+                  "hooks": [
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                      "eventName": "permissionRequest",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-permission-request.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 0,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:60f3f1de21f20eb4f54007342338e7000b9dca06a111e776a37dcd62fdd7b215",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                      "eventName": "postToolUse",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-post-tool-use.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 1,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:4ff952d5bac454272cc8d3eec507954c8bab421066aaa2e60026e09920d20ed6",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-session-start.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 2,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:4524bbc6e5a9e4b2528f06432e7aa9829b42d7e7aa24d66b0c30aada912baf34",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-prompt-submit.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 3,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:122190ef9554a17967255480c31b7beb36e69e08353840c7ef947c145186ad91",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                      "eventName": "stop",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-stop.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 4,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:e206bdb01c8e380c7b5a4fa4ee1473c1f20338b9762bcfe0d0832ac7f99eb46c",
+                      "trustStatus": "untrusted"
+                    }
+                  ],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          },
+          "observed_elapsed_ms": 165
+        }
+      ],
+      "process_cleanup": {
+        "root_exited_naturally": true,
+        "root_forced": false,
+        "descendants_forced": false,
+        "readers_eof": true,
+        "cleanup_confirmed": true,
+        "root_exit_code": 0,
+        "reader_errors": [],
+        "elapsed_ms": 16
+      },
+      "hooks": {
+        "data": [
+          {
+            "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+            "hooks": [
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                "eventName": "permissionRequest",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-permission-request.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 0,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:60f3f1de21f20eb4f54007342338e7000b9dca06a111e776a37dcd62fdd7b215",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                "eventName": "postToolUse",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-post-tool-use.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 1,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:4ff952d5bac454272cc8d3eec507954c8bab421066aaa2e60026e09920d20ed6",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                "eventName": "sessionStart",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-session-start.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 2,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:4524bbc6e5a9e4b2528f06432e7aa9829b42d7e7aa24d66b0c30aada912baf34",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-prompt-submit.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 3,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:122190ef9554a17967255480c31b7beb36e69e08353840c7ef947c145186ad91",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                "eventName": "stop",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-stop.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 4,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:e206bdb01c8e380c7b5a4fa4ee1473c1f20338b9762bcfe0d0832ac7f99eb46c",
+                "trustStatus": "untrusted"
+              }
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      }
+    },
+    {
+      "stage": "owned_source_reinstall_then_restart",
+      "events": [
+        {
+          "channel": "stderr",
+          "value": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))",
+          "observed_elapsed_ms": 9
+        },
+        {
+          "channel": "stderr",
+          "value": "\u001b[2m2026-09-17T06:41:52.988532Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+          "observed_elapsed_ms": 43
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_cache_refresh_probe/0.147.0 (Ubuntu 22.4.0; x86_64) unknown (infinishell_cache_refresh_probe; 0.1.0)",
+              "codexHome": "/tmp/infinishell-cache-refresh-aj8ugwug/codex",
+              "platformFamily": "unix",
+              "platformOs": "linux"
+            }
+          },
+          "observed_elapsed_ms": 152
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "configWarning",
+            "params": {
+              "summary": "Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+              "details": null
+            },
+            "emittedAtMs": 1789627313097
+          },
+          "observed_elapsed_ms": 152
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "ci-ubuntu",
+              "installationId": "9923dd1a-8a8e-41bb-b3ac-be6ccb1cfe92",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789627313097
+          },
+          "observed_elapsed_ms": 153
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 3,
+            "result": {
+              "data": [
+                {
+                  "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+                  "hooks": [
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                      "eventName": "permissionRequest",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-permission-request.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 0,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:60f3f1de21f20eb4f54007342338e7000b9dca06a111e776a37dcd62fdd7b215",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                      "eventName": "postToolUse",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-post-tool-use.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 1,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:4ff952d5bac454272cc8d3eec507954c8bab421066aaa2e60026e09920d20ed6",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                      "eventName": "sessionStart",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-session-start.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 2,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:4524bbc6e5a9e4b2528f06432e7aa9829b42d7e7aa24d66b0c30aada912baf34",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                      "eventName": "userPromptSubmit",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-prompt-submit.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 3,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:122190ef9554a17967255480c31b7beb36e69e08353840c7ef947c145186ad91",
+                      "trustStatus": "untrusted"
+                    },
+                    {
+                      "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                      "eventName": "stop",
+                      "handlerType": "command",
+                      "matcher": null,
+                      "command": "bash \"$PLUGIN_ROOT/scripts/on-stop.sh\"",
+                      "timeoutSec": 600,
+                      "statusMessage": null,
+                      "additionalContextLimit": null,
+                      "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                      "source": "plugin",
+                      "pluginId": "warp@codex-warp",
+                      "displayOrder": 4,
+                      "enabled": true,
+                      "isManaged": false,
+                      "currentHash": "sha256:e206bdb01c8e380c7b5a4fa4ee1473c1f20338b9762bcfe0d0832ac7f99eb46c",
+                      "trustStatus": "untrusted"
+                    }
+                  ],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          },
+          "observed_elapsed_ms": 160
+        }
+      ],
+      "process_cleanup": {
+        "root_exited_naturally": true,
+        "root_forced": false,
+        "descendants_forced": false,
+        "readers_eof": true,
+        "cleanup_confirmed": true,
+        "root_exit_code": 0,
+        "reader_errors": [],
+        "elapsed_ms": 16
+      },
+      "hooks": {
+        "data": [
+          {
+            "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+            "hooks": [
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+                "eventName": "permissionRequest",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-permission-request.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 0,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:60f3f1de21f20eb4f54007342338e7000b9dca06a111e776a37dcd62fdd7b215",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+                "eventName": "postToolUse",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-post-tool-use.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 1,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:4ff952d5bac454272cc8d3eec507954c8bab421066aaa2e60026e09920d20ed6",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+                "eventName": "sessionStart",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-session-start.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 2,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:4524bbc6e5a9e4b2528f06432e7aa9829b42d7e7aa24d66b0c30aada912baf34",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+                "eventName": "userPromptSubmit",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-prompt-submit.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 3,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:122190ef9554a17967255480c31b7beb36e69e08353840c7ef947c145186ad91",
+                "trustStatus": "untrusted"
+              },
+              {
+                "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+                "eventName": "stop",
+                "handlerType": "command",
+                "matcher": null,
+                "command": "bash \"$PLUGIN_ROOT/scripts/on-stop.sh\"",
+                "timeoutSec": 600,
+                "statusMessage": null,
+                "additionalContextLimit": null,
+                "sourcePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+                "source": "plugin",
+                "pluginId": "warp@codex-warp",
+                "displayOrder": 4,
+                "enabled": true,
+                "isManaged": false,
+                "currentHash": "sha256:e206bdb01c8e380c7b5a4fa4ee1473c1f20338b9762bcfe0d0832ac7f99eb46c",
+                "trustStatus": "untrusted"
+              }
+            ],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      }
+    },
+    {
+      "stage": "explicit_native_disable",
+      "events": [
+        {
+          "channel": "stderr",
+          "value": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))",
+          "observed_elapsed_ms": 10
+        },
+        {
+          "channel": "stderr",
+          "value": "\u001b[2m2026-09-17T06:41:53.185696Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+          "observed_elapsed_ms": 51
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_cache_refresh_probe/0.147.0 (Ubuntu 22.4.0; x86_64) unknown (infinishell_cache_refresh_probe; 0.1.0)",
+              "codexHome": "/tmp/infinishell-cache-refresh-aj8ugwug/codex",
+              "platformFamily": "unix",
+              "platformOs": "linux"
+            }
+          },
+          "observed_elapsed_ms": 161
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "configWarning",
+            "params": {
+              "summary": "Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+              "details": null
+            },
+            "emittedAtMs": 1789627313295
+          },
+          "observed_elapsed_ms": 161
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "ci-ubuntu",
+              "installationId": "9923dd1a-8a8e-41bb-b3ac-be6ccb1cfe92",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789627313295
+          },
+          "observed_elapsed_ms": 162
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 2,
+            "result": {
+              "status": "ok",
+              "version": "sha256:b774c8e044974ec4d1ce5bfdf4c22b6e6df2775f913429529ec205c4e18a6ba5",
+              "filePath": "/tmp/infinishell-cache-refresh-aj8ugwug/codex/config.toml",
+              "overriddenMetadata": null
+            }
+          },
+          "observed_elapsed_ms": 168
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 3,
+            "result": {
+              "data": [
+                {
+                  "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+                  "hooks": [],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          },
+          "observed_elapsed_ms": 175
+        }
+      ],
+      "process_cleanup": {
+        "root_exited_naturally": true,
+        "root_forced": false,
+        "descendants_forced": false,
+        "readers_eof": true,
+        "cleanup_confirmed": true,
+        "root_exit_code": 0,
+        "reader_errors": [],
+        "elapsed_ms": 16
+      },
+      "hooks": {
+        "data": [
+          {
+            "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+            "hooks": [],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      }
+    },
+    {
+      "stage": "disabled_restart",
+      "events": [
+        {
+          "channel": "stderr",
+          "value": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))",
+          "observed_elapsed_ms": 8
+        },
+        {
+          "channel": "stderr",
+          "value": "\u001b[2m2026-09-17T06:41:53.375585Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+          "observed_elapsed_ms": 49
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_cache_refresh_probe/0.147.0 (Ubuntu 22.4.0; x86_64) unknown (infinishell_cache_refresh_probe; 0.1.0)",
+              "codexHome": "/tmp/infinishell-cache-refresh-aj8ugwug/codex",
+              "platformFamily": "unix",
+              "platformOs": "linux"
+            }
+          },
+          "observed_elapsed_ms": 159
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "configWarning",
+            "params": {
+              "summary": "Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+              "details": null
+            },
+            "emittedAtMs": 1789627313485
+          },
+          "observed_elapsed_ms": 160
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "ci-ubuntu",
+              "installationId": "9923dd1a-8a8e-41bb-b3ac-be6ccb1cfe92",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789627313485
+          },
+          "observed_elapsed_ms": 160
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 3,
+            "result": {
+              "data": [
+                {
+                  "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+                  "hooks": [],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          },
+          "observed_elapsed_ms": 167
+        }
+      ],
+      "process_cleanup": {
+        "root_exited_naturally": true,
+        "root_forced": false,
+        "descendants_forced": false,
+        "readers_eof": true,
+        "cleanup_confirmed": true,
+        "root_exit_code": 0,
+        "reader_errors": [],
+        "elapsed_ms": 16
+      },
+      "hooks": {
+        "data": [
+          {
+            "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+            "hooks": [],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      }
+    },
+    {
+      "stage": "disabled_source_recovery_restart",
+      "events": [
+        {
+          "channel": "stderr",
+          "value": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/infinishell-cache-refresh-aj8ugwug/codex\"))",
+          "observed_elapsed_ms": 6
+        },
+        {
+          "channel": "stderr",
+          "value": "\u001b[2m2026-09-17T06:41:53.646075Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+          "observed_elapsed_ms": 47
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 1,
+            "result": {
+              "userAgent": "infinishell_cache_refresh_probe/0.147.0 (Ubuntu 22.4.0; x86_64) unknown (infinishell_cache_refresh_probe; 0.1.0)",
+              "codexHome": "/tmp/infinishell-cache-refresh-aj8ugwug/codex",
+              "platformFamily": "unix",
+              "platformOs": "linux"
+            }
+          },
+          "observed_elapsed_ms": 156
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "configWarning",
+            "params": {
+              "summary": "Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+              "details": null
+            },
+            "emittedAtMs": 1789627313755
+          },
+          "observed_elapsed_ms": 156
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "method": "remoteControl/status/changed",
+            "params": {
+              "status": "disabled",
+              "serverName": "ci-ubuntu",
+              "installationId": "9923dd1a-8a8e-41bb-b3ac-be6ccb1cfe92",
+              "environmentId": null
+            },
+            "emittedAtMs": 1789627313755
+          },
+          "observed_elapsed_ms": 156
+        },
+        {
+          "channel": "stdout",
+          "value": {
+            "id": 3,
+            "result": {
+              "data": [
+                {
+                  "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+                  "hooks": [],
+                  "warnings": [],
+                  "errors": []
+                }
+              ]
+            }
+          },
+          "observed_elapsed_ms": 163
+        }
+      ],
+      "process_cleanup": {
+        "root_exited_naturally": true,
+        "root_forced": false,
+        "descendants_forced": false,
+        "readers_eof": true,
+        "cleanup_confirmed": true,
+        "root_exit_code": 0,
+        "reader_errors": [],
+        "elapsed_ms": 15
+      },
+      "hooks": {
+        "data": [
+          {
+            "cwd": "/tmp/infinishell-cache-refresh-aj8ugwug",
+            "hooks": [],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      }
+    }
+  ],
+  "credentials_provided": false,
+  "thread_or_turn_created": false,
+  "product_installer_fixed": false,
+  "native_pty_verified": false,
+  "cli": "codex-cli 0.147.0",
+  "executable_sha256": "cb0a15567e9a60a5820d54b0f6ae86d504dc3805c1eab21a47f70e3eb7b73a40",
+  "cache_only_before_restart": {
+    "tree": {
+      "hooks/hooks.json": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
+      "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+      "scripts/warp-notify.sh": "b0b75257e90f432d43848f051329664376ee8b662e8531ea8ab3c42d62c9017c",
+      "scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+      "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+      "scripts/on-prompt-submit.sh": "68051813eb32d83faf5e3c33f2e49111e1b469f23afa220648b35a882d9cb082",
+      "scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+      "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+      "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+      ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e"
+    },
+    "config": {
+      "approval_policy": "on-request",
+      "sandbox_mode": "read-only",
+      "marketplaces": {
+        "codex-warp": {
+          "last_updated": "2026-09-17T06:41:49Z",
+          "source_type": "git",
+          "source": "https://github.com/warpdotdev/codex-warp.git",
+          "ref": "31ce59d9011cfb1d78f265649a228dac5de58d76"
+        }
+      },
+      "plugins": {
+        "warp@codex-warp": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "cache_only_after_restart": {
+    "tree": {
+      "hooks/hooks.json": "79b5f2bc55848ba1bc3cb7ddb9a4979249681b9b3719420752a512bb95881cdc",
+      "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+      "scripts/warp-notify.sh": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366",
+      "scripts/build-payload.sh": "2e34b5874724234c14222b2c271efdf4dbfd33ad993bfb411d963a2eb468f24e",
+      "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+      "scripts/on-prompt-submit.sh": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+      "scripts/on-stop.sh": "a2de778f79114c32bc64e4a8a8697b566c0a1fe22faac5010cfccdefa05406ec",
+      "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+      "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+      ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e"
+    },
+    "config": {
+      "approval_policy": "on-request",
+      "sandbox_mode": "read-only",
+      "marketplaces": {
+        "codex-warp": {
+          "last_updated": "2026-09-17T06:41:52Z",
+          "last_revision": "31ce59d9011cfb1d78f265649a228dac5de58d76",
+          "source_type": "git",
+          "source": "https://github.com/warpdotdev/codex-warp.git",
+          "ref": "31ce59d9011cfb1d78f265649a228dac5de58d76"
+        }
+      },
+      "plugins": {
+        "warp@codex-warp": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "same_id_migration": {
+    "config": {
+      "approval_policy": "on-request",
+      "sandbox_mode": "read-only",
+      "marketplaces": {
+        "fixture-other": {
+          "last_updated": "2026-09-17T06:41:52Z",
+          "source_type": "local",
+          "source": "/tmp/infinishell-cache-refresh-aj8ugwug/other-marketplace"
+        },
+        "codex-warp": {
+          "last_updated": "2026-09-17T06:41:52Z",
+          "source_type": "local",
+          "source": "/tmp/infinishell-cache-refresh-aj8ugwug/owned-source/codex-0.147.0-rev3/codex-warp"
+        }
+      },
+      "plugins": {
+        "warp@codex-warp": {
+          "enabled": true
+        },
+        "orchestration@codex-warp": {
+          "enabled": false
+        }
+      }
+    },
+    "owned_source_tree": {
+      "LICENSE": "b6686c85488c50963919885a98bb86ad7e10fe1b60139b98149fe9fad488c7c8",
+      "README.md": "e0b2cb724fee2c3ecec7fe3c1e09018b787d8fa53c230d4257edd109e8b751e6",
+      "tests/test-hooks.sh": "cfd7b359b09f4008ab989e477d7190631631b892d596f77d73cd67c67ae4c601",
+      "plugins/orchestration/skills/oz-notify-user/SKILL.md": "dd8a74b320cd90081f1bd729fba1faca9bb13f58744c3d82a15dddd12a8cffc3",
+      "plugins/orchestration/skills/oz-upload-file/SKILL.md": "83007bcc06df76fceef9564a72e91d062293d3318f8344f33f08a3c839ae9b5e",
+      "plugins/orchestration/skills/oz-child-agent-orchestration/SKILL.md": "70cda0056e96d30b11283e23495e3ff23e03a9e0e9bb2a1a2df39073242fa52d",
+      "plugins/orchestration/skills/oz-finish-task/SKILL.md": "5b6d83f467b105c8a74e8f937501e026683e9171c7bfb4d8153e611e60e38590",
+      "plugins/orchestration/skills/factory-files/SKILL.md": "219664b416c5591af2471c8930224eb0e6a35916ec900492b1dd98b9fcf49a66",
+      "plugins/orchestration/skills/factory-files/references/validation.md": "5c53ceea4c9d7dac1a4b237f09abca6b846d4219e76241fac8dbf1279cc8ae95",
+      "plugins/orchestration/skills/factory-files/references/examples.md": "9fd905c3b08b440c8f40a5d42e9efff868c820b4b129f40c08ddefe587b1280d",
+      "plugins/orchestration/skills/factory-files/references/scorers.md": "8a18d06091e01b332e2751836f8e3616583de48fe7ea2bb76aacdb6017f2bb25",
+      "plugins/orchestration/skills/factory-files/scripts/validate_factory_files.py": "3e9faa9f43dc5c2eb2b9f10bb3716cc53e251d8c59d685989548a1a85cd1f29b",
+      "plugins/orchestration/skills/oz-report-pr/SKILL.md": "fad6c455cdae4a0a019793be24afb28e024ac8fee6ef97a4bf8689517dc58b13",
+      "plugins/orchestration/tests/test-factory-files.sh": "d20fa0c689189e8ed0ac54444edcee9d48ced83588a5d616a25839e2030f545b",
+      "plugins/orchestration/hooks/hooks.json": "758d851b5d916fd5d2d75795b1f6d41cc827a51e0b6608be0bf43031ab5a0113",
+      "plugins/orchestration/scripts/oz-parent-listener.sh": "ad3b870d1719ea8eba527a4a7a273fb9bf533e3599455f22e02efa87253bf62e",
+      "plugins/orchestration/scripts/oz-parent-common.sh": "51cd1833e4cc1d5a2072f0d73392cfaaaf711ebd03710d50facd4dcc1fd80a66",
+      "plugins/orchestration/scripts/drain-mailbox.sh": "3647d900f161beb247d406f3c5f41c735b59f8b888551ad29aea561b56478e7a",
+      "plugins/orchestration/scripts/on-prompt-submit.sh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "plugins/orchestration/scripts/on-stop.sh": "bccbaabdb87e59d86648092af0fa0ce1485268faa40e3091da20ec769cac515c",
+      "plugins/orchestration/scripts/on-post-tool-use.sh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "plugins/orchestration/scripts/on-session-end.sh": "d693a293622158a95c7c18bbd153dffd8c041b3b13cf83d91feb175fc9076ec7",
+      "plugins/orchestration/scripts/on-session-start.sh": "436a73ee08f44aa87febf4397aeecc409592e028bf95070e8e981855f68d88bb",
+      "plugins/orchestration/.codex-plugin/plugin.json": "f009943a7794e7764d7d71c5c7ece7cf8baab42b103d4e2dbf2191ef9616a51e",
+      "plugins/warp/hooks/hooks.json": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
+      "plugins/warp/scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+      "plugins/warp/scripts/warp-notify.sh": "b0b75257e90f432d43848f051329664376ee8b662e8531ea8ab3c42d62c9017c",
+      "plugins/warp/scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+      "plugins/warp/scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+      "plugins/warp/scripts/on-prompt-submit.sh": "68051813eb32d83faf5e3c33f2e49111e1b469f23afa220648b35a882d9cb082",
+      "plugins/warp/scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+      "plugins/warp/scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+      "plugins/warp/scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+      "plugins/warp/.codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+      ".github/workflows/test.yml": "20204501cdb85f00a6c8f20130602a616e0a790016a62a8f20629fe99fa3a06a",
+      ".agents/plugins/marketplace.json": "9a051e04663470d26cac04a50eaa29c3bca830697f93c7fe261329514db2e5ce"
+    }
+  },
+  "native_switch_failure_before_recovery": {
+    "config": {
+      "approval_policy": "on-request",
+      "sandbox_mode": "read-only",
+      "marketplaces": {
+        "fixture-other": {
+          "last_updated": "2026-09-17T06:41:52Z",
+          "source_type": "local",
+          "source": "/tmp/infinishell-cache-refresh-aj8ugwug/other-marketplace"
+        }
+      },
+      "plugins": {
+        "warp@codex-warp": {
+          "enabled": false
+        },
+        "orchestration@codex-warp": {
+          "enabled": false
+        }
+      }
+    },
+    "requires_explicit_recovery": true
+  },
+  "native_switch_recovery": {
+    "config": {
+      "approval_policy": "on-request",
+      "sandbox_mode": "read-only",
+      "marketplaces": {
+        "fixture-other": {
+          "last_updated": "2026-09-17T06:41:52Z",
+          "source_type": "local",
+          "source": "/tmp/infinishell-cache-refresh-aj8ugwug/other-marketplace"
+        },
+        "codex-warp": {
+          "last_updated": "2026-09-17T06:41:53Z",
+          "source_type": "local",
+          "source": "/tmp/infinishell-cache-refresh-aj8ugwug/owned-source/codex-0.147.0-rev3/codex-warp"
+        }
+      },
+      "plugins": {
+        "warp@codex-warp": {
+          "enabled": false
+        },
+        "orchestration@codex-warp": {
+          "enabled": false
+        }
+      }
+    },
+    "plugin_add_used": false
+  },
+  "checks": {
+    "cache_only_patch_reverted_by_native_startup": true,
+    "same_commit_first_refresh_reinstalled_cache": true,
+    "complete_other_plugin_sources_preserved": true,
+    "installed_orchestration_cache_and_disabled_config_preserved": true,
+    "same_plugin_id_preserved": true,
+    "other_marketplace_preserved": true,
+    "owned_source_survives_native_reinstall_and_restarts": true,
+    "explicit_disabled_state_survives_restart": true,
+    "no_automatic_hook_trust": true,
+    "native_remove_add_failure_gap_observed": true,
+    "disabled_native_source_recovery_preserved_cache": true
+  },
+  "private_directory_removed": true
+}

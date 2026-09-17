@@ -29,17 +29,31 @@ pub(crate) fn prepare_managed_input(
     attachment_store: &Path,
 ) -> Result<Vec<InputContent>, String> {
     match harness {
-        Harness::Codex | Harness::Claude => {}
-        Harness::Grok => return Err(crate::t!("cli-agent-grok-managed-unavailable")),
+        Harness::Codex | Harness::Claude | Harness::Grok => {}
         Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Unknown => {
             return Err(crate::t!("cli-agent-managed-version-unavailable"));
         }
     }
-    if harness == Harness::Claude && !images.is_empty() {
+    if harness == Harness::Grok && !images.is_empty() {
         return Err(crate::t!(
             "cli-agent-input-images-unverified",
             cli = harness.display_name()
         ));
+    }
+    if harness == Harness::Grok && !skills.is_empty() {
+        return Err(crate::t!("cli-agent-grok-input-skills-unverified"));
+    }
+    if harness == Harness::Claude && !images.is_empty() {
+        // 当前原生校准仅覆盖 PNG 与文本，不把其他格式或技能混用计作可用能力。
+        if images.iter().any(|image| image.mime_type != "image/png") {
+            return Err(crate::t!("cli-agent-claude-png-only"));
+        }
+        if !skills.is_empty() {
+            return Err(crate::t!("cli-agent-claude-image-skill-unverified"));
+        }
+        if text.trim().is_empty() {
+            return Err(crate::t!("cli-task-manager-empty-prompt"));
+        }
     }
     if images.len() > MAX_IMAGE_COUNT_FOR_QUERY {
         return Err(crate::t!(
@@ -48,10 +62,13 @@ pub(crate) fn prepare_managed_input(
         ));
     }
     let skill_inputs = prepare_local_cli_skill_inputs(skills, harness, true)?;
-    let images = images
+    let validated_images = images
         .iter()
         .map(validate_image)
         .collect::<Result<Vec<_>, _>>()?;
+    if harness == Harness::Claude && !images.is_empty() {
+        super::claude::verify_prepared_png_budget(&text, images)?;
+    }
     if text.is_empty() && images.is_empty() && skill_inputs.is_empty() {
         return Err(crate::t!("cli-task-manager-empty-prompt"));
     }
@@ -62,7 +79,7 @@ pub(crate) fn prepare_managed_input(
     }
     if !images.is_empty() {
         prepare_attachment_store(attachment_store).map_err(storage_error)?;
-        for image in images {
+        for image in validated_images {
             let path = persist_image(attachment_store, &image).map_err(storage_error)?;
             input.push(InputContent::LocalImage(path));
         }

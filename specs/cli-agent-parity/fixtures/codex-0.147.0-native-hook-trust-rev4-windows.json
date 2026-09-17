@@ -1,0 +1,193 @@
+{
+  "cli": "codex-cli 0.147.0",
+  "plugin": "warp@codex-warp",
+  "plugin_version": "0.4.0",
+  "patch_revision": 4,
+  "verified_platform": "windows",
+  "verified_architecture": "x86_64",
+  "passed": true,
+  "hooks_file_sha256": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
+  "source_metadata_sha256": "dc5754dbf7cc3a69ab5261216073bfb711c923082bf8f2b6a6bd5b391c49fa96",
+  "model_request_attempted": false,
+  "credentials_provided": false,
+  "native_config_restored": true,
+  "native_hook_lifecycle_verified": false,
+  "windows_product_enabled": false,
+  "native_artifact_sha256": "803db5ecf876ea79aae8fb4f1d27ae206fabba746c482ae3d64174a49943bb5e",
+  "hooks": [
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
+      "eventName": "permissionRequest",
+      "handlerType": "command",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:44070d73fcbf068004c31131a2627104bf6c327a0a45cb2f3ea7a66c39eb1308",
+      "trustStatus": "untrusted",
+      "command_sha256": "5b9ac93652e1f28687d9e9dc48713718353441ad796f887396a5a4bf02be784a"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
+      "eventName": "postToolUse",
+      "handlerType": "command",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:1b249d42206a018be2cab3f53d27b739b67c4997c8583c2ad883ff937f46509e",
+      "trustStatus": "untrusted",
+      "command_sha256": "7098783fca8d010f0511323d5c050a5f2d4d235b3444c76d074a2acd4accd29c"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
+      "eventName": "sessionStart",
+      "handlerType": "command",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:84c9084a052e6efc4f8104ff953afdf1f8bde6613e87638ce5cf1f3fc6ab230d",
+      "trustStatus": "untrusted",
+      "command_sha256": "bc3fa419f01a499cb29a4a1ad5a1e2b44bdd92a529139d7747559f6623150fb7"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+      "eventName": "userPromptSubmit",
+      "handlerType": "command",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:c5e2c592551335a5dc0de1aa80273f4d3e6195da3209b3f313c3b5b4425c1c20",
+      "trustStatus": "untrusted",
+      "command_sha256": "e74a5ad1f2a0cf664fd4389aa8f98249e676c205987905babb540cb2a34864b2"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
+      "eventName": "stop",
+      "handlerType": "command",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:7aca65d37ccae169a00489c40f6b130d5611c7774ca6fed130b3a5b6d19aa3cd",
+      "trustStatus": "untrusted",
+      "command_sha256": "f508f72c38e0b3e2c9367deb802778be20b88cdc3b4255e512faa8d87d77aee1"
+    }
+  ],
+  "source_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "official_codex_commit": "be6e8eac029b183056b7e4402879f15d2c85f61b",
+  "fixed_cli": {
+    "asset": "codex-x86_64-pc-windows-msvc.exe",
+    "bytes": 298668336,
+    "sha256": "935a1911ed2556e4ffcec995f4886ac2ac425863ba26fed264df62e30272ad9d",
+    "url": "https://github.com/openai/codex/releases/download/rust-v0.147.0/codex-x86_64-pc-windows-msvc.exe"
+  },
+  "scope": "正式、无插桩五 hook 的原生注册、用户配置匹配与回滚；不证明普通 TUI 或完整生命周期。",
+  "projection": "保留原生 key/currentHash/状态字段；command 保留 SHA256 并核对正式 commandWindows 全字节；不归档临时机器路径或原生跟踪全文。",
+  "resource_tree_sha256": {
+    ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+    "hooks/hooks.json": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
+    "scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+    "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+    "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+    "scripts/on-prompt-submit.sh": "68051813eb32d83faf5e3c33f2e49111e1b469f23afa220648b35a882d9cb082",
+    "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+    "scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+    "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+    "scripts/warp-notify.sh": "b0b75257e90f432d43848f051329664376ee8b662e8531ea8ab3c42d62c9017c"
+  },
+  "cases": [
+    {
+      "name": "插件 空 格",
+      "formal_registration": {
+        "passed": true,
+        "mode": "formal",
+        "patch_revision": 4,
+        "source_metadata_sha256": "dc5754dbf7cc3a69ab5261216073bfb711c923082bf8f2b6a6bd5b391c49fa96",
+        "resource_tree_sha256": {
+          ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+          "hooks/hooks.json": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
+          "scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+          "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+          "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+          "scripts/on-prompt-submit.sh": "68051813eb32d83faf5e3c33f2e49111e1b469f23afa220648b35a882d9cb082",
+          "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+          "scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+          "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+          "scripts/warp-notify.sh": "b0b75257e90f432d43848f051329664376ee8b662e8531ea8ab3c42d62c9017c"
+        },
+        "hook_count": 5,
+        "scripts_instrumented": false,
+        "source_manifest_modified": false,
+        "native_trust_confirmed": true,
+        "no_thread_or_turn_started": true,
+        "config_rollback": {
+          "attempted": true,
+          "restored": true,
+          "concurrent_change_detected": false
+        }
+      },
+      "untrusted_hashes": {
+        "warp@codex-warp:hooks/hooks.json:permission_request:0:0": "sha256:44070d73fcbf068004c31131a2627104bf6c327a0a45cb2f3ea7a66c39eb1308",
+        "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0": "sha256:1b249d42206a018be2cab3f53d27b739b67c4997c8583c2ad883ff937f46509e",
+        "warp@codex-warp:hooks/hooks.json:session_start:0:0": "sha256:84c9084a052e6efc4f8104ff953afdf1f8bde6613e87638ce5cf1f3fc6ab230d",
+        "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0": "sha256:c5e2c592551335a5dc0de1aa80273f4d3e6195da3209b3f313c3b5b4425c1c20",
+        "warp@codex-warp:hooks/hooks.json:stop:0:0": "sha256:7aca65d37ccae169a00489c40f6b130d5611c7774ca6fed130b3a5b6d19aa3cd"
+      },
+      "trusted_hashes": {
+        "warp@codex-warp:hooks/hooks.json:permission_request:0:0": "sha256:44070d73fcbf068004c31131a2627104bf6c327a0a45cb2f3ea7a66c39eb1308",
+        "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0": "sha256:1b249d42206a018be2cab3f53d27b739b67c4997c8583c2ad883ff937f46509e",
+        "warp@codex-warp:hooks/hooks.json:session_start:0:0": "sha256:84c9084a052e6efc4f8104ff953afdf1f8bde6613e87638ce5cf1f3fc6ab230d",
+        "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0": "sha256:c5e2c592551335a5dc0de1aa80273f4d3e6195da3209b3f313c3b5b4425c1c20",
+        "warp@codex-warp:hooks/hooks.json:stop:0:0": "sha256:7aca65d37ccae169a00489c40f6b130d5611c7774ca6fed130b3a5b6d19aa3cd"
+      }
+    },
+    {
+      "name": "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()",
+      "formal_registration": {
+        "passed": true,
+        "mode": "formal",
+        "patch_revision": 4,
+        "source_metadata_sha256": "dc5754dbf7cc3a69ab5261216073bfb711c923082bf8f2b6a6bd5b391c49fa96",
+        "resource_tree_sha256": {
+          ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+          "hooks/hooks.json": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
+          "scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+          "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+          "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+          "scripts/on-prompt-submit.sh": "68051813eb32d83faf5e3c33f2e49111e1b469f23afa220648b35a882d9cb082",
+          "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+          "scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+          "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+          "scripts/warp-notify.sh": "b0b75257e90f432d43848f051329664376ee8b662e8531ea8ab3c42d62c9017c"
+        },
+        "hook_count": 5,
+        "scripts_instrumented": false,
+        "source_manifest_modified": false,
+        "native_trust_confirmed": true,
+        "no_thread_or_turn_started": true,
+        "config_rollback": {
+          "attempted": true,
+          "restored": true,
+          "concurrent_change_detected": false
+        }
+      },
+      "untrusted_hashes": {
+        "warp@codex-warp:hooks/hooks.json:permission_request:0:0": "sha256:44070d73fcbf068004c31131a2627104bf6c327a0a45cb2f3ea7a66c39eb1308",
+        "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0": "sha256:1b249d42206a018be2cab3f53d27b739b67c4997c8583c2ad883ff937f46509e",
+        "warp@codex-warp:hooks/hooks.json:session_start:0:0": "sha256:84c9084a052e6efc4f8104ff953afdf1f8bde6613e87638ce5cf1f3fc6ab230d",
+        "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0": "sha256:c5e2c592551335a5dc0de1aa80273f4d3e6195da3209b3f313c3b5b4425c1c20",
+        "warp@codex-warp:hooks/hooks.json:stop:0:0": "sha256:7aca65d37ccae169a00489c40f6b130d5611c7774ca6fed130b3a5b6d19aa3cd"
+      },
+      "trusted_hashes": {
+        "warp@codex-warp:hooks/hooks.json:permission_request:0:0": "sha256:44070d73fcbf068004c31131a2627104bf6c327a0a45cb2f3ea7a66c39eb1308",
+        "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0": "sha256:1b249d42206a018be2cab3f53d27b739b67c4997c8583c2ad883ff937f46509e",
+        "warp@codex-warp:hooks/hooks.json:session_start:0:0": "sha256:84c9084a052e6efc4f8104ff953afdf1f8bde6613e87638ce5cf1f3fc6ab230d",
+        "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0": "sha256:c5e2c592551335a5dc0de1aa80273f4d3e6195da3209b3f313c3b5b4425c1c20",
+        "warp@codex-warp:hooks/hooks.json:stop:0:0": "sha256:7aca65d37ccae169a00489c40f6b130d5611c7774ca6fed130b3a5b6d19aa3cd"
+      }
+    }
+  ]
+}

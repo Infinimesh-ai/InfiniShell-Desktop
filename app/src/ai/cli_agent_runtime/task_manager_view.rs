@@ -16,9 +16,10 @@ use uuid::Uuid;
 use warp_cli::agent::Harness;
 use warp_core::features::FeatureFlag;
 use warpui::clipboard::ClipboardContent;
+use warpui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
 use warpui::elements::{
-    ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, Flex,
-    ParentElement, ScrollbarWidth,
+    ChildView, ClippedScrollStateHandle, ConstrainedBox, Container, Flex, ParentElement,
+    ScrollbarWidth,
 };
 use warpui::keymap::FixedBinding;
 use warpui::ui_components::components::UiComponent;
@@ -110,6 +111,7 @@ pub(crate) enum TaskManagerAction {
     SelectPermission(PermissionPolicy),
     ToggleSpawn,
     ToggleMessages,
+    TogglePermissionDetails,
     Approve {
         task_id: String,
         task_generation: i64,
@@ -139,6 +141,8 @@ struct SavedLaunchOptions {
     permission_policy: PermissionPolicy,
     #[serde(default)]
     permission_ceiling: Option<super::permissions::ParentPermissionCeiling>,
+    #[serde(default)]
+    claude_profile: Option<super::permissions::ClaudeRestrictedFilesV1>,
     model: Option<String>,
     #[serde(default)]
     local_tools: Option<LocalToolPermissions>,
@@ -178,6 +182,7 @@ pub(crate) struct LocalCLITaskManagerView {
     harness: Harness,
     permission: PermissionPolicy,
     local_tools: LocalToolPermissions,
+    permission_details_expanded: bool,
     selected_task: Option<String>,
     input_generation: Uuid,
     managed_input: ManagedInputState,
@@ -266,6 +271,11 @@ impl LocalCLITaskManagerView {
         }
         let mut buttons = HashMap::new();
         for (key, label, action) in [
+            (
+                "permission-details",
+                crate::t!("cli-task-manager-show-permission-details"),
+                TaskManagerAction::TogglePermissionDetails,
+            ),
             (
                 "attach-files",
                 crate::t!("cli-task-manager-attach-files"),
@@ -359,6 +369,7 @@ impl LocalCLITaskManagerView {
             PermissionPolicy::Inherit,
             PermissionPolicy::ReadOnly,
             PermissionPolicy::WorkspaceWrite,
+            PermissionPolicy::ClaudeRestrictedFilesV1,
         ]
         .into_iter()
         .map(|permission| {
@@ -393,6 +404,7 @@ impl LocalCLITaskManagerView {
             harness: Harness::Codex,
             permission: PermissionPolicy::Inherit,
             local_tools: Default::default(),
+            permission_details_expanded: false,
             selected_task: None,
             input_generation: Uuid::new_v4(),
             managed_input: ManagedInputState::new(ctx),
@@ -500,6 +512,9 @@ impl LocalCLITaskManagerView {
     }
 
     fn select_task(&mut self, task_id: Option<String>, ctx: &mut ViewContext<Self>) {
+        if self.selected_task != task_id {
+            self.permission_details_expanded = false;
+        }
         let previous_key = self.draft_key();
         self.managed_input.saved_text_revisions.insert(
             previous_key.clone(),
@@ -686,11 +701,8 @@ impl LocalCLITaskManagerView {
         let agent = match harness {
             Harness::Codex => CLIAgent::Codex,
             Harness::Claude => CLIAgent::Claude,
-            Harness::Grok
-            | Harness::Oz
-            | Harness::Gemini
-            | Harness::OpenCode
-            | Harness::Unknown => return None,
+            Harness::Grok => CLIAgent::Grok,
+            Harness::Oz | Harness::Gemini | Harness::OpenCode | Harness::Unknown => return None,
         };
         let installation = CLIAgentInstallModel::as_ref(ctx).installation(agent)?;
         if !verified_version(harness, &installation.version) {
@@ -747,6 +759,7 @@ impl LocalCLITaskManagerView {
             let saved = SavedLaunchOptions {
                 permission_policy: self.permission,
                 permission_ceiling: None,
+                claude_profile: None,
                 model: None,
                 selected_skills: input
                     .iter()
@@ -789,6 +802,7 @@ impl LocalCLITaskManagerView {
             generation: Uuid::new_v4(),
             permission_policy: saved.permission_policy,
             permission_ceiling: saved.permission_ceiling,
+            claude_profile: saved.claude_profile,
             model: saved.model,
             local_tools: saved.local_tools,
             selected_skills: saved.selected_skills,
@@ -1003,6 +1017,7 @@ impl LocalCLITaskManagerView {
                 }
                 RuntimeEventKind::SessionReady { .. }
                 | RuntimeEventKind::TurnStarted { .. }
+                | RuntimeEventKind::InputJoined { .. }
                 | RuntimeEventKind::TextDelta { .. }
                 | RuntimeEventKind::Progress { .. }
                 | RuntimeEventKind::LocalToolRequested { .. }
@@ -1115,6 +1130,13 @@ impl LocalCLITaskManagerView {
     }
 
     fn refresh_buttons(&mut self, ctx: &mut ViewContext<Self>) {
+        let permission_label = if self.permission_details_expanded {
+            crate::t!("cli-task-manager-hide-permission-details")
+        } else {
+            crate::t!("cli-task-manager-show-permission-details")
+        };
+        self.buttons["permission-details"]
+            .update(ctx, |button, ctx| button.set_label(permission_label, ctx));
         let tasks = self.tasks(ctx);
         self.task_buttons
             .retain(|id, _| tasks.iter().any(|task| &task.task_id == id));
@@ -1166,7 +1188,7 @@ impl LocalCLITaskManagerView {
         let send_label = if running
             && snapshot
                 .as_ref()
-                .is_some_and(|snapshot| snapshot.task.harness == "claude")
+                .is_some_and(|snapshot| matches!(snapshot.task.harness.as_str(), "claude" | "grok"))
         {
             crate::t!("cli-task-manager-queue-next-turn")
         } else {
@@ -1266,8 +1288,7 @@ impl LocalCLITaskManagerView {
                 button.set_active(*permission == self.permission, ctx);
                 button.set_disabled(
                     self.selected_task.is_some()
-                        || (self.harness != Harness::Codex
-                            && *permission != PermissionPolicy::Inherit),
+                        || !permission_supported(self.harness, *permission),
                     ctx,
                 );
             });
@@ -1467,7 +1488,10 @@ impl View for LocalCLITaskManagerView {
         );
         body.add_child(self.text(crate::t!("cli-task-manager-permission"), appearance));
         let mut permissions = Flex::row();
-        for (_, button) in &self.permission_buttons {
+        for (permission, button) in &self.permission_buttons {
+            if !permission_supported(self.harness, *permission) {
+                continue;
+            }
             permissions.add_child(
                 Container::new(ChildView::new(button).finish())
                     .with_margin_right(8.)
@@ -1476,7 +1500,11 @@ impl View for LocalCLITaskManagerView {
         }
         body.add_child(permissions.finish());
         body.add_child(self.text(
-            crate::t!("cli-task-manager-permission-inherit-help"),
+            if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1 {
+                crate::t!("cli-task-manager-permission-claude-files-help")
+            } else {
+                crate::t!("cli-task-manager-permission-inherit-help")
+            },
             appearance,
         ));
         body.add_child(self.text(crate::t!("cli-task-manager-tools-title"), appearance));
@@ -1497,16 +1525,19 @@ impl View for LocalCLITaskManagerView {
                     crate::t!("cli-task-manager-effective-permissions"),
                     appearance,
                 ));
-                body.add_child(
-                    self.text(
-                        serde_json::to_string_pretty(permissions)
-                            .unwrap_or_default()
-                            .chars()
-                            .take(8192)
-                            .collect(),
-                        appearance,
-                    ),
-                );
+                body.add_child(self.row(&["permission-details"]));
+                if self.permission_details_expanded {
+                    body.add_child(
+                        self.text(
+                            serde_json::to_string_pretty(permissions)
+                                .unwrap_or_default()
+                                .chars()
+                                .take(8192)
+                                .collect(),
+                            appearance,
+                        ),
+                    );
+                }
             }
             body.add_child(self.text(
                 crate::t!(
@@ -1590,18 +1621,21 @@ impl View for LocalCLITaskManagerView {
         }
         body.add_child(self.render_managed_attachments(ctx, appearance));
         body.add_child(self.text(crate::t!("cli-task-manager-prompt"), appearance));
+        // 内层输入框必须与外层任务视口相交，避免滚出面板后仍绘制文本和占位符。
         body.add_child(
             ConstrainedBox::new(
-                ClippedScrollable::vertical(
-                    self.prompt_scroll.clone(),
-                    Container::new(ChildView::new(&self.prompt).finish())
-                        .with_uniform_padding(8.)
-                        .finish(),
-                    ScrollbarWidth::Auto,
+                NewScrollable::vertical(
+                    SingleAxisConfig::Clipped {
+                        handle: self.prompt_scroll.clone(),
+                        child: Container::new(ChildView::new(&self.prompt).finish())
+                            .with_uniform_padding(8.)
+                            .finish(),
+                    },
                     appearance.theme().nonactive_ui_detail().into(),
                     appearance.theme().active_ui_detail().into(),
                     warpui::elements::Fill::None,
                 )
+                .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, false))
                 .finish(),
             )
             .with_min_height(80.)
@@ -1626,6 +1660,11 @@ impl View for LocalCLITaskManagerView {
             }
         }
         body.add_child(self.row(&["start", "send", "resume"]));
+        if snapshot.as_ref().is_some_and(|snapshot| {
+            snapshot.task.harness == "grok" && snapshot.active_turn_id.is_some()
+        }) {
+            body.add_child(self.text(crate::t!("cli-task-manager-grok-queued"), appearance));
+        }
         if snapshot
             .as_ref()
             .is_some_and(|snapshot| claude_input_pending(&snapshot.task))
@@ -1666,14 +1705,18 @@ impl View for LocalCLITaskManagerView {
             ));
         }
         ConstrainedBox::new(
-            ClippedScrollable::vertical(
-                self.body_scroll.clone(),
-                body.finish(),
-                ScrollbarWidth::Auto,
+            NewScrollable::vertical(
+                SingleAxisConfig::Clipped {
+                    handle: self.body_scroll.clone(),
+                    child: body.finish(),
+                },
                 appearance.theme().nonactive_ui_detail().into(),
                 appearance.theme().active_ui_detail().into(),
                 warpui::elements::Fill::None,
             )
+            // 输入区先消费滚轮，避免同一次滚动同时移动整个任务面板。
+            .with_always_handle_events_first(false)
+            .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, false))
             .finish(),
         )
         .with_max_height(650.)
@@ -1707,6 +1750,10 @@ impl TypedActionView for LocalCLITaskManagerView {
                 self.select_task(None, ctx);
                 Ok(())
             }
+            TaskManagerAction::TogglePermissionDetails => {
+                self.permission_details_expanded = !self.permission_details_expanded;
+                Ok(())
+            }
             TaskManagerAction::SelectTask(id) => {
                 self.select_task(Some(id.clone()), ctx);
                 Ok(())
@@ -1715,6 +1762,9 @@ impl TypedActionView for LocalCLITaskManagerView {
                 if self.selected_task.is_none() {
                     self.harness = *harness;
                     self.permission = PermissionPolicy::Inherit;
+                    if *harness == Harness::Grok {
+                        self.local_tools = LocalToolPermissions::default();
+                    }
                     self.input_generation = Uuid::new_v4();
                     self.managed_input.preparing = None;
                     self.prompt.update(ctx, |editor, ctx| {
@@ -1724,9 +1774,7 @@ impl TypedActionView for LocalCLITaskManagerView {
                 Ok(())
             }
             TaskManagerAction::SelectPermission(permission) => {
-                if self.selected_task.is_none()
-                    && (self.harness == Harness::Codex || *permission == PermissionPolicy::Inherit)
-                {
+                if self.selected_task.is_none() && permission_supported(self.harness, *permission) {
                     self.permission = *permission;
                 }
                 Ok(())
@@ -2082,8 +2130,8 @@ fn input_action_with_content(
             },
             None => RuntimeAction::Submit { input },
         }),
-        Harness::Claude => Ok(RuntimeAction::Submit { input }),
-        Harness::Grok | Harness::Oz | Harness::Gemini | Harness::OpenCode | Harness::Unknown => {
+        Harness::Claude | Harness::Grok => Ok(RuntimeAction::Submit { input }),
+        Harness::Oz | Harness::Gemini | Harness::OpenCode | Harness::Unknown => {
             Err(crate::t!("cli-agent-managed-version-unavailable"))
         }
     }
@@ -2093,6 +2141,7 @@ fn verified_version(harness: Harness, version: &CLIAgentVersionStatus) -> bool {
     match (harness, version) {
         (Harness::Codex, CLIAgentVersionStatus::Detected(version)) => version == "0.147.0",
         (Harness::Claude, CLIAgentVersionStatus::Detected(version)) => version == "2.1.273",
+        (Harness::Grok, CLIAgentVersionStatus::Detected(version)) => version == "1.0.30",
         _ => false,
     }
 }
@@ -2113,6 +2162,17 @@ fn permission_name(permission: PermissionPolicy) -> String {
         PermissionPolicy::Inherit => crate::t!("cli-task-manager-permission-inherit"),
         PermissionPolicy::ReadOnly => crate::t!("cli-task-manager-permission-readonly"),
         PermissionPolicy::WorkspaceWrite => crate::t!("cli-task-manager-permission-workspace"),
+        PermissionPolicy::ClaudeRestrictedFilesV1 => {
+            crate::t!("cli-task-manager-permission-claude-files")
+        }
+    }
+}
+
+fn permission_supported(harness: Harness, permission: PermissionPolicy) -> bool {
+    match permission {
+        PermissionPolicy::Inherit => true,
+        PermissionPolicy::ReadOnly | PermissionPolicy::WorkspaceWrite => harness == Harness::Codex,
+        PermissionPolicy::ClaudeRestrictedFilesV1 => harness == Harness::Claude,
     }
 }
 

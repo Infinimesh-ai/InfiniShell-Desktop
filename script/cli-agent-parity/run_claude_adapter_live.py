@@ -150,14 +150,37 @@ def verified_acceptance(exit_code, output, events):
     turn_ids = [event.get("turn_id") for event in results]
     if len(set(turn_ids)) != 8 or any(not isinstance(turn_id, str) or not turn_id for turn_id in turn_ids):
         return False
+    joins = [event for event in events if event.get("event") == "input_joined"]
+    matched_joins = []
     for result in results:
         if not any(event.get("event") == "message_accepted" and event.get("phase") == result.get("phase")
                    and event.get("message_id") == result["turn_id"] and event.get("turn_id") == result["turn_id"]
                    for event in events):
             return False
-        if sum(event.get("event") == "turn_started" and event.get("turn_id") == result["turn_id"]
-               for event in events) != 1:
+        starts = [event for event in events if event.get("event") == "turn_started"
+                  and event.get("turn_id") == result["turn_id"]]
+        input_joins = [event for event in joins if event.get("message_id") == result["turn_id"]]
+        if len(starts) == 1 and not input_joins:
+            continue
+        if starts or len(input_joins) != 1 or result.get("phase") != "queued_input":
             return False
+        joined = input_joins[0]
+        execution = next((event for event in results if event.get("turn_id") == joined.get("turn_id")), None)
+        execution_starts = [event for event in events if event.get("event") == "turn_started"
+                            and event.get("turn_id") == joined.get("turn_id")]
+        accepts = [event for event in events if event.get("event") == "message_accepted"
+                   and event.get("message_id") == result["turn_id"]]
+        if (execution is None or len(execution_starts) != 1 or len(accepts) != 1
+                or joined.get("phase") != "queued_input" or joined.get("native_session_id") != native_id
+                or execution.get("phase") != "queued_input" or execution is result
+                or execution.get("outcome") != result.get("outcome")
+                or execution.get("output") != result.get("output")
+                or not events.index(execution_starts[0]) < events.index(joined) < events.index(result) < events.index(execution)
+                or events.index(accepts[0]) >= events.index(joined)):
+            return False
+        matched_joins.append(joined)
+    if len(matched_joins) != len(joins):
+        return False
     queue_results = [event for event in results if event.get("phase") == "queued_input"]
     if len(queue_results) != 2 or any(event.get("outcome") != "Completed" for event in queue_results):
         return False

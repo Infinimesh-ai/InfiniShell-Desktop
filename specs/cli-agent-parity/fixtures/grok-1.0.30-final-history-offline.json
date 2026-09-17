@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "description": "固定 Grok Build 1.0.30 在 deny network*、虚构模型密钥下执行 /session-info；仅查询原生历史，无付费模型调用。",
+  "binarySha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "sourceSha256": "adddc66833db64c58d33df1a239626bd324e1fc5733750d847b52cde7a7423c9",
+  "nativeModelTested": false,
+  "leaderPathTested": false,
+  "paidModelCalls": 0,
+  "builtinTurn": {
+    "jsonrpc": "2.0",
+    "id": 4,
+    "result": {
+      "stopReason": "end_turn",
+      "_meta": {
+        "sessionId": "01a0ae16-4d67-7961-b8b2-58b4a41f952a",
+        "requestId": "a040ca77-88f0-499c-b699-7a0e3f1938ec",
+        "promptId": "a040ca77-88f0-499c-b699-7a0e3f1938ec",
+        "totalTokens": 0,
+        "modelId": "claude-sonnet-4-6"
+      }
+    }
+  },
+  "immediateSnapshot": {
+    "jsonrpc": "2.0",
+    "id": 5,
+    "result": {
+      "updates": [],
+      "totalCount": 0,
+      "hasMore": false,
+      "promptStarts": []
+    }
+  },
+  "verifiedSnapshot": {
+    "jsonrpc": "2.0",
+    "id": 6,
+    "result": {
+      "updates": [
+        {
+          "timestamp": 1789627092,
+          "method": "session/update",
+          "params": {
+            "sessionId": "01a0ae16-4d67-7961-b8b2-58b4a41f952a",
+            "update": {
+              "sessionUpdate": "user_message_chunk",
+              "content": {
+                "type": "text",
+                "text": "/session-info"
+              },
+              "_meta": {
+                "hostTurn": true
+              }
+            },
+            "_meta": {
+              "eventId": "01a0ae16-4d67-7961-b8b2-58b4a41f952a-2",
+              "agentTimestampMs": 1789627092408
+            }
+          }
+        },
+        {
+          "timestamp": 1789627092,
+          "method": "session/update",
+          "params": {
+            "sessionId": "01a0ae16-4d67-7961-b8b2-58b4a41f952a",
+            "update": {
+              "sessionUpdate": "agent_message_chunk",
+              "content": {
+                "type": "text",
+                "text": "**Session ID:** 01a0ae16-4d67-7961-b8b2-58b4a41f952a\n\n**Working directory:** <private-probe>/project\n\n**Model:** claude-sonnet-4-6\n\n**Turn:** 0\n\n**Context:** 1474 / 200000 tokens (1%)"
+              },
+              "_meta": {
+                "hostTurn": true
+              }
+            },
+            "_meta": {
+              "totalTokens": 1474,
+              "eventId": "01a0ae16-4d67-7961-b8b2-58b4a41f952a-3",
+              "agentTimestampMs": 1789627092409,
+              "promptId": "a040ca77-88f0-499c-b699-7a0e3f1938ec",
+              "updateType": "AgentMessageChunk"
+            }
+          }
+        },
+        {
+          "timestamp": 1789627092,
+          "method": "_x.ai/session/update",
+          "params": {
+            "sessionId": "01a0ae16-4d67-7961-b8b2-58b4a41f952a",
+            "update": {
+              "sessionUpdate": "turn_completed",
+              "prompt_id": "a040ca77-88f0-499c-b699-7a0e3f1938ec",
+              "stop_reason": "end_turn",
+              "elapsed_ms": 1
+            },
+            "_meta": {
+              "eventId": "01a0ae16-4d67-7961-b8b2-58b4a41f952a-4",
+              "agentTimestampMs": 1789627092409
+            }
+          }
+        }
+      ],
+      "totalCount": 3,
+      "hasMore": false,
+      "lastEventId": "01a0ae16-4d67-7961-b8b2-58b4a41f952a-4",
+      "promptStarts": [
+        0
+      ]
+    }
+  },
+  "exitCode": 0,
+  "forcedCleanup": false
+}

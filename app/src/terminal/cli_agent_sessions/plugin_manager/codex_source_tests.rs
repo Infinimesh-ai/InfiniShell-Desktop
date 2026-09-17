@@ -1,5 +1,9 @@
 use super::*;
 
+#[cfg(unix)]
+#[path = "codex_source_live_tests.rs"]
+mod live_tests;
+
 fn private_home() -> (TempDir, PathBuf) {
     let directory = tempfile::tempdir().unwrap();
     let home = directory.path().canonicalize().unwrap();

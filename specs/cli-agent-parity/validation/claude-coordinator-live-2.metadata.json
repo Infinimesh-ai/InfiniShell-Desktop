@@ -1,0 +1,79 @@
+{
+  "test": "ai::cli_agent_runtime::coordinator::claude_live_tests::real_claude_fixed_profile_parent_child",
+  "scope": "real_claude_production_coordinator",
+  "platform": "darwin",
+  "cli": {
+    "platform": "darwin-arm64",
+    "binary": "claude",
+    "bytes": 212228880,
+    "sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
+    "url": "https://downloads.claude.ai/claude-code-releases/2.1.273/darwin-arm64/claude"
+  },
+  "model": "claude-sonnet-4-6",
+  "test_binary_sha256": "7838e9dfea308a3bcafcc2198cf43f740e8461296f46d55a1530c592cab9188c",
+  "supervisor_binary_sha256": "091fe9364cec79601d539fe436d24d4a375b7928548cfde8d9e343e31fb61d4a",
+  "private_workspace": "/private/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-claude-coordinator-pairbygx",
+  "project_settings_sha256": "f57e59bf08d340460a4c05d5b167051ddce0baad396ebd0d6f487481ead2805e",
+  "private_workspace_preserved": true,
+  "runner_modifies_auth_configuration": false,
+  "fresh_private_auth_home": true,
+  "authentication_source": "explicit_api_environment",
+  "native_credential_files_read_or_copied": false,
+  "api_environment_values_recorded": false,
+  "native_cli_may_refresh_credentials": true,
+  "real_gui_verified": false,
+  "automatic_result_delivery_ack_verified": false,
+  "model_requests_expected": true,
+  "max_native_tools": 4,
+  "max_native_inputs": 6,
+  "max_native_executions": 6,
+  "max_test_seconds": 450,
+  "http_request_count_verified": false,
+  "runner_timeout_seconds": 600,
+  "acceptance_passed": false,
+  "public_evidence_projection_version": 1,
+  "private_raw_evidence_preserved": true,
+  "private_raw_evidence_filename": "coordinator.raw.ndjson",
+  "commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+  "worktree_dirty": true,
+  "test_exit_code": 0,
+  "private_test_output_filename": "coordinator.raw.test-output.txt",
+  "private_test_output_sha256": "fd822312344e23553ed5f81ac142655944995f0b4383a1477bdb3a45a70f6fd9",
+  "native_result_correlations": [
+    {
+      "uuid": "715e5499-d29b-40c1-81c0-6b1ab1365384",
+      "session_id": "c95574c5-6389-4a22-8145-ddb673064e48",
+      "subtype": "success",
+      "user_message_uuid": "b32ed2f4-d0cd-45b8-bea2-4672b4c9b9f7",
+      "user_message_uuids": [
+        "b32ed2f4-d0cd-45b8-bea2-4672b4c9b9f7",
+        "e7e09893-9cdc-9261-a0e0-fbd20e089fec"
+      ]
+    },
+    {
+      "uuid": "c65ad4ad-1bf0-4141-b6b4-fd1c0c786a61",
+      "session_id": "9c9dfc8f-9152-49a9-badc-ea8c260cef16",
+      "subtype": "success",
+      "user_message_uuid": "5cbf8bec-0c08-4ac8-abb9-21e8667235d6",
+      "user_message_uuids": [
+        "5cbf8bec-0c08-4ac8-abb9-21e8667235d6",
+        "e8c63920-4c0b-7c96-a472-b97ffb9dffaf"
+      ]
+    },
+    {
+      "uuid": "385a0352-c05a-498c-b20f-47026d56c4c8",
+      "session_id": "9c9dfc8f-9152-49a9-badc-ea8c260cef16",
+      "subtype": "success",
+      "user_message_uuid": "fbd8f89a-e630-2b08-92f5-6d9e369ccbc3",
+      "user_message_uuids": [
+        "fbd8f89a-e630-2b08-92f5-6d9e369ccbc3"
+      ]
+    }
+  ],
+  "private_raw_evidence_sha256": "acb03953a83fe3718d28a4f175b42f520bc7fd2d33c0eff845d87453de020eb1",
+  "private_event_count": 63,
+  "public_event_count": 63,
+  "project_settings_unchanged": true,
+  "denied_read_fixture_unchanged": true,
+  "public_evidence_sha256": "d86b05e3890635b71a541f9bc41fef7355fb8c8596eb5ccf7615f60db33c4d4c"
+}

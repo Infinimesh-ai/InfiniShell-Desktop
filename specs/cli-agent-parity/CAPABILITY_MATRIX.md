@@ -1,90 +1,65 @@
 # CLI 能力矩阵
 
-更新日期：2026-09-17。此表区分代码实现、真实接口证据与产品验收；任何“待验”项均不计入 Goal 完成。
+更新日期：2026-09-18（北京时间）。此表分别记录实现路径、真实接口证据与最终产品验收。Goal 未完成；固定受测版本为 Codex `0.147.0`、Claude `2.1.273`、Grok `1.0.30`。本轮实际修改提交前的已推送检查点为 `b3d8b0f11657b0ed1ba34035dda8d363eb52747f`。
 
-受测接口为 Codex CLI 0.147.0、Claude Code 2.1.273、Grok Build 1.0.30。原始协议、隔离方法和官方来源见 [PROTOCOL_EVIDENCE.md](PROTOCOL_EVIDENCE.md)。不根据较新网页推定其他 CLI 版本兼容。
+source21 的87路径中间快照已通过 check、i18n11、定向1270、Python363；没有 source21 main 或真实CLI。source20构建与严格签名保留历史。随后发现旧独立Claude AgentDriver 的绕过与全局写入，已关闭该旧入口并移除相关实现；source22 的93路径新快照通过 check、i18n11、定向1301、Python363。下表中间证据不代表最终实际修改提交、所有平台或整个能力通过。完整来源、失败与历史入口见 [验证报告](VALIDATION_REPORT.md)。
+
+## 身份、普通终端与上下文
 
 | 能力 | Codex CLI | Claude Code | Grok Build |
 | --- | --- | --- | --- |
-| 命令、别名、路径与管理命令识别 | 已实现，待当前提交回归 | 已实现，待当前提交回归 | 新增专用身份与规则，待当前提交回归 |
-| 安装路径和真实版本检测 | 3 秒受限探测，安装不等于登录 | 同左 | 同左，补充 `.grok/bin` 路径 |
-| 普通终端工具栏与富输入 | macOS 隔离 GUI 普通 PTY 两轮多行通过；bundle7 持久来源及五项原生授权经重启保持；bundle8 当前真实通知和英文 Unknown 已验证 | 文本后延迟 Enter | 括号粘贴候选；真实完整输入待验 |
-| 连续发送、取消后旧输入 | 提交流程互斥；旧代际不可写入 | 同左 | 同左 |
-| 中英文、多行、长文本 | macOS GUI 中英多行、真实拼音组合通过；候选列表选择和其他平台待验 | UTF-8 与控制序列夹具；真实完整输入待验 | 同左 |
-| 图片 | 既有终端粘贴、托管 localImage；macOS Rust 适配器与中文 GUI 真实读图通过；其他平台待验 | 既有终端粘贴；托管支持需单列验证 | 未验证时拒绝并保留草稿和附件 |
-| 文件与评审意见 | macOS 中文 GUI 已实际读取所选文件并传递有效评审的路径、行号与中英内容 | 复用上下文构造，真实完整路径待验 | 同左 |
-| 技能 | 保留 `$` 与 Agents 来源；新项目真实路径/符号链接发现已修，GUI 刷新、选择和原生 skill 输入通过 | 保留 `/` 调用及 Claude 来源 | Grok/Claude 来源；Agents 仅 Home，项目 `.agents` 不冒充兼容 |
-| 通知插件 | 旧 GUI 缓存修补曾被原生自动更新覆盖，失败证据保留；持久来源修复经 build17 回归及 bundle7 GUI 更新、CLI/应用重启保持验证，五项信任均由原生界面授权；bundle8 当前真实通知已确认；完整负向组合、其他平台仍未通过 | 2.2.0 固定来源关联修补；无模型原生重启/同版本更新保持修补及禁用，受控跨版本切换会失去修补，未知版本拒绝，详见 CLAUDE_PLUGIN_CACHE_AUDIT.md | 仓库随附插件；真实生产安装、同版本修复、禁用拒绝、文件事务回滚及恢复已通过，最终平台组合待验 |
-| 基础通知 | OSC 9 只提供未知状态；普通 Stop 保存响应并显示 Unknown，同回合后续工具/审批/明确失败仍有效；相关回归在 build23 通过，bundle8 英文 Unknown 已验证 | Stop 不含全部 handlers 聚合后的最终确认；采用同样 Unknown 降级，共享回归通过，不替代真实模型验证 | 不把 PermissionDenied 当等待审批；shutdown Stop 不覆盖失败；成功 Stop 最终性未验证，降级 Unknown，共享回归通过 |
-| 重复/过时事件 | 原生 turn_id、event ID/序号与 listener 实例检查；未关联终态降级，旧回合不能结束新输入 | 保留原生 prompt_id，与 Codex 不混用；同样过滤旧回合 | 独立 Grok 身份、兼容 hooks 去重及状态文件 |
-| 普通本地子任务权限 | 移除固定绕过审批/沙箱，可见原生终端 | 移除固定绕过，不再修改全局信任/onboarding/config | 托管关键验收未过，暂不开放本地子任务 |
-| 托管传输 | app-server 原生 JSON-RPC | 双向 stream-json/control；macOS 另有无凭据原生初始化/空闲 EOF 实证，不替代生产适配器完整生命周期 | ACP v1；已验证的连接能力与未验证的执行能力分开 |
-| 托管运行中追加 | 原生 turn/steer；须已收到 turn/started | 已接入单条下一轮队列；真实中英 GUI 排队、原生确认、独立结果、取消当前轮后执行队列通过；重启保留确认且不自动重投 | 内部 ACP 队列已实现并有真实 no-leader 夹具；产品门禁仍关闭 |
-| 托管审批 | 原始请求 ID，单次允许或拒绝 | 单次允许/拒绝及真实文件效果通过隔离 API 与 GUI 验收；父权限上限仍待验 | 原生 no-leader ACP 已通过精确单次允许/拒绝；产品审批仍待接入验证 |
-| 托管取消 | interrupt 的 ACK 不等于已取消，等原生终态 | 聚合 interrupt ACK、aborted_streaming 与 cancelled 后，真实生产适配器取消通过 | 原生输出后 cancel 返回 cancelled/MidTurnAbort；产品路径待验 |
-| 本地任务与消息记录 | SQLite 提交确认、父子约束、代际、revision、原生 ACK 与结果历史；build16 跨进程 Sent/结果唯一性故障注入通过 | 共用存储；协议排队差异保留 | 共用存储准备就绪，不代表执行已开放 |
-| 已绑定 PTY 的结果待确认 | 兼容子 pane 保存为 Unconfirmed，继续占用原生会话/当前代，不生成最终结果；build23 SQLite 迁移和重启回归通过 | 共用状态；与托管原生 Completed 分开 | 共用存储能力，不代表托管已开放 |
-| 应用重启 | macOS GUI 正常退出活动任务后重开为 Disconnected，明确继续才新建代次，同原生 ID 且未重发旧工具调用；新资源域下的真实 Codex 工具异常清理已独立通过，最终同提交重启整链待验 | 共用恢复逻辑，真实模型重启待验 | 共用恢复准备，托管未开放 |
-| 历史继续 | 原生 thread/resume；macOS GUI 完成历史与活动退出后的继续均通过，缺失 ID 原生失败不会新建替代会话 | 缺失历史拒绝及生产适配器按原 ID 进程重启恢复、随机标记回收通过；GUI 待验 | 原生新进程按原 ID load 模型历史并回收标记通过；产品与 session/resume 模型历史待验 |
-| 当前应用活动连接 | 重新打开任务只选择现有连接，不再启动进程 | 同左 | 未开放托管任务 |
-| CLI 崩溃后的进程清理 | 旧进程组残留负向保留；资源域 C 组 4 项、通用组同字节副本重验 4 项和真实 Codex 空闲崩溃通过；运行工具时宿主/CLI 两种崩溃均确认全部目标退出及完整清理证明，最终同提交待验 | 复用新资源域实现，真实 Claude 异常工具清理待验 | 复用监督基础设施，托管执行仍门控 |
+| 命令／管理命令、安装及版本识别 | 专用规则及受限版本探测；最终提交回归待验 | 同类专用规则，安装不等于登录 | 独立身份、规则及 `.grok/bin` 探测；默认标题栏已有双语 [入口实测](GROK_TITLEBAR_ENTRY.md) |
+| 普通 PTY 工具栏与富输入 | macOS 隔离 GUI 两轮多行有 [证据](validation/macos-gui-report.md) | 延迟 Enter 策略；认证后完整普通 PTY 组合待验 | 括号粘贴候选；普通 PTY 完整链待验，托管 GUI 证据另列 |
+| 中文输入法／中英多行 | macOS GUI 逐键拼音组合、混排与多行已有证据；候选列表及其他平台待验 | 托管 API／GUI 有多行输入阶段证据；普通 PTY 与三平台待验 | source11 托管 GUI 中英文多行通过；普通 PTY 输入法与三平台待验 |
+| 图片 | `localImage` 原生适配器及 macOS GUI 已实际读图；最终提交与其他平台待验 | 生产 typed PNG2 的前两轮及正常关闭通过，Resume 失败；只读 PNG 接入不宣称其他格式／技能组合通过，完整 GUI 待验 | 托管图片未验，拒绝并保留草稿／附件 |
+| 文件与代码评审 | macOS GUI 文件实际读取及有效评审的路径／行号／内容传递有证据 | 复用上下文；普通 PTY 与完整组合待验 | 复用上下文；完整组合待验 |
+| 技能来源与语法 | `$` 与 Agents 来源；新项目发现、选择及原生注入有 macOS GUI 证据 | `/` 与 Claude 来源；普通／托管组合分别验收 | Grok／Claude 来源，Agents 仅已支持的 Home 来源；托管技能未开放，不从菜单存在推断调用成功 |
+| 原生模型、推理与登录 | 按实际版本／配置保留差异，不从安装推断已登录 | API 鉴权已可用于实测，不将 Inherit 模式视为固定文件策略 | 官方在线授权及根任务已有成功证据，旧额度失败不再作为当前阻塞 |
 
-## 产品开放边界
+## 插件、事件与状态
 
-- `LocalCLIManagedTasks` 统一控制任务管理入口和托管启动，默认关闭；开发构建可通过 `local_cli_managed_tasks` 或运行时开关进行验收。
-- 托管适配器启动前重新探测真实版本，不依赖 UI 缓存放行其他版本。受管任务默认继承 CLI 权限；Codex 经验证的只读/项目写入策略与 Claude 的权限模式不等价。
-- Claude 已通过用户指定 API 的生产适配器进程生命周期，GUI 与父任务权限上限待验；Grok 官方模型额度耗尽仍未解除。完成基础协议、夹具、鉴权或编译不能替代生命周期验收。
-- 本机安装状态不能用来证明 SSH 远端安装或版本；普通 PTY 会话不转换成协议任务。
-- 三款普通 PTY Stop 只提供候选响应，不能据此显示成功；托管原生 Completed 契约保持独立。降级和后续同回合事件规则见 [Stop 审计](STOP_HOOK_COMPLETION_AUDIT.md)。
+| 能力 | Codex CLI | Claude Code | Grok Build |
+| --- | --- | --- | --- |
+| 插件安装／更新／禁用／恢复 | 固定 rev4、持久来源及原生信任有中间证据；完整负向组合与最终提交待验 | 固定插件版本及来源修补、禁用和事务恢复有阶段记录；未知版本不放行 | 随附独立插件；真实生产安装、同版本修复、禁用及事务回滚有阶段记录；全平台组合待验 |
+| 普通 PTY 完成依据 | Stop／OSC 9 仅候选响应，显示 Unknown；同回合后续有效事件继续处理 | 同样降级 Unknown，不能仅由 Stop 推断聚合完成 | `PermissionDenied` 不表示等待审批；缺可信终态降级 Unknown |
+| 托管终态 | 原生 turn 终态与任务结果分别核对 | 原生输入 UUID／执行归属与完整 result；取消要求完整证据聚合 | 完整原生历史与同回合 completion watermark 核对；不从 `end_turn` 单独推断正文完整 |
+| 重复／乱序／旧回调 | turn／事件 ID、代次与实例约束，定向回归已有证据 | 保留 prompt／UUID 语义，不混用其他 CLI 身份 | 独立身份与来源，兼容 hooks 及乱序的完整真实负向链待验 |
+| Windows hooks | CI10 五项原生注册通过；SessionStart／UserPromptSubmit 两项真实到达 ConPTY，其余三项实效待验 | 无凭据原生边界与事务各按原报告范围；完整模型／GUI 待验 | ACP／插件边界各按原报告范围；完整模型／GUI 待验 |
 
-## 新增验证范围
+## 托管任务、权限与恢复
 
-- [bundle7 插件验证](validation/macos-gui-bundle7-plugin-report.md)通过持久来源重启、五项原生信任及授权/安装/更新六张双语说明布局；布局夹具不等于六条功能流程全部通过。授权查询已不依赖进程内运行时热缓存，完整插件树按正常路径组件映射清单、保留 Unix 字面反斜杠；本地回归通过不代表 Windows 原生验证。bundle7 当时未确认 GUI 富通知；后续 bundle8 已确认当前原生通知受理与英文 Unknown，中文新事件及最终同提交复验仍待完成。
-- [独立原生 hook 传输](CODEX_HOOK_TRANSPORT_VERIFICATION.md)在 macOS 控制 PTY 捕获未改参考脚本的完整 OSC，完整原生结果为四项 completed、一项 stopped。固定输入由原生 hook 阻断，本机模型 HTTP 请求为零；没有经过 GUI 接收链，不验证 Stop 最终成功。
-- [Codex 原生 SSH/tmux](CODEX_NATIVE_SSH_TMUX_VERIFICATION.md)在 macOS 回环 SSH 直连及透传 on 各收到两条通知；off 的原生 hook 已执行但通知被阻断。三模式绑定各自原生 session/turn 和 stopped 显示，HTTP 为零、正常退出；没有完整 HookRunSummary。含最终 SetEnv 的版本已在干净 dbee1ecae 实跑通过；不计 GUI SSH、逐键输入或模型生命周期。
-- [Unconfirmed 状态与迁移](UNCONFIRMED_TASK_STATE.md)用于已绑定本地任务的兼容 PTY 子 pane；未知结果仍占用当前代，明确断线或启动恢复才记录 Disconnected，不重放消息。真实 SQLite/Diesel 回归在 build23 通过；独立 GUI 库副本原三表为空，迁移 SQL 与索引夹具不能冒称有用户任务的升级或新 GUI 启动验收。
-- [Claude 2.1.273 无凭据验证](CLAUDE_NO_CREDENTIALS_VERIFICATION.md)通过 macOS 初始化及空闲 EOF 自行退出；固定 Linux/Windows 文件已完整下载并核验大小/摘要。第三轮 Linux 原生获取与初始化/EOF 已通过，Windows 因前置夹具失败待验；不计完整平台或模型生命周期通过。
+| 能力 | Codex CLI | Claude Code | Grok Build |
+| --- | --- | --- | --- |
+| 传输 | 官方 app-server JSON-RPC | 双向 stream-json／control | ACP；根任务 leader 与 SDK direct 对照分别记录 |
+| 新建／两轮／允许与拒绝 | 完整固定包 [原生适配器](CODEX_COMPLETE_RUNTIME_NATIVE_VERIFICATION.md)和中间 macOS GUI 有证据 | [API 适配器](CLAUDE_API_ADAPTER_VERIFICATION.md)与固定策略 [GUI 阶段](CLAUDE_GUI_RUNTIME_CHAIN.md)有证据，失败阶段保留 | [source11 GUI](GROK_GUI_RUNTIME_CHAIN.md)根任务两轮及精确 Write 允许／拒绝通过 |
+| 运行中追加 | 原生 `turn/steer`，必须已有 started；macOS GUI 实际采用追加内容 | 原生可并入当前工具执行或独立下一轮；必须逐 UUID 核对 ACK、合并及完整结果，不宣称 steer | 后续回合排队；保留提交代与执行代，source11／13 已实际核对，不宣称同回合 steer |
+| 取消 | interrupt ACK 不等于取消；原生 Cancelled 与下一轮完成已有中间证据 | 批次三证据取消有证据；等待 Edit 审批旧 GUI 为 Failed。新夹具已接线并经 source21 Cargo／纯审计通过，真实验收待验 | source11 GUI 正文输出后真实 Cancelled，随后同连接继续通过；SDK7 清理不等于取消或完成成功 |
+| 默认权限及配置副作用 | 已移除固定绕过审批／沙箱；普通子 pane 使用可见原生终端 | 可见子 pane 与托管入口已移除固定绕过；旧独立 AgentDriver 已关闭并移除全局信任／onboarding 改写；source22 回归通过，真实全局配置保持仍须进程证据 | 根任务 Inherit；SDK 创建与权限上限尚未获证据，子任务不开放 |
+| 父子派发／双向 ACK／回收 | macOS 中间 GUI 生产协调器有派发、子进度、父追加、原生 ACK 与实际结果回收 | 固定 `ClaudeRestrictedFilesV1` 的 [独立父子夹具](CLAUDE_COORDINATOR_ACCEPTANCE.md)第2轮生产执行和修正审计通过：5输入、3执行、双向 ACK、inspect 与自动结果；旧运行器误拒绝记录保留。完整 GUI／最终提交待验 | SDK7 仅有首次发现请求，业务工具、来源账本和父权限上限未验，子任务关闭 |
+| 权限上限 | 保存创建时父代完整快照，首输入前核对；未知／漂移／跨 CLI 不等价拒绝 | Inherit 不提供可证明的完整规则上限，派发拒绝；固定策略只允许已验证的同策略继承，非 OS 沙箱 | 根任务的审批证据不能用于子任务权限上限；来源缺失时不派发 |
+| SQLite 任务／消息／结果 | 父子、代次、revision、原生 ACK 与结果历史；中间故障注入有证据 | 固定策略 GUI 与父子协调器记录有证据；合并输入保留原提交代和完整 UUID 列表 | source11 GUI 9消息／9代（7 Complete、2 Cancel），source13 生产 coordinator／SQLite 8输入／8结果实际核对 |
+| 当前连接重新选择 | 复用活跃连接，不启动第二进程 | 同类路径；完整故障恢复待验 | source11 取消后继续复用原连接；历史继续才创建新连接 |
+| 历史继续／应用重启 | GUI 完成与活动退出后的原 ID 显式继续、无重复执行有证据 | 固定策略 GUI 同 ID／同策略历史继续有证据；PNG2 Resume 最新 startup 无原生 ID 被夹具拒绝，第三输入未发，不计完整图片恢复 | source11 实际应用退出重开、原 ID 新进程历史继续、无自动重投及显式记忆回收通过；source13 夹具不是完整桌面重启 |
+| 已绑定 PTY 未确认结果 | 保存 Unconfirmed，占用原会话／代次，不能生成最终成功结果 | 共用约束，与托管 Completed 独立 | 共用存储约束不等于子任务已开放 |
+| 真正进程清理 | macOS 资源域的真实 Codex 工具／空闲崩溃有独立证据，最终提交复验待验 | PNG2 两个代次 stdio／0、Job／CID 清理有收据；真实异常工具崩溃待验 | source11／13 根任务正常 stdio／0 清理有证据；SDK7 exit=null、原始 wait=9、cleanup=true，不能记原生退出0 |
 
-## 尚待收口
+## 产品开放边界与消息契约
 
-1. 最终代码与同提交证据。build23 相关 617/617（8.590s）、i18n 11 项（4.67s）、check20（2m26）和 Python gate5 76 项（5.114s）通过；gate6 全量 76 项（5.142s）再验通过。build19 旧取消断言失败、build20 相关测试编译前撤下、build21 非 UTF-8 文件名夹具失败均保留；后者尚未进入产品校验，现限定 Linux 待验。TUI 既有 9 项 36/80 列双语回归独立保留。上述历史快照均为 dirty 中间构建。bundle8 当前通知与任务详情双语检查已有实证；dbee1ecae 同提交门禁的进展和未通过项见文末，不能用中间快照替代最终验收。
-2. 三方完整产品验收。Codex macOS GUI 已完成主要生命周期、父子双向消息与结果回收，Claude 生产适配器进程流程通过、GUI 待验；Grok 自定义 Claude 后端原生流程通过，产品及官方模型分别待验；macOS 真实 Codex 异常工具树已在资源域实现通过，最终同提交及其余 CLI 待验。
-3. macOS/Linux/Windows 同一实际修改提交的构建与交互验证；SSH/tmux 单独记录。
-4. 随附 Claude/Codex 关联修补的完整安装、升级、禁用、失败回滚与 SSH 手动发布验收。Codex bundle7 已通过持久来源与原生授权的特定路径，bundle8 已确认当前 GUI 富通知；其余负向组合及最终同提交复验仍待完成。
+`LocalCLIManagedTasks` 同时控制入口与托管启动，默认关闭；开发验收使用显式开关。启动前重新探测受测版本，未验证版本只开放已经证明的模式。普通 PTY 不转换成协议任务，本机安装状态不证明 SSH 远端状态。
 
-## 本地工具与消息的当前实现
+Grok 官方根任务已有真实 GUI 与生产 coordinator 证据，SDK／子任务仍关闭。SDK7 的单次 `server/discover` 只证明反向发现路径改善，六个 carrier 的来源字段均缺失；它不是业务工具阶段，不证明后续业务来源必然缺失，也不能追认 leader 根因。现代 MCP 候选与 PNG 就绪／身份分离均待新快照和真实复验。
 
-- Codex dynamic tools 与 Claude SDK MCP 的无凭据注册已经实测；原生工具调用进入绑定连接身份的协调器，先记录调用，再派发子任务或父子消息。重复调用不能自动再次执行。
-- 工具授权默认关闭，界面保存显式派发/消息权限。Codex 子任务固定保存创建时父任务已提交的完整权限快照，握手后、首条输入前逐字段校验；用户默认配置漂移、未知权限结构或跨 CLI 不等价均拒绝，恢复仍绑定创建时父代。Claude 的 permissionMode 不包含完整允许/拒绝规则，暂不能证明子任务权限上限，因此原生 Claude 父任务的托管派发保守拒绝，此项尚未完成。
-- 已发送未确认消息在完成、断线、取消与换代后仍保留未确认。结果从完整任务记录产生有界摘录，原子领取后才能首次投递。`inspect_local_tasks` 支持指定一个关联任务的 `result_generation`，并按返回的 `result_next_offset` 继续读取完整结果；偏移按 UTF-8 字节计数，每页最多 8192 字节，非法字符边界明确拒绝。查询历史不切换当前执行代次，也不重新投递消息。旧原生会话保存的工具参数定义可能尚不包含分页字段，完整历史仍可由应用查询。
-- Codex 0.147.0 已真实完成动态查询工具调用、进程关闭、同原生会话 `thread/resume` 及再次调用；恢复使用原生保存的工具定义，不向恢复接口添加未知字段。监督版证据见 `validation/macos-codex-supervised-tools-restore-1.ndjson`；macOS GUI 正常退出应用后的恢复与父子双向消息/结果回收已有 bundle4/5 证据，最终提交仍须复验。Claude API 的生产适配器排队输入、原生接收确认与真实审批已通过，父子任务和 GUI 仍待验。
-- 消息回执记录 `receipt_kind`：`native_protocol` 是 CLI 原生接收，`application_history` 是已写入应用会话历史、供下一次正常请求读取。后者不能描述为立即追加指令或模型已执行。没有可靠来源的旧回执不能冒充原生确认。
-- 子任务固定保存创建时的父代数；旧结果保存在原父代，父任务进入新轮后不自动改投。显式查询仍可回收历史结果。
+消息保存明确的 `receipt_kind`：`native_protocol` 表示原生接收；`application_history` 只表示进入应用历史供正常后续请求读取。两者都不能独立证明模型执行完成。发送未确认记录、创建时父代、历史结果和分页查询保持关联；恢复不能自动重投已经执行的输入。完整实现边界见 [消息交付](OZ_LOCAL_MESSAGE_DELIVERY.md)、[Unconfirmed](UNCONFIRMED_TASK_STATE.md) 和原协调器报告。
 
-- Codex macOS Rust 适配器已实际通过两轮、允许/拒绝、追加应用、取消、同 ID 历史恢复与图片输入；监督版重验见 `validation/macos-codex-supervised-lifecycle-1.ndjson` 和 `validation/macos-codex-supervised-image-1.ndjson`。此证据仍为中间快照，不能覆盖其后发现的真实 CLI 崩溃清理缺陷；正常退出应用重启及双语 GUI 已有 bundle4/5 的独立证据，见 `validation/macos-gui-report.md`；最终提交与其他平台仍需验证。
+## 最终验收仍未满足
 
-本轮 [build23](validation/macos-local-gates-build23.json)及 [bundle8](validation/macos-gui-bundle8-build.json)仍含 dirty 构建边界；另一任务网页搜索修改已排除本目标暂存，需在独立工作树验证实际提交。[Darwin coalition / launchd 只读核验](DARWIN_COALITION_LAUNCHD_AUDIT.md)不等于实际清理修复，其后资源域产品实现已通过真实 Codex 两种崩溃清理，见文末当前结果。
+| 要求 | 当前边界 |
+| --- | --- |
+| 三款 CLI 各自完整规定链路 | 中间有成功与失败阶段，最终实际修改提交未完成整链 |
+| 普通 PTY 与托管模式分别覆盖 | 普通 Claude／Grok 全输入上下文链、PNG GUI、Grok SDK／子任务待验 |
+| 负向与故障组合 | 已有定向与部分真实记录，完整插件／崩溃／重投／恢复失败组合待验 |
+| 英文／简体中文 | source20 完整 FTL 嵌入及 i18n 通过；source11 Grok 布局有实证，最新完整布局待验 |
+| 同提交三平台／全工作区 | CI10 仅 b3d8 所选门禁通过且 full_workspace=false；当前实际修改尚未提交复验 |
+| SSH／tmux | 既有原生通知与传输边界保留，三方完整交互和恢复链待验 |
 
-## 提交验收进度
-
-- 当前新增 [Claude 队列与 Codex rev4](CLAUDE_QUEUE_AND_CODEX_REV4.md)：44 文件快照通过 check、本地化 11 项、相关模块 1033 项；Claude 真实 GUI 的排队、取消及重启保留确认通过。Grok 内部协议与 Windows 正式插件仍有明确未验边界。
-
-- 最新已推送检查点 a245 补入 Grok 默认标题栏入口，真实英文/简体中文布局与隐藏持久化已通过。[第九轮 e473](NINTH_PLATFORM_RUN_E4738E1EA.md)Windows 所选检查通过，Linux 前置测试失败；Linux 修复已在 a245，仍待复验。Claude [e473→a245 GUI 更新恢复](CLAUDE_GUI_E473_A245.md)通过真实两轮、审批、取消继续和原 ID 恢复，但运行中排队、父子任务及最终同提交完整生命周期仍未完成。
-
-历史检查点 `49456958279cc193392b2d09118e680fc0b14ea4` 已推送，干净 macOS 同提交 check、国际化 11 项、相关模块 987 项全部通过。[第八轮已结束](EIGHTH_PLATFORM_RUN_494569582.md)：Linux 所选检查通过；Windows check、1678 项定向测试及监督清理通过，但插件缓存清理、ConPTY 完成及缺失会话退出码断言仍失败，不能计为 Windows 整体通过。
-
-此前 `37b0bc73288aab5be4d0d151796eea557be4c0fb` 的干净 macOS 同提交 check、国际化 11 项、相关模块 987 项全部通过。第七轮已结束：Linux 所选门禁通过；Windows check 通过，但权限探针路径夹具、5 个 Claude 事务夹具和 command 进程派生失败。Windows 通知探针还确认实际 Git Bash 无法打开 `/dev/tty`，详见 [完整报告](SEVENTH_PLATFORM_RUN_37B0BC732.md)。候选 `CONOUT$` 输出器仅进入临时探针，未纳入生产配方；[诊断及候选边界](WINDOWS_CONPTY_NOTIFICATION_PROBE.md)保留真实失败和本机测试范围。
-
-[第六轮验证](SIXTH_PLATFORM_RUN_7E0650855.md)已经结束：Linux 所选门禁全部通过（warp 定向 1684 项）；Windows 在插件来源探针收尾、ConPTY 原生通知两项失败，Rust 门禁跳过。Grok/Claude 无凭据边界和 Codex 原生 hook 的独立成功保留，不能合并为 Windows 平台通过。完整工作区与 GUI 集成未执行。
-
-干净 macOS 同提交通过 check、提供商 18 项、国际化 11 项与相关模块 965 项，新包构建签名成功。全部 25 个应用文件变更与已通过的本地冻结输入一致，来源关联、执行命令、二进制摘要和历史失败见 [验证记录](VALIDATION_REPORT.md#当前提交验证)。
-
-新包 Codex 前两轮已有拼音、图片、技能和评审传递证据；私有测试副本漏装同版本 code-mode-host，实际工具不能启动，文件读取和第三轮审批未通过。已恢复完整官方包，37b0bc732 真实适配器的文件效果、允许/拒绝、取消及同会话继续已通过；新包 GUI 原流程仍待复验。真实 Oz 往返等待用户手动允许专用测试钥匙串项，电脑操作工具禁止操作该系统窗口。最终同提交 GUI 生命周期、双语布局和结果回收均未完成。
-
-先前 bundle4/5 的 Codex 生命周期与双向消息、bundle7 的插件与双语布局、bundle8 的普通通知及 Unknown/Unconfirmed，以及 macOS 资源域崩溃清理，分别保留其版本和输入范围；不能代替新包验收。历史各轮平台的失败、后续修复与仍未覆盖的组合统一见 [验证记录](VALIDATION_REPORT.md)。
-
-37b0bc732 已接入 Claude 同连接只读权限观测、完整固定 Codex 运行包和 Windows 独立 Rust 门禁。观测仍不能证明原子权限上限，Claude 父任务派发继续拒绝；完整包工具执行的 macOS 原生适配器复验已通过，见 [三项记录](CODEX_COMPLETE_RUNTIME_NATIVE_VERIFICATION.md)；候选通知仍待 Windows 原生执行。用户提供 API 后，Claude 2.1.273 的原生成功模型输出已通过，鉴权限制解除；生产适配器进程链路已通过，GUI 与父子任务仍待验。Grok 模型额度耗尽尚未解除。这些实现和单次输出不计三方完整生命周期通过。
-
-[Claude API 生产适配器验收](CLAUDE_API_ADAPTER_VERIFICATION.md)修复后已通过真实两轮、精确文件审批允许/拒绝、运行中排队的原生确认、取消与按原 ID 新进程恢复回收标记。前三次启动失败和旧取消失败均保留。19 文件冻结输入通过 check、i18n 11 项与相关模块 1001 项；这是 dirty 中间快照，GUI、父权限上限与最终同提交验收仍未完成。
-
-Grok 固定版本在系统断网条件下已验证每模型 API 凭据对应的无交互认证；适配器仅使用原生公布的方法，不读取密钥或修改后端。详见 [API 认证边界](GROK_BYOK_AUTH_VERIFICATION.md)。原生 no-leader ACP 的两轮、单次审批、运行中取消及新进程 session/load 模型历史现已通过；产品执行门禁仍关闭，独立适配与真实生产路径待验。中英文认证提示同步更新，最终 GUI 双语布局仍待验。
+根代理最近核对 Linux／Windows runner 均 online、busy=false，派发前重新留证；不把可用性当门禁成功。source22 不可用入口提示已同步英文与简体中文；i18n门禁11项通过，最终双语检查待验。

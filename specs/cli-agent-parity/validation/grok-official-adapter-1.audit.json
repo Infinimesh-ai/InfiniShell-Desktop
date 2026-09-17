@@ -1,0 +1,66 @@
+{
+  "scope": "官方授权已完成后的生产托管流程首轮失败，保留失败而非通过证据",
+  "acceptance_passed": false,
+  "credential_values_recorded": false,
+  "failure_stage": "原生 leader 执行前的沙箱包装器私有 socket 父目录检查",
+  "failure_message": "Grok 未完成真实初始化",
+  "native_exit_code": 93,
+  "production_cleanup_confirmed": true,
+  "production_containment": "macos_resource_coalition",
+  "production_generation": "f7641bd2-9c33-4c88-93cc-dcbac4ae2c14",
+  "native_leader_launch_count": 0,
+  "native_version_probe_count": 2,
+  "official_tls_connection_attempts": 0,
+  "official_tls_bytes": 0,
+  "model_requests": 0,
+  "model_requests_evidence": "原生 leader 未启动，CONNECT 代理零连接；未把 --version 探测计为模型请求",
+  "launch_arguments": [
+    "agent",
+    "stdio",
+    "--leader-socket",
+    "<私有临时目录>/leader.sock"
+  ],
+  "wrapper_guard": [
+    {
+      "line": 12,
+      "source": " if parent.stat().st_uid!=os.getuid() or parent.stat().st_mode & 0o077:raise SystemExit(93)"
+    }
+  ],
+  "wrapper_sha256": "17e2866c84005a5bd1d096563b5c0fbcc476442a92ede7878f99ce88abf26fd1",
+  "socket_parent_present_when_audited": false,
+  "socket_parent_mode_independently_verified": false,
+  "root_diagnosis": {
+    "reported_mode": "0755",
+    "source": "主代理结合生产临时目录默认权限得到的根因诊断",
+    "independent_audit_limit": "父目录已被清理；保留包装器判定同时含 uid 和权限位，无法从 exit 93 单独证明真实 mode 为 0755"
+  },
+  "network_canary": {
+    "allowed_proxy": true,
+    "other_loopback": 1,
+    "external": 1,
+    "exact_unix": true,
+    "other_unix": 1,
+    "credential_read": 1
+  },
+  "network_canary_semantics": "allowed_proxy/exact_unix 为允许；其余数值 1 为 EPERM。仅验证 canary 的进程沙箱范围，不能声称实际 leader 的隔离已完成验收。",
+  "private_auth_copy_removed": true,
+  "cleanup_evidence_limit": "凭据副本删除独立于生产清理；进程清理由 exit receipt 与 macOS job/resource coalition 清理回执证明。",
+  "source_sha256": {
+    "metadata": "f0295464ccb5a1ab6fc87ea4b020070d4daf4a4d28e8ee7e8e4c1c07aaebd914",
+    "public_ndjson": "8ae6a970ed9aade61fc1fc1a1e3dcbd6d447f18105f44ea5a8fd8c9061855975",
+    "network": "c378f13bd1deb3fc87bdd200fccb5c315c6d58e4d2f44a4d0ea40a1df48537fe",
+    "exit_receipt": "7e39c5cdf55ae41f3e996ab73a5306c85b882a23ebd0ec88bdc920ff0b936aa1",
+    "macos_cleanup": "c90275c67cf243d3ec2fcbd81cbd129144f2a4846dac82f5e3caf167ea6d0812",
+    "manifest": "18f7c0a23f07f0491944cfbbe141d692b239434bfefa4772b88533cd796d55b9",
+    "wrapper_audit": "35b5d17a83c76540d70de5ada84a7c01859bc16abe6c4a1f11a3c2951a4e4d52",
+    "private_evidence": "7324fe6c7eb62ec0905a2209d536a882db7f3970a2863f8ea06af95f1a679282"
+  },
+  "snapshot": {
+    "repository_commit": "b3d8b0f11657b0ed1ba34035dda8d363eb52747f",
+    "worktree_dirty": true,
+    "grok_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+    "test_binary_sha256": "79456b54137b2dc1ebfae5564098e1d4effd1c57624c59f58d6314e46bc5a773",
+    "supervisor_sha256": "ade1e8aa69c26c900b72a8697e71f2942f07813084b209cd45f973e2f8ce1c10"
+  },
+  "remaining_acceptance": "两轮交互、审批、追加指令、取消、继续、应用重启、恢复、结果回收均未由本轮失败验证"
+}
