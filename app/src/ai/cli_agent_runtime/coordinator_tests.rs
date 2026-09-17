@@ -14,6 +14,7 @@ use crate::ai::cli_agent_runtime::{InputContent, channels};
 use crate::ai::llms::LLMId;
 use crate::ai::local_cli_mailbox::send_local_message_if_current;
 use crate::persistence::local_cli_tasks::load_task_generations;
+use crate::persistence::model::LocalCliReceiptKind;
 use crate::test_util::terminal::{add_window_with_terminal, initialize_app_for_terminal_view};
 
 #[test]
@@ -692,6 +693,521 @@ fn sqlite_parent_ceiling_uses_the_creation_generation_after_parent_resume() {
                 .await
                 .is_err()
         );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+async fn persisted_running_claude(sender: &SyncSender<ModelEvent>) -> ManagedTaskSnapshot {
+    let mut state = snapshot();
+    state.task.harness = "claude".into();
+    checkpoint_task(sender, state.task.clone(), None)
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+    let previous = state.task.clone();
+    state.task.state = LocalCliTaskState::Running;
+    state.active_turn_id = Some(Uuid::from_u128(10).to_string());
+    state.output = "当前回合输出".into();
+    commit_transition(sender, &mut state.task, &previous)
+        .await
+        .unwrap();
+    state
+}
+
+#[test]
+fn claude_queued_input_commits_receipt_before_advancing_the_execution_generation() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("queue.sqlite")).unwrap();
+    block_on(async {
+        let mut state = persisted_running_claude(&writer.sender).await;
+        let token = Uuid::new_v4();
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let id = Uuid::from_u128(11);
+        let action = RuntimeAction::Submit {
+            input: vec![InputContent::Text("下一轮中文\nNext turn".into())],
+        };
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            id,
+            action.clone(),
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().action, action);
+        assert_eq!(state.task.generation, 1);
+        assert_eq!(
+            state.active_turn_id.as_deref(),
+            Some(Uuid::from_u128(10).to_string().as_str())
+        );
+        assert_eq!(state.output, "当前回合输出");
+        let saved = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved[0].state, LocalCliMessageState::Sent);
+        assert!(claude_input_pending(&state.task));
+
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            id,
+            action.clone(),
+            false,
+        )
+        .await
+        .unwrap();
+        assert!(commands.try_recv().is_err());
+        assert!(
+            send_user_request(
+                &writer.sender,
+                &mut state,
+                &controller,
+                token,
+                Uuid::from_u128(12),
+                action,
+                false
+            )
+            .await
+            .is_err()
+        );
+        assert!(commands.try_recv().is_err());
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let ack = event(
+            &state,
+            RuntimeEventKind::MessageAccepted {
+                message_id: id,
+                turn_id: Some(id.to_string()),
+            },
+        );
+        assert!(
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &ack,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .unwrap()
+        );
+        assert!(claude_input_pending(&state.task));
+        assert_eq!(state.task.generation, 1);
+        assert_eq!(state.output, "当前回合输出");
+        let saved = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].state, LocalCliMessageState::Acknowledged);
+        assert_eq!(
+            saved[0].receipt_kind,
+            Some(LocalCliReceiptKind::NativeProtocol)
+        );
+
+        let first_finished = event(
+            &state,
+            RuntimeEventKind::TurnFinished {
+                turn_id: Uuid::from_u128(10).to_string(),
+                outcome: TurnOutcome::Completed,
+                output: "第一轮最终结果".into(),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &first_finished,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.generation, 1);
+        assert_eq!(state.task.result.as_deref(), Some("第一轮最终结果"));
+        assert!(claude_input_pending(&state.task));
+        let old_start = event(
+            &state,
+            RuntimeEventKind::TurnStarted {
+                turn_id: Uuid::from_u128(10).to_string(),
+            },
+        );
+        assert!(
+            !commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &old_start,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .unwrap()
+        );
+        let next_start = event(
+            &state,
+            RuntimeEventKind::TurnStarted {
+                turn_id: id.to_string(),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &next_start,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.generation, 2);
+        assert_eq!(state.task.state, LocalCliTaskState::Running);
+        assert!(!claude_input_pending(&state.task));
+        assert_eq!(state.output, "");
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&state.task.config_json).unwrap()["claude_current_input"],
+            json!({"turn_id":id,"submission_generation":1})
+        );
+        assert!(
+            !commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &next_start,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .unwrap()
+        );
+        let next_finished = event(
+            &state,
+            RuntimeEventKind::TurnFinished {
+                turn_id: id.to_string(),
+                outcome: TurnOutcome::Completed,
+                output: "下一轮最终结果".into(),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &next_finished,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        let generations = load_task_generations(&writer.sender, state.task.task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(generations.len(), 2);
+        assert_eq!(generations[0].result.as_deref(), Some("第一轮最终结果"));
+        assert_eq!(generations[1].result.as_deref(), Some("下一轮最终结果"));
+        let saved = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved[0].state, LocalCliMessageState::Acknowledged);
+        assert_eq!(saved[0].recipient_generation, 1);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn cancelling_current_claude_turn_does_not_claim_queued_input_was_cancelled() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("queue.sqlite")).unwrap();
+    block_on(async {
+        let mut state = persisted_running_claude(&writer.sender).await;
+        let token = Uuid::new_v4();
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let id = Uuid::from_u128(11);
+        let action = RuntimeAction::Submit {
+            input: vec![InputContent::Text("已排队输入".into())],
+        };
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            id,
+            action,
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().message_id, id);
+        let interrupt = RuntimeAction::Interrupt {
+            turn_id: Uuid::from_u128(10).to_string(),
+        };
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            Uuid::from_u128(12),
+            interrupt.clone(),
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().action, interrupt);
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let cancelled = event(
+            &state,
+            RuntimeEventKind::TurnFinished {
+                turn_id: Uuid::from_u128(10).to_string(),
+                outcome: TurnOutcome::Cancelled,
+                output: "".into(),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &cancelled,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.state, LocalCliTaskState::Cancelled);
+        assert!(claude_input_pending(&state.task));
+        let saved = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved[0].state, LocalCliMessageState::Sent);
+        assert_eq!(saved[0].receipt_kind, None);
+        let late_ack = event(
+            &state,
+            RuntimeEventKind::MessageAccepted {
+                message_id: id,
+                turn_id: Some(id.to_string()),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &late_ack,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        let started = event(
+            &state,
+            RuntimeEventKind::TurnStarted {
+                turn_id: id.to_string(),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &started,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        let generations = load_task_generations(&writer.sender, state.task.task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(generations[0].state, LocalCliTaskState::Cancelled);
+        assert_eq!(generations[1].state, LocalCliTaskState::Running);
+        let saved = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved[0].state, LocalCliMessageState::Acknowledged);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn disconnected_claude_queue_keeps_unconfirmed_delivery_without_replay() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("queue.sqlite")).unwrap();
+    block_on(async {
+        let mut state = persisted_running_claude(&writer.sender).await;
+        let token = Uuid::new_v4();
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let id = Uuid::from_u128(11);
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            id,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Text("不能自动重放".into())],
+            },
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().message_id, id);
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let disconnected = event(
+            &state,
+            RuntimeEventKind::Disconnected {
+                reason: "EOF".into(),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &disconnected,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        let recovered = load_tasks(&writer.sender, true)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(recovered[0].state, LocalCliTaskState::Disconnected);
+        assert_eq!(recovered[0].generation, 1);
+        assert!(claude_input_pending(&recovered[0]));
+        assert_eq!(recovered[0].result, None);
+        let saved = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved[0].state, LocalCliMessageState::Sent);
+        assert_eq!(saved[0].receipt_kind, None);
+        assert!(saved[0].body.contains("不能自动重放"));
+        assert!(commands.try_recv().is_err());
+        assert!(
+            send_user_request(
+                &writer.sender,
+                &mut state,
+                &controller,
+                token,
+                id,
+                RuntimeAction::Submit {
+                    input: vec![InputContent::Text("不能自动重放".into())]
+                },
+                false
+            )
+            .await
+            .is_err()
+        );
+        assert!(commands.try_recv().is_err());
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn premature_claude_queue_terminal_or_overlapping_start_cannot_replace_the_active_turn() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("queue.sqlite")).unwrap();
+    block_on(async {
+        let mut state = persisted_running_claude(&writer.sender).await;
+        let token = Uuid::new_v4();
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let id = Uuid::from_u128(11);
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            id,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Text("等待当前轮结束".into())],
+            },
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().message_id, id);
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let ack = event(
+            &state,
+            RuntimeEventKind::MessageAccepted {
+                message_id: id,
+                turn_id: Some(id.to_string()),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &ack,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        let before = state.task.clone();
+        let premature = event(
+            &state,
+            RuntimeEventKind::TurnFinished {
+                turn_id: id.to_string(),
+                outcome: TurnOutcome::Cancelled,
+                output: "".into(),
+            },
+        );
+        assert!(
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &premature,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        let overlap = event(
+            &state,
+            RuntimeEventKind::TurnStarted {
+                turn_id: id.to_string(),
+            },
+        );
+        assert!(
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &overlap,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        assert_eq!(state.output, "当前回合输出");
+        assert_eq!(
+            state.active_turn_id.as_deref(),
+            Some(Uuid::from_u128(10).to_string().as_str())
+        );
+        assert!(claude_input_pending(&state.task));
     });
     writer.sender.send(ModelEvent::Terminate).unwrap();
     writer.handle.join().unwrap();

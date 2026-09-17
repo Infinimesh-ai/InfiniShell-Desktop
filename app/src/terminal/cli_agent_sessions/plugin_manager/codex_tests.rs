@@ -2,6 +2,8 @@ use std::fs;
 use std::path::Path;
 
 use super::CodexPluginManager;
+#[cfg(windows)]
+use super::NativeAuthorizationStatus;
 use crate::features::FeatureFlag;
 use crate::terminal::cli_agent_sessions::plugin_manager::CliAgentPluginManager;
 
@@ -24,6 +26,27 @@ fn can_auto_install_is_true() {
 fn can_auto_install_is_false_without_codex_plugin() {
     let _guard = FeatureFlag::CodexPlugin.override_enabled(false);
     assert!(!CodexPluginManager::new(None).can_auto_install());
+}
+
+#[cfg(windows)]
+#[test]
+#[serial_test::serial]
+fn windows_rev4_cannot_infer_native_trust_from_the_unix_contract() {
+    let _guard = FeatureFlag::CodexPlugin.override_enabled(true);
+    let home = tempfile::tempdir().unwrap();
+    write_plugin_config(home.path(), super::PLUGIN_KEY, true);
+    write_cache_manifest(home.path(), super::PLUGIN_NAME, "0.4.0");
+    let previous = std::env::var_os("CODEX_HOME");
+    unsafe { std::env::set_var("CODEX_HOME", home.path()) };
+    let manager = CodexPluginManager::new(None);
+    let status = manager.native_authorization_status();
+    let can_install = manager.can_auto_install();
+    match previous {
+        Some(value) => unsafe { std::env::set_var("CODEX_HOME", value) },
+        None => unsafe { std::env::remove_var("CODEX_HOME") },
+    }
+    assert_eq!(status, NativeAuthorizationStatus::Unknown);
+    assert!(!can_install);
 }
 
 #[test]
@@ -412,6 +435,12 @@ fn cache_only_patch_still_needs_persistent_source() {
     write_cache_manifest(dir.path(), super::PLUGIN_NAME, "0.4.0");
     let root = dir.path().join("plugins/cache/codex-warp/warp/0.4.0");
     for (relative, contents) in [
+        (
+            "scripts/on-prompt-submit.sh",
+            include_str!(
+                "../../../../assets/bundled/cli-agent-plugins/codex/scripts/on-prompt-submit.sh"
+            ),
+        ),
         (
             "scripts/build-payload.sh",
             include_str!(

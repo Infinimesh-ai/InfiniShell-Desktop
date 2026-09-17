@@ -20,7 +20,7 @@ CONTRACTS = {
 }
 FILES = {
     "claude": ("scripts/build-payload.sh", "scripts/on-stop.sh", "scripts/should-use-structured.sh", "hooks/hooks.json", "scripts/warp-notify.sh"),
-    "codex": ("scripts/build-payload.sh", "scripts/on-stop.sh", "hooks/hooks.json", "scripts/warp-notify.sh"),
+    "codex": ("scripts/build-payload.sh", "scripts/on-stop.sh", "hooks/hooks.json", "scripts/warp-notify.sh", "scripts/on-prompt-submit.sh"),
 }
 
 
@@ -200,6 +200,7 @@ def export_bundle(source, destination):
     source_bundle(source)
     shutil.copytree(source / "codex/source", destination / "codex/source")
     shutil.copy2(source / "codex/SOURCE_METADATA.json", destination / "codex/SOURCE_METADATA.json")
+    shutil.copytree(source / "codex/revisions", destination / "codex/revisions")
     for agent in CONTRACTS:
         bundle_data(source, agent)
         for name in (*FILES[agent], "PATCH_METADATA.json", "LICENSE", "README.md", "upstream.patch"):

@@ -1,0 +1,17 @@
+{
+  "platform": "win32-x64",
+  "artifact": "grok-1.0.30-windows-x86_64.exe",
+  "binary": "grok.exe",
+  "bytes": 150036808,
+  "sha256": "ca24ea63272ba7881261f4a52498d1f5bd884b01da25845990422a10dd315266",
+  "url": "https://x.ai/cli/grok-1.0.30-windows-x86_64.exe",
+  "format": "pe32+-x86-64",
+  "version": "1.0.30",
+  "version_output": "grok 1.0.30 (04b7ffed98c6)",
+  "native_version_verified": true,
+  "installed": false,
+  "credentials_provided": false,
+  "model_input_submitted": false,
+  "checksum_origin": "observed_complete_official_download",
+  "archive": false
+}

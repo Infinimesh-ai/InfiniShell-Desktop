@@ -6,6 +6,147 @@ fn private_home() -> (TempDir, PathBuf) {
     (directory, home)
 }
 
+fn previous_home(home: &Path) -> PathBuf {
+    let source = home
+        .join("plugins/infinishell-sources")
+        .join(&PREVIOUS_BUNDLE.directory)
+        .join("source");
+    for (name, contents) in FILES {
+        let path = source.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, contents).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            fs::set_permissions(
+                &path,
+                fs::Permissions::from_mode(PREVIOUS_BUNDLE.files[*name].mode),
+            )
+            .unwrap();
+        }
+    }
+    for (name, contents) in [
+        ("hooks/hooks.json", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev3/hooks/hooks.json").as_slice()),
+        ("scripts/warp-notify.sh", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev3/scripts/warp-notify.sh").as_slice()),
+        ("scripts/on-prompt-submit.sh", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev3/scripts/on-prompt-submit.sh").as_slice()),
+    ] {
+        fs::write(source.join("plugins/warp").join(name), contents).unwrap();
+    }
+    fs::write(
+        source.parent().unwrap().join("SOURCE_METADATA.json"),
+        PREVIOUS_METADATA,
+    )
+    .unwrap();
+    verify_revision(home, &PREVIOUS_BUNDLE, PREVIOUS_METADATA).unwrap();
+    for name in revision_tree(&PREVIOUS_BUNDLE, "plugins/warp/", false).keys() {
+        let path = cache_root(home, "warp").join("0.4.0").join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::copy(source.join("plugins/warp").join(name), path).unwrap();
+    }
+    let mut document = DocumentMut::new();
+    document["marketplaces"][MARKETPLACE]["source_type"] = toml_edit::value("local");
+    document["marketplaces"][MARKETPLACE]["source"] = toml_edit::value(source.to_str().unwrap());
+    document["plugins"]["warp@codex-warp"]["enabled"] = toml_edit::value(true);
+    document["plugins"]["orchestration@codex-warp"]["enabled"] = toml_edit::value(false);
+    document["hooks"]["state"]["user"]["trusted_hash"] = toml_edit::value("保持用户信任");
+    save(home, &document);
+    source
+}
+
+#[test]
+fn exact_rev3_migrates_without_overwriting_previous_source_or_trust() {
+    let (_directory, home) = private_home();
+    let previous = previous_home(&home);
+    let old_tree = tree(&previous, false).unwrap();
+    assert!(!has_custom_source(&home));
+    assert!(!is_current(&home));
+    assert!(notification_patch::preflight(&home, PatchKind::Codex).unwrap());
+    assert!(!notification_patch::full_tree_is_applied(
+        &home,
+        PatchKind::Codex
+    ));
+    let (transaction, staged, original, installed) = prepared(&home);
+    commit_install(
+        &home,
+        "warp",
+        &original,
+        &installed,
+        &staged,
+        transaction.path(),
+        |_, _| Ok(()),
+    )
+    .unwrap();
+    invalidate(&home);
+    assert!(is_current(&home));
+    assert_eq!(tree(&previous, false).unwrap(), old_tree);
+    assert!(is_previous_notification_cache(
+        &transaction.path().join("previous-cache/0.4.0")
+    ));
+    assert_eq!(
+        config(&home)["hooks"]["state"]["user"]["trusted_hash"].as_str(),
+        Some("保持用户信任")
+    );
+    assert_eq!(
+        config(&home)["plugins"]["orchestration@codex-warp"]["enabled"].as_bool(),
+        Some(false)
+    );
+}
+
+#[test]
+fn rev3_upgrade_failure_restores_previous_pointer_cache_and_keeps_source() {
+    for failing_step in [1, 2] {
+        let (_directory, home) = private_home();
+        let previous = previous_home(&home);
+        let old_tree = tree(&previous, false).unwrap();
+        let (transaction, staged, original, installed) = prepared(&home);
+        assert!(
+            commit_install(
+                &home,
+                "warp",
+                &original,
+                &installed,
+                &staged,
+                transaction.path(),
+                |step, _| {
+                    if step == failing_step {
+                        Err(io::Error::other("注入 rev3 迁移故障"))
+                    } else {
+                        Ok(())
+                    }
+                }
+            )
+            .is_err()
+        );
+        assert!(original.matches(&Scope::read(&config(&home), "warp@codex-warp")));
+        assert!(is_previous_notification_cache(
+            &cache_root(&home, "warp").join("0.4.0")
+        ));
+        assert_eq!(tree(&previous, false).unwrap(), old_tree);
+    }
+}
+
+#[test]
+fn modified_rev3_source_or_mixed_cache_is_not_a_migration_candidate() {
+    let (_directory, home) = private_home();
+    let previous = previous_home(&home);
+    let path = previous.join("plugins/warp/scripts/on-prompt-submit.sh");
+    let bytes = fs::read(&path).unwrap();
+    fs::write(&path, "用户自定义脚本".as_bytes()).unwrap();
+    assert!(has_custom_source(&home));
+    assert!(validate_existing(&home, &config(&home)).is_err());
+    assert_eq!(fs::read(&path).unwrap(), "用户自定义脚本".as_bytes());
+    fs::write(&path, bytes).unwrap();
+    fs::write(
+        cache_root(&home, "warp").join("0.4.0/scripts/warp-notify.sh"),
+        include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/scripts/warp-notify.sh"),
+    )
+    .unwrap();
+    assert!(notification_patch::preflight(&home, PatchKind::Codex).is_err());
+    assert!(!is_previous_notification_cache(
+        &cache_root(&home, "warp").join("0.4.0")
+    ));
+}
+
 fn config(home: &Path) -> DocumentMut {
     read_config(home).unwrap().1
 }
@@ -127,7 +268,7 @@ fn valid_inline_user_tables_remain_supported_by_scoped_write() {
 }
 
 #[test]
-fn full_source_keeps_fixed_upstream_files_and_only_four_reviewed_changes() {
+fn full_source_keeps_fixed_upstream_files_and_only_five_reviewed_changes() {
     let (_directory, home) = private_home();
     materialize(&home).unwrap();
     assert_eq!(FILES.len(), 36);
@@ -146,6 +287,7 @@ fn full_source_keeps_fixed_upstream_files_and_only_four_reviewed_changes() {
         [
             "plugins/warp/hooks/hooks.json",
             "plugins/warp/scripts/build-payload.sh",
+            "plugins/warp/scripts/on-prompt-submit.sh",
             "plugins/warp/scripts/on-stop.sh",
             "plugins/warp/scripts/warp-notify.sh"
         ]

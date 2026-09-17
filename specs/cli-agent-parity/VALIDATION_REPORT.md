@@ -1,8 +1,13 @@
 # CLI 对齐验证记录
 
+当前检查点新增：[Claude 队列、Codex rev4 与 Grok 内部适配](CLAUDE_QUEUE_AND_CODEX_REV4.md)。44 文件本地门禁通过；三方最终同提交完整验收仍未满足。
+
 状态：实施中，Goal 未完成。工作分支 `codex/cli-agent-parity`，基线 `6921a9925955a1955503e259cd935eaea4ac2ac0`；实现检查点 `dbee1ecae81da54a1749de88a7caffb3099d7eb7` 已推送，完整验收仍未完成。用户原有计划目录和另一任务网页搜索修改均保留。
 
 ## 当前提交验证
+
+- 最新已推送检查点 `a245c639d` 修复 Grok 默认标题栏入口；[中英文 GUI 布局、隐藏持久化及启动入口](GROK_TITLEBAR_ENTRY.md)通过。前一提交 e473 的 [第九轮平台检查](NINTH_PLATFORM_RUN_E4738E1EA.md)已结束：Windows 所选门禁全部通过，Linux 因 Windows 专用 jq 用例误执行而失败；a245 修复平台限定，Linux 复验待完成。
+- [Claude 真实 GUI](CLAUDE_GUI_E473_A245.md)完成两轮多行中英文、允许/拒绝、取消后继续及应用更新重启后原 ID 恢复/结果回收；跨度 e473→a245，不算最终单一提交全部验收。运行中排队协调器与 Grok ACP 的 11 文件冻结快照通过 check（89.273s）、i18n 11 项（197.137s，含编译）和相关测试 1030 项（16.068s）；[输入与门禁](validation/macos-queue-grok-gates-1.json)保留 dirty 边界，真实 GUI 排队尚待验收。
 
 - `494569582` 的干净 macOS check、国际化 11 项及相关模块 987 项通过；[第八轮](EIGHTH_PLATFORM_RUN_494569582.md)已结束，Linux 所选门禁通过；Windows check 和 Rust 定向门禁通过，插件缓存清理、ConPTY hook 完成、缺失会话退出码断言三项未通过。
 - [Claude API 生产适配器](CLAUDE_API_ADAPTER_VERIFICATION.md)旧快照取消失败已保留。修复后的19文件冻结输入通过 check、i18n 11 项及相关模块 1001 项；真实两轮、允许/拒绝、运行中排队、取消与按原 ID 新进程恢复回收标记全部通过。此中间快照不计 GUI、父子任务或最终同提交通过。

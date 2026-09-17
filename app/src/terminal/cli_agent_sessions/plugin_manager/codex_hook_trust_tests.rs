@@ -95,14 +95,25 @@ fn disabled_modified_or_missing_hooks_never_become_configured() {
 fn native_contract_is_exactly_the_recorded_cli_response_and_bundled_manifest() {
     use sha2::{Digest as _, Sha256};
     let source: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../../../specs/cli-agent-parity/fixtures/codex-0.147.0-native-hook-trust.json"
+        "../../../../../specs/cli-agent-parity/fixtures/codex-0.147.0-native-hook-trust-rev4-macos.json"
     ))
     .unwrap();
     let bundled: serde_json::Value = serde_json::from_str(CONTRACT).unwrap();
     assert_eq!(source["hooks"], bundled["hooks"]);
     assert_eq!(bundled["cli"], "codex-cli 0.147.0");
     assert_eq!(bundled["plugin_version"], "0.4.0");
-    assert_eq!(bundled["patch_revision"], 3);
+    assert_eq!(bundled["patch_revision"], 4);
+    assert_eq!(bundled["verified_platform"], "macos");
+    assert_eq!(bundled["windows_verified"], false);
+    assert_eq!(
+        bundled["source_metadata_sha256"],
+        format!(
+            "{:x}",
+            Sha256::digest(include_bytes!(
+                "../../../../assets/bundled/cli-agent-plugins/codex/SOURCE_METADATA.json"
+            ))
+        )
+    );
     let patch_metadata: serde_json::Value = serde_json::from_str(include_str!(
         "../../../../assets/bundled/cli-agent-plugins/codex/PATCH_METADATA.json"
     ))

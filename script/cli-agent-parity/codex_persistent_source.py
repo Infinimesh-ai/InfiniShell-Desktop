@@ -86,6 +86,34 @@ def verify_owned(home, bundle):
     return source
 
 
+def previous_revision(bundle):
+    data = checked_file(bundle / 'codex/revisions/rev3', 'SOURCE_METADATA.json').read_bytes()
+    metadata = json.loads(data)
+    require(metadata['upstream_commit'] == COMMIT and metadata['cli_contract_version'] == '0.147.0'
+            and metadata['patch_revision'] == 3 and metadata['directory'] == 'codex-warp-0.4.0-rev3'
+            and len(metadata['files']) == 36, '旧版本迁移契约不是固定 rev3')
+    return metadata, data
+
+
+def verify_previous(home, bundle):
+    metadata, data = previous_revision(bundle)
+    source = source_path(home, metadata)
+    require(checked_file(source.parent, 'SOURCE_METADATA.json').read_bytes() == data
+            and tree(source) == {name: entry['sha256'] for name, entry in metadata['files'].items()},
+            '旧 rev3 来源有修改、缺失或额外文件')
+    verify_modes(source, metadata['files'])
+    return source
+
+
+def verify_previous_cache(root, bundle):
+    metadata, _ = previous_revision(bundle)
+    files = {name.removeprefix('plugins/warp/'): entry for name, entry in metadata['files'].items()
+             if name.startswith('plugins/warp/')}
+    require(tree(root) == {name: entry['sha256'] for name, entry in files.items()},
+            '旧缓存不是完整固定 rev3，拒绝新旧混合或自定义脚本')
+    verify_modes(root, files)
+
+
 def validate_source(home, settings, bundle):
     metadata, _, _ = source_bundle(bundle)
     entry = settings.get('marketplaces', {}).get(MARKETPLACE)
@@ -94,6 +122,11 @@ def validate_source(home, settings, bundle):
     if entry.get('source_type') == 'local' and entry.get('source') == str(source_path(home, metadata)):
         verify_owned(home, bundle)
         return True
+    previous, _ = previous_revision(bundle)
+    if entry.get('source_type') == 'local' and entry.get('source') == str(source_path(home, previous)):
+        verify_previous(home, bundle)
+        # 旧版可以迁移，但检查命令不能把它报告为当前配方。
+        return False
     require(entry.get('source_type') == 'git' and entry.get('source') in (
         'https://github.com/warpdotdev/codex-warp.git', 'https://github.com/warpdotdev/codex-warp',
         'warpdotdev/codex-warp') and entry.get('ref') in (None, COMMIT) and
@@ -115,7 +148,11 @@ def validate_caches(home, bundle):
         require(len(entries) == 1 and not entries[0].is_symlink(), '目标缓存版本不唯一')
         manifest = json.loads(checked_file(entries[0], '.codex-plugin/plugin.json').read_bytes())
         require(manifest['name'] == 'warp' and manifest['version'] == entries[0].name, '插件版本目录不一致')
-        validate_tree(entries[0], manifest['version'], metadata)
+        try:
+            validate_tree(entries[0], manifest['version'], metadata)
+        except ValueError:
+            require(manifest['version'] == '0.4.0', '旧缓存版本不是受测版本')
+            verify_previous_cache(entries[0], bundle)
     orchestration = home / 'plugins/cache/codex-warp/orchestration'
     if orchestration.exists():
         source, _, _ = source_bundle(bundle)
@@ -250,6 +287,14 @@ def install_source(home, executable, bundle, check=False, before_step=lambda ste
     require(settings.get('plugins', {}).get(PLUGIN, {}).get('enabled') is not False, '插件已被用户禁用，保持禁用')
     current = validate_source(home, settings, bundle)
     validate_caches(home, bundle)
+    preserve_previous_cache = False
+    previous_cache = home / 'plugins/cache/codex-warp/warp/0.4.0'
+    if previous_cache.exists():
+        try:
+            verify_previous_cache(previous_cache, bundle)
+            preserve_previous_cache = True
+        except ValueError:
+            pass
     if check:
         require(current and settings.get('plugins', {}).get(PLUGIN, {}).get('enabled') is True,
                 '尚未启用完整持久来源')
@@ -278,4 +323,6 @@ def install_source(home, executable, bundle, check=False, before_step=lambda ste
         commit(home, stage, original_bytes, installed_bytes, bundle, before_step)
     except Exception as error:
         raise ValueError(f'{error}；事务资料保留于 {stage}') from error
-    shutil.rmtree(stage)
+    # 成功的旧版升级也留下 previous-cache/state.json；不删除用户已有的受控旧树。
+    if not preserve_previous_cache:
+        shutil.rmtree(stage)

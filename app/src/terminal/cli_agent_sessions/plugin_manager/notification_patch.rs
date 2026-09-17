@@ -109,6 +109,12 @@ impl PatchKind {
             ],
             Self::Codex => &[
                 (
+                    "scripts/on-prompt-submit.sh",
+                    include_str!(
+                        "../../../../assets/bundled/cli-agent-plugins/codex/scripts/on-prompt-submit.sh"
+                    ),
+                ),
+                (
                     "scripts/build-payload.sh",
                     include_str!(
                         "../../../../assets/bundled/cli-agent-plugins/codex/scripts/build-payload.sh"
@@ -507,7 +513,13 @@ pub(super) fn preflight(home: &Path, kind: PatchKind) -> Result<bool, PluginInst
     invalidate(home, kind);
     let installation = installed(home, kind).map_err(|_| modified())?;
     if let Some(installation) = installation {
-        validate_tree(&installation, kind).map_err(|_| modified())?;
+        if validate_tree(&installation, kind).is_err()
+            && !(kind == PatchKind::Codex
+                && installation.version == kind.version()
+                && super::codex_source::is_previous_notification_cache(&installation.path))
+        {
+            return Err(modified());
+        }
         return Ok(installation.version == kind.version());
     }
     Ok(false)

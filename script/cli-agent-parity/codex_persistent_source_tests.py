@@ -19,6 +19,69 @@ class SourceTests(unittest.TestCase):
         self.home = Path(self.temporary.name).resolve()
         self.bundle = default_bundle()
 
+    def previous(self):
+        metadata, data = source.previous_revision(self.bundle)
+        root = source.source_path(self.home, metadata)
+        shutil.copytree(self.bundle / 'codex/source', root)
+        for name in ('hooks/hooks.json', 'scripts/warp-notify.sh', 'scripts/on-prompt-submit.sh'):
+            (root / 'plugins/warp' / name).write_bytes((self.bundle / 'codex/revisions/rev3' / name).read_bytes())
+        (root.parent / 'SOURCE_METADATA.json').write_bytes(data)
+        source.verify_previous(self.home, self.bundle)
+        cache = self.home / 'plugins/cache/codex-warp/warp/0.4.0'
+        shutil.copytree(root / 'plugins/warp', cache)
+        initial = ('[marketplaces.codex-warp]\nsource_type="local"\nsource=' + json.dumps(str(root)) +
+                   '\n[plugins."warp@codex-warp"]\nenabled=true\n'
+                   '[plugins."orchestration@codex-warp"]\nenabled=false\n'
+                   '[hooks.state.user]\ntrusted_hash="user-owned"\n').encode()
+        (self.home / 'config.toml').write_bytes(initial)
+        return root, initial
+
+    def rev3_transaction(self):
+        previous, initial = self.previous()
+        root = source.materialize(self.home, self.bundle)
+        stage = self.home / 'transaction'
+        shutil.copytree(root / 'plugins/warp', stage / 'codex/plugins/cache/codex-warp/warp/0.4.0')
+        final = initial.replace(json.dumps(str(previous)).encode(), json.dumps(str(root)).encode())
+        return previous, stage, initial, final
+
+    def test_exact_rev3_upgrade_keeps_old_tree_trust_and_disabled_orchestration(self):
+        previous, stage, initial, final = self.rev3_transaction()
+        old = source.tree(previous)
+        self.assertFalse(source.validate_source(self.home, source.config(self.home)[1], self.bundle))
+        source.validate_caches(self.home, self.bundle)
+        source.commit(self.home, stage, initial, final, self.bundle)
+        self.assertEqual(source.config(self.home)[0], final)
+        self.assertTrue(source.validate_source(self.home, source.config(self.home)[1], self.bundle))
+        self.assertEqual(source.tree(previous), old)
+        source.verify_previous_cache(stage / 'previous-cache/0.4.0', self.bundle)
+
+    def test_rev3_failure_restores_original_pointer_and_cache(self):
+        previous, stage, initial, final = self.rev3_transaction()
+        old = source.tree(previous)
+        def fail_after_config(step):
+            if step == 2:
+                raise OSError('注入 rev3 配置提交后故障')
+        with self.assertRaises(OSError):
+            source.commit(self.home, stage, initial, final, self.bundle, fail_after_config)
+        self.assertEqual(source.config(self.home)[0], initial)
+        self.assertEqual(source.tree(previous), old)
+        source.verify_previous_cache(self.home / 'plugins/cache/codex-warp/warp/0.4.0', self.bundle)
+
+    def test_rev3_modified_source_and_mixed_cache_are_rejected_without_writes(self):
+        root, initial = self.previous()
+        path = root / 'plugins/warp/scripts/on-prompt-submit.sh'
+        original = path.read_bytes()
+        path.write_bytes(b'user modification')
+        with self.assertRaises(ValueError):
+            source.validate_source(self.home, source.config(self.home)[1], self.bundle)
+        self.assertEqual(path.read_bytes(), b'user modification')
+        path.write_bytes(original)
+        (self.home / 'plugins/cache/codex-warp/warp/0.4.0/scripts/warp-notify.sh').write_bytes(
+            (self.bundle / 'codex/scripts/warp-notify.sh').read_bytes())
+        with self.assertRaises(ValueError):
+            source.validate_caches(self.home, self.bundle)
+        self.assertEqual(source.config(self.home)[0], initial)
+
     def prepared(self, existing=False):
         root = source.materialize(self.home, self.bundle)
         stage = self.home / 'transaction'
@@ -34,12 +97,12 @@ class SourceTests(unittest.TestCase):
             shutil.copytree(staged_cache.parent, target)
         return stage, initial, final, target
 
-    def test_whole_bundle_and_only_four_changes_are_pinned(self):
+    def test_whole_bundle_and_only_five_changes_are_pinned(self):
         metadata, _, expected = source.source_bundle(self.bundle)
         self.assertEqual(len(expected), 36)
         changed = {name for name, entry in metadata['files'].items() if entry['sha256'] != entry['upstream_sha256']}
         self.assertEqual(changed, {'plugins/warp/hooks/hooks.json', 'plugins/warp/scripts/build-payload.sh',
-                                 'plugins/warp/scripts/on-stop.sh', 'plugins/warp/scripts/warp-notify.sh'})
+                                 'plugins/warp/scripts/on-prompt-submit.sh', 'plugins/warp/scripts/on-stop.sh', 'plugins/warp/scripts/warp-notify.sh'})
         root = source.materialize(self.home, self.bundle)
         previous = (root / 'plugins/warp/scripts/on-stop.sh').stat().st_mtime_ns
         self.assertEqual(source.materialize(self.home, self.bundle), root)

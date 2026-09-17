@@ -1,0 +1,66 @@
+{
+  "base_commit": "a245c639d307ababbc9b26e604e71318b8ee9522",
+  "worktree_dirty": true,
+  "source_manifest": "/tmp/infinishell-cli-parity-rev4-queue-inputs-1.json",
+  "source_manifest_sha256": "25db61ce053cadc0354f70b7ed270eef5e6d98f9ab0fdd2fb96d95aeff58c16d",
+  "target_directory": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 65.765,
+      "log": "/tmp/infinishell-cli-parity-rev4-queue-1-check.log",
+      "log_sha256": "d02e365b78ae853f5e23393f9c2f2d7a32cb2006edb3ef25fdf397d4aab69db6"
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 6.488,
+      "log": "/tmp/infinishell-cli-parity-rev4-queue-1-i18n.log",
+      "log_sha256": "53212d1d0036d2d2e5fe6a64f1c01078f4804b31e7f8c38e348816f87612f107"
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(cli_agent) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::) | test(ai::agent_providers::chat_stream::) | test(ai::blocklist::action_model::execute::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 14.807,
+      "log": "/tmp/infinishell-cli-parity-rev4-queue-1-focused.log",
+      "log_sha256": "5fa42f7faf81abaa75f64b029ae4fbdd3c2f9e85e5dc7f5c09ecd22e6d36e084"
+    }
+  ],
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "f93fe6cde0fc6402a27da343c7e2d53a021e43dbbadeabba15780cbaeb64e3f6"
+  },
+  "source_unchanged_after_gates": true,
+  "valid_gate_evidence": false,
+  "invalid_reason": "首次合入 rev4 使用 copy2 保留早于既有编译产物的 mtime，Cargo 沿用旧测试二进制；1030 项仍为此前快照，不能计 rev4 验证。按冻结摘要核对后更新源 mtime 并另轮验证。"
+}

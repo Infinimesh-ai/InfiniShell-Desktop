@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::SyncSender;
+use std::time::{Duration, Instant};
 
 use futures::channel::oneshot;
 use futures::future::{AbortHandle, Abortable, Aborted};
@@ -10,11 +11,13 @@ use futures::{FutureExt, StreamExt, pin_mut, select};
 
 #[path = "coordinator_tools.rs"]
 mod tools;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 use warp_cli::agent::Harness;
 use warp_core::features::FeatureFlag;
+use warpui::r#async::Timer;
 use warpui::{Entity, ModelContext, ModelSpawner, SingletonEntity};
 
 use super::{
@@ -110,6 +113,47 @@ pub(crate) struct ManagedTaskSnapshot {
     pub approvals: Vec<ManagedApproval>,
     pub output: String,
     pub error: Option<String>,
+}
+
+/// 回执仍属于提交时的代数；只有原生 started 才把下一轮升级为新的运行。
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct ClaudePendingInput {
+    message_id: Uuid,
+    submission_generation: i64,
+}
+
+fn claude_pending_input(task: &LocalCliTask) -> Result<Option<ClaudePendingInput>, String> {
+    if task.harness != "claude" {
+        return Ok(None);
+    }
+    let config: serde_json::Value =
+        serde_json::from_str(&task.config_json).map_err(|error| error.to_string())?;
+    config
+        .get("claude_pending_input")
+        .filter(|value| !value.is_null())
+        .map(|value| serde_json::from_value(value.clone()).map_err(|error| error.to_string()))
+        .transpose()
+}
+
+pub(crate) fn claude_input_pending(task: &LocalCliTask) -> bool {
+    // 配置无法解释时也不能开放第二个输入，避免失去跨代回执关联。
+    !claude_pending_input(task).is_ok_and(|pending| pending.is_none())
+}
+
+fn set_claude_pending_input(
+    task: &mut LocalCliTask,
+    pending: Option<ClaudePendingInput>,
+) -> Result<(), String> {
+    let mut config: serde_json::Value =
+        serde_json::from_str(&task.config_json).map_err(|error| error.to_string())?;
+    let object = config.as_object_mut().ok_or("本地任务配置无效")?;
+    if let Some(pending) = pending {
+        object.insert("claude_pending_input".into(), json!(pending));
+    } else {
+        object.remove("claude_pending_input");
+    }
+    task.config_json = config.to_string();
+    Ok(())
 }
 
 pub(crate) enum LocalCLITaskCoordinatorEvent {
@@ -645,6 +689,12 @@ async fn run_managed_task(
     config["permission_ceiling"] =
         serde_json::to_value(&options.permission_ceiling).map_err(|error| error.to_string())?;
     config["runtime_generation"] = json!(options.generation);
+    // 旧进程已确认退出后才能走到这里；旧输入保留在消息表，恢复不会自动重投。
+    if snapshot.task.harness == "claude" {
+        let object = config.as_object_mut().ok_or("本地任务配置无效")?;
+        object.remove("claude_pending_input");
+        object.remove("claude_current_input");
+    }
     snapshot.task.config_json = config.to_string();
     commit_transition(&sender, &mut snapshot.task, &unclaimed).await?;
     if let Err(error) = verify_saved_parent_ceiling(&sender, &snapshot.task, &options).await {
@@ -688,12 +738,14 @@ async fn run_managed_task(
     let mut tool_calls = FuturesUnordered::new();
     let mut tool_abort_handles = HashMap::new();
     let mut cancelled_tools = HashSet::new();
+    let mut queue_start_wait: Option<Instant> = None;
     let worker = async {
         loop {
             enum Incoming {
                 Event(Option<RuntimeEvent>),
                 Request(Option<ManagedRequest>),
                 Tool(Option<Result<tools::ToolCompletion, Aborted>>),
+                QueueStartTimedOut,
             }
             let incoming = {
                 let event = events.recv().fuse();
@@ -706,11 +758,21 @@ async fn run_managed_task(
                     }
                 }
                 .fuse();
-                pin_mut!(event, request, tool);
+                let queue_timeout = async {
+                    if let Some(started) = queue_start_wait {
+                        Timer::after(Duration::from_secs(30).saturating_sub(started.elapsed()))
+                            .await;
+                    } else {
+                        futures::future::pending().await
+                    }
+                }
+                .fuse();
+                pin_mut!(event, request, tool, queue_timeout);
                 select! {
                     event = event => Incoming::Event(event),
                     request = request => Incoming::Request(request),
                     tool = tool => Incoming::Tool(tool),
+                    () = queue_timeout => Incoming::QueueStartTimedOut,
                 }
             };
             match incoming {
@@ -718,10 +780,7 @@ async fn run_managed_task(
                     if event.generation != token {
                         continue;
                     }
-                    // 重复开始与旧轮终态不能清空当前输出、工具调用或新一轮的审批。
-                    if matches!(&event.kind,RuntimeEventKind::TurnStarted {turn_id} if snapshot.active_turn_id.as_ref()==Some(turn_id))
-                        || matches!(&event.kind,RuntimeEventKind::TurnFinished {turn_id, ..} if snapshot.active_turn_id.as_ref()!=Some(turn_id))
-                    {
+                    if runtime_event_is_stale(&snapshot, &event, &finished_turns)? {
                         continue;
                     }
                     match &event.kind {
@@ -740,44 +799,17 @@ async fn run_managed_task(
                         }
                         _ => {}
                     }
-                    if let RuntimeEventKind::MessageAccepted {
-                        turn_id: Some(turn_id),
-                        ..
-                    } = &event.kind
-                        && snapshot.active_turn_id.as_ref() != Some(turn_id)
-                        && !finished_turns.contains(turn_id)
-                    {
-                        accepted_turns.insert(turn_id.clone());
-                    }
-                    if let RuntimeEventKind::TurnStarted { turn_id } = &event.kind {
-                        if finished_turns.contains(turn_id) {
-                            continue;
-                        }
-                        if snapshot.task.state.is_terminal() {
-                            if !accepted_turns.contains(turn_id) {
-                                return Err("未经确认的新回合不能重新打开任务".to_owned());
-                            }
-                            let previous = snapshot.task.clone();
-                            let mut next = next_task_generation(&previous)?;
-                            commit_transition(&sender, &mut next, &previous).await?;
-                            snapshot.task = next;
-                        }
-                        accepted_turns.remove(turn_id);
-                    }
-                    let previous = snapshot.task.clone();
-                    let mut updated = snapshot.clone();
-                    apply_runtime_event(&mut updated, &event)?;
-                    if updated.task != previous {
-                        commit_transition(&sender, &mut updated.task, &previous).await?;
-                    }
-                    snapshot = updated;
-                    acknowledge_runtime_message(
+                    if !commit_runtime_event(
                         &sender,
-                        &snapshot.task.task_id,
-                        snapshot.task.generation,
-                        &event.kind,
+                        &mut snapshot,
+                        &event,
+                        &mut accepted_turns,
+                        &mut finished_turns,
                     )
-                    .await?;
+                    .await?
+                    {
+                        continue;
+                    }
                     if matches!(event.kind, RuntimeEventKind::SessionReady { .. })
                         && let Some((message_id, action)) = initial_request.take()
                     {
@@ -795,9 +827,6 @@ async fn run_managed_task(
                     if matches!(event.kind, RuntimeEventKind::TurnFinished { .. })
                         && snapshot.task.state.is_terminal()
                     {
-                        if let RuntimeEventKind::TurnFinished { turn_id, .. } = &event.kind {
-                            finished_turns.insert(turn_id.clone());
-                        }
                         let result = enqueue_task_result(
                             &sender,
                             snapshot.task.task_id.clone(),
@@ -900,6 +929,9 @@ async fn run_managed_task(
                     }
                 }
                 Incoming::Tool(Some(Err(Aborted))) | Incoming::Tool(None) => {}
+                Incoming::QueueStartTimedOut => {
+                    return Err(crate::t!("cli-agent-claude-queue-uncertain"));
+                }
                 Incoming::Event(None) | Incoming::Request(None) => break,
                 Incoming::Request(Some(request)) => {
                     let result = if request.expected_generation != snapshot.task.generation {
@@ -907,17 +939,16 @@ async fn run_managed_task(
                     } else if request.from_mailbox {
                         if !snapshot.ready || !snapshot.task.state.is_active() {
                             Err(crate::t!("cli-agent-message-recipient-unavailable"))
-                        } else if unverified_overlap(&snapshot, &request.action) {
-                            Err(crate::t!("cli-agent-claude-queue-unverified"))
                         } else {
-                            controller
-                                .send(RuntimeCommand {
-                                    generation: token,
-                                    message_id: request.message_id,
-                                    action: request.action,
-                                })
-                                .await
-                                .map_err(|error| error.to_string())
+                            send_mailbox_request(
+                                &sender,
+                                &mut snapshot,
+                                &controller,
+                                token,
+                                request.message_id,
+                                request.action,
+                            )
+                            .await
                         }
                     } else {
                         send_user_request(
@@ -938,6 +969,16 @@ async fn run_managed_task(
                         .await
                         .map_err(|_| "本地任务界面已关闭".to_owned())?;
                 }
+            }
+            // 仅在上一轮已结束、下一轮仍未开始时计时；状态噪声不会重新延长期限。
+            if snapshot.connected
+                && snapshot.ready
+                && snapshot.active_turn_id.is_none()
+                && claude_input_pending(&snapshot.task)
+            {
+                queue_start_wait.get_or_insert_with(Instant::now);
+            } else {
+                queue_start_wait = None;
             }
         }
         Ok::<(), String>(())
@@ -1086,9 +1127,6 @@ async fn send_user_request(
     if !snapshot.connected || (!snapshot.ready && !matches!(action, RuntimeAction::Shutdown)) {
         return Err(crate::t!("cli-agent-status-disconnected"));
     }
-    if unverified_overlap(snapshot, &action) {
-        return Err(crate::t!("cli-agent-claude-queue-unverified"));
-    }
     let is_input = matches!(
         action,
         RuntimeAction::Submit { .. } | RuntimeAction::Steer { .. }
@@ -1115,7 +1153,35 @@ async fn send_user_request(
         }
     }
     let mut input_prepared = allow_prepared;
-    if matches!(action, RuntimeAction::Submit { .. }) && snapshot.task.state.is_terminal() {
+    if snapshot.task.harness == "claude" && matches!(action, RuntimeAction::Submit { .. }) {
+        if claude_input_pending(&snapshot.task) {
+            return Err(crate::t!("cli-agent-claude-queue-full"));
+        }
+        let previous = snapshot.task.clone();
+        let mut updated = if previous.state.is_terminal() {
+            next_task_generation(&previous)?
+        } else {
+            previous.clone()
+        };
+        let pending = ClaudePendingInput {
+            message_id,
+            submission_generation: updated.generation,
+        };
+        set_claude_pending_input(&mut updated, Some(pending))?;
+        if updated.generation == previous.generation {
+            updated.revision = previous.revision.checked_add(1).ok_or("任务修订号已耗尽")?;
+        }
+        // 队列占用和原始输入一起提交，不能先派发再补记录。
+        let message = input_message(&updated, message_id, &action)?;
+        checkpoint_task_with_message(sender, updated.clone(), Some(previous.generation), message)?
+            .await
+            .map_err(|_| crate::t!("cli-agent-task-save-failed"))??;
+        snapshot.task = updated;
+        if previous.state.is_terminal() {
+            snapshot.output.clear();
+        }
+        input_prepared = true;
+    } else if matches!(action, RuntimeAction::Submit { .. }) && snapshot.task.state.is_terminal() {
         let previous = snapshot.task.clone();
         let updated = next_task_generation(&previous)?;
         let message = input_message(&updated, message_id, &action)?;
@@ -1170,6 +1236,38 @@ async fn send_user_request(
     Ok(())
 }
 
+async fn send_mailbox_request(
+    sender: &SyncSender<ModelEvent>,
+    snapshot: &mut ManagedTaskSnapshot,
+    controller: &RuntimeController,
+    token: Uuid,
+    message_id: Uuid,
+    action: RuntimeAction,
+) -> Result<(), String> {
+    if snapshot.task.harness == "claude" && matches!(action, RuntimeAction::Submit { .. }) {
+        if claude_input_pending(&snapshot.task) {
+            return Err(crate::t!("cli-agent-claude-queue-full"));
+        }
+        let previous = snapshot.task.clone();
+        let pending = ClaudePendingInput {
+            message_id,
+            submission_generation: previous.generation,
+        };
+        let mut updated = previous.clone();
+        set_claude_pending_input(&mut updated, Some(pending))?;
+        commit_transition(sender, &mut updated, &previous).await?;
+        snapshot.task = updated;
+    }
+    controller
+        .send(RuntimeCommand {
+            generation: token,
+            message_id,
+            action,
+        })
+        .await
+        .map_err(|error| error.to_string())
+}
+
 fn input_message(
     task: &LocalCliTask,
     message_id: Uuid,
@@ -1189,12 +1287,6 @@ fn input_message(
     })
 }
 
-fn unverified_overlap(snapshot: &ManagedTaskSnapshot, action: &RuntimeAction) -> bool {
-    snapshot.task.harness == "claude"
-        && snapshot.active_turn_id.is_some()
-        && matches!(action, RuntimeAction::Submit { .. })
-}
-
 fn next_task_generation(previous: &LocalCliTask) -> Result<LocalCliTask, String> {
     let mut task = previous.clone();
     task.generation = task.generation.checked_add(1).ok_or("任务代数已耗尽")?;
@@ -1203,6 +1295,118 @@ fn next_task_generation(previous: &LocalCliTask) -> Result<LocalCliTask, String>
     task.result = None;
     task.terminal_evidence = None;
     Ok(task)
+}
+
+fn runtime_event_is_stale(
+    snapshot: &ManagedTaskSnapshot,
+    event: &RuntimeEvent,
+    finished_turns: &HashSet<String>,
+) -> Result<bool, String> {
+    let pending = claude_pending_input(&snapshot.task)?;
+    Ok(
+        matches!(&event.kind, RuntimeEventKind::TurnStarted { turn_id }
+        if snapshot.active_turn_id.as_ref() == Some(turn_id) || finished_turns.contains(turn_id))
+            || matches!(&event.kind, RuntimeEventKind::TurnFinished { turn_id, .. }
+            if snapshot.active_turn_id.as_ref() != Some(turn_id)
+                && !pending.as_ref().is_some_and(|input| input.message_id.to_string() == *turn_id)),
+    )
+}
+
+async fn commit_runtime_event(
+    sender: &SyncSender<ModelEvent>,
+    snapshot: &mut ManagedTaskSnapshot,
+    event: &RuntimeEvent,
+    accepted_turns: &mut HashSet<String>,
+    finished_turns: &mut HashSet<String>,
+) -> Result<bool, String> {
+    if runtime_event_is_stale(snapshot, event, finished_turns)? {
+        return Ok(false);
+    }
+    let pending = claude_pending_input(&snapshot.task)?;
+    // 已接收而尚未 started 的下一轮不能被当成当前轮的完成或取消。
+    if matches!(&event.kind, RuntimeEventKind::TurnFinished { turn_id, .. }
+        if snapshot.active_turn_id.as_ref() != Some(turn_id)
+            && pending.as_ref().is_some_and(|input| input.message_id.to_string() == *turn_id))
+    {
+        return Err(crate::t!("cli-agent-claude-queue-uncertain"));
+    }
+    if let RuntimeEventKind::MessageAccepted {
+        message_id,
+        turn_id: Some(turn_id),
+    } = &event.kind
+        && snapshot.active_turn_id.as_ref() != Some(turn_id)
+        && !finished_turns.contains(turn_id)
+    {
+        if snapshot.task.harness == "claude"
+            && !pending.as_ref().is_some_and(|input| {
+                input.message_id == *message_id
+                    && message_id.to_string() == *turn_id
+                    && input.submission_generation == snapshot.task.generation
+            })
+        {
+            return Err(crate::t!("cli-agent-claude-queue-uncertain"));
+        }
+        accepted_turns.insert(turn_id.clone());
+    }
+    if let RuntimeEventKind::TurnStarted { turn_id } = &event.kind {
+        if snapshot.task.harness == "claude"
+            && (!snapshot.connected
+                || !snapshot.ready
+                || snapshot.active_turn_id.is_some()
+                || !accepted_turns.contains(turn_id)
+                || !pending.as_ref().is_some_and(|input| {
+                    input.message_id.to_string() == *turn_id
+                        && input.submission_generation == snapshot.task.generation
+                }))
+        {
+            return Err(crate::t!("cli-agent-claude-queue-uncertain"));
+        }
+        if snapshot.task.state.is_terminal() {
+            if !accepted_turns.contains(turn_id) {
+                return Err("未经确认的新回合不能重新打开任务".to_owned());
+            }
+            let previous = snapshot.task.clone();
+            let mut next = next_task_generation(&previous)?;
+            commit_transition(sender, &mut next, &previous).await?;
+            snapshot.task = next;
+        }
+        accepted_turns.remove(turn_id);
+    }
+    let previous = snapshot.task.clone();
+    let mut updated = snapshot.clone();
+    if snapshot.task.harness == "claude" {
+        if let RuntimeEventKind::TurnStarted { turn_id } = &event.kind {
+            set_claude_pending_input(&mut updated.task, None)?;
+            let mut config: serde_json::Value = serde_json::from_str(&updated.task.config_json)
+                .map_err(|error| error.to_string())?;
+            // 保留执行回合与原始提交的对应关系；不会篡改旧代的消息回执。
+            config["claude_current_input"] = json!({
+                "turn_id": turn_id,
+                "submission_generation": pending.as_ref().map(|input| input.submission_generation),
+            });
+            updated.task.config_json = config.to_string();
+        } else if matches!(&event.kind, RuntimeEventKind::RequestFailed { message_id, .. }
+            if pending.as_ref().is_some_and(|input| input.message_id == *message_id))
+        {
+            set_claude_pending_input(&mut updated.task, None)?;
+        }
+    }
+    apply_runtime_event(&mut updated, event)?;
+    if updated.task != previous {
+        commit_transition(sender, &mut updated.task, &previous).await?;
+    }
+    *snapshot = updated;
+    acknowledge_runtime_message(
+        sender,
+        &snapshot.task.task_id,
+        snapshot.task.generation,
+        &event.kind,
+    )
+    .await?;
+    if let RuntimeEventKind::TurnFinished { turn_id, .. } = &event.kind {
+        finished_turns.insert(turn_id.clone());
+    }
+    Ok(true)
 }
 
 fn apply_runtime_event(

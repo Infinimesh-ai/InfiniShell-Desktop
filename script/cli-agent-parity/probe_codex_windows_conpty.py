@@ -1,4 +1,4 @@
-"""真实 Windows ConPTY 中运行固定 Codex hooks 候选；不验证普通 TUI 或模型生命周期。"""
+"""真实 Windows ConPTY 直验正式 Codex 通知，或独立复现旧候选；不验证 TUI 或模型生命周期。"""
 
 import argparse
 import ctypes
@@ -100,15 +100,33 @@ def verify_transport(raw, cases):
     observed = notifications(raw)
     matched = []
     for case in cases:
-        markers = case['markers']
-        session = markers['on-session-start.sh']['session_id']
-        turn = markers['on-prompt-submit.sh']['turn_id']
+        if case.get('mode') == 'formal':
+            registration = case['formal_registration']
+            trigger = case['trigger_validation']
+            require(registration['passed'] and registration['hook_count'] == 5
+                    and registration['source_manifest_modified'] is False
+                    and registration['scripts_instrumented'] is False
+                    and registration['native_trust_confirmed']
+                    and registration['config_rollback']['restored'], '正式五项注册及回滚证据不完整')
+            require(trigger['formal_registration_unchanged'] and trigger['test_only_hook_count'] == 1
+                    and trigger['scripts_match_formal_resource'] and case['scripts_instrumented'] is False
+                    and case['config_rollback']['restored'], '正式触发脚本或临时配置未经完整核对')
+            expected = case['transport_expectations']
+            require(expected['provenance'] == 'app_server_request_response'
+                    and expected['query_normalization_applied'] is False, '正式通知必须对照原始 RPC，不能使用插桩 marker')
+            session, turn = expected['session_id'], expected['turn_id']
+        else:
+            require(case.get('mode', 'candidate') == 'candidate', '未知通知证据模式')
+            markers = case['markers']
+            session = markers['on-session-start.sh']['session_id']
+            turn = markers['on-prompt-submit.sh']['turn_id']
         for event in ('session_start', 'prompt_submit'):
             found = [item for item in observed if item.get('v') == 1 and item.get('agent') == 'codex'
                      and item.get('event') == event and item.get('session_id') == session
                      and (event != 'prompt_submit' or item.get('turn_id') == turn)]
             require(len(found) == 1, f'{case["name"]} 的 {event} 必须真实且仅出现一次，实际 {len(found)}')
-            marker = markers['on-session-start.sh' if event == 'session_start' else 'on-prompt-submit.sh']
+            marker = expected if case.get('mode') == 'formal' else markers[
+                'on-session-start.sh' if event == 'session_start' else 'on-prompt-submit.sh']
             require(isinstance(marker.get('cwd'), str) and found[0].get('cwd') == marker['cwd'],
                     '原生通知工作目录未完整保留 Unicode 或原始路径')
             if event == 'prompt_submit':
@@ -236,6 +254,7 @@ def run_driver(configuration):
     config = json.loads(configuration.read_text(encoding='utf-8'))
     api = WinApi()
     report = {'passed': False, 'cases': [], 'model_http_requests': [], 'attachments': [],
+              'schema_version': 2, 'mode': config['mode'],
               'native_codex_attachments': [], 'credentials_provided': False}
     stop = threading.Event()
     server = None
@@ -282,15 +301,19 @@ def run_driver(configuration):
         native.NativeRecorder = AttachedRecorder
         environment = windows_environment(Path(config['bash']), Path(config['jq']))
         environment.update(WARP_CLI_AGENT_PROTOCOL_VERSION='1', WARP_CLIENT_VERSION='conpty-probe', TERM_PROGRAM='WarpTerminal')
-        environment.update(BASH_ENV=bash_environment.as_posix(),
-                           INFINISHELL_CONPTY_DIAGNOSTICS_DIR=shell_diagnostics.as_posix())
+        # 正式入口不注入 Bash observer；旧候选诊断仅在独立候选模式下保留。
+        if config['mode'] == 'candidate':
+            environment.update(BASH_ENV=bash_environment.as_posix(),
+                               INFINISHELL_CONPTY_DIAGNOSTICS_DIR=shell_diagnostics.as_posix())
+        report['bash_observer_enabled'] = config['mode'] == 'candidate'
         report['jq_newline_boundary'] = {}
         native.verify_jq_newline_boundary(environment, report['jq_newline_boundary'])
         server = ThreadingHTTPServer(('127.0.0.1', 0), RejectModel)
         server_thread = threading.Thread(target=server.serve_forever, daemon=True)
         server_thread.start()
         args = types.SimpleNamespace(repo=Path(config['repo']), upstream_plugin=Path(config['plugin']),
-            codex_executable=Path(config['codex']), native_environment=environment, port=server.server_port)
+            codex_executable=Path(config['codex']), native_environment=environment, port=server.server_port,
+            mode=config['mode'])
         for name, prompt in zip(('插件 空 格', "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()"), native.HOOK_PROMPTS):
             evidence = {'name': name, 'passed': False, 'traces': []}
             report['cases'].append(evidence)
@@ -390,7 +413,9 @@ def run_conpty(dll_path, command, environment, cwd, output, timeout):
         code = wintypes.DWORD()
         api.check(api.kernel.GetExitCodeProcess(process.process, ctypes.byref(code)))
         return {'pid': process.pid, 'exit_code': code.value, 'show_hresult': show_result,
-                'release_hresult': release_result, 'create_flags': flags}
+                'release_hresult': release_result, 'create_flags': flags,
+                # 只有下方 finally 完成 console 关闭、句柄回收和输出 EOF 后才会返回此回执。
+                'console_close_and_output_eof_confirmed': True, 'descendants_job_verified': False}
     finally:
         if process.process:
             if api.kernel.WaitForSingleObject(process.process, 0) == 258:
@@ -424,6 +449,7 @@ def run_conpty(dll_path, command, environment, cwd, output, timeout):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--mode', choices=('formal', 'candidate'), default='formal')
     parser.add_argument('--driver-config', type=Path, help=argparse.SUPPRESS)
     parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[2])
     for name in ('bash-executable', 'jq-executable', 'download-dir', 'output'):
@@ -441,10 +467,10 @@ def main():
         require(not path.is_relative_to(repo), '禁止在源码树中写探针产物、下载或 HOME')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     require(not args.output.exists(), '输出已经存在，不能覆盖先前证据')
-    report = {'passed': False, 'native_conpty_notifications_verified': False,
-              'scope': 'candidate_windows_hooks_actual_conpty_transport', 'ordinary_codex_tui_verified': False,
+    report = {'schema_version': 2, 'mode': args.mode, 'passed': False, 'native_conpty_notifications_verified': False,
+              'scope': args.mode + '_windows_hooks_actual_conpty_transport', 'ordinary_codex_tui_verified': False,
               'product_ui_notifications_verified': False, 'full_lifecycle_verified': False,
-              'model_generation_verified': False, 'credentials_provided': False}
+              'model_generation_verified': False, 'credentials_provided': False, 'windows_product_enabled': False}
     root = Path(tempfile.mkdtemp(prefix='infinishell-codex-conpty-'))
     report['private_dir'] = str(root)
     try:
@@ -453,7 +479,8 @@ def main():
             *(repo / 'script/cli-agent-parity' / name for name in (
                 'probe_codex_windows_hooks.py', 'codex_windows_hook_command.py',
                 'codex_windows_hook_command.ps1', 'codex_windows_hook_inputs.py',
-                'codex_windows_notify.py', 'codex_windows_notify.ps1', 'apply_notification_patch.py'))]
+                'codex_windows_notify.py', 'codex_windows_notify.ps1', 'apply_notification_patch.py',
+                'codex_windows_formal.py', 'codex_persistent_source.py'))]
         report['source_sha256'] = {str(path.relative_to(repo)): sha256(path) for path in source_files}
         report['candidate_lf_sha256'] = require_candidate_contract()
         codex, plugin, report['fixed_inputs'] = obtain_inputs(repo, args.download_dir, 'x86_64')
@@ -472,7 +499,7 @@ def main():
         require(not native_report.exists() and not raw_output.exists(), '派生证据路径已存在')
         report['native_report'] = str(native_report)
         report['raw_output'] = {'path': str(raw_output)}
-        config = {'nonce': str(uuid.uuid4()), 'repo': str(repo), 'bash': str(args.bash_executable),
+        config = {'nonce': str(uuid.uuid4()), 'mode': args.mode, 'repo': str(repo), 'bash': str(args.bash_executable),
                   'jq': str(args.jq_executable), 'codex': str(codex), 'plugin': str(plugin),
                   'private_dir': str(root / 'cases'), 'native_report': str(native_report)}
         config_file = root / 'driver.json'
@@ -482,24 +509,34 @@ def main():
         for key in ('HOME', 'APPDATA', 'LOCALAPPDATA'):
             Path(environment[key]).mkdir(parents=True, exist_ok=True)
         report['driver'] = run_conpty(host / 'conpty.dll', [sys.executable, '-B', str(Path(__file__).resolve()),
-            '--driver-config', str(config_file)], environment, root, raw_output, 240)
+            '--driver-config', str(config_file)], environment, root, raw_output, 480)
         native = json.loads(native_report.read_text(encoding='utf-8'))
         report['raw_output'] = {'path': str(raw_output), 'sha256': sha256(raw_output), 'bytes': raw_output.stat().st_size}
         require(report['driver']['exit_code'] == 0 and native['passed'], '附着原生 hook 场景失败')
         raw = raw_output.read_bytes()
         report['conout_canary_observed'] = any(item.get('diagnostic_nonce') == config['nonce'] for item in notifications(raw))
         report['matched_notifications'] = verify_transport(raw, native['cases'])
+        report['notification_events_verified'] = ['session_start', 'prompt_submit']
+        report['notification_events_not_verified'] = ['stop', 'permission_request', 'post_tool_use']
+        report['formal_five_hook_registration_verified'] = args.mode == 'formal'
         require(not native['model_http_requests'], '发生模型请求')
         require(report['candidate_lf_sha256'] == require_candidate_contract(), '候选脚本在执行中改变')
         require(report['source_sha256'] == {str(path.relative_to(repo)): sha256(path) for path in source_files},
                 '探针源码在执行中改变')
+        from probe_codex_windows_hooks import cleanup_private_cases, verify_case_resources
+        verify_case_resources(repo, native['cases'], args.mode)
+        report['private_cases_cleanup'] = {}
+        cleanup_private_cases(root / 'cases', native['cases'], report['private_cases_cleanup'])
+        # ctypes 加载的私有 ConPTY DLL 仍属于宿主进程，不能在这里假称整个根目录可安全删除。
+        report['retained_host_directory'] = {'path': str(root), 'reason': 'conpty_dll_loaded_by_probe_host',
+                                            'contains_cli_configuration': False}
         report['native_conpty_notifications_verified'] = True
         report['passed'] = True
     except Exception as error:
         report['failure'] = {'type': type(error).__name__, 'message': str(error)}
         raise
     finally:
-        # 保留所有失败现场；目录内没有用户认证，后续清理由调用方处理。
+        # 失败保留现场；成功只清理已确认退出并回滚的 CLI case，宿主 DLL 由调用方收尾。
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 

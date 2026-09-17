@@ -19,6 +19,18 @@ def fixture_case(prompt='中文输入\nEnglish'):
         'on-prompt-submit.sh': {'turn_id': 'native-turn-unique', 'cwd': 'C:/隔离 空格', 'prompt': prompt}}}
 
 
+def formal_case(prompt='中文输入\nEnglish'):
+    return {'name': '正式资源离线判定夹具', 'mode': 'formal', 'passed': True,
+        'formal_registration': {'passed': True, 'hook_count': 5, 'source_manifest_modified': False,
+            'scripts_instrumented': False, 'native_trust_confirmed': True, 'config_rollback': {'restored': True}},
+        'trigger_validation': {'formal_registration_unchanged': True, 'test_only_hook_count': 1,
+            'scripts_match_formal_resource': True}, 'scripts_instrumented': False,
+        'config_rollback': {'restored': True}, 'transport_expectations': {
+            'provenance': 'app_server_request_response', 'query_normalization_applied': False,
+            'session_id': 'native-session-unique', 'turn_id': 'native-turn-unique',
+            'cwd': 'C:/隔离 空格', 'prompt': prompt}}
+
+
 def osc(event, session='native-session-unique', turn='native-turn-unique', terminator=b'\x07', query='中文输入\nEnglish'):
     payload = {'v': 1, 'agent': 'codex', 'event': event, 'session_id': session,
                'turn_id': turn, 'cwd': 'C:/隔离 空格', 'query': query}
@@ -26,6 +38,44 @@ def osc(event, session='native-session-unique', turn='native-turn-unique', termi
 
 
 class ConptyProbeTests(unittest.TestCase):
+    def test_formal_transport_uses_rpc_text_without_wrapper_markers(self):
+        for prompt in ('中文\nEnglish', '中文\r\nEnglish', 'literal \\r\\n'):
+            case = formal_case(prompt)
+            self.assertNotIn('markers', case)
+            raw = osc('session_start') + osc('prompt_submit', query=prompt)
+            self.assertEqual(verify_transport(raw, [case])[1]['query'], prompt)
+            changed = prompt.replace('\r', '').replace('\n', '\r\n') if '\r' not in prompt else prompt.replace('\r', '')
+            if changed != prompt:
+                with self.assertRaises(ValueError):
+                    verify_transport(osc('session_start') + osc('prompt_submit', query=changed), [case])
+
+    def test_formal_transport_requires_five_unmodified_registration_and_rollback_proofs(self):
+        for field, value in (('passed', False), ('hook_count', 6), ('source_manifest_modified', True),
+                             ('scripts_instrumented', True), ('native_trust_confirmed', False)):
+            case = formal_case()
+            case['formal_registration'][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                verify_transport(osc('session_start') + osc('prompt_submit'), [case])
+        for parent in ('formal_registration', None):
+            case = formal_case()
+            (case[parent] if parent else case)['config_rollback']['restored'] = False
+            with self.subTest(parent=parent), self.assertRaises(ValueError):
+                verify_transport(osc('session_start') + osc('prompt_submit'), [case])
+
+    def test_formal_transport_cannot_fall_back_to_candidate_markers_or_normalized_input(self):
+        for field, value in (('provenance', 'hook_wrapper_marker'), ('query_normalization_applied', True)):
+            case = formal_case()
+            case['transport_expectations'][field] = value
+            case['markers'] = fixture_case()['markers']
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                verify_transport(osc('session_start') + osc('prompt_submit'), [case])
+        for field, value in (('formal_registration_unchanged', False), ('test_only_hook_count', 0),
+                             ('scripts_match_formal_resource', False)):
+            case = formal_case()
+            case['trigger_validation'][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                verify_transport(osc('session_start') + osc('prompt_submit'), [case])
+
     def test_exact_native_session_and_turn_are_required(self):
         raw = b'ordinary terminal output' + osc('session_start') + osc('prompt_submit', terminator=b'\x1b\\')
         found = verify_transport(raw, [fixture_case()])

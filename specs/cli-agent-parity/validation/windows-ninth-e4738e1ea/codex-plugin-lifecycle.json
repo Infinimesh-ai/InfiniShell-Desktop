@@ -1,0 +1,581 @@
+{
+  "passed": true,
+  "host_os": "win32",
+  "codex_source_commit": "be6e8eac029b183056b7e4402879f15d2c85f61b",
+  "plugin_source_commit": "31ce59d9011cfb1d78f265649a228dac5de58d76",
+  "commands": [
+    {
+      "arguments": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "codex-cli 0.147.0\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Manage Codex plugins\n\nUsage: codex plugin [OPTIONS] <COMMAND>\n\nCommands:\n  add          Install a plugin from a configured marketplace snapshot\n  list         List plugins available from configured marketplace snapshots\n  marketplace  Add, list, upgrade, or remove configured plugin marketplaces\n  remove       Remove an installed plugin from local config and cache\n  help         Print this message or the help of the given subcommand(s)\n\nOptions:\n  -c, --config <key=value>\n          Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.\n          Use a dotted path (`foo.bar.baz`) to override nested values. The `value` portion is parsed\n          as TOML. If it fails to parse as TOML, the raw string is used as a literal.\n          \n          Examples: - `-c model=\"o3\"` - `-c 'sandbox_permissions=[\"disk-full-read-access\"]'` - `-c\n          shell_environment_policy.inherit=all`\n\n      --enable <FEATURE>\n          Enable a feature (repeatable). Equivalent to `-c features.<name>=true`\n\n      --disable <FEATURE>\n          Disable a feature (repeatable). Equivalent to `-c features.<name>=false`\n\n  -h, --help\n          Print help (see a summary with '-h')\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "disable",
+        "--help"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'disable'\n\nUsage: codex plugin [OPTIONS] <COMMAND>\n\nFor more information, try '--help'.\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "enable",
+        "--help"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'enable'\n\nUsage: codex plugin [OPTIONS] <COMMAND>\n\nFor more information, try '--help'.\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "update",
+        "--help"
+      ],
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'update'\n\nUsage: codex plugin [OPTIONS] <COMMAND>\n\nFor more information, try '--help'.\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "list",
+        "--available",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"installed\": [],\n  \"available\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "warp@codex-warp",
+        "--json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: plugin `warp` was not found in marketplace `codex-warp`\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"codex-warp\",\n  \"installedRoot\": \"C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\",\n  \"alreadyAdded\": false\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "list",
+        "--available",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"installed\": [],\n  \"available\": [\n    {\n      \"pluginId\": \"warp@codex-warp\",\n      \"name\": \"warp\",\n      \"marketplaceName\": \"codex-warp\",\n      \"version\": \"0.4.0\",\n      \"installed\": false,\n      \"enabled\": false,\n      \"source\": {\n        \"source\": \"local\",\n        \"path\": \"C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\\\\plugins\\\\warp\"\n      },\n      \"marketplaceSource\": {\n        \"sourceType\": \"local\",\n        \"source\": \"\\\\\\\\?\\\\C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\"\n      },\n      \"installPolicy\": \"AVAILABLE\",\n      \"authPolicy\": \"ON_INSTALL\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "warp@codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"warp@codex-warp\",\n  \"name\": \"warp\",\n  \"marketplaceName\": \"codex-warp\",\n  \"version\": \"0.4.0\",\n  \"installedPath\": \"C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\codex\\\\plugins\\\\cache\\\\codex-warp\\\\warp\\\\0.4.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "list",
+        "--available",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"installed\": [\n    {\n      \"pluginId\": \"warp@codex-warp\",\n      \"name\": \"warp\",\n      \"marketplaceName\": \"codex-warp\",\n      \"version\": \"0.4.0\",\n      \"installed\": true,\n      \"enabled\": true,\n      \"source\": {\n        \"source\": \"local\",\n        \"path\": \"C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\\\\plugins\\\\warp\"\n      },\n      \"marketplaceSource\": {\n        \"sourceType\": \"local\",\n        \"source\": \"\\\\\\\\?\\\\C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\"\n      },\n      \"installPolicy\": \"AVAILABLE\",\n      \"authPolicy\": \"ON_INSTALL\"\n    }\n  ],\n  \"available\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "list",
+        "--available",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"installed\": [\n    {\n      \"pluginId\": \"warp@codex-warp\",\n      \"name\": \"warp\",\n      \"marketplaceName\": \"codex-warp\",\n      \"version\": \"0.4.0\",\n      \"installed\": true,\n      \"enabled\": false,\n      \"source\": {\n        \"source\": \"local\",\n        \"path\": \"C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\\\\plugins\\\\warp\"\n      },\n      \"marketplaceSource\": {\n        \"sourceType\": \"local\",\n        \"source\": \"\\\\\\\\?\\\\C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\"\n      },\n      \"installPolicy\": \"AVAILABLE\",\n      \"authPolicy\": \"ON_INSTALL\"\n    }\n  ],\n  \"available\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "warp@codex-warp",
+        "--json"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Error: failed to parse plugin.json: key must be a string at line 1 column 2\n\nCaused by:\n    failed to parse plugin.json: key must be a string at line 1 column 2\n"
+    },
+    {
+      "arguments": [
+        "plugin",
+        "list",
+        "--available",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"installed\": [\n    {\n      \"pluginId\": \"warp@codex-warp\",\n      \"name\": \"warp\",\n      \"marketplaceName\": \"codex-warp\",\n      \"version\": \"0.4.0\",\n      \"installed\": true,\n      \"enabled\": false,\n      \"source\": {\n        \"source\": \"local\",\n        \"path\": \"C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\\\\plugins\\\\warp\"\n      },\n      \"marketplaceSource\": {\n        \"sourceType\": \"local\",\n        \"source\": \"\\\\\\\\?\\\\C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\"\n      },\n      \"installPolicy\": \"AVAILABLE\",\n      \"authPolicy\": \"ON_INSTALL\"\n    }\n  ],\n  \"available\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "warp@codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"warp@codex-warp\",\n  \"name\": \"warp\",\n  \"marketplaceName\": \"codex-warp\",\n  \"version\": \"0.4.0\",\n  \"installedPath\": \"C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\codex\\\\plugins\\\\cache\\\\codex-warp\\\\warp\\\\0.4.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "list",
+        "--available",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"installed\": [\n    {\n      \"pluginId\": \"warp@codex-warp\",\n      \"name\": \"warp\",\n      \"marketplaceName\": \"codex-warp\",\n      \"version\": \"0.4.0\",\n      \"installed\": true,\n      \"enabled\": true,\n      \"source\": {\n        \"source\": \"local\",\n        \"path\": \"C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\\\\plugins\\\\warp\"\n      },\n      \"marketplaceSource\": {\n        \"sourceType\": \"local\",\n        \"source\": \"\\\\\\\\?\\\\C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\"\n      },\n      \"installPolicy\": \"AVAILABLE\",\n      \"authPolicy\": \"ON_INSTALL\"\n    }\n  ],\n  \"available\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "list",
+        "--available",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"installed\": [\n    {\n      \"pluginId\": \"warp@codex-warp\",\n      \"name\": \"warp\",\n      \"marketplaceName\": \"codex-warp\",\n      \"version\": \"0.4.0\",\n      \"installed\": true,\n      \"enabled\": false,\n      \"source\": {\n        \"source\": \"local\",\n        \"path\": \"C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\\\\plugins\\\\warp\"\n      },\n      \"marketplaceSource\": {\n        \"sourceType\": \"local\",\n        \"source\": \"\\\\\\\\?\\\\C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\"\n      },\n      \"installPolicy\": \"AVAILABLE\",\n      \"authPolicy\": \"ON_INSTALL\"\n    }\n  ],\n  \"available\": []\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "remove",
+        "warp@codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"warp@codex-warp\",\n  \"name\": \"warp\",\n  \"marketplaceName\": \"codex-warp\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "list",
+        "--available",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"installed\": [],\n  \"available\": [\n    {\n      \"pluginId\": \"warp@codex-warp\",\n      \"name\": \"warp\",\n      \"marketplaceName\": \"codex-warp\",\n      \"version\": \"0.4.0\",\n      \"installed\": false,\n      \"enabled\": false,\n      \"source\": {\n        \"source\": \"local\",\n        \"path\": \"C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\\\\plugins\\\\warp\"\n      },\n      \"marketplaceSource\": {\n        \"sourceType\": \"local\",\n        \"source\": \"\\\\\\\\?\\\\C:\\\\Users\\\\infinishell-build.WIN-E000APDGSNS\\\\AppData\\\\Local\\\\Temp\\\\infinishell-plugin-lifecycle-i51fmtnn\\\\marketplace\"\n      },\n      \"installPolicy\": \"AVAILABLE\",\n      \"authPolicy\": \"ON_INSTALL\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "remove",
+        "codex-warp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"codex-warp\",\n  \"installedRoot\": null\n}\n",
+      "stderr": ""
+    }
+  ],
+  "states": {
+    "missing": {
+      "installed": [],
+      "available": []
+    },
+    "available_before_install": {
+      "installed": [],
+      "available": [
+        {
+          "pluginId": "warp@codex-warp",
+          "name": "warp",
+          "marketplaceName": "codex-warp",
+          "version": "0.4.0",
+          "installed": false,
+          "enabled": false,
+          "source": {
+            "source": "local",
+            "path": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace\\plugins\\warp"
+          },
+          "marketplaceSource": {
+            "sourceType": "local",
+            "source": "\\\\?\\C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace"
+          },
+          "installPolicy": "AVAILABLE",
+          "authPolicy": "ON_INSTALL"
+        }
+      ]
+    },
+    "installed_enabled": {
+      "installed": [
+        {
+          "pluginId": "warp@codex-warp",
+          "name": "warp",
+          "marketplaceName": "codex-warp",
+          "version": "0.4.0",
+          "installed": true,
+          "enabled": true,
+          "source": {
+            "source": "local",
+            "path": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace\\plugins\\warp"
+          },
+          "marketplaceSource": {
+            "sourceType": "local",
+            "source": "\\\\?\\C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace"
+          },
+          "installPolicy": "AVAILABLE",
+          "authPolicy": "ON_INSTALL"
+        }
+      ],
+      "available": []
+    },
+    "disabled": {
+      "installed": [
+        {
+          "pluginId": "warp@codex-warp",
+          "name": "warp",
+          "marketplaceName": "codex-warp",
+          "version": "0.4.0",
+          "installed": true,
+          "enabled": false,
+          "source": {
+            "source": "local",
+            "path": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace\\plugins\\warp"
+          },
+          "marketplaceSource": {
+            "sourceType": "local",
+            "source": "\\\\?\\C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace"
+          },
+          "installPolicy": "AVAILABLE",
+          "authPolicy": "ON_INSTALL"
+        }
+      ],
+      "available": []
+    },
+    "failed_reinstall_preserved_disabled": {
+      "installed": [
+        {
+          "pluginId": "warp@codex-warp",
+          "name": "warp",
+          "marketplaceName": "codex-warp",
+          "version": "0.4.0",
+          "installed": true,
+          "enabled": false,
+          "source": {
+            "source": "local",
+            "path": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace\\plugins\\warp"
+          },
+          "marketplaceSource": {
+            "sourceType": "local",
+            "source": "\\\\?\\C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace"
+          },
+          "installPolicy": "AVAILABLE",
+          "authPolicy": "ON_INSTALL"
+        }
+      ],
+      "available": []
+    },
+    "native_reinstall_reenabled": {
+      "installed": [
+        {
+          "pluginId": "warp@codex-warp",
+          "name": "warp",
+          "marketplaceName": "codex-warp",
+          "version": "0.4.0",
+          "installed": true,
+          "enabled": true,
+          "source": {
+            "source": "local",
+            "path": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace\\plugins\\warp"
+          },
+          "marketplaceSource": {
+            "sourceType": "local",
+            "source": "\\\\?\\C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace"
+          },
+          "installPolicy": "AVAILABLE",
+          "authPolicy": "ON_INSTALL"
+        }
+      ],
+      "available": []
+    },
+    "recovered_original_disabled_state": {
+      "installed": [
+        {
+          "pluginId": "warp@codex-warp",
+          "name": "warp",
+          "marketplaceName": "codex-warp",
+          "version": "0.4.0",
+          "installed": true,
+          "enabled": false,
+          "source": {
+            "source": "local",
+            "path": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace\\plugins\\warp"
+          },
+          "marketplaceSource": {
+            "sourceType": "local",
+            "source": "\\\\?\\C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace"
+          },
+          "installPolicy": "AVAILABLE",
+          "authPolicy": "ON_INSTALL"
+        }
+      ],
+      "available": []
+    },
+    "removed": {
+      "installed": [],
+      "available": [
+        {
+          "pluginId": "warp@codex-warp",
+          "name": "warp",
+          "marketplaceName": "codex-warp",
+          "version": "0.4.0",
+          "installed": false,
+          "enabled": false,
+          "source": {
+            "source": "local",
+            "path": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace\\plugins\\warp"
+          },
+          "marketplaceSource": {
+            "sourceType": "local",
+            "source": "\\\\?\\C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\marketplace"
+          },
+          "installPolicy": "AVAILABLE",
+          "authPolicy": "ON_INSTALL"
+        }
+      ]
+    }
+  },
+  "config_api_traces": [
+    [
+      {
+        "channel": "stdout",
+        "value": {
+          "id": 1,
+          "result": {
+            "userAgent": "infinishell_plugin_lifecycle_probe/0.147.0 (Windows 10.0.26100; x86_64) unknown (infinishell_plugin_lifecycle_probe; 0.1.0)",
+            "codexHome": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\codex",
+            "platformFamily": "windows",
+            "platformOs": "windows"
+          }
+        },
+        "observed_elapsed_ms": 250
+      },
+      {
+        "channel": "stdout",
+        "value": {
+          "method": "remoteControl/status/changed",
+          "params": {
+            "status": "disabled",
+            "serverName": "WIN-E000APDGSNS",
+            "installationId": "6c9ee6e9-7de2-4464-8561-7a8e3d1a3fb0",
+            "environmentId": null
+          },
+          "emittedAtMs": 1789623488515
+        },
+        "observed_elapsed_ms": 250
+      },
+      {
+        "channel": "stdout",
+        "value": {
+          "id": 2,
+          "result": {
+            "status": "ok",
+            "version": "sha256:1284cfc779c02a6773a38a9a3e01f48d69b200aa66943151086a58a058a49fc6",
+            "filePath": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\codex\\config.toml",
+            "overriddenMetadata": null
+          }
+        },
+        "observed_elapsed_ms": 255
+      },
+      {
+        "channel": "stdout",
+        "value": {
+          "id": 3,
+          "result": {
+            "data": [
+              {
+                "cwd": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn",
+                "hooks": [],
+                "warnings": [],
+                "errors": []
+              }
+            ]
+          }
+        },
+        "observed_elapsed_ms": 269
+      }
+    ],
+    [
+      {
+        "channel": "stdout",
+        "value": {
+          "id": 1,
+          "result": {
+            "userAgent": "infinishell_plugin_lifecycle_probe/0.147.0 (Windows 10.0.26100; x86_64) unknown (infinishell_plugin_lifecycle_probe; 0.1.0)",
+            "codexHome": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\codex",
+            "platformFamily": "windows",
+            "platformOs": "windows"
+          }
+        },
+        "observed_elapsed_ms": 151
+      },
+      {
+        "channel": "stdout",
+        "value": {
+          "method": "remoteControl/status/changed",
+          "params": {
+            "status": "disabled",
+            "serverName": "WIN-E000APDGSNS",
+            "installationId": "6c9ee6e9-7de2-4464-8561-7a8e3d1a3fb0",
+            "environmentId": null
+          },
+          "emittedAtMs": 1789623490991
+        },
+        "observed_elapsed_ms": 151
+      },
+      {
+        "channel": "stdout",
+        "value": {
+          "id": 2,
+          "result": {
+            "status": "ok",
+            "version": "sha256:1284cfc779c02a6773a38a9a3e01f48d69b200aa66943151086a58a058a49fc6",
+            "filePath": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn\\codex\\config.toml",
+            "overriddenMetadata": null
+          }
+        },
+        "observed_elapsed_ms": 163
+      },
+      {
+        "channel": "stdout",
+        "value": {
+          "id": 3,
+          "result": {
+            "data": [
+              {
+                "cwd": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn",
+                "hooks": [],
+                "warnings": [],
+                "errors": []
+              }
+            ]
+          }
+        },
+        "observed_elapsed_ms": 177
+      }
+    ]
+  ],
+  "hook_listings": [
+    {
+      "enabled": false,
+      "response": {
+        "data": [
+          {
+            "cwd": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn",
+            "hooks": [],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      }
+    },
+    {
+      "enabled": false,
+      "response": {
+        "data": [
+          {
+            "cwd": "C:\\Users\\infinishell-build.WIN-E000APDGSNS\\AppData\\Local\\Temp\\infinishell-plugin-lifecycle-i51fmtnn",
+            "hooks": [],
+            "warnings": [],
+            "errors": []
+          }
+        ]
+      }
+    }
+  ],
+  "checks": {
+    "missing_install_preserves_config": true,
+    "native_disable_persisted": true,
+    "failed_native_reinstall_preserves_config_and_cache": true,
+    "native_add_reenables_disabled_plugin": true,
+    "explicit_native_disable_restores_original_config_bytes": true,
+    "source_manifest_restored": true,
+    "native_remove_deleted_cache_and_preserved_source": true,
+    "unrelated_isolated_user_settings_unchanged": true
+  },
+  "credentials_provided": false,
+  "model_entrypoints_called": [],
+  "app_server_rpc_methods": [
+    "initialize",
+    "config/value/write",
+    "hooks/list"
+  ],
+  "scope": "native_registry_and_failed_reinstall_only",
+  "product_installer_exercised": false,
+  "native_plugin_update_subcommand_supported": false,
+  "git_marketplace_upgrade_verified": false,
+  "new_plugin_version_upgrade_verified": false,
+  "native_hook_execution_verified": false,
+  "cli": "codex-cli 0.147.0",
+  "executable_sha256": "935a1911ed2556e4ffcec995f4886ac2ac425863ba26fed264df62e30272ad9d",
+  "unsupported_cli_subcommands": [
+    "disable",
+    "enable",
+    "update"
+  ],
+  "original_plugin_tree_sha256": {
+    ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+    "hooks/hooks.json": "79b5f2bc55848ba1bc3cb7ddb9a4979249681b9b3719420752a512bb95881cdc",
+    "scripts/build-payload.sh": "2e34b5874724234c14222b2c271efdf4dbfd33ad993bfb411d963a2eb468f24e",
+    "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+    "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+    "scripts/on-prompt-submit.sh": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+    "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+    "scripts/on-stop.sh": "a2de778f79114c32bc64e4a8a8697b566c0a1fe22faac5010cfccdefa05406ec",
+    "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+    "scripts/warp-notify.sh": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366"
+  },
+  "config_before_failure_sha256": "4e36f4281f571d8ec341eef8f6efbbba3b5f3d0fc36e7b27dd548190e9194a10",
+  "config_after_recovery_sha256": "4e36f4281f571d8ec341eef8f6efbbba3b5f3d0fc36e7b27dd548190e9194a10"
+}

@@ -1,0 +1,116 @@
+{
+  "files": [
+    {
+      "path": "04-deny-request.png",
+      "sha256": "cd208650d23fdd8639a4582e8418f35af9fdbe74d26bf0fe6d606173785ab8e9",
+      "bytes": 126089
+    },
+    {
+      "path": "03-allow-records.json",
+      "sha256": "af71b800a6adbb4877fd6e9976345ce3cc154da465c60340c929e43d5a08bcf2",
+      "bytes": 9266
+    },
+    {
+      "path": "04-deny-result.png",
+      "sha256": "57cd98b9ee6945fd1216e2b157779f57c8de3b36ec179809fb696884c63251ca",
+      "bytes": 85479
+    },
+    {
+      "path": "09-resume-records.json",
+      "sha256": "0088f1fb8d98bd8d04807bea5773d7ebc8150abb527d3903efa54b76e37d1dd9",
+      "bytes": 140676
+    },
+    {
+      "path": "02-second-result.png",
+      "sha256": "b20a0e79aa51ebc9d24c1863a10f399fb0fb7836a87e8918d3274a77944a5eac",
+      "bytes": 85556
+    },
+    {
+      "path": "09-resume-result.png",
+      "sha256": "8d2867b8da1d32c6fccf2ebd47fe96f4dc9b69863a105dc1f29b6c4c58586744",
+      "bytes": 84678
+    },
+    {
+      "path": "05-cancel-records.json",
+      "sha256": "4020cdc54920ecc8ebe5f95c91277920d171c41e4d76e2b8595d0edcb6efdd59",
+      "bytes": 134875
+    },
+    {
+      "path": "06-continue-before-restart.json",
+      "sha256": "4a18e55b0b78b189a87e3dcb669a3a5cea29fc85a94ea694ca9bbcc0fccdec43",
+      "bytes": 137741
+    },
+    {
+      "path": "08-restart-before-resume.png",
+      "sha256": "6c52f3fd4b5b242a79706332b30ce742dad16b9fb017378d17292a0e434610e0",
+      "bytes": 83582
+    },
+    {
+      "path": "03-allow-result.png",
+      "sha256": "62450393dd9bf9729247dbbde5a58eebf59c7d043890be3945ff97c9c567f8db",
+      "bytes": 85546
+    },
+    {
+      "path": "05-cancel-click.png",
+      "sha256": "d33591ff8ce9eb2819d60f40d43790c4adb9d24eefcb888838a07fe87838008f",
+      "bytes": 107501
+    },
+    {
+      "path": "04-deny-records.json",
+      "sha256": "993071e45f9424489555a4f1481fda6c2460d2909b1ce2273344662bf1523744",
+      "bytes": 11825
+    },
+    {
+      "path": "10-titlebar-settings-en.png",
+      "sha256": "626304b7c8f9e3eb5ccda543550d6bacfb8ca3c23424cf86cf823d9ba6468603",
+      "bytes": 122174
+    },
+    {
+      "path": "01-first-ack.png",
+      "sha256": "a50c39aa84284889d6c198ca4ad2d3d0924f508742ec1c2ef6f1b3de74609a11",
+      "bytes": 89789
+    },
+    {
+      "path": "06-continue-before-restart.png",
+      "sha256": "4802fb1c67be2b4e71b5341fc07c236bf5756fa7f75b7ad5dfd4a9ee1ee429d8",
+      "bytes": 85552
+    },
+    {
+      "path": "12-titlebar-settings-zh-CN.png",
+      "sha256": "e4d15113bc9e4f598bfa87b80405f5667f206d7505877fe7902a6550f0422557",
+      "bytes": 113744
+    },
+    {
+      "path": "11-titlebar-zh-CN.png",
+      "sha256": "67dd84e74e64813252c714666e5e191f1f4414a0a7c2139e5cd53b5f08cd7402",
+      "bytes": 45426
+    },
+    {
+      "path": "13-titlebar-hidden-zh-CN.png",
+      "sha256": "f247a738a4e85c7fe7f971d8352d3489ba1e246bfdbfa4defc5f972592012629",
+      "bytes": 114688
+    },
+    {
+      "path": "03-allow-request.png",
+      "sha256": "2afc236604fe592e24d54e0e329d4a7038ec037a5de51df602952caa3e1f7e3c",
+      "bytes": 117877
+    },
+    {
+      "path": "01-first-records.json",
+      "sha256": "4260328a7215e1468aea0aae1f123ae8797f5431951f2e83be59c3f3f79e8ff0",
+      "bytes": 4331
+    },
+    {
+      "path": "14-titlebar-hidden-after-restart.png",
+      "sha256": "fb32bb69c16cb73a27c8460f20f75075950b3a312b35e7ed76a167d28fbc4fb1",
+      "bytes": 45107
+    },
+    {
+      "path": "07-grok-titlebar-en.png",
+      "sha256": "d077c3f1e7d24487bcce99007aa6abc528df23ca4e42af5087c7a3bfd4f809f3",
+      "bytes": 47759
+    }
+  ],
+  "scope": "e473 GUI 新建/两轮/审批允许拒绝/取消继续；a245 更新重启并按原 ID 恢复、Grok 标题栏双语布局。不是单一最终提交的完整验收。",
+  "credential_scan": "未发现实际 API 密钥；清单不含认证环境和原生登录验证码截图。"
+}

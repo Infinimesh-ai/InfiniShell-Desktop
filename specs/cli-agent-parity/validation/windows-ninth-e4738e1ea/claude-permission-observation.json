@@ -1,0 +1,1111 @@
+{
+  "passed": true,
+  "expected_version": "2.1.273",
+  "host_os": "win32",
+  "credentials_provided": false,
+  "model_commands_sent": 0,
+  "tool_execution_tested": false,
+  "production_rust_adapter_verified": false,
+  "dispatch_authorized": false,
+  "atomic_permission_ceiling_proven": false,
+  "session_grant_revoke": {
+    "tested": false,
+    "direct_control_endpoint_verified": false,
+    "reason": "固定接口审计仅确认 can_use_tool 待审批响应可带 updatedPermissions；本轮没有真实待审批，不伪造响应"
+  },
+  "managed_only_true_tested": false,
+  "runtime_sandbox_enforcement_tested": false,
+  "script_sha256": "bade01bfe64de4a9e647d0210bcb097300b870f7d5e42d6e855300c19426a877",
+  "binary": {
+    "platform": "win32-x64",
+    "binary": "claude.exe",
+    "bytes": 231776416,
+    "sha256": "19654006672b6da7c945115eea99ca10051796016df563a65b3f0c7d72720ef0",
+    "url": "https://downloads.claude.ai/claude-code-releases/2.1.273/win32-x64/claude.exe"
+  },
+  "cli_version": "2.1.273 (Claude Code)",
+  "sessions": [
+    {
+      "native_pid": 30556,
+      "queries": [
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-be1690c9-4501-4f96-9203-9924d4a8b45d-0",
+          "success": true
+        },
+        {
+          "subtype": "get_settings",
+          "request_id": "infinishell-permissions-80afec40-caa2-467d-870f-0f51040eee67-1",
+          "success": true
+        },
+        {
+          "subtype": "list_permission_rules",
+          "request_id": "infinishell-permissions-469fe1f7-486d-41c0-9977-e971019f23a2-2",
+          "success": true
+        },
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-7b045450-9345-461d-b81d-fb7c05b4465c-3",
+          "success": true
+        },
+        {
+          "subtype": "set_permission_mode",
+          "request_id": "infinishell-permissions-9d4a27a5-c199-4b77-88df-a30bd262e12e-4",
+          "success": true
+        },
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-c5a06b27-46c5-4753-8c3f-801bdac8430d-5",
+          "success": true
+        },
+        {
+          "subtype": "get_settings",
+          "request_id": "infinishell-permissions-3297be35-6828-4942-b4f5-f4feb5ad5750-6",
+          "success": true
+        },
+        {
+          "subtype": "list_permission_rules",
+          "request_id": "infinishell-permissions-bff20c4a-fc24-47e9-a8d5-f45b00508cd9-7",
+          "success": true
+        },
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-4a030501-b7da-445d-8e9d-f163e12e8b69-8",
+          "success": true
+        },
+        {
+          "subtype": "set_permission_mode",
+          "request_id": "infinishell-permissions-f268423b-edc9-4090-a275-bc120430e1d3-9",
+          "success": true
+        },
+        {
+          "subtype": "apply_flag_settings",
+          "request_id": "infinishell-permissions-3ea10abb-1680-4028-bad4-f496ac65b41d-10",
+          "success": true
+        },
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-c07e02c6-5ed0-4121-92c7-d922b27a1f5c-11",
+          "success": true
+        },
+        {
+          "subtype": "get_settings",
+          "request_id": "infinishell-permissions-9a256e58-9cf8-44b7-9a22-afb249295025-12",
+          "success": true
+        },
+        {
+          "subtype": "list_permission_rules",
+          "request_id": "infinishell-permissions-2c740ed5-9849-42a7-937f-f8eed76e0452-13",
+          "success": true
+        },
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-ba0d385f-9e26-406c-9f99-e5de7a7a4156-14",
+          "success": true
+        }
+      ],
+      "notifications": [
+        {
+          "subtype": "background_tasks_changed",
+          "tasks": [],
+          "native_session_id": "ba9af62a-ce61-4e68-a750-9c614bf49dad",
+          "uuid": "44938be0-cbd5-4dce-9bd9-ff4e613bc0fb"
+        },
+        {
+          "subtype": "status",
+          "permissionMode": "dontAsk",
+          "native_session_id": "ba9af62a-ce61-4e68-a750-9c614bf49dad",
+          "uuid": "a0027d70-f4a1-4319-b440-30cf01e12d93"
+        },
+        {
+          "subtype": "background_tasks_changed",
+          "tasks": [],
+          "native_session_id": "ba9af62a-ce61-4e68-a750-9c614bf49dad",
+          "uuid": "69934fdb-50cc-4533-8fe4-a2820ff0c80e"
+        },
+        {
+          "subtype": "background_tasks_changed",
+          "tasks": [],
+          "native_session_id": "ba9af62a-ce61-4e68-a750-9c614bf49dad",
+          "uuid": "2285bafc-60a4-466c-a502-7c99c8d8be04"
+        },
+        {
+          "subtype": "status",
+          "permissionMode": "default",
+          "native_session_id": "ba9af62a-ce61-4e68-a750-9c614bf49dad",
+          "uuid": "9880de1b-5ee0-4c1a-b3b4-ff320941888b"
+        },
+        {
+          "subtype": "background_tasks_changed",
+          "tasks": [],
+          "native_session_id": "ba9af62a-ce61-4e68-a750-9c614bf49dad",
+          "uuid": "936c38e8-f76a-4b6e-8f0c-98c561f6d608"
+        },
+        {
+          "subtype": "background_tasks_changed",
+          "tasks": [],
+          "native_session_id": "ba9af62a-ce61-4e68-a750-9c614bf49dad",
+          "uuid": "5e7da169-050b-4c9b-866d-2be59d0b7a6e"
+        }
+      ],
+      "eof": {
+        "alive_before_stdin_eof": true,
+        "stdin_eof_exited_within_5s": true,
+        "exit_code_before_cleanup": 0,
+        "eof_elapsed_ms": 36
+      },
+      "snapshots": [
+        {
+          "name": "parent_initial",
+          "native_pid": 30556,
+          "mode_before": "default",
+          "mode_after": "default",
+          "settings": {
+            "effective": {
+              "permissions": {
+                "allow": [
+                  "Read(./allowed/**)"
+                ],
+                "deny": [
+                  "Edit(./blocked/**)"
+                ],
+                "ask": [
+                  "Bash"
+                ]
+              },
+              "sandbox": {
+                "enabled": false,
+                "failIfUnavailable": true,
+                "autoAllowBashIfSandboxed": false,
+                "allowUnsandboxedCommands": false
+              }
+            },
+            "sources": [
+              {
+                "source": "flagSettings",
+                "settings": {
+                  "permissions": {
+                    "allow": [
+                      "Read(./allowed/**)"
+                    ],
+                    "deny": [
+                      "Edit(./blocked/**)"
+                    ],
+                    "ask": [
+                      "Bash"
+                    ]
+                  },
+                  "sandbox": {
+                    "enabled": false,
+                    "failIfUnavailable": true,
+                    "autoAllowBashIfSandboxed": false,
+                    "allowUnsandboxedCommands": false
+                  }
+                }
+              }
+            ],
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "rules": {
+            "rules": [
+              {
+                "behavior": "allow",
+                "source": "flagSettings",
+                "rule": "Read(./allowed/**)",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "ask",
+                "source": "flagSettings",
+                "rule": "Bash",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "deny",
+                "source": "flagSettings",
+                "rule": "Edit(./blocked/**)",
+                "editability": "readonly"
+              }
+            ],
+            "workspaceDirectories": [
+              {
+                "path": "<isolated-probe>\\additional 目录",
+                "source": "cliArg"
+              }
+            ],
+            "originalCwd": "<isolated-probe>\\project 中文",
+            "managedOnly": false,
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "consistency_rejections": []
+        },
+        {
+          "name": "parent_dont_ask",
+          "native_pid": 30556,
+          "mode_before": "dontAsk",
+          "mode_after": "dontAsk",
+          "settings": {
+            "effective": {
+              "permissions": {
+                "allow": [
+                  "Read(./allowed/**)"
+                ],
+                "deny": [
+                  "Edit(./blocked/**)"
+                ],
+                "ask": [
+                  "Bash"
+                ]
+              },
+              "sandbox": {
+                "enabled": false,
+                "failIfUnavailable": true,
+                "autoAllowBashIfSandboxed": false,
+                "allowUnsandboxedCommands": false
+              }
+            },
+            "sources": [
+              {
+                "source": "flagSettings",
+                "settings": {
+                  "permissions": {
+                    "allow": [
+                      "Read(./allowed/**)"
+                    ],
+                    "deny": [
+                      "Edit(./blocked/**)"
+                    ],
+                    "ask": [
+                      "Bash"
+                    ]
+                  },
+                  "sandbox": {
+                    "enabled": false,
+                    "failIfUnavailable": true,
+                    "autoAllowBashIfSandboxed": false,
+                    "allowUnsandboxedCommands": false
+                  }
+                }
+              }
+            ],
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "rules": {
+            "rules": [
+              {
+                "behavior": "allow",
+                "source": "flagSettings",
+                "rule": "Read(./allowed/**)",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "ask",
+                "source": "flagSettings",
+                "rule": "Bash",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "deny",
+                "source": "flagSettings",
+                "rule": "Edit(./blocked/**)",
+                "editability": "readonly"
+              }
+            ],
+            "workspaceDirectories": [
+              {
+                "path": "<isolated-probe>\\additional 目录",
+                "source": "cliArg"
+              }
+            ],
+            "originalCwd": "<isolated-probe>\\project 中文",
+            "managedOnly": false,
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "consistency_rejections": []
+        },
+        {
+          "name": "parent_merged_deny",
+          "native_pid": 30556,
+          "mode_before": "default",
+          "mode_after": "default",
+          "settings": {
+            "effective": {
+              "permissions": {
+                "allow": [
+                  "Read(./allowed/**)"
+                ],
+                "deny": [
+                  "Edit(./blocked/**)",
+                  "Read(./allowed/**)"
+                ],
+                "ask": [
+                  "Bash"
+                ]
+              },
+              "sandbox": {
+                "enabled": false,
+                "failIfUnavailable": true,
+                "autoAllowBashIfSandboxed": false,
+                "allowUnsandboxedCommands": false
+              }
+            },
+            "sources": [
+              {
+                "source": "flagSettings",
+                "settings": {
+                  "permissions": {
+                    "allow": [
+                      "Read(./allowed/**)"
+                    ],
+                    "deny": [
+                      "Edit(./blocked/**)",
+                      "Read(./allowed/**)"
+                    ],
+                    "ask": [
+                      "Bash"
+                    ]
+                  },
+                  "sandbox": {
+                    "enabled": false,
+                    "failIfUnavailable": true,
+                    "autoAllowBashIfSandboxed": false,
+                    "allowUnsandboxedCommands": false
+                  }
+                }
+              }
+            ],
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "rules": {
+            "rules": [
+              {
+                "behavior": "allow",
+                "source": "flagSettings",
+                "rule": "Read(./allowed/**)",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "ask",
+                "source": "flagSettings",
+                "rule": "Bash",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "deny",
+                "source": "flagSettings",
+                "rule": "Edit(./blocked/**)",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "deny",
+                "source": "flagSettings",
+                "rule": "Read(./allowed/**)",
+                "editability": "readonly"
+              }
+            ],
+            "workspaceDirectories": [
+              {
+                "path": "<isolated-probe>\\additional 目录",
+                "source": "cliArg"
+              }
+            ],
+            "originalCwd": "<isolated-probe>\\project 中文",
+            "managedOnly": false,
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "consistency_rejections": []
+        }
+      ],
+      "forced_cleanup_used": false,
+      "stderr_records_omitted": 0
+    },
+    {
+      "native_pid": 23168,
+      "queries": [
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-5e460205-2ccb-4fdf-9166-83fe5e001e7b-0",
+          "success": true
+        },
+        {
+          "subtype": "get_settings",
+          "request_id": "infinishell-permissions-f6e09fef-6630-4829-a5f5-a850b59ac7d9-1",
+          "success": true
+        },
+        {
+          "subtype": "list_permission_rules",
+          "request_id": "infinishell-permissions-6f6a3e07-2b32-4bd3-aa00-12da42d64214-2",
+          "success": true
+        },
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-b7b9952c-6eb3-451f-b8b5-5920e83c1c74-3",
+          "success": true
+        }
+      ],
+      "notifications": [
+        {
+          "subtype": "background_tasks_changed",
+          "tasks": [],
+          "native_session_id": "7988f6de-fa26-4d85-82f1-24c335d2490c",
+          "uuid": "f1e05ea5-ba0f-44fa-821e-f77fa846d413"
+        }
+      ],
+      "eof": {
+        "alive_before_stdin_eof": true,
+        "stdin_eof_exited_within_5s": true,
+        "exit_code_before_cleanup": 0,
+        "eof_elapsed_ms": 29
+      },
+      "snapshots": [
+        {
+          "name": "child_initial",
+          "native_pid": 23168,
+          "mode_before": "default",
+          "mode_after": "default",
+          "settings": {
+            "effective": {
+              "permissions": {
+                "allow": [
+                  "Read(./allowed/**)"
+                ],
+                "deny": [
+                  "Edit(./blocked/**)"
+                ],
+                "ask": [
+                  "Bash"
+                ]
+              },
+              "sandbox": {
+                "enabled": false,
+                "failIfUnavailable": true,
+                "autoAllowBashIfSandboxed": false,
+                "allowUnsandboxedCommands": false
+              }
+            },
+            "sources": [
+              {
+                "source": "flagSettings",
+                "settings": {
+                  "permissions": {
+                    "allow": [
+                      "Read(./allowed/**)"
+                    ],
+                    "deny": [
+                      "Edit(./blocked/**)"
+                    ],
+                    "ask": [
+                      "Bash"
+                    ]
+                  },
+                  "sandbox": {
+                    "enabled": false,
+                    "failIfUnavailable": true,
+                    "autoAllowBashIfSandboxed": false,
+                    "allowUnsandboxedCommands": false
+                  }
+                }
+              }
+            ],
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "rules": {
+            "rules": [
+              {
+                "behavior": "allow",
+                "source": "flagSettings",
+                "rule": "Read(./allowed/**)",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "ask",
+                "source": "flagSettings",
+                "rule": "Bash",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "deny",
+                "source": "flagSettings",
+                "rule": "Edit(./blocked/**)",
+                "editability": "readonly"
+              }
+            ],
+            "workspaceDirectories": [
+              {
+                "path": "<isolated-probe>\\additional 目录",
+                "source": "cliArg"
+              }
+            ],
+            "originalCwd": "<isolated-probe>\\project 中文",
+            "managedOnly": false,
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "consistency_rejections": []
+        }
+      ],
+      "forced_cleanup_used": false,
+      "stderr_records_omitted": 0
+    },
+    {
+      "native_pid": 30160,
+      "queries": [
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-2ddf0f8f-6e58-4e24-84ca-c6c70dc6c016-0",
+          "success": true
+        },
+        {
+          "subtype": "get_settings",
+          "request_id": "infinishell-permissions-d152820e-c677-4d5e-ad89-1f408adbcd2b-1",
+          "success": true
+        },
+        {
+          "subtype": "list_permission_rules",
+          "request_id": "infinishell-permissions-92c14aeb-8a01-42f9-a793-3f19667e1d64-2",
+          "success": true
+        },
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-09487099-f109-4e61-9d4e-ff93d7e0c2fb-3",
+          "success": true
+        }
+      ],
+      "notifications": [
+        {
+          "subtype": "background_tasks_changed",
+          "tasks": [],
+          "native_session_id": "578f7c76-1390-4b12-ac33-5a8d4b2a7c21",
+          "uuid": "8f7c7436-7997-4986-bf52-195b46effe9a"
+        }
+      ],
+      "eof": {
+        "alive_before_stdin_eof": true,
+        "stdin_eof_exited_within_5s": true,
+        "exit_code_before_cleanup": 0,
+        "eof_elapsed_ms": 29
+      },
+      "snapshots": [
+        {
+          "name": "child_current_flags",
+          "native_pid": 30160,
+          "mode_before": "default",
+          "mode_after": "default",
+          "settings": {
+            "effective": {
+              "permissions": {
+                "allow": [
+                  "Read(./allowed/**)"
+                ],
+                "deny": [
+                  "Edit(./blocked/**)",
+                  "Read(./allowed/**)"
+                ],
+                "ask": [
+                  "Bash"
+                ]
+              },
+              "sandbox": {
+                "enabled": false,
+                "failIfUnavailable": true,
+                "autoAllowBashIfSandboxed": false,
+                "allowUnsandboxedCommands": false
+              }
+            },
+            "sources": [
+              {
+                "source": "flagSettings",
+                "settings": {
+                  "permissions": {
+                    "allow": [
+                      "Read(./allowed/**)"
+                    ],
+                    "deny": [
+                      "Edit(./blocked/**)",
+                      "Read(./allowed/**)"
+                    ],
+                    "ask": [
+                      "Bash"
+                    ]
+                  },
+                  "sandbox": {
+                    "enabled": false,
+                    "failIfUnavailable": true,
+                    "autoAllowBashIfSandboxed": false,
+                    "allowUnsandboxedCommands": false
+                  }
+                }
+              }
+            ],
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "rules": {
+            "rules": [
+              {
+                "behavior": "allow",
+                "source": "flagSettings",
+                "rule": "Read(./allowed/**)",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "ask",
+                "source": "flagSettings",
+                "rule": "Bash",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "deny",
+                "source": "flagSettings",
+                "rule": "Edit(./blocked/**)",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "deny",
+                "source": "flagSettings",
+                "rule": "Read(./allowed/**)",
+                "editability": "readonly"
+              }
+            ],
+            "workspaceDirectories": [
+              {
+                "path": "<isolated-probe>\\additional 目录",
+                "source": "cliArg"
+              }
+            ],
+            "originalCwd": "<isolated-probe>\\project 中文",
+            "managedOnly": false,
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "consistency_rejections": []
+        }
+      ],
+      "forced_cleanup_used": false,
+      "stderr_records_omitted": 0
+    },
+    {
+      "native_pid": 3232,
+      "queries": [
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-033c17c3-5d07-4c5d-9477-ee3e29244be1-0",
+          "success": true
+        },
+        {
+          "subtype": "get_settings",
+          "request_id": "infinishell-permissions-c28aada9-4fd2-4f8d-b34b-cd3ffb7cca30-1",
+          "success": true
+        },
+        {
+          "subtype": "list_permission_rules",
+          "request_id": "infinishell-permissions-13a922b8-22b6-4dfd-8ef5-fa0448f88510-2",
+          "success": true
+        },
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-3e5ac266-4eb9-45cd-bda1-a2fafa7dca82-3",
+          "success": true
+        },
+        {
+          "subtype": "update_settings",
+          "request_id": "infinishell-permissions-4e69a342-fab7-46a1-8f3c-c6a63eeed04a-4",
+          "success": false,
+          "expected_error": "update_settings keys not allowed: permissions"
+        },
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-8284b32a-9991-4132-bebf-414b36e5a481-5",
+          "success": true
+        },
+        {
+          "subtype": "get_settings",
+          "request_id": "infinishell-permissions-3e069be4-d895-4bc2-ba79-a5ef2aa18693-6",
+          "success": true
+        },
+        {
+          "subtype": "list_permission_rules",
+          "request_id": "infinishell-permissions-ff862810-8930-4c95-8c05-d0510f76541f-7",
+          "success": true
+        },
+        {
+          "subtype": "initialize",
+          "request_id": "infinishell-permissions-d2adc7c3-ac8c-4101-b0ee-ad411126e40c-8",
+          "success": true
+        }
+      ],
+      "notifications": [
+        {
+          "subtype": "background_tasks_changed",
+          "tasks": [],
+          "native_session_id": "b8c3ffe7-f766-464a-ae23-ec7a1af3fd09",
+          "uuid": "fb1c6f18-5b25-4e0b-b79a-a24d30b5f0c1"
+        },
+        {
+          "subtype": "background_tasks_changed",
+          "tasks": [],
+          "native_session_id": "b8c3ffe7-f766-464a-ae23-ec7a1af3fd09",
+          "uuid": "a08a70d2-cafb-45a6-84d2-905a25c146da"
+        },
+        {
+          "subtype": "background_tasks_changed",
+          "tasks": [],
+          "native_session_id": "b8c3ffe7-f766-464a-ae23-ec7a1af3fd09",
+          "uuid": "498207cf-6887-4f43-a18f-615c821aef28"
+        }
+      ],
+      "eof": {
+        "alive_before_stdin_eof": true,
+        "stdin_eof_exited_within_5s": true,
+        "exit_code_before_cleanup": 0,
+        "eof_elapsed_ms": 44
+      },
+      "snapshots": [
+        {
+          "name": "sourced_before_drift",
+          "native_pid": 3232,
+          "mode_before": "default",
+          "mode_after": "default",
+          "settings": {
+            "effective": {
+              "permissions": {
+                "allow": [
+                  "Read(./user-only/**)",
+                  "Read(./allowed/**)"
+                ],
+                "deny": [
+                  "Edit(./project-only/**)",
+                  "Edit(./blocked/**)"
+                ],
+                "ask": [
+                  "Read(./local-only/**)",
+                  "Bash"
+                ]
+              },
+              "sandbox": {
+                "enabled": false,
+                "failIfUnavailable": true,
+                "autoAllowBashIfSandboxed": false,
+                "allowUnsandboxedCommands": false
+              }
+            },
+            "sources": [
+              {
+                "source": "userSettings",
+                "settings": {
+                  "permissions": {
+                    "allow": [
+                      "Read(./user-only/**)"
+                    ]
+                  }
+                }
+              },
+              {
+                "source": "projectSettings",
+                "settings": {
+                  "permissions": {
+                    "deny": [
+                      "Edit(./project-only/**)"
+                    ]
+                  }
+                }
+              },
+              {
+                "source": "localSettings",
+                "settings": {
+                  "permissions": {
+                    "ask": [
+                      "Read(./local-only/**)"
+                    ]
+                  }
+                }
+              },
+              {
+                "source": "flagSettings",
+                "settings": {
+                  "permissions": {
+                    "allow": [
+                      "Read(./allowed/**)"
+                    ],
+                    "deny": [
+                      "Edit(./blocked/**)"
+                    ],
+                    "ask": [
+                      "Bash"
+                    ]
+                  },
+                  "sandbox": {
+                    "enabled": false,
+                    "failIfUnavailable": true,
+                    "autoAllowBashIfSandboxed": false,
+                    "allowUnsandboxedCommands": false
+                  }
+                }
+              }
+            ],
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "rules": {
+            "rules": [
+              {
+                "behavior": "allow",
+                "source": "userSettings",
+                "rule": "Read(./user-only/**)",
+                "editability": "persistent"
+              },
+              {
+                "behavior": "allow",
+                "source": "flagSettings",
+                "rule": "Read(./allowed/**)",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "ask",
+                "source": "localSettings",
+                "rule": "Read(./local-only/**)",
+                "editability": "persistent"
+              },
+              {
+                "behavior": "ask",
+                "source": "flagSettings",
+                "rule": "Bash",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "deny",
+                "source": "projectSettings",
+                "rule": "Edit(./project-only/**)",
+                "editability": "persistent"
+              },
+              {
+                "behavior": "deny",
+                "source": "flagSettings",
+                "rule": "Edit(./blocked/**)",
+                "editability": "readonly"
+              }
+            ],
+            "workspaceDirectories": [
+              {
+                "path": "<isolated-probe>\\additional 目录",
+                "source": "cliArg"
+              }
+            ],
+            "originalCwd": "<isolated-probe>\\project 中文",
+            "managedOnly": false,
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "consistency_rejections": []
+        },
+        {
+          "name": "sourced_after_file_change",
+          "native_pid": 3232,
+          "mode_before": "default",
+          "mode_after": "default",
+          "settings": {
+            "effective": {
+              "permissions": {
+                "allow": [
+                  "Read(./user-only/**)",
+                  "Read(./allowed/**)"
+                ],
+                "deny": [
+                  "Edit(./project-only/**)",
+                  "Read(./file-drift/**)",
+                  "Edit(./blocked/**)"
+                ],
+                "ask": [
+                  "Bash"
+                ]
+              },
+              "sandbox": {
+                "enabled": false,
+                "failIfUnavailable": true,
+                "autoAllowBashIfSandboxed": false,
+                "allowUnsandboxedCommands": false
+              }
+            },
+            "sources": [
+              {
+                "source": "userSettings",
+                "settings": {
+                  "permissions": {
+                    "allow": [
+                      "Read(./user-only/**)"
+                    ]
+                  }
+                }
+              },
+              {
+                "source": "projectSettings",
+                "settings": {
+                  "permissions": {
+                    "deny": [
+                      "Edit(./project-only/**)"
+                    ]
+                  }
+                }
+              },
+              {
+                "source": "localSettings",
+                "settings": {
+                  "permissions": {
+                    "deny": [
+                      "Read(./file-drift/**)"
+                    ]
+                  }
+                }
+              },
+              {
+                "source": "flagSettings",
+                "settings": {
+                  "permissions": {
+                    "allow": [
+                      "Read(./allowed/**)"
+                    ],
+                    "deny": [
+                      "Edit(./blocked/**)"
+                    ],
+                    "ask": [
+                      "Bash"
+                    ]
+                  },
+                  "sandbox": {
+                    "enabled": false,
+                    "failIfUnavailable": true,
+                    "autoAllowBashIfSandboxed": false,
+                    "allowUnsandboxedCommands": false
+                  }
+                }
+              }
+            ],
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "rules": {
+            "rules": [
+              {
+                "behavior": "allow",
+                "source": "userSettings",
+                "rule": "Read(./user-only/**)",
+                "editability": "persistent"
+              },
+              {
+                "behavior": "allow",
+                "source": "flagSettings",
+                "rule": "Read(./allowed/**)",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "ask",
+                "source": "localSettings",
+                "rule": "Read(./local-only/**)",
+                "editability": "persistent"
+              },
+              {
+                "behavior": "ask",
+                "source": "flagSettings",
+                "rule": "Bash",
+                "editability": "readonly"
+              },
+              {
+                "behavior": "deny",
+                "source": "projectSettings",
+                "rule": "Edit(./project-only/**)",
+                "editability": "persistent"
+              },
+              {
+                "behavior": "deny",
+                "source": "flagSettings",
+                "rule": "Edit(./blocked/**)",
+                "editability": "readonly"
+              }
+            ],
+            "workspaceDirectories": [
+              {
+                "path": "<isolated-probe>\\additional 目录",
+                "source": "cliArg"
+              }
+            ],
+            "originalCwd": "<isolated-probe>\\project 中文",
+            "managedOnly": false,
+            "reported_errors": false,
+            "unknown_fields": []
+          },
+          "consistency_rejections": [
+            "settings_live_rules_mismatch"
+          ]
+        }
+      ],
+      "forced_cleanup_used": false,
+      "stderr_records_omitted": 0
+    }
+  ],
+  "comparisons": {
+    "initial": {
+      "equal_and_consistent_observation": true,
+      "reasons": [],
+      "atomic_permission_ceiling_proven": false,
+      "dispatch_authorized": false
+    },
+    "stale_mode": {
+      "equal_and_consistent_observation": false,
+      "reasons": [
+        "observed_projection_differs"
+      ],
+      "atomic_permission_ceiling_proven": false,
+      "dispatch_authorized": false
+    },
+    "stale_rules": {
+      "equal_and_consistent_observation": false,
+      "reasons": [
+        "observed_projection_differs"
+      ],
+      "atomic_permission_ceiling_proven": false,
+      "dispatch_authorized": false
+    },
+    "refreshed_flags": {
+      "equal_and_consistent_observation": true,
+      "reasons": [],
+      "atomic_permission_ceiling_proven": false,
+      "dispatch_authorized": false
+    }
+  },
+  "file_drift": {
+    "effective_observed_change": true,
+    "live_rules_observed_change": false,
+    "consistency_rejections": [
+      "settings_live_rules_mismatch"
+    ],
+    "comparison": {
+      "equal_and_consistent_observation": false,
+      "reasons": [
+        "observed_projection_differs",
+        "settings_live_rules_mismatch"
+      ],
+      "atomic_permission_ceiling_proven": false,
+      "dispatch_authorized": false
+    },
+    "atomic_snapshot_proven": false
+  },
+  "source_anchors": {
+    "configured_files": {
+      "userSettings": "<isolated-probe>\\claude\\settings.json",
+      "projectSettings": "<isolated-probe>\\project 中文\\.claude\\settings.json",
+      "localSettings": "<isolated-probe>\\project 中文\\.claude\\settings.local.json"
+    },
+    "original_cwd": "<isolated-probe>\\project 中文",
+    "cli_additional_directory": "<isolated-probe>\\additional 目录",
+    "native_canonical_source_paths_returned": false,
+    "relative_rule_authorization_executed": false
+  },
+  "binary_unchanged_after_probe": true
+}

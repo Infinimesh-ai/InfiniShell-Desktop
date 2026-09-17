@@ -19,8 +19,8 @@
 | 重复/过时事件 | 原生 turn_id、event ID/序号与 listener 实例检查；未关联终态降级，旧回合不能结束新输入 | 保留原生 prompt_id，与 Codex 不混用；同样过滤旧回合 | 独立 Grok 身份、兼容 hooks 去重及状态文件 |
 | 普通本地子任务权限 | 移除固定绕过审批/沙箱，可见原生终端 | 移除固定绕过，不再修改全局信任/onboarding/config | 托管关键验收未过，暂不开放本地子任务 |
 | 托管传输 | app-server 原生 JSON-RPC | 双向 stream-json/control；macOS 另有无凭据原生初始化/空闲 EOF 实证，不替代生产适配器完整生命周期 | ACP v1；已验证的连接能力与未验证的执行能力分开 |
-| 托管运行中追加 | 原生 turn/steer；须已收到 turn/started | 原生适配器已验证运行中排队、接收确认和独立回合结果；产品入口尚未开放，不冒充同回合 steer | 未验证，明确拒绝 |
-| 托管审批 | 原始请求 ID，单次允许或拒绝 | 单次允许/拒绝及真实文件效果已通过隔离 API 验收；GUI 和父权限上限仍待验 | 原生 no-leader ACP 已通过精确单次允许/拒绝；产品审批仍待接入验证 |
+| 托管运行中追加 | 原生 turn/steer；须已收到 turn/started | 已接入单条下一轮队列；真实中英 GUI 排队、原生确认、独立结果、取消当前轮后执行队列通过；重启保留确认且不自动重投 | 内部 ACP 队列已实现并有真实 no-leader 夹具；产品门禁仍关闭 |
+| 托管审批 | 原始请求 ID，单次允许或拒绝 | 单次允许/拒绝及真实文件效果通过隔离 API 与 GUI 验收；父权限上限仍待验 | 原生 no-leader ACP 已通过精确单次允许/拒绝；产品审批仍待接入验证 |
 | 托管取消 | interrupt 的 ACK 不等于已取消，等原生终态 | 聚合 interrupt ACK、aborted_streaming 与 cancelled 后，真实生产适配器取消通过 | 原生输出后 cancel 返回 cancelled/MidTurnAbort；产品路径待验 |
 | 本地任务与消息记录 | SQLite 提交确认、父子约束、代际、revision、原生 ACK 与结果历史；build16 跨进程 Sent/结果唯一性故障注入通过 | 共用存储；协议排队差异保留 | 共用存储准备就绪，不代表执行已开放 |
 | 已绑定 PTY 的结果待确认 | 兼容子 pane 保存为 Unconfirmed，继续占用原生会话/当前代，不生成最终结果；build23 SQLite 迁移和重启回归通过 | 共用状态；与托管原生 Completed 分开 | 共用存储能力，不代表托管已开放 |
@@ -67,7 +67,11 @@
 
 ## 提交验收进度
 
-最新检查点 `49456958279cc193392b2d09118e680fc0b14ea4` 已推送，干净 macOS 同提交 check、国际化 11 项、相关模块 987 项全部通过。[第八轮已结束](EIGHTH_PLATFORM_RUN_494569582.md)：Linux 所选检查通过；Windows check、1678 项定向测试及监督清理通过，但插件缓存清理、ConPTY 完成及缺失会话退出码断言仍失败，不能计为 Windows 整体通过。
+- 当前新增 [Claude 队列与 Codex rev4](CLAUDE_QUEUE_AND_CODEX_REV4.md)：44 文件快照通过 check、本地化 11 项、相关模块 1033 项；Claude 真实 GUI 的排队、取消及重启保留确认通过。Grok 内部协议与 Windows 正式插件仍有明确未验边界。
+
+- 最新已推送检查点 a245 补入 Grok 默认标题栏入口，真实英文/简体中文布局与隐藏持久化已通过。[第九轮 e473](NINTH_PLATFORM_RUN_E4738E1EA.md)Windows 所选检查通过，Linux 前置测试失败；Linux 修复已在 a245，仍待复验。Claude [e473→a245 GUI 更新恢复](CLAUDE_GUI_E473_A245.md)通过真实两轮、审批、取消继续和原 ID 恢复，但运行中排队、父子任务及最终同提交完整生命周期仍未完成。
+
+历史检查点 `49456958279cc193392b2d09118e680fc0b14ea4` 已推送，干净 macOS 同提交 check、国际化 11 项、相关模块 987 项全部通过。[第八轮已结束](EIGHTH_PLATFORM_RUN_494569582.md)：Linux 所选检查通过；Windows check、1678 项定向测试及监督清理通过，但插件缓存清理、ConPTY 完成及缺失会话退出码断言仍失败，不能计为 Windows 整体通过。
 
 此前 `37b0bc73288aab5be4d0d151796eea557be4c0fb` 的干净 macOS 同提交 check、国际化 11 项、相关模块 987 项全部通过。第七轮已结束：Linux 所选门禁通过；Windows check 通过，但权限探针路径夹具、5 个 Claude 事务夹具和 command 进程派生失败。Windows 通知探针还确认实际 Git Bash 无法打开 `/dev/tty`，详见 [完整报告](SEVENTH_PLATFORM_RUN_37B0BC732.md)。候选 `CONOUT$` 输出器仅进入临时探针，未纳入生产配方；[诊断及候选边界](WINDOWS_CONPTY_NOTIFICATION_PROBE.md)保留真实失败和本机测试范围。
 

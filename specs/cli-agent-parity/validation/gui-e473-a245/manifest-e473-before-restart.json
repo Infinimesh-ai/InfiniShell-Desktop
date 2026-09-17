@@ -1,0 +1,15 @@
+{
+  "commit": "e4738e1ea96ea727c15d51e2c31dbf34152814b6",
+  "root": "/private/tmp/infinishell-gui-e473-h61w8ru9",
+  "project": "/private/tmp/infinishell-gui-e473-h61w8ru9/project",
+  "home": "/private/tmp/infinishell-gui-e473-h61w8ru9/home",
+  "bundle_id": "dev.infinishell.InfiniShellParityE473Claude",
+  "claude_wrapper_sha256": "5674b766b239a83c1609a6e9405c24dde5ed6e6871132ba84a164dbbc53a4765",
+  "credential_values_in_manifest": false,
+  "models_executed": false,
+  "app": "/private/tmp/infinishell-gui-e473-h61w8ru9/InfiniShellParityE473Claude.app",
+  "source_binary_sha256": "2181ff4965056a5c9c408c2fcc6b0b7269db4ba16ed6fcf86ce51a4b55f31a9f",
+  "resigned_binary_sha256": "fef5e18e88dec28914b1e784ffc25625a3c058dfa64aacccbe71e94fcfb70ffb",
+  "running_pid": 89094,
+  "running_log": "/private/tmp/infinishell-gui-e473-h61w8ru9/gui-1789623730.log"
+}

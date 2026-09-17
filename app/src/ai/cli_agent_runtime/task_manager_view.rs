@@ -28,6 +28,7 @@ use warpui::{
 
 use super::coordinator::{
     LocalCLITaskCoordinator, LocalCLITaskCoordinatorEvent, ManagedTaskSnapshot,
+    claude_input_pending,
 };
 use super::local_skills::SelectedLocalSkill;
 use super::local_tools::LocalToolPermissions;
@@ -1159,6 +1160,19 @@ impl LocalCLITaskManagerView {
         let running = snapshot
             .as_ref()
             .is_some_and(|snapshot| snapshot.active_turn_id.is_some());
+        let queued = snapshot
+            .as_ref()
+            .is_some_and(|snapshot| claude_input_pending(&snapshot.task));
+        let send_label = if running
+            && snapshot
+                .as_ref()
+                .is_some_and(|snapshot| snapshot.task.harness == "claude")
+        {
+            crate::t!("cli-task-manager-queue-next-turn")
+        } else {
+            crate::t!("cli-task-manager-send")
+        };
+        self.buttons["send"].update(ctx, |button, ctx| button.set_label(send_label, ctx));
         let pending = self
             .selected_task
             .as_ref()
@@ -1180,7 +1194,7 @@ impl LocalCLITaskManagerView {
             ),
             (
                 "send",
-                !enabled || !connected || pending || text_empty || preparing,
+                !enabled || !connected || pending || queued || text_empty || preparing,
             ),
             (
                 "resume",
@@ -1612,6 +1626,12 @@ impl View for LocalCLITaskManagerView {
             }
         }
         body.add_child(self.row(&["start", "send", "resume"]));
+        if snapshot
+            .as_ref()
+            .is_some_and(|snapshot| claude_input_pending(&snapshot.task))
+        {
+            body.add_child(self.text(crate::t!("cli-task-manager-claude-queued"), appearance));
+        }
         body.add_child(self.row(&["cancel", "disconnect"]));
         let output = snapshot
             .as_ref()
@@ -2062,9 +2082,6 @@ fn input_action_with_content(
             },
             None => RuntimeAction::Submit { input },
         }),
-        Harness::Claude if active_turn.is_some() => {
-            Err(crate::t!("cli-agent-claude-queue-unverified"))
-        }
         Harness::Claude => Ok(RuntimeAction::Submit { input }),
         Harness::Grok | Harness::Oz | Harness::Gemini | Harness::OpenCode | Harness::Unknown => {
             Err(crate::t!("cli-agent-managed-version-unavailable"))

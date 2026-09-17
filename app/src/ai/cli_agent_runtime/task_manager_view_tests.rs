@@ -88,7 +88,7 @@ fn missing_native_session_and_generation_overflow_never_fall_back_to_new() {
 }
 
 #[test]
-fn running_codex_steers_but_unverified_claude_queue_is_blocked() {
+fn running_codex_steers_and_claude_submits_a_separate_turn() {
     let text = "中文与English\n第二行 🧪";
     assert_eq!(
         input_action(Harness::Codex, Some("turn-1"), text).unwrap(),
@@ -97,7 +97,12 @@ fn running_codex_steers_but_unverified_claude_queue_is_blocked() {
             input: vec![InputContent::Text(text.into())],
         }
     );
-    assert!(input_action(Harness::Claude, Some("turn-1"), text).is_err());
+    assert_eq!(
+        input_action(Harness::Claude, Some("turn-1"), text).unwrap(),
+        RuntimeAction::Submit {
+            input: vec![InputContent::Text(text.into())],
+        }
+    );
     assert!(matches!(
         input_action(Harness::Claude, None, text).unwrap(),
         RuntimeAction::Submit { .. }

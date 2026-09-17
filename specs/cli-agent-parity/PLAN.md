@@ -1,6 +1,10 @@
 # Codex CLI、Grok Build、Claude Code 支持优化与能力对齐计划
 
+当前检查点新增：[Claude 队列、Codex rev4 与 Grok 内部适配](CLAUDE_QUEUE_AND_CODEX_REV4.md)。44 文件本地门禁通过；三方最终同提交完整验收仍未满足。
+
 ## 1. 目标与范围
+
+最新实施进展：已推送 a245 标题栏修复并通过实际 Grok 双语入口布局；[第九轮 e473](NINTH_PLATFORM_RUN_E4738E1EA.md)Windows 所选门禁通过、Linux 专用 jq 用例范围错误已修但待重跑。[Claude GUI 更新恢复](CLAUDE_GUI_E473_A245.md)已有真实证据，运行中队列和 Grok ACP 冻结实现通过本地 check/i18n/1030 项相关测试，正在补完整产品验收。P0–P5 和 Goal 均仍为实施中。
 
 让用户在 InfiniShell 中使用三款 CLI 时，可以通过一致的入口完成启动、输入、查看状态、处理审批、停止任务、继续会话和查看结果。各 CLI 的模型、权限和协议差异由适配层处理；尚未验证或上游不提供的能力应明确显示为不可用，不能通过猜测终端文本伪造支持。
 

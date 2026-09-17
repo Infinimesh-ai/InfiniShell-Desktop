@@ -1,0 +1,4 @@
+# 原生证据保留原始字节，确保 Windows CRLF 与摘要一致。
+* -text whitespace=cr-at-eol
+*.bin -diff
+*.test-output.txt whitespace=cr-at-eol,-blank-at-eof

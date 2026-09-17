@@ -20,6 +20,9 @@ const MARKETPLACE: &str = "codex-warp";
 const COMMIT: &str = "31ce59d9011cfb1d78f265649a228dac5de58d76";
 const METADATA: &str =
     include_str!("../../../../assets/bundled/cli-agent-plugins/codex/SOURCE_METADATA.json");
+const PREVIOUS_METADATA: &str = include_str!(
+    "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev3/SOURCE_METADATA.json"
+);
 
 #[derive(Deserialize)]
 struct SourceMetadata {
@@ -37,6 +40,9 @@ struct SourceFile {
 
 static BUNDLE: LazyLock<SourceMetadata> =
     LazyLock::new(|| serde_json::from_str(METADATA).expect("随附 Codex 完整来源元数据必须有效"));
+static PREVIOUS_BUNDLE: LazyLock<SourceMetadata> = LazyLock::new(|| {
+    serde_json::from_str(PREVIOUS_METADATA).expect("随附 Codex rev3 完整来源元数据必须有效")
+});
 static CURRENT: LazyLock<Mutex<BTreeMap<PathBuf, (Instant, bool)>>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
 
@@ -157,7 +163,15 @@ fn cache_snapshot(root: &Path) -> io::Result<BTreeMap<String, String>> {
 }
 
 fn expected_tree(prefix: &str, upstream: bool) -> BTreeMap<String, String> {
-    BUNDLE
+    revision_tree(&BUNDLE, prefix, upstream)
+}
+
+fn revision_tree(
+    revision: &SourceMetadata,
+    prefix: &str,
+    upstream: bool,
+) -> BTreeMap<String, String> {
+    revision
         .files
         .iter()
         .filter_map(|(name, file)| {
@@ -176,21 +190,31 @@ fn expected_tree(prefix: &str, upstream: bool) -> BTreeMap<String, String> {
 }
 
 fn verify_owned(home: &Path) -> io::Result<()> {
-    let parent = source_parent(home);
-    if fs::read(relative_file(&parent, "SOURCE_METADATA.json")?)? != METADATA.as_bytes()
-        || tree(&parent.join("source"), false)? != expected_tree("", false)
+    verify_revision(home, &BUNDLE, METADATA)
+}
+
+fn verify_revision(home: &Path, revision: &SourceMetadata, metadata: &str) -> io::Result<()> {
+    let parent = home
+        .join("plugins/infinishell-sources")
+        .join(&revision.directory);
+    if fs::read(relative_file(&parent, "SOURCE_METADATA.json")?)? != metadata.as_bytes()
+        || tree(&parent.join("source"), false)? != revision_tree(revision, "", false)
     {
         return Err(invalid());
     }
-    verify_modes(&parent.join("source"), "")?;
+    verify_revision_modes(&parent.join("source"), "", revision)?;
     Ok(())
 }
 
 fn verify_modes(root: &Path, prefix: &str) -> io::Result<()> {
+    verify_revision_modes(root, prefix, &BUNDLE)
+}
+
+fn verify_revision_modes(root: &Path, prefix: &str, revision: &SourceMetadata) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt as _;
-        for (name, expected) in &BUNDLE.files {
+        for (name, expected) in &revision.files {
             if let Some(relative) = name.strip_prefix(prefix)
                 && fs::metadata(relative_file(root, relative)?)?
                     .permissions()
@@ -203,8 +227,15 @@ fn verify_modes(root: &Path, prefix: &str) -> io::Result<()> {
         }
     }
     #[cfg(not(unix))]
-    let _ = (root, prefix);
+    let _ = (root, prefix, revision);
     Ok(())
+}
+
+/// 只接收 rev3 的完整已部署树；不能将任意新旧脚本组合当作可迁移版本。
+pub(super) fn is_previous_notification_cache(root: &Path) -> bool {
+    tree(root, false)
+        .is_ok_and(|actual| actual == revision_tree(&PREVIOUS_BUNDLE, "plugins/warp/", false))
+        && verify_revision_modes(root, "plugins/warp/", &PREVIOUS_BUNDLE).is_ok()
 }
 
 fn validate_config_shape(document: &DocumentMut) -> io::Result<()> {
@@ -258,10 +289,17 @@ fn marketplace(document: &DocumentMut) -> Option<&Item> {
 }
 
 fn owned_entry(document: &DocumentMut, home: &Path) -> bool {
+    owned_revision_entry(document, home, &BUNDLE)
+}
+
+fn owned_revision_entry(document: &DocumentMut, home: &Path, revision: &SourceMetadata) -> bool {
+    let source = home
+        .join("plugins/infinishell-sources")
+        .join(&revision.directory)
+        .join("source");
     marketplace(document).is_some_and(|entry| {
         entry.get("source_type").and_then(Item::as_str) == Some("local")
-            && entry.get("source").and_then(Item::as_str).map(Path::new)
-                == Some(source_path(home).as_path())
+            && entry.get("source").and_then(Item::as_str).map(Path::new) == Some(source.as_path())
     })
 }
 
@@ -292,6 +330,9 @@ pub(super) fn has_custom_source(home: &Path) -> bool {
         Ok((_, document)) => match marketplace(&document) {
             None => false,
             Some(entry) if canonical_entry(entry) => false,
+            Some(_) if owned_revision_entry(&document, home, &PREVIOUS_BUNDLE) => {
+                verify_revision(home, &PREVIOUS_BUNDLE, PREVIOUS_METADATA).is_err()
+            }
             Some(_) => !owned_entry(&document, home) || !is_current(home),
         },
         Err(_) => true,
@@ -338,6 +379,9 @@ fn validate_existing(home: &Path, document: &DocumentMut) -> io::Result<()> {
             }
         }
         Some(_) if owned_entry(document, home) => verify_owned(home)?,
+        Some(_) if owned_revision_entry(document, home, &PREVIOUS_BUNDLE) => {
+            verify_revision(home, &PREVIOUS_BUNDLE, PREVIOUS_METADATA)?;
+        }
         Some(_) => return Err(invalid()),
     }
     notification_patch::preflight(home, PatchKind::Codex).map_err(|_| invalid())?;
@@ -527,6 +571,8 @@ pub(super) async fn install(
         return Err(notification_patch::modified());
     }
     validate_existing(&home, &document).map_err(|_| notification_patch::modified())?;
+    let preserve_previous_cache =
+        name == "warp" && is_previous_notification_cache(&cache_root(&home, name).join("0.4.0"));
     let source = materialize(&home).map_err(|error| failure(error, log))?;
     let transactions = home.join("plugins/infinishell-transactions");
     plain_path(&transactions)?;
@@ -578,7 +624,12 @@ pub(super) async fn install(
             log,
         )
     })?;
-    fs::remove_dir_all(transaction)?;
+    if preserve_previous_cache {
+        // rev3 升级成功仍保留旧缓存和事务记录，旧不可变来源也不会被删除。
+        log.push_str(&format!("rev3 恢复资料保留于 {}\n", transaction.display()));
+    } else {
+        fs::remove_dir_all(transaction)?;
+    }
     invalidate(&home);
     Ok(())
 }

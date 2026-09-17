@@ -20,6 +20,9 @@ from codex_windows_hook_command import (SCRIPTS, encode, encode_source, verify_e
                                         verify_windows_syntax, windows_environment)
 from codex_windows_hook_inputs import (CODEX_COMMIT, RELEASE_ASSETS, obtain_inputs,
                                        plugin_base, require, verify_plugin)
+from codex_windows_formal import (EVENTS, authorize_config, exact_plugin_tree, formal_transport_expectations,
+                                  native_hooks, probe_bundle, restore_config, same_native_registration,
+                                  split_trigger_hooks, tree, validate_native_hooks)
 
 
 HOOK_COMPLETION_TIMEOUT = 45
@@ -198,6 +201,8 @@ class NativeRecorder:
         raise RuntimeError(f'{method} 没有原生确认')
 
     def close(self):
+        self.close_receipt = {'root_exited_naturally': False, 'termination_requested': False,
+                              'kill_requested': False, 'output_readers_eof': False}
         try:
             self.process.stdin.close()
         except (BrokenPipeError, OSError):
@@ -205,16 +210,23 @@ class NativeRecorder:
         try:
             self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
+            self.close_receipt['termination_requested'] = True
             self.process.terminate()
             try:
                 self.process.wait(timeout=3)
             except subprocess.TimeoutExpired:
+                self.close_receipt['kill_requested'] = True
                 self.process.kill()
                 self.process.wait(timeout=3)
+        self.close_receipt.update(root_exit_code=self.process.returncode,
+            root_exited_naturally=not self.close_receipt['termination_requested'])
         for reader in self.readers:
             reader.join(timeout=2)
-        require(not self.reader_errors and all(not reader.is_alive() for reader in self.readers),
-                '原生输出读取失败或没有结束: ' + repr(self.reader_errors))
+        require(all(not reader.is_alive() for reader in self.readers), '原生输出读取没有结束')
+        for stream in (self.process.stdout, self.process.stderr):
+            stream.close()
+        require(not self.reader_errors, '原生输出读取失败: ' + repr(self.reader_errors))
+        self.close_receipt['output_readers_eof'] = True
 
 
 def start_codex(executable, env, directory, traces):
@@ -244,9 +256,9 @@ def capture_case_markers(directory, evidence):
     return markers
 
 
-def one_case(args, directory, requests, evidence, prompt=HOOK_PROMPTS[0]):
-    from apply_notification_patch import apply_files, bundle_data, default_bundle, validate_tree
-    metadata, replacements = bundle_data(default_bundle(), 'codex')
+def prepare_case(args, directory, evidence, mode):
+    from apply_notification_patch import apply_files, validate_tree
+    metadata, replacements, source_hash = probe_bundle(args.repo, mode)
     cli_home = directory / 'codex'
     cli_home.mkdir(parents=True)
     user_home = directory / 'home'
@@ -263,6 +275,124 @@ def one_case(args, directory, requests, evidence, prompt=HOOK_PROMPTS[0]):
     shutil.copytree(args.upstream_plugin, plugin)
     validate_tree(plugin, '0.4.0', metadata)
     apply_files(plugin, metadata, replacements)
+    evidence.update(mode=mode, patch_revision=metadata['patch_revision'],
+                    source_metadata_sha256=source_hash, resource_tree_sha256=exact_plugin_tree(plugin, metadata))
+    index = marketplace / '.agents/plugins/marketplace.json'
+    index.parent.mkdir(parents=True)
+    index.write_text(json.dumps({'name': 'codex-warp', 'plugins': [{'name': 'warp',
+        'source': './plugins/warp', 'version': '0.4.0',
+        'policy': {'installation': 'AVAILABLE', 'authentication': 'ON_INSTALL'}}]}), encoding='utf-8')
+    config = cli_home / 'config.toml'
+    config.write_text('cli_auth_credentials_store = "file"\nmodel = "gpt-5.4"\n'
+        'model_provider = "local_hook_probe"\n'
+        '[model_providers.local_hook_probe]\nname = "Local hook probe"\n'
+        f'base_url = "http://127.0.0.1:{args.port}/v1"\n'
+        'wire_api = "responses"\nrequires_openai_auth = false\nsupports_websockets = false\n', encoding='utf-8')
+    return cli_home, env, marketplace, plugin, config
+
+
+def install_case(args, directory, env, marketplace):
+    for command in (['plugin', 'marketplace', 'add', str(marketplace), '--json'],
+                    ['plugin', 'add', 'warp@codex-warp', '--json']):
+        subprocess.run([str(args.codex_executable), *command], env=env, cwd=directory,
+                       capture_output=True, check=True, timeout=30)
+
+
+def close_case(recorder, evidence):
+    # 保留首个失败，同时明确记录清理是否完成；关闭失败不能计入通过。
+    primary = sys.exc_info()[1]
+    try:
+        recorder.close()
+        evidence.setdefault('process_closes', []).append(dict(recorder.close_receipt,
+            all_descendants_job_verified=False))
+        require(recorder.close_receipt['root_exited_naturally'] and recorder.process.returncode == 0,
+                '原生 app-server 未正常退出，不能把监督终止计入通过')
+    except BaseException as error:
+        evidence['close_failure'] = {'type': type(error).__name__, 'message': str(error)}
+        evidence['failed_close_receipt'] = getattr(recorder, 'close_receipt', {})
+        if primary is None:
+            raise
+
+
+def rollback_case(config, before, written, evidence):
+    primary = sys.exc_info()[1]
+    try:
+        restore_config(config, before, written, evidence.setdefault('config_rollback', {}))
+    except BaseException as error:
+        evidence['config_rollback_failure'] = {'type': type(error).__name__, 'message': str(error)}
+        if primary is None:
+            raise
+
+
+def formal_registration(args, directory, evidence):
+    evidence.update(passed=False, traces=[], scope='uninstrumented_formal_five_hooks',
+                    model_generation_requested_by_probe=False, native_hook_events_verified=[],
+                    native_hook_events_not_verified=list(EVENTS))
+    cli_home, env, marketplace, plugin, config = prepare_case(args, directory, evidence, 'formal')
+    install_case(args, directory, env, marketplace)
+    before = config.read_bytes()
+    recorder = start_codex(args.codex_executable, env, directory, evidence['traces'])
+    try:
+        hooks = native_hooks(recorder.rpc('hooks/list', {'cwds': [str(directory)]}, 2))
+        evidence['untrusted_hooks'] = hooks
+        validate_native_hooks(hooks, cli_home, plugin, {encode(script) for script in SCRIPTS}, 'untrusted')
+        require({hook['eventName'] for hook in hooks} == set(EVENTS), '正式五项事件集合改变')
+        require(config.read_bytes() == before, '未授权注册检查修改了隔离配置')
+    finally:
+        close_case(recorder, evidence)
+    require(config.read_bytes() == before, '未授权 app-server 退出时改变了隔离配置')
+    before, written = authorize_config(config, hooks)
+    try:
+        recorder = start_codex(args.codex_executable, env, directory, evidence['traces'])
+        try:
+            trusted = native_hooks(recorder.rpc('hooks/list', {'cwds': [str(directory)]}, 3))
+            evidence['trusted_hooks'] = trusted
+            validate_native_hooks(trusted, cli_home, plugin, {encode(script) for script in SCRIPTS}, 'trusted')
+            same_native_registration(hooks, trusted)
+            require(tree(plugin) == evidence['resource_tree_sha256'], '正式来源字节在采集中改变')
+            require(config.read_bytes() == written, '正式信任检查修改了隔离配置')
+        finally:
+            close_case(recorder, evidence)
+    finally:
+        rollback_case(config, before, written, evidence)
+    evidence.update(passed=True, hook_count=5, scripts_instrumented=False,
+                    source_manifest_modified=False, native_trust_confirmed=True,
+                    no_thread_or_turn_started=True, windows_product_enabled=False)
+    return hooks
+
+
+def cleanup_private_cases(directory, cases, evidence):
+    evidence.update(attempted=False, deleted=False, descendants_job_verified=False)
+    require(cases and all(case['passed'] for case in cases), '失败现场不能自动清理')
+    for case in cases:
+        phases = [case, case['formal_registration']] if case.get('mode') == 'formal' else [case]
+        for phase in phases:
+            closes = phase.get('process_closes', [])
+            require(len(closes) == 2 and all(close['root_exited_naturally'] and close['root_exit_code'] == 0
+                    and close['output_readers_eof'] for close in closes) and not phase.get('close_failure')
+                    and phase.get('config_rollback', {}).get('restored'), '缺少退出、EOF 或配置回滚证据，保留现场')
+    require(directory.is_dir() and not directory.is_symlink(), '私有临时目录已被替换，拒绝清理')
+    evidence['attempted'] = True
+    try:
+        # 不更改未知只读属性；任何文件占用或权限错误都保留原始失败。
+        shutil.rmtree(directory)
+        evidence['deleted'] = True
+    except Exception as error:
+        evidence['failure'] = {'type': type(error).__name__, 'message': str(error),
+                               'winerror': getattr(error, 'winerror', None), 'filename': getattr(error, 'filename', None)}
+        raise
+
+
+def verify_case_resources(repo, cases, mode):
+    metadata, _, source_hash = probe_bundle(repo, mode)
+    expected = dict(metadata['compatible_bases'][0]['tree_sha256'])
+    expected.update({name: entry['replacement_sha256'] for name, entry in metadata['files'].items()})
+    for case in cases:
+        require(case['source_metadata_sha256'] == source_hash and case['resource_tree_sha256'] == expected,
+                '探测期间配方或正式资源发生变化')
+
+
+def instrument_candidate(plugin, evidence):
     from codex_windows_notify import candidate_notify, evidence as notify_evidence
     notify_path = plugin / 'scripts/warp-notify.sh'
     original_notify = notify_path.read_text(encoding='utf-8')
@@ -276,13 +406,7 @@ def one_case(args, directory, requests, evidence, prompt=HOOK_PROMPTS[0]):
             for handler in group['hooks']:
                 script = next(script for script in SCRIPTS if script in handler['command'])
                 handler['commandWindows'] = encode(script)
-    # 只有临时测试插件增加阻断 hook；不生成模型请求，也不绕过原生 hook 信任。
-    stop_source = "[Console]::Out.WriteLine('{\"continue\":false,\"stopReason\":\"isolated hook probe\"}')"
-    blocker = encode_source(stop_source)
-    hooks['hooks']['UserPromptSubmit'].append({'hooks': [{'type': 'command', 'command': 'false',
-                                                        'commandWindows': blocker}]})
     hooks_path.write_text(json.dumps(hooks), encoding='utf-8')
-    evidence['temporary_hooks_sha256'] = hashlib.sha256(hooks_path.read_bytes()).hexdigest()
     original_hashes = {}
     for script in ('on-session-start.sh', 'on-prompt-submit.sh'):
         path = plugin / 'scripts' / script
@@ -303,98 +427,112 @@ printf '%s' "$input" | jq -c --arg root "$PLUGIN_ROOT" '{hook_event_name,turn_id
 printf '%s' "$input" | bash -- "$SCRIPT_DIR/__FIXTURE_ENTRY__"
 '''.replace('__FIXTURE_SCRIPT__', script).replace('__FIXTURE_ENTRY__', entry)
         path.write_text(wrapper, encoding='utf-8', newline='\n')
-    index = marketplace / '.agents/plugins/marketplace.json'
-    index.parent.mkdir(parents=True)
-    index.write_text(json.dumps({'name': 'codex-warp', 'plugins': [{'name': 'warp',
-        'source': './plugins/warp', 'version': '0.4.0',
-        'policy': {'installation': 'AVAILABLE', 'authentication': 'ON_INSTALL'}}]}), encoding='utf-8')
-    config = cli_home / 'config.toml'
-    config.write_text('cli_auth_credentials_store = "file"\nmodel = "gpt-5.4"\n'
-        'model_provider = "local_hook_probe"\n'
-        '[model_providers.local_hook_probe]\nname = "Local hook probe"\n'
-        f'base_url = "http://127.0.0.1:{args.port}/v1"\n'
-        'wire_api = "responses"\nrequires_openai_auth = false\nsupports_websockets = false\n', encoding='utf-8')
-    for command in (['plugin', 'marketplace', 'add', str(marketplace), '--json'],
-                    ['plugin', 'add', 'warp@codex-warp', '--json']):
-        subprocess.run([str(args.codex_executable), *command], env=env, cwd=directory,
-                       capture_output=True, check=True, timeout=30)
+    return original_hashes
+
+
+def one_case(args, directory, requests, evidence, prompt=HOOK_PROMPTS[0]):
+    mode = getattr(args, 'mode', 'formal')
+    formal = None
+    if mode == 'formal':
+        evidence['formal_registration'] = {}
+        formal = formal_registration(args, directory / 'formal-registration', evidence['formal_registration'])
+    cli_home, env, marketplace, plugin, config = prepare_case(args, directory, evidence, mode)
+    if formal is not None:
+        registration = evidence['formal_registration']
+        require(evidence['resource_tree_sha256'] == registration['resource_tree_sha256']
+                and evidence['source_metadata_sha256'] == registration['source_metadata_sha256'],
+                '正式注册与触发验证的资源不是同一版字节')
+    original_hashes = instrument_candidate(plugin, evidence) if mode == 'candidate' else {}
+    hooks_path = plugin / 'hooks/hooks.json'
+    hooks = json.loads(hooks_path.read_bytes())
+    # 第六项仅阻断本次测试；正式五项摘要只能来自上面未改动资源的独立注册。
+    stop_source = "[Console]::Out.WriteLine('{\"continue\":false,\"stopReason\":\"isolated hook probe\"}')"
+    blocker = encode_source(stop_source)
+    hooks['hooks']['UserPromptSubmit'].append({'hooks': [{'type': 'command', 'command': 'false',
+                                                        'commandWindows': blocker}]})
+    hooks_path.write_text(json.dumps(hooks), encoding='utf-8')
+    expected_tree = tree(plugin)
+    evidence['temporary_hooks_sha256'] = expected_tree['hooks/hooks.json']
+    if formal is not None:
+        require({name: digest for name, digest in expected_tree.items() if name != 'hooks/hooks.json'} ==
+                {name: digest for name, digest in evidence['resource_tree_sha256'].items() if name != 'hooks/hooks.json'},
+                '正式触发验证不得修改脚本或增加插桩文件')
+        evidence['scripts_instrumented'] = False
+    install_case(args, directory, env, marketplace)
+    initial_config = config.read_bytes()
     recorder = start_codex(args.codex_executable, env, directory, evidence['traces'])
     try:
         listed = recorder.rpc('hooks/list', {'cwds': [str(directory)]}, 2)
-        native_hooks = [hook for group in listed['data'] for hook in group['hooks']
-                        if hook.get('pluginId') == 'warp@codex-warp']
-        require(len(native_hooks) == 6, '原生 hook 注册数量不匹配')
-        require(all(hook['trustStatus'] == 'untrusted' for hook in native_hooks), '初始 hook 必须未受信任')
-        require({hook['command'] for hook in native_hooks} == {encode(s) for s in SCRIPTS} | {blocker},
-                'Windows 原生没有选择预期的 commandWindows')
-        installed_root = Path(native_hooks[0]['sourcePath']).parent.parent
-        require(installed_root.resolve().is_relative_to(cli_home.resolve()), '原生插件目录不属于隔离 HOME')
-        expected_tree = {path.relative_to(plugin).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-                         for path in plugin.rglob('*') if path.is_file()}
-        actual_tree = {path.relative_to(installed_root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-                       for path in installed_root.rglob('*') if path.is_file()}
-        require(actual_tree == expected_tree, '授权前原生安装副本与临时受控插件不一致')
-        evidence['native_initial_hooks'] = native_hooks
+        initial_hooks = native_hooks(listed)
+        evidence['native_initial_hooks'] = initial_hooks
+        installed_root = validate_native_hooks(initial_hooks, cli_home, plugin,
+                                              {encode(script) for script in SCRIPTS} | {blocker}, 'untrusted')
+        if formal is not None:
+            evidence['trigger_validation'] = split_trigger_hooks(formal, initial_hooks, blocker)
     finally:
-        recorder.close()
-    with config.open('a', encoding='utf-8') as target:
-        for hook in native_hooks:
-            # 仅授权本测试生成的临时插件，待授权脚本已在复制前完整验证。
-            target.write(f'\n[hooks.state.{json.dumps(hook["key"])}]\nenabled = true\n'
-                         f'trusted_hash = {json.dumps(hook["currentHash"])}\n')
-    before = config.read_bytes()
-    recorder = start_codex(args.codex_executable, env, directory, evidence['traces'])
+        close_case(recorder, evidence)
+    require(config.read_bytes() == initial_config, '未授权 app-server 改变了隔离配置')
+    before, written = authorize_config(config, initial_hooks)
     evidence['expected_prompt'] = prompt
+    recorder = None
     try:
-        trusted = recorder.rpc('hooks/list', {'cwds': [str(directory)]}, 3)
-        trusted_hooks = [hook for group in trusted['data'] for hook in group['hooks']
-                         if hook.get('pluginId') == 'warp@codex-warp']
-        require(len(trusted_hooks) == 6, '信任后 hook 数量不匹配')
-        require(all(hook['enabled'] and hook['trustStatus'] == 'trusted' for hook in trusted_hooks),
-                '临时 hook 没有得到原生信任确认')
+        recorder = start_codex(args.codex_executable, env, directory, evidence['traces'])
+        trusted_hooks = native_hooks(recorder.rpc('hooks/list', {'cwds': [str(directory)]}, 3))
+        validate_native_hooks(trusted_hooks, cli_home, plugin, {encode(script) for script in SCRIPTS} | {blocker}, 'trusted')
+        same_native_registration(initial_hooks, trusted_hooks)
+        if formal is not None:
+            evidence['trigger_validation'] = split_trigger_hooks(formal, trusted_hooks, blocker)
         thread = recorder.rpc('thread/start', {'cwd': str(directory), 'sessionStartSource': 'startup',
             'ephemeral': False, 'sandbox': 'read-only', 'approvalPolicy': 'on-request',
             'modelProvider': 'local_hook_probe'}, 4)
         require(thread['modelProvider'] == 'local_hook_probe', '原生会话没有使用隔离的本机 provider')
         turn = recorder.rpc('turn/start', {'threadId': thread['thread']['id'], 'input': [
             {'type': 'text', 'text': prompt, 'text_elements': []}]}, 5)
+        if formal is not None:
+            evidence['transport_expectations'] = formal_transport_expectations(
+                directory, thread['thread']['id'], turn['turn']['id'], prompt)
         wait_for_hook_completion(recorder, thread['thread']['id'], turn['turn']['id'], trusted_hooks,
                                  blocker, requests, evidence)
-        markers = capture_case_markers(directory, evidence)
-        require(markers['on-session-start.sh']['hook_event_name'] == 'SessionStart', 'SessionStart 未原生执行')
-        require(markers['on-prompt-submit.sh']['prompt'] == prompt, '原生 prompt 字节语义被更改')
-        require(markers['on-prompt-submit.sh']['hook_event_name'] == 'UserPromptSubmit' and
-                markers['on-prompt-submit.sh']['session_id'] == thread['thread']['id'] and
-                markers['on-prompt-submit.sh']['turn_id'] == turn['turn']['id'], '原生输入关联字段丢失')
-        evidence['markers'] = markers
-        require(all(Path(marker['plugin_root']) == installed_root for marker in markers.values()),
-                'PLUGIN_ROOT 没有指向原生已安装插件')
-        require(all(hashlib.sha256((installed_root / 'scripts' / (s + '.fixture-original')).read_bytes()).hexdigest() == h
-                    for s, h in original_hashes.items()), '插桩后的原脚本没有逐字保留')
+        if formal is not None:
+            evidence['trigger_validation'].update(native_events_verified=['sessionStart', 'userPromptSubmit'],
+                native_events_not_verified=['stop', 'permissionRequest', 'postToolUse'],
+                notification_transport_verified=False, scripts_match_formal_resource=True)
+        else:
+            markers = capture_case_markers(directory, evidence)
+            require(markers['on-session-start.sh']['hook_event_name'] == 'SessionStart', 'SessionStart 未原生执行')
+            require(markers['on-prompt-submit.sh']['prompt'] == prompt, '原生 prompt 字节语义被更改')
+            require(markers['on-prompt-submit.sh']['hook_event_name'] == 'UserPromptSubmit' and
+                    markers['on-prompt-submit.sh']['session_id'] == thread['thread']['id'] and
+                    markers['on-prompt-submit.sh']['turn_id'] == turn['turn']['id'], '原生输入关联字段丢失')
+            require(all(Path(marker['plugin_root']) == installed_root for marker in markers.values()),
+                    'PLUGIN_ROOT 没有指向原生已安装插件')
+            require(all(hashlib.sha256((installed_root / 'scripts' / (s + '.fixture-original')).read_bytes()).hexdigest() == h
+                        for s, h in original_hashes.items()), '插桩后的原脚本没有逐字保留')
+        require(tree(installed_root) == expected_tree and tree(plugin) == expected_tree,
+                '触发后插件来源或原生缓存被修改')
         require(not requests, f'阻断前出现模型 HTTP 请求: {requests}')
         require(not (directory / 'INJECTED').exists(), '目录数据被错误作为 shell 源码执行')
-        require(config.read_bytes() == before, '原生执行意外修改了已核对的隔离配置')
+        require(config.read_bytes() == written, '原生执行意外修改了已核对的隔离配置')
         return {'name': directory.name, 'native_session_start': True, 'native_user_prompt_submit': True,
                 'native_prompt_blocked': True, 'native_hooks': trusted_hooks,
                 'model_http_requests': len(requests), 'model_generation_verified': False,
                 'native_conpty_notifications_verified': False, 'full_lifecycle_verified': False}
     finally:
-        primary = sys.exc_info()[1]
         try:
-            recorder.close()
-        except BaseException as error:
-            evidence['close_failure'] = {'type': type(error).__name__, 'message': str(error)}
-            if primary is None:
-                raise
+            if recorder is not None:
+                close_case(recorder, evidence)
         finally:
-            try:
-                capture_case_markers(directory, evidence)
-            except Exception as error:
-                evidence['marker_capture_failure'] = {'type': type(error).__name__, 'message': str(error)}
+            rollback_case(config, before, written, evidence)
+            if mode == 'candidate':
+                try:
+                    capture_case_markers(directory, evidence)
+                except Exception as error:
+                    evidence['marker_capture_failure'] = {'type': type(error).__name__, 'message': str(error)}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--mode', choices=('formal', 'candidate'), default='formal')
     parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument('--architecture', choices=RELEASE_ASSETS, default='x86_64')
     for name in ('codex-executable', 'upstream-plugin', 'download-dir'):
@@ -413,9 +551,9 @@ def main():
     for path in (args.output, args.download_dir, Path(tempfile.gettempdir()).resolve()):
         require(path is None or not path.is_relative_to(args.repo), '禁止将产物、下载或临时 HOME 写入源树')
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    report = {'passed': False, 'official_commit': CODEX_COMMIT, 'cases': [], 'checks': {},
-              'scope': 'native_cmd_powershell_bash_hooks_and_blocking_only',
-              'credentials_provided': False, 'native_conpty_notifications_verified': False,
+    report = {'schema_version': 2, 'mode': args.mode, 'passed': False, 'official_commit': CODEX_COMMIT, 'cases': [], 'checks': {},
+              'scope': args.mode + '_native_registration_and_two_blocked_hook_events',
+              'credentials_provided': False, 'windows_product_enabled': False, 'native_conpty_notifications_verified': False,
               'full_lifecycle_verified': False, 'model_generation_verified': False}
     requests = []
     server = None
@@ -464,19 +602,24 @@ def main():
         worker = threading.Thread(target=server.serve_forever, daemon=True)
         worker.start()
         phase = 'native_codex_hooks'
-        with tempfile.TemporaryDirectory(prefix='infinishell-native-windows-hooks-') as tmp:
-            for name, prompt in zip(('插件 空 格', "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()"), HOOK_PROMPTS):
-                evidence = {'name': name, 'passed': False, 'traces': []}
-                report['cases'].append(evidence)
-                evidence.update(one_case(args, Path(tmp) / name, requests, evidence, prompt))
-                evidence['passed'] = True
+        private = Path(tempfile.mkdtemp(prefix='infinishell-native-windows-hooks-'))
+        report['private_dir'] = str(private)
+        for name, prompt in zip(('插件 空 格', "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()"), HOOK_PROMPTS):
+            evidence = {'name': name, 'passed': False, 'traces': []}
+            report['cases'].append(evidence)
+            evidence.update(one_case(args, private / name, requests, evidence, prompt))
+            evidence['passed'] = True
         phase = 'zero_model_requests'
         require(not requests, f'原生进程关闭前出现模型 HTTP 请求: {requests}')
         report['checks'][phase] = True
         phase = 'source_inputs_unchanged'
         verify_plugin(args.upstream_plugin, plugin_base(args.repo))
+        verify_case_resources(args.repo, report['cases'], args.mode)
         require(verify_encoding() == report['checks']['encoding'], '探测期间固定源码被并发修改')
         report['checks'][phase] = True
+        phase = 'private_directory_cleanup'
+        report['private_directory_cleanup'] = {}
+        cleanup_private_cases(private, report['cases'], report['private_directory_cleanup'])
         report['passed'] = True
     except Exception as error:
         report['failure'] = {'phase': phase, 'type': type(error).__name__, 'message': str(error)}

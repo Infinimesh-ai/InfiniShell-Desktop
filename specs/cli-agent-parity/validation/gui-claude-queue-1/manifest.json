@@ -1,0 +1,57 @@
+{
+  "scope": "隔离 macOS GUI，基于a245的11文件冻结快照；不代表同提交全平台通过",
+  "files": [
+    {
+      "path": "01-queued-records.json",
+      "sha256": "cc4a21187ca0a0eef4f98c5a57824eadd76767fcde11c25c133078adb91d2b9c"
+    },
+    {
+      "path": "01-queued-zh-CN.png",
+      "sha256": "bf73ac7d925d740f535a7289fb5cc93800dc01880348fe1878e60e52094fbeb7"
+    },
+    {
+      "path": "02-queue-full-draft.png",
+      "sha256": "029cde7fd8d9f8086af391f2182e4c3e9c365db45cabc194fd29d77b62be4045"
+    },
+    {
+      "path": "03-queued-result-records.json",
+      "sha256": "7dafdd160af1b3c24a1c5ee0fd05aeed4cad6154890b4b1d584e8f07f8dd00c2"
+    },
+    {
+      "path": "03-queued-result.png",
+      "sha256": "891dafa67b37f67a88fbaf9a39a6b4ab446062ae435c98a06602720852a842a2"
+    },
+    {
+      "path": "04-queued-en.png",
+      "sha256": "97bcc1cf67c8b3e92a3e125de69192a587887ebc401d8f8f6e1547b52720215a"
+    },
+    {
+      "path": "05-cancel-current-en.png",
+      "sha256": "5cec67fb2147a35853603cf2dcddf30d078adff637e74a1a410ea9ad4ec8f113"
+    },
+    {
+      "path": "06-queued-after-cancel-en.png",
+      "sha256": "3d67d0001c511f20834e8a512a76519e9856bb00f89f8a5f0fcddc5612f6dd31"
+    },
+    {
+      "path": "06-queued-after-cancel-records.json",
+      "sha256": "b4d6e7e69c16e6b3e31229c15857e10c94d756f10c0c808d96db7695404ad70f"
+    },
+    {
+      "path": "07-before-restart-records.json",
+      "sha256": "14d4994b153448d660a3991ea99633b290f93ba4c28ceac8555932ca51072023"
+    },
+    {
+      "path": "07-pending-before-restart.png",
+      "sha256": "bd47e47286433e8dff2a7e416c48c22825cecde5d0e5904b3a3d4f1d6d3a2e8e"
+    },
+    {
+      "path": "08-after-restart-records.json",
+      "sha256": "1728ae150566326be48f6d38ddaa0290cf22345a33acdc64e6ee9c61f05e3176"
+    },
+    {
+      "path": "08-after-restart.png",
+      "sha256": "d58dbea901f2348fff986d50739354f41a1eb114c7c98e9207493f17796b0698"
+    }
+  ]
+}

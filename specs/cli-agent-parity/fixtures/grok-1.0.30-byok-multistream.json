@@ -1,0 +1,1659 @@
+{
+  "source_report_sha256": "433645de5ee61cd0f3753fa3dca975892049e94ba93976efb4e262d8636708a7",
+  "binary_version": "grok 1.0.30 (04b7ffed98c6)",
+  "binary_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "model_path": "Grok Build + 自定义 Claude 后端",
+  "scope": "原生 no-leader ACP 同回合文本、精确 Write 审批、第二条文本流；过滤未使用参数增量事件，保留原始身份与顺序。",
+  "records": [
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": 1,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": false,
+              "writeTextFile": false
+            },
+            "terminal": false
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "promptCapabilities": {
+              "image": false,
+              "audio": false,
+              "embeddedContext": true
+            },
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "sessionCapabilities": {
+              "list": {},
+              "resume": {},
+              "close": {}
+            },
+            "auth": {},
+            "_meta": {
+              "x.ai/fs_notify": true,
+              "x.ai/hooks": {
+                "blockingEvents": [
+                  "pre_tool_use",
+                  "stop",
+                  "subagent_stop"
+                ],
+                "decisions": [
+                  "deny",
+                  "block"
+                ],
+                "stopSignals": [
+                  "continue",
+                  "stopReason",
+                  "additionalContext"
+                ]
+              },
+              "x.ai/capabilities": {
+                "toolOverrides": {
+                  "x_keyword_search": true,
+                  "x_semantic_search": true,
+                  "x_user_search": false,
+                  "x_thread_fetch": false
+                }
+              }
+            }
+          },
+          "authMethods": [
+            {
+              "id": "xai.api_key",
+              "name": "xai.api_key",
+              "description": "XAI_API_KEY or api_key/env_key in config.toml"
+            },
+            {
+              "id": "grok.com",
+              "name": "Grok",
+              "description": "Sign in with Grok"
+            }
+          ],
+          "_meta": {
+            "grokShell": true,
+            "defaultAuthMethodId": "xai.api_key",
+            "x.ai/mcp/sdk": true,
+            "x.ai/pluginDirs": true,
+            "currentWorkingDirectory": "<private-smoke>/empty-project",
+            "agentVersion": "1.0.30",
+            "agentId": "6ebb6fd1-fe11-5365-8b3d-92c8fa6675e4",
+            "agentInstanceId": "ff559d5b-4f7c-4538-ae79-2df2404460a7",
+            "hostname": "<redacted>",
+            "modelState": {
+              "currentModelId": "parity-claude",
+              "availableModels": [
+                {
+                  "modelId": "grok-4.6",
+                  "name": "Grok 4.6",
+                  "description": "SpaceXAI's latest frontier model",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "xhigh",
+                        "value": "xhigh",
+                        "label": "Extra High Effort",
+                        "description": "Highest effort and reasoning level",
+                        "default": false
+                      },
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Higher implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "modelId": "grok-4.5",
+                  "name": "Grok 4.5",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Highest implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "modelId": "parity-claude",
+                  "name": "Grok Build - custom Claude backend",
+                  "_meta": {
+                    "totalContextTokens": 200000,
+                    "agentType": "grok-build-plan"
+                  }
+                }
+              ]
+            },
+            "mcpServers": [],
+            "mcpApps": false,
+            "metadata": null,
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              }
+            ],
+            "cancelRewind": true,
+            "sessionRecap": true,
+            "feedbackTraceOffer": false,
+            "voiceMode": true
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/servers_updated",
+        "params": {
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "authenticate",
+        "params": {
+          "methodId": "xai.api_key",
+          "_meta": {
+            "headless": true
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {}
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "session/new",
+        "params": {
+          "cwd": "<private-smoke>/empty-project",
+          "mcpServers": [],
+          "_meta": {
+            "modelId": "parity-claude",
+            "yoloMode": false,
+            "autoMode": false
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp_initialized",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "mcpToolCount": 0,
+          "elapsedMs": 0
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                },
+                "_meta": {
+                  "workflowSource": "builtin",
+                  "workflowPath": "/Users/admin/actions-runner/_work/xai/xai/crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "send_feedback",
+                "web_search",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 1474,
+            "eventId": "01a0adec-6149-7ff3-a254-1e786010a9b4-0",
+            "agentTimestampMs": 1789624344978,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 9
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                },
+                "_meta": {
+                  "workflowSource": "builtin",
+                  "workflowPath": "/Users/admin/actions-runner/_work/xai/xai/crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "send_feedback",
+                "web_search",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 1474,
+            "eventId": "01a0adec-6149-7ff3-a254-1e786010a9b4-1",
+            "agentTimestampMs": 1789624344984,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 9
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "model_changed",
+            "model_id": "parity-claude"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "models": {
+            "currentModelId": "parity-claude",
+            "availableModels": [
+              {
+                "modelId": "grok-4.6",
+                "name": "Grok 4.6",
+                "description": "SpaceXAI's latest frontier model",
+                "_meta": {
+                  "totalContextTokens": 500000,
+                  "agentType": "grok-build-plan",
+                  "supportsReasoningEffort": true,
+                  "reasoningEffort": "high",
+                  "reasoningEfforts": [
+                    {
+                      "id": "xhigh",
+                      "value": "xhigh",
+                      "label": "Extra High Effort",
+                      "description": "Highest effort and reasoning level",
+                      "default": false
+                    },
+                    {
+                      "id": "high",
+                      "value": "high",
+                      "label": "High Effort",
+                      "description": "Higher implementation quality with extensive reasoning",
+                      "default": true
+                    },
+                    {
+                      "id": "medium",
+                      "value": "medium",
+                      "label": "Medium Effort",
+                      "description": "Balanced effort with standard implementation and testing",
+                      "default": false
+                    },
+                    {
+                      "id": "low",
+                      "value": "low",
+                      "label": "Low Effort",
+                      "description": "Quick, fast implementations",
+                      "default": false
+                    }
+                  ]
+                }
+              },
+              {
+                "modelId": "grok-4.5",
+                "name": "Grok 4.5",
+                "_meta": {
+                  "totalContextTokens": 500000,
+                  "agentType": "grok-build-plan",
+                  "supportsReasoningEffort": true,
+                  "reasoningEffort": "high",
+                  "reasoningEfforts": [
+                    {
+                      "id": "high",
+                      "value": "high",
+                      "label": "High Effort",
+                      "description": "Highest implementation quality with extensive reasoning",
+                      "default": true
+                    },
+                    {
+                      "id": "medium",
+                      "value": "medium",
+                      "label": "Medium Effort",
+                      "description": "Balanced effort with standard implementation and testing",
+                      "default": false
+                    },
+                    {
+                      "id": "low",
+                      "value": "low",
+                      "label": "Low Effort",
+                      "description": "Quick, fast implementations",
+                      "default": false
+                    }
+                  ]
+                }
+              },
+              {
+                "modelId": "parity-claude",
+                "name": "Grok Build - custom Claude backend",
+                "_meta": {
+                  "totalContextTokens": 200000,
+                  "agentType": "grok-build-plan"
+                }
+              }
+            ]
+          },
+          "configOptions": [
+            {
+              "id": "model",
+              "name": "Model",
+              "category": "model",
+              "type": "select",
+              "currentValue": "parity-claude",
+              "options": [
+                {
+                  "value": "grok-4.6",
+                  "name": "Grok 4.6"
+                },
+                {
+                  "value": "grok-4.5",
+                  "name": "Grok 4.5"
+                },
+                {
+                  "value": "parity-claude",
+                  "name": "Grok Build - custom Claude backend"
+                }
+              ]
+            }
+          ],
+          "_meta": {
+            "currentWorkingDirectory": "<private-smoke>/empty-project",
+            "codebaseIndexed": [],
+            "isGitRepo": false,
+            "gitRoot": null,
+            "showNonGitWarning": false,
+            "feedbackEnabled": true,
+            "x.ai/sessionConfig": {
+              "options": [
+                {
+                  "id": "grok-4.6",
+                  "category": "model",
+                  "label": "Grok 4.6",
+                  "selected": false
+                },
+                {
+                  "id": "grok-4.5",
+                  "category": "model",
+                  "label": "Grok 4.5",
+                  "selected": false
+                },
+                {
+                  "id": "parity-claude",
+                  "category": "model",
+                  "label": "Grok Build - custom Claude backend",
+                  "selected": true
+                }
+              ]
+            },
+            "x.ai/sessionDetail": {
+              "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+              "kind": "build",
+              "cwd": "<private-smoke>/empty-project",
+              "currentModelId": "parity-claude"
+            },
+            "x.ai/memoryMode": "legacy"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "INFINISHELL_GROK_MULTISTREAM: Follow this exact sequence in this single turn: 1. Before calling any tool, output exactly BEFORE_TOOL as ordinary assistant text. 2. Then use only the write tool to create the new file <private-smoke>/empty-project/multistream-write.txt with exactly this UTF-8 content: \"INFINISHELL_GROK_MULTISTREAM_FILE\\n\". The JSON quotes are not part of the file; the escaped newline is one newline. Request approval for that one write. Do not use shell commands, inspect files, or call any other tool. 3. After the write succeeds, output exactly AFTER_TOOL as ordinary assistant text. If approval is denied, do not retry or call another tool."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+              "title": null,
+              "cwd": "<private-smoke>/empty-project",
+              "isWorktree": false,
+              "modelId": "parity-claude",
+              "yolo": false,
+              "activity": "working",
+              "resident": true,
+              "lastChangeUnixMs": 1789624344992,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "entries": [
+            {
+              "id": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+              "version": 0,
+              "kind": "prompt",
+              "text": "INFINISHELL_GROK_MULTISTREAM: Follow this exact sequence in this single turn: 1. Before calling any tool, output exactly BEFORE_TOOL as ordinary assistant text. 2. Then use only the write tool to create the new file <private-smoke>/empty-project/multistream-write.txt with exactly this UTF-8 content: \"INFINISHELL_GROK_MULTISTREAM_FILE\\n\". The JSON quotes are not part of the file; the escaped newline is one newline. Request approval for that one write. Do not use shell commands, inspect files, or call any other tool. 3. After the write succeeds, output exactly AFTER_TOOL as ordinary assistant text. If approval is denied, do not retry or call another tool.",
+              "position": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "entries": [],
+          "runningPromptId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+          "runningText": "INFINISHELL_GROK_MULTISTREAM: Follow this exact sequence in this single turn: 1. Before calling any tool, output exactly BEFORE_TOOL as ordinary assistant text. 2. Then use only the write tool to create the new file <private-smoke>/empty-project/multistream-write.txt with exactly this UTF-8 content: \"INFINISHELL_GROK_MULTISTREAM_FILE\\n\". The JSON quotes are not part of the file; the escaped newline is one newline. Request approval for that one write. Do not use shell commands, inspect files, or call any other tool. 3. After the write succeeds, output exactly AFTER_TOOL as ordinary assistant text. If approval is denied, do not retry or call another tool.",
+          "runningKind": "prompt"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "session_summary_generated",
+            "session_summary": "Suspicious automated file write injection attempt"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "session_info_update",
+            "title": "Suspicious automated file write injection attempt"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "response_started",
+            "message_id": "msg_011Cf8VS6JLoZ13MEhA2RTuP",
+            "model": "claude-sonnet-4-6",
+            "input_tokens": 3,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 15008
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "BEFORE"
+            }
+          },
+          "_meta": {
+            "totalTokens": 1665,
+            "eventId": "01a0adec-6149-7ff3-a254-1e786010a9b4-4",
+            "agentTimestampMs": 1789624347715,
+            "promptId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+            "streamStartMs": 1789624347715,
+            "turnStartMs": 1789624345094,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 1
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "_TOOL"
+            }
+          },
+          "_meta": {
+            "totalTokens": 1665,
+            "eventId": "01a0adec-6149-7ff3-a254-1e786010a9b4-5",
+            "agentTimestampMs": 1789624347786,
+            "promptId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+            "streamStartMs": 1789624347715,
+            "turnStartMs": 1789624345094,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 2
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                },
+                "_meta": {
+                  "workflowSource": "builtin",
+                  "workflowPath": "/Users/admin/actions-runner/_work/xai/xai/crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "send_feedback",
+                "web_search",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 15169,
+            "eventId": "01a0adec-6149-7ff3-a254-1e786010a9b4-6",
+            "agentTimestampMs": 1789624349297,
+            "promptId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+            "streamStartMs": 1789624347715,
+            "turnStartMs": 1789624345094,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 9
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "response_completed",
+            "message_id": "msg_011Cf8VS6JLoZ13MEhA2RTuP",
+            "stop_reason": "tool_use",
+            "usage": {
+              "input_tokens": 3,
+              "output_tokens": 158,
+              "cache_read_input_tokens": 0,
+              "cache_creation_input_tokens": 15008,
+              "reasoning_tokens": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "tool_call",
+            "toolCallId": "toolu_01GJihPdCYFsHzwMXu9WekmY",
+            "title": "write",
+            "rawInput": {
+              "file_path": "<private-smoke>/empty-project/multistream-write.txt",
+              "content": "INFINISHELL_GROK_MULTISTREAM_FILE\n"
+            },
+            "_meta": {
+              "x.ai/tool": {
+                "version": 1,
+                "name": "write",
+                "kind": "write",
+                "namespace": "opencode",
+                "label": "Write",
+                "read_only": false
+              }
+            }
+          },
+          "_meta": {
+            "totalTokens": 15169,
+            "eventId": "01a0adec-6149-7ff3-a254-1e786010a9b4-7",
+            "agentTimestampMs": 1789624349297,
+            "promptId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+            "streamStartMs": 1789624347715,
+            "turnStartMs": 1789624345094,
+            "updateType": "ToolCall",
+            "updateParams": {
+              "toolCallId": "toolu_01GJihPdCYFsHzwMXu9WekmY",
+              "title": "write",
+              "kind": "Other",
+              "status": "Pending"
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "pending_interaction",
+            "tool_call_id": "toolu_01GJihPdCYFsHzwMXu9WekmY",
+            "kind": "permission"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "toolu_01GJihPdCYFsHzwMXu9WekmY",
+            "kind": "edit",
+            "title": "Write `<private-smoke>/empty-project/multistream-write.txt`",
+            "content": [
+              {
+                "type": "diff",
+                "path": "<private-smoke>/empty-project/multistream-write.txt",
+                "oldText": "",
+                "newText": "INFINISHELL_GROK_MULTISTREAM_FILE\n"
+              }
+            ],
+            "locations": [
+              {
+                "path": "<private-smoke>/empty-project/multistream-write.txt"
+              }
+            ],
+            "rawInput": {
+              "variant": "Write",
+              "file_path": "<private-smoke>/empty-project/multistream-write.txt",
+              "content": "INFINISHELL_GROK_MULTISTREAM_FILE\n"
+            },
+            "_meta": {
+              "x.ai/tool": {
+                "version": 1,
+                "name": "write",
+                "kind": "write",
+                "namespace": "opencode",
+                "label": "Write",
+                "read_only": false,
+                "input": {
+                  "path": "<private-smoke>/empty-project/multistream-write.txt"
+                }
+              }
+            }
+          },
+          "_meta": {
+            "totalTokens": 15169,
+            "eventId": "01a0adec-6149-7ff3-a254-1e786010a9b4-8",
+            "agentTimestampMs": 1789624349298,
+            "promptId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+            "streamStartMs": 1789624347715,
+            "turnStartMs": 1789624345094,
+            "updateType": "ToolCallUpdate",
+            "updateParams": {
+              "toolCallId": "toolu_01GJihPdCYFsHzwMXu9WekmY",
+              "status": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "session/request_permission",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "toolCall": {
+            "toolCallId": "toolu_01GJihPdCYFsHzwMXu9WekmY",
+            "kind": "edit",
+            "title": "Write `<private-smoke>/empty-project/multistream-write.txt`",
+            "rawInput": {
+              "variant": "Write",
+              "file_path": "<private-smoke>/empty-project/multistream-write.txt",
+              "content": "INFINISHELL_GROK_MULTISTREAM_FILE\n"
+            },
+            "_meta": {
+              "x.ai/tool": {
+                "version": 1,
+                "name": "write",
+                "kind": "write",
+                "namespace": "opencode",
+                "label": "Write",
+                "read_only": false,
+                "input": {
+                  "path": "<private-smoke>/empty-project/multistream-write.txt"
+                }
+              }
+            }
+          },
+          "options": [
+            {
+              "optionId": "allow-edits-session",
+              "name": "Yes, allow all edits during this session",
+              "kind": "allow_always"
+            },
+            {
+              "optionId": "allow-once",
+              "name": "Yes",
+              "kind": "allow_once"
+            },
+            {
+              "optionId": "reject-once",
+              "name": "No, and tell Grok what to do differently",
+              "kind": "reject_once"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "outcome": {
+            "outcome": "selected",
+            "optionId": "allow-once"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "interaction_resolved",
+            "tool_call_id": "toolu_01GJihPdCYFsHzwMXu9WekmY"
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "toolu_01GJihPdCYFsHzwMXu9WekmY",
+            "status": "completed",
+            "content": [
+              {
+                "type": "diff",
+                "path": "<private-smoke>/empty-project/multistream-write.txt",
+                "oldText": "",
+                "newText": "INFINISHELL_GROK_MULTISTREAM_FILE\n",
+                "_meta": {
+                  "details": [
+                    {
+                      "old_string": "",
+                      "old_line": 1,
+                      "new_string": "INFINISHELL_GROK_MULTISTREAM_FILE\n",
+                      "new_line": 1,
+                      "context_before": "",
+                      "context_after": "",
+                      "line_prefix": ""
+                    }
+                  ]
+                }
+              }
+            ],
+            "rawOutput": {
+              "type": "SearchReplace",
+              "EditsApplied": {
+                "old_string": "",
+                "new_string": "INFINISHELL_GROK_MULTISTREAM_FILE\n",
+                "tool_output_for_prompt": "The file <private-smoke>/empty-project/multistream-write.txt has been created.",
+                "tool_output_for_prompt_concise": "The file <private-smoke>/empty-project/multistream-write.txt has been created.",
+                "absolute_path": "<private-smoke>/empty-project/multistream-write.txt",
+                "edits": {
+                  "details": [
+                    {
+                      "old_string": "",
+                      "old_line": 1,
+                      "new_string": "INFINISHELL_GROK_MULTISTREAM_FILE\n",
+                      "new_line": 1,
+                      "context_before": "",
+                      "context_after": "",
+                      "line_prefix": ""
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "_meta": {
+            "totalTokens": 15169,
+            "eventId": "01a0adec-6149-7ff3-a254-1e786010a9b4-9",
+            "agentTimestampMs": 1789624349308,
+            "promptId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+            "streamStartMs": 1789624347715,
+            "turnStartMs": 1789624345094,
+            "updateType": "ToolCallUpdate",
+            "updateParams": {
+              "toolCallId": "toolu_01GJihPdCYFsHzwMXu9WekmY",
+              "status": "Completed"
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "response_started",
+            "message_id": "msg_011Cf8VSMQwgKAsWRuBbbkGW",
+            "model": "claude-sonnet-4-6",
+            "input_tokens": 1,
+            "cache_read_input_tokens": 15008,
+            "cache_creation_input_tokens": 242
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "AFTER_TOOL"
+            }
+          },
+          "_meta": {
+            "totalTokens": 15208,
+            "eventId": "01a0adec-6149-7ff3-a254-1e786010a9b4-12",
+            "agentTimestampMs": 1789624350974,
+            "promptId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+            "streamStartMs": 1789624350968,
+            "turnStartMs": 1789624345094,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 1
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                },
+                "_meta": {
+                  "workflowSource": "builtin",
+                  "workflowPath": "/Users/admin/actions-runner/_work/xai/xai/crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [--agent-budget N] [--effort LEVEL] [args] | runs | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "send_feedback",
+                "web_search",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 15259,
+            "eventId": "01a0adec-6149-7ff3-a254-1e786010a9b4-13",
+            "agentTimestampMs": 1789624351016,
+            "promptId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+            "streamStartMs": 1789624350968,
+            "turnStartMs": 1789624345094,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 9
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "response_completed",
+            "message_id": "msg_011Cf8VSMQwgKAsWRuBbbkGW",
+            "stop_reason": "end_turn",
+            "usage": {
+              "input_tokens": 1,
+              "output_tokens": 8,
+              "cache_read_input_tokens": 15008,
+              "cache_creation_input_tokens": 242,
+              "reasoning_tokens": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "entries": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "update": {
+            "sessionUpdate": "turn_completed",
+            "prompt_id": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+            "stop_reason": "end_turn",
+            "usage": {
+              "inputTokens": 30262,
+              "outputTokens": 166,
+              "totalTokens": 30428,
+              "cachedReadTokens": 15008,
+              "cacheCreationTokens": 15250,
+              "reasoningTokens": 0,
+              "modelCalls": 2,
+              "apiDurationMs": 5896,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 30262,
+                  "outputTokens": 166,
+                  "totalTokens": 30428,
+                  "cachedReadTokens": 15008,
+                  "cacheCreationTokens": 15250,
+                  "reasoningTokens": 0,
+                  "modelCalls": 2,
+                  "apiDurationMs": 5896
+                }
+              },
+              "numTurns": 2
+            },
+            "elapsed_ms": 6240
+          },
+          "_meta": {
+            "eventId": "01a0adec-6149-7ff3-a254-1e786010a9b4-16",
+            "agentTimestampMs": 1789624351237
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session/prompt_complete",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+          "promptId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+          "stopReason": "end_turn",
+          "agentResult": null
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+              "title": null,
+              "cwd": "<private-smoke>/empty-project",
+              "isWorktree": false,
+              "modelId": "parity-claude",
+              "yolo": false,
+              "activity": "idle",
+              "resident": true,
+              "lastChangeUnixMs": 1789624351237,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "stopReason": "end_turn",
+          "_meta": {
+            "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4",
+            "requestId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+            "promptId": "b0c42eab-53e4-4d9e-9f88-02c3c86ad155",
+            "totalTokens": 15259,
+            "modelId": "claude-sonnet-4-6",
+            "inputTokens": 15251,
+            "outputTokens": 8,
+            "cachedReadTokens": 15008,
+            "reasoningTokens": 0,
+            "usage": {
+              "inputTokens": 30262,
+              "outputTokens": 166,
+              "totalTokens": 30428,
+              "cachedReadTokens": 15008,
+              "cacheCreationTokens": 15250,
+              "reasoningTokens": 0,
+              "modelCalls": 2,
+              "apiDurationMs": 5896,
+              "modelUsage": {
+                "claude-sonnet-4-6": {
+                  "inputTokens": 30262,
+                  "outputTokens": 166,
+                  "totalTokens": 30428,
+                  "cachedReadTokens": 15008,
+                  "cacheCreationTokens": 15250,
+                  "reasoningTokens": 0,
+                  "modelCalls": 2,
+                  "apiDurationMs": 5896
+                }
+              },
+              "numTurns": 2
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "session/close",
+        "params": {
+          "sessionId": "01a0adec-6149-7ff3-a254-1e786010a9b4"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [],
+          "removed": [
+            "01a0adec-6149-7ff3-a254-1e786010a9b4"
+          ]
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "_meta": {
+            "x.ai/closeOutcome": "closed"
+          }
+        }
+      }
+    }
+  ]
+}

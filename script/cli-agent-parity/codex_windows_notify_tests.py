@@ -1,6 +1,7 @@
 """Windows 通知候选的编码与 Unix 保持回归；原生控制台必须由 ConPTY 探针验收。"""
 
 import base64
+import json
 import os
 from pathlib import Path
 import re
@@ -12,13 +13,53 @@ from unittest.mock import patch
 
 import codex_windows_notify as candidate
 import tmux_notification_tests as unix_probe
+from codex_windows_hook_command import SCRIPTS, encode
 
 ASSETS = Path(__file__).resolve().parents[2] / 'app/assets/bundled/cli-agent-plugins'
 
 
 class NotifyCandidateTests(unittest.TestCase):
     def original(self):
-        return (ASSETS / 'codex/scripts/warp-notify.sh').read_text(encoding='utf-8')
+        return (ASSETS / 'codex/revisions/rev3/scripts/warp-notify.sh').read_text(encoding='utf-8')
+
+    def test_rev4_resources_match_reviewable_candidate_and_five_native_commands(self):
+        self.assertEqual((ASSETS / 'codex/scripts/warp-notify.sh').read_text(encoding='utf-8'),
+                         candidate.candidate_notify(self.original()).rstrip("\n") + "\n")
+        hooks = json.loads((ASSETS / 'codex/hooks/hooks.json').read_text())['hooks']
+        handlers = [handler for groups in hooks.values() for group in groups for handler in group['hooks']]
+        self.assertEqual(len(handlers), 5)
+        self.assertEqual({handler['commandWindows'] for handler in handlers}, {encode(name) for name in SCRIPTS})
+        self.assertNotIn('continue', json.dumps(hooks))
+        for name in ('hooks/hooks.json', 'scripts/warp-notify.sh', 'scripts/on-prompt-submit.sh'):
+            self.assertEqual((ASSETS / 'codex' / name).read_bytes(),
+                             (ASSETS / 'codex/source/plugins/warp' / name).read_bytes())
+        metadata = json.loads((ASSETS / 'codex/PATCH_METADATA.json').read_text())
+        self.assertEqual(metadata['patch_revision'], 4)
+        self.assertFalse(metadata['windows_product_enabled'])
+        self.assertFalse(metadata['windows_uninstrumented_hooks_verified'])
+
+    @unittest.skipUnless(os.name == 'posix', 'Unix 兼容分支由真实 Bash/jq 回放')
+    def test_unix_query_keeps_lf_crlf_without_requiring_jq_binary_option(self):
+        real_jq = shutil.which('jq')
+        self.assertIsNotNone(real_jq)
+        with tempfile.TemporaryDirectory(prefix='rev4-query-') as temporary:
+            root = Path(temporary)
+            scripts = root / 'scripts'
+            shutil.copytree(ASSETS / 'codex/source/plugins/warp/scripts', scripts)
+            (scripts / 'warp-notify.sh').write_text('#!/bin/bash\nprintf "%s" "$2"\n')
+            (scripts / 'warp-notify.sh').chmod(0o755)
+            shim = root / 'bin'
+            shim.mkdir()
+            (shim / 'jq').write_text('#!/bin/bash\nfor arg do [ "$arg" != "--binary" ] || exit 93; done\nexec "$REV4_REAL_JQ" "$@"\n')
+            (shim / 'jq').chmod(0o755)
+            environment = {**os.environ, 'PATH': str(shim) + os.pathsep + os.environ['PATH'],
+                           'REV4_REAL_JQ': real_jq, 'WARP_CLI_AGENT_PROTOCOL_VERSION': '1',
+                           'WARP_CLIENT_VERSION': 'rev4-test'}
+            for prompt in ('中文\nEnglish', '中文\r\nEnglish', r'字面 \r\n'):
+                result = subprocess.run(['bash', str(scripts / 'on-prompt-submit.sh')],
+                    input=json.dumps({'prompt': prompt, 'session_id': 'session', 'turn_id': 'turn', 'cwd': str(root)}).encode(),
+                    env=environment, capture_output=True, check=True, timeout=10)
+                self.assertEqual(json.loads(result.stdout)['query'], prompt)
 
     def test_encoded_program_roundtrip_and_bash_syntax(self):
         body = candidate.candidate_notify(self.original())

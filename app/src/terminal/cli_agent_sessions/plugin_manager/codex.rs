@@ -128,6 +128,10 @@ impl CliAgentPluginManager for CodexPluginManager {
         if !FeatureFlag::CodexPlugin.is_enabled() || !self.is_installed() {
             return NativeAuthorizationStatus::NotApplicable;
         }
+        if cfg!(windows) {
+            // rev4 的正式 Windows 五 hook 摘要尚待采集，不能采用 Unix 配置推断已授权。
+            return NativeAuthorizationStatus::Unknown;
+        }
         match codex_home_dir() {
             Ok(home) => super::codex_hook_trust::status(&home),
             Err(_) => NativeAuthorizationStatus::Unknown,

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 import subprocess
 import tempfile
@@ -18,6 +19,197 @@ from codex_windows_hook_command import (PREFIX, SCRIPTS, cmd_line, encode, sourc
 from codex_windows_hook_inputs import (CODEX_COMMIT, RELEASE_ASSETS, fetch_file, plugin_base,
                                        regular_file, sha256, verify_codex, verify_plugin)
 import probe_codex_windows_hooks as native_probe
+from codex_windows_formal import (EVENTS, authorize_config, exact_plugin_tree, formal_transport_expectations,
+                                  probe_bundle, restore_config, split_trigger_hooks, validate_native_hooks)
+
+
+class FormalResourceTests(unittest.TestCase):
+    def fixtures(self):
+        hooks = [{'key': 'test-only:' + event, 'eventName': event, 'handlerType': 'command',
+                  'command': encode(script), 'timeoutSec': 600, 'source': 'plugin',
+                  'pluginId': 'warp@codex-warp', 'currentHash': 'sha256:' + hashlib.sha256(event.encode()).hexdigest(),
+                  'enabled': True, 'trustStatus': 'untrusted'} for event, script in zip(EVENTS, SCRIPTS)]
+        blocker = dict(hooks[1], key='test-only:extra-blocker', command='test-only-blocker')
+        return hooks, hooks + [blocker], blocker['command']
+
+    def test_formal_and_old_candidate_have_separate_immutable_baselines(self):
+        repo = Path(__file__).resolve().parents[2]
+        current, replacements, source_hash = probe_bundle(repo, 'formal')
+        old, old_replacements, old_source_hash = probe_bundle(repo, 'candidate')
+        self.assertEqual((current['patch_revision'], old['patch_revision']), (4, 3))
+        self.assertEqual(len(source_hash), 64)
+        self.assertIsNone(old_source_hash)
+        self.assertNotIn('scripts/on-prompt-submit.sh', old_replacements)
+        self.assertNotEqual(replacements['scripts/warp-notify.sh'], old_replacements['scripts/warp-notify.sh'])
+        plugin = repo / 'app/assets/bundled/cli-agent-plugins/codex/source/plugins/warp'
+        self.assertEqual(len(exact_plugin_tree(plugin, current)), 10)
+        with self.assertRaises(ValueError):
+            exact_plugin_tree(plugin, old)
+        with self.assertRaises(ValueError):
+            probe_bundle(repo, 'unknown')
+
+    def test_formal_full_tree_rejects_missing_extra_and_modified_files(self):
+        repo = Path(__file__).resolve().parents[2]
+        metadata, _, _ = probe_bundle(repo, 'formal')
+        source = repo / 'app/assets/bundled/cli-agent-plugins/codex/source/plugins/warp'
+        for change in ('missing', 'extra', 'modified'):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temporary:
+                target = Path(temporary) / 'plugin'
+                shutil.copytree(source, target)
+                if change == 'missing':
+                    (target / 'scripts/on-stop.sh').unlink()
+                elif change == 'extra':
+                    (target / 'test-marker.sh').write_text('changed')
+                else:
+                    (target / 'hooks/hooks.json').write_text('{}')
+                with self.assertRaises(ValueError):
+                    exact_plugin_tree(target, metadata)
+
+    def test_old_candidate_is_reproducible_after_formal_resources_are_updated(self):
+        repo = Path(__file__).resolve().parents[2]
+        bundle = repo / 'app/assets/bundled/cli-agent-plugins/codex'
+        metadata, replacements, _ = probe_bundle(repo, 'candidate')
+        with tempfile.TemporaryDirectory() as temporary:
+            plugin = Path(temporary) / 'plugin'
+            shutil.copytree(bundle / 'source/plugins/warp', plugin)
+            for name, contents in replacements.items():
+                (plugin / name).write_bytes(contents)
+            (plugin / 'scripts/on-prompt-submit.sh').write_bytes(
+                (bundle / 'revisions/rev3/scripts/on-prompt-submit.sh').read_bytes())
+            self.assertEqual(len(exact_plugin_tree(plugin, metadata)), 10)
+            evidence = {}
+            native_probe.instrument_candidate(plugin, evidence)
+            self.assertTrue((plugin / 'scripts/on-prompt-submit.sh.fixture-original').is_file())
+            self.assertIn('query_binary_candidate', evidence)
+            self.assertIn('notification_transport_candidate', evidence)
+            self.assertFalse(evidence['query_binary_candidate']['newline_normalization_applied'])
+            # 二次变换必须失败，正式模式只能绕过候选变换，不能吞掉它的固定基线检查。
+            with self.assertRaises(ValueError):
+                native_probe.instrument_candidate(plugin, {})
+
+    def test_sixth_hook_never_becomes_a_formal_registered_hash(self):
+        formal, runtime, blocker = self.fixtures()
+        result = split_trigger_hooks(formal, runtime, blocker)
+        self.assertEqual(result['formal_hooks'], formal)
+        self.assertEqual(result['test_only_blocker'], runtime[-1])
+        self.assertEqual(result['native_events_verified'], [])
+        self.assertEqual(result['native_events_not_verified'], list(EVENTS))
+        for changed in (runtime[:-1], runtime + [runtime[-1]], formal + [dict(runtime[-1], key=formal[0]['key'])]):
+            with self.subTest(count=len(changed)), self.assertRaises(ValueError):
+                split_trigger_hooks(formal, changed, blocker)
+        with self.assertRaises(ValueError):
+            split_trigger_hooks(runtime, runtime, blocker)
+
+    def test_blocker_cannot_hide_changed_formal_command_hash_or_timeout(self):
+        for field, value in (('command', 'different'), ('currentHash', 'sha256:' + '0' * 64),
+                             ('timeoutSec', 1), ('eventName', 'stop'), ('key', 'other')):
+            formal, runtime, blocker = self.fixtures()
+            runtime = json.loads(json.dumps(runtime))
+            runtime[0][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                split_trigger_hooks(formal, runtime, blocker)
+
+    def test_registration_requires_native_windows_command_and_exact_private_cache(self):
+        formal, _, _ = self.fixtures()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            plugin = root / 'source'
+            cache = root / 'home/cache'
+            for path in (plugin, cache):
+                (path / 'hooks').mkdir(parents=True)
+                (path / 'hooks/hooks.json').write_text('{}')
+            for hook in formal:
+                hook['sourcePath'] = str(cache / 'hooks/hooks.json')
+            commands = {encode(script) for script in SCRIPTS}
+            self.assertEqual(validate_native_hooks(formal, root / 'home', plugin, commands, 'untrusted'), cache)
+            with self.assertRaises(ValueError):
+                validate_native_hooks(formal, root / 'different-home', plugin, commands, 'untrusted')
+            for field, value in (('trustStatus', 'trusted'), ('currentHash', 'unknown'),
+                                 ('command', 'bash old-posix'), ('enabled', False), ('sourcePath', str(root / 'outside'))):
+                changed = json.loads(json.dumps(formal))
+                changed[0][field] = value
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    validate_native_hooks(changed, root / 'home', plugin, commands, 'untrusted')
+            (cache / 'uncontrolled').write_text('extra')
+            with self.assertRaises(ValueError):
+                validate_native_hooks(formal, root / 'home', plugin, commands, 'untrusted')
+
+    def test_private_trust_transaction_restores_exact_bytes_and_preserves_concurrent_edit(self):
+        formal, _, _ = self.fixtures()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'config.toml'
+            original = '# 用户原文\r\nmodel = "fixed"\r\n'.encode('utf-8')
+            path.write_bytes(original)
+            before, written = authorize_config(path, formal)
+            self.assertEqual(before, original)
+            self.assertTrue(written.startswith(original))
+            receipt = {}
+            restore_config(path, before, written, receipt)
+            self.assertEqual(path.read_bytes(), original)
+            self.assertTrue(receipt['restored'])
+            before, written = authorize_config(path, formal)
+            changed = written + b'# concurrent user edit\n'
+            path.write_bytes(changed)
+            receipt = {}
+            with self.assertRaises(ValueError):
+                restore_config(path, before, written, receipt)
+            self.assertEqual(path.read_bytes(), changed)
+            self.assertTrue(receipt['concurrent_change_detected'])
+            self.assertFalse(receipt['restored'])
+
+    def test_formal_expectations_preserve_original_text_without_marker(self):
+        for prompt in native_probe.HOOK_PROMPTS:
+            result = formal_transport_expectations(Path("C:/中文 ' $()"), 'session', 'turn', prompt)
+            self.assertEqual(result['prompt'].encode(), prompt.encode())
+            self.assertFalse(result['query_normalization_applied'])
+            self.assertEqual(result['provenance'], 'app_server_request_response')
+
+    def test_cleanup_requires_success_eof_and_rollback_and_never_swallows_permission_error(self):
+        def case():
+            return {'passed': True, 'mode': 'candidate', 'config_rollback': {'restored': True},
+                    'process_closes': [{'root_exited_naturally': True, 'root_exit_code': 0,
+                                        'output_readers_eof': True} for _ in range(2)]}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'owned-private'
+            root.mkdir()
+            (root / 'fixture').write_text('private')
+            for field in ('passed', 'eof', 'rollback'):
+                changed = case()
+                if field == 'passed':
+                    changed['passed'] = False
+                elif field == 'eof':
+                    changed['process_closes'][0]['output_readers_eof'] = False
+                else:
+                    changed['config_rollback']['restored'] = False
+                receipt = {}
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    native_probe.cleanup_private_cases(root, [changed], receipt)
+                self.assertFalse(receipt['attempted'])
+                self.assertTrue(root.is_dir())
+            failure = PermissionError(13, 'test-only permission failure', str(root / 'fixture'))
+            receipt = {}
+            with patch.object(native_probe.shutil, 'rmtree', side_effect=failure), self.assertRaises(PermissionError) as caught:
+                native_probe.cleanup_private_cases(root, [case()], receipt)
+            self.assertIs(caught.exception, failure)
+            self.assertEqual(receipt['failure']['filename'], str(root / 'fixture'))
+            self.assertFalse(receipt['deleted'])
+            self.assertTrue(root.is_dir())
+            receipt = {}
+            native_probe.cleanup_private_cases(root, [case()], receipt)
+            self.assertTrue(receipt['deleted'])
+            self.assertFalse(root.exists())
+
+    def test_close_receipt_requires_actual_process_exit_and_both_output_readers(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            events, evidence = [], {}
+            recorder = native_probe.NativeRecorder([sys.executable, '-c',
+                'import sys; sys.stdin.read(); print("{}")'], os.environ.copy(), Path(temporary), events)
+            native_probe.close_case(recorder, evidence)
+            receipt = evidence['process_closes'][0]
+            self.assertTrue(receipt['root_exited_naturally'])
+            self.assertTrue(receipt['output_readers_eof'])
+            self.assertEqual(receipt['root_exit_code'], 0)
+            self.assertFalse(receipt['all_descendants_job_verified'])
 
 
 class NativeCompletionTests(unittest.TestCase):
@@ -112,7 +304,7 @@ class NativeCompletionTests(unittest.TestCase):
 
     def test_binary_query_candidate_changes_only_the_jq_output_mode(self):
         original = (Path(__file__).resolve().parents[2] /
-            'app/assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/on-prompt-submit.sh').read_text(encoding='utf-8')
+            'app/assets/bundled/cli-agent-plugins/codex/revisions/rev3/scripts/on-prompt-submit.sh').read_text(encoding='utf-8')
         candidate, evidence = native_probe.binary_query_candidate(original)
         self.assertEqual(candidate.replace('jq --binary -r', 'jq -r'), original)
         self.assertEqual(evidence['original_sha256'], hashlib.sha256(original.encode()).hexdigest())
@@ -122,7 +314,7 @@ class NativeCompletionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             native_probe.binary_query_candidate(candidate)
 
-    @unittest.skipUnless(os.name == 'nt', '原生 jq 文本与二进制模式边界仅在 Windows 验证')
+    @unittest.skipUnless(os.name == 'nt', '只验证 Windows 原生 jq 的 --binary 输出；Unix jq 无需支持该参数')
     def test_native_jq_binary_boundary_preserves_original_lf_crlf_and_literal_escapes(self):
         evidence = native_probe.verify_jq_newline_boundary(os.environ.copy())
         self.assertEqual([case['input_line_ending'] for case in evidence['cases']], ['LF', 'CRLF'])

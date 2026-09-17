@@ -1,5 +1,5 @@
 {
-  "patch_revision": 3,
+  "patch_revision": 4,
   "upstream_repository": "https://github.com/warpdotdev/codex-warp",
   "upstream_plugin": "warp",
   "compatible_bases": [
@@ -38,13 +38,20 @@
     },
     "hooks/hooks.json": {
       "upstream_sha256": "79b5f2bc55848ba1bc3cb7ddb9a4979249681b9b3719420752a512bb95881cdc",
-      "replacement_sha256": "b4c53714e54207fb9dc760b61ba2c977734e141396c90827e03499142e7bda53",
+      "replacement_sha256": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
       "mode": "0644"
     },
     "scripts/warp-notify.sh": {
       "upstream_sha256": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366",
-      "replacement_sha256": "144f0ce32c629c920ee6d6c164f1fcbd36aaac0429c5348087a33a382d75a050",
+      "replacement_sha256": "b0b75257e90f432d43848f051329664376ee8b662e8531ea8ab3c42d62c9017c",
+      "mode": "0755"
+    },
+    "scripts/on-prompt-submit.sh": {
+      "upstream_sha256": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+      "replacement_sha256": "68051813eb32d83faf5e3c33f2e49111e1b469f23afa220648b35a882d9cb082",
       "mode": "0755"
     }
-  }
+  },
+  "windows_product_enabled": false,
+  "windows_uninstrumented_hooks_verified": false
 }

@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "cli": "codex-cli 0.147.0",
+  "scope": "macos_native_plugin_rev3_to_rev4_source_migration",
+  "credentials_provided": false,
+  "model_commands_sent": 0,
+  "native_hook_lifecycle_verified": false,
+  "previous_source_unchanged": true,
+  "hook_trust_unchanged": true,
+  "orchestration_disabled_preserved": true,
+  "rev4_source_verified": true,
+  "old_cache_retained": true,
+  "transaction_phase": "verified",
+  "authentication_file_created": false,
+  "previous_installation": "controlled_exact_rev3_fixture",
+  "source_metadata_sha256": "dc5754dbf7cc3a69ab5261216073bfb711c923082bf8f2b6a6bd5b391c49fa96",
+  "rust_installer_verified": false
+}
