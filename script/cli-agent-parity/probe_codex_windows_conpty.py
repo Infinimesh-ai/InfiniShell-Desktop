@@ -26,6 +26,71 @@ MAX_OUTPUT = 16 * 1024 * 1024
 OSC = re.compile(rb'\x1b\]777;notify;warp://cli-agent;(.*?)(?:\x07|\x1b\\)', re.DOTALL)
 
 
+def shell_diagnostic_source():
+    # 只在私有 BASH_ENV 中观察真实入口；不替换发布脚本、不读取 hook stdin、不写终端。
+    return r'''case "$0" in
+    */on-session-start.sh.fixture-original|*/on-prompt-submit.sh.fixture-original|*/warp-notify.sh)
+    (
+        set +e
+        diagnostic_id=$BASHPID
+        script_dir=${0%/*}
+        gate=unavailable
+        if [ -f "$script_dir/should-use-structured.sh" ]; then
+            source "$script_dir/should-use-structured.sh"
+            if should_use_structured; then gate=allowed; else gate=rejected; fi
+        fi
+        stdin_tty=false; stdout_tty=false; stderr_tty=false
+        [ -t 0 ] && stdin_tty=true
+        [ -t 1 ] && stdout_tty=true
+        [ -t 2 ] && stderr_tty=true
+        tty_error=$( (exec 9>/dev/tty) 2>&1)
+        tty_status=$?
+        windows_pid=$(cat "/proc/$$/winpid" 2>/dev/null)
+        system=$(uname -s 2>/dev/null)
+        notification=null
+        if [[ "$0" == */warp-notify.sh ]]; then
+            notification=$(printf '%s' "${2:-null}" | jq -c '
+                if type == "object" then {v,agent,event,session_id,turn_id} else null end' 2>/dev/null)
+            [ -n "$notification" ] || notification=null
+        fi
+        set -o noclobber
+        jq -nc --arg script "$0" --arg case_dir "${INFINISHELL_HOOK_PROBE_CASE:-}" \
+            --arg gate "$gate" --arg protocol "${WARP_CLI_AGENT_PROTOCOL_VERSION:-}" \
+            --arg client "${WARP_CLIENT_VERSION:-}" --arg bash_version "$BASH_VERSION" \
+            --arg system "$system" --arg msys_pid "$$" --arg windows_pid "$windows_pid" \
+            --argjson stdin_tty "$stdin_tty" --argjson stdout_tty "$stdout_tty" \
+            --argjson stderr_tty "$stderr_tty" --argjson tty_open_status "$tty_status" \
+            --arg tty_open_error "$tty_error" --argjson notification "$notification" \
+            '{version:1,script:$script,case_dir:$case_dir,structured_gate:$gate,
+              protocol:$protocol,client:$client,bash_version:$bash_version,system:$system,
+              msys_pid:$msys_pid,windows_pid:$windows_pid,stdin_tty:$stdin_tty,
+              stdout_tty:$stdout_tty,stderr_tty:$stderr_tty,tty_open_status:$tty_open_status,
+              tty_open_error:$tty_open_error,notification:$notification}' \
+            > "$INFINISHELL_CONPTY_DIAGNOSTICS_DIR/$diagnostic_id.json"
+    ) >/dev/null 2>/dev/null
+    ;;
+esac
+'''
+
+
+def read_shell_diagnostics(directory):
+    files = sorted(directory.glob('*.json'))
+    require(len(files) <= 64, '实际通知入口诊断超过固定上限')
+    records = []
+    for path in files:
+        require(path.is_file() and not path.is_symlink() and path.stat().st_size <= 65536,
+                '实际通知入口诊断不是受控的小文件')
+        value = json.loads(path.read_text(encoding='utf-8'))
+        require(isinstance(value, dict) and value.get('version') == 1
+                and value.get('structured_gate') in ('allowed', 'rejected', 'unavailable')
+                and type(value.get('tty_open_status')) is int
+                and all(type(value.get(key)) is bool for key in ('stdin_tty', 'stdout_tty', 'stderr_tty'))
+                and (value.get('notification') is None or isinstance(value['notification'], dict)),
+                '实际通知入口诊断字段不符合契约')
+        records.append(value)
+    return records
+
+
 def notifications(raw):
     return [json.loads(match.group(1).decode('utf-8', errors='strict')) for match in OSC.finditer(raw)]
 
@@ -168,6 +233,11 @@ def run_driver(configuration):
               'native_codex_attachments': [], 'credentials_provided': False}
     stop = threading.Event()
     server = None
+    shell_diagnostics = Path(config['private_dir']) / 'shell-diagnostics'
+    shell_diagnostics.mkdir(parents=True)
+    bash_environment = shell_diagnostics / 'observe-entry.sh'
+    bash_environment.write_text(shell_diagnostic_source(), encoding='utf-8', newline='\n')
+    report['shell_diagnostics_source_sha256'] = sha256(bash_environment)
     observed, observation_errors = {}, []
 
     def observe():
@@ -206,6 +276,8 @@ def run_driver(configuration):
         native.NativeRecorder = AttachedRecorder
         environment = windows_environment(Path(config['bash']), Path(config['jq']))
         environment.update(WARP_CLI_AGENT_PROTOCOL_VERSION='1', WARP_CLIENT_VERSION='conpty-probe', TERM_PROGRAM='WarpTerminal')
+        environment.update(BASH_ENV=bash_environment.as_posix(),
+                           INFINISHELL_CONPTY_DIAGNOSTICS_DIR=shell_diagnostics.as_posix())
         server = ThreadingHTTPServer(('127.0.0.1', 0), RejectModel)
         server_thread = threading.Thread(target=server.serve_forever, daemon=True)
         server_thread.start()
@@ -233,6 +305,10 @@ def run_driver(configuration):
         report['attachments'] = list(observed.values())
         report['attachment_observation_errors'] = observation_errors
         report['attachment_snapshot_is_not_complete_process_history'] = True
+        try:
+            report['shell_diagnostics'] = read_shell_diagnostics(shell_diagnostics)
+        except Exception as error:
+            report['shell_diagnostics_error'] = str(error)
         Path(config['native_report']).write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 

@@ -1,0 +1,245 @@
+{
+  "model_commands_sent": 0,
+  "credentials_provided": false,
+  "fresh_initialize_queries": [
+    {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "bcddd27d-3d64-4317-8a31-8bb5ae231dfc",
+        "response": {
+          "commands": {
+            "catalog_omitted": true,
+            "count": 42
+          },
+          "agents": {
+            "catalog_omitted": true,
+            "count": 5
+          },
+          "output_style": "default",
+          "available_output_styles": [
+            "default",
+            "Proactive",
+            "Concise",
+            "Explanatory",
+            "Learning"
+          ],
+          "user_output_styles_dir": "<isolated-probe>/claude/output-styles",
+          "models": {
+            "catalog_omitted": true,
+            "count": 4
+          },
+          "account": {
+            "tokenSource": "none",
+            "apiProvider": "firstParty"
+          },
+          "pid": 35159,
+          "current_permission_mode": "default",
+          "analytics_disabled": true,
+          "remote_control_auto_enable": false,
+          "remote_control_auto_connect_default": false,
+          "remote_control_available": true,
+          "remote_control_auto_on_by_default": false,
+          "ide_rc_auto_enable_gate": false,
+          "fast_mode_state": "off",
+          "fast_mode_disabled_reason": "sdk_opt_in_required",
+          "session_state": "idle"
+        },
+        "pending_permission_requests": [],
+        "pending_user_dialog_requests": []
+      }
+    },
+    {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "aa8271d5-3552-4617-a033-ac70aae3c590",
+        "response": {
+          "commands": {
+            "catalog_omitted": true,
+            "count": 42
+          },
+          "agents": {
+            "catalog_omitted": true,
+            "count": 5
+          },
+          "output_style": "default",
+          "available_output_styles": [
+            "default",
+            "Proactive",
+            "Concise",
+            "Explanatory",
+            "Learning"
+          ],
+          "user_output_styles_dir": "<isolated-probe>/claude/output-styles",
+          "models": {
+            "catalog_omitted": true,
+            "count": 4
+          },
+          "account": {
+            "tokenSource": "none",
+            "apiProvider": "firstParty"
+          },
+          "pid": 35159,
+          "current_permission_mode": "default",
+          "analytics_disabled": true,
+          "remote_control_auto_enable": false,
+          "remote_control_auto_connect_default": false,
+          "remote_control_available": true,
+          "remote_control_auto_on_by_default": false,
+          "ide_rc_auto_enable_gate": false,
+          "fast_mode_state": "off",
+          "fast_mode_disabled_reason": "sdk_opt_in_required",
+          "session_state": "idle"
+        },
+        "pending_permission_requests": [],
+        "pending_user_dialog_requests": []
+      }
+    }
+  ],
+  "alive_before_stdin_eof": true,
+  "stdin_eof_exited_within_5s": true,
+  "exit_code_before_cleanup": 0,
+  "eof_elapsed_ms": 9,
+  "forced_cleanup_used": false,
+  "events": [
+    {
+      "direction": "stdin",
+      "message": {
+        "type": "control_request",
+        "request_id": "bcddd27d-3d64-4317-8a31-8bb5ae231dfc",
+        "request": {
+          "subtype": "initialize"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "type": "control_response",
+        "response": {
+          "subtype": "success",
+          "request_id": "bcddd27d-3d64-4317-8a31-8bb5ae231dfc",
+          "response": {
+            "commands": {
+              "catalog_omitted": true,
+              "count": 42
+            },
+            "agents": {
+              "catalog_omitted": true,
+              "count": 5
+            },
+            "output_style": "default",
+            "available_output_styles": [
+              "default",
+              "Proactive",
+              "Concise",
+              "Explanatory",
+              "Learning"
+            ],
+            "user_output_styles_dir": "<isolated-probe>/claude/output-styles",
+            "models": {
+              "catalog_omitted": true,
+              "count": 4
+            },
+            "account": {
+              "tokenSource": "none",
+              "apiProvider": "firstParty"
+            },
+            "pid": 35159,
+            "current_permission_mode": "default",
+            "analytics_disabled": true,
+            "remote_control_auto_enable": false,
+            "remote_control_auto_connect_default": false,
+            "remote_control_available": true,
+            "remote_control_auto_on_by_default": false,
+            "ide_rc_auto_enable_gate": false,
+            "fast_mode_state": "off",
+            "fast_mode_disabled_reason": "sdk_opt_in_required",
+            "session_state": "idle"
+          },
+          "pending_permission_requests": [],
+          "pending_user_dialog_requests": []
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "type": "control_request",
+        "request_id": "aa8271d5-3552-4617-a033-ac70aae3c590",
+        "request": {
+          "subtype": "initialize"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "type": "control_response",
+        "response": {
+          "subtype": "success",
+          "request_id": "aa8271d5-3552-4617-a033-ac70aae3c590",
+          "response": {
+            "commands": {
+              "catalog_omitted": true,
+              "count": 42
+            },
+            "agents": {
+              "catalog_omitted": true,
+              "count": 5
+            },
+            "output_style": "default",
+            "available_output_styles": [
+              "default",
+              "Proactive",
+              "Concise",
+              "Explanatory",
+              "Learning"
+            ],
+            "user_output_styles_dir": "<isolated-probe>/claude/output-styles",
+            "models": {
+              "catalog_omitted": true,
+              "count": 4
+            },
+            "account": {
+              "tokenSource": "none",
+              "apiProvider": "firstParty"
+            },
+            "pid": 35159,
+            "current_permission_mode": "default",
+            "analytics_disabled": true,
+            "remote_control_auto_enable": false,
+            "remote_control_auto_connect_default": false,
+            "remote_control_available": true,
+            "remote_control_auto_on_by_default": false,
+            "ide_rc_auto_enable_gate": false,
+            "fast_mode_state": "off",
+            "fast_mode_disabled_reason": "sdk_opt_in_required",
+            "session_state": "idle"
+          },
+          "pending_permission_requests": [],
+          "pending_user_dialog_requests": []
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "type": "system",
+        "subtype": "background_tasks_changed",
+        "tasks": [],
+        "uuid": "87146937-be63-4f7e-b1f2-99bf8413a509",
+        "session_id": "a1e03813-d48d-4860-9fdf-67144f4bee33"
+      }
+    }
+  ],
+  "production_rust_adapter_verified": false,
+  "parent_child_permission_ceiling_verified": false,
+  "model_lifecycle_verified": false,
+  "binary": {
+    "version": "2.1.273",
+    "platform": "darwin-arm64",
+    "sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb"
+  }
+}

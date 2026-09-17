@@ -36,6 +36,24 @@ python -B "$env:GITHUB_WORKSPACE\script\cli-agent-parity\probe_codex_windows_con
 - 只有 CONOUT$ 诊断通过而原生 OSC 缺失时，应记录候选通知运输失败，进一步按 `/dev/tty` / MSYS ctty / 控制台附着链定位；不能把错误吞掉后的 exit 0 算通过。
 - 连 CONOUT$ 诊断也缺失时，仍需区分 DLL/宿主建立失败、VT 转换与 OSC 透传行为；不能直接归因为 `/dev/tty`。未将源码中有限接口推断成平台能力结论。
 - 读取到最终字节仍不证明产品真实 IOCP / 终端模型已经消费。现有 `parse_osc777_notification*` 属于解析器回归；完整产品接线仍需要单独的 Windows InfiniShell 终端验收。
-- 离线测试只验证严格关联、重复/旧回调拒绝、环境块编码及 candidate 配置。当前 macOS 开发环境不能执行 Windows 原生验收，首次 Windows 执行结果待主代理同 SHA 预检。
+- 离线测试只验证严格关联、重复/旧回调拒绝、环境块编码及 candidate 配置。当前 macOS 开发环境不能执行 Windows 原生验收；真实 Windows 结果见下一节，不能由离线测试覆盖其失败。
 
 本机准备阶段执行 `python3 -B script/cli-agent-parity/codex_windows_conpty_tests.py -v`：9 项通过；`git diff --check` 通过。未执行 Windows 二进制、Cargo、模型请求或远端派发。
+
+## 第六轮真实失败及下一步诊断
+
+运行 `35126330599`、提交 `7e06508554ae64cdd9321e0a69274e3d7b2d55ce` 的 Windows 原生探针失败：首个场景的 `session_start` 匹配数为 0。原始三份产物保留于回收目录 `/tmp/infinishell-sixth-platform-7e0650855/windows-conpty/`；未覆盖或改写。它们包含 runner 私有路径，未直接复制入仓库。
+
+| 已核验事实 | 结果 |
+| --- | --- |
+| `.pty.bin` 原始字节 | 802 字节；SHA-256 `cd07b30cb800f3d9ac66bff4cedc646b112b3767dfaf928a44e96a5372a91c5d` |
+| CONOUT$ 诊断 | 唯一诊断 nonce 的完整 OSC777 已读取，`conout_canary_observed=true`；原控制台 mode 为 7 并已恢复 |
+| 原生进程附着 | 四次实际 Codex initialize 后均在该私有控制台成员中；成员观察也包含 PS 5.1 与 Git Bash，无采样错误 |
+| 原生 hooks | 两个路径场景均完成 SessionStart / UserPromptSubmit，独立阻断有效，marker 的 session/turn 正确；模型 HTTP 请求为 0 |
+| 真实通知 | 读取到的唯一 OSC777 是诊断项；没有原生 `session_start` 或 `prompt_submit`。整体 `passed=false`，通知运输未通过 |
+
+这些事实排除了本轮 ConPTY 普遍丢弃未知 OSC 的解释，但还不能确认通知在哪个前置步骤停止。发布脚本会在能力变量缺失时静默返回，也会吞掉 `/dev/tty` 写入错误；当前 marker 未记录这两个分支。进程附着不等于 MSYS 已建立 POSIX 控制终端。
+
+后续探针只增加私有 `BASH_ENV` 观察器：在实际原始 SessionStart / UserPromptSubmit 脚本及 `warp-notify.sh` 入口，记录能力 gate、两项能力变量、Bash/MSYS 版本、标准流是否为 tty，以及 `/dev/tty` **仅打开、不写入**的状态与错误。通知入口额外记录已有 argv 载荷中的 session/turn/event，舍弃正文。观察器在子 shell 中执行，不读取 hook stdin，不改原脚本、候选 PS、信任摘要或标准流；诊断 JSON 写到私有目录，再收入 `.native.json`。缺诊断仍是信息缺口，不能自动证明 gate 或 tty 分支。
+
+此修改用于取得首因证据，不是运输修复。唯有原来的真实 OSC 匹配才能通过。新增本机回归确认观察器保留含中文的 stdin/stdout/stderr，并拒绝把诊断 JSON 算作终端通知；11 项测试通过（0.035 秒）。本轮没有执行 Windows 二进制、Cargo、Git 或远端派发。

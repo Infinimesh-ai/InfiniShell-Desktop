@@ -1,0 +1,175 @@
+{
+  "scope": "no_credentials_read_only_control",
+  "model_commands_sent": 0,
+  "credentials_provided": false,
+  "binary": {
+    "platform": "darwin-arm64",
+    "binary": "claude",
+    "bytes": 212228880,
+    "sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
+    "url": "https://downloads.claude.ai/claude-code-releases/2.1.273/darwin-arm64/claude"
+  },
+  "cli_version": "2.1.273 (Claude Code)",
+  "initialize_confirmed": true,
+  "get_settings": {
+    "type": "control_response",
+    "response": {
+      "subtype": "success",
+      "request_id": "432e700b-baaf-4595-b92b-38bf1e5d45c7",
+      "response": {
+        "effective": {},
+        "sources": [],
+        "applied": {
+          "model": "claude-opus-5[1m]",
+          "effort": "high",
+          "advisor": null,
+          "ultracode": false
+        }
+      }
+    }
+  },
+  "list_permission_rules": {
+    "type": "control_response",
+    "response": {
+      "subtype": "success",
+      "request_id": "543968da-3d1b-4a7d-997a-08a186f81913",
+      "response": {
+        "state": {
+          "rules": [],
+          "workspaceDirectories": [],
+          "originalCwd": "<isolated-probe>/project",
+          "managedOnly": false
+        }
+      }
+    }
+  },
+  "alive_before_stdin_eof": true,
+  "stdin_eof_exited_within_5s": true,
+  "exit_code_before_cleanup": 0,
+  "eof_elapsed_ms": 9,
+  "forced_cleanup_used": false,
+  "events": [
+    {
+      "direction": "stdin",
+      "message": {
+        "type": "control_request",
+        "request_id": "af094475-50e1-4aa7-9181-5f50895f27b3",
+        "request": {
+          "subtype": "initialize"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "type": "control_response",
+        "response": {
+          "subtype": "success",
+          "request_id": "af094475-50e1-4aa7-9181-5f50895f27b3",
+          "response": {
+            "commands": {
+              "catalog_omitted": true,
+              "count": 42
+            },
+            "agents": {
+              "catalog_omitted": true,
+              "count": 5
+            },
+            "output_style": "default",
+            "available_output_styles": [
+              "default",
+              "Proactive",
+              "Concise",
+              "Explanatory",
+              "Learning"
+            ],
+            "user_output_styles_dir": "<isolated-probe>/claude/output-styles",
+            "models": {
+              "catalog_omitted": true,
+              "count": 4
+            },
+            "account": {
+              "tokenSource": "none",
+              "apiProvider": "firstParty"
+            },
+            "pid": 34106,
+            "current_permission_mode": "default",
+            "analytics_disabled": true,
+            "remote_control_auto_enable": false,
+            "remote_control_auto_connect_default": false,
+            "remote_control_available": true,
+            "remote_control_auto_on_by_default": false,
+            "ide_rc_auto_enable_gate": false,
+            "fast_mode_state": "off",
+            "fast_mode_disabled_reason": "sdk_opt_in_required",
+            "session_state": "idle"
+          },
+          "pending_permission_requests": [],
+          "pending_user_dialog_requests": []
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "type": "control_request",
+        "request_id": "432e700b-baaf-4595-b92b-38bf1e5d45c7",
+        "request": {
+          "subtype": "get_settings"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "type": "control_response",
+        "response": {
+          "subtype": "success",
+          "request_id": "432e700b-baaf-4595-b92b-38bf1e5d45c7",
+          "response": {
+            "effective": {},
+            "sources": [],
+            "applied": {
+              "model": "claude-opus-5[1m]",
+              "effort": "high",
+              "advisor": null,
+              "ultracode": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "direction": "stdin",
+      "message": {
+        "type": "control_request",
+        "request_id": "543968da-3d1b-4a7d-997a-08a186f81913",
+        "request": {
+          "subtype": "list_permission_rules"
+        }
+      }
+    },
+    {
+      "direction": "stdout",
+      "message": {
+        "type": "control_response",
+        "response": {
+          "subtype": "success",
+          "request_id": "543968da-3d1b-4a7d-997a-08a186f81913",
+          "response": {
+            "state": {
+              "rules": [],
+              "workspaceDirectories": [],
+              "originalCwd": "<isolated-probe>/project",
+              "managedOnly": false
+            }
+          }
+        }
+      }
+    }
+  ],
+  "binary_unchanged_after_probe": true,
+  "production_rust_adapter_verified": false,
+  "parent_child_permission_ceiling_verified": false,
+  "model_lifecycle_verified": false
+}

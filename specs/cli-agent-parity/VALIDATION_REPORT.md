@@ -4,6 +4,14 @@
 
 ## 当前提交验证
 
+- 后续 Claude 同连接权限观测已在冻结源码通过 check、国际化 11 项及相关模块 987 项；[源摘要与门禁](validation/macos-claude-permission-observation-gates-1.json)保留 dirty 快照身份。错误/超时不阻断普通 Inherit 聊天，投影和原生执行规则不一致时拒绝作为派发依据；仍未开放 Claude 父任务派发，真实模型与原生 Rust 运行待验。
+- [固定 Codex 完整运行包](CODEX_FIXED_RUNTIME_PREPARATION.md)已补齐。Linux x64、Windows x64/ARM64 的真实官方包均已在本机完成全树提取及复核，13 项离线回归通过；[记录](validation/macos-codex-complete-packages-1.json)不计异平台程序执行或真实工具通过。
+
+- 第六轮 Windows 已确认两项失败：持久来源探针在缓存回退后没有完整确认输出/后台 Git 退出，清理异常曾掩盖首因；ConPTY 诊断 OSC 通过但真实原生通知匹配为 0。Grok 锁映射、真实 ACP、Claude 无凭据初始化/EOF 与 Codex 原生 hook 分别通过，Windows 本轮 Rust 跳过不计通过。Linux 全部所选门禁通过（warp 定向 1684 项），详见[第六轮专报](SIXTH_PLATFORM_RUN_7E0650855.md)。
+- 新包 Codex 实际两轮中的拼音、图片、技能与评审传递已有证据，私有 Codex 测试副本仅包含主程序、漏装同版本 code-mode-host，实际工具调用报宿主不存在，因此文件读取与第三轮审批未通过，不归因于模型没有选择读文件。已从固定官方完整包恢复宿主、rg 与 zsh，并核对全部成员摘要和主程序版本，见[完整运行时输入](validation/macos-codex-fixed-complete-runtime-1.json)。尚需真实工具复验；其余生命周期正在继续。真实 Oz 测试已准备唯一 profile/安全存储服务，但系统访问提示需用户手动允许；电脑操作工具明确禁止操作 SecurityAgent，没有改 ACL 或默认钥匙串来绕过。GUI 验收仍未完成。
+
+- 最新检查点 `7e06508554ae64cdd9321e0a69274e3d7b2d55ce` 已提交并推送；[第六轮 Actions](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35126330599)同时选择 Linux 和 Windows，完整工作区测试未开启；运行及四个 artifact 已全部回收，Linux passed、Windows failed。全部应用改动已与本地第三冻结快照逐字核对，见[来源关联](validation/macos-message-source-commit-7e0650855.json)，没有将旧测试二进制的提交元数据改写为新 SHA。干净验证树的[macOS 新包](validation/macos-build-7e0650855.json)构建与签名成功（232.035s），原生执行文件 SHA-256 `707b504dcde22686f6c9df1c9ee0563bfd773b6d4d12bc2d755116fd87ffc4f7`；独立副本的 GUI/Oz 与双语验收正在进行，构建成功不计完整交互通过。该提交随后在干净验证树通过 check（63.186s）、提供商 18 项、国际化 11 项和相关模块 965 项，见[同提交本地门禁](validation/macos-local-gates-7e0650855.json)。
+
 - Windows 字节保留与 Oz 最终结果桥检查点 `94a412eb89a4de57977072e6c45f4a692955d970` 已推送，远端 SHA 已核对一致。[第五轮 Actions](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35122575386)仅选择 Windows，已结束且失败，Linux 按参数跳过。候选 Codex 启动器的原始字节、命令长度、PS5、原生 argv 和两组真实阻断 hook 均通过，模型请求 0；ConPTY 通知未验证。Grok 在 ACP 初始化前遇到锁读取权限错误，后续默认 Rust 门禁跳过，详见 [第五轮专报](FIFTH_PLATFORM_RUN_94A412EB.md)。新只读锁诊断和等待修复在本机通过 16 项、另 1 项 Windows 原生测试跳过；macOS 固定 Grok 无凭据协议边界也通过（8.653s），leader 仍需自持句柄强制收尾。[独立证据](validation/macos-grok-lock-reader-gates-1.json)不代替 Windows 复验。
 
 - Oz 普通消息与提供商序列化第一冻结快照通过 check 和国际化 11 项；提供商新回归 10 通过、3 失败，消息相关 803 通过、1 失败。[首轮记录](validation/macos-oz-messages-local-gates-1.json)保留夹具错误和合法进度顺序缺口。第二快照因测试缺少 `RepairRecord` 导入而编译失败，0 项执行，见[第二轮记录](validation/macos-oz-messages-local-gates-2.json)。修正后的第三个 25 文件冻结快照通过 check（57.587s）、提供商回归 18 项、国际化 11 项和相关模块 965 项；[第三轮记录](validation/macos-oz-messages-local-gates-3.json)固定源文件摘要。范围与回执边界见 [消息交付说明](OZ_LOCAL_MESSAGE_DELIVERY.md)，真实模型、GUI 和最终同提交平台仍待验。

@@ -2,6 +2,7 @@
 """复现 Codex 原生后台覆盖缓存修补，并验证同 ID 本地来源迁移；只操作私有 HOME。"""
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -10,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import tomllib
 
@@ -22,6 +24,233 @@ from probe_codex_windows_hooks import NativeRecorder
 
 PLUGIN_ID = 'warp@codex-warp'
 UPSTREAM_URL = 'https://github.com/warpdotdev/codex-warp.git'
+
+
+def failure_record(error):
+    return {'type': type(error).__name__, 'message': str(error)}
+
+
+class WindowsProbeJob:
+    """仅此探针的私有 Job；不允许后台 Git 脱离，也不将回收当作自然退出。"""
+
+    def __init__(self):
+        import ctypes
+        from ctypes import wintypes
+        self.ctypes = ctypes
+        self.kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+        class Limits(ctypes.Structure):
+            _fields_ = [('process_time', ctypes.c_int64), ('job_time', ctypes.c_int64),
+                        ('flags', wintypes.DWORD), ('minimum', ctypes.c_size_t),
+                        ('maximum', ctypes.c_size_t), ('active', wintypes.DWORD),
+                        ('affinity', ctypes.c_size_t), ('priority', wintypes.DWORD),
+                        ('scheduling', wintypes.DWORD)]
+        class Extended(ctypes.Structure):
+            _fields_ = [('basic', Limits), ('io', ctypes.c_uint64 * 6),
+                        ('process_memory', ctypes.c_size_t), ('job_memory', ctypes.c_size_t),
+                        ('peak_process', ctypes.c_size_t), ('peak_job', ctypes.c_size_t)]
+        class Accounting(ctypes.Structure):
+            _fields_ = [('times', ctypes.c_int64 * 4), ('faults', wintypes.DWORD),
+                        ('total', wintypes.DWORD), ('active', wintypes.DWORD),
+                        ('terminated', wintypes.DWORD)]
+        self.accounting = Accounting
+        signatures = {
+            'CreateJobObjectW': ([ctypes.c_void_p, wintypes.LPCWSTR], wintypes.HANDLE),
+            'SetInformationJobObject': ([wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD], wintypes.BOOL),
+            'AssignProcessToJobObject': ([wintypes.HANDLE, wintypes.HANDLE], wintypes.BOOL),
+            'QueryInformationJobObject': ([wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p], wintypes.BOOL),
+            'TerminateJobObject': ([wintypes.HANDLE, wintypes.UINT], wintypes.BOOL),
+            'TerminateProcess': ([wintypes.HANDLE, wintypes.UINT], wintypes.BOOL),
+            'ResumeThread': ([wintypes.HANDLE], wintypes.DWORD),
+            'WaitForSingleObject': ([wintypes.HANDLE, wintypes.DWORD], wintypes.DWORD),
+            'CloseHandle': ([wintypes.HANDLE], wintypes.BOOL),
+        }
+        for name, (arguments, result) in signatures.items():
+            function = getattr(self.kernel, name)
+            function.argtypes, function.restype = arguments, result
+        self.handle = self.kernel.CreateJobObjectW(None, None)
+        self.check(self.handle)
+        try:
+            limits = Extended()
+            limits.basic.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE，不授予 breakaway。
+            self.check(self.kernel.SetInformationJobObject(self.handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)))
+        except BaseException as error:
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                error.add_note('关闭新建私有 Job 失败: ' + str(cleanup_error))
+            raise
+
+    def check(self, value):
+        if not value:
+            raise self.ctypes.WinError(self.ctypes.get_last_error())
+
+    def attach_and_resume(self, process, thread):
+        self.check(self.kernel.AssignProcessToJobObject(self.handle, process))
+        result = self.kernel.ResumeThread(thread)
+        if result == 0xffffffff:
+            raise self.ctypes.WinError(self.ctypes.get_last_error())
+        require(result == 1, '私有进程主线程的暂停计数不符合创建契约')
+
+    def reclaim_suspended(self, process):
+        self.check(self.kernel.TerminateProcess(process, 1))
+        require(self.kernel.WaitForSingleObject(process, 5000) == 0, '暂停进程没有确认退出')
+
+    def active(self):
+        data = self.accounting()
+        self.check(self.kernel.QueryInformationJobObject(self.handle, 1, self.ctypes.byref(data), self.ctypes.sizeof(data), None))
+        return data.active
+
+    def terminate(self):
+        self.check(self.kernel.TerminateJobObject(self.handle, 1))
+
+    def wait_empty(self, timeout):
+        deadline = time.monotonic() + timeout
+        while True:
+            active = self.active()
+            if active == 0 or time.monotonic() >= deadline:
+                return active
+            time.sleep(0.02)
+
+    def close(self):
+        if self.handle:
+            self.check(self.kernel.CloseHandle(self.handle))
+            self.handle = None
+
+
+@contextmanager
+def suspended_creation(api, job, command, env, directory, trace):
+    # CPython 3.13 的 Popen 会立即关闭 hThread；只在精确创建调用返回前附加 Job。
+    original = api.CreateProcess
+    owner = threading.get_ident()
+    invoked = False
+    def create(*arguments):
+        nonlocal invoked
+        if threading.get_ident() != owner:
+            return original(*arguments)
+        require(not invoked and len(arguments) == 9 and arguments[1] == subprocess.list2cmdline(command)
+                and arguments[6] is env and arguments[7] == os.fspath(directory),
+                '拒绝不匹配的 CPython 私有创建调用')
+        invoked = True
+        changed = list(arguments)
+        changed[5] |= 0x00000004  # CREATE_SUSPENDED，避免先运行再附加的竞态。
+        handles = original(*changed)
+        process, thread, pid, _ = handles
+        trace['pid'] = pid
+        try:
+            job.attach_and_resume(process, thread)
+            trace['assigned_before_resume'] = True
+        except BaseException as error:
+            trace['startup_failure'] = failure_record(error)
+            try:
+                job.reclaim_suspended(process)
+                trace['suspended_process_exit_confirmed'] = True
+            except BaseException as cleanup_error:
+                trace['startup_cleanup_failure'] = failure_record(cleanup_error)
+            finally:
+                for handle in (thread, process):
+                    try:
+                        api.CloseHandle(handle)
+                    except BaseException as cleanup_error:
+                        trace.setdefault('handle_close_failures', []).append(failure_record(cleanup_error))
+            raise
+        return handles
+    api.CreateProcess = create
+    try:
+        yield
+        require(invoked, '没有观察到预期的 CPython 进程创建')
+    finally:
+        api.CreateProcess = original
+
+
+class CacheRefreshRecorder(NativeRecorder):
+    def __init__(self, command, env, directory, events, trace):
+        self.trace = trace
+        self.job = None
+        self.readers = []
+        self.reader_errors = []
+        if os.name == 'nt':
+            import _winapi
+            require(sys.implementation.name == 'cpython', 'Windows 探针需要已核实的 CPython 创建接口')
+            try:
+                self.job = WindowsProbeJob()
+                with suspended_creation(_winapi, self.job, command, env, directory, trace):
+                    super().__init__(command, env, directory, events)
+            except BaseException as error:
+                trace.setdefault('startup_failure', failure_record(error))
+                try:
+                    if hasattr(self, 'process'):
+                        self.close()
+                    elif self.job is not None:
+                        # Popen 负责关闭创建失败时尚未移交的管道句柄。
+                        self.job.close()
+                except BaseException as cleanup_error:
+                    trace.setdefault('startup_cleanup_failure', failure_record(cleanup_error))
+                raise
+        else:
+            super().__init__(command, env, directory, events)
+
+    def close(self):
+        trace = self.trace
+        started = time.monotonic()
+        trace.update(root_exited_naturally=False, root_forced=False, descendants_forced=False,
+                     readers_eof=False, cleanup_confirmed=False)
+        try:
+            try:
+                self.process.stdin.close()
+            except (BrokenPipeError, OSError) as error:
+                trace['stdin_close_error'] = failure_record(error)
+            try:
+                self.process.wait(timeout=5)
+                trace['root_exited_naturally'] = True
+            except subprocess.TimeoutExpired:
+                trace['root_forced'] = True
+                if self.job is not None:
+                    self.job.terminate()
+                else:
+                    self.process.kill()
+                self.process.wait(timeout=5)
+            trace['root_exit_code'] = self.process.returncode
+            if self.job is not None:
+                active = self.job.wait_empty(5)
+                trace['job_active_after_grace'] = active
+                if active:
+                    trace['descendants_forced'] = True
+                    self.job.terminate()
+                    active = self.job.wait_empty(5)
+                trace['job_active_after_cleanup'] = active
+                require(active == 0, '私有 Job 中仍有未确认退出的进程')
+            for reader in self.readers:
+                reader.join(timeout=2)
+            trace['reader_errors'] = list(self.reader_errors)
+            trace['readers_eof'] = all(not reader.is_alive() for reader in self.readers)
+            require(not self.reader_errors and trace['readers_eof'],
+                    '原生输出读取失败或没有结束: ' + repr(self.reader_errors))
+            trace['cleanup_confirmed'] = True
+            require(trace['root_exited_naturally'] and self.process.returncode == 0,
+                    '原生主进程没有自然正常退出；回收不能替代成功')
+        finally:
+            primary = sys.exc_info()[1]
+            close_error = None
+            if self.job is not None:
+                try:
+                    self.job.close()
+                except BaseException as error:
+                    trace['job_close_failure'] = failure_record(error)
+                    trace['cleanup_confirmed'] = False
+                    close_error = error
+            # 只有读取线程确已退出时才能关闭文本流，避免阻塞在其内部锁。
+            if all(not reader.is_alive() for reader in self.readers):
+                for stream in (self.process.stdout, self.process.stderr):
+                    try:
+                        stream.close()
+                    except BaseException as error:
+                        trace.setdefault('stream_close_failures', []).append(failure_record(error))
+                        trace['cleanup_confirmed'] = False
+                        if close_error is None:
+                            close_error = error
+            trace['elapsed_ms'] = round((time.monotonic() - started) * 1000)
+            if close_error is not None and primary is None:
+                raise close_error
 
 
 def configuration(home):
@@ -47,9 +276,10 @@ def cli(executable, arguments, env, directory, report, expected_code=0):
 
 
 def native_listing(executable, env, directory, report, stage, cache, expected_revert=None, disable_id=None):
-    trace = {'stage': stage, 'events': []}
+    trace = {'stage': stage, 'events': [], 'process_cleanup': {}}
     report['app_server_traces'].append(trace)
-    recorder = NativeRecorder([str(executable), 'app-server', '--stdio'], env, directory, trace['events'])
+    recorder = CacheRefreshRecorder([str(executable), 'app-server', '--stdio'], env, directory,
+                                    trace['events'], trace['process_cleanup'])
     try:
         initialized = recorder.rpc('initialize', {'clientInfo': {
             'name': 'infinishell_cache_refresh_probe', 'version': '0.1.0'},
@@ -69,8 +299,9 @@ def native_listing(executable, env, directory, report, stage, cache, expected_re
             deadline = time.monotonic() + 20
             while time.monotonic() < deadline:
                 try:
-                    if tree_hashes(cache) == expected_revert:
+                    if background_refresh_published(cache, expected_revert, Path(env['CODEX_HOME'])):
                         trace['background_reverted_to_upstream'] = True
+                        trace['background_revision_published'] = PLUGIN_COMMIT
                         break
                 except (FileNotFoundError, ValueError):
                     # 原生原子替换目录的短窗口不属于最终结果。
@@ -80,7 +311,19 @@ def native_listing(executable, env, directory, report, stage, cache, expected_re
                     '没有在期限内复现真实后台还原；不能把源码推断当实证')
         return hooks
     finally:
-        recorder.close()
+        primary = sys.exc_info()[1]
+        try:
+            recorder.close()
+        except BaseException as error:
+            trace['close_failure'] = failure_record(error)
+            if primary is None:
+                raise
+
+
+def background_refresh_published(cache, expected_tree, home):
+    # 固定上游先发布 revision，再刷新缓存；两项都观察到才进入退出阶段。
+    return (tree_hashes(cache) == expected_tree and
+            configuration(home).get('marketplaces', {}).get('codex-warp', {}).get('last_revision') == PLUGIN_COMMIT)
 
 
 def verify_complete_git_source(root, env):
@@ -236,6 +479,25 @@ def run(executable, directory, report):
         'native_remove_add_failure_gap_observed': True, 'disabled_native_source_recovery_preserved_cache': True}
 
 
+def run_and_cleanup(executable, directory, report):
+    try:
+        run(executable, directory, report)
+    except BaseException as error:
+        report['failure'] = failure_record(error)
+        # 保留失败现场；不得在活跃后台 Git 的目录上盲删并覆盖最初异常。
+        report['private_directory_removed'] = False
+        report['retained_private_directory'] = str(directory)
+        raise
+    try:
+        shutil.rmtree(directory)
+        report['private_directory_removed'] = True
+    except BaseException as error:
+        report['cleanup_failure'] = failure_record(error)
+        report['private_directory_removed'] = False
+        report['retained_private_directory'] = str(directory)
+        raise
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--codex-executable', type=Path, required=True)
@@ -248,13 +510,12 @@ def main():
               'host_os': sys.platform, 'commands': [], 'app_server_traces': [], 'credentials_provided': False,
               'thread_or_turn_created': False, 'product_installer_fixed': False, 'native_pty_verified': False}
     try:
-        with tempfile.TemporaryDirectory(prefix='infinishell-cache-refresh-') as temporary:
-            directory = Path(temporary).resolve()
-            require(not directory.is_relative_to(repo), '隔离 HOME 必须在源树外')
-            run(args.codex_executable.resolve(), directory, report)
+        directory = Path(tempfile.mkdtemp(prefix='infinishell-cache-refresh-')).resolve()
+        require(not directory.is_relative_to(repo), '隔离 HOME 必须在源树外')
+        run_and_cleanup(args.codex_executable.resolve(), directory, report)
         report['passed'] = True
     except Exception as error:
-        report['failure'] = {'type': type(error).__name__, 'message': str(error)}
+        report.setdefault('failure', failure_record(error))
         raise
     finally:
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

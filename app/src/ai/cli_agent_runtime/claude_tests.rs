@@ -59,6 +59,8 @@ fn ready_protocol() -> ClaudeProtocol {
         .unwrap();
     reply["response"]["request_id"] = initialize["request_id"].clone();
     let effects = protocol.receive(reply).unwrap();
+    assert!(effects.events.is_empty());
+    let effects = decline_permission_observation(&mut protocol, &effects);
     assert_eq!(effects.events.len(), 1);
     assert!(matches!(
         effects.events[0],
@@ -71,6 +73,16 @@ fn ready_protocol() -> ClaudeProtocol {
             .is_none()
     );
     protocol
+}
+
+// 旧模型事件夹具没有权限查询；明确返回观察错误，仍验证普通 Inherit 路径。
+fn decline_permission_observation(protocol: &mut ClaudeProtocol, effects: &Effects) -> Effects {
+    protocol
+        .receive(json!({"type":"control_response", "response":{
+            "subtype":"error", "request_id":effects.writes[0]["request_id"],
+            "error":"permission observation is unavailable in this fixture"
+        }}))
+        .unwrap()
 }
 
 fn lifecycle(id: Uuid, state: &str) -> Value {
@@ -630,7 +642,8 @@ fn captured_native_skill_arguments_replay_exactly_and_auth_failure_stays_failed(
         .find(|message| message["type"] == "control_response")
         .unwrap();
     initialized["response"]["request_id"] = initialize["request_id"].clone();
-    protocol.receive(initialized).unwrap();
+    let observation = protocol.receive(initialized).unwrap();
+    decline_permission_observation(&mut protocol, &observation);
     let native_user = capture(&fixture)
         .into_iter()
         .find(|message| message["type"] == "user")
@@ -732,5 +745,382 @@ fn claude_native_mode_cannot_satisfy_a_filesystem_permission_ceiling() {
             .command(submit(Uuid::from_u128(99), "must not run"))
             .writes
             .is_empty()
+    );
+}
+
+fn start_observation(protocol: &mut ClaudeProtocol) -> Effects {
+    let initialize = protocol.initialize();
+    protocol
+        .receive(control_response(
+            initialize["request_id"].as_str().unwrap(),
+            json!({"pid":123, "current_permission_mode":"default", "session_state":"idle"}),
+        ))
+        .unwrap()
+}
+
+fn observation_settings() -> Value {
+    json!({"effective":{"permissions":{"deny":["Bash"]}, "sandbox":{"enabled":false}},
+        "sources":[{"source":"flagSettings", "settings":{"permissions":{"deny":["Bash"]}, "sandbox":{"enabled":false}}}]})
+}
+
+fn observation_rules() -> Value {
+    json!({"state":{"rules":[{"behavior":"deny", "source":"flagSettings", "rule":"Bash", "editability":"readonly"}],
+        "workspaceDirectories":[], "originalCwd":std::env::temp_dir(), "managedOnly":false}})
+}
+
+fn observation_mode_request(protocol: &mut ClaudeProtocol, first: &Effects) -> Effects {
+    let settings = protocol
+        .receive(control_response(
+            first.writes[0]["request_id"].as_str().unwrap(),
+            observation_settings(),
+        ))
+        .unwrap();
+    protocol
+        .receive(control_response(
+            settings.writes[0]["request_id"].as_str().unwrap(),
+            observation_rules(),
+        ))
+        .unwrap()
+}
+
+fn ready_observation(effects: &Effects) -> &Value {
+    let [
+        RuntimeEventKind::SessionReady {
+            effective_permissions,
+        },
+    ] = effects.events.as_slice()
+    else {
+        panic!("expected one session-ready event");
+    };
+    &effective_permissions["permissionObservation"]
+}
+
+#[test]
+fn permission_queries_finish_before_first_ready_without_authorizing_dispatch() {
+    let mut protocol = ClaudeProtocol::new(options());
+    let first = start_observation(&mut protocol);
+    assert!(first.events.is_empty());
+    assert_eq!(
+        first.writes[0]["request"],
+        json!({"subtype":"get_settings"})
+    );
+    assert!(!protocol.initialized);
+    let settings = protocol
+        .receive(control_response(
+            first.writes[0]["request_id"].as_str().unwrap(),
+            observation_settings(),
+        ))
+        .unwrap();
+    assert!(settings.events.is_empty());
+    assert_eq!(
+        settings.writes[0]["request"],
+        json!({"subtype":"list_permission_rules"})
+    );
+    let recheck = protocol
+        .receive(control_response(
+            settings.writes[0]["request_id"].as_str().unwrap(),
+            observation_rules(),
+        ))
+        .unwrap();
+    assert!(recheck.events.is_empty());
+    assert_eq!(
+        recheck.writes[0]["request"],
+        json!({"subtype":"initialize"})
+    );
+    let ready = protocol
+        .receive(control_response(
+            recheck.writes[0]["request_id"].as_str().unwrap(),
+            json!({"pid":123, "current_permission_mode":"default", "session_state":"idle"}),
+        ))
+        .unwrap();
+    assert_eq!(ready_observation(&ready)["rejections"], json!([]));
+    assert_eq!(ready_observation(&ready)["dispatchAuthorized"], false);
+    assert_eq!(
+        ready_observation(&ready)["connectionGeneration"],
+        options().generation.to_string()
+    );
+    assert!(protocol.initialized);
+    assert_eq!(
+        protocol
+            .command(submit(Uuid::from_u128(101), "普通对话仍可继续"))
+            .writes[0]["type"],
+        "user"
+    );
+}
+
+#[test]
+fn denied_permission_query_keeps_inherit_chat_usable_without_leaking_native_error() {
+    let mut protocol = ClaudeProtocol::new(options());
+    let first = start_observation(&mut protocol);
+    let response = json!({"type":"control_response", "response":{"request_id":first.writes[0]["request_id"],
+        "subtype":"error", "error":"private-settings-token"}});
+    let ready = protocol.receive(response.clone()).unwrap();
+    assert_eq!(
+        ready_observation(&ready)["rejections"],
+        json!(["native_request_failed"])
+    );
+    assert!(
+        !ready_observation(&ready)
+            .to_string()
+            .contains("private-settings-token")
+    );
+    assert!(protocol.receive(response).unwrap().events.is_empty());
+    assert!(protocol.pending.is_empty());
+    assert_eq!(
+        protocol
+            .command(submit(Uuid::from_u128(102), "普通对话"))
+            .writes[0]["type"],
+        "user"
+    );
+}
+
+#[test]
+fn malformed_permission_response_does_not_permanently_block_inherit_chat() {
+    let mut protocol = ClaudeProtocol::new(options());
+    let first = start_observation(&mut protocol);
+    let ready = protocol.receive(json!({"type":"control_response", "response":{"request_id":first.writes[0]["request_id"],
+        "subtype":{"unexpected":"private-value"}}})).unwrap();
+    assert_eq!(
+        ready_observation(&ready)["rejections"],
+        json!(["native_request_failed"])
+    );
+    assert_eq!(
+        protocol
+            .command(submit(Uuid::from_u128(103), "继续"))
+            .writes[0]["type"],
+        "user"
+    );
+}
+
+#[test]
+fn observation_total_deadline_releases_chat_and_old_reply_cannot_replace_result() {
+    let mut protocol = ClaudeProtocol::new(options());
+    let first = start_observation(&mut protocol);
+    let recheck = observation_mode_request(&mut protocol, &first);
+    protocol.permission_observation_started = Some(Instant::now() - PERMISSION_OBSERVATION_TIMEOUT);
+    let ready = protocol.expire_permission_observation();
+    assert_eq!(
+        ready_observation(&ready)["rejections"],
+        json!(["timed_out"])
+    );
+    assert!(protocol.expire_permission_observation().events.is_empty());
+    assert!(!protocol.request_timed_out());
+    let late = protocol
+        .receive(control_response(
+            recheck.writes[0]["request_id"].as_str().unwrap(),
+            json!({"pid":123, "current_permission_mode":"default", "session_state":"idle"}),
+        ))
+        .unwrap();
+    assert!(late.writes.is_empty());
+    assert!(late.events.is_empty());
+    assert_eq!(
+        protocol
+            .command(submit(Uuid::from_u128(104), "超时后继续"))
+            .writes[0]["type"],
+        "user"
+    );
+    assert_eq!(
+        protocol.permission_observation.as_ref().unwrap().value()["rejections"],
+        json!(["timed_out"])
+    );
+}
+
+#[test]
+fn previous_generation_reply_cannot_advance_current_permission_observation() {
+    let mut protocol = ClaudeProtocol::new(options());
+    let first = start_observation(&mut protocol);
+    let old = format!("infinishell-{}-2", Uuid::from_u128(999));
+    let effects = protocol
+        .receive(control_response(&old, observation_settings()))
+        .unwrap();
+    assert!(effects.events.is_empty());
+    assert!(effects.writes.is_empty());
+    assert!(!protocol.initialized);
+    assert!(
+        protocol
+            .pending
+            .contains_key(first.writes[0]["request_id"].as_str().unwrap())
+    );
+    let next = protocol
+        .receive(control_response(
+            first.writes[0]["request_id"].as_str().unwrap(),
+            observation_settings(),
+        ))
+        .unwrap();
+    assert_eq!(
+        next.writes[0]["request"]["subtype"],
+        "list_permission_rules"
+    );
+}
+
+#[test]
+fn changed_mode_during_observation_rejects_ceiling_without_disabling_chat() {
+    let mut protocol = ClaudeProtocol::new(options());
+    let first = start_observation(&mut protocol);
+    let recheck = observation_mode_request(&mut protocol, &first);
+    let ready = protocol
+        .receive(control_response(
+            recheck.writes[0]["request_id"].as_str().unwrap(),
+            json!({"pid":123, "current_permission_mode":"dontAsk", "session_state":"idle"}),
+        ))
+        .unwrap();
+    assert_eq!(
+        ready_observation(&ready)["rejections"],
+        json!(["mode_changed"])
+    );
+    assert_eq!(ready_observation(&ready)["modeAfter"], "dontAsk");
+    assert_eq!(
+        protocol
+            .command(submit(Uuid::from_u128(105), "保持原生当前权限"))
+            .writes[0]["type"],
+        "user"
+    );
+}
+
+#[test]
+fn live_settings_disagreement_is_persisted_as_unusable_observation() {
+    let mut protocol = ClaudeProtocol::new(options());
+    let first = start_observation(&mut protocol);
+    let settings = protocol
+        .receive(control_response(
+            first.writes[0]["request_id"].as_str().unwrap(),
+            observation_settings(),
+        ))
+        .unwrap();
+    let mut changed_rules = observation_rules();
+    changed_rules["state"]["rules"][0]["behavior"] = json!("allow");
+    let recheck = protocol
+        .receive(control_response(
+            settings.writes[0]["request_id"].as_str().unwrap(),
+            changed_rules,
+        ))
+        .unwrap();
+    let ready = protocol
+        .receive(control_response(
+            recheck.writes[0]["request_id"].as_str().unwrap(),
+            json!({"pid":123, "current_permission_mode":"default", "session_state":"idle"}),
+        ))
+        .unwrap();
+    assert_eq!(
+        ready_observation(&ready)["rejections"],
+        json!(["settings_live_rules_mismatch"])
+    );
+    assert_eq!(
+        protocol
+            .command(submit(Uuid::from_u128(106), "不改变普通对话"))
+            .writes[0]["type"],
+        "user"
+    );
+}
+
+#[test]
+fn repeated_empty_initialize_keeps_registered_skill_and_mcp_history() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("SKILL.md");
+    std::fs::write(&path, "---\nname: observation-skill\ndescription: Observation test\n---\nOnly review this fixture.\n").unwrap();
+    let mut settings = options();
+    settings.local_tools = Some(local_tools::LocalToolPermissions::default());
+    settings.selected_skills = vec![super::super::local_skills::SelectedLocalSkill {
+        name: "observation-skill".into(),
+        path: path.clone(),
+    }];
+    let mut protocol = ClaudeProtocol::new(settings.clone());
+    protocol.skill_plugin = prepare_claude_skill_plugin(&settings.selected_skills).unwrap();
+    let initialize = protocol.initialize();
+    let first = protocol
+        .receive(control_response(
+            initialize["request_id"].as_str().unwrap(),
+            json!({"pid":123, "current_permission_mode":"default", "session_state":"idle",
+            "commands":[{"name":"infinishell-local-skills:observation-skill"}]}),
+        ))
+        .unwrap();
+    let mcp = json!({"type":"control_request", "request_id":"mcp-observation", "request":{
+        "subtype":"mcp_message", "server_name":"infinishell-local-tasks", "message":{
+            "jsonrpc":"2.0", "id":1, "method":"tools/list", "params":{}}}});
+    let registered_mcp = protocol.receive(mcp.clone()).unwrap();
+    assert_eq!(registered_mcp.writes[0]["response"]["subtype"], "success");
+    let recheck = observation_mode_request(&mut protocol, &first);
+    assert_eq!(
+        recheck.writes[0]["request"],
+        json!({"subtype":"initialize"})
+    );
+    // 重复空查询未再次发 commands/hooks/sdkMcpServers，也不要求新的空目录覆盖原注册。
+    let ready = protocol.receive(control_response(recheck.writes[0]["request_id"].as_str().unwrap(),
+        json!({"pid":123, "current_permission_mode":"default", "session_state":"idle", "commands":[]}))).unwrap();
+    assert_eq!(ready_observation(&ready)["rejections"], json!([]));
+    assert_eq!(protocol.receive(mcp).unwrap().writes, registered_mcp.writes);
+    let submitted = protocol.command(command(
+        Uuid::from_u128(107),
+        RuntimeAction::Submit {
+            input: vec![
+                InputContent::Text("中文 arguments".into()),
+                InputContent::Skill {
+                    name: "observation-skill".into(),
+                    path,
+                },
+            ],
+        },
+    ));
+    assert_eq!(
+        submitted.writes[0]["message"]["content"],
+        "/infinishell-local-skills:observation-skill 中文 arguments"
+    );
+    assert_eq!(protocol.options.local_tools, settings.local_tools);
+}
+
+#[test]
+fn missing_observation_request_id_degrades_without_persisting_unbound_data() {
+    let mut protocol = ClaudeProtocol::new(options());
+    start_observation(&mut protocol);
+    let ready = protocol
+        .receive(
+            json!({"type":"control_response", "response":{"subtype":"success",
+        "response":{"private":"must-not-persist"}}}),
+        )
+        .unwrap();
+    assert_eq!(
+        ready_observation(&ready)["rejections"],
+        json!(["invalid_shape"])
+    );
+    assert!(
+        !ready_observation(&ready)
+            .to_string()
+            .contains("must-not-persist")
+    );
+    assert_eq!(
+        protocol
+            .command(submit(Uuid::from_u128(108), "继续"))
+            .writes[0]["type"],
+        "user"
+    );
+}
+
+#[test]
+fn runtime_mode_notification_invalidates_observation_without_finishing_any_turn() {
+    let mut protocol = ClaudeProtocol::new(options());
+    let first = start_observation(&mut protocol);
+    let recheck = observation_mode_request(&mut protocol, &first);
+    protocol
+        .receive(control_response(
+            recheck.writes[0]["request_id"].as_str().unwrap(),
+            json!({"pid":123, "current_permission_mode":"default", "session_state":"idle"}),
+        ))
+        .unwrap();
+    let updated = protocol.receive(json!({"type":"system", "subtype":"status", "status":null,
+        "permissionMode":"dontAsk", "uuid":"mode-notification", "session_id":"3ddff71c-4062-4198-a130-502e4c15684e"})).unwrap();
+    assert_eq!(
+        ready_observation(&updated)["rejections"],
+        json!(["mode_changed"])
+    );
+    let RuntimeEventKind::SessionReady {
+        effective_permissions,
+    } = &updated.events[0]
+    else {
+        panic!("expected updated permission observation");
+    };
+    assert_eq!(effective_permissions["permissionMode"], "dontAsk");
+    assert_eq!(
+        effective_permissions["permissionObservation"]["modeAfter"],
+        "default"
     );
 }

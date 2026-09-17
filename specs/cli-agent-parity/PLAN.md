@@ -265,16 +265,18 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 
 | 阶段 | 当前进展 | 尚未满足 |
 | --- | --- | --- |
-| P0 | Codex 0.147.0 已实测双轮、允许/拒绝、steer 接收、取消及新进程 resume；Claude 2.1.273 与 Grok 1.0.30 已采集真实控制和错误事件；Claude macOS 无凭据初始化及空闲 EOF 自行退出通过，固定 Linux/Windows 原生文件完整下载与摘要核验通过 | Claude 缺测试登录；第三轮 Linux 的无凭据原生初始化/EOF 通过，Windows 因前置夹具失败待验；Grok 真实请求 402 额度耗尽；最低版本范围未完成 |
-| P1 | Grok 身份、发现、版本探测、技能源已实现；管理命令排除、输入代次隔离已有回归 | 附件失败/连续提交/语音旧回调保护、托管图片/文件/技能/评审入口均已接入并新增回归；最终测试、三方真实 PTY 与双语布局未完成 |
-| P2 | OSC 9 不再推断成功；三款普通 PTY Stop 保留响应并显示 Unknown，同回合有效事件仍可处理；Codex bundle7 持久来源、五项原生授权和六张双语说明布局通过；授权冷缓存及按平台正常路径组件核对清单的修复已有本地回归；独立控制 PTY 和原生 Codex TUI 经回环 SSH/tmux 通知传输已有实证 | bundle8 已验证当前通知与英文 Unknown、Unconfirmed 双语布局；中文 Unknown 新事件、英文历史选择框裁切修复及最终同提交 GUI 待验；旧来源回退、build16/19/21 失败保留，build20 相关测试撤下未跑，后续 build23 617 项通过；插件完整组合、其他平台及产品 SSH 交互仍待验；SSH 探针最终 SetEnv 已在干净 dbee1ecae 实跑通过，完整产品 SSH 仍待验 |
-| P3 | Claude/Codex 不再强制越权；本地 Claude 不再改全局配置或自动安装插件；派发前展示原生终端 | Grok/Windows 本地任务扩展、审批全流程实测 |
-| P4 | 已实现 SQLite 提交后确认、输入与新代原子写入、原生会话/历史/父代、消息接收来源、结果原子领取及工具协调器；兼容 PTY 的 Unconfirmed 活动占用与独立索引迁移已实现，真实 SQLite/Diesel 回归进入 build23 并通过；Codex/Claude 已接托管面板，Codex 工具跨进程恢复、两轮/审批/追加/取消/恢复与读图已有 Rust 适配器真实证据；独立进程监督、恢复退出回执与未启动 CAS 已接入，macOS 4 项监督夹具已验证诊断与恢复拒绝；真实 GUI 已完成 Codex 父子双向消息、结果回收和应用重启继续，历史完整结果新增分页查询；跨进程 Sent 故障注入、结果唯一性及无凭据空闲崩溃的恢复拒绝已通过 | Grok 关键执行仍门控；macOS 已追加专属资源域实现，本地 check、国际化 11 项、运行时/信箱 173 项与 command 5 项通过；新 worker 的 4 项 C 监督用例、真实 Codex 缺失会话/空闲崩溃通过；通用 libtest 组以同字节本机副本重验 4 项通过，初次加载停滞原因未明；真实 Codex 运行工具的宿主/CLI 两种崩溃已确认完整清理，旧异常进程组回执继续拒绝恢复；Oz 父历史桥、三方完整流程及最终同提交 GUI 验收仍未完成；Unconfirmed 双语任务详情已在 bundle8 验证，英文历史选择框修复待复验 |
-| P5 | macOS build23 相关 617/617、i18n 11 项、check20 及 Python gate5 76 项通过（gate6 再验 76 项、5.142s）；Linux/Windows workflow 已接固定 Claude 获取及无凭据探针；SSH/tmux 独立记录 | 328d5ed352 第三轮 Linux 已通过本轮全部步骤，GUI integration/full workspace 按配置跳过；Windows 三处夹具修复本机通过、原生复验待新提交；历史选择框及中文 Unknown、最终发布门禁与三方图形/端到端验收仍待完成 |
+| P0 | 固定 Codex 0.147.0、Claude 2.1.273、Grok 1.0.30 的真实接口已有独立证据；第六轮 Windows Grok ACP、Claude 初始化/EOF、Codex 原生插件注册表均通过；Claude 同进程权限查询已接入并通过本地回归 | Claude 缺成功模型登录；Grok 真实请求 402 额度耗尽；权限规则查询不等于沙箱和实际工具权限证明。系统新装 Codex 0.154.0 未纳入受测托管范围，已验证明确拒绝并保留草稿；受测 0.147.0 已恢复为独立固定副本 |
+| P1 | 三方身份、发现、版本和技能来源已实现；7e065 新包 Codex 真实两轮、中英文拼音、图片、技能与评审传递已有新证据 | 同轮文件路径已进入原生输入；私有测试副本漏装同版本 code-mode-host，导致实际工具启动失败，文件读取及第三轮审批未通过。已恢复完整官方包，待原生复验；其余三方真实输入/附件和最终双语布局继续验收 |
+| P2 | 普通 PTY Stop 统一 Unknown 降级，重复/旧事件已有回归；Codex 持久来源和 Grok 插件事务已有对应原生证据 | 第六轮 Windows ConPTY 有诊断 OSC、无实际通知，生产 gate 继续关闭；持久来源探针收尾失败已本地修复，Windows 待复验；插件完整组合及产品 SSH/tmux 待验 |
+| P3 | Claude/Codex 固定绕过审批与 Claude 启动全局配置写入已移除；审批原生 UI/托管入口与策略均有实现 | Claude 父权限只能按已验证快照证明，不能凭 mode 放行；Grok 关键执行未通过，Windows 托管及三方审批完整流程待验 |
+| P4 | SQLite 提交确认、原生会话/父代、消息与结果领取、重连和显式恢复已实现；Oz 普通消息和出站正文已在 7e065 干净提交通过 check、18 项提供商、11 项 i18n 与 965 项相关测试；macOS 资源域两种真实工具崩溃清理有证据 | 当前 Codex GUI 生命周期继续进行；真实 Oz 请求等待用户手动允许专用钥匙串项，电脑操作工具禁止操作该安全窗口。Claude/Grok 完整生命周期和最终同提交三方回收未通过 |
+| P5 | 7e065 干净 macOS 门禁与新包签名通过；第六轮两平台分别保留原生结果和失败；工作流已按真实前置依赖分离 Windows 原生探针与离线 Rust 检查，待同提交执行 | 第六 Linux 全部所选门禁通过（warp 定向 1684 项），Windows 两项探针失败导致本轮 Rust 门禁跳过；后续工作流不能追溯改变本轮。最终完整工作区/GUI/双语/三平台及 SSH/tmux 验收均未收口 |
+
+当前后续检查点 `7e06508554ae64cdd9321e0a69274e3d7b2d55ce` 已提交并推送，包含普通消息投递、提供商请求修复、Grok 只读锁修复和 ConPTY 探针。[第六轮两平台验证](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35126330599)已结束（Linux passed、Windows failed）；干净 macOS 新包构建签名通过（232.035s），GUI/Oz 和双语布局仍待实际验收。
 
 原生 CLI 协议探测与产品集成验收分别记录，前者不能替代后者。未登录、额度耗尽、未运行或失败的验证均不计为完成；独立实现和确定性测试继续推进。
 
-检查点 `94a412eb89` 已保存 Windows 候选启动器字节保留修复和 Oz 最终结果桥回归。[第五轮 Windows 定向验证](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35122575386)已结束：Codex 候选原生 hook 通过，Grok 锁读取失败，整体未通过；第四轮 Linux 成功与 Windows 失败分别保留。P4 新增的 Oz 普通消息授权、投递、出站正文及历史 ID 冲突修复已在第三个 25 文件冻结快照通过 check、提供商 18 项、国际化 11 项及相关 965 项，见 [消息交付说明](OZ_LOCAL_MESSAGE_DELIVERY.md)。最终同提交平台、真实 Oz 模型请求和新包双语布局尚未验收；Windows ConPTY 新探针已通过离线门禁，待下轮原生运行。
+检查点 `94a412eb89` 已保存 Windows 候选启动器字节保留修复和 Oz 最终结果桥回归。[第五轮 Windows 定向验证](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35122575386)已结束：Codex 候选原生 hook 通过，Grok 锁读取失败，整体未通过；第四轮 Linux 成功与 Windows 失败分别保留。P4 新增的 Oz 普通消息授权、投递、出站正文及历史 ID 冲突修复已在第三个 25 文件冻结快照通过 check、提供商 18 项、国际化 11 项及相关 965 项，见 [消息交付说明](OZ_LOCAL_MESSAGE_DELIVERY.md)。最终同提交平台、真实 Oz 模型请求和新包双语布局尚未验收；Windows ConPTY 原生通知在第六轮未到达；新诊断已通过离线门禁，待修正后的原生复验。
 
 新增证据分别见 [Stop 契约审计](STOP_HOOK_COMPLETION_AUDIT.md)、[Unconfirmed 与独立迁移](UNCONFIRMED_TASK_STATE.md)、[Codex 原生 hook 传输](CODEX_HOOK_TRANSPORT_VERIFICATION.md)、[原生 SSH/tmux](CODEX_NATIVE_SSH_TMUX_VERIFICATION.md)、[bundle7 插件与双语布局](validation/macos-gui-bundle7-plugin-report.md)及 [Claude 无凭据验证](CLAUDE_NO_CREDENTIALS_VERIFICATION.md)。build20 只有 i18n 通过，相关测试在编译前主动撤下；build21 的非 UTF-8 文件名夹具被 macOS 文件系统拒绝，未进入产品校验，现限定 Linux 待验。后续 build23 的本地门禁通过仍是 dirty 中间工作树证据，不能替代最终同 SHA。bundle8 已确认当前 GUI 通知、英文 Unknown 与 Unconfirmed 双语任务详情；中文新事件、历史选择框裁切修复及最终同提交 GUI 仍待验。独立传输、初始化或下载不能替代模型生命周期。
 

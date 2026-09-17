@@ -1,0 +1,1389 @@
+{
+  "run": {
+    "conclusion": "failure",
+    "headSha": "7e06508554ae64cdd9321e0a69274e3d7b2d55ce",
+    "jobs": [
+      {
+        "completedAt": "2026-09-16T17:19:00Z",
+        "conclusion": "failure",
+        "databaseId": 104896165834,
+        "name": "Windows x64",
+        "startedAt": "2026-09-16T17:08:46Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-16T17:09:02Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-16T17:08:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:09:22Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "number": 2,
+            "startedAt": "2026-09-16T17:09:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:09:39Z",
+            "conclusion": "success",
+            "name": "Prepare job-local Python for CLI parity verification",
+            "number": 3,
+            "startedAt": "2026-09-16T17:09:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:09:40Z",
+            "conclusion": "success",
+            "name": "Configure Windows build environment",
+            "number": 4,
+            "startedAt": "2026-09-16T17:09:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:09:43Z",
+            "conclusion": "success",
+            "name": "Verify provisioned toolchain",
+            "number": 5,
+            "startedAt": "2026-09-16T17:09:40Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:09:44Z",
+            "conclusion": "success",
+            "name": "Install Node for CLI plugin verification",
+            "number": 6,
+            "startedAt": "2026-09-16T17:09:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:09:45Z",
+            "conclusion": "success",
+            "name": "Test Grok notification plugin scripts",
+            "number": 7,
+            "startedAt": "2026-09-16T17:09:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:09:52Z",
+            "conclusion": "success",
+            "name": "Test notification patch file transactions",
+            "number": 8,
+            "startedAt": "2026-09-16T17:09:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:13:04Z",
+            "conclusion": "success",
+            "name": "Prepare fixed native Codex without credentials",
+            "number": 9,
+            "startedAt": "2026-09-16T17:09:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:15:27Z",
+            "conclusion": "success",
+            "name": "Prepare fixed native Claude without credentials",
+            "number": 10,
+            "startedAt": "2026-09-16T17:13:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:16:34Z",
+            "conclusion": "success",
+            "name": "Prepare fixed native Grok without credentials",
+            "number": 11,
+            "startedAt": "2026-09-16T17:15:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:16:43Z",
+            "conclusion": "success",
+            "name": "Verify fixed Grok unauthenticated ACP boundaries",
+            "number": 12,
+            "startedAt": "2026-09-16T17:16:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:16:46Z",
+            "conclusion": "success",
+            "name": "Verify native Claude initialization and idle EOF",
+            "number": 13,
+            "startedAt": "2026-09-16T17:16:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:11Z",
+            "conclusion": "success",
+            "name": "Verify native Codex plugin registry failure recovery",
+            "number": 14,
+            "startedAt": "2026-09-16T17:16:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "failure",
+            "name": "Verify native Codex persistent plugin source",
+            "number": 15,
+            "startedAt": "2026-09-16T17:17:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "skipped",
+            "name": "Check InfiniShell-Desktop",
+            "number": 16,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "skipped",
+            "name": "Build InfiniShell SSH worker",
+            "number": 17,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "skipped",
+            "name": "Test Windows PowerShell SSH worker arguments",
+            "number": 18,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "skipped",
+            "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+            "number": 19,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "skipped",
+            "name": "Test shared CLI action contracts and skills",
+            "number": 20,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "skipped",
+            "name": "Test CLI harness arguments",
+            "number": 21,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "skipped",
+            "name": "Test bilingual TUI task message states",
+            "number": 22,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "skipped",
+            "name": "Test managed command process ownership",
+            "number": 23,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "skipped",
+            "name": "Build CLI process supervisor",
+            "number": 24,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "skipped",
+            "name": "Test supervisor cleanup after host crash",
+            "number": 25,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:30Z",
+            "conclusion": "skipped",
+            "name": "Verify native recovery and idle-crash boundaries without credentials",
+            "number": 26,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:35Z",
+            "conclusion": "success",
+            "name": "Preserve Windows native CLI boundary evidence",
+            "number": 27,
+            "startedAt": "2026-09-16T17:17:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:35Z",
+            "conclusion": "skipped",
+            "name": "Test rust-genai",
+            "number": 28,
+            "startedAt": "2026-09-16T17:17:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:35Z",
+            "conclusion": "skipped",
+            "name": "Compile GUI integration tests",
+            "number": 29,
+            "startedAt": "2026-09-16T17:17:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:35Z",
+            "conclusion": "skipped",
+            "name": "Run desktop workspace unit tests",
+            "number": 30,
+            "startedAt": "2026-09-16T17:17:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:17:47Z",
+            "conclusion": "success",
+            "name": "Test Windows Git Bash notification payloads",
+            "number": 31,
+            "startedAt": "2026-09-16T17:17:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:18:19Z",
+            "conclusion": "success",
+            "name": "Verify Codex Windows native hooks without model requests",
+            "number": 32,
+            "startedAt": "2026-09-16T17:17:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:18:23Z",
+            "conclusion": "success",
+            "name": "Preserve Codex Windows native hook evidence",
+            "number": 33,
+            "startedAt": "2026-09-16T17:18:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:18:45Z",
+            "conclusion": "failure",
+            "name": "Verify Codex Windows ConPTY notification transport",
+            "number": 34,
+            "startedAt": "2026-09-16T17:18:23Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:18:50Z",
+            "conclusion": "success",
+            "name": "Preserve Codex Windows ConPTY evidence",
+            "number": 35,
+            "startedAt": "2026-09-16T17:18:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:18:51Z",
+            "conclusion": "success",
+            "name": "Report sccache statistics",
+            "number": 36,
+            "startedAt": "2026-09-16T17:18:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:18:51Z",
+            "conclusion": "skipped",
+            "name": "Post Install Node for CLI plugin verification",
+            "number": 71,
+            "startedAt": "2026-09-16T17:18:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:18:54Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "number": 72,
+            "startedAt": "2026-09-16T17:18:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:18:54Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 73,
+            "startedAt": "2026-09-16T17:18:54Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35126330599/job/104896165834"
+      },
+      {
+        "completedAt": "2026-09-16T17:42:25Z",
+        "conclusion": "success",
+        "databaseId": 104896166333,
+        "name": "Linux x64",
+        "startedAt": "2026-09-16T17:08:44Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-09-16T17:09:03Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-09-16T17:08:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:10:48Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "number": 2,
+            "startedAt": "2026-09-16T17:09:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:10:48Z",
+            "conclusion": "success",
+            "name": "Install Python for CLI parity verification",
+            "number": 3,
+            "startedAt": "2026-09-16T17:10:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:10:48Z",
+            "conclusion": "success",
+            "name": "Verify provisioned toolchain",
+            "number": 4,
+            "startedAt": "2026-09-16T17:10:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:10:49Z",
+            "conclusion": "success",
+            "name": "Install Node for CLI plugin verification",
+            "number": 5,
+            "startedAt": "2026-09-16T17:10:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:10:49Z",
+            "conclusion": "success",
+            "name": "Test Grok notification plugin scripts",
+            "number": 6,
+            "startedAt": "2026-09-16T17:10:49Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:10:51Z",
+            "conclusion": "success",
+            "name": "Test notification patch file transactions",
+            "number": 7,
+            "startedAt": "2026-09-16T17:10:49Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:11:58Z",
+            "conclusion": "success",
+            "name": "Prepare fixed native Codex without credentials",
+            "number": 8,
+            "startedAt": "2026-09-16T17:10:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:14:11Z",
+            "conclusion": "success",
+            "name": "Prepare fixed native Claude without credentials",
+            "number": 9,
+            "startedAt": "2026-09-16T17:11:58Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:15:36Z",
+            "conclusion": "success",
+            "name": "Prepare fixed native Grok without credentials",
+            "number": 10,
+            "startedAt": "2026-09-16T17:14:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:15:45Z",
+            "conclusion": "success",
+            "name": "Verify fixed Grok unauthenticated ACP boundaries",
+            "number": 11,
+            "startedAt": "2026-09-16T17:15:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:15:46Z",
+            "conclusion": "success",
+            "name": "Verify native Claude initialization and idle EOF",
+            "number": 12,
+            "startedAt": "2026-09-16T17:15:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:15:57Z",
+            "conclusion": "success",
+            "name": "Verify native Codex plugin registry failure recovery",
+            "number": 13,
+            "startedAt": "2026-09-16T17:15:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:16:04Z",
+            "conclusion": "success",
+            "name": "Verify native Codex persistent plugin source",
+            "number": 14,
+            "startedAt": "2026-09-16T17:15:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:16:09Z",
+            "conclusion": "success",
+            "name": "Test Claude and Codex Bash notification payloads",
+            "number": 15,
+            "startedAt": "2026-09-16T17:16:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:16:09Z",
+            "conclusion": "success",
+            "name": "Test Unix PTY notification framing",
+            "number": 16,
+            "startedAt": "2026-09-16T17:16:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:20:02Z",
+            "conclusion": "success",
+            "name": "Check InfiniShell-Desktop",
+            "number": 17,
+            "startedAt": "2026-09-16T17:16:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:27:32Z",
+            "conclusion": "success",
+            "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+            "number": 18,
+            "startedAt": "2026-09-16T17:20:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:28:11Z",
+            "conclusion": "success",
+            "name": "Test shared CLI action contracts and skills",
+            "number": 19,
+            "startedAt": "2026-09-16T17:27:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:28:38Z",
+            "conclusion": "success",
+            "name": "Test CLI harness arguments",
+            "number": 20,
+            "startedAt": "2026-09-16T17:28:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:33:39Z",
+            "conclusion": "success",
+            "name": "Test bilingual TUI task message states",
+            "number": 21,
+            "startedAt": "2026-09-16T17:28:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:33:57Z",
+            "conclusion": "success",
+            "name": "Test managed command process ownership",
+            "number": 22,
+            "startedAt": "2026-09-16T17:33:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:41:04Z",
+            "conclusion": "success",
+            "name": "Build CLI process supervisor",
+            "number": 23,
+            "startedAt": "2026-09-16T17:33:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:41:09Z",
+            "conclusion": "success",
+            "name": "Test supervisor cleanup after host crash",
+            "number": 24,
+            "startedAt": "2026-09-16T17:41:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:41:38Z",
+            "conclusion": "success",
+            "name": "Verify native recovery and idle-crash boundaries without credentials",
+            "number": 25,
+            "startedAt": "2026-09-16T17:41:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:41:42Z",
+            "conclusion": "success",
+            "name": "Preserve Linux native CLI boundary evidence",
+            "number": 26,
+            "startedAt": "2026-09-16T17:41:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:42:12Z",
+            "conclusion": "success",
+            "name": "Test rust-genai",
+            "number": 27,
+            "startedAt": "2026-09-16T17:41:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:42:12Z",
+            "conclusion": "skipped",
+            "name": "Compile GUI integration tests",
+            "number": 28,
+            "startedAt": "2026-09-16T17:42:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:42:12Z",
+            "conclusion": "skipped",
+            "name": "Run desktop workspace unit tests",
+            "number": 29,
+            "startedAt": "2026-09-16T17:42:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:42:12Z",
+            "conclusion": "success",
+            "name": "Post Install Node for CLI plugin verification",
+            "number": 56,
+            "startedAt": "2026-09-16T17:42:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:42:12Z",
+            "conclusion": "success",
+            "name": "Post Install Python for CLI parity verification",
+            "number": 57,
+            "startedAt": "2026-09-16T17:42:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:42:12Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "number": 58,
+            "startedAt": "2026-09-16T17:42:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-09-16T17:42:12Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 59,
+            "startedAt": "2026-09-16T17:42:12Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35126330599/job/104896166333"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35126330599"
+  },
+  "requested_inputs": {
+    "run_linux": true,
+    "run_windows": true,
+    "full_workspace_tests": false
+  },
+  "overall_verification": "failed",
+  "linux_collection_complete": true,
+  "artifacts": [
+    {
+      "id": 10460528949,
+      "node_id": "MDg6QXJ0aWZhY3QxMDQ2MDUyODk0OQ==",
+      "name": "cli-linux-native-boundaries-7e06508554ae64cdd9321e0a69274e3d7b2d55ce",
+      "size_in_bytes": 19255,
+      "url": "https://api.github.com/repos/Infinimesh-ai/InfiniShell-Desktop/actions/artifacts/10460528949",
+      "archive_download_url": "https://api.github.com/repos/Infinimesh-ai/InfiniShell-Desktop/actions/artifacts/10460528949/zip",
+      "expired": false,
+      "digest": "sha256:3e60f861b37f2b25542db0baa84eebae99dcb1f13acaef428298813556e1c39e",
+      "created_at": "2026-09-16T17:41:41Z",
+      "updated_at": "2026-09-16T17:41:41Z",
+      "expires_at": "2026-09-30T17:41:38Z",
+      "workflow_run": {
+        "id": 35126330599,
+        "repository_id": 1278707472,
+        "head_repository_id": 1278707472,
+        "head_branch": "codex/cli-agent-parity",
+        "head_sha": "7e06508554ae64cdd9321e0a69274e3d7b2d55ce"
+      }
+    },
+    {
+      "id": 10460110642,
+      "node_id": "MDg6QXJ0aWZhY3QxMDQ2MDExMDY0Mg==",
+      "name": "codex-windows-conpty-7e06508554ae64cdd9321e0a69274e3d7b2d55ce",
+      "size_in_bytes": 32071,
+      "url": "https://api.github.com/repos/Infinimesh-ai/InfiniShell-Desktop/actions/artifacts/10460110642",
+      "archive_download_url": "https://api.github.com/repos/Infinimesh-ai/InfiniShell-Desktop/actions/artifacts/10460110642/zip",
+      "expired": false,
+      "digest": "sha256:d30ee1df5980e98b9ff10ce1a4696ab100f473b53f578b9b5b77adc766f77253",
+      "created_at": "2026-09-16T17:18:50Z",
+      "updated_at": "2026-09-16T17:18:50Z",
+      "expires_at": "2026-09-30T17:18:45Z",
+      "workflow_run": {
+        "id": 35126330599,
+        "repository_id": 1278707472,
+        "head_repository_id": 1278707472,
+        "head_branch": "codex/cli-agent-parity",
+        "head_sha": "7e06508554ae64cdd9321e0a69274e3d7b2d55ce"
+      }
+    },
+    {
+      "id": 10459677980,
+      "node_id": "MDg6QXJ0aWZhY3QxMDQ1OTY3Nzk4MA==",
+      "name": "codex-windows-native-hooks-7e06508554ae64cdd9321e0a69274e3d7b2d55ce",
+      "size_in_bytes": 29885,
+      "url": "https://api.github.com/repos/Infinimesh-ai/InfiniShell-Desktop/actions/artifacts/10459677980",
+      "archive_download_url": "https://api.github.com/repos/Infinimesh-ai/InfiniShell-Desktop/actions/artifacts/10459677980/zip",
+      "expired": false,
+      "digest": "sha256:2a1346a3deeca082bd587148424f9f46a9a7bbdb3e939b2790ac517e9e0559ea",
+      "created_at": "2026-09-16T17:18:23Z",
+      "updated_at": "2026-09-16T17:18:23Z",
+      "expires_at": "2026-09-30T17:18:19Z",
+      "workflow_run": {
+        "id": 35126330599,
+        "repository_id": 1278707472,
+        "head_repository_id": 1278707472,
+        "head_branch": "codex/cli-agent-parity",
+        "head_sha": "7e06508554ae64cdd9321e0a69274e3d7b2d55ce"
+      }
+    },
+    {
+      "id": 10459602910,
+      "node_id": "MDg6QXJ0aWZhY3QxMDQ1OTYwMjkxMA==",
+      "name": "cli-windows-native-boundaries-7e06508554ae64cdd9321e0a69274e3d7b2d55ce",
+      "size_in_bytes": 11960,
+      "url": "https://api.github.com/repos/Infinimesh-ai/InfiniShell-Desktop/actions/artifacts/10459602910",
+      "archive_download_url": "https://api.github.com/repos/Infinimesh-ai/InfiniShell-Desktop/actions/artifacts/10459602910/zip",
+      "expired": false,
+      "digest": "sha256:0d899a252616ad18bf77937e2b9f89cf50dc3c9add5be6f44d94a8a1febc5c72",
+      "created_at": "2026-09-16T17:17:34Z",
+      "updated_at": "2026-09-16T17:17:34Z",
+      "expires_at": "2026-09-30T17:17:31Z",
+      "workflow_run": {
+        "id": 35126330599,
+        "repository_id": 1278707472,
+        "head_repository_id": 1278707472,
+        "head_branch": "codex/cli-agent-parity",
+        "head_sha": "7e06508554ae64cdd9321e0a69274e3d7b2d55ce"
+      }
+    }
+  ],
+  "local_raw_evidence_directory": "/tmp/infinishell-sixth-platform-7e0650855",
+  "raw_file_digests": {
+    "windows-native-boundaries/codex-plugin-lifecycle.json": {
+      "bytes": 25742,
+      "sha256": "f1234fb32ef1bd299266bbb966ca33e9727b89bcfb51ca4030076fc3eef76547"
+    },
+    "windows-native-boundaries/grok-fixed-acp.json": {
+      "bytes": 14954,
+      "sha256": "88bca18e95ad3fdfcf1682486c5b1a6121e9812d56d6b15e4e19ee16f2522524"
+    },
+    "windows-native-boundaries/claude-initialize-idle-eof.json": {
+      "bytes": 3097,
+      "sha256": "aabfba10a65a98fc3f123d16412f760cc694119bb7c2755dbd8a2735dbeb8268"
+    },
+    "windows-native-boundaries/codex-plugin-cache-refresh.json": {
+      "bytes": 15997,
+      "sha256": "88dfb827f8991975a615ecc50503477335a1340cc442052bbbd93d5ffaf68cf7"
+    },
+    "windows-native-boundaries/claude-21273-inputs/claude-fixed-inputs.json": {
+      "bytes": 494,
+      "sha256": "d24604d73edffafc0d49d4e1de5e758f03e35e539dc4083e312c4b5ce132888f"
+    },
+    "windows-native-boundaries/grok-cli-fixed/grok-fixed-inputs.json": {
+      "bytes": 569,
+      "sha256": "b63784c0ff6a65ee4904271740d39913895afea441218bbe3aa9a9cd98d84028"
+    },
+    "windows-native-hooks/codex-windows-native-hooks.json": {
+      "bytes": 384622,
+      "sha256": "e696bb420f0dd36122346ff71d6636804a1cd07b97b8ae644538865fd4e255c5"
+    },
+    "windows-conpty/codex-windows-conpty.json": {
+      "bytes": 3701,
+      "sha256": "a9f55529c650003962190d1f8577b9ddd2fd3cc4e6d5233ec2594b1f44ea452d"
+    },
+    "windows-conpty/codex-windows-conpty.pty.bin": {
+      "bytes": 802,
+      "sha256": "cd07b30cb800f3d9ac66bff4cedc646b112b3767dfaf928a44e96a5372a91c5d"
+    },
+    "windows-conpty/codex-windows-conpty.native.json": {
+      "bytes": 405628,
+      "sha256": "39558548fec72f6d4d6541ced80ba9300170a290d2ab73762ed326475e6ccea8"
+    },
+    "linux-native-boundaries/codex-plugin-lifecycle.json": {
+      "bytes": 28843,
+      "sha256": "857e04f95eaa60b42e58ae503224319be76b8ee7ed63dcd36eeb44d467620b6d"
+    },
+    "linux-native-boundaries/codex-missing-session.metadata.json": {
+      "bytes": 708,
+      "sha256": "da9984a165e15c54d09848fe0d85e9ec5ebb54d90b22e083b15104ccb11ceff2"
+    },
+    "linux-native-boundaries/grok-fixed-acp.json": {
+      "bytes": 14758,
+      "sha256": "254c0558468d0f66257d2b31fe9d933c3be39609822c0b804a9f4364a59a84ce"
+    },
+    "linux-native-boundaries/codex-idle-crash.metadata.json": {
+      "bytes": 737,
+      "sha256": "286ebbd1af3f3d3a71bf3ff9779dbf5e524e71569f55fdc5d7dea9bc2aad0496"
+    },
+    "linux-native-boundaries/codex-idle-crash.test-output.txt": {
+      "bytes": 485,
+      "sha256": "fbcdebdefb00b4392ae67c49550ae357903f1bd386412703330efbd20b0e4d2c"
+    },
+    "linux-native-boundaries/codex-idle-crash.ndjson": {
+      "bytes": 2571,
+      "sha256": "d733536756c0bb7a740f04fa500c3a2e7cb286e54b664ba7a1bdabd2af515beb"
+    },
+    "linux-native-boundaries/codex-missing-session.ndjson": {
+      "bytes": 594,
+      "sha256": "49981c49b92bb0302d3f195483365ee95d5e2a62207e05b275a23c910134c6c5"
+    },
+    "linux-native-boundaries/claude-initialize-idle-eof.json": {
+      "bytes": 3091,
+      "sha256": "aa71fae5a11a655dd9e22562f2eaa07bf114648b1792b0d80ae7bdc9fe161038"
+    },
+    "linux-native-boundaries/codex-plugin-cache-refresh.json": {
+      "bytes": 78289,
+      "sha256": "6ad1e10f4d374600276540a86d3fe3062ba9e7f92349948f157750fe41c5c11c"
+    },
+    "linux-native-boundaries/codex-missing-session.test-output.txt": {
+      "bytes": 465,
+      "sha256": "2564010c6ae5b35209fcf14f778a7d00e3766263235edf58d58e19e9216023ff"
+    },
+    "linux-native-boundaries/claude-21273-inputs/claude-fixed-inputs.json": {
+      "bytes": 486,
+      "sha256": "ab39a24c8e2cec7703fb49c3993c72e06a077379eeabc4db71df9c3c2ac68bc6"
+    },
+    "linux-native-boundaries/grok-cli-fixed/grok-fixed-inputs.json": {
+      "bytes": 553,
+      "sha256": "a5400e8e9fb8e3e14d0e16430823aeadcd7318d002fddc9bf45bb13147c80740"
+    },
+    "windows-job.log": {
+      "bytes": 105640,
+      "sha256": "a5b7964556e857a615dfbebc6bc04d0505bf57ae461e6d22d12d78dcb1c72c34"
+    },
+    "linux-job.log": {
+      "bytes": 1213744,
+      "sha256": "e8d82000a91ea131c513ecce96e62561aabc4e78a5a7ff79c02a8ded3a957e1d"
+    }
+  },
+  "windows": {
+    "conclusion": "failure",
+    "first_failure": {
+      "step": "Verify native Codex persistent plugin source",
+      "primary_exception_type": "ValueError",
+      "primary_message": "原生输出读取失败或没有结束: []",
+      "raw_log_lines": [
+        638,
+        655
+      ],
+      "primary_location": "probe_codex_windows_hooks.py:87 NativeRecorder.close",
+      "phase": "cache_only_restart",
+      "background_reverted_to_upstream": true,
+      "same_id_migration_started": false,
+      "cleanup_exception_type": "PermissionError",
+      "cleanup_winerror": 32,
+      "cleanup_file_category": "private CODEX_HOME/.tmp/plugins-clone-*/.git/objects/pack/tmp_pack_*",
+      "json_primary_was_masked_by_cleanup": true,
+      "raw_cleanup_log_lines": [
+        657,
+        691
+      ],
+      "descendant_identity_observed": false,
+      "natural_complete_shutdown_verified": false
+    },
+    "grok_fixed_acp": {
+      "passed": true,
+      "repository_commit": "7e06508554ae64cdd9321e0a69274e3d7b2d55ce",
+      "worktree_dirty": false,
+      "leader_identity_read_mode": "read_only_mmap",
+      "cases": [
+        {
+          "method": "initialize",
+          "request_id": "93e3e52b-a8de-4ba9-88df-32b4fec954c9:initialize",
+          "status": "passed",
+          "protocol_version": 1,
+          "agent_version": "1.0.30",
+          "auth_method_ids": [
+            "grok.com"
+          ],
+          "reported_capabilities": {
+            "loadSession": true,
+            "promptCapabilities": {
+              "image": false,
+              "audio": false,
+              "embeddedContext": true
+            },
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "sessionCapabilities": {
+              "list": {},
+              "resume": {},
+              "close": {}
+            },
+            "auth": {},
+            "_meta": {
+              "x.ai/fs_notify": true,
+              "x.ai/hooks": {
+                "blockingEvents": [
+                  "pre_tool_use",
+                  "stop",
+                  "subagent_stop"
+                ],
+                "decisions": [
+                  "deny",
+                  "block"
+                ],
+                "stopSignals": [
+                  "continue",
+                  "stopReason",
+                  "additionalContext"
+                ]
+              },
+              "x.ai/capabilities": {
+                "toolOverrides": {
+                  "x_keyword_search": true,
+                  "x_semantic_search": true,
+                  "x_user_search": false,
+                  "x_thread_fetch": false
+                }
+              }
+            }
+          }
+        },
+        {
+          "method": "session/new",
+          "request_id": "93e3e52b-a8de-4ba9-88df-32b4fec954c9:new",
+          "status": "blocked_by_auth",
+          "error": {
+            "code": -32000,
+            "message": "Authentication required",
+            "data": "no auth method id provided"
+          },
+          "session_created": false
+        },
+        {
+          "method": "session/cancel",
+          "request_id": null,
+          "status": "notification_sent_without_ack",
+          "session_exists": false,
+          "active_turn_exists": false,
+          "running_turn_cancelled": false
+        },
+        {
+          "method": "session/load",
+          "request_id": "93e3e52b-a8de-4ba9-88df-32b4fec954c9:load",
+          "status": "missing_session_rejected",
+          "error": {
+            "code": -32603,
+            "message": "Path not found.",
+            "data": {
+              "detail": "系统找不到指定的路径。 (os error 3)",
+              "code": "FS_NOT_FOUND"
+            }
+          },
+          "history_restored": false
+        },
+        {
+          "method": "session/resume",
+          "request_id": "93e3e52b-a8de-4ba9-88df-32b4fec954c9:resume",
+          "status": "missing_session_rejected",
+          "error": {
+            "code": -32603,
+            "message": "Path not found.",
+            "data": {
+              "detail": "系统找不到指定的路径。 (os error 3)",
+              "code": "FS_NOT_FOUND"
+            }
+          },
+          "history_restored": false
+        }
+      ],
+      "stdio_eof": {
+        "alive_before_stdin_eof": true,
+        "stdin_eof_exited_within_5s": true,
+        "exit_code_before_cleanup": 0,
+        "eof_elapsed_ms": 2142
+      },
+      "leader_after_stdio_eof": {
+        "exited_within_5s": false,
+        "exit_code_before_cleanup": null,
+        "elapsed_ms": 5004
+      },
+      "cleanup": {
+        "stdio": {
+          "forced_termination": false,
+          "exit_code": 0,
+          "owned_process_exited": true
+        },
+        "leader": {
+          "forced_termination": true,
+          "exit_code": 1,
+          "owned_process_exited": true
+        }
+      },
+      "private_directory_removed": true,
+      "credentials_provided": false,
+      "model_input_submitted": false,
+      "model_http_traffic_measured": false,
+      "running_approval_verified": false,
+      "running_cancel_verified": false,
+      "history_recovery_verified": false
+    },
+    "claude_idle": {
+      "passed": true,
+      "repository_commit": "7e06508554ae64cdd9321e0a69274e3d7b2d55ce",
+      "worktree_dirty": false,
+      "expected_version": "2.1.273",
+      "initialize_confirmed": true,
+      "eof_elapsed_ms": 41,
+      "exit_code_before_cleanup": 0,
+      "forced_cleanup_used": false,
+      "model_commands_sent": 0,
+      "production_rust_adapter_verified": false
+    },
+    "codex_registry": {
+      "passed": true,
+      "checks": {
+        "missing_install_preserves_config": true,
+        "native_disable_persisted": true,
+        "failed_native_reinstall_preserves_config_and_cache": true,
+        "native_add_reenables_disabled_plugin": true,
+        "explicit_native_disable_restores_original_config_bytes": true,
+        "source_manifest_restored": true,
+        "native_remove_deleted_cache_and_preserved_source": true,
+        "unrelated_isolated_user_settings_unchanged": true
+      },
+      "product_installer_exercised": false,
+      "model_entrypoints_called": [],
+      "native_hook_execution_verified": false
+    },
+    "codex_native_hooks": {
+      "passed": true,
+      "checks": {
+        "encoding": {
+          "source_sha256_lf_utf8": "327603d72b007e9ea68a3902cee3f8b4cda4ebd70c6729826f58de79651d8952",
+          "command_characters": {
+            "on-session-start.sh": 7238,
+            "on-prompt-submit.sh": 7238,
+            "on-stop.sh": 7214,
+            "on-permission-request.sh": 7250,
+            "on-post-tool-use.sh": 7238
+          },
+          "encoding_roundtrip": true
+        },
+        "powershell_51_syntax": true,
+        "native_argv_roundtrip": true,
+        "native_bytes_and_cmd_boundary": {
+          "raw_stdin_stdout_roundtrip": true,
+          "cmd_8191_executed": true,
+          "cmd_8192_rejected_before_execution": true
+        },
+        "zero_model_requests": true,
+        "source_inputs_unchanged": true
+      },
+      "model_http_requests": [],
+      "cases": [
+        {
+          "name": "插件 空 格",
+          "passed": true,
+          "native_session_start": true,
+          "native_user_prompt_submit": true,
+          "native_prompt_blocked": true,
+          "model_http_requests": 0
+        },
+        {
+          "name": "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()",
+          "passed": true,
+          "native_session_start": true,
+          "native_user_prompt_submit": true,
+          "native_prompt_blocked": true,
+          "model_http_requests": 0
+        }
+      ],
+      "native_conpty_notifications_verified": false,
+      "full_lifecycle_verified": false
+    },
+    "codex_conpty": {
+      "passed": false,
+      "raw_sha256": "cd07b30cb800f3d9ac66bff4cedc646b112b3767dfaf928a44e96a5372a91c5d",
+      "raw_bytes": 802,
+      "conout_canary_observed": true,
+      "driver_exit_code": 0,
+      "native_cases_passed": true,
+      "model_http_requests": [],
+      "failure": {
+        "type": "ValueError",
+        "message": "插件 空 格 的 session_start 必须真实且仅出现一次，实际 0"
+      },
+      "native_codex_console_membership_checks": 4,
+      "ordinary_codex_tui_verified": false,
+      "product_ui_notifications_verified": false
+    },
+    "rust_gates_skipped_after_probe_failure": true,
+    "duration_seconds": 614,
+    "successful_steps": 22,
+    "failed_steps": 2,
+    "skipped_steps": 15,
+    "grok_offline_suite": {
+      "tests": 17,
+      "execution_seconds": 0.402,
+      "real_windows_lockfile_case_passed": true,
+      "source_log_line": 493
+    }
+  },
+  "post_run_changes_not_tested_by_this_sha": [
+    "cache-refresh 专用 Windows Job、首因保留、完整收尾与原生回归，待下一提交实跑",
+    "ConPTY 临时诊断由独立代理处理；本次 0 个匹配仍保留为失败",
+    "工作流将独立 Rust 门禁与原生探针失败解耦；不改变本次跳过事实"
+  ],
+  "scope": {
+    "dispatch_repeated": false,
+    "ssh_used": false,
+    "local_cargo_run_by_collector": false,
+    "user_configuration_changed": false,
+    "main_documents_changed": false,
+    "windows_production_auto_install_opened": false,
+    "full_authenticated_lifecycle_verified": false
+  },
+  "redaction": "仅摘要入库；原始用户名、主机名、私有目录与完整 hook 定义留在受控 artifact/本地回收目录。原生协议请求 ID 保留。",
+  "linux": {
+    "conclusion": "success",
+    "duration_seconds": 2021,
+    "successful_steps": 31,
+    "configured_skipped_steps": 2,
+    "gates": {
+      "cargo_check_warp_lib": {
+        "passed": true,
+        "elapsed_seconds": 232
+      },
+      "warp_focused": {
+        "passed": 1684,
+        "skipped": 4788,
+        "execution_seconds": 19.435
+      },
+      "ai_contracts_skills": {
+        "passed": 71,
+        "skipped": 220,
+        "execution_seconds": 0.07
+      },
+      "warp_cli": {
+        "passed": 128,
+        "skipped": 0,
+        "execution_seconds": 0.158
+      },
+      "tui_task_message_labels": {
+        "passed": 9,
+        "skipped": 927,
+        "execution_seconds": 0.317
+      },
+      "managed_command": {
+        "passed": 1,
+        "skipped": 14,
+        "execution_seconds": 0.217
+      },
+      "supervisor_build": {
+        "passed": true,
+        "elapsed_seconds": 426
+      },
+      "supervisor_host_crash": {
+        "passed": 4,
+        "skipped": 6468,
+        "execution_seconds": 1.663
+      },
+      "rust_genai": {
+        "passed": 81,
+        "failed": 0
+      },
+      "bash_payload": {
+        "passed": 13
+      },
+      "unix_pty": {
+        "passed": 4
+      },
+      "python_suite_counts": [
+        13,
+        10,
+        8,
+        15,
+        4,
+        2,
+        6,
+        10,
+        17,
+        9
+      ],
+      "python_windows_only_lockfile_test_skipped_on_linux": true,
+      "gui_integration_compile": "skipped_by_input",
+      "full_workspace_suite": "skipped_by_input"
+    },
+    "grok_fixed_acp": {
+      "passed": true,
+      "repository_commit": "7e06508554ae64cdd9321e0a69274e3d7b2d55ce",
+      "worktree_dirty": false,
+      "leader_identity_read_mode": "regular_read",
+      "cases": [
+        {
+          "method": "initialize",
+          "request_id": "fe20aa43-8cf9-4caa-846d-693863de5913:initialize",
+          "status": "passed",
+          "protocol_version": 1,
+          "agent_version": "1.0.30",
+          "auth_method_ids": [
+            "grok.com"
+          ],
+          "reported_capabilities": {
+            "loadSession": true,
+            "promptCapabilities": {
+              "image": false,
+              "audio": false,
+              "embeddedContext": true
+            },
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "sessionCapabilities": {
+              "list": {},
+              "resume": {},
+              "close": {}
+            },
+            "auth": {},
+            "_meta": {
+              "x.ai/fs_notify": true,
+              "x.ai/hooks": {
+                "blockingEvents": [
+                  "pre_tool_use",
+                  "stop",
+                  "subagent_stop"
+                ],
+                "decisions": [
+                  "deny",
+                  "block"
+                ],
+                "stopSignals": [
+                  "continue",
+                  "stopReason",
+                  "additionalContext"
+                ]
+              },
+              "x.ai/capabilities": {
+                "toolOverrides": {
+                  "x_keyword_search": true,
+                  "x_semantic_search": true,
+                  "x_user_search": false,
+                  "x_thread_fetch": false
+                }
+              }
+            }
+          }
+        },
+        {
+          "method": "session/new",
+          "request_id": "fe20aa43-8cf9-4caa-846d-693863de5913:new",
+          "status": "blocked_by_auth",
+          "error": {
+            "code": -32000,
+            "message": "Authentication required",
+            "data": "no auth method id provided"
+          },
+          "session_created": false
+        },
+        {
+          "method": "session/cancel",
+          "request_id": null,
+          "status": "notification_sent_without_ack",
+          "session_exists": false,
+          "active_turn_exists": false,
+          "running_turn_cancelled": false
+        },
+        {
+          "method": "session/load",
+          "request_id": "fe20aa43-8cf9-4caa-846d-693863de5913:load",
+          "status": "missing_session_rejected",
+          "error": {
+            "code": -32603,
+            "message": "Path not found.",
+            "data": {
+              "detail": "No such file or directory (os error 2)",
+              "code": "FS_NOT_FOUND"
+            }
+          },
+          "history_restored": false
+        },
+        {
+          "method": "session/resume",
+          "request_id": "fe20aa43-8cf9-4caa-846d-693863de5913:resume",
+          "status": "missing_session_rejected",
+          "error": {
+            "code": -32603,
+            "message": "Path not found.",
+            "data": {
+              "detail": "No such file or directory (os error 2)",
+              "code": "FS_NOT_FOUND"
+            }
+          },
+          "history_restored": false
+        }
+      ],
+      "stdio_eof": {
+        "alive_before_stdin_eof": true,
+        "stdin_eof_exited_within_5s": true,
+        "exit_code_before_cleanup": 0,
+        "eof_elapsed_ms": 2121
+      },
+      "leader_after_stdio_eof": {
+        "exited_within_5s": false,
+        "exit_code_before_cleanup": null,
+        "elapsed_ms": 5000
+      },
+      "cleanup": {
+        "stdio": {
+          "forced_termination": false,
+          "exit_code": 0,
+          "owned_process_exited": true
+        },
+        "leader": {
+          "forced_termination": true,
+          "exit_code": -9,
+          "owned_process_exited": true
+        }
+      },
+      "private_directory_removed": true,
+      "credentials_provided": false,
+      "model_input_submitted": false,
+      "model_http_traffic_measured": false,
+      "running_approval_verified": false,
+      "running_cancel_verified": false,
+      "history_recovery_verified": false
+    },
+    "claude_idle": {
+      "passed": true,
+      "repository_commit": "7e06508554ae64cdd9321e0a69274e3d7b2d55ce",
+      "worktree_dirty": false,
+      "expected_version": "2.1.273",
+      "initialize_confirmed": true,
+      "eof_elapsed_ms": 64,
+      "exit_code_before_cleanup": 0,
+      "forced_cleanup_used": false,
+      "model_commands_sent": 0,
+      "production_rust_adapter_verified": false
+    },
+    "codex_registry": {
+      "passed": true,
+      "checks": {
+        "missing_install_preserves_config": true,
+        "native_disable_persisted": true,
+        "failed_native_reinstall_preserves_config_and_cache": true,
+        "native_add_reenables_disabled_plugin": true,
+        "explicit_native_disable_restores_original_config_bytes": true,
+        "source_manifest_restored": true,
+        "native_remove_deleted_cache_and_preserved_source": true,
+        "unrelated_isolated_user_settings_unchanged": true
+      },
+      "product_installer_exercised": false,
+      "model_entrypoints_called": [],
+      "native_hook_execution_verified": false
+    },
+    "codex_persistent_source": {
+      "passed": true,
+      "checks": {
+        "cache_only_patch_reverted_by_native_startup": true,
+        "same_commit_first_refresh_reinstalled_cache": true,
+        "complete_other_plugin_sources_preserved": true,
+        "installed_orchestration_cache_and_disabled_config_preserved": true,
+        "same_plugin_id_preserved": true,
+        "other_marketplace_preserved": true,
+        "owned_source_survives_native_reinstall_and_restarts": true,
+        "explicit_disabled_state_survives_restart": true,
+        "no_automatic_hook_trust": true,
+        "native_remove_add_failure_gap_observed": true,
+        "disabled_native_source_recovery_preserved_cache": true
+      },
+      "credentials_provided": false,
+      "thread_or_turn_created": false,
+      "product_installer_fixed": false,
+      "native_pty_verified": false
+    },
+    "codex_adapter_missing_session": {
+      "test": "ai::cli_agent_runtime::codex::tests::live_codex_missing_session_is_not_replaced",
+      "test_case": "missing-session",
+      "scope": "rust_adapter_missing_session",
+      "credentials_provided": false,
+      "model_requests_expected": false,
+      "app_restart_and_ui_verified": false,
+      "test_binary_sha256": "09b391ed59f196d36ebe5d28809e2adf6d3d9ca0481666eb962f32d070863f1c",
+      "supervisor_binary_sha256": "18cbbe67eceff480b0b0bb2513dff76709269a0632049ef3ccf46a318339aca5",
+      "supervised_process_lifecycle": true,
+      "platform": "linux",
+      "commit": "7e06508554ae64cdd9321e0a69274e3d7b2d55ce",
+      "worktree_dirty": false,
+      "cli_version": "codex-cli 0.147.0",
+      "test_exit_code": 0,
+      "acceptance_passed": true
+    },
+    "codex_adapter_idle_crash": {
+      "test": "ai::cli_agent_runtime::codex::tests::idle_crash::live_codex_idle_crash_after_ready_disconnects_once",
+      "test_case": "idle-crash",
+      "scope": "rust_adapter_idle_crash_after_native_ready",
+      "credentials_provided": false,
+      "model_requests_expected": false,
+      "app_restart_and_ui_verified": false,
+      "test_binary_sha256": "09b391ed59f196d36ebe5d28809e2adf6d3d9ca0481666eb962f32d070863f1c",
+      "supervisor_binary_sha256": "18cbbe67eceff480b0b0bb2513dff76709269a0632049ef3ccf46a318339aca5",
+      "supervised_process_lifecycle": true,
+      "platform": "linux",
+      "commit": "7e06508554ae64cdd9321e0a69274e3d7b2d55ce",
+      "worktree_dirty": false,
+      "cli_version": "codex-cli 0.147.0",
+      "test_exit_code": 0,
+      "acceptance_passed": true
+    },
+    "idle_crash_result": {
+      "passed": true,
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "linux_subtree",
+        "exit_code": null,
+        "exit_reason": "stdio_closed",
+        "generation": "59f33e4c-e93b-4005-84f3-05a5abdcbf19",
+        "manifest_sha256": "4d76342237d0a8fffbbe3d304db027eadf250b15a5ff78200ae5207d5d8007a9",
+        "version": 1
+      },
+      "idle_process_cleanup_confirmed": true,
+      "model_commands_sent": 0,
+      "native_root_exit_observed": true,
+      "running_tool_tree_cleanup_verified": false,
+      "termination_mechanism": "linux_pidfd_send_signal",
+      "app_restart_and_ui_verified": false
+    }
+  }
+}

@@ -67,18 +67,12 @@
 
 ## 提交验收进度
 
-实现检查点 `dbee1ecae81da54a1749de88a7caffb3099d7eb7` 已推送。干净 macOS 的 cargo check、Python 76 项、Grok Node 11 项及两项无模型原生边界已有同提交证据；Linux/Windows [预检](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35100708171)因 Python 工具链不满足要求失败，Rust 与原生 CLI 尚未执行。详见 [当前验证记录](VALIDATION_REPORT.md#当前提交验证)。
+最新检查点 `7e06508554ae64cdd9321e0a69274e3d7b2d55ce` 已推送。[第六轮验证](SIXTH_PLATFORM_RUN_7E0650855.md)已经结束：Linux 所选门禁全部通过（warp 定向 1684 项）；Windows 在插件来源探针收尾、ConPTY 原生通知两项失败，Rust 门禁跳过。Grok/Claude 无凭据边界和 Codex 原生 hook 的独立成功保留，不能合并为 Windows 平台通过。完整工作区与 GUI 集成未执行。
 
-bundle8 当前通知受理、英文 Unknown 和 Unconfirmed 双语任务详情通过；其输入法造成的固定输出偏差仍未通过，英文历史选择框裁切已作局部修复、等待新包，中文 Unknown 新事件和最终同提交 GUI 仍待验。上述独立结果均不替代三方完整生命周期；macOS 异常子树清理的后续实证见文末。
+干净 macOS 同提交通过 check、提供商 18 项、国际化 11 项与相关模块 965 项，新包构建签名成功。全部 25 个应用文件变更与已通过的本地冻结输入一致，来源关联、执行命令、二进制摘要和历史失败见 [验证记录](VALIDATION_REPORT.md#当前提交验证)。
 
-新增 [macOS 受控 launchd / coalition 原型](DARWIN_LAUNCHD_COALITION_PROTOTYPE.md)已验证专属域跨 setsid/双重 fork 保持、仅按已知身份清理后 CID 查询返回 ESRCH；根 SIGKILL 与 bootout 均不能单独证明完成。上述是原型阶段证据；后续生产接入、真实 worker 与插件事务的当前结果见能力表及验证报告。私有接口/内核版本的边界仍保留，不把原型、版本号或原生命令退出码当成完整验收成功。
+新包 Codex 前两轮已有拼音、图片、技能和评审传递证据；私有测试副本漏装同版本 code-mode-host，实际工具不能启动，文件读取和第三轮审批未通过。已恢复完整官方包，仍须真实工具复验。真实 Oz 往返等待用户手动允许专用测试钥匙串项，电脑操作工具禁止操作该系统窗口。最终同提交 GUI 生命周期、双语布局和结果回收均未完成。
 
-后续检查点 `c55385a69` 的干净 macOS 构建、国际化 11 项及相关模块 617 项已通过。同 SHA 第二轮预检仍失败：Linux 已解决 Python 安装，传输夹具失败；Windows 下载解压后安装失败。两平台 Rust/原生验收未开始。后续 Windows 使用官方固定 NuGet 包作为作业私有解释器，Linux 夹具修复独立推进，详见 [当前验证记录](VALIDATION_REPORT.md#当前提交验证)。
+先前 bundle4/5 的 Codex 生命周期与双向消息、bundle7 的插件与双语布局、bundle8 的普通通知及 Unknown/Unconfirmed，以及 macOS 资源域崩溃清理，分别保留其版本和输入范围；不能代替新包验收。历史各轮平台的失败、后续修复与仍未覆盖的组合统一见 [验证记录](VALIDATION_REPORT.md)。
 
-插件追加验证已在隔离树通过编译、国际化 11 项与插件回归 163 项。Grok 1.0.30 真实生产安装器五阶段通过（安装、同版本修复、禁用拒绝、受控文件失败回滚、更新恢复），0 模型；见 [记录](validation/macos-grok-production-installer-1.json)。Claude 2.1.273 的生产升级、暂存修补失败保持旧版本、安装父进程强杀后新目录重试三场景各 1 项通过，边界见 [事务报告](CLAUDE_PLUGIN_UPGRADE_TRANSACTION.md)。两组代码已纳入 328d5ed352；这些冻结源代码实测不替代最终同提交平台验收。
-
-328d5ed352 的[第三轮平台记录](THIRD_PLATFORM_RUN_328D5ED35.md)已越过旧 Python 环境失败：Linux 本轮所有步骤通过，GUI integration/full workspace 跳过；Windows 失败限定为当前记录的验证夹具，修复后必须原生复验。后续 macOS [专属资源域接入](DARWIN_COALITION_PRODUCT_CONTRACT.md)已通过本地 check、国际化与相关测试，新 worker 的 C 夹具组和 Codex 空闲崩溃通过，通用组同字节副本重验 4 项通过，首轮加载失败保留且原因未明；真实 Codex 运行工具的宿主/CLI 两种崩溃也已通过生产监督清理证明；没有据此开放 Grok 托管执行。
-
-Grok 1.0.30 新增[固定 ACP 无凭据边界](GROK_FIXED_ACP_BOUNDARIES.md)：macOS initialize 通过，新建受认证阻断，load/resume 明确拒绝缺失历史；缺失会话 cancel 只有通知发送。stdio EOF 自行退出，leader 需使用自持句柄强制回收，不能计自然退出或运行中取消通过。固定 Linux/Windows 输入与相同探针已接 workflow，待新提交实跑。
-
-最新资源域检查点 `6635f98690` 已推送；干净 macOS [同提交门禁](validation/macos-local-gates-6635f9869.json)通过 check、国际化 11 项、相关模块 650 项与 command 5 项，[脚本 75 项](validation/macos-python-gates-6635f9869.json)也通过。第四轮已完成：Linux 本轮全部通过，Windows 新路径夹具和候选启动器字节边界失败保留；新包已构建签名，GUI 待验。修复检查点 `94a412eb89` 的第五轮仅 Windows 已结束且失败：真实 Codex 候选 hook 的字节、参数和两组阻断路径通过，Grok 在 ACP 初始化前遇到锁读取权限错误，后续默认门禁跳过；不能合并为完整平台通过。后续 Grok 只读锁修复在 macOS 通过离线与无凭据边界，Windows 待复验。Oz 普通消息投递与请求正文接入已在第三个 25 文件冻结快照通过 check、18 项提供商回归、11 项国际化及 965 项相关测试，见 [消息交付说明](OZ_LOCAL_MESSAGE_DELIVERY.md)；真实 Oz 请求、GUI 双语布局及最终同提交平台仍待验。新增 Windows ConPTY 探针仅通过 9 项离线回归及工作流静态检查，尚未原生运行。
+后续正在补齐 Windows 真实通知诊断、独立 Rust 门禁、完整固定 Codex 运行包和 Claude 同连接权限观测。Claude 缺成功模型登录、Grok 模型额度耗尽的限制未解除；这些实现和无凭据检查不计三方完整生命周期通过。

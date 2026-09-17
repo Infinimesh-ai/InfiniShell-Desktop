@@ -63,3 +63,15 @@ SSH 手动包必须携带相同完整来源和迁移规则，不能继续把仅�
 追加的[手动产品迁移原生证据](fixtures/codex-persistent-source-product-python-0.147.0-macos.json)已覆盖真正 Git marketplace 安装→已有 orchestration 禁用→手动产品 helper 迁移→新原生进程加载→warp 禁用→产品更新拒绝。原始 Git snapshot、orchestration 全树和禁用字段、用户 hooks trust 均保持；拒绝更新时配置逐字及缓存不变。它调用实际手动产品 helper，不覆盖 Rust GUI 安装器。
 
 手动步骤已改为导出包命令并同步中英文；因导出包当前目录未知，按钮不自动执行该相对命令。产品 GUI 重启、真实新 PTY hooks 执行以及各平台同提交验证仍须单独验收。
+
+## 第六轮 Windows 探针收尾失败与修正
+
+第六轮 `35126330599` / `7e06508554ae64cdd9321e0a69274e3d7b2d55ce` 的 Windows 原生探针已观察到 `cache_only_restart.background_reverted_to_upstream=true`，但尚未进入同 ID 来源迁移。首个异常是共享 `NativeRecorder.close` 发现输出读取线程仍存活（`reader_errors=[]`），随后 `TemporaryDirectory` 删除私有 `.tmp/plugins-clone-*/.git/objects/pack/tmp_pack_*` 遇到 `WinError 32`，覆盖了 JSON 中的最初异常。不能将该次失败写成来源迁移失败，也不能把后台进程未确认退出算作成功。原始失败留在第六轮 Actions artifact，不用修正后的代码覆盖它。
+
+本轮后续修正仅涉及独立探针和专用测试，不修改共享 Recorder、产品进程监督或插件 gate：
+
+- Windows 专用 Recorder 创建无名称、禁止 breakaway 的私有 Job。在 CPython 的精确 `CreateProcess` 调用返回前，加入 `CREATE_SUSPENDED`，先按持有的进程句柄附加 Job，再恢复持有的主线程。匹配完整 argv、环境对象、cwd 和创建线程，其他线程的创建保持原状；创建临界区退出后立即恢复原函数。依据为固定 [CPython 3.13.15 subprocess](https://github.com/python/cpython/blob/v3.13.15/Lib/subprocess.py) 和官方 [Job 附加/后代继承契约](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-assignprocesstojobobject)。Job 创建或附加失败不能启动未监督的备用进程；已创建的暂停进程由持有句柄终止并等待，两个原生句柄均关闭，管道由 Popen 异常路径关闭。
+- 先送 EOF，分别等待根进程自然退出和 Job 中后台进程退出。仍活跃时只强制终止自有 Job；使用 [Job accounting](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-queryinformationjobobject) 确认 active processes 为零，再要求两个读取线程确已结束。报告独立记录 `root_exited_naturally`、`root_exit_code`、`root_forced`、`descendants_forced`、Job 活跃数、`readers_eof`、`cleanup_confirmed`。根进程被强制结束或非零退出仍判失败；后台回收不能反推原生自然退出。
+- cache-only 对照必须同时观察完整上游缓存树和固定 `last_revision`；固定源码先发布 revision，再刷新缓存，这不是用 sleep 代替发布证据。原生协议异常优先保留，收尾异常单独记录；任何失败保留私有目录，不再盲删活跃文件。所有验证完成后删除目录若失败，探针仍失败并保存清理诊断。
+
+本机运行 `python3 -B script/cli-agent-parity/codex_plugin_cache_refresh_tests.py -v`：12 项中 11 项通过，1 项 Windows 原生 Job 测试跳过。后者在目标平台实际启动私有 Python 父子进程，让子进程继承 stdout/stderr 并保持一个无法删除的文件；确认根 EOF 自然退出、子进程被本探针回收、Job 清空、读取到 EOF 后文件可删除。它不替代真实 Codex 来源重启探针；本次修正的 Windows 实际结果仍待后续同提交 CI。无需本地化变更。

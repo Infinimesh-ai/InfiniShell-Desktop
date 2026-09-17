@@ -23,6 +23,12 @@ use super::{
     TurnOutcome, channels, local_tools,
 };
 
+#[path = "claude_permission_snapshot.rs"]
+mod permission_snapshot;
+
+use permission_snapshot::{Observation, Rejection};
+
+const PERMISSION_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(5);
 const VERIFIED_VERSION: &str = "2.1.273 (Claude Code)";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -123,6 +129,8 @@ async fn run_transport(
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 8192];
     loop {
+        let effects = protocol.expire_permission_observation();
+        flush_effects(protocol, stdin, events, effects).await?;
         if protocol.request_timed_out() {
             return Err(RuntimeError::RequestTimedOut);
         }
@@ -278,8 +286,16 @@ struct Effects {
     events: Vec<RuntimeEventKind>,
 }
 
+#[derive(Clone, Copy)]
+enum PermissionStage {
+    Settings,
+    Rules,
+    RecheckMode,
+}
+
 enum PendingKind {
     Initialize,
+    PermissionObservation(PermissionStage),
     Interrupt { message_id: Uuid, turn_id: Uuid },
 }
 
@@ -332,6 +348,9 @@ struct ClaudeProtocol {
     local_tools: HashMap<String, PendingLocalTool>,
     mcp_replies: HashMap<String, ([u8; 32], Value)>,
     skill_plugin: Option<PreparedClaudeSkillPlugin>,
+    permission_observation: Option<Observation>,
+    permission_observation_started: Option<Instant>,
+    ready_permissions: Value,
 }
 
 impl ClaudeProtocol {
@@ -350,6 +369,9 @@ impl ClaudeProtocol {
             local_tools: HashMap::new(),
             mcp_replies: HashMap::new(),
             skill_plugin: None,
+            permission_observation: None,
+            permission_observation_started: None,
+            ready_permissions: Value::Null,
         }
     }
 
@@ -382,12 +404,62 @@ impl ClaudeProtocol {
     }
 
     fn request_timed_out(&self) -> bool {
+        self.pending.values().any(|request| {
+            !matches!(request.kind, PendingKind::PermissionObservation(_))
+                && request.sent_at.elapsed() >= REQUEST_TIMEOUT
+        }) || self.turns.values().any(|turn| {
+            !turn.accepted && !turn.finished && turn.sent_at.elapsed() >= REQUEST_TIMEOUT
+        })
+    }
+
+    fn start_permission_observation(&mut self, initialize: &Value) -> Effects {
+        self.permission_observation = Some(Observation::new(self.options.generation, initialize));
+        self.permission_observation_started = Some(Instant::now());
+        Effects {
+            writes: vec![self.request(
+                PendingKind::PermissionObservation(PermissionStage::Settings),
+                json!({"subtype":"get_settings"}),
+            )],
+            events: Vec::new(),
+        }
+    }
+
+    fn finish_permission_observation(&mut self, rejection: Option<Rejection>) -> Effects {
+        if let Some(rejection) = rejection
+            && let Some(observation) = &mut self.permission_observation
+        {
+            observation.reject(rejection);
+        }
+        self.permission_observation_started = None;
         self.pending
-            .values()
-            .any(|request| request.sent_at.elapsed() >= REQUEST_TIMEOUT)
-            || self.turns.values().any(|turn| {
-                !turn.accepted && !turn.finished && turn.sent_at.elapsed() >= REQUEST_TIMEOUT
-            })
+            .retain(|_, request| !matches!(request.kind, PendingKind::PermissionObservation(_)));
+        self.initialized = true;
+        Effects {
+            writes: Vec::new(),
+            events: vec![self.ready_event()],
+        }
+    }
+
+    fn ready_event(&self) -> RuntimeEventKind {
+        let mut effective_permissions = self.ready_permissions.clone();
+        if let Some(observation) = &self.permission_observation {
+            effective_permissions["permissionObservation"] = observation.value();
+        }
+        RuntimeEventKind::SessionReady {
+            effective_permissions,
+        }
+    }
+
+    fn expire_permission_observation(&mut self) -> Effects {
+        if self
+            .permission_observation_started
+            .is_some_and(|started| started.elapsed() >= PERMISSION_OBSERVATION_TIMEOUT)
+        {
+            // 查询失败不替用户变更 Inherit 策略，也不能永久阻止正常对话启动。
+            self.finish_permission_observation(Some(Rejection::TimedOut))
+        } else {
+            Effects::default()
+        }
     }
 
     fn remember_response(&mut self, event: &RuntimeEventKind) {
@@ -805,9 +877,28 @@ impl ClaudeProtocol {
                     &self.options.cwd,
                     &effective_permissions,
                 )?;
-                effects.events.push(RuntimeEventKind::SessionReady {
-                    effective_permissions,
-                });
+                if let Some(observation) = &mut self.permission_observation {
+                    observation.invalidate_mode(&message["permissionMode"]);
+                }
+                self.ready_permissions = effective_permissions;
+                if self.initialized {
+                    effects.events.push(self.ready_event());
+                }
+            }
+            "system"
+                if message["subtype"] == "status" && message.get("permissionMode").is_some() =>
+            {
+                if let Some(observation) = &mut self.permission_observation {
+                    observation.invalidate_mode(&message["permissionMode"]);
+                }
+                if self.ready_permissions.is_object() {
+                    if let Some(mode) = permission_snapshot::mode(message.get("permissionMode")) {
+                        self.ready_permissions["permissionMode"] = json!(mode);
+                    }
+                    if self.initialized {
+                        effects.events.push(self.ready_event());
+                    }
+                }
             }
             // 原生系统状态、速率限制等扩展不等价于回合完成。
             _ => {}
@@ -816,11 +907,24 @@ impl ClaudeProtocol {
     }
 
     fn receive_control_response(&mut self, response: &Value) -> Result<Effects, RuntimeError> {
-        let id = required_string(response, "request_id")?;
+        let id = match required_string(response, "request_id") {
+            Ok(id) => id,
+            Err(error) => {
+                if self.permission_observation_started.is_some() {
+                    return Ok(self.finish_permission_observation(Some(Rejection::InvalidShape)));
+                }
+                return Err(error);
+            }
+        };
         let Some(pending) = self.pending.remove(id) else {
             return Ok(Effects::default());
         };
-        let success = required_string(response, "subtype")? == "success";
+        let success = if matches!(pending.kind, PendingKind::PermissionObservation(_)) {
+            // 权限资料未知或格式错误只使观察无效，不中断普通 Inherit 对话。
+            response.get("subtype").and_then(Value::as_str) == Some("success")
+        } else {
+            required_string(response, "subtype")? == "success"
+        };
         let mut effects = Effects::default();
         match pending.kind {
             PendingKind::Initialize => {
@@ -866,11 +970,45 @@ impl ClaudeProtocol {
                     &self.options.cwd,
                     &effective_permissions,
                 )?;
-                self.initialized = true;
-                // 握手不提供原生 ID；后续原生 init/lifecycle 才能确认本机历史关联。
-                effects.events.push(RuntimeEventKind::SessionReady {
-                    effective_permissions,
-                });
+                self.ready_permissions = effective_permissions;
+                // 首次握手不提供原生 ID；观察只绑定当前连接代次和原生 PID。
+                // 后续重复 initialize 只含 subtype，不重新注册 MCP、技能或 hooks。
+                effects = self.start_permission_observation(&response["response"]);
+            }
+            PendingKind::PermissionObservation(stage) => {
+                if !success {
+                    return Ok(
+                        self.finish_permission_observation(Some(Rejection::NativeRequestFailed))
+                    );
+                }
+                let Some(observation) = &mut self.permission_observation else {
+                    return Ok(Effects::default());
+                };
+                match stage {
+                    PermissionStage::Settings => {
+                        observation.settings(&response["response"]);
+                        effects.writes.push(self.request(
+                            PendingKind::PermissionObservation(PermissionStage::Rules),
+                            json!({"subtype":"list_permission_rules"}),
+                        ));
+                    }
+                    PermissionStage::Rules => {
+                        observation.rules(&response["response"]);
+                        effects.writes.push(self.request(
+                            PendingKind::PermissionObservation(PermissionStage::RecheckMode),
+                            json!({"subtype":"initialize"}),
+                        ));
+                    }
+                    PermissionStage::RecheckMode => {
+                        observation.finish(&response["response"], &self.options.cwd);
+                        if let Some(mode) = permission_snapshot::mode(
+                            response["response"].get("current_permission_mode"),
+                        ) {
+                            self.ready_permissions["permissionMode"] = json!(mode);
+                        }
+                        effects = self.finish_permission_observation(None);
+                    }
+                }
             }
             PendingKind::Interrupt {
                 message_id,
