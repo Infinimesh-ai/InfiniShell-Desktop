@@ -291,6 +291,197 @@ fn unknown_string_response_cannot_replace_a_numeric_pending_request() {
     assert_eq!(context["generation"], json!(protocol.options.generation));
 }
 
+fn internal_skills_reload_fixture() -> Value {
+    json!({"jsonrpc":"2.0","id":"skills-reload","result":{"result":{"reloaded":1}}})
+}
+
+#[test]
+fn internal_skills_reload_accepts_u64_boundaries_without_advancing_user_rpc() {
+    for count in [0, u64::MAX] {
+        let mut protocol = GrokProtocol::new(options());
+        protocol.initialize();
+        let context = protocol.transaction_context();
+        let sent_at = protocol.pending.as_ref().unwrap().sent_at;
+        let mut response = internal_skills_reload_fixture();
+        response["result"]["result"]["reloaded"] = json!(count);
+
+        let effects = protocol.receive(response).unwrap();
+        assert!(effects.writes.is_empty() && effects.events.is_empty());
+        assert_eq!(protocol.transaction_context(), context);
+        assert_eq!(protocol.pending.as_ref().unwrap().sent_at, sent_at);
+        assert!(protocol.responses.is_empty() && protocol.session_id.is_none());
+        // 只有真实的数值响应才能推进握手。
+        let authenticated = protocol.receive(fixture_response(1)).unwrap();
+        assert_eq!(authenticated.writes[0]["method"], "authenticate");
+        assert_eq!(protocol.pending.as_ref().unwrap().id, 2);
+    }
+}
+
+#[test]
+fn duplicate_internal_skills_reload_preserves_authentication_and_native_identity() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.initialize();
+    protocol.receive(fixture_response(1)).unwrap();
+    let context = protocol.transaction_context();
+    let responses = protocol.responses.clone();
+    let capabilities = protocol.reported_capabilities.clone();
+    let response = internal_skills_reload_fixture();
+
+    for _ in 0..3 {
+        let effects = protocol.receive(response.clone()).unwrap();
+        assert!(effects.writes.is_empty() && effects.events.is_empty());
+        assert_eq!(protocol.transaction_context(), context);
+        assert_eq!(protocol.responses, responses);
+        assert_eq!(protocol.reported_capabilities, capabilities);
+        assert!(protocol.session_id.is_none() && protocol.observed_prompt_ids.is_empty());
+        assert!(protocol.notification_ids.is_empty() && protocol.permission_requests.is_empty());
+    }
+    assert_eq!(
+        protocol.receive(fixture_response(2)).unwrap().writes[0]["method"],
+        "session/new"
+    );
+}
+
+#[test]
+fn internal_skills_reload_cannot_acknowledge_or_finish_an_active_prompt() {
+    let (mut protocol, _) = pending_native_approval();
+    let probe = super::sdk_origin_live_tests::SdkOriginProbe::new(protocol.options.generation);
+    protocol.sdk_origin_probe = Some(probe.clone());
+    let context = protocol.transaction_context();
+    let native_prompt = protocol.prompt.as_ref().unwrap().native_id.clone();
+    let output = protocol.prompt.as_ref().unwrap().output.clone();
+    let responses = protocol.responses.clone();
+    let notification_ids = protocol.notification_ids.clone();
+    let permission_requests = protocol.permission_requests.clone();
+    let tools = protocol.tools.len();
+    let approvals = protocol.approvals.len();
+
+    for _ in 0..2 {
+        let effects = protocol.receive(internal_skills_reload_fixture()).unwrap();
+        assert!(effects.writes.is_empty() && effects.events.is_empty());
+        assert_eq!(protocol.transaction_context(), context);
+        assert_eq!(protocol.responses, responses);
+        assert_eq!(protocol.notification_ids, notification_ids);
+        assert_eq!(protocol.permission_requests, permission_requests);
+        assert_eq!(protocol.tools.len(), tools);
+        assert_eq!(protocol.approvals.len(), approvals);
+        let prompt = protocol.prompt.as_ref().unwrap();
+        assert_eq!(prompt.native_id, native_prompt);
+        assert_eq!(prompt.output, output);
+        assert!(!prompt.finished && prompt.completion.is_none());
+        assert!(
+            protocol.options.permission_ceiling.is_none() && protocol.options.local_tools.is_none()
+        );
+    }
+    let report = probe.report(None, None);
+    assert_eq!(report["sdk_request_count"], 0);
+    assert_eq!(report["inspect_call_count"], 0);
+    assert_eq!(report["permission_request_count"], 0);
+    assert_eq!(report["origin_verification"], "unknown");
+}
+
+#[test]
+fn internal_skills_reload_rejects_non_u64_counts_and_malformed_wrappers() {
+    let mut rejected = Vec::new();
+    for count in [
+        json!(-1),
+        json!(1.0),
+        json!(true),
+        json!("1"),
+        Value::Null,
+        json!([]),
+        json!({"body":"OFFLINE_PRIVATE_MAINTENANCE_BODY"}),
+        serde_json::from_str::<Value>("18446744073709551616").unwrap(),
+    ] {
+        let mut response = internal_skills_reload_fixture();
+        response["result"]["result"]["reloaded"] = count;
+        rejected.push(response);
+    }
+    rejected.extend([
+        json!({"jsonrpc":"2.0","id":"skills-reload","result":{"reloaded":1}}),
+        json!({"jsonrpc":"2.0","id":"skills-reload","result":{"result":{}}}),
+        json!({"jsonrpc":"2.0","id":"skills-reload","result":{"result":null}}),
+        json!({"jsonrpc":"2.0","id":"skills-reload","result":null}),
+        json!({"jsonrpc":"2.0","id":"skills-reload"}),
+    ]);
+    for response in rejected {
+        let mut protocol = GrokProtocol::new(options());
+        protocol.initialize();
+        let error = protocol.receive(response).err().unwrap();
+        assert_eq!(
+            super::runtime_error_diagnostic(&error)["protocol_failure_kind"],
+            "invalid_response_id"
+        );
+        assert_eq!(protocol.pending.as_ref().unwrap().id, 1);
+        assert!(protocol.responses.is_empty());
+    }
+}
+
+#[test]
+fn internal_skills_reload_rejects_foreign_ids_errors_and_injected_identity() {
+    let mut rejected = Vec::new();
+    for id in [
+        json!("OFFLINE_UNKNOWN_RESPONSE_ID"),
+        json!("skills-reload "),
+        Value::Null,
+        json!(true),
+    ] {
+        let mut response = internal_skills_reload_fixture();
+        response["id"] = id;
+        rejected.push(response);
+    }
+    for error in [
+        Value::Null,
+        json!({"code":-32603,"message":"OFFLINE_PRIVATE_MAINTENANCE_ERROR"}),
+    ] {
+        let mut response = internal_skills_reload_fixture();
+        response["error"] = error;
+        rejected.push(response);
+    }
+    for field in [
+        "sessionId",
+        "promptId",
+        "toolCallId",
+        "eventId",
+        "generation",
+        "_meta",
+        "responseId",
+    ] {
+        for path in ["", "/result", "/result/result"] {
+            let mut response = internal_skills_reload_fixture();
+            response.pointer_mut(path).unwrap()[field] =
+                json!("OFFLINE_FABRICATED_NATIVE_IDENTITY");
+            rejected.push(response);
+        }
+    }
+    for response in rejected {
+        let mut protocol = GrokProtocol::new(options());
+        protocol.initialize();
+        let context = protocol.transaction_context();
+        let error = protocol.receive(response).err().unwrap();
+        assert_eq!(
+            super::runtime_error_diagnostic(&error)["protocol_failure_kind"],
+            "invalid_response_id"
+        );
+        assert_eq!(protocol.transaction_context(), context);
+        assert!(protocol.responses.is_empty() && protocol.session_id.is_none());
+    }
+}
+
+#[test]
+fn mixed_internal_skills_reload_frame_cannot_become_a_client_tool_request() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.initialize();
+    let mut response = internal_skills_reload_fixture();
+    response["method"] = json!("session/request_permission");
+    response["params"] = json!({"sessionId":"OFFLINE_FABRICATED_SESSION"});
+
+    assert!(protocol.receive(response).is_err());
+    assert_eq!(protocol.pending.as_ref().unwrap().id, 1);
+    assert!(protocol.responses.is_empty() && protocol.approvals.is_empty());
+    assert!(protocol.permission_requests.is_empty() && protocol.tools.is_empty());
+}
+
 #[tokio::test]
 async fn outbound_diagnostic_records_written_identity_without_parameters() {
     let mut protocol = GrokProtocol::new(options());
@@ -304,7 +495,7 @@ async fn outbound_diagnostic_records_written_identity_without_parameters() {
     let (sender, _) = mpsc::channel(4);
     let mut stdin = Cursor::new(Vec::new());
     flush_effects(
-        &protocol,
+        &mut protocol,
         &mut stdin,
         &sender,
         super::Effects {
@@ -339,7 +530,7 @@ async fn failed_write_does_not_claim_an_outbound_transaction() {
     let mut stdin = Cursor::new(&mut storage[..]);
     assert!(
         flush_effects(
-            &protocol,
+            &mut protocol,
             &mut stdin,
             &sender,
             super::Effects {
@@ -1889,7 +2080,7 @@ async fn next_prompt_write_failure_preserves_the_previous_terminal_result() {
     let mut storage = [];
     let mut stdin = Cursor::new(&mut storage[..]);
     assert!(
-        flush_effects(&protocol, &mut stdin, &sender, effects)
+        flush_effects(&mut protocol, &mut stdin, &sender, effects)
             .await
             .is_err()
     );
@@ -1917,7 +2108,7 @@ async fn failed_cancel_write_never_reports_dispatch_or_cancellation() {
     let mut storage = [];
     let mut stdin = Cursor::new(&mut storage[..]);
     assert!(
-        flush_effects(&protocol, &mut stdin, &sender, effects)
+        flush_effects(&mut protocol, &mut stdin, &sender, effects)
             .await
             .is_err()
     );
@@ -2172,7 +2363,7 @@ async fn recovered_text_is_published_before_the_terminal_event() {
     let effects = reply_history(&mut protocol, multistream_history());
     let (sender, mut receiver) = mpsc::channel(4);
     let mut stdin = Cursor::new(Vec::new());
-    flush_effects(&protocol, &mut stdin, &sender, effects)
+    flush_effects(&mut protocol, &mut stdin, &sender, effects)
         .await
         .unwrap();
     assert!(
@@ -2456,7 +2647,7 @@ fn production_text_command_dispatches_before_native_ack_and_queues_without_claim
 }
 
 #[test]
-fn root_only_adapter_rejects_parent_ceiling_and_local_tools_before_spawn() {
+fn root_adapter_accepts_leased_tools_but_rejects_unknown_parent_ceiling_before_spawn() {
     let mut launch = options();
     let ceiling = serde_json::from_value(json!({
         "parent_task_id":"parent", "parent_generation":1,
@@ -2469,7 +2660,586 @@ fn root_only_adapter_rejects_parent_ceiling_and_local_tools_before_spawn() {
     assert!(validate_options(&launch).is_err());
     launch.permission_ceiling = None;
     launch.local_tools = Some(LocalToolPermissions::default());
-    assert!(validate_options(&launch).is_err());
+    assert!(validate_options(&launch).is_ok());
     launch.local_tools = None;
     assert!(validate_options(&launch).is_ok());
+}
+
+// 下列帧为离线协议测试，不计作真实 CLI 完成证据。
+fn leased_protocol() -> GrokProtocol {
+    let mut launch = options();
+    launch.local_tools = Some(LocalToolPermissions {
+        allow_spawn: true,
+        allow_message: true,
+    });
+    let mut protocol = GrokProtocol::new(launch);
+    protocol.sdk.as_mut().unwrap().owned_process = true;
+    protocol.initialize();
+    protocol.receive(fixture_response(1)).unwrap();
+    protocol.receive(fixture_response(2)).unwrap();
+    protocol.receive(fixture_response(3)).unwrap();
+    protocol
+}
+
+fn leased_begin(protocol: &mut GrokProtocol, turn: &str) {
+    internal_submit(protocol, Uuid::new_v4(), "检查任务状态");
+    let session = protocol.session_id.clone();
+    protocol
+        .receive(
+            json!({"jsonrpc":"2.0","method":"_x.ai/queue/changed","params":{
+        "sessionId":session,"entries":[{"kind":"prompt","id":turn}]}}),
+        )
+        .unwrap();
+    protocol
+        .receive(
+            json!({"jsonrpc":"2.0","method":"_x.ai/queue/changed","params":{
+        "sessionId":session,"entries":[],"runningPromptId":turn}}),
+        )
+        .unwrap();
+    assert!(protocol.prompt.as_ref().unwrap().started);
+}
+
+fn leased_frame(protocol: &GrokProtocol, turn: &str, event: &str, update: Value) -> Value {
+    json!({"jsonrpc":"2.0","method":"session/update","params":{
+        "sessionId":protocol.session_id,"_meta":{"promptId":turn,"eventId":event},"update":update}})
+}
+
+fn leased_inputs(protocol: &mut GrokProtocol, turn: &str, call: &str) {
+    let initial = leased_frame(
+        protocol,
+        turn,
+        &format!("{call}-initial"),
+        json!({
+        "sessionUpdate":"tool_call","toolCallId":call,"_meta":{"x.ai/tool":{"name":"use_tool"}},
+        "rawInput":{"tool_name":"infinishell-local-tasks__inspect_local_tasks","tool_input":{}}}),
+    );
+    protocol.receive(initial).unwrap();
+    let final_input = leased_frame(
+        protocol,
+        turn,
+        &format!("{call}-final"),
+        json!({
+        "sessionUpdate":"tool_call_update","toolCallId":call,"kind":"other",
+        "rawInput":{"tool_name":"infinishell-local-tasks__inspect_local_tasks","tool_input":{},"variant":"UseTool"}}),
+    );
+    protocol.receive(final_input).unwrap();
+}
+
+fn leased_permission(protocol: &GrokProtocol, call: &str, id: u64) -> Value {
+    json!({"jsonrpc":"2.0","id":id,"method":"session/request_permission","params":{
+        "sessionId":protocol.session_id,"toolCall":{"toolCallId":call,"kind":"other",
+        "rawInput":{"tool_name":"infinishell-local-tasks__inspect_local_tasks","tool_input":{},"variant":"UseTool"}},
+        "options":[{"optionId":"allow-once","kind":"allow_once"},{"optionId":"reject-once","kind":"reject_once"}]}})
+}
+
+fn leased_sdk(protocol: &GrokProtocol, outer: u64, inner: u64) -> Value {
+    json!({"jsonrpc":"2.0","id":outer,"method":"_x.ai/mcp/sdk_call","params":{
+        "serverId":protocol.sdk.as_ref().unwrap().bridge.server_id(),"message":{"jsonrpc":"2.0","id":inner,
+        "method":"tools/call","params":{"name":"inspect_local_tasks","arguments":{}}}}})
+}
+
+async fn leased_flush(protocol: &mut GrokProtocol, effects: super::Effects) {
+    let (sender, _receiver) = mpsc::channel(32);
+    flush_effects(protocol, &mut Cursor::new(Vec::new()), &sender, effects)
+        .await
+        .unwrap();
+}
+
+async fn leased_allow(protocol: &mut GrokProtocol, call: &str, approval: u64) {
+    let permission = leased_permission(protocol, call, approval);
+    protocol.receive(permission).unwrap();
+    let effects = internal_action(
+        protocol,
+        Uuid::new_v4(),
+        RuntimeAction::RespondApproval {
+            approval_id: format!("grok:{approval}"),
+            decision: ApprovalDecision::AllowOnce,
+        },
+    );
+    assert_eq!(effects.writes.len(), 1);
+    leased_flush(protocol, effects).await;
+}
+
+fn leased_request(
+    protocol: &mut GrokProtocol,
+    outer: u64,
+    inner: u64,
+) -> crate::ai::cli_agent_runtime::local_tools::NativeLocalToolRequest {
+    let sdk = leased_sdk(protocol, outer, inner);
+    let effects = protocol.receive(sdk).unwrap();
+    let [RuntimeEventKind::LocalToolRequested { request }] = effects.events.as_slice() else {
+        panic!("租约应只派发一次本地工具");
+    };
+    request.clone()
+}
+
+#[test]
+fn production_sdk_registration_uses_process_nonce_and_never_advertises_spawn() {
+    let mut launch = options();
+    launch.local_tools = Some(LocalToolPermissions {
+        allow_spawn: true,
+        allow_message: true,
+    });
+    let mut first = GrokProtocol::new(launch.clone());
+    let second = GrokProtocol::new(launch);
+    assert_ne!(
+        first.sdk.as_ref().unwrap().bridge.server_id(),
+        second.sdk.as_ref().unwrap().bridge.server_id()
+    );
+    let initialize = first.initialize();
+    assert_eq!(
+        initialize["params"]["clientCapabilities"]["_meta"]["x.ai/mcp/sdk"],
+        true
+    );
+    first.sdk.as_mut().unwrap().owned_process = true;
+    first.receive(fixture_response(1)).unwrap();
+    let open = first.receive(fixture_response(2)).unwrap();
+    assert_eq!(open.writes[0]["params"]["mcpServers"], json!([]));
+    assert_eq!(
+        open.writes[0]["params"]["_meta"]["x.ai/mcp/servers"],
+        first.sdk.as_ref().unwrap().bridge.registration()
+    );
+    let ready = first.receive(fixture_response(3)).unwrap();
+    let [
+        RuntimeEventKind::SessionReady {
+            effective_permissions,
+        },
+    ] = ready.events.as_slice()
+    else {
+        panic!("缺少原生会话就绪");
+    };
+    assert_eq!(
+        effective_permissions["verifiedCapabilities"]["localTools"],
+        true
+    );
+    assert_eq!(
+        effective_permissions["verifiedCapabilities"]["childTasks"],
+        false
+    );
+    assert_eq!(
+        effective_permissions["permissionEnforcementVerified"],
+        false
+    );
+    let mut request = leased_sdk(&first, 101, 101);
+    request["params"]["message"]["method"] = json!("tools/list");
+    request["params"]["message"]["params"] = json!({});
+    let response = first.receive(request).unwrap();
+    let names = response.writes[0]["result"]["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(names, ["inspect_local_tasks", "send_message_to_agent"]);
+}
+
+#[test]
+fn production_sdk_without_owned_process_cannot_register_or_open_session() {
+    let mut launch = options();
+    launch.local_tools = Some(LocalToolPermissions::default());
+    let mut protocol = GrokProtocol::new(launch);
+    protocol.initialize();
+    protocol.receive(fixture_response(1)).unwrap();
+    protocol.receive(fixture_response(2)).unwrap();
+    assert!(protocol.receive(fixture_response(3)).is_err());
+    let mut registration = leased_sdk(&protocol, 80, 80);
+    registration["params"]["message"]["method"] = json!("tools/list");
+    registration["params"]["message"]["params"] = json!({});
+    assert!(protocol.receive(registration).is_err());
+}
+
+#[tokio::test]
+async fn production_lease_requires_written_approval_and_dispatches_duplicate_rpc_once() {
+    let mut protocol = leased_protocol();
+    leased_begin(&mut protocol, "lease-turn");
+    leased_inputs(&mut protocol, "lease-turn", "lease-call");
+    let permission = leased_permission(&protocol, "lease-call", 50);
+    protocol.receive(permission).unwrap();
+    let approval = internal_action(
+        &mut protocol,
+        Uuid::new_v4(),
+        RuntimeAction::RespondApproval {
+            approval_id: "grok:50".into(),
+            decision: ApprovalDecision::AllowOnce,
+        },
+    );
+    let sdk = leased_sdk(&protocol, 90, 2);
+    assert!(protocol.receive(sdk.clone()).is_err());
+    leased_flush(&mut protocol, approval).await;
+    let effects = protocol.receive(sdk.clone()).unwrap();
+    assert!(
+        matches!(effects.events.as_slice(), [RuntimeEventKind::LocalToolRequested { request }] if request.turn_id == "lease-turn")
+    );
+    assert!(protocol.receive(sdk).unwrap().events.is_empty());
+    let retry = leased_sdk(&protocol, 91, 2);
+    assert!(protocol.receive(retry).unwrap().events.is_empty());
+    assert_eq!(protocol.sdk.as_ref().unwrap().calls.len(), 1);
+}
+
+#[test]
+fn production_lease_rejects_changed_approval_before_any_allow_is_written() {
+    let mut protocol = leased_protocol();
+    leased_begin(&mut protocol, "lease-turn");
+    leased_inputs(&mut protocol, "lease-turn", "lease-call");
+    let mut permission = leased_permission(&protocol, "lease-call", 50);
+    permission["params"]["toolCall"]["rawInput"]["tool_input"] = json!({"task_ids":["other"]});
+    let rejected = protocol.receive(permission).unwrap();
+    assert_eq!(
+        rejected.writes[0]["result"]["outcome"]["outcome"],
+        "cancelled"
+    );
+    assert!(rejected.events.is_empty());
+    assert!(protocol.approvals.is_empty());
+    assert!(
+        protocol
+            .sdk
+            .as_ref()
+            .unwrap()
+            .permissions_to_write
+            .is_empty()
+    );
+    let sdk = leased_sdk(&protocol, 90, 2);
+    assert!(protocol.receive(sdk).is_err());
+}
+
+#[tokio::test]
+async fn production_lease_failed_reply_write_preserves_bound_state_and_emits_no_receipt() {
+    let mut protocol = leased_protocol();
+    leased_begin(&mut protocol, "lease-turn");
+    leased_inputs(&mut protocol, "lease-turn", "lease-call");
+    leased_allow(&mut protocol, "lease-call", 50).await;
+    let request = leased_request(&mut protocol, 90, 2);
+    let effects = internal_action(
+        &mut protocol,
+        Uuid::new_v4(),
+        RuntimeAction::RespondLocalTool {
+            turn_id: request.turn_id.clone(),
+            call_id: request.call_id.clone(),
+            result: Ok(json!({"tasks":[]})),
+        },
+    );
+    let (sender, mut events) = mpsc::channel(8);
+    let mut storage = [];
+    let mut writer = Cursor::new(&mut storage[..]);
+    assert!(
+        flush_effects(&mut protocol, &mut writer, &sender, effects)
+            .await
+            .is_err()
+    );
+    assert!(events.try_recv().is_err());
+    let sdk = protocol.sdk.as_ref().unwrap();
+    assert_eq!(
+        sdk.ledger
+            .as_ref()
+            .unwrap()
+            .state(&sdk.calls[&request.call_id].proof)
+            .unwrap(),
+        super::super::grok_tool_lease::GrokToolLeaseState::Bound
+    );
+    let cleanup = protocol.finish_transport(&Err(RuntimeError::RequestTimedOut));
+    assert!(matches!(
+        cleanup.events.as_slice(),
+        [RuntimeEventKind::LocalToolCancelled { .. }]
+    ));
+    assert!(protocol.sdk.as_ref().unwrap().retired);
+}
+
+#[tokio::test]
+async fn production_lease_native_completion_and_written_reply_enable_next_turn_without_rebinding_old_rpc()
+ {
+    let mut protocol = leased_protocol();
+    leased_begin(&mut protocol, "first-turn");
+    leased_inputs(&mut protocol, "first-turn", "first-call");
+    leased_allow(&mut protocol, "first-call", 50).await;
+    let old_rpc = leased_sdk(&protocol, 90, 2);
+    let request = leased_request(&mut protocol, 90, 2);
+    let reply = internal_action(
+        &mut protocol,
+        Uuid::new_v4(),
+        RuntimeAction::RespondLocalTool {
+            turn_id: request.turn_id.clone(),
+            call_id: request.call_id.clone(),
+            result: Ok(json!({"tasks":[]})),
+        },
+    );
+    leased_flush(&mut protocol, reply).await;
+    let complete = leased_frame(
+        &protocol,
+        "first-turn",
+        "first-complete",
+        json!({"sessionUpdate":"tool_call_update","toolCallId":"first-call","status":"completed"}),
+    );
+    protocol.receive(complete).unwrap();
+    let prompt_id = protocol.pending.as_ref().unwrap().id;
+    finish_with_unit_history(
+        &mut protocol,
+        json!({"jsonrpc":"2.0","id":prompt_id,"result":{"stopReason":"end_turn","_meta":{"promptId":"first-turn"}}}),
+    );
+    leased_begin(&mut protocol, "second-turn");
+    leased_inputs(&mut protocol, "second-turn", "second-call");
+    leased_allow(&mut protocol, "second-call", 51).await;
+    let replay = protocol.receive(old_rpc).unwrap();
+    assert!(replay.events.is_empty());
+    assert_eq!(replay.writes.len(), 1);
+    leased_flush(&mut protocol, replay).await;
+    let second = leased_request(&mut protocol, 91, 3);
+    assert_ne!(request.call_id, second.call_id);
+    assert_eq!(second.turn_id, "second-turn");
+    let sdk = protocol.sdk.as_ref().unwrap();
+    assert_eq!(
+        sdk.calls[&request.call_id].proof.native_call_id(),
+        "first-call"
+    );
+    assert_eq!(
+        sdk.calls[&second.call_id].proof.native_call_id(),
+        "second-call"
+    );
+}
+
+#[tokio::test]
+async fn production_lease_cancel_retires_callbacks_and_waits_for_native_cancelled_history() {
+    let mut protocol = leased_protocol();
+    leased_begin(&mut protocol, "lease-turn");
+    leased_inputs(&mut protocol, "lease-turn", "lease-call");
+    leased_allow(&mut protocol, "lease-call", 50).await;
+    let request = leased_request(&mut protocol, 90, 2);
+    let queued = Uuid::new_v4();
+    internal_submit(&mut protocol, queued, "不得重投");
+    let cancelled = internal_action(
+        &mut protocol,
+        Uuid::new_v4(),
+        RuntimeAction::Interrupt {
+            turn_id: "lease-turn".into(),
+        },
+    );
+    assert_eq!(cancelled.writes[0]["method"], "session/cancel");
+    assert!(
+        !cancelled
+            .events
+            .iter()
+            .any(|event| matches!(event, RuntimeEventKind::TurnFinished { .. }))
+    );
+    assert!(protocol.sdk.as_ref().unwrap().retired);
+    let late = leased_sdk(&protocol, 91, 3);
+    assert!(protocol.receive(late).is_err());
+    let reply = internal_action(
+        &mut protocol,
+        Uuid::new_v4(),
+        RuntimeAction::RespondLocalTool {
+            turn_id: request.turn_id,
+            call_id: request.call_id,
+            result: Ok(json!({"tasks":[]})),
+        },
+    );
+    assert!(reply.writes.is_empty());
+    assert!(matches!(
+        reply.events.as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+    let prompt_id = protocol.pending.as_ref().unwrap().id;
+    let final_events = finish_with_unit_history(
+        &mut protocol,
+        json!({"jsonrpc":"2.0","id":prompt_id,"result":{
+        "stopReason":"cancelled","_meta":{"promptId":"lease-turn","cancellationCategory":"MidTurnAbort"}}}),
+    );
+    assert!(protocol.closed);
+    assert!(final_events.events.iter().any(|event| matches!(
+        event,
+        RuntimeEventKind::TurnFinished {
+            outcome: TurnOutcome::Cancelled,
+            ..
+        }
+    )));
+    assert!(final_events.events.iter().any(|event| matches!(event,RuntimeEventKind::RequestFailed {message_id,..} if *message_id == queued)));
+    assert!(final_events.writes.is_empty());
+}
+
+#[tokio::test]
+async fn production_lease_permission_rejection_does_not_invent_task_cancellation() {
+    let mut protocol = leased_protocol();
+    leased_begin(&mut protocol, "lease-turn");
+    leased_inputs(&mut protocol, "lease-turn", "lease-call");
+    let permission = leased_permission(&protocol, "lease-call", 50);
+    protocol.receive(permission).unwrap();
+    let denied = internal_action(
+        &mut protocol,
+        Uuid::new_v4(),
+        RuntimeAction::RespondApproval {
+            approval_id: "grok:50".into(),
+            decision: ApprovalDecision::DenyOnce,
+        },
+    );
+    leased_flush(&mut protocol, denied).await;
+    assert!(protocol.sdk.as_ref().unwrap().retired);
+    assert!(!protocol.prompt.as_ref().unwrap().finished);
+    assert!(!protocol.closed);
+    assert!(protocol.sdk_timed_out(Instant::now() + REQUEST_TIMEOUT + Duration::from_secs(1)));
+    let callback = leased_sdk(&protocol, 90, 2);
+    assert!(protocol.receive(callback).is_err());
+}
+
+#[tokio::test]
+async fn production_lease_approved_callback_timeout_and_old_tool_frame_cannot_become_success() {
+    let mut protocol = leased_protocol();
+    leased_begin(&mut protocol, "lease-turn");
+    leased_inputs(&mut protocol, "lease-turn", "lease-call");
+    leased_allow(&mut protocol, "lease-call", 50).await;
+    assert!(protocol.sdk_timed_out(Instant::now() + REQUEST_TIMEOUT + Duration::from_secs(1)));
+    let old = leased_frame(
+        &protocol,
+        "old-turn",
+        "old-event",
+        json!({"sessionUpdate":"tool_call_update","toolCallId":"lease-call","status":"completed"}),
+    );
+    assert!(protocol.receive(old).unwrap().events.is_empty());
+    assert!(!protocol.tools["lease-call"].finished);
+    let cleanup = protocol.finish_transport(&Err(RuntimeError::RequestTimedOut));
+    assert!(
+        !cleanup
+            .events
+            .iter()
+            .any(|event| matches!(event, RuntimeEventKind::TurnFinished { .. }))
+    );
+    assert!(protocol.sdk.as_ref().unwrap().retired);
+}
+
+#[tokio::test]
+async fn production_lease_written_reply_has_a_bounded_native_completion_wait() {
+    let mut protocol = leased_protocol();
+    leased_begin(&mut protocol, "lease-turn");
+    leased_inputs(&mut protocol, "lease-turn", "lease-call");
+    leased_allow(&mut protocol, "lease-call", 50).await;
+    let request = leased_request(&mut protocol, 90, 2);
+    let reply = internal_action(
+        &mut protocol,
+        Uuid::new_v4(),
+        RuntimeAction::RespondLocalTool {
+            turn_id: request.turn_id.clone(),
+            call_id: request.call_id.clone(),
+            result: Ok(json!({"tasks":[]})),
+        },
+    );
+
+    // 生成和缓存结果不代表回写，不能提前启动原生完成期限。
+    assert!(
+        protocol
+            .sdk
+            .as_ref()
+            .unwrap()
+            .native_completion_deadlines
+            .is_empty()
+    );
+    assert!(!protocol.sdk_timed_out(Instant::now() + REQUEST_TIMEOUT + Duration::from_secs(1)));
+    leased_flush(&mut protocol, reply).await;
+    let deadline = protocol.sdk.as_ref().unwrap().native_completion_deadlines["lease-call"].1;
+    assert!(!protocol.sdk_timed_out(deadline - Duration::from_millis(1)));
+    assert!(protocol.sdk_timed_out(deadline));
+    assert!(!protocol.prompt.as_ref().unwrap().finished);
+
+    // 原生重投只重发缓存，不能刷新等待真实工具完成的期限。
+    let replay = leased_sdk(&protocol, 91, 2);
+    let cached = protocol.receive(replay).unwrap();
+    leased_flush(&mut protocol, cached).await;
+    assert_eq!(
+        protocol.sdk.as_ref().unwrap().native_completion_deadlines["lease-call"].1,
+        deadline
+    );
+    let completed = leased_frame(
+        &protocol,
+        "lease-turn",
+        "lease-completed",
+        json!({
+        "sessionUpdate":"tool_call_update","toolCallId":"lease-call","status":"completed"}),
+    );
+    let effects = protocol.receive(completed).unwrap();
+    assert!(effects.events.is_empty());
+    assert!(protocol.sdk.as_ref().unwrap().calls[&request.call_id].closed);
+    assert!(
+        protocol
+            .sdk
+            .as_ref()
+            .unwrap()
+            .native_completion_deadlines
+            .is_empty()
+    );
+    assert!(!protocol.sdk_timed_out(deadline + Duration::from_secs(1)));
+    assert!(!protocol.prompt.as_ref().unwrap().finished);
+    let closed_replay = leased_sdk(&protocol, 92, 2);
+    let cached = protocol.receive(closed_replay).unwrap();
+    leased_flush(&mut protocol, cached).await;
+    assert!(
+        protocol
+            .sdk
+            .as_ref()
+            .unwrap()
+            .native_completion_deadlines
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn production_lease_immediate_error_reply_also_bounds_native_completion_wait() {
+    let mut protocol = leased_protocol();
+    leased_begin(&mut protocol, "lease-turn");
+    leased_inputs(&mut protocol, "lease-turn", "lease-call");
+    leased_allow(&mut protocol, "lease-call", 50).await;
+    let mut request = leased_sdk(&protocol, 90, 2);
+    // 合法原生租约仍可能收到不支持的 MCP 版本；错误回复没有应用工具调用对象。
+    request["params"]["message"]["params"]["_meta"] = json!({
+        "io.modelcontextprotocol/protocolVersion":"unsupported-version",
+        "io.modelcontextprotocol/clientCapabilities":{}});
+    let error_reply = protocol.receive(request.clone()).unwrap();
+    assert!(error_reply.events.is_empty());
+    assert_eq!(error_reply.writes.len(), 1);
+    assert!(error_reply.writes[0]["result"]["error"].is_object());
+    assert!(protocol.sdk.as_ref().unwrap().calls.is_empty());
+    assert!(
+        protocol
+            .sdk
+            .as_ref()
+            .unwrap()
+            .native_completion_deadlines
+            .is_empty()
+    );
+    leased_flush(&mut protocol, error_reply).await;
+    let deadline = protocol.sdk.as_ref().unwrap().native_completion_deadlines["lease-call"].1;
+    assert!(!protocol.sdk_timed_out(deadline - Duration::from_millis(1)));
+    assert!(protocol.sdk_timed_out(deadline));
+
+    request["id"] = json!(91);
+    let cached = protocol.receive(request.clone()).unwrap();
+    leased_flush(&mut protocol, cached).await;
+    assert_eq!(
+        protocol.sdk.as_ref().unwrap().native_completion_deadlines["lease-call"].1,
+        deadline
+    );
+    let completed = leased_frame(
+        &protocol,
+        "lease-turn",
+        "lease-completed",
+        json!({
+        "sessionUpdate":"tool_call_update","toolCallId":"lease-call","status":"completed"}),
+    );
+    assert!(protocol.receive(completed).unwrap().events.is_empty());
+    assert!(
+        protocol
+            .sdk
+            .as_ref()
+            .unwrap()
+            .native_completion_deadlines
+            .is_empty()
+    );
+    assert!(!protocol.sdk_timed_out(deadline + Duration::from_secs(1)));
+    request["id"] = json!(92);
+    let cached = protocol.receive(request).unwrap();
+    leased_flush(&mut protocol, cached).await;
+    assert!(
+        protocol
+            .sdk
+            .as_ref()
+            .unwrap()
+            .native_completion_deadlines
+            .is_empty()
+    );
+    assert!(!protocol.prompt.as_ref().unwrap().finished);
 }

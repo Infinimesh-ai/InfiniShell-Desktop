@@ -72,6 +72,7 @@ FIXED_VALUES = EVENTS | ORIGIN_STATES | {SCOPE, "sdk_mcp", "initialize", "tools/
     "mcp_envelope", "mcp_envelope_meta", "mcp_params_meta", "pending", "in_progress",
     "completed", "failed", "cancelled", "inspect_local_tasks"}
 KEYS = {"event", "scope", "max_native_inputs", "origin_verification", "credential_files_read_by_probe",
+    "skills_reload_closed_success_shape",
     "public_product_gate_open", "framework", "protocol_version", "sequence", "outer_id", "inner_id",
     "mcp_method", "outer_keys", "params_keys", "inner_keys", "tool_params_keys", "metadata_keys",
     "origin_fields", "origin_field_types", "origin", "origin_present", "origin_field_presence",
@@ -245,6 +246,8 @@ def projection(value, key=None, depth=0):
         return {"value_omitted": True}
     if key in ID_KEYS:
         return safe_id(value)
+    if key == "skills_reload_closed_success_shape":
+        return value if type(value) is bool else None
     if key == "transaction_context":
         return value if transaction_context_valid(value) else {"type": type(value).__name__, "sha256": sha(json.dumps(value, sort_keys=True).encode())}
     if key in {"method", "id", "inner_response_id"}:
@@ -452,7 +455,8 @@ def private_response_envelope_audit(path):
     if len(records) > 1:
         raise ValueError("私有信封只允许一个响应")
     for envelope in records:
-        fields = {"jsonrpc", "id", "result_type", "result_field_count", "result_fields", "error_present"}
+        fields = {"jsonrpc", "id", "result_type", "result_field_count", "result_fields", "error_present",
+            "skills_reload_closed_success_shape"}
         if not isinstance(envelope, dict) or set(envelope) != fields:
             raise ValueError("私有信封出现额外字段")
         if (envelope["id"] is not None and type(envelope["id"]) not in (str, int, float)
@@ -460,7 +464,8 @@ def private_response_envelope_audit(path):
                 or envelope["jsonrpc"] != "2.0" and not diagnostic_summary(envelope["jsonrpc"])
                 or not isinstance(envelope["result_type"], str) or envelope["result_type"] not in JSON_TYPES - {"absent_or_null"}
                 or type(envelope["result_field_count"]) is not int or not 0 <= envelope["result_field_count"] < 2 ** 63
-                or type(envelope["error_present"]) is not bool):
+                or type(envelope["error_present"]) is not bool
+                or type(envelope["skills_reload_closed_success_shape"]) is not bool):
             raise ValueError("私有信封字段形状无效")
         rows = envelope["result_fields"]
         if envelope["result_type"] != "object":
@@ -471,8 +476,19 @@ def private_response_envelope_audit(path):
                     or not diagnostic_summary(row["key"]) or row["key"]["type"] != "string"
                     or not isinstance(row["value_type"], str) or row["value_type"] not in JSON_TYPES - {"absent", "absent_or_null"} for row in rows)):
             raise ValueError("私有信封结果字段范围无效")
-    return {"private_native_response_envelope_bytes": len(raw), "private_native_response_envelope_count": len(records),
+        # 原始内层值已在 Rust 端丢弃；这里只核对布尔诊断与允许的外层指纹一致。
+        if envelope["skills_reload_closed_success_shape"] and (
+                envelope["jsonrpc"] != "2.0" or envelope["id"] != "skills-reload"
+                or envelope["error_present"] or envelope["result_type"] != "object"
+                or envelope["result_field_count"] != 1
+                or rows != [{"key": {"type": "string", "bytes": 6, "sha256": sha(b"result")},
+                    "value_type": "object"}]):
+            raise ValueError("私有维护形状诊断与信封不匹配")
+    audit = {"private_native_response_envelope_bytes": len(raw), "private_native_response_envelope_count": len(records),
         "private_native_response_envelope_sha256": sha(raw), "private_native_response_envelope_scope_verified": True}
+    if records:
+        audit["skills_reload_closed_success_shape"] = records[0]["skills_reload_closed_success_shape"]
+    return audit
 
 
 def response_envelope_ledger_matches(audit, events):

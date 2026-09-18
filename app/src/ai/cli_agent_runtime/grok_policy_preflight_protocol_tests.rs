@@ -8,9 +8,10 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::{
-    ALLOWED_METHODS, DIAGNOSTIC_METHODS, MAX_BYTES, MAX_FRAMES, Observations, Plan, RequestKind,
-    SCOPE, WireReader, confirm_info, guard_outbound, hash, mcp_counts, normal_receipt,
-    notification_diagnostic, outbound, phase_outcome, response_body,
+    ALLOWED_METHODS, DIAGNOSTIC_METHODS, MAX_BYTES, MAX_FRAMES, MAX_REQUESTS, Observations, Plan,
+    RequestKind, SCOPE, WireReader, confirm_cached_token_method, confirm_info, guard_outbound,
+    hash, mcp_counts, normal_receipt, notification_diagnostic, outbound, phase_outcome,
+    phase_requests, response_body, rpc_error_diagnostic,
 };
 use crate::ai::cli_agent_runtime::managed_process::ExitReceipt;
 
@@ -21,9 +22,287 @@ const CWD: &str = "/isolated/project";
 #[cfg(windows)]
 const CWD: &str = r"C:\isolated\project";
 
+#[test]
+fn cached_token_authentication_wire_has_only_headless_parameters() {
+    let request = outbound(RequestKind::Authenticate, 2, Path::new(CWD), None).unwrap();
+    assert_eq!(
+        request,
+        json!({"jsonrpc":"2.0","id":2,"method":"authenticate",
+        "params":{"methodId":"cached_token","_meta":{"headless":true}}})
+    );
+    assert_eq!(
+        request,
+        outbound(RequestKind::Authenticate, 2, Path::new(CWD), Some(SESSION)).unwrap()
+    );
+    let bytes = serde_json::to_vec(&request).unwrap();
+    let frame: Value = serde_json::from_slice(&bytes).unwrap();
+    guard_outbound(&frame, RequestKind::Authenticate, 2, Path::new(CWD), None).unwrap();
+    assert!(!String::from_utf8(bytes).unwrap().contains(SESSION));
+}
+
+#[test]
+fn cached_token_requires_one_exact_advertised_method() {
+    confirm_cached_token_method(&json!({"authMethods":[
+        {"id":"xai.api_key","name":"OFFLINE_API_METHOD"},
+        {"id":"cached_token","name":"OFFLINE_CACHED_METHOD"}]}))
+    .unwrap();
+    for methods in [
+        json!([]),
+        json!([{"id":"xai.api_key"}]),
+        json!([{"id":"Cached_Token"}]),
+        json!([{"id":"cached_token/extra"}]),
+        json!([{"id":"cached_token"},{"id":"cached_token"}]),
+    ] {
+        assert_eq!(
+            confirm_cached_token_method(&json!({"authMethods":methods})),
+            Err("native_cached_token_unavailable")
+        );
+    }
+}
+
+#[test]
+fn malformed_or_unbounded_auth_advertisement_is_rejected() {
+    for initialized in [
+        json!({}),
+        json!({"authMethods":null}),
+        json!({"authMethods":{}}),
+        json!({"authMethods":[{"id":"cached_token"},{}]}),
+        json!({"authMethods":[{"id":"cached_token"},{"id":false}]}),
+        json!({"authMethods":[{"id":"cached_token"},{"id":""}]}),
+        json!({"authMethods":vec![json!({"id":"cached_token"});65]}),
+    ] {
+        assert_eq!(
+            confirm_cached_token_method(&initialized),
+            Err("native_auth_methods_invalid")
+        );
+    }
+}
+
+#[test]
+fn authentication_cannot_request_interactive_api_key_or_stale_session_parameters() {
+    let original = outbound(RequestKind::Authenticate, 2, Path::new(CWD), None).unwrap();
+    for method in ["xai.api_key", "oauth", "cached_token/extra"] {
+        let mut changed = original.clone();
+        changed["params"]["methodId"] = json!(method);
+        assert_eq!(
+            guard_outbound(&changed, RequestKind::Authenticate, 2, Path::new(CWD), None),
+            Err("outbound_parameters_rejected")
+        );
+    }
+    for patch in [
+        json!({"headless":false}),
+        json!({"sessionId":FOREIGN}),
+        json!({"token":"OFFLINE_TOKEN_DO_NOT_READ"}),
+        json!({"cwd":"OFFLINE_OLD_CWD"}),
+    ] {
+        let mut changed = original.clone();
+        if patch.get("headless").is_some() {
+            changed["params"]["_meta"] = patch;
+        } else {
+            changed["params"]
+                .as_object_mut()
+                .unwrap()
+                .extend(patch.as_object().unwrap().clone());
+        }
+        assert_eq!(
+            guard_outbound(
+                &changed,
+                RequestKind::Authenticate,
+                2,
+                Path::new(CWD),
+                Some(SESSION)
+            ),
+            Err("outbound_parameters_rejected")
+        );
+    }
+}
+
+#[test]
+fn authentication_result_never_binds_or_replaces_native_session() {
+    let response = json!({"jsonrpc":"2.0","id":2,"result":{"sessionId":FOREIGN}});
+    for session in [None, Some(SESSION)] {
+        let mut observations = Observations {
+            native_session: session.map(str::to_owned),
+            pending_response: Some((2, RequestKind::Authenticate)),
+            ..Default::default()
+        };
+        assert_eq!(
+            observations.response_transaction(&response),
+            Ok(Some(RequestKind::Authenticate))
+        );
+        response_body(&response, 2, RequestKind::Authenticate).unwrap();
+        assert_eq!(observations.native_session.as_deref(), session);
+        assert!(observations.pending_response.is_none());
+        assert_eq!(
+            observations.completed_responses[&2].1,
+            RequestKind::Authenticate
+        );
+    }
+}
+
+#[test]
+fn failed_authentication_response_cannot_be_a_successful_object_result() {
+    for result in [
+        json!(null),
+        json!(false),
+        json!([]),
+        json!("OFFLINE_AUTH_BODY"),
+    ] {
+        let frame = json!({"jsonrpc":"2.0","id":2,"result":result});
+        assert_eq!(
+            response_body(&frame, 2, RequestKind::Authenticate),
+            Err("native_result_invalid")
+        );
+        let mut observations = Observations {
+            pending_response: Some((2, RequestKind::Authenticate)),
+            ..Default::default()
+        };
+        assert_eq!(
+            observations.response_transaction(&frame),
+            Err("native_response_uncorrelated")
+        );
+        assert_eq!(
+            observations.pending_response,
+            Some((2, RequestKind::Authenticate))
+        );
+    }
+    let frame =
+        json!({"jsonrpc":"2.0","id":2,"error":{"code":-32000,"message":"OFFLINE_AUTH_ERROR"}});
+    assert_eq!(
+        response_body(&frame, 2, RequestKind::Authenticate),
+        Err("rpc_error")
+    );
+    let frame = json!({"jsonrpc":"2.0","id":2,"result":{},"error":{"code":-32000}});
+    assert_eq!(
+        response_body(&frame, 2, RequestKind::Authenticate),
+        Err("native_response_uncorrelated")
+    );
+}
+
+#[test]
+fn initialization_and_authentication_duplicates_preserve_the_next_owned_rpc() {
+    let initialized =
+        json!({"jsonrpc":"2.0","id":1,"result":{"authMethods":[{"id":"cached_token"}]}});
+    let authenticated = json!({"jsonrpc":"2.0","id":2,"result":{}});
+    let mut observations = Observations {
+        pending_response: Some((1, RequestKind::Initialize)),
+        ..Default::default()
+    };
+    assert_eq!(
+        observations.response_transaction(&initialized),
+        Ok(Some(RequestKind::Initialize))
+    );
+    observations.pending_response = Some((2, RequestKind::Authenticate));
+    assert_eq!(observations.response_transaction(&initialized), Ok(None));
+    assert_eq!(
+        observations.pending_response,
+        Some((2, RequestKind::Authenticate))
+    );
+    assert_eq!(
+        observations.response_transaction(&authenticated),
+        Ok(Some(RequestKind::Authenticate))
+    );
+    observations.pending_response = Some((3, RequestKind::New));
+    assert_eq!(observations.response_transaction(&authenticated), Ok(None));
+    assert_eq!(observations.pending_response, Some((3, RequestKind::New)));
+    let conflict = json!({"jsonrpc":"2.0","id":2,"result":{"sessionId":FOREIGN}});
+    assert_eq!(
+        observations.response_transaction(&conflict),
+        Err("native_response_conflict")
+    );
+    assert_eq!(observations.pending_response, Some((3, RequestKind::New)));
+    assert!(observations.native_session.is_none());
+}
+
+#[test]
+fn out_of_order_and_previous_process_authentication_cannot_consume_pending() {
+    for (pending, response_id) in [
+        ((2, RequestKind::Authenticate), 3),
+        ((3, RequestKind::New), 2),
+        ((9, RequestKind::Authenticate), 2),
+    ] {
+        let mut observations = Observations {
+            pending_response: Some(pending),
+            ..Default::default()
+        };
+        let response = json!({"jsonrpc":"2.0","id":response_id,"result":{}});
+        assert_eq!(
+            observations.response_transaction(&response),
+            Err("native_response_uncorrelated")
+        );
+        assert_eq!(observations.pending_response, Some(pending));
+        assert!(observations.completed_responses.is_empty());
+    }
+}
+
+#[test]
+fn both_phase_wire_sequences_authenticate_before_opening_with_four_diagnostics() {
+    for (resume, opening) in [(false, "session/new"), (true, "session/load")] {
+        let stages = phase_requests(resume);
+        assert_eq!(
+            stages.map(RequestKind::method),
+            [
+                "initialize",
+                "authenticate",
+                opening,
+                "x.ai/session/info",
+                "x.ai/session/state",
+                "x.ai/mcp/list",
+                "x.ai/debug/agent"
+            ]
+        );
+        let mut wire = Vec::new();
+        for (index, kind) in stages.into_iter().enumerate() {
+            let session = if index >= 3 || resume && index == 2 {
+                Some(SESSION)
+            } else {
+                None
+            };
+            let request = outbound(kind, index + 1, Path::new(CWD), session).unwrap();
+            wire.extend(serde_json::to_vec(&request).unwrap());
+            wire.push(b'\n');
+        }
+        let mut reader = WireReader::new(Cursor::new(wire), MAX_BYTES, MAX_FRAMES);
+        block_on(async {
+            for method in stages.map(RequestKind::method) {
+                let (frame, _) = reader.next().await.unwrap().unwrap();
+                assert_eq!(frame["method"], method);
+            }
+            assert!(reader.next().await.unwrap().is_none());
+        });
+    }
+}
+
+#[test]
+fn fourteen_request_budget_does_not_admit_a_fifteenth_or_prompt() {
+    assert_eq!(
+        MAX_REQUESTS,
+        phase_requests(false).len() + phase_requests(true).len()
+    );
+    assert_eq!(MAX_REQUESTS, 14);
+    serde_json::from_value::<Plan>(plan_value())
+        .unwrap()
+        .validate()
+        .unwrap();
+    for budget in [12, 13, 15] {
+        let mut value = plan_value();
+        value["max_protocol_requests"] = json!(budget);
+        assert_eq!(
+            serde_json::from_value::<Plan>(value).unwrap().validate(),
+            Err("plan_budget_invalid")
+        );
+    }
+    outbound(RequestKind::DebugAgent, 14, Path::new(CWD), Some(SESSION)).unwrap();
+    assert_eq!(
+        outbound(RequestKind::Authenticate, 15, Path::new(CWD), None),
+        Err("request_identity_invalid")
+    );
+    assert!(!ALLOWED_METHODS.contains(&"session/prompt"));
+}
+
 fn plan_value() -> Value {
     json!({"schema_version":1,"scope":SCOPE,"max_native_inputs":0,
-        "max_protocol_requests":12,"max_session_processes":2,"allowed_methods":ALLOWED_METHODS,
+        "max_protocol_requests":14,"max_session_processes":2,"allowed_methods":ALLOWED_METHODS,
         "diagnostic_methods":DIAGNOSTIC_METHODS,"profile_sha256":hash(b"profile"),"config_sha256":hash(b"config"),
         "always_approve_requested":false,"auto_mode_requested":false,"protocol_guard_required_before_write":true,
         "reject_reverse_tool_requests":true,"model_http_count_measured":false,"candidate_source_is_exact_binary":false})
@@ -122,7 +401,7 @@ fn request_identity_and_extra_fields_fail_before_serialized_write() {
         Err("request_identity_invalid")
     );
     assert_eq!(
-        outbound(RequestKind::Info, 13, Path::new(CWD), Some(SESSION)),
+        outbound(RequestKind::Info, 15, Path::new(CWD), Some(SESSION)),
         Err("request_identity_invalid")
     );
     assert_eq!(
@@ -651,8 +930,15 @@ fn primary_failure_survives_missing_exit_code_cleanup_timeout_and_drain_error() 
         &generation.to_string(),
     );
     exit.exit_code = None;
-    let cleanup = super::cleanup_event(&exit).map(|_| ());
-    assert_eq!(cleanup, Err("native_exit_code_missing"));
+    let event = super::cleanup_event(&exit).unwrap();
+    assert_eq!(event["exit_code"], Value::Null);
+    assert_eq!(event["exit_reason"], "stop_requested");
+    assert_eq!(event["cleanup_confirmed"], true);
+    assert_eq!(
+        normal_receipt(&exit, generation),
+        Err("normal_stdio_cleanup_unconfirmed")
+    );
+    let cleanup = Ok(());
     assert_eq!(
         phase_outcome::<()>(
             Err("native_unknown_notification_rejected"),
@@ -776,5 +1062,152 @@ fn stop_ack_legacy_process_group_or_wrong_generation_never_proves_normal_stdio_c
             generation
         ),
         Err("normal_stdio_cleanup_unconfirmed")
+    );
+}
+
+#[test]
+fn owned_rpc_error_exposes_only_bounded_code_and_value_summaries() {
+    let generation = Uuid::new_v4();
+    for (code, expected) in [
+        (json!(-32602), json!(-32602)),
+        (json!(2147483648_i64), Value::Null),
+        (json!(true), Value::Null),
+        (json!("OFFLINE_CODE"), Value::Null),
+    ] {
+        let frame = json!({"jsonrpc":"2.0","id":3,"error":{
+            "code":code,"message":"OFFLINE_PRIVATE_MESSAGE","data":{"body":"OFFLINE_PRIVATE_DATA"}}});
+        let raw = serde_json::to_vec(&frame).unwrap();
+        let mut observations = Observations {
+            pending_response: Some((3, RequestKind::New)),
+            ..Default::default()
+        };
+        let consumed = observations.response_transaction(&frame).unwrap();
+        let diagnostic =
+            rpc_error_diagnostic(&frame, generation, 3, RequestKind::New, consumed, &raw)
+                .unwrap()
+                .unwrap();
+        assert_eq!(diagnostic["error_code"], expected);
+        assert_eq!(diagnostic["owned_current_request"], true);
+        assert_eq!(diagnostic["message"]["type"], "string");
+        assert_eq!(diagnostic["data"]["type"], "object");
+        let public = serde_json::to_string(&diagnostic).unwrap();
+        assert!(!public.contains("OFFLINE_PRIVATE"));
+        assert_eq!(response_body(&frame, 3, RequestKind::New), Err("rpc_error"));
+    }
+}
+
+#[test]
+fn duplicate_old_unknown_or_wrong_kind_cannot_emit_owned_rpc_error() {
+    let generation = Uuid::new_v4();
+    let frame = json!({"jsonrpc":"2.0","id":3,"error":{"code":-32602,"message":"OFFLINE_ERROR"}});
+    let raw = serde_json::to_vec(&frame).unwrap();
+    let mut observations = Observations {
+        pending_response: Some((3, RequestKind::New)),
+        ..Default::default()
+    };
+    observations.response_transaction(&frame).unwrap();
+    observations.pending_response = Some((4, RequestKind::Info));
+    let duplicate = observations.response_transaction(&frame).unwrap();
+    assert_eq!(duplicate, None);
+    assert_eq!(
+        rpc_error_diagnostic(&frame, generation, 3, RequestKind::New, duplicate, &raw),
+        Err("error_diagnostic_not_owned")
+    );
+    assert_eq!(observations.pending_response, Some((4, RequestKind::Info)));
+    for (id, consumed) in [(4, Some(RequestKind::New)), (3, Some(RequestKind::Load))] {
+        assert_eq!(
+            rpc_error_diagnostic(&frame, generation, id, RequestKind::New, consumed, &raw),
+            Err("error_diagnostic_not_owned")
+        );
+    }
+    let unknown = json!({"jsonrpc":"2.0","id":99,"error":{"code":-32602}});
+    assert_eq!(
+        observations.response_transaction(&unknown),
+        Err("native_response_uncorrelated")
+    );
+    assert_eq!(observations.pending_response, Some((4, RequestKind::Info)));
+}
+
+fn compatibility_model_notification(session: &str) -> Value {
+    json!({"jsonrpc":"2.0","method":"_x.ai/session_notification","params":{
+        "sessionId":session,"update":{"sessionUpdate":"model_changed","model_id":"offline-model"}}})
+}
+
+#[test]
+fn compatibility_model_metadata_before_new_does_not_bind_session_or_consume_rpc() {
+    let mut observations = Observations {
+        pending_response: Some((3, RequestKind::New)),
+        ..Default::default()
+    };
+    let frame = compatibility_model_notification(SESSION);
+    observations.notification(&frame).unwrap();
+    observations.notification(&frame).unwrap();
+    assert_eq!(observations.native_session, None);
+    assert_eq!(observations.pending_response, Some((3, RequestKind::New)));
+    assert!(observations.completed_responses.is_empty());
+    observations.bind(FOREIGN).unwrap();
+    assert_eq!(observations.native_session.as_deref(), Some(FOREIGN));
+}
+
+#[test]
+fn load_model_metadata_repeats_preserve_response_and_reject_conflicting_event_id() {
+    let mut observations = Observations {
+        native_session: Some(SESSION.into()),
+        pending_response: Some((10, RequestKind::Load)),
+        ..Default::default()
+    };
+    let mut frame = compatibility_model_notification(SESSION);
+    frame["params"]["_meta"] = json!({"eventId":"offline-metadata-event"});
+    observations.notification(&frame).unwrap();
+    observations.notification(&frame).unwrap();
+    assert_eq!(observations.pending_response, Some((10, RequestKind::Load)));
+    assert_eq!(observations.native_session.as_deref(), Some(SESSION));
+    assert!(observations.completed_responses.is_empty());
+    frame["params"]["update"]["model_id"] = json!("conflicting-model");
+    assert_eq!(
+        observations.notification(&frame),
+        Err("native_notification_conflict")
+    );
+    assert_eq!(observations.pending_response, Some((10, RequestKind::Load)));
+}
+
+#[test]
+fn compatibility_metadata_cannot_change_bound_session_or_admit_tool_activity() {
+    let mut observations = Observations {
+        native_session: Some(SESSION.into()),
+        pending_response: Some((10, RequestKind::Load)),
+        ..Default::default()
+    };
+    assert_eq!(
+        observations.notification(&compatibility_model_notification(FOREIGN)),
+        Err("native_session_changed")
+    );
+    let mut frame = compatibility_model_notification(SESSION);
+    frame["params"]["update"]["rawInput"] = json!({"command":"offline-not-executed"});
+    assert_eq!(
+        observations.notification(&frame),
+        Err("native_session_notification_activity_rejected")
+    );
+    assert_eq!(observations.received_notifications, 0);
+    assert_eq!(observations.pending_response, Some((10, RequestKind::Load)));
+    assert_eq!(observations.native_session.as_deref(), Some(SESSION));
+}
+
+#[test]
+fn compatibility_metadata_diagnostic_keeps_model_private_and_rejects_turn_completion() {
+    let frame = compatibility_model_notification(SESSION);
+    let diagnostic = notification_diagnostic(&frame, Uuid::nil());
+    assert_eq!(diagnostic["method"], "_x.ai/session_notification");
+    assert_eq!(diagnostic["session_notification_metadata_only"], true);
+    assert!(!diagnostic.to_string().contains("offline-model"));
+    let mut completion = frame;
+    completion["params"]["update"] = json!({"sessionUpdate":"turn_completed","prompt_id":SESSION});
+    assert_eq!(
+        notification_diagnostic(&completion, Uuid::nil())["session_notification_metadata_only"],
+        false
+    );
+    assert_eq!(
+        Observations::default().notification(&completion),
+        Err("native_session_notification_activity_rejected")
     );
 }

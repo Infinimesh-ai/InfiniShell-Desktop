@@ -1151,7 +1151,95 @@ class TransactionEnvelopeDiagnosticTests(unittest.TestCase):
 
     def envelope(self):
         return {"jsonrpc": "2.0", "id": "OFFLINE_EXACT_PRIVATE_ID", "result_type": "object", "result_field_count": 1,
-            "result_fields": [{"key": self.summary("OFFLINE_PRIVATE_KEY"), "value_type": "string"}], "error_present": False}
+            "result_fields": [{"key": self.summary("OFFLINE_PRIVATE_KEY"), "value_type": "string"}], "error_present": False,
+            "skills_reload_closed_success_shape": False}
+
+    def maintenance_envelope(self):
+        return self.envelope() | {"id": "skills-reload", "skills_reload_closed_success_shape": True,
+            "result_fields": [{"key": {"type": "string", "bytes": 6, "sha256": runner.sha(b"result")},
+                "value_type": "object"}]}
+
+    @unittest.skipUnless(os.name == "posix", "私有信封权限只验证Unix")
+    def test_maintenance_shape_audit_exports_only_the_strict_boolean_and_file_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "envelope.ndjson"
+            path.touch(mode=0o600)
+            path.write_text(json.dumps(self.maintenance_envelope()))
+            audit = runner.private_response_envelope_audit(path)
+            self.assertIs(audit["skills_reload_closed_success_shape"], True)
+            public = json.dumps(audit)
+            for forbidden in ("skills-reload", "reloaded", "result_fields", "OFFLINE"):
+                self.assertNotIn(forbidden, public)
+            path.write_text(json.dumps(self.envelope()))
+            self.assertIs(runner.private_response_envelope_audit(path)["skills_reload_closed_success_shape"], False)
+
+    @unittest.skipUnless(os.name == "posix", "私有信封权限只验证Unix")
+    def test_maintenance_shape_audit_rejects_non_boolean_flags_and_legacy_schema(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "envelope.ndjson"
+            path.touch(mode=0o600)
+            for flag in (0, 1, -1, 1.0, "true", None, {}, [], {"body": "OFFLINE_DEEP_BODY"}):
+                path.write_text(json.dumps(self.maintenance_envelope() | {"skills_reload_closed_success_shape": flag}))
+                with self.assertRaises(ValueError):
+                    runner.private_response_envelope_audit(path)
+            legacy = self.envelope()
+            legacy.pop("skills_reload_closed_success_shape")
+            path.write_text(json.dumps(legacy))
+            with self.assertRaises(ValueError):
+                runner.private_response_envelope_audit(path)
+
+    @unittest.skipUnless(os.name == "posix", "私有信封权限只验证Unix")
+    def test_true_maintenance_shape_audit_rejects_conflicting_outer_summaries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "envelope.ndjson"
+            path.touch(mode=0o600)
+            for fields in ({"id": "OFFLINE_OTHER_ID"}, {"id": 1}, {"jsonrpc": "1.0"},
+                    {"error_present": True}, {"result_type": "string", "result_field_count": 0, "result_fields": None},
+                    {"result_field_count": 0, "result_fields": []},
+                    {"result_fields": [{"key": self.summary("OFFLINE_OTHER_KEY"), "value_type": "object"}]},
+                    {"result_fields": [{"key": {"type": "string", "bytes": 6, "sha256": runner.sha(b"result")},
+                        "value_type": "number"}]},
+                    {"result_fields": [{"key": {"type": "string", "bytes": 5, "sha256": runner.sha(b"result")},
+                        "value_type": "object"}]}):
+                path.write_text(json.dumps(self.maintenance_envelope() | fields))
+                with self.assertRaises(ValueError):
+                    runner.private_response_envelope_audit(path)
+
+    @unittest.skipUnless(os.name == "posix", "私有信封权限只验证Unix")
+    def test_maintenance_shape_audit_rejects_control_fields_and_deep_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "envelope.ndjson"
+            path.touch(mode=0o600)
+            for fields in ({"method": "_x.ai/internal/reload_skills"}, {"error": None},
+                    {"sessionId": "OFFLINE_OTHER_SESSION"}, {"generation": "OFFLINE_OTHER_GENERATION"},
+                    {"result": {"result": {"reloaded": {"body": ["OFFLINE_DEEP_BODY"]}}}},
+                    {"reloaded": 18446744073709551615}, {"extra": "OFFLINE_BODY"}):
+                path.write_text(json.dumps(self.maintenance_envelope() | fields))
+                with self.assertRaises(ValueError):
+                    runner.private_response_envelope_audit(path)
+
+    @unittest.skipUnless(os.name == "posix", "私有信封权限只验证Unix")
+    def test_empty_capture_has_no_maintenance_shape_claim(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "envelope.ndjson"
+            path.touch(mode=0o600)
+            self.assertNotIn("skills_reload_closed_success_shape", runner.private_response_envelope_audit(path))
+
+    def test_maintenance_shape_public_projection_never_promotes_non_boolean_values(self):
+        for value in (True, False):
+            self.assertIs(runner.projection({"skills_reload_closed_success_shape": value})[
+                "skills_reload_closed_success_shape"], value)
+        for value in (0, 1, -1, 1.0, "OFFLINE_BODY", None, {"body": ["OFFLINE_DEEP_BODY"]}):
+            projected = runner.projection({"skills_reload_closed_success_shape": value})
+            self.assertIsNone(projected["skills_reload_closed_success_shape"])
+            self.assertNotIn("OFFLINE", json.dumps(projected))
+
+    def test_maintenance_shape_boolean_cannot_verify_sdk_origin_or_complete_the_probe(self):
+        events = evidence()
+        events[-1].update(passed=False, skills_reload_closed_success_shape=True)
+        observation = runner.probe_observation(101, "", events)
+        self.assertFalse(observation["probe_passed"])
+        self.assertFalse(observation["native_origin_verified"])
 
     def test_outbound_closed_context_and_summaries_are_retained_without_id_body(self):
         row = self.outbound()

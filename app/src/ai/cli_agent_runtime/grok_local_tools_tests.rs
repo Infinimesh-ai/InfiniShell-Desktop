@@ -796,3 +796,315 @@ fn inline_modern_call_cannot_downgrade_when_its_version_is_missing() {
 
     assert_eq!(response["result"]["error"]["code"], -32602);
 }
+
+fn lease_ledger(bridge: &GrokMcpBridge, tool: &str) -> GrokToolLeaseLedger {
+    lease_ledger_with_arguments(bridge, tool, json!({}))
+}
+
+fn lease_ledger_with_arguments(
+    bridge: &GrokMcpBridge,
+    tool: &str,
+    inputs: Value,
+) -> GrokToolLeaseLedger {
+    let now = Instant::now();
+    let mut ledger = GrokToolLeaseLedger::new(
+        Uuid::nil(),
+        Uuid::nil(),
+        bridge.server_id().into(),
+        MCP_SERVER_NAME.into(),
+        "native-session".into(),
+    )
+    .unwrap();
+    ledger.begin_turn(Uuid::nil(), "native-turn-1").unwrap();
+    ledger.observe_native_tool(&json!({"jsonrpc":"2.0","method":"session/update","params":{
+        "sessionId":"native-session","_meta":{"promptId":"native-turn-1","eventId":"initial"},
+        "update":{"sessionUpdate":"tool_call","toolCallId":"native-call","_meta":{"x.ai/tool":{"name":"use_tool"}},
+        "rawInput":{"tool_name":format!("{MCP_SERVER_NAME}__{tool}"),"tool_input":inputs}}}}), now).unwrap();
+    ledger.observe_native_tool(&json!({"jsonrpc":"2.0","method":"session/update","params":{
+        "sessionId":"native-session","_meta":{"promptId":"native-turn-1","eventId":"final"},
+        "update":{"sessionUpdate":"tool_call_update","toolCallId":"native-call","kind":"other",
+        "rawInput":{"tool_name":format!("{MCP_SERVER_NAME}__{tool}"),"tool_input":inputs,"variant":"UseTool"}}}}), now).unwrap();
+    ledger.record_permission(&json!({"jsonrpc":"2.0","id":1,"method":"session/request_permission","params":{
+        "sessionId":"native-session","toolCall":{"toolCallId":"native-call","kind":"other",
+        "rawInput":{"tool_name":format!("{MCP_SERVER_NAME}__{tool}"),"tool_input":inputs,"variant":"UseTool"}}}}), true, now).unwrap();
+    ledger
+}
+
+#[test]
+fn authenticated_native_lease_bridge_replays_cached_reply_without_another_tool_effect() {
+    let now = Instant::now();
+    let mut bridge = bridge();
+    let mut ledger = lease_ledger(&bridge, INSPECT_TOOL_NAME);
+    let (first, proof) = bridge
+        .receive_with_lease(&inspect_request(), &mut ledger, now)
+        .unwrap();
+    let GrokMcpRequest::Tool(tool) = first else {
+        panic!("已绑定租约未产生工具请求");
+    };
+    assert_eq!(proof.native_call_id(), "native-call");
+    assert_eq!(tool.turn_id, "native-turn-1");
+    assert_eq!(
+        bridge
+            .receive_with_lease(&inspect_request(), &mut ledger, now)
+            .unwrap()
+            .0,
+        GrokMcpRequest::Duplicate
+    );
+    let responses = bridge
+        .reply_with_lease(&tool, Ok(json!({"tasks":[]})), &ledger, &proof)
+        .unwrap();
+    ledger.record_reply_written(&proof).unwrap();
+    let (retry, retry_proof) = bridge
+        .receive_with_lease(&inspect_request(), &mut ledger, now)
+        .unwrap();
+    assert_eq!(retry, GrokMcpRequest::Immediate(responses[0].clone()));
+    assert_eq!(retry_proof, proof);
+    ledger.retire();
+    assert!(
+        bridge
+            .receive_with_lease(&inspect_request(), &mut ledger, now)
+            .is_err()
+    );
+    assert!(
+        bridge
+            .reply_with_lease(&tool, Ok(json!({})), &ledger, &proof)
+            .is_err()
+    );
+}
+
+#[test]
+fn authenticated_native_lease_does_not_prove_spawn_floor_or_replace_missing_turn() {
+    let now = Instant::now();
+    let mut without_lease = bridge();
+    let GrokMcpRequest::Immediate(rejected) =
+        without_lease.receive(&inspect_request(), None).unwrap()
+    else {
+        panic!("无来源请求未拒绝");
+    };
+    assert_eq!(rejected["result"]["result"]["isError"], true);
+    let mut bridge = bridge();
+    let mut ledger = lease_ledger(&bridge, "run_agents");
+    let spawn = request(
+        json!(2),
+        json!(12),
+        "tools/call",
+        json!({"name":"run_agents","arguments":{}}),
+    );
+    let (result, _) = bridge.receive_with_lease(&spawn, &mut ledger, now).unwrap();
+    let GrokMcpRequest::Immediate(response) = result else {
+        panic!("租约不能代替父任务权限上限");
+    };
+    assert_eq!(response["result"]["result"]["isError"], true);
+}
+
+#[test]
+fn bridge_protocol_rollback_keeps_lease_but_never_revives_expired_epoch() {
+    let now = Instant::now();
+    let mut correct = bridge();
+    let mut ledger = lease_ledger(&correct, INSPECT_TOOL_NAME);
+    let mut foreign = GrokMcpBridge::new(
+        Uuid::from_u128(1),
+        LocalToolPermissions {
+            allow_spawn: false,
+            allow_message: false,
+        },
+    );
+    assert!(
+        foreign
+            .receive_with_lease(&inspect_request(), &mut ledger, now)
+            .is_err()
+    );
+    assert!(!ledger.is_retired());
+    assert!(matches!(
+        correct
+            .receive_with_lease(&inspect_request(), &mut ledger, now)
+            .unwrap()
+            .0,
+        GrokMcpRequest::Tool(_)
+    ));
+    let mut expired_bridge = bridge();
+    let mut expired = lease_ledger(&expired_bridge, INSPECT_TOOL_NAME);
+    assert!(
+        expired_bridge
+            .receive_with_lease(
+                &inspect_request(),
+                &mut expired,
+                now + std::time::Duration::from_secs(31)
+            )
+            .is_err()
+    );
+    assert!(expired.is_retired());
+    assert!(
+        expired_bridge
+            .receive_with_lease(&inspect_request(), &mut expired, now)
+            .is_err()
+    );
+}
+
+#[test]
+fn production_registration_entry_cannot_dispatch_or_replay_business_calls() {
+    let now = Instant::now();
+    let mut bridge = bridge();
+    let discovery = request(json!(100), json!(100), "server/discover", modern_params());
+    let discovered = bridge.receive_registration(&discovery).unwrap();
+    assert!(matches!(discovered, GrokMcpRequest::Immediate(_)));
+    assert_eq!(bridge.receive_registration(&discovery).unwrap(), discovered);
+    let list = request(json!(101), json!(101), "tools/list", modern_params());
+    let GrokMcpRequest::Immediate(response) = bridge.receive_registration(&list).unwrap() else {
+        panic!("目录不应进入分发器");
+    };
+    let tools = response["result"]["result"]["tools"].as_array().unwrap();
+    assert!(tools.iter().any(|tool| tool["name"] == INSPECT_TOOL_NAME));
+    assert!(tools.iter().all(|tool| tool["name"] != "run_agents"));
+    let mut params = modern_params();
+    params["name"] = json!(INSPECT_TOOL_NAME);
+    params["arguments"] = json!({});
+    let business = request(json!(1), json!(11), "tools/call", params);
+    assert!(bridge.receive_registration(&business).is_err());
+    let mut ledger = lease_ledger(&bridge, INSPECT_TOOL_NAME);
+    assert!(matches!(
+        bridge
+            .receive_with_lease(&business, &mut ledger, now)
+            .unwrap()
+            .0,
+        GrokMcpRequest::Tool(_)
+    ));
+    assert!(bridge.receive_registration(&business).is_err());
+}
+
+#[test]
+fn production_registration_entry_rejects_identity_or_response_injection_before_caching() {
+    let clean = request(json!(100), json!(100), "server/discover", modern_params());
+    let mut frames = Vec::new();
+    let mut top = clean.clone();
+    top["turnId"] = json!("claimed-turn");
+    frames.push(top);
+    let mut session = clean.clone();
+    session["params"]["sessionId"] = json!("claimed-session");
+    frames.push(session);
+    let mut generation = clean.clone();
+    generation["params"]["message"]["generation"] = json!("claimed-generation");
+    frames.push(generation);
+    let mut result = clean.clone();
+    result["result"] = json!({});
+    frames.push(result);
+    let mut error = clean.clone();
+    error["params"]["message"]["error"] = json!({"code":1});
+    frames.push(error);
+    let mut foreign = clean.clone();
+    foreign["params"]["serverId"] = json!("another-server");
+    frames.push(foreign);
+    let mut unknown = clean.clone();
+    unknown["params"]["message"]["method"] = json!("unknown/extension");
+    frames.push(unknown);
+    let mut bridge = bridge();
+    for frame in frames {
+        assert!(bridge.receive_registration(&frame).is_err());
+    }
+    assert!(matches!(
+        bridge.receive_registration(&clean).unwrap(),
+        GrokMcpRequest::Immediate(_)
+    ));
+}
+
+#[test]
+fn leased_grok_message_uses_common_dispatcher_without_expanding_sender_relations() {
+    let now = Instant::now();
+    let mut bridge = bridge();
+    let inputs = json!({"addresses":["parent"],"subject":"进度","message":"中文\nSecond line"});
+    let mut ledger = lease_ledger_with_arguments(&bridge, SEND_MESSAGE.name, inputs.clone());
+    let frame = request(
+        json!(2),
+        json!(12),
+        "tools/call",
+        json!({"name":SEND_MESSAGE.name,"arguments":inputs}),
+    );
+    let (received, proof) = bridge.receive_with_lease(&frame, &mut ledger, now).unwrap();
+    let GrokMcpRequest::Tool(tool) = received else {
+        panic!("已绑定消息未进入工具分发");
+    };
+    assert_eq!(proof.native_call_id(), "native-call");
+    let context = TrustedLocalToolContext {
+        task_id: "child".into(),
+        generation: 1,
+        runtime_generation: Uuid::nil(),
+        active_turn_id: "native-turn-1".into(),
+        allow_spawn: true,
+        allow_message: true,
+        related_task_ids: HashSet::from(["parent".into()]),
+    };
+    let bound = bind_local_tool_call(tool.clone(), &context).unwrap();
+    assert_eq!(bound.sender_task_id, "child");
+    let super::super::LocalToolOperation::Send(message) = bound.operation else {
+        panic!("消息工具类型错误");
+    };
+    assert_eq!(message.addresses, vec!["parent".to_string()]);
+    assert_eq!(message.message, "中文\nSecond line");
+    let mut forged = tool.clone();
+    forged.arguments["sender_task_id"] = json!("parent");
+    assert!(bind_local_tool_call(forged, &context).is_err());
+    let mut unrelated = tool;
+    unrelated.arguments["addresses"] = json!(["stranger"]);
+    assert!(bind_local_tool_call(unrelated, &context).is_err());
+}
+
+#[test]
+fn production_lease_reply_rejects_changed_targets_and_keeps_modern_cached_result() {
+    let now = Instant::now();
+    let mut bridge = bridge();
+    let mut ledger = lease_ledger(&bridge, INSPECT_TOOL_NAME);
+    let mut params = modern_params();
+    params["name"] = json!(INSPECT_TOOL_NAME);
+    params["arguments"] = json!({});
+    let frame = request(json!(1), json!(11), "tools/call", params);
+    let (outcome, proof) = bridge.receive_with_lease(&frame, &mut ledger, now).unwrap();
+    let GrokMcpRequest::Tool(tool) = outcome else {
+        panic!("未建立回复事务");
+    };
+    let mut wrong_outer = tool.clone();
+    wrong_outer.reply_target = LocalToolReplyTarget::Grok {
+        request_id: json!(9),
+        mcp_id: json!(11),
+    };
+    assert!(
+        bridge
+            .reply_with_lease(&wrong_outer, Ok(json!({})), &ledger, &proof)
+            .is_err()
+    );
+    let mut wrong_inner = tool.clone();
+    wrong_inner.reply_target = LocalToolReplyTarget::Grok {
+        request_id: json!(1),
+        mcp_id: json!(12),
+    };
+    assert!(
+        bridge
+            .reply_with_lease(&wrong_inner, Ok(json!({})), &ledger, &proof)
+            .is_err()
+    );
+    let mut changed = tool.clone();
+    changed.arguments = json!({"task_ids":["stranger"]});
+    assert!(
+        bridge
+            .reply_with_lease(&changed, Ok(json!({})), &ledger, &proof)
+            .is_err()
+    );
+    let replies = bridge
+        .reply_with_lease(&tool, Err("执行失败".into()), &ledger, &proof)
+        .unwrap();
+    assert_eq!(replies.len(), 1);
+    assert_eq!(replies[0]["id"], 1);
+    assert_eq!(replies[0]["result"]["id"], 11);
+    assert_eq!(replies[0]["result"]["result"]["isError"], true);
+    assert_eq!(replies[0]["result"]["result"]["resultType"], "complete");
+    assert!(replies[0].get("native_receipt").is_none());
+    ledger.record_reply_written(&proof).unwrap();
+    let mut retry = frame;
+    retry["id"] = json!(3);
+    let (cached, cached_proof) = bridge.receive_with_lease(&retry, &mut ledger, now).unwrap();
+    assert_eq!(cached_proof, proof);
+    let GrokMcpRequest::Immediate(response) = cached else {
+        panic!("已回复工具被再次分发");
+    };
+    assert_eq!(response["id"], 3);
+    assert_eq!(response["result"], replies[0]["result"]);
+}

@@ -24,7 +24,7 @@ const SCOPE: &str = "grok_fixed_policy_interface_preflight";
 const FIXED_VERSION: &str = "grok 1.0.30 (04b7ffed98c6)";
 const FIXED_BINARY_SHA256: &str =
     "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb";
-const MAX_REQUESTS: usize = 12;
+const MAX_REQUESTS: usize = 14;
 const MAX_PROCESSES: usize = 2;
 const MAX_BYTES: usize = 4 * 1024 * 1024;
 const MAX_FRAMES: usize = 256;
@@ -35,8 +35,9 @@ const DIAGNOSTIC_METHODS: [&str; 4] = [
     "x.ai/mcp/list",
     "x.ai/debug/agent",
 ];
-const ALLOWED_METHODS: [&str; 7] = [
+const ALLOWED_METHODS: [&str; 8] = [
     "initialize",
+    "authenticate",
     "session/new",
     "session/load",
     "x.ai/session/info",
@@ -308,6 +309,7 @@ impl Evidence {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum RequestKind {
     Initialize,
+    Authenticate,
     New,
     Load,
     Info,
@@ -320,6 +322,7 @@ impl RequestKind {
     fn method(self) -> &'static str {
         match self {
             Self::Initialize => "initialize",
+            Self::Authenticate => "authenticate",
             Self::New => "session/new",
             Self::Load => "session/load",
             Self::Info => "x.ai/session/info",
@@ -345,6 +348,8 @@ impl RequestKind {
         Ok(match self {
             Self::Initialize => json!({"protocolVersion":1,"clientCapabilities":{
                 "fs":{"readTextFile":false,"writeTextFile":false},"terminal":false}}),
+            // 只消费原生公布的缓存登录，不读取凭据或把历史会话写入认证请求。
+            Self::Authenticate => json!({"methodId":"cached_token","_meta":{"headless":true}}),
             Self::New => {
                 check(session_id.is_none(), "new_session_already_bound")?;
                 json!({"cwd":cwd,"mcpServers":[],"_meta":{"yoloMode":false,"autoMode":false}})
@@ -359,6 +364,44 @@ impl RequestKind {
             Self::DebugAgent => json!({}),
         })
     }
+}
+
+fn phase_requests(resume: bool) -> [RequestKind; 7] {
+    [
+        RequestKind::Initialize,
+        RequestKind::Authenticate,
+        if resume {
+            RequestKind::Load
+        } else {
+            RequestKind::New
+        },
+        RequestKind::Info,
+        RequestKind::State,
+        RequestKind::McpList,
+        RequestKind::DebugAgent,
+    ]
+}
+
+fn confirm_cached_token_method(initialized: &Value) -> ProbeResult<()> {
+    let methods = initialized["authMethods"]
+        .as_array()
+        .filter(|methods| methods.len() <= 64)
+        .ok_or("native_auth_methods_invalid")?;
+    check(
+        methods.iter().all(|method| {
+            method.is_object() && method["id"].as_str().is_some_and(|id| !id.is_empty())
+        }),
+        "native_auth_methods_invalid",
+    )?;
+    // 无交互探针只选择唯一的 cached_token；不退回 API key 或浏览器授权。
+    check(
+        methods
+            .iter()
+            .filter(|method| method["id"] == "cached_token")
+            .count()
+            == 1,
+        "native_cached_token_unavailable",
+    )
 }
 
 fn outbound(
@@ -451,8 +494,35 @@ impl<R: AsyncRead + Unpin> WireReader<R> {
 struct Observations {
     native_session: Option<String>,
     received_notifications: usize,
+    metadata_notification_ids: HashMap<String, [u8; 32]>,
     pending_response: Option<(usize, RequestKind)>,
     completed_responses: HashMap<usize, ([u8; 32], RequestKind)>,
+}
+
+fn session_notification_metadata(params: &Value) -> bool {
+    // 真实 1.0.30 夹具中的模型变更属于元数据；不会执行工具、绑定会话或证明权限。
+    let Some(params) = params.as_object() else {
+        return false;
+    };
+    let Some(update) = params.get("update").and_then(Value::as_object) else {
+        return false;
+    };
+    params
+        .keys()
+        .all(|key| matches!(key.as_str(), "sessionId" | "update" | "_meta"))
+        && params
+            .get("sessionId")
+            .and_then(Value::as_str)
+            .is_some_and(is_session_id)
+        && params.get("_meta").is_none_or(Value::is_object)
+        && update.len() == 2
+        && update
+            .get("sessionUpdate")
+            .is_some_and(|kind| kind == "model_changed")
+        && update
+            .get("model_id")
+            .and_then(Value::as_str)
+            .is_some_and(|model| !model.is_empty() && model.len() <= 256)
 }
 
 fn global_catalog_empty(params: &Value) -> ProbeResult<()> {
@@ -540,6 +610,36 @@ impl Observations {
                 self.received_notifications += 1;
                 return Ok(());
             }
+            Some("_x.ai/session_notification") => {
+                check(
+                    session_notification_metadata(&frame["params"]),
+                    "native_session_notification_activity_rejected",
+                )?;
+                check(
+                    self.received_notifications < MAX_FRAMES,
+                    "native_notification_budget_exceeded",
+                )?;
+                if let Some(session) = self.native_session.as_deref() {
+                    check(
+                        frame["params"]["sessionId"] == session,
+                        "native_session_changed",
+                    )?;
+                    // Load 的旧模型元数据与当前连接同样只忽略；实际 New/Load 回复才推进事务。
+                    if let Some(id) = frame["params"]["_meta"]["eventId"].as_str() {
+                        check(super::valid_native_id(id), "native_notification_id_invalid")?;
+                        let fingerprint: [u8; 32] = Sha256::digest(encoded(frame)?).into();
+                        if let Some(previous) = self.metadata_notification_ids.get(id) {
+                            check(*previous == fingerprint, "native_notification_conflict")?;
+                        } else {
+                            self.metadata_notification_ids
+                                .insert(id.to_owned(), fingerprint);
+                        }
+                    }
+                }
+                // New 回复前没有可信会话，不能从兼容通知推导身份。
+                self.received_notifications += 1;
+                return Ok(());
+            }
             Some("session/update") => {
                 check(
                     matches!(
@@ -586,7 +686,8 @@ fn notification_diagnostic(frame: &Value, generation: Uuid) -> Value {
             | "_x.ai/mcp_initialized"
             | "_x.ai/mcp/init_progress"
             | "_x.ai/mcp/server_status"
-            | "_x.ai/mcp/servers_updated",
+            | "_x.ai/mcp/servers_updated"
+            | "_x.ai/session_notification",
         ) => frame["method"].clone(),
         Some(_) | None => super::diagnostic_value(frame.get("method")),
     };
@@ -597,6 +698,14 @@ fn notification_diagnostic(frame: &Value, generation: Uuid) -> Value {
         "id_present":frame.get("id").is_some(),"result_present":frame.get("result").is_some(),
         "error_present":frame.get("error").is_some(),
         "session_id":super::diagnostic_value(frame.get("params").and_then(|params|params.get("sessionId")))});
+    if frame["method"] == "_x.ai/session_notification" {
+        diagnostic["session_notification_metadata_only"] = json!(
+            frame.as_object().is_some_and(|frame| frame.len() == 3)
+                && frame["jsonrpc"] == "2.0"
+                && frame["params"]["_meta"].get("promptId").is_none()
+                && session_notification_metadata(&frame["params"])
+        );
+    }
     if frame["method"] == "_x.ai/mcp/servers_updated" {
         // 仅公开封闭空目录的校验结论；失败参数或环境值不进入投影。
         diagnostic["global_catalog_closed_empty"] = json!(
@@ -618,6 +727,45 @@ fn phase_outcome<T>(
     cleanup?;
     drained?;
     Ok(value)
+}
+
+fn rpc_error_diagnostic(
+    frame: &Value,
+    generation: Uuid,
+    id: usize,
+    kind: RequestKind,
+    consumed: Option<RequestKind>,
+    raw: &[u8],
+) -> ProbeResult<Option<Value>> {
+    // consumed 只来自实际账本本次消费；重复回复的 None 不构成当前事务。
+    check(consumed == Some(kind), "error_diagnostic_not_owned")?;
+    check(
+        id > 0
+            && id <= MAX_REQUESTS
+            && frame.as_object().is_some_and(|frame| frame.len() == 3)
+            && frame["jsonrpc"] == "2.0"
+            && frame["id"].as_u64() == Some(id as u64)
+            && frame.get("method").is_none(),
+        "error_diagnostic_not_owned",
+    )?;
+    let Some(error) = frame.get("error") else {
+        return Ok(None);
+    };
+    check(
+        error.is_object() && frame.get("result").is_none(),
+        "error_diagnostic_invalid",
+    )?;
+    // 只公开有界标准错误码；message/data 无论形状都只保留类型、字节和散列。
+    let code = error["code"]
+        .as_i64()
+        .filter(|code| i32::try_from(*code).is_ok());
+    Ok(Some(
+        json!({"event":"rpc_error_diagnostic","generation":generation,
+        "sequence":id,"rpc_id":id,"method":kind.method(),"owned_current_request":true,
+        "error_code":code,"message":super::diagnostic_value(error.get("message")),
+        "data":super::diagnostic_value(error.get("data")),
+        "response_bytes":raw.len(),"response_sha256":hash(raw)}),
+    ))
 }
 
 fn response_body(frame: &Value, id: usize, kind: RequestKind) -> ProbeResult<&Value> {
@@ -653,9 +801,11 @@ fn response_body(frame: &Value, id: usize, kind: RequestKind) -> ProbeResult<&Va
                 .filter(|value| value.is_object())
                 .ok_or("extension_result_missing")
         }
-        RequestKind::Initialize | RequestKind::New | RequestKind::Load | RequestKind::State => {
-            Ok(result)
-        }
+        RequestKind::Initialize
+        | RequestKind::Authenticate
+        | RequestKind::New
+        | RequestKind::Load
+        | RequestKind::State => Ok(result),
     }
 }
 
@@ -782,14 +932,15 @@ async fn rpc<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
                 }
                 continue;
             }
-            if observations.response_transaction(&frame)?.is_none() {
+            let consumed = observations.response_transaction(&frame)?;
+            if consumed.is_none() {
                 continue;
             }
-            return Ok((frame, raw));
+            return Ok((frame, raw, consumed));
         }
     })
     .await;
-    let (frame, raw) = match incoming {
+    let (frame, raw, consumed) = match incoming {
         Ok(result) => result?,
         Err(_) => {
             evidence.record(json!({"event":"rpc_response","generation":generation,
@@ -807,6 +958,9 @@ async fn rpc<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
         json!({"event":"rpc_response","generation":generation,"sequence":id,
         "rpc_id":id,"status":status,"response_bytes":raw.len(),"response_sha256":hash(&raw)}),
     )?;
+    if let Some(diagnostic) = rpc_error_diagnostic(&frame, generation, id, kind, consumed, &raw)? {
+        evidence.record(diagnostic)?;
+    }
     if kind.diagnostic() {
         let keys: Vec<String> = body
             .as_ref()
@@ -831,9 +985,10 @@ fn cleanup_event(receipt: &ExitReceipt) -> ProbeResult<Value> {
         ExitReason::StdioClosed => "stdio_closed",
     };
     let bytes = serde_json::to_vec(receipt).map_err(|_| "receipt_encode_failed")?;
+    // 失败取消可产生无数值退出码的真实收据；保留 null，不补成正常退出。
     Ok(
         json!({"event":"process_cleanup","generation":receipt.generation,
-        "exit_code":receipt.exit_code.ok_or("native_exit_code_missing")?,"exit_reason":reason,
+        "exit_code":receipt.exit_code,"exit_reason":reason,
         "cleanup_confirmed":receipt.cleanup_confirmed,"receipt_sha256":hash(&bytes)}),
     )
 }
@@ -889,12 +1044,19 @@ async fn phase(
         ..Default::default()
     };
     let result: ProbeResult<String> = async {
-        let initialized = rpc(&mut stdin,&mut reader,&mut observations,RequestKind::Initialize,
+        let [initialize, authenticate, opening, info_request, state_request, mcp_request, debug_request] =
+            phase_requests(previous_session.is_some());
+        let initialized = rpc(&mut stdin,&mut reader,&mut observations,initialize,
             generation,paths,plan,budget,evidence).await?;
         check(initialized["protocolVersion"].as_u64() == Some(1)
             && initialized["_meta"]["agentVersion"] == "1.0.30"
             && initialized["agentCapabilities"]["loadSession"] == true, "native_identity_unconfirmed")?;
-        let opening = if previous_session.is_some() { RequestKind::Load } else { RequestKind::New };
+        confirm_cached_token_method(&initialized)?;
+        evidence.record(json!({"event":"auth_method_selected","generation":generation,
+            "method_id":"cached_token","advertised":true,"headless":true}))?;
+        // 认证只完成当前 RPC，不把响应中的会话字段绑定为 New/Load 的原生身份。
+        rpc(&mut stdin,&mut reader,&mut observations,authenticate,
+            generation,paths,plan,budget,evidence).await?;
         let opened = rpc(&mut stdin,&mut reader,&mut observations,opening,
             generation,paths,plan,budget,evidence).await?;
         if let Some(previous) = previous_session {
@@ -906,14 +1068,14 @@ async fn phase(
             observations.bind(opened["sessionId"].as_str().ok_or("native_new_session_missing")?)?;
         }
         let session = observations.native_session.clone().ok_or("native_session_missing")?;
-        let info = rpc(&mut stdin,&mut reader,&mut observations,RequestKind::Info,
+        let info = rpc(&mut stdin,&mut reader,&mut observations,info_request,
             generation,paths,plan,budget,evidence).await?;
         confirm_info(&info,&session,&paths.cwd)?;
-        let state = rpc(&mut stdin,&mut reader,&mut observations,RequestKind::State,
+        let state = rpc(&mut stdin,&mut reader,&mut observations,state_request,
             generation,paths,plan,budget,evidence).await?;
-        let mcp = rpc(&mut stdin,&mut reader,&mut observations,RequestKind::McpList,
+        let mcp = rpc(&mut stdin,&mut reader,&mut observations,mcp_request,
             generation,paths,plan,budget,evidence).await?;
-        rpc(&mut stdin,&mut reader,&mut observations,RequestKind::DebugAgent,
+        rpc(&mut stdin,&mut reader,&mut observations,debug_request,
             generation,paths,plan,budget,evidence).await?;
         let (tools, extra_sources) = mcp_counts(&mcp)?;
         evidence.record(json!({"event":"mode_observation","generation":generation,

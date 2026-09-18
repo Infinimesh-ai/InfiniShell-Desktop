@@ -1,10 +1,12 @@
 //! 固定 Grok SDK MCP 反向通道；只转换已注册连接的工具，不把观察快照当作子任务权限。
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
+
+use super::super::grok_tool_lease::{GrokToolLeaseLedger, VerifiedGrokToolLease};
 
 use super::{
     INSPECT_TOOL_NAME, LocalToolPermissions, LocalToolReplyTarget, MAX_ARGUMENT_BYTES,
@@ -54,10 +56,10 @@ pub(crate) struct GrokMcpBridge {
 }
 
 impl GrokMcpBridge {
-    pub(crate) fn new(runtime_generation: Uuid, permissions: LocalToolPermissions) -> Self {
+    pub(crate) fn new(process_epoch: Uuid, permissions: LocalToolPermissions) -> Self {
         // allow_spawn 请求不能代替 Grok 创建时固定的权限证明；当前始终拒绝派发。
         Self {
-            server_id: format!("infinishell-{runtime_generation}"),
+            server_id: format!("infinishell-{process_epoch}"),
             allow_message: permissions.allow_message,
             outer_requests: HashMap::new(),
             inner_requests: HashMap::new(),
@@ -75,9 +77,67 @@ impl GrokMcpBridge {
         json!([{"name":MCP_SERVER_NAME,"serverId":self.server_id}])
     }
 
-    /// 回合来源须由调用方先完成协议关联验证；不能用当前活跃回合代替缺失的来源标记。
-    /// 工具输入和未经验证的 MCP 元数据都不能声明身份；当前真实 SDK 来源链尚待验证。
-    pub(crate) fn receive(
+    /// 初始化与目录请求没有业务来源；封闭的方法列表不能访问已缓存的业务请求。
+    pub(crate) fn receive_registration(
+        &mut self,
+        message: &Value,
+    ) -> Result<GrokMcpRequest, String> {
+        let params = &message["params"];
+        let inner = &params["message"];
+        if !closed(message, &["jsonrpc", "id", "method", "params"])
+            || !closed(params, &["serverId", "message"])
+            || !closed(inner, &["jsonrpc", "id", "method", "params"])
+            || !matches!(
+                inner["method"].as_str(),
+                Some("initialize" | "server/discover" | "tools/list" | "ping")
+            )
+        {
+            return Err("不是封闭的 Grok MCP 注册请求".into());
+        }
+        self.receive(message, None)
+    }
+
+    /// 先模拟租约事务，再验证现有 MCP 协议；协议拒绝不能消费原生租约。
+    pub(crate) fn receive_with_lease(
+        &mut self,
+        message: &Value,
+        ledger: &mut GrokToolLeaseLedger,
+        now: Instant,
+    ) -> Result<(GrokMcpRequest, VerifiedGrokToolLease), String> {
+        let mut candidate = ledger.clone();
+        let proof = match candidate.bind_sdk(message, now) {
+            Ok(proof) => proof,
+            Err(error) => {
+                // 协议事务可以回滚，旧进程能力的退休不能回滚。
+                if candidate.is_retired() {
+                    ledger.retire();
+                }
+                return Err(error);
+            }
+        };
+        candidate.verify_bound(&proof, &self.server_id, &message["params"]["message"]["id"])?;
+        let outcome = self.receive(message, Some(proof.turn_id()))?;
+        *ledger = candidate;
+        Ok((outcome, proof))
+    }
+
+    /// 工具结果只能回到同进程、同内层事务的租约；真实写入确认仍由 transport 单独报告。
+    pub(crate) fn reply_with_lease(
+        &mut self,
+        request: &NativeLocalToolRequest,
+        result: Result<Value, String>,
+        ledger: &GrokToolLeaseLedger,
+        proof: &VerifiedGrokToolLease,
+    ) -> Result<Vec<Value>, String> {
+        let LocalToolReplyTarget::Grok { mcp_id, .. } = &request.reply_target else {
+            return Err("工具回复不属于 Grok 租约".into());
+        };
+        ledger.verify_bound(proof, &self.server_id, mcp_id)?;
+        self.reply(request, result, Some(proof.turn_id()))
+    }
+
+    /// 内部协议转换仅供注册与租约入口调用；生产调用者不能直接填入活动回合。
+    fn receive(
         &mut self,
         message: &Value,
         verified_turn_id: Option<&str>,
@@ -309,7 +369,7 @@ impl GrokMcpBridge {
     }
 
     /// 只回复来源已验证、仍未关闭且内容未变的原生工具；派发写入不是 CLI 接收 ACK。
-    pub(crate) fn reply(
+    fn reply(
         &mut self,
         request: &NativeLocalToolRequest,
         result: Result<Value, String>,
@@ -461,6 +521,12 @@ fn complete_modern_response(response: &mut Value, method: &str) {
         json!({"io.modelcontextprotocol/serverInfo":{
         "name":MCP_SERVER_NAME,"version":"0.1.0"}})
     });
+}
+
+fn closed(value: &Value, keys: &[&str]) -> bool {
+    value.as_object().is_some_and(|fields| {
+        fields.len() == keys.len() && fields.keys().all(|key| keys.contains(&key.as_str()))
+    })
 }
 
 fn envelope(id: Value, mcp_response: Value) -> Value {

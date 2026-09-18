@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
+const crypto = require("node:crypto");
 const plugin = require("../../app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs");
 
 const fixtures = path.join(__dirname, "../../specs/cli-agent-parity/fixtures");
@@ -27,6 +28,32 @@ function normalized(event, fields = {}) {
     ...fields,
   }, environment(event));
 }
+
+test("真实 session_start 上报版本匹配随附 manifest 与 manager 最低版本", () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname,
+    "../../app/assets/bundled/cli-agent-plugins/grok/.grok-plugin/plugin.json"), "utf8"));
+  const manager = fs.readFileSync(path.join(__dirname,
+    "../../app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs"), "utf8");
+  // 解析实际 minimum 方法返回的标识符，再读取其声明，不能在测试中抄版本常量。
+  const method = manager.match(/fn minimum_plugin_version\(&self\) -> &'static str\s*\{\s*([A-Z_]+)\s*\}/);
+  assert.ok(method, "manager 最低版本方法形状必须明确");
+  const declaration = manager.match(new RegExp(`const ${method[1]}: &str = "([^"]+)";`));
+  assert.ok(declaration, "manager 最低版本声明必须明确");
+  const notification = plugin.makeNotification(normalized("session_start"), {});
+  assert.equal(notification.event, "session_start");
+  assert.equal(notification.plugin_version, manifest.version);
+  assert.equal(notification.plugin_version, declaration[1]);
+});
+
+test("固定 0.1.0 通知脚本保留父提交原字节和旧版本上报", () => {
+  const file = path.join(fixtures, "grok-plugin-0.1.0-notify.cjs");
+  assert.equal(crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex"),
+    "134fd490e7396157c80c2a33bd9d8a88397881e6f926743319fafe6c0df5ccd8");
+  const legacy = require(file);
+  const input = legacy.normalize({ hookEventName: "session_start", sessionId: "session-test" },
+    environment("session_start"));
+  assert.equal(legacy.makeNotification(input, {}).plugin_version, "0.1.0");
+});
 
 test("真实额度错误和关闭回调不会变成完成", () => {
   const state = {};

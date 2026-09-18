@@ -232,7 +232,7 @@ fn failures_remain_native_tool_errors_on_both_protocols() {
 
 #[test]
 fn grok_tool_error_remains_a_nested_mcp_error_without_claiming_native_receipt() {
-    // Grok 回复目标和转换模块只存在于测试编译，不代表生产适配器已接线。
+    // 回复序列化已进入生产构建，仍不代表 transport 已写入或原生工具已完成。
     let response = tool_reply(
         LocalToolReplyTarget::Grok {
             request_id: json!("reverse-7"),
@@ -247,4 +247,72 @@ fn grok_tool_error_remains_a_nested_mcp_error_without_claiming_native_receipt() 
     assert_eq!(response["result"]["result"]["isError"], true);
     assert!(response["result"].get("message").is_none());
     assert!(response.get("native_receipt").is_none());
+}
+
+#[test]
+fn grok_dispatcher_never_promotes_unknown_spawn_floor_from_call_time_permissions() {
+    let codex = codex_tool_request(
+        &codex_message(
+            RUN_AGENTS.name,
+            json!({
+        "summary":"审查","base_prompt":"检查","harness":"codex",
+        "agent_run_configs":[{"name":"review","prompt":"检查改动"}]}),
+        ),
+        "native-session",
+        "turn-1",
+    )
+    .unwrap();
+    let mut allowed = context();
+    allowed.allow_spawn = true;
+    assert!(matches!(
+        bind_local_tool_call(codex.clone(), &allowed)
+            .unwrap()
+            .operation,
+        LocalToolOperation::Spawn(_)
+    ));
+    let mut grok = codex;
+    grok.reply_target = LocalToolReplyTarget::Grok {
+        request_id: json!(4),
+        mcp_id: json!(2),
+    };
+    assert!(bind_local_tool_call(grok.clone(), &allowed).is_err());
+    grok.arguments["parent_task_id"] = json!("claimed-parent");
+    assert!(bind_local_tool_call(grok, &allowed).is_err());
+}
+
+#[test]
+fn grok_dispatcher_preserves_serialized_reply_targets_and_shared_task_boundaries() {
+    let request = NativeLocalToolRequest {
+        reply_target: LocalToolReplyTarget::Grok {
+            request_id: json!(4),
+            mcp_id: json!(2),
+        },
+        call_id: "authenticated-grok-call".into(),
+        turn_id: "turn-1".into(),
+        tool: SEND_MESSAGE.name.into(),
+        arguments: json!({"addresses":["parent"],"subject":"进度","message":"中文\nSecond line"}),
+    };
+    let restored: NativeLocalToolRequest = serde_json::from_value(json!(request)).unwrap();
+    assert_eq!(restored, request);
+    let first = bind_local_tool_call(restored.clone(), &context()).unwrap();
+    assert_eq!(
+        first.message_id,
+        bind_local_tool_call(request.clone(), &context())
+            .unwrap()
+            .message_id
+    );
+    let LocalToolOperation::Send(sent) = first.operation else {
+        panic!("消息未进入共同分发器");
+    };
+    assert_eq!(sent.addresses, vec!["parent".to_string()]);
+    assert_eq!(sent.message, "中文\nSecond line");
+    let mut denied = context();
+    denied.allow_message = false;
+    assert!(bind_local_tool_call(restored.clone(), &denied).is_err());
+    let mut stale = context();
+    stale.active_turn_id = "different-turn".into();
+    assert!(bind_local_tool_call(restored.clone(), &stale).is_err());
+    let mut unrelated = restored;
+    unrelated.arguments["addresses"] = json!(["stranger"]);
+    assert!(bind_local_tool_call(unrelated, &context()).is_err());
 }

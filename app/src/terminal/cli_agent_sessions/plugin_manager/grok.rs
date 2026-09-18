@@ -7,6 +7,7 @@ use std::{env, fs, io};
 
 use async_trait::async_trait;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 #[cfg(not(target_family = "wasm"))]
 use {
     command::{Output, r#async::Command},
@@ -19,8 +20,14 @@ use super::{CliAgentPluginManager, PluginInstallError, PluginInstructionStep, Pl
 use crate::util::path::resolve_executable_in_path;
 
 const PLUGIN_NAME: &str = "infinishell-grok";
-const PLUGIN_VERSION: &str = "0.1.0";
+const PLUGIN_VERSION: &str = "0.1.1";
 const TESTED_GROK_VERSION: &str = "1.0.30";
+// 只认可此次发布前的完整 0.1.0 配方，不能把任意旧版说明当作应用来源。
+const LEGACY_README_SHA256: &str =
+    "2db65e9c54c35725ba1164edb39daf9645bfdf7f1d3cd2689b8e338853c2e8b7";
+// 历史通知脚本只按固定 0.1.0 原字节认可，当前脚本的版本修复不能写回旧来源。
+const LEGACY_NOTIFY_SHA256: &str =
+    "134fd490e7396157c80c2a33bd9d8a88397881e6f926743319fafe6c0df5ccd8";
 const BUNDLED_FILES: &[(&str, &str)] = &[
     (
         ".grok-plugin/plugin.json",
@@ -44,7 +51,7 @@ pub(super) struct GrokPluginManager {
     path_env_var: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct InstalledPlugin {
     path: PathBuf,
     source: PathBuf,
@@ -187,6 +194,13 @@ impl GrokPluginManager {
         )
         .await?;
 
+        // 只读校验的 await 期间也可能收到新的禁用或注册意图，不能沿用起始状态。
+        if plugin_disabled(&grok_home).map_err(|error| file_error(error, &log))?
+            || registered_plugin(&grok_home).map_err(|_| invalid_state_error(&log))? != previous
+        {
+            return Err(invalid_state_error(&log));
+        }
+
         let Some(previous) = previous else {
             self.install_source(&executable, &source, &mut log).await?;
             return verify_installed(&grok_home, PLUGIN_VERSION, &log);
@@ -200,89 +214,15 @@ impl GrokPluginManager {
         if !updating {
             return Err(invalid_state_error(&log));
         }
-        // 旧来源必须仍是应用拥有的完整已知配方，不备份或覆盖未知脚本。
-        validate_owned_source(&previous, &source_root).map_err(|_| invalid_state_error(&log))?;
-        validate_expected_tree(&previous.path, &previous.version)
-            .map_err(|_| invalid_state_error(&log))?;
-        let recovery =
-            backup_plugin(&previous.path, &source_root).map_err(|error| file_error(error, &log))?;
-        let removed = self
-            .run(
-                &executable,
-                &[
-                    OsStr::new("plugin"),
-                    OsStr::new("uninstall"),
-                    OsStr::new("--keep-data"),
-                    OsStr::new(PLUGIN_NAME),
-                ],
-                Duration::from_secs(30),
-                &mut log,
-            )
-            .await;
-        if removed.is_err() && verify_installed(&grok_home, &previous.version, &log).is_ok() {
-            return Err(operation_error(&log));
-        }
-        let attempted = if removed.is_ok() {
-            self.install_source(&executable, &source, &mut log).await
-        } else {
-            Err(operation_error(&log))
-        };
-        if attempted.is_ok() && verify_installed(&grok_home, PLUGIN_VERSION, &log).is_ok() {
-            return Ok(());
-        }
-
-        // 原生 local update 不更新复制文件；安装失败后用受控备份恢复，不回写全局配置快照。
-        match registered_source(&grok_home) {
-            Ok(Some(registered)) if registered == source || registered == previous.source => {
-                // 安装中断可能留下本次操作的注册项，仅清理确知来源的单插件。
-                self.run(
-                    &executable,
-                    &[
-                        OsStr::new("plugin"),
-                        OsStr::new("uninstall"),
-                        OsStr::new("--keep-data"),
-                        OsStr::new(PLUGIN_NAME),
-                    ],
-                    Duration::from_secs(30),
-                    &mut log,
-                )
-                .await?;
-            }
-            Ok(None) => {}
-            Ok(Some(_)) | Err(_) => {
-                return Err(PluginInstallError {
-                    message: crate::t!("cli-agent-plugin-grok-restore-failed"),
-                    log,
-                });
-            }
-        }
-        let was_disabled = plugin_disabled(&grok_home).unwrap_or(true);
-        let restored = self.install_source(&executable, &recovery, &mut log).await;
-        if was_disabled && restored.is_ok() {
-            self.run(
-                &executable,
-                &[
-                    OsStr::new("plugin"),
-                    OsStr::new("disable"),
-                    OsStr::new(PLUGIN_NAME),
-                ],
-                Duration::from_secs(5),
-                &mut log,
-            )
-            .await?;
-        }
-        let restored_version = installed_plugin(&grok_home)
-            .ok()
-            .flatten()
-            .is_some_and(|plugin| plugin.version == previous.version);
-        Err(PluginInstallError {
-            message: if restored.is_ok() && restored_version {
-                crate::t!("cli-agent-plugin-grok-update-restored")
-            } else {
-                crate::t!("cli-agent-plugin-grok-restore-failed")
-            },
-            log,
-        })
+        upgrade_plugin(
+            &grok_home,
+            &previous,
+            &source_root,
+            &source,
+            &(self, executable.as_path()),
+            &mut log,
+        )
+        .await
     }
 }
 
@@ -443,9 +383,11 @@ fn includes_plugin(config: &toml::Value, list: &str) -> io::Result<bool> {
         .iter()
         .map(|name| name.as_str().ok_or_else(invalid))
         .collect::<io::Result<Vec<_>>>()?;
-    Ok(names
-        .into_iter()
-        .any(|name| name == PLUGIN_NAME || name.ends_with(&format!("/{PLUGIN_NAME}"))))
+    Ok(names.into_iter().any(plugin_name_matches))
+}
+
+fn plugin_name_matches(name: &str) -> bool {
+    name == PLUGIN_NAME || name.ends_with(&format!("/{PLUGIN_NAME}"))
 }
 
 fn plugin_disabled(root: &Path) -> io::Result<bool> {
@@ -636,7 +578,13 @@ fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> 
             if serde_json::from_slice::<Value>(contents)? != manifest {
                 return Err(invalid_tree());
             }
-        } else if contents.as_slice() != expected.as_bytes() {
+        } else if contents.as_slice() != expected.as_bytes()
+            && !(version == "0.1.0"
+                && ((*name == "README.md"
+                    && format!("{:x}", Sha256::digest(contents)) == LEGACY_README_SHA256)
+                    || (*name == "hooks/notify.cjs"
+                        && format!("{:x}", Sha256::digest(contents)) == LEGACY_NOTIFY_SHA256)))
+        {
             return Err(invalid_tree());
         }
     }
@@ -655,6 +603,396 @@ fn validate_owned_source(plugin: &InstalledPlugin, source_root: &Path) -> io::Re
     }
     validate_expected_tree(&plugin.source, &plugin.version)?;
     Ok(())
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[derive(Clone, Copy)]
+enum PluginMutation<'a> {
+    Uninstall,
+    Install(&'a Path),
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[async_trait]
+trait PluginMutationRunner: Sync {
+    async fn mutate(
+        &self,
+        mutation: PluginMutation<'_>,
+        log: &mut String,
+    ) -> Result<(), PluginInstallError>;
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[async_trait]
+impl PluginMutationRunner for (&GrokPluginManager, &Path) {
+    async fn mutate(
+        &self,
+        mutation: PluginMutation<'_>,
+        log: &mut String,
+    ) -> Result<(), PluginInstallError> {
+        match mutation {
+            PluginMutation::Install(source) => self.0.install_source(self.1, source, log).await,
+            PluginMutation::Uninstall => {
+                self.0
+                    .run(
+                        self.1,
+                        &[
+                            OsStr::new("plugin"),
+                            OsStr::new("uninstall"),
+                            OsStr::new("--keep-data"),
+                            OsStr::new(PLUGIN_NAME),
+                        ],
+                        Duration::from_secs(30),
+                        log,
+                    )
+                    .await?;
+                Ok(())
+            }
+        }
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[derive(Clone, Debug, PartialEq)]
+struct PluginMutationState {
+    registry: Option<Vec<u8>>,
+    config_contents: Option<Vec<u8>>,
+    config: toml::Value,
+    plugin: Option<InstalledPlugin>,
+    files: Option<PluginTree>,
+    tracked_cache: Option<PluginTree>,
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn optional_file(path: &Path) -> io::Result<Option<Vec<u8>>> {
+    match fs::read(path) {
+        Ok(contents) => Ok(Some(contents)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn plugin_mutation_state(home: &Path, tracked_cache: &Path) -> io::Result<PluginMutationState> {
+    let registry_path = home.join("installed-plugins/registry.json");
+    let config_path = home.join("config.toml");
+    let registry = optional_file(&registry_path)?;
+    let config_contents = optional_file(&config_path)?;
+    let config = read_config(home)?;
+    includes_plugin(&config, "enabled")?;
+    includes_plugin(&config, "disabled")?;
+    let plugin = registered_plugin(home)?;
+    if registered_source(home)?.as_deref() != plugin.as_ref().map(|plugin| plugin.source.as_path())
+    {
+        return Err(invalid_tree());
+    }
+    let files = plugin
+        .as_ref()
+        .map(|plugin| plugin_tree(&plugin.path, true))
+        .transpose()?;
+    let tracked_files = match fs::symlink_metadata(tracked_cache) {
+        Ok(_) => Some(plugin_tree(tracked_cache, true)?),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error),
+    };
+    if plugin
+        .as_ref()
+        .is_some_and(|plugin| plugin.path.as_path() == tracked_cache)
+        && files != tracked_files
+    {
+        return Err(invalid_tree());
+    }
+    if optional_file(&registry_path)? != registry || optional_file(&config_path)? != config_contents
+    {
+        return Err(invalid_tree());
+    }
+    Ok(PluginMutationState {
+        registry,
+        config_contents,
+        config,
+        plugin,
+        files,
+        tracked_cache: tracked_files,
+    })
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn config_without_plugin(config: &toml::Value) -> io::Result<toml::Value> {
+    let mut config = config.clone();
+    let table = config.as_table_mut().ok_or_else(invalid_tree)?;
+    if let Some(plugins) = table.get_mut("plugins") {
+        let plugins = plugins.as_table_mut().ok_or_else(invalid_tree)?;
+        for name in ["enabled", "disabled"] {
+            if let Some(names) = plugins.get_mut(name) {
+                let names = names.as_array_mut().ok_or_else(invalid_tree)?;
+                if names.iter().any(|name| name.as_str().is_none()) {
+                    return Err(invalid_tree());
+                }
+                names.retain(|name| !name.as_str().is_some_and(plugin_name_matches));
+                if names.is_empty() {
+                    plugins.remove(name);
+                }
+            }
+        }
+        if plugins.is_empty() {
+            table.remove("plugins");
+        }
+    }
+    Ok(config)
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn registry_without_plugin(contents: Option<&[u8]>) -> io::Result<Value> {
+    let mut registry = match contents {
+        Some(contents) => serde_json::from_slice::<Value>(contents)?,
+        None => serde_json::json!({"version":1,"repos":{}}),
+    };
+    let repos = registry
+        .get_mut("repos")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(invalid_tree)?;
+    repos.retain(|_, repo| {
+        !repo
+            .get("plugins")
+            .and_then(Value::as_object)
+            .is_some_and(|plugins| plugins.contains_key(PLUGIN_NAME))
+    });
+    Ok(registry)
+}
+
+#[cfg(not(target_family = "wasm"))]
+struct PluginUpgradeGuard<'a> {
+    home: &'a Path,
+    tracked_cache: &'a Path,
+    original_cache: PluginTree,
+    sources: Vec<(&'a Path, PluginTree)>,
+    registry_without_plugin: Value,
+    config_without_plugin: toml::Value,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl PluginUpgradeGuard<'_> {
+    fn check_boundary(&self, state: &PluginMutationState) -> io::Result<()> {
+        if plugin_mutation_state(self.home, self.tracked_cache)? != *state
+            || includes_plugin(&state.config, "disabled")?
+            || registry_without_plugin(state.registry.as_deref())? != self.registry_without_plugin
+            || config_without_plugin(&state.config)? != self.config_without_plugin
+        {
+            return Err(invalid_tree());
+        }
+        for (source, expected) in &self.sources {
+            if plugin_tree(source, false)? != *expected {
+                return Err(invalid_tree());
+            }
+        }
+        Ok(())
+    }
+
+    async fn mutate(
+        &self,
+        state: &mut PluginMutationState,
+        mutation: PluginMutation<'_>,
+        runner: &impl PluginMutationRunner,
+        log: &mut String,
+    ) -> Result<Result<(), PluginInstallError>, PluginInstallError> {
+        self.check_boundary(state)
+            .map_err(|_| upgrade_state_error(log))?;
+        match mutation {
+            PluginMutation::Uninstall => {
+                if state.plugin.is_none() {
+                    return Err(upgrade_state_error(log));
+                }
+            }
+            PluginMutation::Install(source) => {
+                if state.plugin.is_some() || !self.sources.iter().any(|(path, _)| *path == source) {
+                    return Err(upgrade_state_error(log));
+                }
+            }
+        }
+        let result = runner.mutate(mutation, log).await;
+        let next = plugin_mutation_state(self.home, self.tracked_cache)
+            .map_err(|_| upgrade_state_error(log))?;
+        self.check_boundary(&next)
+            .map_err(|_| upgrade_state_error(log))?;
+        // 只允许本命令能产生的注册与已知缓存子集；同 source_path 不能证明用户新内容属于本操作。
+        if let Some(plugin) = &next.plugin {
+            let expected = match mutation {
+                PluginMutation::Uninstall => {
+                    if state.plugin.as_ref() != Some(plugin) {
+                        return Err(upgrade_state_error(log));
+                    }
+                    state
+                        .files
+                        .as_ref()
+                        .ok_or_else(|| upgrade_state_error(log))?
+                }
+                PluginMutation::Install(source) => {
+                    let actual_source = plugin
+                        .source
+                        .canonicalize()
+                        .map_err(|_| upgrade_state_error(log))?;
+                    let expected_source = source
+                        .canonicalize()
+                        .map_err(|_| upgrade_state_error(log))?;
+                    if state.plugin.is_some() || actual_source != expected_source {
+                        return Err(upgrade_state_error(log));
+                    }
+                    let expected = self
+                        .sources
+                        .iter()
+                        .find(|(path, _)| *path == source)
+                        .map(|(_, tree)| tree)
+                        .ok_or_else(|| upgrade_state_error(log))?;
+                    let manifest = expected
+                        .get(".grok-plugin/plugin.json")
+                        .ok_or_else(|| upgrade_state_error(log))?;
+                    let manifest: Value = serde_json::from_slice(&manifest.contents)
+                        .map_err(|_| upgrade_state_error(log))?;
+                    if manifest.get("version").and_then(Value::as_str)
+                        != Some(plugin.version.as_str())
+                    {
+                        return Err(upgrade_state_error(log));
+                    }
+                    expected
+                }
+            };
+            let files = next
+                .files
+                .as_ref()
+                .ok_or_else(|| upgrade_state_error(log))?;
+            // 新缓存的原生权限没有提前声明；记录真实权限用于下一边界，不猜复制策略。
+            let permissions_must_match = matches!(mutation, PluginMutation::Uninstall);
+            let unknown_file = files.iter().any(|(name, file)| {
+                !expected.get(name).is_some_and(|expected| {
+                    expected.contents == file.contents
+                        && (!permissions_must_match || expected.permissions == file.permissions)
+                })
+            });
+            if unknown_file {
+                return Err(upgrade_state_error(log));
+            }
+        }
+        let tracked_is_registered = next
+            .plugin
+            .as_ref()
+            .is_some_and(|plugin| plugin.path.as_path() == self.tracked_cache);
+        if !tracked_is_registered {
+            if let Some(files) = &next.tracked_cache {
+                if files
+                    .iter()
+                    .any(|(name, file)| self.original_cache.get(name) != Some(file))
+                {
+                    return Err(upgrade_state_error(log));
+                }
+            }
+            let tracked_was_registered = state
+                .plugin
+                .as_ref()
+                .is_some_and(|plugin| plugin.path.as_path() == self.tracked_cache);
+            if !tracked_was_registered && next.tracked_cache != state.tracked_cache {
+                return Err(upgrade_state_error(log));
+            }
+        }
+        *state = next;
+        Ok(result)
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn upgrade_state_error(log: &str) -> PluginInstallError {
+    PluginInstallError {
+        message: crate::t!("cli-agent-plugin-grok-restore-failed"),
+        log: log.to_owned(),
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+async fn upgrade_plugin(
+    home: &Path,
+    previous: &InstalledPlugin,
+    source_root: &Path,
+    source: &Path,
+    runner: &impl PluginMutationRunner,
+    log: &mut String,
+) -> Result<(), PluginInstallError> {
+    validate_owned_source(previous, source_root).map_err(|_| invalid_state_error(log))?;
+    let old_tree = validate_expected_tree(&previous.path, &previous.version)
+        .map_err(|_| invalid_state_error(log))?;
+    let old_source = validate_expected_tree(&previous.source, &previous.version)
+        .map_err(|_| invalid_state_error(log))?;
+    let new_source =
+        validate_expected_tree(source, PLUGIN_VERSION).map_err(|_| invalid_state_error(log))?;
+    let mut state =
+        plugin_mutation_state(home, &previous.path).map_err(|_| invalid_state_error(log))?;
+    if state.plugin.as_ref() != Some(previous)
+        || state.files.as_ref() != Some(&old_tree)
+        || !includes_plugin(&state.config, "enabled").map_err(|_| invalid_state_error(log))?
+        || includes_plugin(&state.config, "disabled").map_err(|_| invalid_state_error(log))?
+    {
+        return Err(invalid_state_error(log));
+    }
+    let recovery =
+        backup_plugin(&previous.path, source_root).map_err(|error| file_error(error, log))?;
+    let recovery_tree = validate_expected_tree(&recovery, &previous.version)
+        .map_err(|_| invalid_state_error(log))?;
+    if recovery_tree != old_tree {
+        return Err(invalid_state_error(log));
+    }
+    let guard = PluginUpgradeGuard {
+        home,
+        tracked_cache: &previous.path,
+        original_cache: old_tree.clone(),
+        sources: vec![
+            (&previous.source, old_source),
+            (source, new_source),
+            (&recovery, recovery_tree),
+        ],
+        registry_without_plugin: registry_without_plugin(state.registry.as_deref())
+            .map_err(|_| invalid_state_error(log))?,
+        config_without_plugin: config_without_plugin(&state.config)
+            .map_err(|_| invalid_state_error(log))?,
+    };
+    let removed = guard
+        .mutate(&mut state, PluginMutation::Uninstall, runner, log)
+        .await?;
+    if state.plugin.as_ref() == Some(previous) && state.files.as_ref() == Some(&old_tree) {
+        return Err(operation_error(log));
+    }
+    if removed.is_ok() && state.plugin.is_none() {
+        let attempted = guard
+            .mutate(&mut state, PluginMutation::Install(source), runner, log)
+            .await?;
+        if attempted.is_ok() && verify_installed(home, PLUGIN_VERSION, log).is_ok() {
+            guard
+                .check_boundary(&state)
+                .map_err(|_| upgrade_state_error(log))?;
+            return Ok(());
+        }
+    }
+    if state.plugin.is_some() {
+        let cleanup = guard
+            .mutate(&mut state, PluginMutation::Uninstall, runner, log)
+            .await?;
+        if cleanup.is_err() || state.plugin.is_some() {
+            return Err(upgrade_state_error(log));
+        }
+    }
+    let restored = guard
+        .mutate(&mut state, PluginMutation::Install(&recovery), runner, log)
+        .await?;
+    let restored_version =
+        restored.is_ok() && verify_installed(home, &previous.version, log).is_ok();
+    guard
+        .check_boundary(&state)
+        .map_err(|_| upgrade_state_error(log))?;
+    Err(PluginInstallError {
+        message: if restored_version {
+            crate::t!("cli-agent-plugin-grok-update-restored")
+        } else {
+            crate::t!("cli-agent-plugin-grok-restore-failed")
+        },
+        log: log.to_owned(),
+    })
 }
 
 fn replace_plugin_file(path: &Path, file: &PluginFile) -> io::Result<()> {

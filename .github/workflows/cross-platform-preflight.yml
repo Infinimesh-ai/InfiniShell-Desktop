@@ -83,6 +83,8 @@ jobs:
           node --version
           node -e "if (Number(process.versions.node.split('.')[0]) < 18) throw new Error('Node 18+ is required');"
           node --test script/cli-agent-parity/grok_plugin_tests.cjs
+          # Unix 控制终端实测；Windows 的 CONOUT$ 通道须由独立原生验收覆盖。
+          python3 -B script/cli-agent-parity/installed_grok_hook_tests.py -v
 
       - name: Test notification patch file transactions
         shell: bash
@@ -110,6 +112,7 @@ jobs:
           # 官方隔离运行器的 POSIX 权限与私有文件回归，不发起模型请求。
           python3 -B script/cli-agent-parity/grok_official_adapter_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py -v
+          python3 -B script/cli-agent-parity/grok_native_tool_lease_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_policy_preflight_runner_tests.py -v
           python3 -B script/cli-agent-parity/codex_windows_hook_tests.py -v
           python3 -B script/cli-agent-parity/codex_plugin_lifecycle_tests.py -v

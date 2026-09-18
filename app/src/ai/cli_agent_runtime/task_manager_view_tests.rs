@@ -442,10 +442,79 @@ fn managed_typed_history_remains_recoverable_without_automatic_resend() {
     })
     .unwrap();
     assert_eq!(recoverable_parts(&stored), Some(input));
-    // 混合内容以完整 JSON 提供只读预览，不能把图片和技能从文本预览中静默丢掉。
+    // 完整类型仍供还原使用，纯文本恢复不能静默丢弃图片或技能。
     assert!(input_text(&stored).is_none());
     stored.state = LocalCliMessageState::Acknowledged;
     assert!(recoverable_parts(&stored).is_none());
+}
+
+#[test]
+fn mixed_saved_input_preview_preserves_text_and_attachment_types_without_storage_paths() {
+    let mut stored = message(LocalCliMessageState::Acknowledged);
+    let input = vec![
+        InputContent::Text("中文 🧪\nEnglish\n$(literal)".into()),
+        InputContent::LocalImage(PathBuf::from("/scope/local-cli-attachments/internal.png")),
+        InputContent::Skill {
+            name: "review".into(),
+            path: PathBuf::from("/project/.agents/skills/review/SKILL.md"),
+        },
+    ];
+    stored.body = serde_json::to_string(&RuntimeAction::Submit { input }).unwrap();
+    let original_body = stored.body.clone();
+    let preview = message_body_text(&stored);
+    assert_eq!(
+        preview,
+        [
+            "中文 🧪\nEnglish\n$(literal)".to_owned(),
+            crate::t!("cli-task-manager-message-image-attachment"),
+            crate::t!("cli-task-manager-message-skill", skill = "review"),
+        ]
+        .join("\n\n")
+    );
+    assert!(!preview.contains("local-cli-attachments"));
+    assert!(!preview.contains("SKILL.md"));
+    assert_eq!(stored.body, original_body);
+    assert!(recoverable_parts(&stored).is_none());
+    stored.state = LocalCliMessageState::Sent;
+    assert_eq!(recoverable_parts(&stored).unwrap().len(), 3);
+}
+
+#[test]
+fn image_only_and_repeated_attachments_remain_visible_in_saved_preview() {
+    let mut stored = message(LocalCliMessageState::Sent);
+    stored.body = serde_json::to_string(&RuntimeAction::Submit {
+        input: vec![
+            InputContent::LocalImage(PathBuf::from("/scope/first.png")),
+            InputContent::LocalImage(PathBuf::from("/scope/second.png")),
+        ],
+    })
+    .unwrap();
+    let image = crate::t!("cli-task-manager-message-image-attachment");
+    assert_eq!(message_body_text(&stored), format!("{image}\n\n{image}"));
+    assert!(input_text(&stored).is_none());
+}
+
+#[test]
+fn steer_preview_preserves_multiple_text_blocks_and_named_skill() {
+    let mut stored = message(LocalCliMessageState::Sent);
+    stored.body = serde_json::to_string(&RuntimeAction::Steer {
+        expected_turn_id: "native-turn".into(),
+        input: vec![
+            InputContent::Text("第一段\nsecond line".into()),
+            InputContent::Skill {
+                name: "中文 review".into(),
+                path: PathBuf::from("/private/skill/SKILL.md"),
+            },
+            InputContent::Text("后续指令".into()),
+        ],
+    })
+    .unwrap();
+    let skill = crate::t!("cli-task-manager-message-skill", skill = "中文 review");
+    assert_eq!(
+        message_body_text(&stored),
+        format!("第一段\nsecond line\n\n{skill}\n\n后续指令")
+    );
+    assert!(!message_body_text(&stored).contains("native-turn"));
 }
 
 #[test]

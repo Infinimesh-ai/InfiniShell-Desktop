@@ -5652,6 +5652,8 @@ cli-task-manager-message-acknowledged = 已记录确认状态
 cli-task-manager-message-failed = 发送失败
 cli-task-manager-message-cancelled = 已取消
 cli-task-manager-message-unknown = 状态未知
+cli-task-manager-message-image-attachment = 图片附件
+cli-task-manager-message-skill = 技能：{ $skill }
 
 cli-agent-task-skill-unavailable = 技能 { $skill } 缺失、未启用、重复或内容无效。
 cli-agent-task-skill-local-required = 技能 { $skill } 必须可作为本地文件访问。

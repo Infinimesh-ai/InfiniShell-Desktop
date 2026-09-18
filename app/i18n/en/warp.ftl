@@ -5840,6 +5840,8 @@ cli-task-manager-message-acknowledged = Acknowledgement recorded
 cli-task-manager-message-failed = Delivery failed
 cli-task-manager-message-cancelled = Cancelled
 cli-task-manager-message-unknown = Status unknown
+cli-task-manager-message-image-attachment = Image attachment
+cli-task-manager-message-skill = Skill: { $skill }
 
 cli-agent-task-skill-unavailable = Skill { $skill } is missing, inactive, duplicated, or invalid.
 cli-agent-task-skill-local-required = Skill { $skill } must be available as a local file.

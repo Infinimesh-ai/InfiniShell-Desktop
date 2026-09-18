@@ -2,6 +2,8 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::ffi::OsString;
+#[cfg(test)]
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use command::Stdio;
@@ -21,6 +23,9 @@ use super::{
     TurnOutcome, channels,
 };
 
+use super::grok_tool_lease::{GrokToolLeaseLedger, GrokToolLeaseState, VerifiedGrokToolLease};
+use super::local_tools::{GrokMcpBridge, GrokMcpRequest, MCP_SERVER_NAME, NativeLocalToolRequest};
+
 const VERIFIED_VERSION: &str = "1.0.30";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -29,13 +34,20 @@ const MAX_NATIVE_IDENTITIES: usize = 16_384;
 const MAX_QUEUED_PROMPTS: usize = 32;
 const SNAPSHOT_RETRY_INTERVAL: Duration = Duration::from_millis(250);
 
-/// 仅验证连接、新建与能力来源；产品入口仍须关闭未通过真实验收的托管回合。
+/// 验证固定版本、原生生命周期及独占 SDK 租约；产品能力另由协调器门禁控制。
 pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeError> {
     validate_options(&options)?;
-    let (controller, commands, sender, events) = channels(options.generation);
+    Ok(connect_protocol(GrokProtocol::new(options)))
+}
+
+fn connect_protocol(mut protocol: GrokProtocol) -> RuntimeConnection {
+    let (controller, commands, sender, events) = channels(protocol.options.generation);
     let task = Box::pin(async move {
-        let mut protocol = GrokProtocol::new(options);
         let result = run_process(&mut protocol, commands, &sender).await;
+        #[cfg(test)]
+        update_lease_audit(&protocol.lease_audit_for_live, |audit| {
+            audit.protocol_errors += u64::from(result.is_err());
+        });
         let reason = match &result {
             Ok(()) => "runtime connection closed".to_owned(),
             Err(error) => error.to_string(),
@@ -43,11 +55,11 @@ pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeErro
         let _ = sender.try_send(protocol.event(RuntimeEventKind::Disconnected { reason }));
         result
     });
-    Ok(RuntimeConnection {
+    RuntimeConnection {
         controller,
         events,
         task,
-    })
+    }
 }
 
 fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
@@ -67,7 +79,6 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
         || options.permission_ceiling.is_some()
         || options.claude_profile.is_some()
         || options.model.is_some()
-        || options.local_tools.is_some()
         || !options.selected_skills.is_empty()
     {
         return Err(RuntimeError::InvalidConfiguration(crate::t!(
@@ -142,6 +153,14 @@ async fn run_process(
         &protocol.options.cwd,
     )
     .await?;
+    if let Some(sdk) = protocol.sdk.as_mut() {
+        // 只有生产监督器成功派生的独占进程才能提供这次 SDK 能力来源。
+        sdk.owned_process = true;
+        #[cfg(test)]
+        update_lease_audit(&protocol.lease_audit_for_live, |audit| {
+            audit.owned_process_confirmed = true
+        });
+    }
     let mut stdin = child
         .stdin
         .take()
@@ -207,6 +226,9 @@ async fn run_transport(
         flush_effects(protocol, stdin, events, effects).await?;
         if protocol.closed {
             return Ok(());
+        }
+        if protocol.sdk_timed_out(Instant::now()) {
+            return Err(RuntimeError::RequestTimedOut);
         }
         if protocol.request_timed_out() {
             return Err(RuntimeError::RequestTimedOut);
@@ -418,14 +440,20 @@ async fn write_message(
 }
 
 async fn flush_effects(
-    protocol: &GrokProtocol,
+    protocol: &mut GrokProtocol,
     stdin: &mut (impl AsyncWrite + Unpin),
     events: &mpsc::Sender<RuntimeEvent>,
     effects: Effects,
 ) -> Result<(), RuntimeError> {
+    let generation = protocol.options.generation;
+    let native_session_id = protocol.session_id.clone();
     let publish = |kind| {
         events
-            .try_send(protocol.event(kind))
+            .try_send(RuntimeEvent {
+                generation,
+                native_session_id: native_session_id.clone(),
+                kind,
+            })
             .map_err(|error| match error {
                 mpsc::error::TrySendError::Full(_) => RuntimeError::EventBackpressure,
                 mpsc::error::TrySendError::Closed(_) => RuntimeError::ControllerClosed,
@@ -438,6 +466,7 @@ async fn flush_effects(
                 | RuntimeEventKind::TextDelta { .. }
                 | RuntimeEventKind::RequestFailed { .. }
                 | RuntimeEventKind::ApprovalCancelled { .. }
+                | RuntimeEventKind::LocalToolCancelled { .. }
         )
     });
     // 下一轮写入失败不能丢失上一轮真实终态；派发确认与审批决定仍在写入成功后发布。
@@ -446,6 +475,8 @@ async fn flush_effects(
     }
     for message in effects.writes {
         write_message(stdin, &message).await?;
+        // 缓存或生成回复不能证明真实写入；必须在 write_all 和 flush 都成功后登记。
+        protocol.sdk_written_message(&message)?;
         #[cfg(test)]
         if let Some(probe) = &protocol.sdk_origin_probe {
             probe.observe_outbound_transaction(&message, protocol.transaction_context());
@@ -516,6 +547,7 @@ struct PendingApproval {
     turn_id: String,
     tool_call_id: String,
     resolved: bool,
+    lease_permission: Option<Value>,
 }
 
 // 仅反序列化展示所需的实际原生字段，不把账号、路径或扩展凭据元数据带入快照。
@@ -576,6 +608,93 @@ struct ReportedMetadata {
     available_commands: Vec<ReportedCommand>,
 }
 
+fn internal_skills_reload_success(message: &Value) -> bool {
+    let Some(outer) = message.as_object() else {
+        return false;
+    };
+    if outer.len() != 3 || message["jsonrpc"] != "2.0" || message["id"] != "skills-reload" {
+        return false;
+    }
+    let Some(result) = message.get("result").and_then(Value::as_object) else {
+        return false;
+    };
+    let Some(inner) = result.get("result").and_then(Value::as_object) else {
+        return false;
+    };
+    result.len() == 1 && inner.len() == 1 && inner.get("reloaded").and_then(Value::as_u64).is_some()
+}
+
+struct PendingGrokLocalTool {
+    request: NativeLocalToolRequest,
+    proof: VerifiedGrokToolLease,
+    requested_at: Instant,
+    replied: bool,
+    cancelled: bool,
+    closed: bool,
+}
+
+// 隔离原生验收只观察生产状态；计数不参与协议、审批、身份或结果判断。
+#[cfg(test)]
+#[derive(Clone, Default, Serialize)]
+struct GrokLeaseAudit {
+    owned_process_confirmed: bool,
+    capability_confirmed: bool,
+    registration_requests: u64,
+    native_tool_frames: u64,
+    native_initial_inputs: u64,
+    native_complete_inputs: u64,
+    permission_writes_allow: u64,
+    permission_writes_deny: u64,
+    business_dispatches: u64,
+    reply_writes: u64,
+    native_completions: u64,
+    retired: bool,
+    protocol_errors: u64,
+    sdk_origin_observations: u64,
+    full_native_sdk_origin_fields_observed: Option<bool>,
+}
+
+#[cfg(test)]
+fn update_lease_audit(
+    audit: &Option<Arc<Mutex<GrokLeaseAudit>>>,
+    update: impl FnOnce(&mut GrokLeaseAudit),
+) {
+    if let Some(audit) = audit {
+        update(&mut audit.lock().expect("验收计数锁不应损坏"));
+    }
+}
+
+struct GrokSdkConnection {
+    process_epoch: Uuid,
+    bridge: GrokMcpBridge,
+    ledger: Option<GrokToolLeaseLedger>,
+    owned_process: bool,
+    retired: bool,
+    retired_at: Option<Instant>,
+    native_calls: HashSet<String>,
+    calls: HashMap<String, PendingGrokLocalTool>,
+    permissions_to_write: HashMap<[u8; 32], (Value, bool)>,
+    approved_until: HashMap<String, Instant>,
+    replies_to_write: HashMap<String, (VerifiedGrokToolLease, HashSet<[u8; 32]>)>,
+    native_completion_deadlines: HashMap<String, (VerifiedGrokToolLease, Instant)>,
+}
+
+impl GrokSdkConnection {
+    fn schedule_replies(
+        &mut self,
+        proof: VerifiedGrokToolLease,
+        writes: &[Value],
+    ) -> Result<(), RuntimeError> {
+        let fingerprints = writes
+            .iter()
+            .map(message_fingerprint)
+            .collect::<Result<HashSet<_>, _>>()?;
+        self.replies_to_write
+            .insert(proof.native_call_id().to_owned(), (proof, fingerprints));
+        Ok(())
+    }
+}
+
 struct GrokProtocol {
     options: SessionOptions,
     session_id: Option<String>,
@@ -594,6 +713,9 @@ struct GrokProtocol {
     reported_capabilities: Value,
     reported_metadata: ReportedMetadata,
     closed: bool,
+    sdk: Option<GrokSdkConnection>,
+    #[cfg(test)]
+    lease_audit_for_live: Option<Arc<Mutex<GrokLeaseAudit>>>,
     #[cfg(test)]
     queued_submissions: usize,
     #[cfg(test)]
@@ -621,6 +743,23 @@ impl GrokProtocol {
     }
 
     fn new(options: SessionOptions) -> Self {
+        let sdk = options.local_tools.map(|permissions| {
+            let process_epoch = Uuid::new_v4();
+            GrokSdkConnection {
+                process_epoch,
+                bridge: GrokMcpBridge::new(process_epoch, permissions),
+                ledger: None,
+                owned_process: false,
+                retired: false,
+                retired_at: None,
+                native_calls: HashSet::new(),
+                calls: HashMap::new(),
+                permissions_to_write: HashMap::new(),
+                approved_until: HashMap::new(),
+                replies_to_write: HashMap::new(),
+                native_completion_deadlines: HashMap::new(),
+            }
+        });
         Self {
             options,
             session_id: None,
@@ -639,6 +778,9 @@ impl GrokProtocol {
             reported_capabilities: Value::Null,
             reported_metadata: ReportedMetadata::default(),
             closed: false,
+            sdk,
+            #[cfg(test)]
+            lease_audit_for_live: None,
             #[cfg(test)]
             queued_submissions: 0,
             #[cfg(test)]
@@ -646,6 +788,433 @@ impl GrokProtocol {
             #[cfg(test)]
             verified_final_histories_for_live: None,
         }
+    }
+
+    fn sdk_timed_out(&self, now: Instant) -> bool {
+        self.sdk.as_ref().is_some_and(|sdk| {
+            sdk.retired_at
+                .is_some_and(|at| now.duration_since(at) >= REQUEST_TIMEOUT)
+                || sdk.approved_until.values().any(|until| now >= *until)
+                || sdk
+                    .native_completion_deadlines
+                    .values()
+                    .any(|(_, deadline)| now >= *deadline)
+                || sdk.calls.values().any(|call| {
+                    !call.replied && now.duration_since(call.requested_at) >= REQUEST_TIMEOUT
+                })
+        })
+    }
+
+    fn retire_sdk(&mut self, events: &mut Vec<RuntimeEventKind>) {
+        let Some(sdk) = &mut self.sdk else {
+            return;
+        };
+
+        sdk.retired = true;
+        #[cfg(test)]
+        update_lease_audit(&self.lease_audit_for_live, |audit| audit.retired = true);
+        sdk.retired_at.get_or_insert_with(Instant::now);
+        if let Some(turn_id) = self
+            .prompt
+            .as_ref()
+            .and_then(|prompt| prompt.native_id.as_deref())
+        {
+            // 已缓存的回复仍可能写入失败；应用调用账本负责回收所有未闭合调用。
+            sdk.bridge.cancel_turn(turn_id);
+            for (call_id, call) in &mut sdk.calls {
+                if call.request.turn_id == turn_id && !call.cancelled && !call.closed {
+                    call.cancelled = true;
+                    events.push(RuntimeEventKind::LocalToolCancelled {
+                        turn_id: turn_id.to_owned(),
+                        call_id: call_id.clone(),
+                    });
+                }
+            }
+        }
+        if let Some(ledger) = &mut sdk.ledger {
+            ledger.retire();
+        }
+    }
+
+    fn confirm_sdk_turn(&mut self) -> Result<(), RuntimeError> {
+        let Some(prompt) = self
+            .prompt
+            .as_ref()
+            .filter(|prompt| prompt.started && !prompt.finished)
+        else {
+            return Ok(());
+        };
+        let Some(turn_id) = prompt.native_id.as_deref() else {
+            return Ok(());
+        };
+        let Some(sdk) = &mut self.sdk else {
+            return Ok(());
+        };
+
+        if !sdk.retired {
+            sdk.ledger
+                .as_mut()
+                .ok_or_else(|| {
+                    RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
+                })?
+                .begin_turn(self.options.generation, turn_id)
+                .map_err(|_| {
+                    RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
+                })?;
+        }
+        Ok(())
+    }
+
+    fn observe_sdk_native_tool(&mut self, message: &Value) -> Result<(), RuntimeError> {
+        let current_turn = self
+            .prompt
+            .as_ref()
+            .filter(|prompt| prompt.started && !prompt.finished)
+            .and_then(|prompt| prompt.native_id.as_deref());
+        if current_turn.is_none() || message["params"]["_meta"]["promptId"].as_str() != current_turn
+        {
+            return Ok(());
+        }
+        let Some(sdk) = &mut self.sdk else {
+            return Ok(());
+        };
+
+        let update = &message["params"]["update"];
+        let Some(call_id) = update["toolCallId"].as_str() else {
+            return Ok(());
+        };
+        let ours = update["sessionUpdate"] == "tool_call"
+            && update["_meta"]["x.ai/tool"]["name"] == "use_tool"
+            && update["rawInput"]["tool_name"]
+                .as_str()
+                .is_some_and(|name| name.starts_with(&format!("{MCP_SERVER_NAME}__")));
+        if !ours && !sdk.native_calls.contains(call_id) {
+            return Ok(());
+        }
+        if sdk.retired {
+            return Ok(());
+        }
+        #[cfg(test)]
+        let was_closed = sdk
+            .calls
+            .values()
+            .find(|call| call.proof.native_call_id() == call_id)
+            .is_some_and(|call| {
+                sdk.ledger
+                    .as_ref()
+                    .and_then(|ledger| ledger.state(&call.proof).ok())
+                    == Some(GrokToolLeaseState::Closed)
+            });
+        sdk.ledger
+            .as_mut()
+            .ok_or_else(|| RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified")))?
+            .observe_native_tool(message, Instant::now())
+            .map_err(|_| RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified")))?;
+        if update["status"] == "completed" {
+            sdk.approved_until.remove(call_id);
+        }
+        if sdk
+            .native_completion_deadlines
+            .get(call_id)
+            .is_some_and(|(proof, _)| {
+                sdk.ledger
+                    .as_ref()
+                    .and_then(|ledger| ledger.state(proof).ok())
+                    == Some(GrokToolLeaseState::Closed)
+            })
+        {
+            sdk.native_completion_deadlines.remove(call_id);
+        }
+        sdk.native_calls.insert(call_id.to_owned());
+        for call in sdk
+            .calls
+            .values_mut()
+            .filter(|call| call.proof.native_call_id() == call_id)
+        {
+            call.closed = sdk
+                .ledger
+                .as_ref()
+                .and_then(|ledger| ledger.state(&call.proof).ok())
+                == Some(GrokToolLeaseState::Closed);
+        }
+        #[cfg(test)]
+        update_lease_audit(&self.lease_audit_for_live, |audit| {
+            audit.native_tool_frames += 1;
+            audit.native_initial_inputs += u64::from(update["sessionUpdate"] == "tool_call");
+            audit.native_complete_inputs += u64::from(
+                update["sessionUpdate"] == "tool_call_update" && update.get("rawInput").is_some(),
+            );
+            let is_closed = sdk
+                .calls
+                .values()
+                .find(|call| call.proof.native_call_id() == call_id)
+                .is_some_and(|call| {
+                    sdk.ledger
+                        .as_ref()
+                        .and_then(|ledger| ledger.state(&call.proof).ok())
+                        == Some(GrokToolLeaseState::Closed)
+                });
+            audit.native_completions += u64::from(!was_closed && is_closed);
+        });
+        Ok(())
+    }
+
+    fn receive_sdk(&mut self, message: &Value) -> Result<Effects, RuntimeError> {
+        let active_turn = self
+            .prompt
+            .as_ref()
+            .filter(|prompt| {
+                prompt.started
+                    && !prompt.finished
+                    && prompt.completion.is_none()
+                    && prompt.cancel_sent.is_none()
+            })
+            .and_then(|prompt| prompt.native_id.as_deref());
+        let sdk = self.sdk.as_mut().expect("仅注册 SDK 通道进入此分支");
+        if !sdk.owned_process || sdk.retired {
+            return Err(RuntimeError::Protocol(crate::t!(
+                "cli-agent-grok-managed-unverified"
+            )));
+        }
+        if message["params"]["message"]["method"] != "tools/call" {
+            let registration = sdk.bridge.receive_registration(message).map_err(|_| {
+                RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
+            })?;
+            #[cfg(test)]
+            update_lease_audit(&self.lease_audit_for_live, |audit| {
+                audit.registration_requests += 1;
+                audit.capability_confirmed = true;
+            });
+            return match registration {
+                GrokMcpRequest::Immediate(reply) => Ok(Effects {
+                    writes: vec![reply],
+                    events: Vec::new(),
+                }),
+                GrokMcpRequest::Duplicate => Ok(Effects::default()),
+                GrokMcpRequest::Tool(_) => Err(RuntimeError::Protocol(crate::t!(
+                    "cli-agent-grok-managed-unverified"
+                ))),
+            };
+        }
+        let ledger = sdk.ledger.as_mut().ok_or_else(|| {
+            RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
+        })?;
+        let (outcome, proof) = sdk
+            .bridge
+            .receive_with_lease(message, ledger, Instant::now())
+            .map_err(|_| RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified")))?;
+        #[cfg(test)]
+        update_lease_audit(&self.lease_audit_for_live, |audit| {
+            let params = &message["params"];
+            let fields_present = [
+                &message["_meta"],
+                params,
+                &params["_meta"],
+                &params["message"],
+                &params["message"]["_meta"],
+                &params["message"]["params"]["_meta"],
+            ]
+            .into_iter()
+            .any(|carrier| {
+                ["sessionId", "promptId", "toolCallId"]
+                    .into_iter()
+                    .all(|key| carrier[key].as_str().is_some())
+            });
+            audit.sdk_origin_observations += 1;
+            audit.full_native_sdk_origin_fields_observed = Some(
+                audit.full_native_sdk_origin_fields_observed.unwrap_or(true) && fields_present,
+            );
+        });
+        match outcome {
+            GrokMcpRequest::Tool(request) => {
+                if proof.process_epoch() != sdk.process_epoch
+                    || proof.runtime_generation() != self.options.generation
+                    || Some(proof.turn_id()) != active_turn
+                    || request.turn_id != proof.turn_id()
+                    || sdk.calls.contains_key(&request.call_id)
+                {
+                    return Err(RuntimeError::Protocol(crate::t!(
+                        "cli-agent-grok-managed-unverified"
+                    )));
+                }
+                sdk.approved_until.remove(proof.native_call_id());
+                sdk.calls.insert(
+                    request.call_id.clone(),
+                    PendingGrokLocalTool {
+                        request: request.clone(),
+                        proof,
+                        requested_at: Instant::now(),
+                        replied: false,
+                        cancelled: false,
+                        closed: false,
+                    },
+                );
+                #[cfg(test)]
+                update_lease_audit(&self.lease_audit_for_live, |audit| {
+                    audit.business_dispatches += 1
+                });
+                Ok(Effects {
+                    writes: Vec::new(),
+                    events: vec![RuntimeEventKind::LocalToolRequested { request }],
+                })
+            }
+            GrokMcpRequest::Immediate(reply) => {
+                let writes = vec![reply];
+                sdk.approved_until.remove(proof.native_call_id());
+                sdk.schedule_replies(proof, &writes)?;
+                Ok(Effects {
+                    writes,
+                    events: Vec::new(),
+                })
+            }
+            GrokMcpRequest::Duplicate => Ok(Effects::default()),
+        }
+    }
+
+    fn respond_local_tool(
+        &mut self,
+        message_id: Uuid,
+        turn_id: &str,
+        call_id: &str,
+        result: Result<Value, String>,
+    ) -> Effects {
+        let active = self.prompt.as_ref().is_some_and(|prompt| {
+            prompt.started
+                && !prompt.finished
+                && prompt.completion.is_none()
+                && prompt.cancel_sent.is_none()
+                && prompt.native_id.as_deref() == Some(turn_id)
+        });
+        let Some(sdk) = &mut self.sdk else {
+            return rejected_command(message_id, crate::t!("cli-agent-grok-managed-unverified"));
+        };
+
+        let Some(call) = sdk.calls.get(call_id) else {
+            return rejected_command(message_id, crate::t!("cli-agent-grok-managed-unverified"));
+        };
+        if !active
+            || sdk.retired
+            || call.replied
+            || call.request.turn_id != turn_id
+            || call.proof.runtime_generation() != self.options.generation
+        {
+            return rejected_command(message_id, crate::t!("cli-agent-grok-managed-unverified"));
+        }
+        let proof = call.proof.clone();
+        let writes = match sdk.bridge.reply_with_lease(
+            &call.request,
+            result,
+            sdk.ledger.as_ref().expect("业务已有账本"),
+            &proof,
+        ) {
+            Ok(writes) => writes,
+            Err(_) => {
+                return rejected_command(
+                    message_id,
+                    crate::t!("cli-agent-grok-managed-unverified"),
+                );
+            }
+        };
+        if sdk.schedule_replies(proof, &writes).is_err() {
+            return rejected_command(message_id, crate::t!("cli-agent-grok-managed-unverified"));
+        }
+        sdk.calls.get_mut(call_id).expect("已核对本地调用").replied = true;
+        Effects {
+            writes,
+            events: vec![RuntimeEventKind::CommandDispatched {
+                message_id,
+                turn_id: Some(turn_id.to_owned()),
+            }],
+        }
+    }
+
+    fn sdk_written_message(&mut self, message: &Value) -> Result<(), RuntimeError> {
+        let Some(sdk) = &mut self.sdk else {
+            return Ok(());
+        };
+        let hash = message_fingerprint(message)?;
+        if let Some((permission, allowed)) = sdk.permissions_to_write.remove(&hash) {
+            let ledger = sdk.ledger.as_mut().ok_or_else(|| {
+                RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
+            })?;
+            ledger
+                .record_permission(&permission, allowed, Instant::now())
+                .map_err(|_| {
+                    RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
+                })?;
+            #[cfg(test)]
+            update_lease_audit(&self.lease_audit_for_live, |audit| {
+                audit.permission_writes_allow += u64::from(allowed);
+                audit.permission_writes_deny += u64::from(!allowed);
+                audit.retired |= !allowed;
+            });
+            if allowed {
+                sdk.approved_until.insert(
+                    permission["params"]["toolCall"]["toolCallId"]
+                        .as_str()
+                        .expect("审批已核对工具")
+                        .to_owned(),
+                    Instant::now() + REQUEST_TIMEOUT,
+                );
+            } else {
+                sdk.retired = true;
+                sdk.retired_at.get_or_insert_with(Instant::now);
+            }
+        }
+        let mut written = Vec::new();
+        for (call, (_, remaining)) in &mut sdk.replies_to_write {
+            if remaining.remove(&hash) && remaining.is_empty() {
+                written.push(call.clone());
+            }
+        }
+        for call in written {
+            let (proof, _) = sdk.replies_to_write.remove(&call).expect("待写回执存在");
+            #[cfg(test)]
+            let was_closed = sdk
+                .ledger
+                .as_ref()
+                .and_then(|ledger| ledger.state(&proof).ok())
+                == Some(GrokToolLeaseState::Closed);
+            sdk.ledger
+                .as_mut()
+                .expect("已绑定回执已有账本")
+                .record_reply_written(&proof)
+                .map_err(|_| {
+                    RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
+                })?;
+            let native_closed = sdk
+                .ledger
+                .as_ref()
+                .and_then(|ledger| ledger.state(&proof).ok())
+                == Some(GrokToolLeaseState::Closed);
+            if native_closed {
+                sdk.native_completion_deadlines
+                    .remove(proof.native_call_id());
+            } else {
+                // 错误回复也等待原生闭合；真实回写起算，缓存重发不能延长首次期限。
+                sdk.native_completion_deadlines
+                    .entry(proof.native_call_id().to_owned())
+                    .or_insert_with(|| (proof.clone(), Instant::now() + REQUEST_TIMEOUT));
+            }
+            for call in sdk.calls.values_mut().filter(|call| call.proof == proof) {
+                call.closed = sdk
+                    .ledger
+                    .as_ref()
+                    .and_then(|ledger| ledger.state(&proof).ok())
+                    == Some(GrokToolLeaseState::Closed);
+            }
+            #[cfg(test)]
+            update_lease_audit(&self.lease_audit_for_live, |audit| {
+                audit.reply_writes += 1;
+                let is_closed = sdk
+                    .ledger
+                    .as_ref()
+                    .and_then(|ledger| ledger.state(&proof).ok())
+                    == Some(GrokToolLeaseState::Closed);
+                audit.native_completions += u64::from(!was_closed && is_closed);
+            });
+        }
+        Ok(())
     }
 
     fn event(&self, kind: RuntimeEventKind) -> RuntimeEvent {
@@ -667,7 +1236,7 @@ impl GrokProtocol {
     }
 
     fn initialize(&mut self) -> Value {
-        let message = self.request(
+        let mut message = self.request(
             PendingKind::Initialize,
             "initialize",
             json!({
@@ -677,6 +1246,9 @@ impl GrokProtocol {
                 }
             }),
         );
+        if self.sdk.is_some() {
+            message["params"]["clientCapabilities"]["_meta"]["x.ai/mcp/sdk"] = json!(true);
+        }
         #[cfg(test)]
         if let Some(probe) = &self.sdk_origin_probe {
             let mut message = message;
@@ -710,7 +1282,7 @@ impl GrokProtocol {
                 RuntimeError::StaleGeneration.to_string(),
             );
         }
-        // 固定版本的 leader 链已验证；追加输入只排队到后续回合，技能与 SDK 仍不开放。
+        // 追加输入只排队到后续回合；本地工具另由独占进程与原生租约验证。
         self.acp_command(command)
     }
 
@@ -730,6 +1302,26 @@ impl GrokProtocol {
         }
         match command.action {
             RuntimeAction::Shutdown => {
+                let mut sdk_events = Vec::new();
+                self.retire_sdk(&mut sdk_events);
+                if self.sdk.is_some() {
+                    self.closed = true;
+                    sdk_events.push(RuntimeEventKind::CommandDispatched {
+                        message_id: command.message_id,
+                        turn_id: None,
+                    });
+                    sdk_events.extend(self.queued.drain(..).map(|queued| {
+                        RuntimeEventKind::RequestFailed {
+                            message_id: queued.message_id,
+                            message: RuntimeError::ControllerClosed.to_string(),
+                        }
+                    }));
+                    self.cancel_approvals(&mut sdk_events);
+                    return Effects {
+                        writes: Vec::new(),
+                        events: sdk_events,
+                    };
+                }
                 if self.closed
                     || matches!(
                         self.pending.as_ref().map(|request| &request.kind),
@@ -789,6 +1381,7 @@ impl GrokProtocol {
                     };
                 }
                 if self.closed
+                    || self.sdk.as_ref().is_some_and(|sdk| sdk.retired)
                     || self.session_id.is_none()
                     || self.controls.contains_key(&command.message_id)
                     || self.pending.as_ref().is_some_and(|request| {
@@ -860,14 +1453,17 @@ impl GrokProtocol {
                     return Effects::default();
                 }
                 prompt.cancel_sent = Some(Instant::now());
+                let mut cancelled = Vec::new();
+                self.retire_sdk(&mut cancelled);
+                cancelled.push(RuntimeEventKind::CommandDispatched {
+                    message_id: command.message_id,
+                    turn_id: Some(turn_id),
+                });
                 Effects {
                     writes: vec![
                         json!({"jsonrpc": "2.0", "method": "session/cancel", "params": {"sessionId": self.session_id}}),
                     ],
-                    events: vec![RuntimeEventKind::CommandDispatched {
-                        message_id: command.message_id,
-                        turn_id: Some(turn_id),
-                    }],
+                    events: cancelled,
                 }
             }
             RuntimeAction::RespondApproval {
@@ -900,15 +1496,39 @@ impl GrokProtocol {
                         "Grok approval is no longer active".into(),
                     );
                 }
+                if let (Some(sdk), Some(permission)) = (&self.sdk, &approval.lease_permission) {
+                    let verified = !sdk.retired
+                        && sdk.ledger.as_ref().is_some_and(|ledger| {
+                            ledger
+                                .clone()
+                                .record_permission(
+                                    permission,
+                                    decision == ApprovalDecision::AllowOnce,
+                                    Instant::now(),
+                                )
+                                .is_ok()
+                        });
+                    if !verified {
+                        return rejected_command(
+                            command.message_id,
+                            crate::t!("cli-agent-grok-managed-unverified"),
+                        );
+                    }
+                }
                 let option_id = match decision {
                     ApprovalDecision::AllowOnce => "allow-once",
                     ApprovalDecision::DenyOnce => "reject-once",
                 };
                 approval.resolved = true;
+                let response = json!({"jsonrpc": "2.0", "id": approval.native_id, "result": {"outcome": {"outcome": "selected", "optionId": option_id}}});
+                if let (Some(sdk), Some(permission)) = (&mut self.sdk, &approval.lease_permission) {
+                    sdk.permissions_to_write.insert(
+                        message_fingerprint(&response).expect("JSON 审批响应可计算摘要"),
+                        (permission.clone(), decision == ApprovalDecision::AllowOnce),
+                    );
+                }
                 Effects {
-                    writes: vec![
-                        json!({"jsonrpc": "2.0", "id": approval.native_id, "result": {"outcome": {"outcome": "selected", "optionId": option_id}}}),
-                    ],
+                    writes: vec![response],
                     events: vec![
                         RuntimeEventKind::CommandDispatched {
                             message_id: command.message_id,
@@ -921,12 +1541,15 @@ impl GrokProtocol {
                     ],
                 }
             }
-            RuntimeAction::Steer { .. } | RuntimeAction::RespondLocalTool { .. } => {
-                rejected_command(
-                    command.message_id,
-                    crate::t!("cli-agent-grok-managed-unverified"),
-                )
-            }
+            RuntimeAction::RespondLocalTool {
+                turn_id,
+                call_id,
+                result,
+            } => self.respond_local_tool(command.message_id, &turn_id, &call_id, result),
+            RuntimeAction::Steer { .. } => rejected_command(
+                command.message_id,
+                crate::t!("cli-agent-grok-managed-unverified"),
+            ),
         }
     }
 
@@ -958,6 +1581,15 @@ impl GrokProtocol {
 
     fn complete_rpc(&mut self, effects: &mut Effects) {
         self.cancel_approvals(&mut effects.events);
+        if self.sdk.as_ref().is_some_and(|sdk| sdk.retired) {
+            self.closed = true;
+            effects.events.extend(self.queued.drain(..).map(|queued| {
+                RuntimeEventKind::RequestFailed {
+                    message_id: queued.message_id,
+                    message: RuntimeError::ControllerClosed.to_string(),
+                }
+            }));
+        }
         self.prompt = None;
         if !self.closed {
             if let Some(queued) = self.queued.pop_front() {
@@ -1057,6 +1689,28 @@ impl GrokProtocol {
         if !allow_once || !reject_once {
             return Ok(cancelled_permission(id));
         }
+        let lease_permission = if let Some(sdk) = &self.sdk {
+            let ours = params["toolCall"]["rawInput"]["tool_name"]
+                .as_str()
+                .is_some_and(|name| name.starts_with(&format!("{MCP_SERVER_NAME}__")));
+            if ours || sdk.native_calls.contains(call_id.expect("已关联工具")) {
+                if sdk.retired
+                    || !sdk.ledger.as_ref().is_some_and(|ledger| {
+                        ledger
+                            .clone()
+                            .record_permission(message, true, Instant::now())
+                            .is_ok()
+                    })
+                {
+                    return Ok(cancelled_permission(id));
+                }
+                Some(message.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         let turn_id = turn_id.expect("关联成功后必须存在回合").to_owned();
         self.approvals.insert(
             approval_id.clone(),
@@ -1065,6 +1719,7 @@ impl GrokProtocol {
                 turn_id: turn_id.clone(),
                 tool_call_id: call_id.expect("关联成功后必须存在工具调用").to_owned(),
                 resolved: false,
+                lease_permission,
             },
         );
         Ok(Effects {
@@ -1210,12 +1865,20 @@ impl GrokProtocol {
     }
 
     fn finish_transport(&mut self, result: &Result<(), RuntimeError>) -> Effects {
+        let mut sdk_events = Vec::new();
+        self.retire_sdk(&mut sdk_events);
+        if self.sdk.is_some() {
+            self.cancel_approvals(&mut sdk_events);
+        }
         if !self
             .prompt
             .as_ref()
             .is_some_and(|prompt| prompt.completion.is_some())
         {
-            return Effects::default();
+            return Effects {
+                writes: Vec::new(),
+                events: sdk_events,
+            };
         }
         // 正常断开也可能打断最终快照；关闭连接不等于结果已完整，更不等于原生取消。
         self.closed = true;
@@ -1225,6 +1888,7 @@ impl GrokProtocol {
             Err(_) => "native history connection lost",
         };
         let mut effects = self.unverified_final_output(reason);
+        effects.events.extend(sdk_events);
         effects.events.extend(self.queued.drain(..).map(|queued| {
             RuntimeEventKind::RequestFailed {
                 message_id: queued.message_id,
@@ -1556,6 +2220,9 @@ impl GrokProtocol {
         if let Some(id) = &requested_id {
             params["sessionId"] = json!(id);
         }
+        if let Some(sdk) = &self.sdk {
+            params["_meta"]["x.ai/mcp/servers"] = sdk.bridge.registration();
+        }
         #[cfg(test)]
         if let Some(probe) = &self.sdk_origin_probe {
             probe.decorate_open_session(&mut params);
@@ -1604,6 +2271,13 @@ impl GrokProtocol {
             {
                 return Err(RuntimeError::Protocol("invalid Grok server message".into()));
             }
+            if matches!(
+                method.as_str(),
+                Some("x.ai/mcp/sdk_call" | "_x.ai/mcp/sdk_call")
+            ) && self.sdk.is_some()
+            {
+                return self.receive_sdk(&message);
+            }
             if method == "session/request_permission" && message.get("id").is_some() {
                 return self.permission_request(&message);
             }
@@ -1617,6 +2291,10 @@ impl GrokProtocol {
                 });
             }
             return self.notification(&message);
+        }
+        // 固定原生版本会转发 CLI 自己的技能维护响应；它不确认或完成应用请求。
+        if internal_skills_reload_success(&message) {
+            return Ok(Effects::default());
         }
         let id = message
             .get("id")
@@ -1746,7 +2424,26 @@ impl GrokProtocol {
                         })?
                         .to_owned(),
                 };
-                self.session_id = Some(id);
+                self.session_id = Some(id.clone());
+                if let Some(sdk) = &mut self.sdk {
+                    if !sdk.owned_process || sdk.retired {
+                        return Err(RuntimeError::Protocol(crate::t!(
+                            "cli-agent-grok-managed-unverified"
+                        )));
+                    }
+                    sdk.ledger = Some(
+                        GrokToolLeaseLedger::new(
+                            sdk.process_epoch,
+                            self.options.generation,
+                            sdk.bridge.server_id().to_owned(),
+                            MCP_SERVER_NAME.into(),
+                            id,
+                        )
+                        .map_err(|_| {
+                            RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
+                        })?,
+                    );
+                }
                 self.update_metadata(result)?;
                 effects.events.push(RuntimeEventKind::SessionReady {
                     effective_permissions: json!({
@@ -1758,7 +2455,7 @@ impl GrokProtocol {
                             "newSession": true, "emptyHistoryRecovery": true, "closeSession": true,
                             "submit": true, "queuedSubmit": true, "steer": false, "approval": true,
                             "cancel": true, "resume": self.reported_capabilities["loadSession"] == true,
-                            "localTools": false, "childTasks": false
+                            "localTools": self.sdk.is_some(), "childTasks": false
                         }
                     }),
                 });
@@ -1874,7 +2571,11 @@ impl GrokProtocol {
                 .insert(event_id.to_owned(), fingerprint);
         }
         match method {
-            "_x.ai/queue/changed" => self.queue_changed(params),
+            "_x.ai/queue/changed" => {
+                let effects = self.queue_changed(params)?;
+                self.confirm_sdk_turn()?;
+                Ok(effects)
+            }
             "_x.ai/session/prompt_complete" => Ok(self.prompt_complete(
                 params["promptId"].as_str(),
                 params["stopReason"].as_str(),
@@ -1898,7 +2599,10 @@ impl GrokProtocol {
                         decode_metadata(&update["availableCommands"])?;
                 }
                 self.update_metadata(update)?;
-                self.session_update(params)
+                let effects = self.session_update(params)?;
+                self.confirm_sdk_turn()?;
+                self.observe_sdk_native_tool(message)?;
+                Ok(effects)
             }
             // 未知扩展、working/空队列、摘要等不能驱动成功或取消。
             _ => Ok(Effects::default()),
@@ -2140,3 +2844,7 @@ mod sdk_origin_live_tests;
 #[cfg(test)]
 #[path = "grok_policy_preflight_live_tests.rs"]
 mod policy_preflight_live_tests;
+
+#[cfg(all(test, unix))]
+#[path = "grok_native_tool_lease_live_tests.rs"]
+mod native_tool_lease_live_tests;

@@ -26,7 +26,7 @@ SUMMARY = b"test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filter
 def fixture():
     # 合成记录只用于审计负例，不能作为原生协议、模式或权限证明。
     rows = [{"event": "probe_started", "scope": runner.SCOPE, "max_native_inputs": 0,
-        "request_budget": 12, "allowed_methods_sha256": runner.sha(runner.canonical(list(runner.ALLOWED_METHODS))),
+        "request_budget": 14, "allowed_methods_sha256": runner.sha(runner.canonical(list(runner.ALLOWED_METHODS))),
         "guard_before_native_write": True, "production_supervision": True,
         "candidate_source_is_exact_binary": False}]
     sequence = 0
@@ -35,7 +35,7 @@ def fixture():
             "cli_version": runner.VERSION, "cli_sha256": runner.BINARY_SHA256,
             "profile_sha256": PROFILE, "config_sha256": CONFIG,
             "always_approve_requested": False, "auto_mode_requested": False})
-        for method in ("initialize", opening, *runner.DIAGNOSTIC_METHODS):
+        for method in ("initialize", "authenticate", opening, *runner.DIAGNOSTIC_METHODS):
             sequence += 1
             rows.append({"event": "rpc_sent", "generation": generation, "sequence": sequence,
                 "method": method, "rpc_id": sequence, "request_bytes": 80,
@@ -43,6 +43,9 @@ def fixture():
             rows.append({"event": "rpc_response", "generation": generation, "sequence": sequence,
                 "rpc_id": sequence, "status": "ok", "response_bytes": 50,
                 "response_sha256": runner.sha(b"offline-response")})
+            if method == "initialize":
+                rows.append({"event": "auth_method_selected", "generation": generation,
+                    "method_id": "cached_token", "advertised": True, "headless": True})
             if method in runner.DIAGNOSTIC_METHODS:
                 rows.append({"event": "diagnostic_observed", "generation": generation, "method": method,
                     "status": "ok", "top_level_key_sha256s": [runner.sha(b"offline-key")]})
@@ -208,13 +211,13 @@ class PolicyPreflightRunnerTests(unittest.TestCase):
         self.assertNotIn(path, output.getvalue())
 
     def test_protocol_budget_zero_and_invalid_values_reject(self):
-        for budget in (0, -1, 13, False):
+        for budget in (0, -1, 15, False):
             with self.subTest(budget=budget), self.assertRaisesRegex(runner.PreflightRejected, "request_budget_invalid"):
                 runner.make_plan(PROFILE, CONFIG, budget)
         plan = runner.make_plan(PROFILE, CONFIG)
         self.assertEqual(plan["max_native_inputs"], 0)
         self.assertNotIn("session/prompt", plan["allowed_methods"])
-        self.assertNotIn("authenticate", plan["allowed_methods"])
+        self.assertIn("authenticate", plan["allowed_methods"])
 
     def test_stdout_budget_zero_prevents_process_spawn(self):
         with patch.object(runner.subprocess, "Popen") as spawn:
@@ -421,7 +424,7 @@ class NativeFailureDiagnosticTests(unittest.TestCase):
             "session_id": {"type": "absent"}, "global_catalog_closed_empty": True}
 
     def test_four_notification_methods_and_typed_summaries_have_closed_public_projection(self):
-        for method in runner.NOTIFICATION_METHODS - {runner.GLOBAL_CATALOG_METHOD}:
+        for method in runner.NOTIFICATION_METHODS - {runner.GLOBAL_CATALOG_METHOD, runner.SESSION_NOTIFICATION_METHOD}:
             row = self.notification() | {"method": method}
             public, faults = runner.project_events([row])
             self.assertEqual(public, [row])
@@ -430,6 +433,31 @@ class NativeFailureDiagnosticTests(unittest.TestCase):
             result = runner.audit_events(0, SUMMARY, self.insert(row))
             self.assertTrue(result["execution_boundary_passed"])
             self.assertEqual(result["policy"], runner.unknown_policy())
+
+    def session_metadata(self):
+        return self.notification() | {"method": runner.SESSION_NOTIFICATION_METHOD,
+            "method_summary": {"type": "string", "bytes": 26,
+                "sha256": runner.sha(runner.SESSION_NOTIFICATION_METHOD.encode())},
+            "session_notification_metadata_only": True}
+
+    def test_session_metadata_duplicates_do_not_replace_actual_rpc_or_prove_policy(self):
+        rows = self.insert(self.session_metadata())
+        rows.insert(rows.index(event(rows, "process_cleanup", FIRST)), self.session_metadata())
+        result = runner.audit_events(0, SUMMARY, rows)
+        self.assertTrue(result["execution_boundary_passed"])
+        self.assertEqual(result["policy"], runner.unknown_policy())
+        rows.remove(event(rows, "rpc_response", FIRST))
+        self.assertFalse(runner.audit_events(0, SUMMARY, rows)["execution_boundary_passed"])
+
+    def test_session_notification_requires_closed_metadata_proof_and_exact_method(self):
+        for changes in ({"session_notification_metadata_only": False}, {"id_present": True},
+                {"method_summary": self.summary("FOREIGN_METHOD")}, {"generation": FOREIGN}):
+            self.assertFalse(runner.audit_events(0, SUMMARY, self.insert(self.session_metadata() | changes))["execution_boundary_passed"])
+        for changes in ({"rawInput": {"tool": "DO_NOT_EXPORT"}}, {"session_notification_metadata_only": 1},
+                {"method": "_x.ai/session_notification_unknown"}):
+            public, faults = runner.project_events([self.session_metadata() | changes])
+            self.assertEqual(public, [])
+            self.assertEqual(len(faults), 1)
 
     def test_closed_empty_global_catalog_preserves_unknown_policy_without_native_session(self):
         row = self.global_catalog()
@@ -571,6 +599,28 @@ class NativeFailureDiagnosticTests(unittest.TestCase):
             self.assertFalse(result["execution_boundary_passed"])
             self.assertEqual(result["policy"], runner.unknown_policy())
 
+    def test_cancelled_cleanup_null_is_preserved_and_never_normal_success(self):
+        rows = fixture()
+        cleanup = event(rows, "process_cleanup", FIRST)
+        cleanup.update(exit_code=None, exit_reason="stop_requested")
+        self.assertEqual(runner.project_events([cleanup]), ([cleanup], []))
+        result = runner.audit_events(0, SUMMARY, rows)
+        self.assertFalse(result["execution_boundary_passed"])
+        self.assertFalse(result["interface_investigation_completed"])
+        self.assertEqual(result["failure_code"], "cleanup_unconfirmed")
+        self.assertEqual(event(result["events"], "process_cleanup", FIRST), cleanup)
+        result = runner.audit_events(101, b"", rows)
+        self.assertFalse(result["execution_boundary_passed"])
+        self.assertEqual(result["failure_code"], "test_or_projection_failed")
+        self.assertIsNone(event(result["events"], "process_cleanup", FIRST)["exit_code"])
+
+    def test_cleanup_null_does_not_relax_numeric_or_boolean_projection(self):
+        cleanup = event(fixture(), "process_cleanup", FIRST)
+        for value in (True, False, "0", 0.0, -256, 256):
+            public, faults = runner.project_events([cleanup | {"exit_code": value}])
+            self.assertEqual(public, [])
+            self.assertEqual(len(faults), 1)
+
     def test_failed_test_retains_notification_phase_and_drain_summaries_in_metadata(self):
         rows = self.insert(self.notification())
         rows.insert(-1, {"event": "phase_failure", "generation": FIRST, "stage": "drain",
@@ -581,6 +631,166 @@ class NativeFailureDiagnosticTests(unittest.TestCase):
         self.assertEqual(len(result["failure_diagnostics"]["notifications"]), 1)
         self.assertEqual(len(result["failure_diagnostics"]["phase_failures"]), 1)
         self.assertEqual(runner.failure_diagnostics(result["events"]), result["failure_diagnostics"])
+
+
+class OwnedRpcErrorDiagnosticTests(unittest.TestCase):
+    def rows(self):
+        rows = fixture()
+        response = next(row for row in rows if row["event"] == "rpc_response" and row["rpc_id"] == 3)
+        response["status"] = "rpc_error"
+        raw = runner.canonical("OFFLINE_PRIVATE_MESSAGE")
+        diagnostic = {"event": "rpc_error_diagnostic", "generation": FIRST, "sequence": 3, "rpc_id": 3,
+            "method": "session/new", "owned_current_request": True, "error_code": -32602,
+            "message": {"type": "string", "bytes": len(raw), "sha256": runner.sha(raw)},
+            "data": {"type": "absent"}, "response_bytes": response["response_bytes"],
+            "response_sha256": response["response_sha256"]}
+        rows.insert(rows.index(response) + 1, diagnostic)
+        return rows, diagnostic
+
+    def test_owned_error_survives_failed_runner_without_policy_or_body(self):
+        rows, diagnostic = self.rows()
+        result = runner.audit_events(101, b"", rows)
+        self.assertEqual(result["failure_diagnostics"]["rpc_errors"], [{"diagnostic": diagnostic, "ledger_correlated": True}])
+        self.assertFalse(result["execution_boundary_passed"])
+        self.assertEqual(result["policy"], runner.unknown_policy())
+        self.assertNotIn("OFFLINE_PRIVATE_MESSAGE", json.dumps(result))
+        self.assertEqual(runner.audit_events(0, SUMMARY, rows)["failure_code"], "interface_unavailable")
+        for patching in ({"error_code": True}, {"error_code": 2 ** 31}, {"error_code": "-32602"},
+                {"message": "OFFLINE_PRIVATE_MESSAGE"}, {"raw_error": "OFFLINE_PRIVATE_MESSAGE"}):
+            self.assertEqual(runner.project_events([diagnostic | patching])[0], [])
+        self.assertEqual(runner.project_events([diagnostic | {"error_code": None}])[0], [diagnostic | {"error_code": None}])
+
+    def test_duplicate_old_outoforder_or_wrong_method_error_has_no_ledger_proof(self):
+        for change in ("duplicate", "old_generation", "late", "wrong_method", "hash"):
+            rows, diagnostic = self.rows()
+            if change == "duplicate": rows.insert(rows.index(diagnostic), copy.deepcopy(diagnostic))
+            elif change == "old_generation": diagnostic["generation"] = SECOND
+            elif change == "late": rows.remove(diagnostic); rows.insert(-1, diagnostic)
+            elif change == "wrong_method": diagnostic["method"] = "authenticate"
+            else: diagnostic["response_sha256"] = "a" * 64
+            result = runner.audit_events(101, b"", rows)
+            self.assertTrue(all(not row["ledger_correlated"] for row in result["failure_diagnostics"]["rpc_errors"]))
+            self.assertFalse(result["execution_boundary_passed"])
+
+
+class CachedTokenHandshakeTests(unittest.TestCase):
+    def rejected(self, rows, code):
+        result = runner.audit_events(0, SUMMARY, rows)
+        self.assertFalse(result["execution_boundary_passed"])
+        self.assertFalse(result["interface_investigation_completed"])
+        self.assertEqual(result["policy"], runner.unknown_policy())
+        self.assertEqual(result["failure_code"], code)
+        return result
+
+    def test_two_phases_require_fourteen_owned_requests_and_cached_auth_selection(self):
+        rows = fixture()
+        result = runner.audit_events(0, SUMMARY, rows)
+        self.assertTrue(result["execution_boundary_passed"])
+        sent = [row for row in rows if row["event"] == "rpc_sent"]
+        self.assertEqual(len(sent), runner.MAX_REQUESTS)
+        self.assertEqual(runner.MAX_REQUESTS, 14)
+        for generation, opening in ((FIRST, "session/new"), (SECOND, "session/load")):
+            self.assertEqual([row["method"] for row in sent if row["generation"] == generation],
+                ["initialize", "authenticate", opening, *runner.DIAGNOSTIC_METHODS])
+            selection = event(rows, "auth_method_selected", generation)
+            self.assertEqual(selection, {"event": "auth_method_selected", "generation": generation,
+                "method_id": "cached_token", "advertised": True, "headless": True})
+        self.assertEqual(result["policy"], runner.unknown_policy())
+
+    def test_authentication_method_projection_is_closed_without_credential_arguments(self):
+        selection = event(fixture(), "auth_method_selected")
+        self.assertEqual(runner.project_events([selection]), ([selection], []))
+        for patching in ({"method_id": "xai.api_key"}, {"method_id": "interactive"},
+                {"params": {"token": "OFFLINE_PRIVATE_TOKEN"}}, {"sessionId": "OFFLINE_SESSION"}):
+            public, faults = runner.project_events([selection | patching])
+            self.assertEqual(public, [])
+            self.assertEqual(len(faults), 1)
+            self.assertNotIn("OFFLINE_", json.dumps(faults))
+
+    def test_missing_duplicate_or_unadvertised_selection_cannot_complete_probe(self):
+        rows = fixture()
+        rows.remove(event(rows, "auth_method_selected", FIRST))
+        self.rejected(rows, "auth_method_unproved")
+        rows = fixture()
+        selection = event(rows, "auth_method_selected", FIRST)
+        rows.insert(rows.index(selection), copy.deepcopy(selection))
+        self.rejected(rows, "auth_method_unproved")
+        for field in ("advertised", "headless"):
+            rows = fixture()
+            event(rows, "auth_method_selected")[field] = False
+            self.rejected(rows, "auth_method_unproved")
+
+    def test_selection_must_follow_initialize_response_and_precede_auth_write(self):
+        for destination in ("before_initialize", "after_auth_response"):
+            rows = fixture()
+            selection = event(rows, "auth_method_selected")
+            rows.remove(selection)
+            if destination == "before_initialize":
+                rows.insert(rows.index(event(rows, "rpc_response")), selection)
+            else:
+                response = next(row for row in rows if row["event"] == "rpc_response" and row["rpc_id"] == 2)
+                rows.insert(rows.index(response) + 1, selection)
+            self.rejected(rows, "auth_sequence_invalid")
+
+    def test_authentication_response_must_precede_new_and_load_write(self):
+        for generation, rpc_id in ((FIRST, 2), (SECOND, 9)):
+            rows = fixture()
+            response = next(row for row in rows if row["event"] == "rpc_response" and row["rpc_id"] == rpc_id)
+            rows.remove(response)
+            opening = next(row for row in rows if row["event"] == "rpc_sent"
+                and row["generation"] == generation and row["method"] in ("session/new", "session/load"))
+            rows.insert(rows.index(opening) + 1, response)
+            self.rejected(rows, "auth_sequence_invalid")
+
+    def test_missing_auth_rpc_does_not_turn_matching_new_response_into_authentication(self):
+        rows = fixture()
+        rows = [row for row in rows if not (row["event"] in ("rpc_sent", "rpc_response") and row["rpc_id"] == 2)]
+        for row in rows:
+            if row["event"] in ("rpc_sent", "rpc_response") and row["rpc_id"] > 2:
+                row["rpc_id"] -= 1
+                row["sequence"] -= 1
+        event(rows, "probe_finished")["protocol_request_count"] = 13
+        self.rejected(rows, "method_sequence_invalid")
+
+    def test_auth_error_response_is_retained_as_failure_with_unknown_policy(self):
+        for status in ("rpc_error", "auth_required", "method_not_found", "timeout"):
+            rows = fixture()
+            response = next(row for row in rows if row["event"] == "rpc_response" and row["rpc_id"] == 2)
+            response["status"] = status
+            result = self.rejected(rows, "interface_unavailable")
+            self.assertIn(response, result["events"])
+
+    def test_duplicate_stale_or_reordered_auth_response_cannot_claim_new_pending(self):
+        rows = fixture()
+        response = next(row for row in rows if row["event"] == "rpc_response" and row["rpc_id"] == 2)
+        rows.insert(rows.index(response), copy.deepcopy(response))
+        self.rejected(rows, "response_missing")
+        rows = fixture()
+        response = next(row for row in rows if row["event"] == "rpc_response" and row["rpc_id"] == 9)
+        response["generation"] = FIRST
+        self.rejected(rows, "response_uncorrelated")
+        rows = fixture()
+        response = next(row for row in rows if row["event"] == "rpc_response" and row["rpc_id"] == 2)
+        rows.remove(response)
+        rows.insert(rows.index(event(rows, "rpc_sent")), response)
+        self.rejected(rows, "response_uncorrelated")
+
+    def test_old_generation_auth_selection_and_relaxed_booleans_are_rejected(self):
+        rows = fixture()
+        event(rows, "auth_method_selected")["generation"] = FOREIGN
+        self.rejected(rows, "event_generation_invalid")
+        for patching in ({"advertised": 1}, {"headless": "true"}, {"generation": "OFFLINE_OLD_GENERATION"}):
+            selection = event(fixture(), "auth_method_selected") | patching
+            self.assertEqual(runner.project_events([selection])[0], [])
+
+    def test_fourteen_rpc_budget_rejects_stale_twelve_claim_and_fifteenth(self):
+        rows = fixture()
+        event(rows, "probe_started")["request_budget"] = 12
+        self.rejected(rows, "request_ledger_invalid")
+        self.assertEqual(runner.make_plan(PROFILE, CONFIG, 14)["max_protocol_requests"], 14)
+        with self.assertRaisesRegex(runner.PreflightRejected, "request_budget_invalid"):
+            runner.make_plan(PROFILE, CONFIG, 15)
+        self.assertNotIn("session/prompt", runner.make_plan(PROFILE, CONFIG)["allowed_methods"])
 
 
 if __name__ == "__main__":

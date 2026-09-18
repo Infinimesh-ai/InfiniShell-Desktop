@@ -4,7 +4,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const PLUGIN_VERSION = "0.1.1";
+const PLUGIN_VERSION = "0.1.0";
 const MAX_INPUT_BYTES = 1024 * 1024;
 const MAX_TEXT_CHARS = 16000;
 

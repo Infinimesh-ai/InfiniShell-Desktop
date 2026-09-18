@@ -10,10 +10,11 @@ use warp_multi_agent_api as api;
 
 use crate::ai::agent_providers::tools::local_orchestration::{RUN_AGENTS, SEND_MESSAGE};
 
-// 真实 SDK 请求的回合来源尚未验证，协议准备只随纯回归编译，生产不暴露入口。
-#[cfg(test)]
+// 生产桥接的业务入口要求已绑定原生工具租约；协议模块可见不代表连接能力已开放。
 #[path = "grok_local_tools.rs"]
 mod grok;
+
+pub(crate) use grok::{GrokMcpBridge, GrokMcpRequest};
 
 pub(crate) const MCP_SERVER_NAME: &str = "infinishell-local-tasks";
 const INSPECT_TOOL_NAME: &str = "inspect_local_tasks";
@@ -27,18 +28,9 @@ pub(crate) struct LocalToolPermissions {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum LocalToolReplyTarget {
-    Codex {
-        request_id: Value,
-    },
-    Claude {
-        request_id: String,
-        mcp_id: Value,
-    },
-    #[cfg(test)]
-    Grok {
-        request_id: Value,
-        mcp_id: Value,
-    },
+    Codex { request_id: Value },
+    Claude { request_id: String, mcp_id: Value },
+    Grok { request_id: Value, mcp_id: Value },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -237,6 +229,12 @@ pub(crate) fn bind_local_tool_call(
     {
         return Err("本地工具调用的任务身份或回合已过时".to_owned());
     }
+    // Grok 注册、租约与调用时授权均不能替代尚未验证的父任务权限上限。
+    if matches!(&request.reply_target, LocalToolReplyTarget::Grok { .. })
+        && request.tool == RUN_AGENTS.name
+    {
+        return Err("Grok 父任务缺少创建时固定的权限上限，不能派发子任务".into());
+    }
     let encoded = serde_json::to_string(&request.arguments).map_err(|error| error.to_string())?;
     if encoded.len() > MAX_ARGUMENT_BYTES {
         return Err("本地工具参数超过大小限制".to_owned());
@@ -360,7 +358,6 @@ pub(crate) fn tool_reply(target: LocalToolReplyTarget, result: Result<Value, Str
             json!({"jsonrpc":"2.0","id":mcp_id,"result":{
                 "isError":!success,"content":[{"type":"text","text":text}]}}),
         ),
-        #[cfg(test)]
         LocalToolReplyTarget::Grok { request_id, mcp_id } => json!({
             "jsonrpc":"2.0","id":request_id,"result":{
                 "jsonrpc":"2.0","id":mcp_id,"result":{

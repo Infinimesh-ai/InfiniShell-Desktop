@@ -3,6 +3,8 @@ use std::fs;
 use serde_json::json;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 use sha2::{Digest as _, Sha256};
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+use warpui::r#async::FutureExt as _;
 
 use super::*;
 
@@ -27,9 +29,10 @@ fn install_fixture(root: &std::path::Path) -> std::path::PathBuf {
         .next()
         .unwrap()
         .clone();
-    // 仅将真实原生记录的路径和键重定位到测试目录，保留其他原生字段。
+    // 重定位真实注册形状并使用当前随附版本；原始证据保持不变。
     entry["kind"]["source_path"] = json!(source);
     entry["path"] = json!(installed);
+    entry["plugins"][PLUGIN_NAME]["version"] = json!(PLUGIN_VERSION);
     fs::write(
         root.join("installed-plugins/registry.json"),
         serde_json::to_string(&json!({
@@ -53,7 +56,590 @@ fn native_registry_reads_verified_installed_files() {
     let installed = install_fixture(directory.path());
     let plugin = installed_plugin(directory.path()).unwrap().unwrap();
     assert_eq!(plugin.path, installed);
-    assert_eq!(plugin.version, "0.1.0");
+    assert_eq!(plugin.version, PLUGIN_VERSION);
+}
+
+const LEGACY_README: &str =
+    include_str!("../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.0-readme.md");
+const LEGACY_NOTIFY: &str =
+    include_str!("../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.0-notify.cjs");
+
+fn write_legacy_bundle(root: &Path) -> PathBuf {
+    let source = root.join("0.1.0");
+    fs::create_dir_all(&source).unwrap();
+    for (name, contents) in BUNDLED_FILES {
+        let destination = source.join(name);
+        fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        let contents = match *name {
+            ".grok-plugin/plugin.json" => {
+                let mut manifest: Value = serde_json::from_str(contents).unwrap();
+                manifest["version"] = json!("0.1.0");
+                serde_json::to_string(&manifest).unwrap()
+            }
+            "README.md" => LEGACY_README.to_owned(),
+            "hooks/notify.cjs" => LEGACY_NOTIFY.to_owned(),
+            "hooks/hooks.json" => contents.to_string(),
+            name => panic!("旧版配方未定义文件：{name}"),
+        };
+        fs::write(destination, contents).unwrap();
+    }
+    source
+}
+
+#[test]
+fn known_010_source_and_backup_remain_valid_without_rewriting_the_old_recipe() {
+    let directory = tempfile::tempdir().unwrap();
+    let old = write_legacy_bundle(directory.path());
+    let before_tree = plugin_tree(&old, false).unwrap();
+    let before = fs::read(old.join("README.md")).unwrap();
+    assert_eq!(before, LEGACY_README.as_bytes());
+    assert_eq!(
+        fs::read(old.join("hooks/notify.cjs")).unwrap(),
+        LEGACY_NOTIFY.as_bytes()
+    );
+    validate_expected_tree(&old, "0.1.0").unwrap();
+    let backup = backup_plugin(&old, directory.path()).unwrap();
+    validate_expected_tree(&backup, "0.1.0").unwrap();
+    let current = write_bundle(directory.path()).unwrap();
+    validate_expected_tree(&current, PLUGIN_VERSION).unwrap();
+    assert_ne!(current, old);
+    assert_eq!(fs::read(old.join("README.md")).unwrap(), before);
+    assert_eq!(fs::read(backup.join("README.md")).unwrap(), before);
+    assert_eq!(plugin_tree(&old, false).unwrap(), before_tree);
+    assert_eq!(plugin_tree(&backup, false).unwrap(), before_tree);
+    assert_ne!(fs::read(current.join("README.md")).unwrap(), before);
+}
+
+#[test]
+fn legacy_notify_is_byte_exact_and_rejected_for_other_recipe_versions() {
+    assert_eq!(
+        format!("{:x}", Sha256::digest(LEGACY_NOTIFY.as_bytes())),
+        LEGACY_NOTIFY_SHA256
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let old = write_legacy_bundle(directory.path());
+    validate_expected_tree(&old, "0.1.0").unwrap();
+    assert_eq!(
+        fs::read(old.join("hooks/notify.cjs")).unwrap(),
+        LEGACY_NOTIFY.as_bytes()
+    );
+    let current = write_bundle(directory.path()).unwrap();
+    for version in [PLUGIN_VERSION, "0.0.9"] {
+        let mut manifest: Value = serde_json::from_str(BUNDLED_FILES[0].1).unwrap();
+        manifest["version"] = json!(version);
+        fs::write(
+            current.join(".grok-plugin/plugin.json"),
+            serde_json::to_vec(&manifest).unwrap(),
+        )
+        .unwrap();
+        fs::write(current.join("hooks/notify.cjs"), LEGACY_NOTIFY).unwrap();
+        let before = plugin_tree(&current, false).unwrap();
+        assert!(validate_expected_tree(&current, version).is_err());
+        assert_eq!(plugin_tree(&current, false).unwrap(), before);
+    }
+}
+
+#[test]
+fn modified_legacy_readme_is_rejected_and_not_overwritten() {
+    let directory = tempfile::tempdir().unwrap();
+    let old = write_legacy_bundle(directory.path());
+    fs::write(old.join("README.md"), format!("{LEGACY_README}\n用户说明")).unwrap();
+    let before = fs::read(old.join("README.md")).unwrap();
+    assert!(validate_expected_tree(&old, "0.1.0").is_err());
+    write_bundle(directory.path()).unwrap();
+    assert_eq!(fs::read(old.join("README.md")).unwrap(), before);
+}
+
+#[test]
+fn legacy_readme_cannot_prove_the_current_plugin_or_an_unverified_older_version() {
+    let directory = tempfile::tempdir().unwrap();
+    let old = write_legacy_bundle(directory.path());
+    for version in [PLUGIN_VERSION, "0.0.9"] {
+        let mut manifest: Value = BUNDLED_FILES
+            .iter()
+            .find(|(name, _)| *name == ".grok-plugin/plugin.json")
+            .map(|(_, contents)| serde_json::from_str(contents).unwrap())
+            .unwrap();
+        manifest["version"] = json!(version);
+        fs::write(old.join(".grok-plugin/plugin.json"), manifest.to_string()).unwrap();
+        assert!(validate_expected_tree(&old, version).is_err());
+    }
+}
+
+#[test]
+fn valid_legacy_readme_does_not_allow_modified_hooks_or_extra_source_files() {
+    for changed in ["hooks/notify.cjs", "hooks/hooks.json", "user.txt"] {
+        let directory = tempfile::tempdir().unwrap();
+        let old = write_legacy_bundle(directory.path());
+        fs::write(old.join(changed), "用户内容").unwrap();
+        assert!(validate_expected_tree(&old, "0.1.0").is_err());
+        assert_eq!(fs::read_to_string(old.join(changed)).unwrap(), "用户内容");
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+mod migration_async_tests {
+    use std::sync::Mutex;
+
+    use async_trait::async_trait;
+
+    use super::*;
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum Fault {
+        None,
+        DisableAfterUninstall,
+        EditSourceAfterUninstall,
+        EditCacheAfterInstall,
+        EditRegistryAfterInstall,
+        FailBeforeInstall,
+        FailPartialInstall,
+        FailCompleteInstall,
+        FailRecovery,
+    }
+
+    struct MockMutations {
+        home: PathBuf,
+        current_source: PathBuf,
+        legacy_source: PathBuf,
+        template: Value,
+        fault: Fault,
+        calls: Mutex<Vec<&'static str>>,
+    }
+
+    fn legacy_fixture(home: &Path) -> (InstalledPlugin, PathBuf, PathBuf) {
+        let cache = install_fixture(home);
+        let source_root = home.join("source");
+        let legacy = write_legacy_bundle(&source_root);
+        for (name, _) in BUNDLED_FILES {
+            fs::copy(legacy.join(name), cache.join(name)).unwrap();
+        }
+        let registry_path = home.join("installed-plugins/registry.json");
+        let mut registry: Value =
+            serde_json::from_slice(&fs::read(&registry_path).unwrap()).unwrap();
+        registry["repos"]["source-one"]["kind"]["source_path"] = json!(legacy);
+        registry["repos"]["source-one"]["plugins"][PLUGIN_NAME]["version"] = json!("0.1.0");
+        fs::write(registry_path, serde_json::to_vec(&registry).unwrap()).unwrap();
+        let previous = installed_plugin(home).unwrap().unwrap();
+        let current = write_bundle(&source_root).unwrap();
+        (previous, source_root, current)
+    }
+
+    impl MockMutations {
+        fn new(home: &Path, previous: &InstalledPlugin, source: &Path, fault: Fault) -> Self {
+            let registry: Value = serde_json::from_slice(
+                &fs::read(home.join("installed-plugins/registry.json")).unwrap(),
+            )
+            .unwrap();
+            Self {
+                home: home.to_owned(),
+                current_source: source.to_owned(),
+                legacy_source: previous.source.clone(),
+                template: registry["repos"]["source-one"].clone(),
+                fault,
+                calls: Mutex::new(Vec::new()),
+            }
+        }
+
+        fn write_config(&self, enabled: bool, disabled: bool) {
+            let mut config = config_without_plugin(&read_config(&self.home).unwrap()).unwrap();
+            if enabled || disabled {
+                let plugins = config
+                    .as_table_mut()
+                    .unwrap()
+                    .entry("plugins".to_owned())
+                    .or_insert_with(|| toml::Value::Table(Default::default()))
+                    .as_table_mut()
+                    .unwrap();
+                if enabled {
+                    plugins
+                        .entry("enabled".to_owned())
+                        .or_insert_with(|| toml::Value::Array(Vec::new()))
+                        .as_array_mut()
+                        .unwrap()
+                        .push(toml::Value::String(PLUGIN_NAME.to_owned()));
+                }
+                if disabled {
+                    plugins
+                        .entry("disabled".to_owned())
+                        .or_insert_with(|| toml::Value::Array(Vec::new()))
+                        .as_array_mut()
+                        .unwrap()
+                        .push(toml::Value::String(PLUGIN_NAME.to_owned()));
+                }
+            }
+            fs::write(
+                self.home.join("config.toml"),
+                toml::to_string(&config).unwrap(),
+            )
+            .unwrap();
+        }
+    }
+
+    #[async_trait]
+    impl PluginMutationRunner for MockMutations {
+        async fn mutate(
+            &self,
+            mutation: PluginMutation<'_>,
+            log: &mut String,
+        ) -> Result<(), PluginInstallError> {
+            let label = match mutation {
+                PluginMutation::Uninstall => "uninstall",
+                PluginMutation::Install(source) => {
+                    if source == self.current_source.as_path() {
+                        "install_current"
+                    } else {
+                        "install_recovery"
+                    }
+                }
+            };
+            self.calls.lock().unwrap().push(label);
+            // 只模拟异步命令边界与已知四文件注册，不派生进程、不修改全局环境。
+            tokio::task::yield_now().await;
+            if label == "install_current"
+                && matches!(self.fault, Fault::FailBeforeInstall | Fault::FailRecovery)
+            {
+                log.push_str("受控安装命令失败\n");
+                return Err(operation_error(log));
+            }
+            let registry_path = self.home.join("installed-plugins/registry.json");
+            let mut registry: Value =
+                serde_json::from_slice(&fs::read(&registry_path).unwrap()).unwrap();
+            let repos = registry["repos"].as_object_mut().unwrap();
+            match mutation {
+                PluginMutation::Uninstall => {
+                    if let Some(plugin) = registered_plugin(&self.home).unwrap() {
+                        fs::remove_dir_all(plugin.path).unwrap();
+                    }
+                    repos.retain(|_, repo| {
+                        !repo["plugins"]
+                            .as_object()
+                            .unwrap()
+                            .contains_key(PLUGIN_NAME)
+                    });
+                    self.write_config(false, false);
+                }
+                PluginMutation::Install(source) => {
+                    let key = if source == self.current_source.as_path() {
+                        "mock-current"
+                    } else {
+                        "mock-recovery"
+                    };
+                    let cache = self.home.join("installed-plugins").join(key);
+                    fs::create_dir_all(&cache).unwrap();
+                    for (name, _) in BUNDLED_FILES {
+                        let target = cache.join(name);
+                        fs::create_dir_all(target.parent().unwrap()).unwrap();
+                        fs::copy(source.join(name), target).unwrap();
+                    }
+                    let manifest: Value = serde_json::from_slice(
+                        &fs::read(source.join(".grok-plugin/plugin.json")).unwrap(),
+                    )
+                    .unwrap();
+                    let mut entry = self.template.clone();
+                    entry["kind"]["source_path"] = json!(source);
+                    entry["path"] = json!(cache);
+                    entry["plugins"][PLUGIN_NAME]["version"] = manifest["version"].clone();
+                    repos.insert(key.to_owned(), entry);
+                    self.write_config(true, false);
+                    if label == "install_current" && self.fault == Fault::FailPartialInstall {
+                        fs::remove_file(cache.join("README.md")).unwrap();
+                    }
+                    if label == "install_current" && self.fault == Fault::EditCacheAfterInstall {
+                        fs::write(cache.join("README.md"), "用户新说明").unwrap();
+                    }
+                }
+            }
+            if label == "install_current" && self.fault == Fault::EditRegistryAfterInstall {
+                registry["user_revision"] = json!("用户新注册意图");
+            }
+            fs::write(&registry_path, serde_json::to_vec(&registry).unwrap()).unwrap();
+            if label == "uninstall" && self.fault == Fault::DisableAfterUninstall {
+                self.write_config(false, true);
+            }
+            if label == "uninstall" && self.fault == Fault::EditSourceAfterUninstall {
+                fs::write(self.legacy_source.join("README.md"), "用户新来源说明").unwrap();
+            }
+            tokio::task::yield_now().await;
+            let failed_current = label == "install_current"
+                && matches!(
+                    self.fault,
+                    Fault::FailPartialInstall
+                        | Fault::FailCompleteInstall
+                        | Fault::EditCacheAfterInstall
+                        | Fault::EditRegistryAfterInstall
+                );
+            if failed_current || (label == "install_recovery" && self.fault == Fault::FailRecovery)
+            {
+                log.push_str("受控命令返回失败\n");
+                return Err(operation_error(log));
+            }
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn disabled_at_upgrade_boundary_never_mutates_native_state() {
+        let directory = tempfile::tempdir().unwrap();
+        let home = directory.path();
+        let (previous, source_root, source) = legacy_fixture(home);
+        let runner = MockMutations::new(home, &previous, &source, Fault::None);
+        runner.write_config(false, true);
+        let config = fs::read(home.join("config.toml")).unwrap();
+        let registry = fs::read(home.join("installed-plugins/registry.json")).unwrap();
+        let old_cache = plugin_tree(&previous.path, false).unwrap();
+        assert!(
+            upgrade_plugin(
+                home,
+                &previous,
+                &source_root,
+                &source,
+                &runner,
+                &mut String::new()
+            )
+            .await
+            .is_err()
+        );
+        assert!(runner.calls.lock().unwrap().is_empty());
+        assert_eq!(fs::read(home.join("config.toml")).unwrap(), config);
+        assert_eq!(
+            fs::read(home.join("installed-plugins/registry.json")).unwrap(),
+            registry
+        );
+        assert_eq!(plugin_tree(&previous.path, false).unwrap(), old_cache);
+    }
+
+    #[tokio::test]
+    async fn async_disable_stops_upgrade_without_reinstall_or_restore() {
+        let directory = tempfile::tempdir().unwrap();
+        let home = directory.path();
+        let (previous, source_root, source) = legacy_fixture(home);
+        let legacy = plugin_tree(&previous.source, false).unwrap();
+        let runner = MockMutations::new(home, &previous, &source, Fault::DisableAfterUninstall);
+        assert!(
+            upgrade_plugin(
+                home,
+                &previous,
+                &source_root,
+                &source,
+                &runner,
+                &mut String::new()
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(*runner.calls.lock().unwrap(), ["uninstall"]);
+        assert!(plugin_disabled(home).unwrap());
+        assert!(registered_plugin(home).unwrap().is_none());
+        assert_eq!(plugin_tree(&previous.source, false).unwrap(), legacy);
+    }
+
+    #[tokio::test]
+    async fn async_source_edit_is_preserved_without_installing_backup() {
+        let directory = tempfile::tempdir().unwrap();
+        let home = directory.path();
+        let (previous, source_root, source) = legacy_fixture(home);
+        let runner = MockMutations::new(home, &previous, &source, Fault::EditSourceAfterUninstall);
+        assert!(
+            upgrade_plugin(
+                home,
+                &previous,
+                &source_root,
+                &source,
+                &runner,
+                &mut String::new()
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(*runner.calls.lock().unwrap(), ["uninstall"]);
+        assert_eq!(
+            fs::read_to_string(previous.source.join("README.md")).unwrap(),
+            "用户新来源说明"
+        );
+    }
+
+    #[tokio::test]
+    async fn user_cache_edit_during_failed_install_prevents_cleanup() {
+        let directory = tempfile::tempdir().unwrap();
+        let home = directory.path();
+        let (previous, source_root, source) = legacy_fixture(home);
+        let runner = MockMutations::new(home, &previous, &source, Fault::EditCacheAfterInstall);
+        assert!(
+            upgrade_plugin(
+                home,
+                &previous,
+                &source_root,
+                &source,
+                &runner,
+                &mut String::new()
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(
+            *runner.calls.lock().unwrap(),
+            ["uninstall", "install_current"]
+        );
+        let plugin = registered_plugin(home).unwrap().unwrap();
+        assert_eq!(
+            fs::read_to_string(plugin.path.join("README.md")).unwrap(),
+            "用户新说明"
+        );
+    }
+
+    #[tokio::test]
+    async fn concurrent_registry_change_is_preserved_without_rollback() {
+        let directory = tempfile::tempdir().unwrap();
+        let home = directory.path();
+        let (previous, source_root, source) = legacy_fixture(home);
+        let runner = MockMutations::new(home, &previous, &source, Fault::EditRegistryAfterInstall);
+        assert!(
+            upgrade_plugin(
+                home,
+                &previous,
+                &source_root,
+                &source,
+                &runner,
+                &mut String::new()
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(
+            *runner.calls.lock().unwrap(),
+            ["uninstall", "install_current"]
+        );
+        let registry: Value = serde_json::from_slice(
+            &fs::read(home.join("installed-plugins/registry.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(registry["user_revision"], "用户新注册意图");
+    }
+
+    #[tokio::test]
+    async fn failed_upgrade_install_restores_complete_legacy_recipe() {
+        for fault in [
+            Fault::FailBeforeInstall,
+            Fault::FailPartialInstall,
+            Fault::FailCompleteInstall,
+        ] {
+            let directory = tempfile::tempdir().unwrap();
+            let home = directory.path();
+            let (previous, source_root, source) = legacy_fixture(home);
+            let before = plugin_tree(&previous.path, false).unwrap();
+            let legacy = plugin_tree(&previous.source, false).unwrap();
+            let unrelated_config = config_without_plugin(&read_config(home).unwrap()).unwrap();
+            let runner = MockMutations::new(home, &previous, &source, fault);
+            let error = upgrade_plugin(
+                home,
+                &previous,
+                &source_root,
+                &source,
+                &runner,
+                &mut String::new(),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                error.message,
+                crate::t!("cli-agent-plugin-grok-update-restored")
+            );
+            let restored = installed_plugin(home).unwrap().unwrap();
+            assert_eq!(restored.version, "0.1.0");
+            assert!(restored.source.starts_with(source_root.join("recovery")));
+            assert_eq!(plugin_tree(&restored.path, false).unwrap(), before);
+            assert_eq!(plugin_tree(&previous.source, false).unwrap(), legacy);
+            assert_eq!(
+                config_without_plugin(&read_config(home).unwrap()).unwrap(),
+                unrelated_config
+            );
+            assert!(plugin_enabled(home).unwrap());
+            let expected = if fault == Fault::FailBeforeInstall {
+                vec!["uninstall", "install_current", "install_recovery"]
+            } else {
+                vec![
+                    "uninstall",
+                    "install_current",
+                    "uninstall",
+                    "install_recovery",
+                ]
+            };
+            assert_eq!(*runner.calls.lock().unwrap(), expected);
+        }
+    }
+
+    #[tokio::test]
+    async fn failed_restore_command_never_reports_restore_success() {
+        let directory = tempfile::tempdir().unwrap();
+        let home = directory.path();
+        let (previous, source_root, source) = legacy_fixture(home);
+        let runner = MockMutations::new(home, &previous, &source, Fault::FailRecovery);
+        let error = upgrade_plugin(
+            home,
+            &previous,
+            &source_root,
+            &source,
+            &runner,
+            &mut String::new(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            error.message,
+            crate::t!("cli-agent-plugin-grok-restore-failed")
+        );
+        assert_eq!(
+            *runner.calls.lock().unwrap(),
+            ["uninstall", "install_current", "install_recovery"]
+        );
+    }
+
+    #[tokio::test]
+    async fn normal_upgrade_preserves_the_full_old_source_tree() {
+        let directory = tempfile::tempdir().unwrap();
+        let home = directory.path();
+        let (previous, source_root, source) = legacy_fixture(home);
+        fs::write(home.join("config.toml"), "[ui]\nscreen_mode='minimal'\n[plugins]\nenabled=['infinishell-grok','user-other']\ndisabled=['user-disabled']\n[permissions]\nalways_approve=false\n").unwrap();
+        let other_config = config_without_plugin(&read_config(home).unwrap()).unwrap();
+        let registry_path = home.join("installed-plugins/registry.json");
+        let mut registry: Value =
+            serde_json::from_slice(&fs::read(&registry_path).unwrap()).unwrap();
+        registry["repos"]["unrelated"] =
+            json!({"plugins":{"user-other":{"version":"2.0.0"}},"keep":true});
+        fs::write(&registry_path, serde_json::to_vec(&registry).unwrap()).unwrap();
+        let other_registry =
+            registry_without_plugin(Some(&fs::read(&registry_path).unwrap())).unwrap();
+        let before = plugin_tree(&previous.source, false).unwrap();
+        let runner = MockMutations::new(home, &previous, &source, Fault::None);
+        upgrade_plugin(
+            home,
+            &previous,
+            &source_root,
+            &source,
+            &runner,
+            &mut String::new(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            *runner.calls.lock().unwrap(),
+            ["uninstall", "install_current"]
+        );
+        assert_eq!(
+            installed_plugin(home).unwrap().unwrap().version,
+            PLUGIN_VERSION
+        );
+        assert_eq!(plugin_tree(&previous.source, false).unwrap(), before);
+        assert_eq!(
+            config_without_plugin(&read_config(home).unwrap()).unwrap(),
+            other_config
+        );
+        assert_eq!(
+            registry_without_plugin(Some(&fs::read(&registry_path).unwrap())).unwrap(),
+            other_registry
+        );
+    }
 }
 
 #[test]
@@ -127,6 +713,10 @@ fn bundled_version_and_hook_runtime_match_manifest() {
         serde_json::from_str(&fs::read_to_string(source.join(".grok-plugin/plugin.json")).unwrap())
             .unwrap();
     assert_eq!(manifest["version"], PLUGIN_VERSION);
+    assert_eq!(
+        GrokPluginManager::new(None).minimum_plugin_version(),
+        manifest["version"].as_str().unwrap()
+    );
     assert_eq!(BUNDLED_FILES.len(), 4);
     assert!(
         fs::read_to_string(source.join("hooks/hooks.json"))
@@ -489,6 +1079,76 @@ async fn live_grok_production_installer_repairs_and_preserves_disable() {
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
+async fn installed_hook_export_version_probe(
+    manager: &GrokPluginManager,
+    node: &Path,
+    home: &Path,
+    probe_session: &str,
+) -> Value {
+    let plugin = installed_plugin(home).unwrap().unwrap();
+    let before = plugin_tree(&plugin.path, false).unwrap();
+    let script = plugin.path.join("hooks/notify.cjs");
+    let manifest: Value =
+        serde_json::from_slice(&fs::read(plugin.path.join(".grok-plugin/plugin.json")).unwrap())
+            .unwrap();
+    let registry = fs::read(home.join("installed-plugins/registry.json")).unwrap();
+    let config = fs::read(home.join("config.toml")).unwrap();
+    // 真实 Node 加载已安装模块的导出函数；此检查明确不等同 main 的 /dev/tty 通道。
+    let program = r#"
+const hook = require(process.argv[1]);
+const session = process.argv[2];
+const input = hook.normalize({hookEventName:"session_start",sessionId:session}, {
+  WARP_CLI_AGENT_PROTOCOL_VERSION:"1",GROK_HOOK_EVENT:"session_start",GROK_SESSION_ID:session
+});
+process.stdout.write(JSON.stringify(hook.makeNotification(input, {})));
+"#;
+    let mut command = Command::new(node);
+    command
+        .arg("-e")
+        .arg(program)
+        .arg(&script)
+        .arg(probe_session)
+        .env_clear()
+        .kill_on_drop(true);
+    let output = command
+        .output()
+        .with_timeout(Duration::from_secs(5))
+        .await
+        .expect("已安装通知模块检查超时")
+        .expect("已安装通知模块检查无法启动");
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty() && output.stdout.len() <= 4096);
+    let notification: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(notification["v"], 1);
+    assert_eq!(notification["agent"], "grok");
+    assert_eq!(notification["event"], "session_start");
+    assert_eq!(notification["session_id"], probe_session);
+    assert_eq!(notification["plugin_version"], manifest["version"]);
+    assert_eq!(
+        notification["plugin_version"].as_str().unwrap(),
+        manager.minimum_plugin_version()
+    );
+    assert_eq!(plugin_tree(&plugin.path, false).unwrap(), before);
+    assert_eq!(installed_plugin(home).unwrap(), Some(plugin));
+    assert_eq!(
+        fs::read(home.join("installed-plugins/registry.json")).unwrap(),
+        registry
+    );
+    assert_eq!(fs::read(home.join("config.toml")).unwrap(), config);
+    json!({
+        "kind":"installed_module_export_probe", "node_exit_code":output.status.code().unwrap(),
+        "plugin_version":notification["plugin_version"], "installed_manifest_version":manifest["version"],
+        "manager_minimum_plugin_version":manager.minimum_plugin_version(),
+        "installed_notify_sha256":format!("{:x}", Sha256::digest(fs::read(script).unwrap())),
+        "stdout_bytes":output.stdout.len(), "stdout_sha256":format!("{:x}", Sha256::digest(&output.stdout)),
+        "stderr_bytes":output.stderr.len(), "stderr_sha256":format!("{:x}", Sha256::digest(&output.stderr)),
+        "installed_hook_export_version_verified":true, "main_entry_verified":false,
+        "tty_main_validation_required":true, "config_registry_and_cache_unchanged":true,
+        "model_input_submitted":false
+    })
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 async fn run_live_grok_production_installer() {
     let test_name = "terminal::cli_agent_sessions::plugin_manager::grok::tests::live_grok_production_installer_repairs_and_preserves_disable";
     let arguments = env::args().collect::<Vec<_>>();
@@ -586,16 +1246,74 @@ async fn run_live_grok_production_installer() {
 
     manager.install().await.unwrap();
     assert!(manager.is_installed() && !manager.needs_update());
-    let plugin = installed_plugin(&grok_home).unwrap().unwrap();
     let registry_path = grok_home.join("installed-plugins/registry.json");
     let config_path = grok_home.join("config.toml");
-    let registry = fs::read(&registry_path).unwrap();
-    let config = fs::read(&config_path).unwrap();
+    let installed_hook_export = installed_hook_export_version_probe(
+        &manager,
+        &node,
+        &grok_home,
+        "infinishell-installed-hook-install-export-probe",
+    )
+    .await;
     evidence["steps"]
         .as_array_mut()
         .unwrap()
-        .push(json!({"step": "production_install", "passed": true}));
+        .push(json!({"step": "production_install", "passed": true,
+            "installed_hook_export":installed_hook_export, "installed_hook_main_verified":false}));
     fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+
+    // 用完整旧配方建立原生升级夹具；下面仍由生产 update 完成升级。
+    let legacy_source = write_legacy_bundle(&source_root);
+    validate_expected_tree(&legacy_source, "0.1.0").unwrap();
+    let legacy_source_before = plugin_tree(&legacy_source, false).unwrap();
+    manager
+        .run(
+            &grok,
+            &[
+                OsStr::new("plugin"),
+                OsStr::new("uninstall"),
+                OsStr::new("--keep-data"),
+                OsStr::new(PLUGIN_NAME),
+            ],
+            Duration::from_secs(30),
+            &mut native_log,
+        )
+        .await
+        .unwrap();
+    manager
+        .install_source(&grok, &legacy_source, &mut native_log)
+        .await
+        .unwrap();
+    let old = installed_plugin(&grok_home).unwrap().unwrap();
+    assert_eq!(old.version, "0.1.0");
+    assert_eq!(old.source, legacy_source);
+    assert!(manager.is_installed() && manager.needs_update() && manager.can_auto_install());
+    manager.update().await.unwrap();
+    let plugin = installed_plugin(&grok_home).unwrap().unwrap();
+    assert_eq!(plugin.version, PLUGIN_VERSION);
+    assert!(manager.is_installed() && !manager.needs_update());
+    validate_expected_tree(&legacy_source, "0.1.0").unwrap();
+    assert_eq!(
+        plugin_tree(&legacy_source, false).unwrap(),
+        legacy_source_before
+    );
+    let upgraded_hook_export = installed_hook_export_version_probe(
+        &manager,
+        &node,
+        &grok_home,
+        "infinishell-installed-hook-upgrade-export-probe",
+    )
+    .await;
+    evidence["steps"].as_array_mut().unwrap().push(json!({
+        "step":"production_upgrade_known_010_to_011", "passed":true,
+        "installed_hook_export":upgraded_hook_export, "installed_hook_main_verified":false,
+        "previous_plugin_version":"0.1.0", "current_plugin_version":PLUGIN_VERSION,
+        "legacy_source_unchanged":true, "fixture_old_native_install":true,
+        "production_update_call":true, "model_input_submitted":false
+    }));
+    fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+    let registry = fs::read(&registry_path).unwrap();
+    let config = fs::read(&config_path).unwrap();
 
     fs::write(
         plugin.path.join("hooks/notify.cjs"),
@@ -671,6 +1389,8 @@ async fn run_live_grok_production_installer() {
     assert_eq!(fs::read(&config_path).unwrap(), enabled_config);
     assert_eq!(fs::read(&registry_path).unwrap(), enabled_registry);
     evidence["steps"].as_array_mut().unwrap().push(json!({"step": "file_transaction_failure_rollback", "passed": true, "production_apply_call": false, "fault_after_first_replacement": true}));
+    // 已通过的第五段立即落盘，后续恢复失败也不能丢失这段真实检查。
+    fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
     manager.update().await.unwrap();
     assert!(manager.is_installed() && !manager.needs_update());
     assert_eq!(fs::read(&config_path).unwrap(), enabled_config);

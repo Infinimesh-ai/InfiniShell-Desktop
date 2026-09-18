@@ -5,23 +5,23 @@ use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 #[cfg(unix)]
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 #[cfg(unix)]
 use nix::unistd::Uid;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tempfile::NamedTempFile;
 use tokio::sync::Notify;
 use uuid::Uuid;
 
-use super::{Effects, GrokProtocol, cancelled_permission, run_process};
+use super::{cancelled_permission, run_process, Effects, GrokProtocol};
 use crate::ai::cli_agent_runtime::{
-    InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand, RuntimeError, RuntimeEventKind,
-    SessionOptions, SessionTarget, TurnOutcome, channels, managed_process,
+    channels, managed_process, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand,
+    RuntimeError, RuntimeEventKind, SessionOptions, SessionTarget, TurnOutcome,
 };
 
 const SCOPE: &str = "grok_native_sdk_origin_probe";
@@ -410,6 +410,22 @@ fn open_private_response_envelope(root: &Path) -> Result<File, String> {
     }
 }
 
+fn skills_reload_closed_success_shape(message: &Value) -> bool {
+    let Some(outer) = message.as_object() else {
+        return false;
+    };
+    if outer.len() != 3 || message["jsonrpc"] != "2.0" || message["id"] != "skills-reload" {
+        return false;
+    }
+    let Some(result) = message.get("result").and_then(Value::as_object) else {
+        return false;
+    };
+    let Some(inner) = result.get("result").and_then(Value::as_object) else {
+        return false;
+    };
+    result.len() == 1 && inner.len() == 1 && inner.get("reloaded").and_then(Value::as_u64).is_some()
+}
+
 fn private_response_envelope(message: &Value) -> Option<Value> {
     if message.get("method").is_some() {
         return None;
@@ -426,7 +442,9 @@ fn private_response_envelope(message: &Value) -> Option<Value> {
         "result_fields":result.map(|fields|fields.iter().take(MAX_RECORDS).map(|(key,value)|json!({
             "key":super::diagnostic_value(Some(&Value::String(key.clone()))),
             "value_type":super::diagnostic_value_type(Some(value))})).collect::<Vec<_>>()),
-        "error_present":message.get("error").is_some()}),
+        "error_present":message.get("error").is_some(),
+        // 只诊断候选维护成功形状，不接受响应或复制内部计数。
+        "skills_reload_closed_success_shape":skills_reload_closed_success_shape(message)}),
     )
 }
 
@@ -1766,11 +1784,9 @@ async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
         report["private_error_capture_status"] =
             json!(state.private_error_capture_status.unwrap_or("not_observed"));
         report["private_error_response_bytes"] = json!(state.private_error_response_bytes);
-        report["private_response_envelope_status"] = json!(
-            state
-                .private_response_envelope_status
-                .unwrap_or("not_observed")
-        );
+        report["private_response_envelope_status"] = json!(state
+            .private_response_envelope_status
+            .unwrap_or("not_observed"));
         report["private_response_envelope_bytes"] = json!(state.private_response_envelope_bytes);
         report["private_response_envelope_sha256"] = json!(state.private_response_envelope_sha256);
     }
@@ -1874,11 +1890,9 @@ fn malformed_response_shape_is_saved_before_the_jsonrpc_guard() {
     assert_eq!(diagnostic["jsonrpc"]["type"], "boolean");
     assert_eq!(diagnostic["jsonrpc_is_2_0"], false);
     assert_eq!(diagnostic["error_code"], -32603);
-    assert!(
-        !diagnostic
-            .to_string()
-            .contains("OFFLINE_MALFORMED_RESPONSE_BODY")
-    );
+    assert!(!diagnostic
+        .to_string()
+        .contains("OFFLINE_MALFORMED_RESPONSE_BODY"));
     assert_eq!(state.sdk_requests, 0);
     assert_eq!(state.inspect_calls, 0);
 }
@@ -1907,6 +1921,179 @@ fn response_envelope_retains_only_exact_id_and_result_field_shapes() {
     }
     assert!(private_response_envelope(&json!({"method":"session/update","id":1})).is_none());
     assert!(private_response_envelope(&json!({"id":{"body":"OFFLINE_BODY"}})).is_none());
+}
+
+#[test]
+fn maintenance_shape_diagnostic_accepts_u64_boundaries_without_retaining_counts() {
+    for count in [0, u64::MAX] {
+        let envelope = private_response_envelope(
+            &json!({"jsonrpc":"2.0","id":"skills-reload","result":{"result":{"reloaded":count}}}),
+        )
+        .unwrap();
+        assert_eq!(envelope["skills_reload_closed_success_shape"], true);
+        assert_eq!(envelope["result_field_count"], 1);
+        assert_eq!(envelope["result_fields"][0]["value_type"], "object");
+        assert_eq!(envelope.as_object().unwrap().len(), 7);
+        assert!(envelope.get("result").is_none());
+        assert!(envelope.get("reloaded").is_none());
+        assert!(!envelope.to_string().contains("18446744073709551615"));
+    }
+}
+
+#[test]
+fn maintenance_shape_diagnostic_rejects_wrong_identity_and_outer_injections() {
+    let valid = json!({"jsonrpc":"2.0","id":"skills-reload","result":{"result":{"reloaded":0}}});
+    for (key, value) in [
+        ("jsonrpc", json!("1.0")),
+        ("id", json!("OFFLINE_OTHER_ID")),
+        ("id", json!(1)),
+        ("error", Value::Null),
+        ("sessionId", json!("OFFLINE_SESSION")),
+        ("generation", json!("OFFLINE_GENERATION")),
+        ("params", json!({})),
+        ("_meta", json!({})),
+    ] {
+        let mut message = valid.clone();
+        message.as_object_mut().unwrap().insert(key.into(), value);
+        let envelope = private_response_envelope(&message).unwrap();
+        assert_eq!(envelope["skills_reload_closed_success_shape"], false);
+    }
+    let mut method = valid.clone();
+    method["method"] = json!("_x.ai/internal/reload_skills");
+    assert!(!skills_reload_closed_success_shape(&method));
+    assert!(private_response_envelope(&method).is_none());
+    let mut missing = valid;
+    missing.as_object_mut().unwrap().remove("id");
+    assert!(!skills_reload_closed_success_shape(&missing));
+    assert!(private_response_envelope(&missing).is_none());
+}
+
+#[test]
+fn maintenance_shape_diagnostic_rejects_inner_extras_and_missing_wrappers() {
+    for result in [
+        json!({"result":{"reloaded":0},"error":null}),
+        json!({"result":{"reloaded":0,"sessionId":"OFFLINE_SESSION"}}),
+        json!({"result":{"reloaded":0,"generation":"OFFLINE_GENERATION"}}),
+        json!({"result":{"reloaded":0,"error":null}}),
+        json!({"reloaded":0}),
+        json!({"result":{}}),
+        json!({"result":null}),
+        Value::Null,
+    ] {
+        let envelope = private_response_envelope(
+            &json!({"jsonrpc":"2.0","id":"skills-reload","result":result}),
+        )
+        .unwrap();
+        assert_eq!(envelope["skills_reload_closed_success_shape"], false);
+    }
+}
+
+#[test]
+fn maintenance_shape_diagnostic_rejects_non_u64_counts() {
+    for count in [
+        json!(-1),
+        json!(1.0),
+        json!(true),
+        json!("0"),
+        Value::Null,
+        json!([]),
+        json!({"body":"OFFLINE_MODEL_BODY"}),
+        serde_json::from_str::<Value>("18446744073709551616").unwrap(),
+    ] {
+        let envelope = private_response_envelope(
+            &json!({"jsonrpc":"2.0","id":"skills-reload","result":{"result":{"reloaded":count}}}),
+        )
+        .unwrap();
+        assert_eq!(envelope["skills_reload_closed_success_shape"], false);
+        assert!(!envelope.to_string().contains("OFFLINE_MODEL_BODY"));
+    }
+}
+
+#[test]
+fn maintenance_shape_diagnostic_does_not_copy_deep_result_values() {
+    let envelope = private_response_envelope(
+        &json!({"jsonrpc":"2.0","id":"skills-reload","result":{"result":{
+            "reloaded":{"OFFLINE_PRIVATE_KEY":[{"body":"OFFLINE_DEEP_MODEL_BODY"}]}}}}),
+    )
+    .unwrap();
+    assert_eq!(envelope["skills_reload_closed_success_shape"], false);
+    assert_eq!(envelope["result_fields"].as_array().unwrap().len(), 1);
+    assert!(!envelope.to_string().contains("OFFLINE_PRIVATE_KEY"));
+    assert!(!envelope.to_string().contains("OFFLINE_DEEP_MODEL_BODY"));
+}
+
+#[cfg(unix)]
+#[test]
+fn maintenance_shape_diagnostic_preserves_user_pending_and_rejects_unknown_ids() {
+    let root = tempfile::tempdir().unwrap();
+    fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut protocol = GrokProtocol::new(super::tests::options());
+    let probe = SdkOriginProbe::new(protocol.options.generation);
+    probe.state.lock().unwrap().private_response_envelope =
+        Some(open_private_response_envelope(root.path()).unwrap());
+    protocol.sdk_origin_probe = Some(probe.clone());
+    protocol.initialize();
+    let context = protocol.transaction_context();
+    let sent_at = protocol.pending.as_ref().unwrap().sent_at;
+    let response = json!({"jsonrpc":"2.0","id":"skills-reload","result":{"result":{"reloaded":0}}});
+    for _ in 0..2 {
+        let effects = protocol.receive(response.clone()).unwrap();
+        assert!(effects.writes.is_empty() && effects.events.is_empty());
+        assert_eq!(protocol.transaction_context(), context);
+        assert_eq!(protocol.pending.as_ref().unwrap().sent_at, sent_at);
+    }
+    // 兼容已验证的内部维护帧仍不能接纳未知响应或夹带业务身份的帧。
+    for invalid in [
+        json!({"jsonrpc":"2.0","id":"OFFLINE_UNKNOWN_RESPONSE","result":{"result":{"reloaded":0}}}),
+        json!({"jsonrpc":"2.0","id":"skills-reload","error":{"code":-1,"message":"OFFLINE_PRIVATE_ERROR"}}),
+        json!({"jsonrpc":"2.0","id":"skills-reload","result":{"result":{"reloaded":0}},"sessionId":"OFFLINE_NATIVE_SESSION"}),
+    ] {
+        let error = protocol.receive(invalid).err().unwrap();
+        assert_eq!(
+            super::runtime_error_diagnostic(&error)["protocol_failure_kind"],
+            "invalid_response_id"
+        );
+        assert_eq!(protocol.transaction_context(), context);
+        assert_eq!(protocol.pending.as_ref().unwrap().sent_at, sent_at);
+    }
+    assert_eq!(protocol.pending.as_ref().unwrap().id, 1);
+    assert!(protocol.responses.is_empty());
+    let state = probe.state.lock().unwrap();
+    assert_eq!(state.sdk_requests, 0);
+    assert_eq!(state.inspect_calls, 0);
+    assert_eq!(state.permission_requests, 0);
+    assert_eq!(state.private_response_envelope_status, Some("captured"));
+    let raw =
+        fs::read_to_string(root.path().join("private-native-response-envelope.ndjson")).unwrap();
+    assert_eq!(raw.lines().count(), 1);
+    let envelope = serde_json::from_str::<Value>(raw.trim()).unwrap();
+    assert_eq!(envelope["skills_reload_closed_success_shape"], true);
+    assert!(envelope.get("reloaded").is_none());
+    let diagnostic = state.last_native_response_diagnostic.as_ref().unwrap();
+    assert!(!diagnostic.to_string().contains("skills-reload"));
+}
+
+#[cfg(unix)]
+#[test]
+fn maintenance_shape_diagnostic_cannot_replace_the_first_private_response() {
+    let private = NamedTempFile::new().unwrap();
+    let mut state = ProbeState {
+        private_response_envelope: Some(private.as_file().try_clone().unwrap()),
+        ..ProbeState::default()
+    };
+    capture_private_response_envelope(
+        &mut state,
+        &json!({"jsonrpc":"2.0","id":"first","result":{"result":{"reloaded":0}}}),
+    );
+    capture_private_response_envelope(
+        &mut state,
+        &json!({"jsonrpc":"2.0","id":"skills-reload","result":{"result":{"reloaded":0}}}),
+    );
+    let raw = fs::read_to_string(private.path()).unwrap();
+    assert_eq!(raw.lines().count(), 1);
+    let envelope = serde_json::from_str::<Value>(raw.trim()).unwrap();
+    assert_eq!(envelope["id"], "first");
+    assert_eq!(envelope["skills_reload_closed_success_shape"], false);
 }
 
 #[cfg(unix)]
@@ -1998,7 +2185,7 @@ fn private_response_envelope_is_first_only_and_preserves_an_empty_file_on_budget
 #[cfg(unix)]
 #[test]
 fn private_envelope_directory_and_file_refuse_links_existing_files_and_shared_permissions() {
-    use std::os::unix::fs::{PermissionsExt, symlink};
+    use std::os::unix::fs::{symlink, PermissionsExt};
     let root = tempfile::tempdir().unwrap();
     fs::set_permissions(root.path(), fs::Permissions::from_mode(0o755)).unwrap();
     assert!(open_private_response_envelope(root.path()).is_err());
@@ -2114,7 +2301,7 @@ fn oversized_private_error_capture_preserves_an_empty_file() {
 #[cfg(unix)]
 #[test]
 fn private_error_file_refuses_a_symlink_and_never_overwrites_evidence() {
-    use std::os::unix::fs::{PermissionsExt, symlink};
+    use std::os::unix::fs::{symlink, PermissionsExt};
     let root = tempfile::tempdir().unwrap();
     fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let target = NamedTempFile::new().unwrap();
@@ -2243,12 +2430,10 @@ fn sdk_probe_matches_only_two_explicit_wire_methods_and_records_the_actual_metho
         assert_eq!(state.frames[0]["wire_method"], wire);
     }
     let mut probe = SdkOriginProbe::new(Uuid::new_v4());
-    assert!(
-        probe
-            .receive(&json!({"jsonrpc":"2.0", "id":1, "method":"__x.ai/mcp/sdk_call", "params":{}}))
-            .unwrap()
-            .is_none()
-    );
+    assert!(probe
+        .receive(&json!({"jsonrpc":"2.0", "id":1, "method":"__x.ai/mcp/sdk_call", "params":{}}))
+        .unwrap()
+        .is_none());
     assert_eq!(probe.state.lock().unwrap().sdk_requests, 0);
 }
 
@@ -2270,11 +2455,9 @@ fn sdk_initialize_observation_records_only_presence_type_and_boolean_enablement(
         assert_eq!(state.frames[0]["sdk_capability_present"], true);
         assert_eq!(state.frames[0]["sdk_capability_type"], value_type(&value));
         assert_eq!(state.frames[0]["sdk_capability_enabled"], value == true);
-        assert!(
-            !state.frames[0]
-                .to_string()
-                .contains("do-not-record-this-value")
-        );
+        assert!(!state.frames[0]
+            .to_string()
+            .contains("do-not-record-this-value"));
     }
 }
 
@@ -2289,16 +2472,12 @@ fn mcp_status_session_match_requires_a_confirmed_present_native_session() {
     assert_eq!(first["session_id_matches"], false);
     let session = Uuid::new_v4().to_string();
     probe.confirm_runtime_session(&session).unwrap();
-    assert!(
-        probe
-            .confirm_runtime_session(&Uuid::new_v4().to_string())
-            .is_err()
-    );
-    assert!(
-        probe
-            .confirm_runtime_session("Bearer OFFLINE_SESSION_CANARY")
-            .is_err()
-    );
+    assert!(probe
+        .confirm_runtime_session(&Uuid::new_v4().to_string())
+        .is_err());
+    assert!(probe
+        .confirm_runtime_session("Bearer OFFLINE_SESSION_CANARY")
+        .is_err());
     probe
         .receive(&json!({"method":"_x.ai/mcp/init_progress","params":{}}))
         .unwrap();
@@ -2404,11 +2583,9 @@ fn mcp_status_observations_are_bounded_and_only_match_three_exact_native_methods
             .receive(&json!({"method":"_x.ai/mcp/init_progress","params":{"total":total}}))
             .unwrap();
     }
-    assert!(
-        probe
-            .receive(&json!({"method":"_x.ai/mcp/init_progress","params":{"total":MAX_RECORDS}}))
-            .is_err()
-    );
+    assert!(probe
+        .receive(&json!({"method":"_x.ai/mcp/init_progress","params":{"total":MAX_RECORDS}}))
+        .is_err());
     assert_eq!(
         probe.report(None, None)["mcp_status_observation_count"],
         MAX_RECORDS
@@ -2818,12 +2995,10 @@ fn exact_native_tool_frame(session: &str, prompt: &str, tool: &str, initial: boo
 
 fn install_exact_tool_ledger(probe: &mut SdkOriginProbe, session: &str, prompt: &str, tool: &str) {
     for initial in [true, false] {
-        assert!(
-            probe
-                .receive(&exact_native_tool_frame(session, prompt, tool, initial))
-                .unwrap()
-                .is_none()
-        );
+        assert!(probe
+            .receive(&exact_native_tool_frame(session, prompt, tool, initial))
+            .unwrap()
+            .is_none());
     }
 }
 
@@ -2918,8 +3093,8 @@ fn exact_inspect_approval_rejects_missing_confirmed_runtime_ledger_and_closed_wi
 }
 
 #[test]
-fn exact_inspect_approval_rejects_changed_payload_extra_keys_wrong_identity_and_other_allow_options()
- {
+fn exact_inspect_approval_rejects_changed_payload_extra_keys_wrong_identity_and_other_allow_options(
+) {
     for mutation in 0..19 {
         let (mut probe, session, prompt, mut request) = exact_permission_probe();
         match mutation {
@@ -3137,11 +3312,9 @@ fn initial_final_ledger_before_started_does_not_authorize_until_real_runtime_con
     assert!(probe.confirm_runtime_started(&prompt).is_err());
     probe.confirm_runtime_ack(&prompt).unwrap();
     assert!(probe.confirm_runtime_ack(&prompt).is_err());
-    assert!(
-        probe
-            .confirm_runtime_started(&Uuid::new_v4().to_string())
-            .is_err()
-    );
+    assert!(probe
+        .confirm_runtime_started(&Uuid::new_v4().to_string())
+        .is_err());
     probe.confirm_runtime_started(&prompt).unwrap();
     assert!(probe.confirm_runtime_started(&prompt).is_err());
     let allowed = probe
@@ -3201,14 +3374,12 @@ fn calibrated_three_options_offer_permanent_permission_but_select_only_allow_onc
     assert_eq!(report["approval_allow_count"], 1);
     assert_eq!(report["approval_deny_count"], 0);
     assert_eq!(report["approval_all_denied"], false);
-    assert!(
-        report["frames"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .filter(|frame| frame["event"] == "probe_approval_observed")
-            .all(|frame| frame["selected_option_id"] == "allow-once")
-    );
+    assert!(report["frames"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|frame| frame["event"] == "probe_approval_observed")
+        .all(|frame| frame["selected_option_id"] == "allow-once"));
     assert!(!report.to_string().contains("PERMANENT_LABEL_CANARY"));
     assert_eq!(report["native_origin_ledger_relation_verified"], false);
 }
@@ -3286,14 +3457,12 @@ fn exact_search_native_tool_frame(session: &str, prompt: &str, tool: &str, initi
 
 fn install_search_ledger(probe: &mut SdkOriginProbe, session: &str, prompt: &str, tool: &str) {
     for initial in [true, false] {
-        assert!(
-            probe
-                .receive(&exact_search_native_tool_frame(
-                    session, prompt, tool, initial
-                ))
-                .unwrap()
-                .is_none()
-        );
+        assert!(probe
+            .receive(&exact_search_native_tool_frame(
+                session, prompt, tool, initial
+            ))
+            .unwrap()
+            .is_none());
     }
 }
 
@@ -3337,11 +3506,9 @@ fn exact_readonly_search_allows_once_without_becoming_an_inspect_or_sdk_origin()
     assert_eq!(report["native_origin_ledger_relation_verified"], false);
     assert_eq!(report["origin_verification"], "unknown");
     assert!(!probe.state.lock().unwrap().tools["native-search-1"].probe_tool);
-    assert!(
-        !report
-            .to_string()
-            .contains("infinishell-sdk-origin-probe inspect")
-    );
+    assert!(!report
+        .to_string()
+        .contains("infinishell-sdk-origin-probe inspect"));
     assert!(probe.check().is_ok());
 }
 

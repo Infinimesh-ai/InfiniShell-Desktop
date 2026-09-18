@@ -17,6 +17,7 @@ pub(crate) mod conversation_bridge;
 #[cfg(feature = "local_fs")]
 pub(crate) mod coordinator;
 pub(crate) mod grok;
+pub(crate) mod grok_tool_lease;
 pub(crate) mod local_skills;
 pub(crate) mod local_tools;
 pub(crate) mod managed_input;

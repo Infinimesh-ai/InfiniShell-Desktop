@@ -7,7 +7,8 @@ inheritSkills: false
 agentsMd: false
 injectDefaultTools: false
 toolConfig:
-  tools: []
+  tools:
+    - id: GrokBuild:read_file
 skills: []
 mcpServers: []
 mcpInheritance: none

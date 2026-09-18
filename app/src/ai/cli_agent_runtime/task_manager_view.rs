@@ -1968,10 +1968,37 @@ fn draft_can_be_restored(
 
 fn message_body_text(message: &LocalCliMessage) -> String {
     if message.subject == "user_input" {
-        input_text(message).unwrap_or_else(|| message.body.clone())
+        input_preview(message).unwrap_or_else(|| message.body.clone())
     } else {
         message.body.clone()
     }
+}
+
+fn input_preview(message: &LocalCliMessage) -> Option<String> {
+    let action: RuntimeAction = serde_json::from_str(&message.body).ok()?;
+    let input = match action {
+        RuntimeAction::Submit { input } | RuntimeAction::Steer { input, .. } => input,
+        RuntimeAction::Interrupt { .. }
+        | RuntimeAction::RespondApproval { .. }
+        | RuntimeAction::RespondLocalTool { .. }
+        | RuntimeAction::Shutdown => return None,
+    };
+    Some(
+        input
+            .into_iter()
+            .map(|part| match part {
+                InputContent::Text(text) => text,
+                // 历史及复制保留附件类型；持久化路径仍只供原有恢复流程使用。
+                InputContent::LocalImage(_) => {
+                    crate::t!("cli-task-manager-message-image-attachment")
+                }
+                InputContent::Skill { name, .. } => {
+                    crate::t!("cli-task-manager-message-skill", skill = name)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n"),
+    )
 }
 
 fn message_receipt_name(message: &LocalCliMessage) -> String {
